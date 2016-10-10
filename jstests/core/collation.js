@@ -1953,7 +1953,7 @@
         // Create a collection with a non-simple default collation.
         assert.commandWorked(
             sourceDB.runCommand({create: coll.getName(), collation: {locale: "en", strength: 2}}));
-        const sourceCollectionInfos = sourceDB.getCollectionInfos({name: coll.getName()});
+        var sourceCollectionInfos = sourceDB.getCollectionInfos({name: coll.getName()});
 
         assert.writeOK(sourceDB[coll.getName()].insert({_id: "FOO"}));
         assert.writeOK(sourceDB[coll.getName()].insert({_id: "bar"}));
@@ -1963,7 +1963,13 @@
 
         assert.commandWorked(
             sourceDB.adminCommand({copydb: 1, fromdb: sourceDB.getName(), todb: destDB.getName()}));
-        const destCollectionInfos = destDB.getCollectionInfos({name: coll.getName()});
+        var destCollectionInfos = destDB.getCollectionInfos({name: coll.getName()});
+
+        // The namespace for the _id index will differ since the source and destination collections
+        // are in different databases.
+        delete sourceCollectionInfos[0].idIndex.ns;
+        delete destCollectionInfos[0].idIndex.ns;
+
         assert.eq(sourceCollectionInfos, destCollectionInfos);
         assert.eq([{_id: "FOO"}], destDB[coll.getName()].find({_id: "foo"}).toArray());
     }

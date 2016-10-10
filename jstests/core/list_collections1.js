@@ -32,6 +32,40 @@
     assert.eq('object', typeof(collObj.options));
     assert.eq('collection', collObj.type, tojson(collObj));
     assert.eq(false, collObj.info.readOnly, tojson(collObj));
+    assert.eq("object", typeof(collObj.idIndex), tojson(collObj));
+    assert(collObj.idIndex.hasOwnProperty("v"), tojson(collObj));
+
+    //
+    // Test basic command output for views.
+    //
+
+    assert.commandWorked(mydb.createView("bar", "foo", []));
+    res = mydb.runCommand("listCollections");
+    assert.commandWorked(res);
+    collObj = res.cursor.firstBatch.filter(function(c) {
+        return c.name === "bar";
+    })[0];
+    assert(collObj);
+    assert.eq("object", typeof(collObj.options), tojson(collObj));
+    assert.eq("foo", collObj.options.viewOn, tojson(collObj));
+    assert.eq([], collObj.options.pipeline, tojson(collObj));
+    assert.eq("view", collObj.type, tojson(collObj));
+    assert.eq(true, collObj.info.readOnly, tojson(collObj));
+    assert(!collObj.hasOwnProperty("idIndex"), tojson(collObj));
+
+    //
+    // Test basic command output for system.indexes.
+    //
+
+    collObj = res.cursor.firstBatch.filter(function(c) {
+        return c.name === "system.indexes";
+    })[0];
+    if (collObj) {
+        assert.eq("object", typeof(collObj.options), tojson(collObj));
+        assert.eq("collection", collObj.type, tojson(collObj));
+        assert.eq(false, collObj.info.readOnly, tojson(collObj));
+        assert(!collObj.hasOwnProperty("idIndex"), tojson(collObj));
+    }
 
     //
     // Test basic usage with DBCommandCursor.

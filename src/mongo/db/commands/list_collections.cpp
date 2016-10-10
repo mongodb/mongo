@@ -46,6 +46,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/cursor_request.h"
 #include "mongo/db/query/cursor_response.h"
@@ -166,6 +167,11 @@ BSONObj buildCollectionBson(OperationContext* txn, const Collection* collection)
 
     BSONObj info = BSON("readOnly" << storageGlobalParams.readOnly);
     b.append("info", info);
+
+    auto idIndex = collection->getIndexCatalog()->findIdIndex(txn);
+    if (idIndex) {
+        b.append("idIndex", idIndex->infoObj());
+    }
 
     return b.obj();
 }
