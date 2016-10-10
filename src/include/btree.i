@@ -1167,7 +1167,37 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * There is no point doing an in-memory split unless there is a lot of
 	 * data in the last skiplist on the page.  Split if there are enough
 	 * items and the skiplist does not fit within a single disk page.
-	 *
+	 */
+
+	ins_head = page->type == WT_PAGE_ROW_LEAF ?
+	    (page->pg_row_entries == 0 ?
+	    WT_ROW_INSERT_SMALLEST(page) :
+	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1)) :
+	    WT_COL_APPEND(page);
+	if (ins_head == NULL)
+		return (false);
+
+	/*
+	 * In the extreme case, where the page is much larger than the maximum
+	 * size, split as soon as there are 5 items on the page.
+	 */
+#define	WT_MAX_SPLIT_COUNT	5
+	if (page->memory_footprint > btree->maxleafpage * 2) {
+		for (count = 0, ins = ins_head->head[0];
+		    ins != NULL;
+		    ins = ins->next[0]) {
+			if (++count < WT_MAX_SPLIT_COUNT)
+				continue;
+
+			WT_STAT_CONN_INCR(session, cache_inmem_splittable);
+			WT_STAT_DATA_INCR(session, cache_inmem_splittable);
+			return (true);
+		}
+
+		return (false);
+	}
+
+	/*
 	 * Rather than scanning the whole list, walk a higher level, which
 	 * gives a sample of the items -- at level 0 we have all the items, at
 	 * level 1 we have 1/4 and at level 2 we have 1/16th.  If we see more
@@ -1177,15 +1207,9 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 #define	WT_MIN_SPLIT_COUNT	30
 #define	WT_MIN_SPLIT_MULTIPLIER 16      /* At level 2, we see 1/16th entries */
 
-	ins_head = page->type == WT_PAGE_ROW_LEAF ?
-	    (page->pg_row_entries == 0 ?
-	    WT_ROW_INSERT_SMALLEST(page) :
-	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1)) :
-	    WT_COL_APPEND(page);
-	if (ins_head == NULL)
-		return (false);
 	for (count = 0, size = 0, ins = ins_head->head[WT_MIN_SPLIT_DEPTH];
-	    ins != NULL; ins = ins->next[WT_MIN_SPLIT_DEPTH]) {
+	    ins != NULL;
+	    ins = ins->next[WT_MIN_SPLIT_DEPTH]) {
 		count += WT_MIN_SPLIT_MULTIPLIER;
 		size += WT_MIN_SPLIT_MULTIPLIER *
 		    (WT_INSERT_KEY_SIZE(ins) + WT_UPDATE_MEMSIZE(ins->upd));

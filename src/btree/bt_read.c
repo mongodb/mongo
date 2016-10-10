@@ -328,10 +328,13 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 		return (false);
 
 	/*
-	 * If we have already tried and the transaction state has not moved on,
-	 * eviction is highly likely to fail.
+	 * Allow some leeway if the transaction ID isn't moving forward since
+	 * it is unlikely eviction will be able to evict the page. Don't keep
+	 * skipping the page indefinitely or large records can lead to
+	 * extremely large memory footprints.
 	 */
-	if (page->modify->last_eviction_id == __wt_txn_oldest_id(session))
+	if (page->memory_footprint < btree->maxmempage &&
+	    page->modify->last_eviction_id == __wt_txn_oldest_id(session))
 		return (false);
 
 	if (page->memory_footprint < btree->maxmempage)
