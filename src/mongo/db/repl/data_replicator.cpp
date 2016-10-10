@@ -419,7 +419,9 @@ Timestamp DataReplicator::_applyUntilAndPause(Timestamp untilTimestamp) {
 void DataReplicator::_resetState_inlock(OperationContext* txn, OpTimeWithHash lastAppliedOpTime) {
     invariant(!_anyActiveHandles_inlock());
     _lastApplied = _lastFetched = lastAppliedOpTime;
-    _oplogBuffer->clear(txn);
+    if (_oplogBuffer) {
+        _oplogBuffer->clear(txn);
+    }
 }
 
 void DataReplicator::setScheduleDbWorkFn_forTest(const CollectionCloner::ScheduleDbWorkFn& work) {
