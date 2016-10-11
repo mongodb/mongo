@@ -153,7 +153,12 @@ void NetworkInterfaceASIO::startup() {
             try {
                 LOG(2) << "The NetworkInterfaceASIO worker thread is spinning up";
                 asio::io_service::work work(_io_service);
-                _io_service.run();
+                std::error_code ec;
+                _io_service.run(ec);
+                if (ec) {
+                    severe() << "Failure in _io_service.run(): " << ec.message();
+                    fassertFailed(40335);
+                }
             } catch (...) {
                 severe() << "Uncaught exception in NetworkInterfaceASIO IO "
                             "worker thread of type: "
@@ -364,7 +369,13 @@ Status NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cb
                 const auto adjustedTimeout = op->_request.timeout - getConnectionDuration;
                 const auto requestId = op->_request.id;
 
-                op->_timeoutAlarm = op->_owner->_timerFactory->make(&op->_strand, adjustedTimeout);
+                try {
+                    op->_timeoutAlarm =
+                        op->_owner->_timerFactory->make(&op->_strand, adjustedTimeout);
+                } catch (std::system_error& e) {
+                    severe() << "Failed to construct timer for AsyncOp: " << e.what();
+                    fassertFailed(40334);
+                }
 
                 std::shared_ptr<AsyncOp::AccessControl> access;
                 std::size_t generation;
@@ -448,8 +459,15 @@ Status NetworkInterfaceASIO::setAlarm(Date_t when, const stdx::function<void()>&
         return {ErrorCodes::ShutdownInProgress, "NetworkInterfaceASIO shutdown in progress"};
     }
 
-    // "alarm" must stay alive until it expires, hence the shared_ptr.
-    auto alarm = std::make_shared<asio::system_timer>(_io_service, when.toSystemTimePoint());
+    std::shared_ptr<asio::system_timer> alarm;
+
+    try {
+        // "alarm" must stay alive until it expires, hence the shared_ptr.
+        alarm = std::make_shared<asio::system_timer>(_io_service, when.toSystemTimePoint());
+    } catch (...) {
+        return exceptionToStatus();
+    }
+
     alarm->async_wait([alarm, this, action](std::error_code ec) {
         if (!ec) {
             return action();

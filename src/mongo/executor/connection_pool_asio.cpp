@@ -25,6 +25,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kASIO
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/executor/connection_pool_asio.h"
@@ -37,6 +39,7 @@
 #include "mongo/rpc/legacy_request_builder.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace executor {
@@ -59,7 +62,13 @@ void ASIOTimer::setTimeout(Milliseconds timeout, TimeoutCallback cb) {
         _cb = std::move(cb);
 
         cancelTimeout();
-        _impl.expires_after(std::min(kMaxTimerDuration, timeout).toSystemDuration());
+
+        std::error_code ec;
+        _impl.expires_after(std::min(kMaxTimerDuration, timeout).toSystemDuration(), ec);
+        if (ec) {
+            severe() << "Failed to set connection pool timer: " << ec.message();
+            fassertFailed(40333);
+        }
 
         decltype(_callbackSharedState->id) id;
         decltype(_callbackSharedState) sharedState;
@@ -104,7 +113,12 @@ void ASIOTimer::cancelTimeout() {
         stdx::lock_guard<stdx::mutex> lk(sharedState->mutex);
         if (sharedState->id != id)
             return;
-        _impl.cancel();
+
+        std::error_code ec;
+        _impl.cancel(ec);
+        if (ec) {
+            log() << "Failed to cancel connection pool timer: " << ec.message();
+        }
     });
 }
 
