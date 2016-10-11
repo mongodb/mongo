@@ -107,14 +107,13 @@ StatusWith<bool> SaslSCRAMSHA1ClientConversation::_firstStep(std::string* output
     std::string user =
         _saslClientSession->getParameter(SaslClientSession::parameterUser).toString();
     encodeSCRAMUsername(user);
-    std::string clientNonce =
-        base64::encode(reinterpret_cast<char*>(binaryNonce), sizeof(binaryNonce));
+    _clientNonce = base64::encode(reinterpret_cast<char*>(binaryNonce), sizeof(binaryNonce));
 
     // Append client-first-message-bare to authMessage
-    _authMessage = "n=" + user + ",r=" + clientNonce + ",";
+    _authMessage = "n=" + user + ",r=" + _clientNonce + ",";
 
     StringBuilder sb;
-    sb << "n,,n=" << user << ",r=" << clientNonce;
+    sb << "n,,n=" << user << ",r=" << _clientNonce;
     *outputData = sb.str();
 
     return StatusWith<bool>(false);
@@ -155,8 +154,8 @@ StatusWith<bool> SaslSCRAMSHA1ClientConversation::_secondStep(const std::vector<
     if (!str::startsWith(nonce, _clientNonce)) {
         return StatusWith<bool>(ErrorCodes::BadValue,
                                 mongoutils::str::stream()
-                                    << "Server SCRAM-SHA-1 nonce does not match client nonce"
-                                    << input[2]);
+                                    << "Server SCRAM-SHA-1 nonce does not match client nonce: "
+                                    << input[0]);
     }
 
     std::string salt = input[1].substr(2);

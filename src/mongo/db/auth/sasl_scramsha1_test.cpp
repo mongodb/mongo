@@ -38,6 +38,7 @@
 #include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/base64.h"
 #include "mongo/util/password_digest.h"
 
 namespace mongo {
@@ -78,47 +79,141 @@ BSONObj generateMONGODBCRUserDocument(StringData username, StringData password) 
                       << BSONArray());
 }
 
+std::string corruptEncodedPayload(const std::string& message,
+                                  std::string::const_iterator begin,
+                                  std::string::const_iterator end) {
+    std::string raw = base64::decode(
+        message.substr(std::distance(message.begin(), begin), std::distance(begin, end)));
+    if (raw[0] == std::numeric_limits<char>::max()) {
+        raw[0] -= 1;
+    } else {
+        raw[0] += 1;
+    }
+    return base64::encode(raw);
+}
+
+class SaslTestState {
+public:
+    enum Participant { kClient, kServer };
+    SaslTestState() : SaslTestState(kClient, 0) {}
+    SaslTestState(Participant participant, size_t stage) : participant(participant), stage(stage) {}
+
+private:
+    // Define members here, so that they can be used in declaration of lens(). In C++14, lens()
+    // can be declared with a return of decltype(auto), without a trailing return type, and these
+    // members can go at the end of the class.
+    Participant participant;
+    size_t stage;
+
+public:
+    auto lens() const -> decltype(std::tie(this->stage, this->participant)) {
+        return std::tie(stage, participant);
+    }
+
+    friend bool operator==(const SaslTestState& lhs, const SaslTestState& rhs) {
+        return lhs.lens() == rhs.lens();
+    }
+
+    friend bool operator<(const SaslTestState& lhs, const SaslTestState& rhs) {
+        return lhs.lens() < rhs.lens();
+    }
+
+    void next() {
+        if (participant == kClient) {
+            participant = kServer;
+        } else {
+            participant = kClient;
+            stage++;
+        }
+    }
+
+    std::string toString() const {
+        std::stringstream ss;
+        if (participant == kClient) {
+            ss << "Client";
+        } else {
+            ss << "Server";
+        }
+        ss << "Step" << stage;
+
+        return ss.str();
+    }
+};
+
+class SCRAMMutators {
+public:
+    SCRAMMutators() {}
+
+    void setMutator(SaslTestState state, stdx::function<void(std::string&)> fun) {
+        mutators.insert(std::make_pair(state, fun));
+    }
+
+    void execute(SaslTestState state, std::string& str) {
+        auto it = mutators.find(state);
+        if (it != mutators.end()) {
+            it->second(str);
+        }
+    }
+
+private:
+    std::map<SaslTestState, stdx::function<void(std::string&)>> mutators;
+};
+
+struct SCRAMStepsResult {
+    SCRAMStepsResult() : outcome(SaslTestState::kClient, 1), status(Status::OK()) {}
+    SCRAMStepsResult(SaslTestState outcome, Status status) : outcome(outcome), status(status) {}
+    bool operator==(const SCRAMStepsResult& other) const {
+        return outcome == other.outcome && status.code() == other.status.code() &&
+            status.reason() == other.status.reason();
+    }
+    SaslTestState outcome;
+    Status status;
+
+    friend std::ostream& operator<<(std::ostream& os, const SCRAMStepsResult& result) {
+        return os << "{outcome: " << result.outcome.toString() << ", status: " << result.status
+                  << "}";
+    }
+};
+
+SCRAMStepsResult runSteps(NativeSaslAuthenticationSession* saslServerSession,
+                          NativeSaslClientSession* saslClientSession,
+                          SCRAMMutators interposers = SCRAMMutators{}) {
+    SCRAMStepsResult result{};
+    std::string clientOutput = "";
+    std::string serverOutput = "";
+
+    for (size_t step = 1; step <= 3; step++) {
+        ASSERT_FALSE(saslClientSession->isDone());
+        ASSERT_FALSE(saslServerSession->isDone());
+
+        // Client step
+        result.status = saslClientSession->step(serverOutput, &clientOutput);
+        if (result.status != Status::OK()) {
+            return result;
+        }
+        std::cout << result.outcome.toString() << ": " << clientOutput << std::endl;
+        interposers.execute(result.outcome, clientOutput);
+        result.outcome.next();
+
+        // Server step
+        result.status = saslServerSession->step(clientOutput, &serverOutput);
+        if (result.status != Status::OK()) {
+            return result;
+        }
+        interposers.execute(result.outcome, serverOutput);
+        std::cout << result.outcome.toString() << ": " << serverOutput << std::endl;
+        result.outcome.next();
+    }
+    ASSERT_TRUE(saslClientSession->isDone());
+    ASSERT_TRUE(saslServerSession->isDone());
+
+    return result;
+}
+
 class SCRAMSHA1Fixture : public mongo::unittest::Test {
 protected:
-    enum TestOutcomes { kSuccess, kStep1ServerFailure, kStep2ServerFailure };
-    void runSteps(TestOutcomes expectedOutcome,
-                  NativeSaslAuthenticationSession* saslServerSession,
-                  NativeSaslClientSession* saslClientSession) {
-        std::string clientOutput, serverOutput;
-
-        ASSERT_FALSE(saslClientSession->isDone());
-        ASSERT_FALSE(saslServerSession->isDone());
-        // step 1
-        ASSERT_OK(saslClientSession->step("", &clientOutput));
-        ASSERT_FALSE(saslClientSession->isDone());
-
-        if (expectedOutcome == kStep1ServerFailure) {
-            ASSERT_NOT_OK(saslServerSession->step(clientOutput, &serverOutput));
-            return;
-        } else {
-            ASSERT_OK(saslServerSession->step(clientOutput, &serverOutput));
-        }
-        ASSERT_FALSE(saslServerSession->isDone());
-
-        // step 2
-        ASSERT_OK(saslClientSession->step(serverOutput, &clientOutput));
-        ASSERT_FALSE(saslClientSession->isDone());
-
-        if (expectedOutcome == kStep2ServerFailure) {
-            ASSERT_NOT_OK(saslServerSession->step(clientOutput, &serverOutput));
-            return;
-        } else {
-            ASSERT_OK(saslServerSession->step(clientOutput, &serverOutput));
-        }
-        ASSERT_FALSE(saslServerSession->isDone());
-
-        // step 3
-        ASSERT_OK(saslClientSession->step(serverOutput, &clientOutput));
-        ASSERT_TRUE(saslClientSession->isDone());
-
-        ASSERT_OK(saslServerSession->step(clientOutput, &serverOutput));
-        ASSERT_TRUE(saslServerSession->isDone());
-    }
+    const SCRAMStepsResult goalState =
+        SCRAMStepsResult(SaslTestState(SaslTestState::kClient, 4), Status::OK());
 
     ServiceContextNoop serviceContext;
     ServiceContextNoop::UniqueClient client;
@@ -154,6 +249,111 @@ protected:
     }
 };
 
+TEST_F(SCRAMSHA1Fixture, testServerStep1DoesNotIncludeNonceFromClientStep1) {
+    authzManagerExternalState->insertPrivilegeDocument(
+        txn.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj());
+
+    saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
+    saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
+                                    createPasswordDigest("sajack", "sajack"));
+
+    ASSERT_OK(saslClientSession->initialize());
+
+    SCRAMMutators mutator;
+    mutator.setMutator(SaslTestState(SaslTestState::kServer, 1), [](std::string& serverMessage) {
+        std::string::iterator nonceBegin = serverMessage.begin() + serverMessage.find("r=");
+        std::string::iterator nonceEnd = std::find(nonceBegin, serverMessage.end(), ',');
+        serverMessage = serverMessage.replace(nonceBegin, nonceEnd, "r=");
+
+    });
+    ASSERT_EQ(SCRAMStepsResult(SaslTestState(SaslTestState::kClient, 2),
+                               Status(ErrorCodes::BadValue,
+                                      "Server SCRAM-SHA-1 nonce does not match client nonce: r=")),
+              runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
+}
+
+TEST_F(SCRAMSHA1Fixture, testClientStep2DoesNotIncludeNonceFromServerStep1) {
+    authzManagerExternalState->insertPrivilegeDocument(
+        txn.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj());
+
+    saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
+    saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
+                                    createPasswordDigest("sajack", "sajack"));
+
+    ASSERT_OK(saslClientSession->initialize());
+
+    SCRAMMutators mutator;
+    mutator.setMutator(SaslTestState(SaslTestState::kClient, 2), [](std::string& clientMessage) {
+        std::string::iterator nonceBegin = clientMessage.begin() + clientMessage.find("r=");
+        std::string::iterator nonceEnd = std::find(nonceBegin, clientMessage.end(), ',');
+        clientMessage = clientMessage.replace(nonceBegin, nonceEnd, "r=");
+    });
+    ASSERT_EQ(SCRAMStepsResult(
+                  SaslTestState(SaslTestState::kServer, 2),
+                  Status(ErrorCodes::BadValue, "Incorrect SCRAM-SHA-1 client|server nonce: r=")),
+              runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
+}
+
+TEST_F(SCRAMSHA1Fixture, testClientStep2GivesBadProof) {
+    authzManagerExternalState->insertPrivilegeDocument(
+        txn.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj());
+
+    saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
+    saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
+                                    createPasswordDigest("sajack", "sajack"));
+
+    ASSERT_OK(saslClientSession->initialize());
+
+    SCRAMMutators mutator;
+    mutator.setMutator(SaslTestState(SaslTestState::kClient, 2), [](std::string& clientMessage) {
+        std::string::iterator proofBegin = clientMessage.begin() + clientMessage.find("p=") + 2;
+        std::string::iterator proofEnd = std::find(proofBegin, clientMessage.end(), ',');
+        clientMessage = clientMessage.replace(
+            proofBegin, proofEnd, corruptEncodedPayload(clientMessage, proofBegin, proofEnd));
+
+    });
+
+    ASSERT_EQ(SCRAMStepsResult(SaslTestState(SaslTestState::kServer, 2),
+                               Status(ErrorCodes::AuthenticationFailed,
+                                      "SCRAM-SHA-1 authentication failed, storedKey mismatch")),
+              runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
+}
+
+TEST_F(SCRAMSHA1Fixture, testServerStep2GivesBadVerifier) {
+    authzManagerExternalState->insertPrivilegeDocument(
+        txn.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj());
+
+    saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
+    saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
+                                    createPasswordDigest("sajack", "sajack"));
+
+    ASSERT_OK(saslClientSession->initialize());
+
+    std::string encodedVerifier;
+    SCRAMMutators mutator;
+    mutator.setMutator(
+        SaslTestState(SaslTestState::kServer, 2), [&encodedVerifier](std::string& serverMessage) {
+            std::string::iterator verifierBegin =
+                serverMessage.begin() + serverMessage.find("v=") + 2;
+            std::string::iterator verifierEnd = std::find(verifierBegin, serverMessage.end(), ',');
+            encodedVerifier = corruptEncodedPayload(serverMessage, verifierBegin, verifierEnd);
+
+            serverMessage = serverMessage.replace(verifierBegin, verifierEnd, encodedVerifier);
+
+        });
+
+    auto result = runSteps(saslServerSession.get(), saslClientSession.get(), mutator);
+
+    ASSERT_EQ(
+        SCRAMStepsResult(
+            SaslTestState(SaslTestState::kClient, 3),
+            Status(ErrorCodes::BadValue,
+                   str::stream() << "Client failed to verify SCRAM-SHA-1 ServerSignature, received "
+                                 << encodedVerifier)),
+        result);
+}
+
+
 TEST_F(SCRAMSHA1Fixture, testSCRAM) {
     authzManagerExternalState->insertPrivilegeDocument(
         txn.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj());
@@ -164,7 +364,7 @@ TEST_F(SCRAMSHA1Fixture, testSCRAM) {
 
     ASSERT_OK(saslClientSession->initialize());
 
-    runSteps(kSuccess, saslServerSession.get(), saslClientSession.get());
+    ASSERT_EQ(goalState, runSteps(saslServerSession.get(), saslClientSession.get()));
 }
 
 TEST_F(SCRAMSHA1Fixture, testNULLInPassword) {
@@ -177,8 +377,9 @@ TEST_F(SCRAMSHA1Fixture, testNULLInPassword) {
 
     ASSERT_OK(saslClientSession->initialize());
 
-    runSteps(kSuccess, saslServerSession.get(), saslClientSession.get());
+    ASSERT_EQ(goalState, runSteps(saslServerSession.get(), saslClientSession.get()));
 }
+
 
 TEST_F(SCRAMSHA1Fixture, testCommasInUsernameAndPassword) {
     authzManagerExternalState->insertPrivilegeDocument(
@@ -190,7 +391,7 @@ TEST_F(SCRAMSHA1Fixture, testCommasInUsernameAndPassword) {
 
     ASSERT_OK(saslClientSession->initialize());
 
-    runSteps(kSuccess, saslServerSession.get(), saslClientSession.get());
+    ASSERT_EQ(goalState, runSteps(saslServerSession.get(), saslClientSession.get()));
 }
 
 TEST_F(SCRAMSHA1Fixture, testIncorrectUser) {
@@ -200,7 +401,9 @@ TEST_F(SCRAMSHA1Fixture, testIncorrectUser) {
 
     ASSERT_OK(saslClientSession->initialize());
 
-    runSteps(kStep1ServerFailure, saslServerSession.get(), saslClientSession.get());
+    ASSERT_EQ(SCRAMStepsResult(SaslTestState(SaslTestState::kServer, 1),
+                               Status(ErrorCodes::UserNotFound, "Could not find user sajack@test")),
+              runSteps(saslServerSession.get(), saslClientSession.get()));
 }
 
 TEST_F(SCRAMSHA1Fixture, testIncorrectPassword) {
@@ -213,7 +416,10 @@ TEST_F(SCRAMSHA1Fixture, testIncorrectPassword) {
 
     ASSERT_OK(saslClientSession->initialize());
 
-    runSteps(kStep2ServerFailure, saslServerSession.get(), saslClientSession.get());
+    ASSERT_EQ(SCRAMStepsResult(SaslTestState(SaslTestState::kServer, 2),
+                               Status(ErrorCodes::AuthenticationFailed,
+                                      "SCRAM-SHA-1 authentication failed, storedKey mismatch")),
+              runSteps(saslServerSession.get(), saslClientSession.get()));
 }
 
 TEST_F(SCRAMSHA1Fixture, testMONGODBCR) {
@@ -226,8 +432,7 @@ TEST_F(SCRAMSHA1Fixture, testMONGODBCR) {
 
     ASSERT_OK(saslClientSession->initialize());
 
-    runSteps(kSuccess, saslServerSession.get(), saslClientSession.get());
+    ASSERT_EQ(goalState, runSteps(saslServerSession.get(), saslClientSession.get()));
 }
-
 
 }  // namespace mongo
