@@ -37,7 +37,8 @@
 
     print("getlasterror; should assert or return an error, depending on timing");
     var gleFunction = function() {
-        var result = master.getDB("test").runCommand({getLastError: 1, w: 2, wtimeout: 30000});
+        var result =
+            master.getDB("test").runCommand({getLastError: 1, w: 2, wtimeout: 10 * 60 * 1000});
         if (result.errmsg === "not master" || result.code == ErrorCodes.NotMaster ||
             result.code == ErrorCodes.InterruptedDueToReplStateChange) {
             throw new Error("satisfy assert.throws()");
