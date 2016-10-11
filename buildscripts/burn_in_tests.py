@@ -12,9 +12,11 @@ import optparse
 import os.path
 import subprocess
 import re
+import requests
 import sys
 import yaml
 
+API_SERVER_DEFAULT = "http://mci-motu.10gen.cc:8080"
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -38,6 +40,10 @@ def parse_command_line():
                       help="The buildvariant the tasks will execute on. \
                             Required when generating the JSON file with test executor information")
 
+    parser.add_option("--checkEvergreen", dest="check_evergreen", action="store_true",
+                      help="Checks Evergreen for the last commit that was scheduled. \
+                            This way all the tests that haven't been burned in will be run.")
+
     parser.add_option("--noExec", dest="no_exec", action="store_true",
                       help="Do not run resmoke loop on new tests.")
 
@@ -55,6 +61,7 @@ def parse_command_line():
     parser.set_defaults(base_commit=None,
                         branch="master",
                         buildvariant=None,
+                        check_evergreen=False,
                         evergreen_file="etc/evergreen.yml",
                         executor_file="with_server",
                         max_revisions=25,
@@ -128,18 +135,75 @@ def callo(args):
     return check_output(args)
 
 
-def find_changed_tests(branch_name, base_commit, max_revisions):
+def read_evg_config():
+    # Expand out evergreen config file possibilities
+    file_list = [
+        "./.evergreen.yml",
+        os.path.expanduser("~/.evergreen.yml"),
+        os.path.expanduser("~/cli_bin/.evergreen.yml")]
+
+    for filename in file_list:
+        if os.path.isfile(filename):
+            with open(filename, "r") as fstream:
+                return yaml.load(fstream)
+    return None
+
+
+def find_last_activated_task(revisions, variant, branch_name):
+    """ Get the git hash of the most recently activated build before this one """
+    rest_prefix = "/rest/v1/"
+    project = "mongodb-mongo-master"
+    build_prefix = "mongodb_mongo_" + branch_name + "_" + variant.replace('-', '_')
+
+    evg_cfg = read_evg_config()
+    try:
+        api_server = evg_cfg["api_server_host"]
+        # Makes some assumptions, but saves doing a full url parse.
+        if api_server.endsWith("/api"):
+            api_server = api_server[:-4]
+    except:
+        api_server = API_SERVER_DEFAULT
+
+    api_prefix = api_server + rest_prefix
+
+    for githash in revisions:
+        response = requests.get(api_prefix + "projects/" + project + "/revisions/" + githash)
+        revision_data = response.json()
+
+        try:
+            for build in revision_data["builds"]:
+                if build.startswith(build_prefix):
+                    build_resp = requests.get(api_prefix + "builds/" + build)
+                    build_data = build_resp.json()
+                    if build_data["activated"]:
+                        return build_data["revision"]
+        except:
+            # Sometimes build data is incomplete, as was the related build.
+            next
+
+    return None
+
+
+def find_changed_tests(branch_name, base_commit, max_revisions, buildvariant, check_evergreen):
     """
     Use git to find which files have changed in this patch.
     TODO: This should be expanded to search for enterprise modules.
     """
-
     changed_tests = []
+
     if base_commit is None:
         base_commit = callo(["git", "merge-base", branch_name + "@{upstream}", "HEAD"]).rstrip()
-    revisions = callo(["git", "rev-list", base_commit + "...HEAD"]).splitlines()
-    revision_count = len(revisions)
+    if check_evergreen:
+        # We're going to check up to 200 commits in evergreen for the last scheduled one
+        revs_to_check = callo(["git", "rev-list", base_commit, "--max-count=200"]).splitlines()
+        last_activated = find_last_activated_task(revs_to_check, buildvariant, branch_name)
+        print "Comparing current branch against", last_activated
+        revisions = callo(["git", "rev-list", base_commit + "..." + last_activated]).splitlines()
+        base_commit = last_activated
+    else:
+        revisions = callo(["git", "rev-list", base_commit + "...HEAD"]).splitlines()
 
+    revision_count = len(revisions)
     if revision_count > max_revisions:
         print "There are too many revisions included (%d)." % revision_count, \
               "This is likely because your base branch is not " + branch_name + ".", \
@@ -204,8 +268,8 @@ def create_buildvariant_list(evergreen_file):
     Parses etc/evergreen.yml. Returns a list of buildvariants.
     """
 
-    with open(evergreen_file, "r") as f:
-        evg = yaml.load(f)
+    with open(evergreen_file, "r") as fstream:
+        evg = yaml.load(fstream)
 
     return [li["name"] for li in evg["buildvariants"]]
 
@@ -226,8 +290,8 @@ def create_task_list(evergreen_file, buildvariant, suites):
         print "Buildvariant", buildvariant, "not found in", evergreen_file
         sys.exit(1)
 
-    with open(evergreen_file, "r") as f:
-        evg = yaml.load(f)
+    with open(evergreen_file, "r") as fstream:
+        evg = yaml.load(fstream)
 
     # Find all the task names for the specified buildvariant.
     variant_tasks = [li["name"] for li in next(item for item in evg["buildvariants"]
@@ -261,8 +325,8 @@ def _write_report_file(tests_by_executor, pathname):
     Writes out a JSON file containing the tests_by_executor dict.  This should
     be done during the compile task when the git repo is available.
     """
-    with open(pathname, "w") as fp:
-        json.dump(tests_by_executor, fp)
+    with open(pathname, "w") as fstream:
+        json.dump(tests_by_executor, fstream)
 
 
 def _load_tests_file(pathname):
@@ -272,8 +336,8 @@ def _load_tests_file(pathname):
     """
     if not os.path.isfile(pathname):
         return None
-    with open(pathname, "r") as fp:
-        return json.load(fp)
+    with open(pathname, "r") as fstream:
+        return json.load(fstream)
 
 
 def _save_report_data(saved_data, pathname):
@@ -283,8 +347,8 @@ def _save_report_data(saved_data, pathname):
     """
     if not os.path.isfile(pathname):
         return None
-    with open(pathname, "r") as fp:
-        current_data = json.load(fp)
+    with open(pathname, "r") as fstream:
+        current_data = json.load(fstream)
     saved_data["failures"] += current_data["failures"]
     saved_data["results"] += current_data["results"]
 
@@ -311,14 +375,21 @@ def main():
                   "Select from the following: \n" \
                   "\t", "\n\t".join(sorted(create_buildvariant_list(values.evergreen_file)))
             sys.exit(1)
-        changed_tests = find_changed_tests(values.branch, values.base_commit, values.max_revisions)
+
+        changed_tests = find_changed_tests(values.branch,
+                                           values.base_commit,
+                                           values.max_revisions,
+                                           values.buildvariant,
+                                           values.check_evergreen)
         # If there are no changed tests, exit cleanly.
         if not changed_tests:
             print "No new or modified tests found."
             sys.exit(0)
         suites = resmokelib.parser.get_suites(values, changed_tests)
         tests_by_executor = create_executor_list(suites)
-        tests_by_task = create_task_list(values.evergreen_file, values.buildvariant, tests_by_executor)
+        tests_by_task = create_task_list(values.evergreen_file,
+                                         values.buildvariant,
+                                         tests_by_executor)
         if values.test_list_outfile is not None:
             _write_report_file(tests_by_task, values.test_list_outfile)
 

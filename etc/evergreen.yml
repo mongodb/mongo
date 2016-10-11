@@ -846,9 +846,9 @@ tasks:
             ${strip_command|/usr/bin/strip} mongobridge
           fi
 
-          # If this is a scheduled build, we check for changes against the last commit.
+          # If this is a scheduled build, we check for changes against the last scheduled commit.
           if [ "${is_patch}" != "true" ]; then
-            burn_in_args="--baseCommit=HEAD~1"
+            burn_in_args="--checkEvergreen"
           fi
           # Capture a list of new and modified tests.
           ${python|python} buildscripts/burn_in_tests.py --buildVariant=${build_variant} --testListOutfile=jstests/new_tests.json --noExec $burn_in_args
