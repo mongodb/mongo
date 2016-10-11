@@ -417,7 +417,7 @@ void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
             BSONObj pt = (*initPoints)[i];
             orderedPts.insert(pt);
         }
-        for (set<BSONObj>::iterator it = orderedPts.begin(); it != orderedPts.end(); ++it) {
+        for (auto it = orderedPts.begin(); it != orderedPts.end(); ++it) {
             splitPoints->push_back(*it);
         }
 

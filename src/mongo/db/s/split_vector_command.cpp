@@ -349,9 +349,7 @@ public:
             //
 
             // Warn for keys that are more numerous than maxChunkSize allows.
-            for (set<BSONObj>::const_iterator it = tooFrequentKeys.begin();
-                 it != tooFrequentKeys.end();
-                 ++it) {
+            for (auto it = tooFrequentKeys.cbegin(); it != tooFrequentKeys.cend(); ++it) {
                 warning() << "possible low cardinality key detected in " << nss.toString()
                           << " - key is " << prettyKey(idx->keyPattern(), *it);
             }

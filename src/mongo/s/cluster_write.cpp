@@ -140,9 +140,7 @@ void splitIfNeeded(OperationContext* txn, const NamespaceString& nss, const Targ
         return;
     }
 
-    for (map<BSONObj, int>::const_iterator it = stats.chunkSizeDelta.begin();
-         it != stats.chunkSizeDelta.end();
-         ++it) {
+    for (auto it = stats.chunkSizeDelta.cbegin(); it != stats.chunkSizeDelta.cend(); ++it) {
         shared_ptr<Chunk> chunk;
         try {
             chunk = chunkManager->findIntersectingChunkWithSimpleCollation(txn, it->first);
