@@ -37,14 +37,8 @@
 
 namespace mongo {
 
-class ChunkManager;
-class OperationContext;
-
 struct ZoneRange {
-    ZoneRange() = default;
-
-    ZoneRange(const BSONObj& a_min, const BSONObj& a_max, const std::string& _zone)
-        : min(a_min.getOwned()), max(a_max.getOwned()), zone(_zone) {}
+    ZoneRange(const BSONObj& a_min, const BSONObj& a_max, const std::string& _zone);
 
     std::string toString() const;
 
@@ -54,21 +48,10 @@ struct ZoneRange {
 };
 
 struct MigrateInfo {
-    MigrateInfo(const std::string& a_ns, const ShardId& a_to, const ChunkType& a_chunk)
-        : ns(a_ns),
-          to(a_to),
-          from(a_chunk.getShard()),
-          minKey(a_chunk.getMin()),
-          maxKey(a_chunk.getMax()) {}
-
-    MigrateInfo(const std::string& a_ns,
-                const ShardId& a_to,
-                const ShardId& a_from,
-                const BSONObj& a_minKey,
-                const BSONObj& a_maxKey)
-        : ns(a_ns), to(a_to), from(a_from), minKey(a_minKey), maxKey(a_maxKey) {}
+    MigrateInfo(const ShardId& a_to, const ChunkType& a_chunk);
 
     std::string getName() const;
+
     std::string toString() const;
 
     std::string ns;
@@ -76,6 +59,7 @@ struct MigrateInfo {
     ShardId from;
     BSONObj minKey;
     BSONObj maxKey;
+    ChunkVersion version;
 };
 
 typedef std::vector<ClusterStatistics::ShardStatistics> ShardStatisticsVector;

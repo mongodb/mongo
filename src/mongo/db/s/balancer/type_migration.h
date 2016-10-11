@@ -52,8 +52,6 @@ public:
     static const BSONField<BSONObj> max;
     static const BSONField<std::string> fromShard;
     static const BSONField<std::string> toShard;
-    static const BSONField<std::string> chunkVersionField;
-    static const BSONField<std::string> collectionVersionField;
 
     /**
      * The Balancer encapsulates migration information in MigrateInfo objects, so this facilitates
@@ -85,12 +83,13 @@ public:
 private:
     MigrationType();
 
-    // Required fields for config.migrations.
-    boost::optional<NamespaceString> _nss;
-    boost::optional<BSONObj> _min;
-    boost::optional<BSONObj> _max;
-    boost::optional<ShardId> _fromShard;
-    boost::optional<ShardId> _toShard;
+    // All required fields for config.migrations
+    NamespaceString _nss;
+    BSONObj _min;
+    BSONObj _max;
+    ShardId _fromShard;
+    ShardId _toShard;
+    ChunkVersion _chunkVersion;
 };
 
 }  // namespace mongo

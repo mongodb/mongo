@@ -34,6 +34,11 @@
 #include "mongo/s/catalog/type_chunk.h"
 
 namespace mongo {
+namespace {
+
+const StringData kChunkVersion = "chunkVersion"_sd;
+
+}  // namespace
 
 const std::string MigrationType::ConfigNS = "config.migrations";
 
@@ -51,7 +56,8 @@ MigrationType::MigrationType(MigrateInfo info)
       _min(info.minKey),
       _max(info.maxKey),
       _fromShard(info.from),
-      _toShard(info.to) {}
+      _toShard(info.to),
+      _chunkVersion(info.version) {}
 
 StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
     MigrationType migrationType;
@@ -79,7 +85,7 @@ StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
         Status status = bsonExtractStringField(source, toShard.name(), &migrationToShard);
         if (!status.isOK())
             return status;
-        migrationType._toShard = migrationToShard;
+        migrationType._toShard = std::move(migrationToShard);
     }
 
     {
@@ -87,7 +93,15 @@ StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
         Status status = bsonExtractStringField(source, fromShard.name(), &migrationFromShard);
         if (!status.isOK())
             return status;
-        migrationType._fromShard = migrationFromShard;
+        migrationType._fromShard = std::move(migrationFromShard);
+    }
+
+    {
+        auto chunkVersionStatus =
+            ChunkVersion::parseFromBSONWithFieldForCommands(source, kChunkVersion);
+        if (!chunkVersionStatus.isOK())
+            return chunkVersionStatus.getStatus();
+        migrationType._chunkVersion = chunkVersionStatus.getValue();
     }
 
     return migrationType;
@@ -95,28 +109,34 @@ StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
 
 BSONObj MigrationType::toBSON() const {
     BSONObjBuilder builder;
-    if (_nss && _min)
-        builder.append(name.name(), getName());
-    if (_nss)
-        builder.append(ns.name(), _nss->ns());
-    if (_min)
-        builder.append(min.name(), _min.get());
-    if (_max)
-        builder.append(max.name(), _max.get());
-    if (_fromShard)
-        builder.append(fromShard.name(), _fromShard->toString());
-    if (_toShard)
-        builder.append(toShard.name(), _toShard->toString());
+
+    builder.append(name.name(), getName());
+    builder.append(ns.name(), _nss.ns());
+
+    builder.append(min.name(), _min);
+    builder.append(max.name(), _max);
+
+    builder.append(fromShard.name(), _fromShard.toString());
+    builder.append(toShard.name(), _toShard.toString());
+
+    _chunkVersion.appendWithFieldForCommands(&builder, kChunkVersion);
 
     return builder.obj();
 }
 
 MigrateInfo MigrationType::toMigrateInfo() const {
-    return MigrateInfo(_nss->ns(), _toShard.get(), _fromShard.get(), _min.get(), _max.get());
+    ChunkType chunk;
+    chunk.setNS(_nss.ns());
+    chunk.setShard(_fromShard);
+    chunk.setMin(_min);
+    chunk.setMax(_max);
+    chunk.setVersion(_chunkVersion);
+
+    return MigrateInfo(_toShard, chunk);
 }
 
 std::string MigrationType::getName() const {
-    return ChunkType::genID(_nss->ns(), _min.get());
+    return ChunkType::genID(_nss.ns(), _min);
 }
 
 }  // namespace mongo

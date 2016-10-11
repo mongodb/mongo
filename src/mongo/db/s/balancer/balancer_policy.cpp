@@ -143,7 +143,8 @@ Status DistributionStatus::addRangeToZone(const ZoneRange& range) {
         }
     }
 
-    _zoneRanges[range.max.getOwned()] = range;
+    // This must be a new entry
+    _zoneRanges.emplace(range.max.getOwned(), range);
     _allTags.insert(range.zone);
     return Status::OK();
 }
@@ -337,7 +338,7 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
                 }
 
                 invariant(to != stat.shardId);
-                migrations.emplace_back(distribution.nss().ns(), to, chunk);
+                migrations.emplace_back(to, chunk);
                 invariant(usedShards.insert(stat.shardId).second);
                 invariant(usedShards.insert(to).second);
                 break;
@@ -384,7 +385,7 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
                 }
 
                 invariant(to != stat.shardId);
-                migrations.emplace_back(distribution.nss().ns(), to, chunk);
+                migrations.emplace_back(to, chunk);
                 invariant(usedShards.insert(stat.shardId).second);
                 invariant(usedShards.insert(to).second);
                 break;
@@ -421,7 +422,7 @@ boost::optional<MigrateInfo> BalancerPolicy::balanceSingleChunk(
         return boost::optional<MigrateInfo>();
     }
 
-    return MigrateInfo(distribution.nss().ns(), newShardId, chunk);
+    return MigrateInfo(newShardId, chunk);
 }
 
 bool BalancerPolicy::_singleZoneBalance(const ShardStatisticsVector& shardStats,
@@ -500,7 +501,7 @@ bool BalancerPolicy::_singleZoneBalance(const ShardStatisticsVector& shardStats,
             continue;
         }
 
-        migrations->emplace_back(distribution.nss().ns(), to, chunk);
+        migrations->emplace_back(to, chunk);
         invariant(usedShards->insert(chunk.getShard()).second);
         invariant(usedShards->insert(to).second);
         return true;
@@ -515,8 +516,24 @@ bool BalancerPolicy::_singleZoneBalance(const ShardStatisticsVector& shardStats,
     return false;
 }
 
+ZoneRange::ZoneRange(const BSONObj& a_min, const BSONObj& a_max, const std::string& _zone)
+    : min(a_min.getOwned()), max(a_max.getOwned()), zone(_zone) {}
+
 string ZoneRange::toString() const {
     return str::stream() << min << " -->> " << max << "  on  " << zone;
+}
+
+MigrateInfo::MigrateInfo(const ShardId& a_to, const ChunkType& a_chunk) {
+    invariantOK(a_chunk.validate());
+    invariant(a_to.isValid());
+
+    to = a_to;
+
+    ns = a_chunk.getNS();
+    from = a_chunk.getShard();
+    minKey = a_chunk.getMin();
+    maxKey = a_chunk.getMax();
+    version = a_chunk.getVersion();
 }
 
 std::string MigrateInfo::getName() const {

@@ -95,7 +95,8 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
     OperationContext* txn, const MigrateInfo& migrateInfo) {
 
     // Try to write a unique migration document to config.migrations.
-    MigrationType migrationType(migrateInfo);
+    const MigrationType migrationType(migrateInfo);
+
     for (int retry = 0; retry < kDuplicateKeyErrorMaxRetries; ++retry) {
         Status result = grid.catalogClient(txn)->insertConfigDocument(
             txn, MigrationType::ConfigNS, migrationType.toBSON(), kMajorityWriteConcern);

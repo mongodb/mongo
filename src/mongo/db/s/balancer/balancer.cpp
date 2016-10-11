@@ -275,11 +275,8 @@ Status Balancer::moveSingleChunk(OperationContext* txn,
         return moveAllowedStatus;
     }
 
-    return _migrationManager.executeManualMigration(txn,
-                                                    MigrateInfo(chunk.getNS(), newShardId, chunk),
-                                                    maxChunkSizeBytes,
-                                                    secondaryThrottle,
-                                                    waitForDelete);
+    return _migrationManager.executeManualMigration(
+        txn, MigrateInfo(newShardId, chunk), maxChunkSizeBytes, secondaryThrottle, waitForDelete);
 }
 
 void Balancer::report(OperationContext* txn, BSONObjBuilder* builder) {

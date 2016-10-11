@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/keypattern.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -76,6 +77,10 @@ std::pair<ShardStatisticsVector, ShardToChunksMap> generateCluster(
 
     int64_t currentChunk = 0;
 
+    ChunkVersion chunkVersion(1, 0, OID::gen());
+
+    const KeyPattern shardKeyPattern(BSON("x" << 1));
+
     for (auto it = shardsAndNumChunks.begin(); it != shardsAndNumChunks.end(); it++) {
         ShardStatistics shard = std::move(it->first);
         const size_t numChunks = it->second;
@@ -85,10 +90,16 @@ std::pair<ShardStatisticsVector, ShardToChunksMap> generateCluster(
 
         for (size_t i = 0; i < numChunks; i++, currentChunk++) {
             ChunkType chunk;
-            chunk.setMin(currentChunk == 0 ? kMinBSONKey : BSON("x" << currentChunk));
-            chunk.setMax(currentChunk == totalNumChunks - 1 ? kMaxBSONKey
+
+            chunk.setNS(kNamespace.ns());
+            chunk.setMin(currentChunk == 0 ? shardKeyPattern.globalMin()
+                                           : BSON("x" << currentChunk));
+            chunk.setMax(currentChunk == totalNumChunks - 1 ? shardKeyPattern.globalMax()
                                                             : BSON("x" << currentChunk + 1));
             chunk.setShard(shard.shardId);
+            chunk.setVersion(chunkVersion);
+
+            chunkVersion.incMajor();
 
             chunkMap[shard.shardId].push_back(std::move(chunk));
         }

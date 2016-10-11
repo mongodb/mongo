@@ -76,6 +76,7 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
         const auto& chunkEntry = entry.second;
 
         ChunkType chunk;
+        chunk.setNS(chunkMgr->getns());
         chunk.setMin(chunkEntry->getMin());
         chunk.setMax(chunkEntry->getMax());
         chunk.setJumbo(chunkEntry->isJumbo());
