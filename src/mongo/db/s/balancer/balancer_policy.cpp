@@ -298,10 +298,11 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
     // migrations for the same shard.
     set<ShardId> usedShards;
 
-    // 1) Check for shards, which are in draining mode and must have chunks moved off of them
+    // 1) Check for shards, which are in draining mode or are above the size limit and must have
+    // chunks moved off of them
     {
         for (const auto& stat : shardStats) {
-            if (!stat.isDraining)
+            if (!stat.isDraining && !stat.isSizeExceeded())
                 continue;
 
             if (usedShards.count(stat.shardId))
@@ -468,6 +469,10 @@ bool BalancerPolicy::_singleZoneBalance(const ShardStatisticsVector& shardStats,
     const size_t idealNumberOfChunksPerShardWithTag =
         (totalNumberOfChunksWithTag / totalNumberOfShardsWithTag) +
         (totalNumberOfChunksWithTag % totalNumberOfShardsWithTag ? 1 : 0);
+
+    // Do not use a shard if it already has more entries than the optimal per-shard chunk count
+    if (min >= idealNumberOfChunksPerShardWithTag)
+        return false;
 
     const size_t imbalance = max - idealNumberOfChunksPerShardWithTag;
 

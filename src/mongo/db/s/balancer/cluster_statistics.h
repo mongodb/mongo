@@ -57,7 +57,6 @@ public:
      */
     struct ShardStatistics {
     public:
-        ShardStatistics();
         ShardStatistics(ShardId shardId,
                         uint64_t maxSizeMB,
                         uint64_t currSizeMB,
@@ -66,10 +65,16 @@ public:
                         std::string mongoVersion);
 
         /**
-         * Returns if a shard cannot receive any new chunks because it has reached the per-shard
-         * data size limit.
+         * Returns true if a shard is not allowed to receive any new chunks because it has reached
+         * the per-shard data size limit.
          */
         bool isSizeMaxed() const;
+
+        /**
+         * Returns true if a shard must be relieved (if possible) of some of the chunks it hosts
+         * because it has exceeded its per-shard data size limit.
+         */
+        bool isSizeExceeded() const;
 
         /**
          * Returns BSON representation of this shard's statistics, for reporting purposes.

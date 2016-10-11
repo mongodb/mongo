@@ -39,8 +39,6 @@ ClusterStatistics::ClusterStatistics() = default;
 
 ClusterStatistics::~ClusterStatistics() = default;
 
-ClusterStatistics::ShardStatistics::ShardStatistics() = default;
-
 ClusterStatistics::ShardStatistics::ShardStatistics(ShardId inShardId,
                                                     uint64_t inMaxSizeMB,
                                                     uint64_t inCurrSizeMB,
@@ -48,9 +46,9 @@ ClusterStatistics::ShardStatistics::ShardStatistics(ShardId inShardId,
                                                     std::set<std::string> inShardTags,
                                                     std::string inMongoVersion)
     : shardId(std::move(inShardId)),
-      maxSizeMB(std::move(inMaxSizeMB)),
-      currSizeMB(std::move(inCurrSizeMB)),
-      isDraining(std::move(inIsDraining)),
+      maxSizeMB(inMaxSizeMB),
+      currSizeMB(inCurrSizeMB),
+      isDraining(inIsDraining),
       shardTags(std::move(inShardTags)),
       mongoVersion(std::move(inMongoVersion)) {}
 
@@ -60,6 +58,14 @@ bool ClusterStatistics::ShardStatistics::isSizeMaxed() const {
     }
 
     return currSizeMB >= maxSizeMB;
+}
+
+bool ClusterStatistics::ShardStatistics::isSizeExceeded() const {
+    if (!maxSizeMB || !currSizeMB) {
+        return false;
+    }
+
+    return currSizeMB > maxSizeMB;
 }
 
 BSONObj ClusterStatistics::ShardStatistics::toBSON() const {

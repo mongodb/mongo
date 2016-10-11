@@ -52,6 +52,8 @@ const auto kShardId0 = ShardId("shard0");
 const auto kShardId1 = ShardId("shard1");
 const auto kShardId2 = ShardId("shard2");
 const auto kShardId3 = ShardId("shard3");
+const auto kShardId4 = ShardId("shard4");
+const auto kShardId5 = ShardId("shard5");
 const NamespaceString kNamespace("TestDB", "TestColl");
 const uint64_t kNoMaxSize = 0;
 
@@ -173,6 +175,30 @@ TEST(BalancerPolicy, ParallelBalancing) {
 
     ASSERT_EQ(kShardId1, migrations[1].from);
     ASSERT_EQ(kShardId3, migrations[1].to);
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId1][0].getMin(), migrations[1].minKey);
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId1][0].getMax(), migrations[1].maxKey);
+}
+
+TEST(BalancerPolicy, ParallelBalancingDoesNotPutChunksOnShardsAboveTheOptimal) {
+    auto cluster = generateCluster(
+        {{ShardStatistics(kShardId0, kNoMaxSize, 100, false, emptyTagSet, emptyShardVersion), 100},
+         {ShardStatistics(kShardId1, kNoMaxSize, 90, false, emptyTagSet, emptyShardVersion), 90},
+         {ShardStatistics(kShardId2, kNoMaxSize, 90, false, emptyTagSet, emptyShardVersion), 90},
+         {ShardStatistics(kShardId3, kNoMaxSize, 80, false, emptyTagSet, emptyShardVersion), 80},
+         {ShardStatistics(kShardId4, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0},
+         {ShardStatistics(kShardId5, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
+
+    const auto migrations(BalancerPolicy::balance(
+        cluster.first, DistributionStatus(kNamespace, cluster.second), false));
+    ASSERT_EQ(2U, migrations.size());
+
+    ASSERT_EQ(kShardId0, migrations[0].from);
+    ASSERT_EQ(kShardId4, migrations[0].to);
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMin(), migrations[0].minKey);
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMax(), migrations[0].maxKey);
+
+    ASSERT_EQ(kShardId1, migrations[1].from);
+    ASSERT_EQ(kShardId5, migrations[1].to);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId1][0].getMin(), migrations[1].minKey);
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId1][0].getMax(), migrations[1].maxKey);
 }
@@ -354,7 +380,7 @@ TEST(BalancerPolicy, NoBalancingDueToAllNodesEitherDrainingOrMaxedOut) {
     ASSERT(migrations.empty());
 }
 
-TEST(BalancerPolicy, BalancerRespectsMaxShardSizeOnlyBalanceToNonMaxed) {
+TEST(BalancerPolicy, BalancerMovesChunksOffSizeMaxedShards) {
     // Note that maxSize of shard0 is 1, and it is therefore overloaded with currSize = 3. Other
     // shards have maxSize = 0 = unset. Even though the overloaded shard has the least number of
     // less chunks, we shouldn't move chunks to that shard.
@@ -366,24 +392,10 @@ TEST(BalancerPolicy, BalancerRespectsMaxShardSizeOnlyBalanceToNonMaxed) {
     const auto migrations(BalancerPolicy::balance(
         cluster.first, DistributionStatus(kNamespace, cluster.second), false));
     ASSERT_EQ(1U, migrations.size());
-    ASSERT_EQ(kShardId2, migrations[0].from);
+    ASSERT_EQ(kShardId0, migrations[0].from);
     ASSERT_EQ(kShardId1, migrations[0].to);
-    ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMin(), migrations[0].minKey);
-    ASSERT_BSONOBJ_EQ(cluster.second[kShardId2][0].getMax(), migrations[0].maxKey);
-}
-
-TEST(BalancerPolicy, BalancerRespectsMaxShardSizeWhenAllBalanced) {
-    // Note that maxSize of shard0 is 1, and it is therefore overloaded with currSize = 4. Other
-    // shards have maxSize = 0 = unset. We check that being over the maxSize is NOT equivalent to
-    // draining, we don't want to empty shards for no other reason than they are over this limit.
-    auto cluster = generateCluster(
-        {{ShardStatistics(kShardId0, 1, 4, false, emptyTagSet, emptyShardVersion), 4},
-         {ShardStatistics(kShardId1, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion), 4},
-         {ShardStatistics(kShardId2, kNoMaxSize, 4, false, emptyTagSet, emptyShardVersion), 4}});
-
-    const auto migrations(BalancerPolicy::balance(
-        cluster.first, DistributionStatus(kNamespace, cluster.second), false));
-    ASSERT(migrations.empty());
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMin(), migrations[0].minKey);
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMax(), migrations[0].maxKey);
 }
 
 TEST(BalancerPolicy, BalancerRespectsTagsWhenDraining) {
