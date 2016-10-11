@@ -1055,7 +1055,7 @@ __evict_walk(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue)
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	u_int max_entries, retries, slot, start_slot, spins;
+	u_int max_entries, retries, slot, spins, start_slot, total_candidates;
 	bool dhandle_locked, incr;
 
 	conn = S2C(session);
@@ -1076,12 +1076,9 @@ __evict_walk(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue)
 	 * Another pathological case: if there are only a tiny number of
 	 * candidate pages in cache, don't put all of them on one queue.
 	 */
-	if (F_ISSET(cache, WT_CACHE_EVICT_CLEAN))
-		max_entries = WT_MIN(max_entries,
-		    1 + (uint32_t)(__wt_cache_pages_inuse(cache) / 2));
-	else
-		max_entries = WT_MIN(max_entries,
-		    1 + (uint32_t)(cache->pages_dirty_leaf / 2));
+	total_candidates = (u_int)(F_ISSET(cache, WT_CACHE_EVICT_CLEAN) ?
+	    __wt_cache_pages_inuse(cache) : cache->pages_dirty_leaf);
+	max_entries = WT_MIN(max_entries, 1 + total_candidates / 2);
 
 retry:	while (slot < max_entries) {
 		/*
