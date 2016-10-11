@@ -1,7 +1,7 @@
 /**
  * This test is only for the WiredTiger storage engine. Test to reproduce recovery bugs in WT from
  * WT-2696 and WT-2706.  Have several threads inserting unique data.  Kill -9 mongod.  After
- * restart and recovery verify that all expected records inserted are there and no records in the 
+ * restart and recovery verify that all expected records inserted are there and no records in the
  * middle of the data set are lost.
  *
  * @tags: [requires_wiredtiger, requires_journaling]
@@ -123,8 +123,8 @@ load('jstests/libs/parallelTester.js');  // For ScopedThread
         }
         assert.eq(null,
                   missing,
-                  'Thread ' + i + ' missing id ' + missing +
-                  ' start and end for all threads: ' + tojson(retData));
+                  'Thread ' + i + ' missing id ' + missing + ' start and end for all threads: ' +
+                      tojson(retData));
     }
 
     MongoRunner.stopMongod(conn);
