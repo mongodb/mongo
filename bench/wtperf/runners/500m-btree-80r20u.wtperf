@@ -8,6 +8,9 @@
 conn_config="cache_size=16G,checkpoint=(wait=60,log_size=2GB),session_max=20000,log=(enabled),statistics=(fast),statistics_log=(wait=30,json),eviction=(threads_max=4)"
 create=false
 compression="snappy"
+# close_conn as false allows this test to close/finish faster, but if running
+# as the set, the next test will need to run recovery.
+close_conn=false
 sess_config="isolation=snapshot
 table_count=2
 key_sz=40

@@ -2300,7 +2300,7 @@ err:		if (ret == 0)
 			ret = t_ret;
 	}
 
-	if (wtperf->conn != NULL &&
+	if (wtperf->conn != NULL && opts->close_conn &&
 	    (t_ret = wtperf->conn->close(wtperf->conn, NULL)) != 0) {
 		lprintf(wtperf, t_ret, 0,
 		    "Error closing connection to %s", wtperf->home);
