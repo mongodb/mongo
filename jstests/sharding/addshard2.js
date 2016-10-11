@@ -47,10 +47,7 @@
         }, "removeShard never completed for shard " + shardName);
     };
 
-    var st = new ShardingTest({
-        shards: 0,
-        mongos: 1
-    });
+    var st = new ShardingTest({shards: 0, mongos: 1});
 
     // Add one shard since the last shard cannot be removed.
     var normalShard = MongoRunner.runMongod();
