@@ -112,8 +112,7 @@ std::string masterSlaveOplogName = "local.oplog.$main";
 MONGO_FP_DECLARE(disableSnapshotting);
 
 namespace {
-// cached copies of these...so don't rename them, drop them, etc.!!!
-Database* _localDB = nullptr;
+// cached copy...so don't rename, drop, etc.!!!
 Collection* _localOplogCollection = nullptr;
 
 PseudoRandom hashGenerator(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64());
@@ -231,17 +230,14 @@ namespace {
 Collection* getLocalOplogCollection(OperationContext* txn, const std::string& oplogCollectionName) {
     if (_localOplogCollection)
         return _localOplogCollection;
-    Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
-    Lock::CollectionLock lk2(txn->lockState(), oplogCollectionName, MODE_IX);
 
-    OldClientContext ctx(txn, oplogCollectionName);
-    _localDB = ctx.db();
-    invariant(_localDB);
-    _localOplogCollection = _localDB->getCollection(oplogCollectionName);
+    AutoGetCollection autoColl(txn, NamespaceString(oplogCollectionName), MODE_IX);
+    _localOplogCollection = autoColl.getCollection();
     massert(13347,
             "the oplog collection " + oplogCollectionName +
                 " missing. did you drop it? if so, restart the server",
             _localOplogCollection);
+
     return _localOplogCollection;
 }
 
@@ -1098,7 +1094,6 @@ void initTimestampFromOplog(OperationContext* txn, const std::string& oplogNS) {
 void oplogCheckCloseDatabase(OperationContext* txn, Database* db) {
     invariant(txn->lockState()->isW());
 
-    _localDB = nullptr;
     _localOplogCollection = nullptr;
 }
 
