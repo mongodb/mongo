@@ -5,7 +5,7 @@
 // the $or implementation may need minor adjustments (memory ownership) if this
 // behavior is changed.
 
-const t = db.jstests_ord;
+t = db.jstests_ord;
 t.drop();
 
 t.ensureIndex({a: 1});
@@ -19,8 +19,8 @@ for (i = 0; i < 100; ++i) {
     t.save({b: 1});
 }
 
-const c = t.find({$or: [{a: 1}, {b: 1}]}).batchSize(100);
-for (i = 0; i < 100; ++i) {
+c = t.find({$or: [{a: 1}, {b: 1}]}).batchSize(100);
+for (i = 0; i < 90; ++i) {
     c.next();
 }
 // At this point, our initial query has ended and there is a client cursor waiting
@@ -31,6 +31,4 @@ t.dropIndex({a: 1});
 
 // Dropping an index kills all cursors on the indexed namespace, not just those
 // cursors using the dropped index.
-assert.throws(function() {
-    c.next();
-});
+assert.throws(c.next());
