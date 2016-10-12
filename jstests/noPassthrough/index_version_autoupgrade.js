@@ -42,9 +42,18 @@
         testDB.dropDatabase();
         var coll = testDB.index_version_autoupgrade;
 
-        assert.commandWorked(coll.createIndex({withoutAnyOptions: 1}));
+        // Create a v=1 _id index. This requires setting featureCompatibilityVersion to 3.2.
+        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: "3.2"}));
+        assert.commandWorked(testDB.createCollection("index_version_autoupgrade"));
+        assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
         var allIndexes = coll.getIndexes();
-        var spec = GetIndexHelpers.findByKeyPattern(allIndexes, {withoutAnyOptions: 1});
+        var spec = GetIndexHelpers.findByKeyPattern(allIndexes, {_id: 1});
+        assert.neq(null, spec, "Index with key pattern {_id: 1} not found: " + tojson(allIndexes));
+        assert.eq(1, spec.v, "Expected a v=1 index to be built: " + tojson(spec));
+
+        assert.commandWorked(coll.createIndex({withoutAnyOptions: 1}));
+        allIndexes = coll.getIndexes();
+        spec = GetIndexHelpers.findByKeyPattern(allIndexes, {withoutAnyOptions: 1});
         assert.neq(
             null,
             spec,
@@ -72,6 +81,7 @@
 
         if (doesAutoUpgrade) {
             expectedResults = [
+                {keyPattern: {_id: 1}, version: defaultIndexVersion},
                 {keyPattern: {withoutAnyOptions: 1}, version: defaultIndexVersion},
                 {keyPattern: {withV1: 1}, version: defaultIndexVersion},
                 {keyPattern: {withV2: 1}, version: defaultIndexVersion},
@@ -79,6 +89,7 @@
 
         } else {
             expectedResults = [
+                {keyPattern: {_id: 1}, version: 1},
                 {keyPattern: {withoutAnyOptions: 1}, version: defaultIndexVersion},
                 {keyPattern: {withV1: 1}, version: 1},
                 {keyPattern: {withV2: 1}, version: 2},
@@ -86,7 +97,7 @@
         }
 
         expectedResults.forEach(function(expected) {
-            var allIndexes = coll.getIndexes();
+            var allIndexes = collToVerify.getIndexes();
             var spec = GetIndexHelpers.findByKeyPattern(allIndexes, expected.keyPattern);
             assert.neq(null,
                        spec,
@@ -146,6 +157,20 @@
         assert.commandWorked(cloneDB.runCommand({
             cloneCollection: coll.getFullName(),
             from: conn.host,
+        }));
+        return cloneDB[coll.getName()];
+    }, false);
+    MongoRunner.stopMongod(cloneConn);
+
+    // Test that the "clone" command doesn't upgrade existing indexes to the latest version.
+    cloneConn = MongoRunner.runMongod({});
+    assert.neq(null, cloneConn, "mongod was unable to start up");
+    assert.eq("3.4", getFeatureCompatibilityVersion(cloneConn));
+    testIndexVersionAutoUpgrades(function(coll) {
+        var cloneDB = cloneConn.getDB(coll.getDB().getName());
+        assert.commandWorked(cloneDB.runCommand({
+            clone: conn.host,
+            fromDB: coll.getDB().getName(),
         }));
         return cloneDB[coll.getName()];
     }, false);

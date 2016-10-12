@@ -674,10 +674,36 @@ Status Cloner::copyDb(OperationContext* txn,
                 MultiIndexBlock indexer(txn, c);
                 indexer.allowInterruption();
 
-                const auto featureCompatibilityVersion =
-                    serverGlobalParams.featureCompatibility.version.load();
-                auto indexInfoObjs = uassertStatusOK(indexer.init(
-                    c->getIndexCatalog()->getDefaultIdIndexSpec(featureCompatibilityVersion)));
+                BSONObj idIndexSpec;
+                {
+                    Lock::TempRelease tempRelease(txn->lockState());
+                    auto sourceIndexes = _conn->getIndexSpecs(
+                        from_name.ns(), opts.slaveOk ? QueryOption_SlaveOk : 0);
+                    for (auto&& indexSpec : sourceIndexes) {
+                        if ("_id_"_sd == indexSpec["name"].String()) {
+                            idIndexSpec = indexSpec;
+                            break;
+                        }
+                    }
+                }
+
+                uassert(ErrorCodes::NotMaster,
+                        str::stream() << "Not primary while cloning database " << opts.fromDB
+                                      << " (after getting _id index spec for collection "
+                                      << from_name.ns()
+                                      << ")",
+                        !txn->writesAreReplicated() ||
+                            repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
+                                toDBName));
+
+                uassert(40332,
+                        str::stream() << "_id index spec not found for collection "
+                                      << from_name.ns()
+                                      << " during clone",
+                        !idIndexSpec.isEmpty());
+
+                auto indexInfoObjs = uassertStatusOK(
+                    indexer.init(fixIndexSpec(to_name.db().toString(), idIndexSpec)));
                 invariant(indexInfoObjs.size() == 1);
                 uassertStatusOK(indexer.insertAllDocumentsInCollection(&dups));
 
