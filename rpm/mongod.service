@@ -1,12 +1,23 @@
 [Unit]
 Description=High-performance, schema-free document-oriented database
+After=network.target
+Documentation=https://docs.mongodb.org/manual
 
 [Service]
 User=mongod
 Group=mongod
 Environment="OPTIONS=--quiet -f /etc/mongod.conf"
-ExecStart=/usr/local/bin/mongod $OPTIONS run
+ExecStart=/usr/bin/mongod $OPTIONS run
 PIDFile=/var/run/mongodb/mongod.pid
+LimitFSIZE=infinity # file size
+LimitCPU=infinity # cpu time 
+LimitAS=infinity # virtual memory size
+LimitNOFILE=64000 # open files
+LimitNPROC=64000 # processes/threads
+TasksMax=infinity # total threads (user+kernel)
+TasksAccounting=false
+# Recommended limits for for mongod as specified in
+# http://docs.mongodb.org/manual/reference/ulimit/#recommended-settings
 
 [Install]
 WantedBy=multi-user.target
