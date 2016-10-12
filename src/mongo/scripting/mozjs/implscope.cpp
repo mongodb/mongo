@@ -249,7 +249,12 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
      * manage this by trapping all calls to malloc, free, etc. and keeping track of
      * counts in some thread locals
      */
-    size_t mallocMemoryLimit = 1024ul * 1024 * engine->getJSHeapLimitMB();
+
+    const auto jsHeapLimit = engine->getJSHeapLimitMB();
+    if (jsHeapLimit != 0 && jsHeapLimit < 10) {
+        warning() << "JavaScript may not be able to initialize with a heap limit less than 10MB.";
+    }
+    size_t mallocMemoryLimit = 1024ul * 1024 * jsHeapLimit;
     mongo::sm::reset(mallocMemoryLimit);
 
     // If this runtime isn't running on an NSPR thread, then it is
@@ -322,6 +327,9 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
 
     _context = JS_NewContext(_runtime, kStackChunkSize);
     uassert(ErrorCodes::JSInterpreterFailure, "Failed to initialize JSContext", _context);
+    uassert(ErrorCodes::ExceededMemoryLimit,
+            "Out of memory while trying to initialize javascript scope",
+            mallocMemoryLimit == 0 || mongo::sm::get_total_bytes() < mallocMemoryLimit);
 }
 
 MozJSImplScope::MozRuntime::~MozRuntime() {
