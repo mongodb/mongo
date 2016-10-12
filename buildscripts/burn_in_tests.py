@@ -194,8 +194,12 @@ def find_changed_tests(branch_name, base_commit, max_revisions, buildvariant, ch
     if base_commit is None:
         base_commit = callo(["git", "merge-base", branch_name + "@{upstream}", "HEAD"]).rstrip()
     if check_evergreen:
-        # We're going to check up to 200 commits in evergreen for the last scheduled one
-        revs_to_check = callo(["git", "rev-list", base_commit, "--max-count=200"]).splitlines()
+        # We're going to check up to 200 commits in Evergreen for the last scheduled one.
+        # The current commit will be activated in Evergreen; we use --skip to start at the
+        # previous commit when trying to find the most recent preceding commit that has been
+        # activated.
+        revs_to_check = callo(["git", "rev-list", base_commit,
+                               "--max-count=200", "--skip=1"]).splitlines()
         last_activated = find_last_activated_task(revs_to_check, buildvariant, branch_name)
         print "Comparing current branch against", last_activated
         revisions = callo(["git", "rev-list", base_commit + "..." + last_activated]).splitlines()
