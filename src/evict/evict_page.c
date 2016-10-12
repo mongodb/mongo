@@ -31,23 +31,14 @@ __evict_exclusive_clear(WT_SESSION_IMPL *session, WT_REF *ref)
 static inline int
 __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-	int loops;
-
 	WT_ASSERT(session, ref->state == WT_REF_LOCKED);
 
 	/*
 	 * Check for a hazard pointer indicating another thread is using the
 	 * page, meaning the page cannot be evicted.
 	 */
-	for (loops = 0; loops < 10; loops++) {
-		if (__wt_page_hazard_check(session, ref->page) == NULL)
-			return (0);
-		if (ref->page->read_gen != WT_READGEN_OLDEST &&
-		    ref->page->memory_footprint <
-		    S2BT(session)->split_deepen_min_child)
-			break;
-		__wt_sleep(0, WT_THOUSAND);
-	}
+	if (__wt_page_hazard_check(session, ref->page) == NULL)
+		return (0);
 
 	WT_STAT_DATA_INCR(session, cache_eviction_hazard);
 	WT_STAT_CONN_INCR(session, cache_eviction_hazard);
