@@ -329,7 +329,8 @@
     // contacted. The config server primary should still report "3.4", since setting the version to
     // "3.2" did not succeed.
     st.rs0.getPrimary().discardMessagesFrom(st.configRS.getPrimary(), 1.0);
-    assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.2"}));
+    assert.commandFailed(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.2", maxTimeMS: 1000}));
     res = configPrimaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
     assert.commandWorked(res);
     assert.eq(res.featureCompatibilityVersion, "3.4");

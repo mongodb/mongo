@@ -103,6 +103,8 @@ public:
                         << ". See http://dochub.mongodb.org/core/3.4-feature-compatibility.",
                     elem.type() == BSONType::String);
                 version = elem.String();
+            } else if (elem.fieldNameStringData() != "maxTimeMS") {
+                continue;
             } else {
                 uasserted(ErrorCodes::FailedToParse,
                           str::stream()
