@@ -898,6 +898,40 @@ TEST_F(DistLockCatalogFixture, BasicUnlock) {
     future.timed_get(kFutureTimeout);
 }
 
+TEST_F(DistLockCatalogFixture, BasicUnlockWithName) {
+    auto future = launchAsync([this] {
+        auto status = distLockCatalog()->unlock(
+            operationContext(), OID("555f99712c99a78c5b083358"), "TestDB.TestColl");
+        ASSERT_OK(status);
+    });
+
+    onCommand([](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        ASSERT_EQUALS(dummyHost, request.target);
+        ASSERT_EQUALS("config", request.dbname);
+
+        BSONObj expectedCmd(fromjson(R"({
+                findAndModify: "locks",
+                query: { ts: ObjectId("555f99712c99a78c5b083358"), _id: "TestDB.TestColl" },
+                update: { $set: { state: 0 }},
+                writeConcern: { w: "majority", wtimeout: 15000 },
+                maxTimeMS: 30000
+            })"));
+
+        ASSERT_BSONOBJ_EQ(expectedCmd, request.cmdObj);
+
+        return fromjson(R"({
+                ok: 1,
+                value: {
+                    _id: "TestDB.TestColl",
+                    ts: ObjectId("555f99712c99a78c5b083358"),
+                    state: 0
+                }
+            })");
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
 TEST_F(DistLockCatalogFixture, UnlockWithNoNewDoc) {
     auto future = launchAsync([this] {
         auto status =
@@ -912,6 +946,36 @@ TEST_F(DistLockCatalogFixture, UnlockWithNoNewDoc) {
         BSONObj expectedCmd(fromjson(R"({
                 findAndModify: "locks",
                 query: { ts: ObjectId("555f99712c99a78c5b083358") },
+                update: { $set: { state: 0 }},
+                writeConcern: { w: "majority", wtimeout: 15000 },
+                maxTimeMS: 30000
+            })"));
+
+        ASSERT_BSONOBJ_EQ(expectedCmd, request.cmdObj);
+
+        return fromjson(R"({
+                ok: 1,
+                value: null
+            })");
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(DistLockCatalogFixture, UnlockWithNameWithNoNewDoc) {
+    auto future = launchAsync([this] {
+        auto status = distLockCatalog()->unlock(
+            operationContext(), OID("555f99712c99a78c5b083358"), "TestDB.TestColl");
+        ASSERT_OK(status);
+    });
+
+    onCommand([](const RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+        ASSERT_EQUALS(dummyHost, request.target);
+        ASSERT_EQUALS("config", request.dbname);
+
+        BSONObj expectedCmd(fromjson(R"({
+                findAndModify: "locks",
+                query: { ts: ObjectId("555f99712c99a78c5b083358"), _id: "TestDB.TestColl" },
                 update: { $set: { state: 0 }},
                 writeConcern: { w: "majority", wtimeout: 15000 },
                 maxTimeMS: 30000
