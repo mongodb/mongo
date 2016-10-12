@@ -436,7 +436,7 @@ WriteResult performInserts(OperationContext* txn, const InsertOp& wholeOp) {
 
     size_t bytesInBatch = 0;
     std::vector<BSONObj> batch;
-    const size_t maxBatchSize = internalQueryExecYieldIterations / 2;
+    const size_t maxBatchSize = internalInsertMaxBatchSize;
     batch.reserve(std::min(wholeOp.documents.size(), maxBatchSize));
 
     for (auto&& doc : wholeOp.documents) {

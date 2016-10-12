@@ -111,4 +111,6 @@ const int64_t insertVectorMaxBytes = 256 * 1024;
 // The number of bytes to buffer at once during a $facet stage.
 extern std::atomic<int> internalQueryFacetBufferSizeBytes;  // NOLINT
 
+extern std::atomic<int> internalInsertMaxBatchSize;  // NOLINT
+
 }  // namespace mongo

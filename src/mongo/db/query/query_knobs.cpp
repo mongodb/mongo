@@ -68,4 +68,8 @@ MONGO_EXPORT_SERVER_PARAMETER(internalQueryExecYieldPeriodMS, int, 10);
 
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryFacetBufferSizeBytes, int, 100 * 1024 * 1024);
 
+MONGO_EXPORT_SERVER_PARAMETER(internalInsertMaxBatchSize,
+                              int,
+                              internalQueryExecYieldIterations / 2);
+
 }  // namespace mongo
