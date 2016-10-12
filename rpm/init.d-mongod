@@ -38,7 +38,7 @@ else
 fi
 
 # things from mongod.conf get there by mongod reading it
-PIDFILEPATH=`awk -F'[:=]' -v IGNORECASE=1 '/^[[:blank:]]*(processManagement\.)?pidfilepath[[:blank:]]*[:=][[:blank:]]*/{print $2}' "$CONFIGFILE" | tr -d "[:blank:]\"'" | awk -F'#' '{print $1}'`
+PIDFILEPATH="`awk -F'[:=]' -v IGNORECASE=1 '/^[[:blank:]]*(processManagement\.)?pidfilepath[[:blank:]]*[:=][[:blank:]]*/{print $2}' "$CONFIGFILE" | tr -d "[:blank:]\"'" | awk -F'#' '{print $1}'`"
 PIDDIR=`dirname $PIDFILEPATH`
 
 start()
@@ -49,7 +49,7 @@ start()
   fi
 
   # Make sure the pidfile does not exist
-  if [ -f $PIDFILEPATH ]; then
+  if [ -f "$PIDFILEPATH" ]; then
       echo "Error starting mongod. $PIDFILEPATH exists."
       RETVAL=1
       return
