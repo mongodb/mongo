@@ -94,8 +94,7 @@ bool MessagingPort::recv(Message& m) {
     again:
 #endif
         MSGHEADER::Value header;
-        int headerLen = sizeof(MSGHEADER::Value);
-        _psock->recv((char*)&header, headerLen);
+        _psock->recv((char*)&header, sizeof(header));
         int len = header.constView().getMessageLength();
 
         if (len == 542393671) {
@@ -140,22 +139,22 @@ bool MessagingPort::recv(Message& m) {
                     sslGlobalParams.sslMode.load() != SSLParams::SSLMode_requireSSL);
 #endif  // MONGO_CONFIG_SSL
         }
-        if (static_cast<size_t>(len) < sizeof(MSGHEADER::Value) ||
+        if (static_cast<size_t>(len) < sizeof(header) ||
             static_cast<size_t>(len) > MaxMessageSizeBytes) {
             LOG(0) << "recv(): message len " << len << " is invalid. "
-                   << "Min " << sizeof(MSGHEADER::Value) << " Max: " << MaxMessageSizeBytes;
+                   << "Min " << sizeof(header) << " Max: " << MaxMessageSizeBytes;
             return false;
         }
 
         _psock->setHandshakeReceived();
-        int z = (len + 1023) & 0xfffffc00;
-        verify(z >= len);
-        auto buf = SharedBuffer::allocate(z);
-        MsgData::View md = buf.get();
-        memcpy(md.view2ptr(), &header, headerLen);
-        int left = len - headerLen;
 
-        _psock->recv(md.data(), left);
+        auto buf = SharedBuffer::allocate(len);
+        MsgData::View md = buf.get();
+        memcpy(md.view2ptr(), &header, sizeof(header));
+
+        const int left = len - sizeof(header);
+        if (left)
+            _psock->recv(md.data(), left);
 
         m.setData(std::move(buf));
         return true;
