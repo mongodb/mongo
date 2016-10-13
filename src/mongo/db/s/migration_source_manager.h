@@ -208,10 +208,8 @@ private:
     // The current state. Used only for diagnostics and validation.
     State _state{kCreated};
 
-    // The cached collection metadata from just after the collection distributed lock was acquired.
-    // This metadata is guaranteed to not change until either failure or successful completion,
-    // because the distributed lock is being held. Available after stabilize stage has completed.
-    ScopedCollectionMetadata _committedMetadata;
+    // The cached collection metadata at the time the migration started.
+    ScopedCollectionMetadata _collectionMetadata;
 
     // The key pattern of the collection whose chunks are being moved.
     BSONObj _keyPattern;

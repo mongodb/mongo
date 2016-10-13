@@ -294,12 +294,7 @@ ScopedCollectionMetadata::ScopedCollectionMetadata(
 ScopedCollectionMetadata::~ScopedCollectionMetadata() {
     if (!_tracker)
         return;
-
-    stdx::lock_guard<stdx::mutex> scopedLock(_manager->_managerLock);
-    invariant(_tracker->usageCounter > 0);
-    if (--_tracker->usageCounter == 0) {
-        _manager->_removeMetadata_inlock(_tracker);
-    }
+    _decrementUsageCounter();
 }
 
 CollectionMetadata* ScopedCollectionMetadata::operator->() {
@@ -316,6 +311,13 @@ ScopedCollectionMetadata::ScopedCollectionMetadata(ScopedCollectionMetadata&& ot
 
 ScopedCollectionMetadata& ScopedCollectionMetadata::operator=(ScopedCollectionMetadata&& other) {
     if (this != &other) {
+        // If "this" was previously initialized, make sure we perform the same logic as in the
+        // destructor to decrement _tracker->usageCounter for the CollectionMetadata "this" had a
+        // reference to before replacing _tracker with other._tracker.
+        if (_tracker) {
+            _decrementUsageCounter();
+        }
+
         _manager = other._manager;
         _tracker = other._tracker;
         other._manager = nullptr;
@@ -323,6 +325,16 @@ ScopedCollectionMetadata& ScopedCollectionMetadata::operator=(ScopedCollectionMe
     }
 
     return *this;
+}
+
+void ScopedCollectionMetadata::_decrementUsageCounter() {
+    invariant(_manager);
+    invariant(_tracker);
+    stdx::lock_guard<stdx::mutex> scopedLock(_manager->_managerLock);
+    invariant(_tracker->usageCounter > 0);
+    if (--_tracker->usageCounter == 0) {
+        _manager->_removeMetadata_inlock(_tracker);
+    }
 }
 
 ScopedCollectionMetadata::operator bool() const {

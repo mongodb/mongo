@@ -235,10 +235,6 @@ public:
      */
     ScopedCollectionMetadata();
 
-    /**
-     * Decrements the usageCounter and conditionally makes a call to _removeMetadata on
-     * the tracker if the count has reached zero.
-     */
     ~ScopedCollectionMetadata();
 
     ScopedCollectionMetadata(ScopedCollectionMetadata&& other);
@@ -263,6 +259,12 @@ private:
      */
     ScopedCollectionMetadata(MetadataManager* manager,
                              MetadataManager::CollectionMetadataTracker* tracker);
+
+    /**
+     * Decrements the usageCounter and conditionally makes a call to _removeMetadata on
+     * the tracker if the count has reached zero.
+     */
+    void _decrementUsageCounter();
 
     MetadataManager* _manager{nullptr};
     MetadataManager::CollectionMetadataTracker* _tracker{nullptr};

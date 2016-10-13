@@ -124,11 +124,11 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkR
         ScopedTransaction scopedXact(txn, MODE_IS);
         AutoGetCollection autoColl(txn, _args.getNss(), MODE_IS);
 
-        _committedMetadata = CollectionShardingState::get(txn, _args.getNss())->getMetadata();
-        _keyPattern = _committedMetadata->getKeyPattern();
+        _collectionMetadata = CollectionShardingState::get(txn, _args.getNss())->getMetadata();
+        _keyPattern = _collectionMetadata->getKeyPattern();
     }
 
-    const ChunkVersion collectionVersion = _committedMetadata->getCollVersion();
+    const ChunkVersion collectionVersion = _collectionMetadata->getCollVersion();
 
     if (expectedCollectionVersion.epoch() != collectionVersion.epoch()) {
         throw SendStaleConfigException(
@@ -148,10 +148,10 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkR
     invariant(collectionVersion >= shardVersion);
 
     // With nonzero shard version, we must have a shard key
-    invariant(!_committedMetadata->getKeyPattern().isEmpty());
+    invariant(!_collectionMetadata->getKeyPattern().isEmpty());
 
     ChunkType origChunk;
-    if (!_committedMetadata->getNextChunk(_args.getMinKey(), &origChunk) ||
+    if (!_collectionMetadata->getNextChunk(_args.getMinKey(), &origChunk) ||
         origChunk.getMin().woCompare(_args.getMinKey()) != 0) {
         // If this assertion is hit, it means that whoever called the shard moveChunk command
         // (mongos or the CSRS balancer) did not check whether the chunk actually belongs to this
@@ -198,7 +198,7 @@ Status MigrationSourceManager::startClone(OperationContext* txn) {
                                        ShardingCatalogClient::kMajorityWriteConcern);
 
     _cloneDriver = stdx::make_unique<MigrationChunkClonerSourceLegacy>(
-        _args, _committedMetadata->getKeyPattern());
+        _args, _collectionMetadata->getKeyPattern());
 
     {
         // Register for notifications from the replication subsystem
@@ -253,11 +253,12 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* txn) {
 
         auto css = CollectionShardingState::get(txn, _args.getNss().ns());
         auto metadata = css->getMetadata();
-        if (!metadata || !metadata->getCollVersion().equals(_committedMetadata->getCollVersion())) {
+        if (!metadata ||
+            !metadata->getCollVersion().equals(_collectionMetadata->getCollVersion())) {
             return {ErrorCodes::IncompatibleShardingMetadata,
                     str::stream()
                         << "Sharding metadata changed while holding distributed lock. Expected: "
-                        << _committedMetadata->getCollVersion().toString()
+                        << _collectionMetadata->getCollVersion().toString()
                         << ", but found: "
                         << (metadata ? metadata->getCollVersion().toString()
                                      : "collection unsharded.")};
@@ -310,9 +311,9 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* txn
     // change the local collection major version, which indicates to other processes that the chunk
     // metadata has changed and they should refresh.
     boost::optional<ChunkType> controlChunkType = boost::none;
-    if (_committedMetadata->getNumChunks() > 1) {
+    if (_collectionMetadata->getNumChunks() > 1) {
         ChunkType differentChunk;
-        invariant(_committedMetadata->getDifferentChunk(_args.getMinKey(), &differentChunk));
+        invariant(_collectionMetadata->getDifferentChunk(_args.getMinKey(), &differentChunk));
         invariant(differentChunk.getMin().woCompare(_args.getMinKey()) != 0);
         controlChunkType = std::move(differentChunk);
     } else {
@@ -326,7 +327,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* txn
                                                  _args.getToShardId(),
                                                  migratedChunkType,
                                                  controlChunkType,
-                                                 _committedMetadata->getCollVersion(),
+                                                 _collectionMetadata->getCollVersion(),
                                                  _args.getTakeDistLock());
 
     builder.append(kWriteConcernField, kMajorityWriteConcern.toBSON());
@@ -414,10 +415,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* txn
         }
 
         // Migration succeeded
-        _committedMetadata = std::move(refreshedMetadata);
-
         log() << "moveChunk updated collection '" << _args.getNss().ns()
-              << "' to collection version '" << _committedMetadata->getCollVersion() << "'.";
+              << "' to collection version '" << refreshedMetadata->getCollVersion() << "'.";
     } else {
         ScopedTransaction scopedXact(txn, MODE_IX);
         AutoGetCollection autoColl(txn, _args.getNss(), MODE_IX, MODE_X);
