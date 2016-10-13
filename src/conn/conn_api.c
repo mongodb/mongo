@@ -1943,6 +1943,42 @@ __conn_chk_file_system(WT_SESSION_IMPL *session, bool readonly)
 }
 
 /*
+ * wiredtiger_dummy_session_init --
+ *	Initialize the connection's dummy session.
+ */
+static void
+wiredtiger_dummy_session_init(
+    WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler)
+{
+	WT_SESSION_IMPL *session;
+
+	session = &conn->dummy_session;
+
+	/*
+	 * We use a fake session until we can allocate and initialize the real
+	 * ones. Initialize the necessary fields (unfortunately, the fields we
+	 * initialize have been selected by core dumps, we need to do better).
+	 */
+	session->iface.connection = &conn->iface;
+	session->name = "wiredtiger_open";
+
+	/* Standard I/O and error handling first. */
+	__wt_os_stdio(session);
+	__wt_event_handler_set(session, event_handler);
+
+	/* Statistics */
+	session->stat_bucket = 0;
+
+	/*
+	 * Set the default session's strerror method. If one of the extensions
+	 * being loaded reports an error via the WT_EXTENSION_API strerror
+	 * method, but doesn't supply that method a WT_SESSION handle, we'll
+	 * use the WT_CONNECTION_IMPL's default session and its strerror method.
+	 */
+	session->iface.strerror = __wt_session_strerror;
+}
+
+/*
  * wiredtiger_open --
  *	Main library entry point: open a new connection to a WiredTiger
  *	database.
@@ -2013,21 +2049,11 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	TAILQ_INSERT_TAIL(&__wt_process.connqh, conn, q);
 	__wt_spin_unlock(NULL, &__wt_process.spinlock);
 
-	session = conn->default_session = &conn->dummy_session;
-	session->iface.connection = &conn->iface;
-	session->name = "wiredtiger_open";
-
-	/* Do standard I/O and error handling first. */
-	__wt_os_stdio(session);
-	__wt_event_handler_set(session, event_handler);
-
 	/*
-	 * Set the default session's strerror method. If one of the extensions
-	 * being loaded reports an error via the WT_EXTENSION_API strerror
-	 * method, but doesn't supply that method a WT_SESSION handle, we'll
-	 * use the WT_CONNECTION_IMPL's default session and its strerror method.
+	 * Initialize the fake session used until we can create real sessions.
 	 */
-	conn->default_session->iface.strerror = __wt_session_strerror;
+	wiredtiger_dummy_session_init(conn, event_handler);
+	session = conn->default_session = &conn->dummy_session;
 
 	/* Basic initialization of the connection structure. */
 	WT_ERR(__wt_connection_init(conn));

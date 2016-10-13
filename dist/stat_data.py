@@ -66,6 +66,10 @@ class JoinStat(Stat):
     prefix = ''  # prefix is inserted dynamically
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, JoinStat.prefix, desc, flags)
+class LockStat(Stat):
+    prefix = 'lock'
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, LockStat.prefix, desc, flags)
 class LogStat(Stat):
     prefix = 'log'
     def __init__(self, name, desc, flags=''):
@@ -233,6 +237,21 @@ connection_stats = [
     CacheStat('cache_write_restore', 'pages written requiring in-memory restoration'),
 
     ##########################################
+    # Cursor operations
+    ##########################################
+    CursorStat('cursor_create', 'cursor create calls'),
+    CursorStat('cursor_insert', 'cursor insert calls'),
+    CursorStat('cursor_next', 'cursor next calls'),
+    CursorStat('cursor_prev', 'cursor prev calls'),
+    CursorStat('cursor_remove', 'cursor remove calls'),
+    CursorStat('cursor_reset', 'cursor reset calls'),
+    CursorStat('cursor_restart', 'cursor restarted searches'),
+    CursorStat('cursor_search', 'cursor search calls'),
+    CursorStat('cursor_search_near', 'cursor search near calls'),
+    CursorStat('cursor_truncate', 'truncate calls'),
+    CursorStat('cursor_update', 'cursor update calls'),
+
+    ##########################################
     # Dhandle statistics
     ##########################################
     DhandleStat('dh_conn_handle_count', 'connection data handles currently active', 'no_clear,no_scale'),
@@ -243,6 +262,25 @@ connection_stats = [
     DhandleStat('dh_sweep_remove', 'connection sweep dhandles removed from hash list'),
     DhandleStat('dh_sweep_tod', 'connection sweep time-of-death sets'),
     DhandleStat('dh_sweeps', 'connection sweeps'),
+
+    ##########################################
+    # Locking statistics
+    ##########################################
+    LockStat('lock_checkpoint_count', 'checkpoint lock acquisitions'),
+    LockStat('lock_checkpoint_wait_application', 'checkpoint lock application thread wait time (usecs)'),
+    LockStat('lock_checkpoint_wait_internal', 'checkpoint lock internal thread wait time (usecs)'),
+    LockStat('lock_handle_list_count', 'handle-list lock acquisitions'),
+    LockStat('lock_handle_list_wait_application', 'handle-list lock application thread wait time (usecs)'),
+    LockStat('lock_handle_list_wait_internal', 'handle-list lock internal thread wait time (usecs)'),
+    LockStat('lock_metadata_count', 'metadata lock acquisitions'),
+    LockStat('lock_metadata_wait_application', 'metadata lock application thread wait time (usecs)'),
+    LockStat('lock_metadata_wait_internal', 'metadata lock internal thread wait time (usecs)'),
+    LockStat('lock_schema_count', 'schema lock acquisitions'),
+    LockStat('lock_schema_wait_application', 'schema lock application thread wait time (usecs)'),
+    LockStat('lock_schema_wait_internal', 'schema lock internal thread wait time (usecs)'),
+    LockStat('lock_table_count', 'table lock acquisitions'),
+    LockStat('lock_table_wait_application', 'table lock application thread time waiting for the table lock (usecs)'),
+    LockStat('lock_table_wait_internal', 'table lock internal thread time waiting for the table lock (usecs)'),
 
     ##########################################
     # Logging statistics
@@ -286,6 +324,20 @@ connection_stats = [
     LogStat('log_zero_fills', 'log files manually zero-filled'),
 
     ##########################################
+    # LSM statistics
+    ##########################################
+    LSMStat('lsm_checkpoint_throttle', 'sleep for LSM checkpoint throttle'),
+    LSMStat('lsm_merge_throttle', 'sleep for LSM merge throttle'),
+    LSMStat('lsm_rows_merged', 'rows merged in an LSM tree'),
+    LSMStat('lsm_work_queue_app', 'application work units currently queued', 'no_clear,no_scale'),
+    LSMStat('lsm_work_queue_manager', 'merge work units currently queued', 'no_clear,no_scale'),
+    LSMStat('lsm_work_queue_max', 'tree queue hit maximum'),
+    LSMStat('lsm_work_queue_switch', 'switch work units currently queued', 'no_clear,no_scale'),
+    LSMStat('lsm_work_units_created', 'tree maintenance operations scheduled'),
+    LSMStat('lsm_work_units_discarded', 'tree maintenance operations discarded'),
+    LSMStat('lsm_work_units_done', 'tree maintenance operations executed'),
+
+    ##########################################
     # Reconciliation statistics
     ##########################################
     RecStat('rec_page_delete', 'pages deleted'),
@@ -294,6 +346,35 @@ connection_stats = [
     RecStat('rec_pages_eviction', 'page reconciliation calls for eviction'),
     RecStat('rec_split_stashed_bytes', 'split bytes currently awaiting free', 'no_clear,no_scale,size'),
     RecStat('rec_split_stashed_objects', 'split objects currently awaiting free', 'no_clear,no_scale'),
+
+    ##########################################
+    # Session operations
+    ##########################################
+    SessionStat('session_cursor_open', 'open cursor count', 'no_clear,no_scale'),
+    SessionStat('session_open', 'open session count', 'no_clear,no_scale'),
+    SessionStat('session_table_compact_fail', 'table compact failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_compact_success', 'table compact successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_create_fail', 'table create failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_create_success', 'table create successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_drop_fail', 'table drop failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_drop_success', 'table drop successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_rebalance_fail', 'table rebalance failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_rebalance_success', 'table rebalance successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_rename_fail', 'table rename failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_rename_success', 'table rename successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_salvage_fail', 'table salvage failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_salvage_success', 'table salvage successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_truncate_fail', 'table truncate failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_truncate_success', 'table truncate successful calls', 'no_clear,no_scale'),
+    SessionStat('session_table_verify_fail', 'table verify failed calls', 'no_clear,no_scale'),
+    SessionStat('session_table_verify_success', 'table verify successful calls', 'no_clear,no_scale'),
+
+    ##########################################
+    # Thread Count statistics
+    ##########################################
+    ThreadStat('thread_fsync_active', 'active filesystem fsync calls','no_clear,no_scale'),
+    ThreadStat('thread_read_active', 'active filesystem read calls','no_clear,no_scale'),
+    ThreadStat('thread_write_active', 'active filesystem write calls','no_clear,no_scale'),
 
     ##########################################
     # Transaction statistics
@@ -322,64 +403,6 @@ connection_stats = [
     TxnStat('txn_sync', 'transaction sync calls'),
 
     ##########################################
-    # LSM statistics
-    ##########################################
-    LSMStat('lsm_checkpoint_throttle', 'sleep for LSM checkpoint throttle'),
-    LSMStat('lsm_merge_throttle', 'sleep for LSM merge throttle'),
-    LSMStat('lsm_rows_merged', 'rows merged in an LSM tree'),
-    LSMStat('lsm_work_queue_app', 'application work units currently queued', 'no_clear,no_scale'),
-    LSMStat('lsm_work_queue_manager', 'merge work units currently queued', 'no_clear,no_scale'),
-    LSMStat('lsm_work_queue_max', 'tree queue hit maximum'),
-    LSMStat('lsm_work_queue_switch', 'switch work units currently queued', 'no_clear,no_scale'),
-    LSMStat('lsm_work_units_created', 'tree maintenance operations scheduled'),
-    LSMStat('lsm_work_units_discarded', 'tree maintenance operations discarded'),
-    LSMStat('lsm_work_units_done', 'tree maintenance operations executed'),
-
-    ##########################################
-    # Session operations
-    ##########################################
-    SessionStat('session_cursor_open', 'open cursor count', 'no_clear,no_scale'),
-    SessionStat('session_open', 'open session count', 'no_clear,no_scale'),
-    SessionStat('session_table_compact_fail', 'table compact failed calls', 'no_clear,no_scale'),
-    SessionStat('session_table_compact_success', 'table compact successful calls', 'no_clear,no_scale'),
-    SessionStat('session_table_create_fail', 'table create failed calls', 'no_clear,no_scale'),
-    SessionStat('session_table_create_success', 'table create successful calls', 'no_clear,no_scale'),
-    SessionStat('session_table_drop_fail', 'table drop failed calls', 'no_clear,no_scale'),
-    SessionStat('session_table_drop_success', 'table drop successful calls', 'no_clear,no_scale'),
-    SessionStat('session_table_rebalance_fail', 'table rebalance failed calls', 'no_clear,no_scale'),
-    SessionStat('session_table_rebalance_success', 'table rebalance successful calls', 'no_clear,no_scale'),
-    SessionStat('session_table_rename_fail', 'table rename failed calls', 'no_clear,no_scale'),
-    SessionStat('session_table_rename_success', 'table rename successful calls', 'no_clear,no_scale'),
-    SessionStat('session_table_salvage_fail', 'table salvage failed calls', 'no_clear,no_scale'),
-    SessionStat('session_table_salvage_success', 'table salvage successful calls', 'no_clear,no_scale'),
-    SessionStat('session_table_truncate_fail', 'table truncate failed calls', 'no_clear,no_scale'),
-    SessionStat('session_table_truncate_success', 'table truncate successful calls', 'no_clear,no_scale'),
-    SessionStat('session_table_verify_fail', 'table verify failed calls', 'no_clear,no_scale'),
-    SessionStat('session_table_verify_success', 'table verify successful calls', 'no_clear,no_scale'),
-
-    ##########################################
-    # Total cursor operations
-    ##########################################
-    CursorStat('cursor_create', 'cursor create calls'),
-    CursorStat('cursor_insert', 'cursor insert calls'),
-    CursorStat('cursor_next', 'cursor next calls'),
-    CursorStat('cursor_prev', 'cursor prev calls'),
-    CursorStat('cursor_remove', 'cursor remove calls'),
-    CursorStat('cursor_reset', 'cursor reset calls'),
-    CursorStat('cursor_restart', 'cursor restarted searches'),
-    CursorStat('cursor_search', 'cursor search calls'),
-    CursorStat('cursor_search_near', 'cursor search near calls'),
-    CursorStat('cursor_truncate', 'truncate calls'),
-    CursorStat('cursor_update', 'cursor update calls'),
-
-    ##########################################
-    # Thread Count statistics
-    ##########################################
-    ThreadStat('thread_fsync_active', 'active filesystem fsync calls','no_clear,no_scale'),
-    ThreadStat('thread_read_active', 'active filesystem read calls','no_clear,no_scale'),
-    ThreadStat('thread_write_active', 'active filesystem write calls','no_clear,no_scale'),
-
-    ##########################################
     # Yield statistics
     ##########################################
     YieldStat('application_cache_time', 'application thread time waiting for cache (usecs)'),
@@ -398,29 +421,18 @@ connection_stats = sorted(connection_stats, key=attrgetter('desc'))
 ##########################################
 dsrc_stats = [
     ##########################################
-    # Session operations
+    # Block manager statistics
     ##########################################
-    SessionStat('session_compact', 'object compaction'),
-    SessionStat('session_cursor_open', 'open cursor count', 'no_clear,no_scale'),
-
-    ##########################################
-    # Cursor operations
-    ##########################################
-    CursorStat('cursor_create', 'create calls'),
-    CursorStat('cursor_insert', 'insert calls'),
-    CursorStat('cursor_insert_bulk', 'bulk-loaded cursor-insert calls'),
-    CursorStat('cursor_insert_bytes', 'cursor-insert key and value bytes inserted', 'size'),
-    CursorStat('cursor_next', 'next calls'),
-    CursorStat('cursor_prev', 'prev calls'),
-    CursorStat('cursor_remove', 'remove calls'),
-    CursorStat('cursor_remove_bytes', 'cursor-remove key bytes removed', 'size'),
-    CursorStat('cursor_reset', 'reset calls'),
-    CursorStat('cursor_restart', 'restarted searches'),
-    CursorStat('cursor_search', 'search calls'),
-    CursorStat('cursor_search_near', 'search near calls'),
-    CursorStat('cursor_truncate', 'truncate calls'),
-    CursorStat('cursor_update', 'update calls'),
-    CursorStat('cursor_update_bytes', 'cursor-update value bytes updated', 'size'),
+    BlockStat('allocation_size', 'file allocation unit size', 'max_aggregate,no_scale,size'),
+    BlockStat('block_alloc', 'blocks allocated'),
+    BlockStat('block_checkpoint_size', 'checkpoint size', 'no_scale,size'),
+    BlockStat('block_extension', 'allocations requiring file extension'),
+    BlockStat('block_free', 'blocks freed'),
+    BlockStat('block_magic', 'file magic number', 'max_aggregate,no_scale'),
+    BlockStat('block_major', 'file major version number', 'max_aggregate,no_scale'),
+    BlockStat('block_minor', 'minor version number', 'max_aggregate,no_scale'),
+    BlockStat('block_reuse_bytes', 'file bytes available for reuse', 'no_scale,size'),
+    BlockStat('block_size', 'file size in bytes', 'no_scale,size'),
 
     ##########################################
     # Btree statistics
@@ -443,36 +455,6 @@ dsrc_stats = [
     BtreeStat('btree_overflow', 'overflow pages', 'no_scale,all_only'),
     BtreeStat('btree_row_internal', 'row-store internal pages', 'no_scale,all_only'),
     BtreeStat('btree_row_leaf', 'row-store leaf pages', 'no_scale,all_only'),
-
-    ##########################################
-    # LSM statistics
-    ##########################################
-    LSMStat('bloom_count', 'bloom filters in the LSM tree', 'no_scale'),
-    LSMStat('bloom_false_positive', 'bloom filter false positives'),
-    LSMStat('bloom_hit', 'bloom filter hits'),
-    LSMStat('bloom_miss', 'bloom filter misses'),
-    LSMStat('bloom_page_evict', 'bloom filter pages evicted from cache'),
-    LSMStat('bloom_page_read', 'bloom filter pages read into cache'),
-    LSMStat('bloom_size', 'total size of bloom filters', 'no_scale,size'),
-    LSMStat('lsm_checkpoint_throttle', 'sleep for LSM checkpoint throttle'),
-    LSMStat('lsm_chunk_count', 'chunks in the LSM tree', 'no_scale'),
-    LSMStat('lsm_generation_max', 'highest merge generation in the LSM tree', 'max_aggregate,no_scale'),
-    LSMStat('lsm_lookup_no_bloom', 'queries that could have benefited from a Bloom filter that did not exist'),
-    LSMStat('lsm_merge_throttle', 'sleep for LSM merge throttle'),
-
-    ##########################################
-    # Block manager statistics
-    ##########################################
-    BlockStat('allocation_size', 'file allocation unit size', 'max_aggregate,no_scale,size'),
-    BlockStat('block_alloc', 'blocks allocated'),
-    BlockStat('block_checkpoint_size', 'checkpoint size', 'no_scale,size'),
-    BlockStat('block_extension', 'allocations requiring file extension'),
-    BlockStat('block_free', 'blocks freed'),
-    BlockStat('block_magic', 'file magic number', 'max_aggregate,no_scale'),
-    BlockStat('block_major', 'file major version number', 'max_aggregate,no_scale'),
-    BlockStat('block_minor', 'minor version number', 'max_aggregate,no_scale'),
-    BlockStat('block_reuse_bytes', 'file bytes available for reuse', 'no_scale,size'),
-    BlockStat('block_size', 'file size in bytes', 'no_scale,size'),
 
     ##########################################
     # Cache and eviction statistics
@@ -512,6 +494,41 @@ dsrc_stats = [
     CompressStat('compress_write_too_small', 'page written was too small to compress'),
 
     ##########################################
+    # Cursor operations
+    ##########################################
+    CursorStat('cursor_create', 'create calls'),
+    CursorStat('cursor_insert', 'insert calls'),
+    CursorStat('cursor_insert_bulk', 'bulk-loaded cursor-insert calls'),
+    CursorStat('cursor_insert_bytes', 'cursor-insert key and value bytes inserted', 'size'),
+    CursorStat('cursor_next', 'next calls'),
+    CursorStat('cursor_prev', 'prev calls'),
+    CursorStat('cursor_remove', 'remove calls'),
+    CursorStat('cursor_remove_bytes', 'cursor-remove key bytes removed', 'size'),
+    CursorStat('cursor_reset', 'reset calls'),
+    CursorStat('cursor_restart', 'restarted searches'),
+    CursorStat('cursor_search', 'search calls'),
+    CursorStat('cursor_search_near', 'search near calls'),
+    CursorStat('cursor_truncate', 'truncate calls'),
+    CursorStat('cursor_update', 'update calls'),
+    CursorStat('cursor_update_bytes', 'cursor-update value bytes updated', 'size'),
+
+    ##########################################
+    # LSM statistics
+    ##########################################
+    LSMStat('bloom_count', 'bloom filters in the LSM tree', 'no_scale'),
+    LSMStat('bloom_false_positive', 'bloom filter false positives'),
+    LSMStat('bloom_hit', 'bloom filter hits'),
+    LSMStat('bloom_miss', 'bloom filter misses'),
+    LSMStat('bloom_page_evict', 'bloom filter pages evicted from cache'),
+    LSMStat('bloom_page_read', 'bloom filter pages read into cache'),
+    LSMStat('bloom_size', 'total size of bloom filters', 'no_scale,size'),
+    LSMStat('lsm_checkpoint_throttle', 'sleep for LSM checkpoint throttle'),
+    LSMStat('lsm_chunk_count', 'chunks in the LSM tree', 'no_scale'),
+    LSMStat('lsm_generation_max', 'highest merge generation in the LSM tree', 'max_aggregate,no_scale'),
+    LSMStat('lsm_lookup_no_bloom', 'queries that could have benefited from a Bloom filter that did not exist'),
+    LSMStat('lsm_merge_throttle', 'sleep for LSM merge throttle'),
+
+    ##########################################
     # Reconciliation statistics
     ##########################################
     RecStat('rec_dictionary', 'dictionary matches'),
@@ -528,6 +545,12 @@ dsrc_stats = [
     RecStat('rec_pages_eviction', 'page reconciliation calls for eviction'),
     RecStat('rec_prefix_compression', 'leaf page key bytes discarded using prefix compression', 'size'),
     RecStat('rec_suffix_compression', 'internal page key bytes discarded using suffix compression', 'size'),
+
+    ##########################################
+    # Session operations
+    ##########################################
+    SessionStat('session_compact', 'object compaction'),
+    SessionStat('session_cursor_open', 'open cursor count', 'no_clear,no_scale'),
 
     ##########################################
     # Transaction statistics

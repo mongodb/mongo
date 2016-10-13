@@ -169,6 +169,7 @@ prefix_list = [
     'reconciliation',
     'LSM',
     'log',
+    'lock',
     'cache',
     'transaction',
     'cursor',
