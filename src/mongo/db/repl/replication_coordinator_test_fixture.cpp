@@ -129,6 +129,10 @@ void ReplCoordTest::init() {
                                                _replExec.get(),
                                                seed,
                                                &_durablityLambda));
+    auto service = getGlobalServiceContext();
+    service->setFastClockSource(stdx::make_unique<executor::NetworkInterfaceMockClockSource>(_net));
+    service->setPreciseClockSource(
+        stdx::make_unique<executor::NetworkInterfaceMockClockSource>(_net));
 }
 
 void ReplCoordTest::init(const ReplSettings& settings) {

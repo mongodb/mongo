@@ -664,5 +664,10 @@ NetworkInterfaceMock::InNetworkGuard::~InNetworkGuard() {
         _net->exitNetwork();
 }
 
+NetworkInterfaceMockClockSource::NetworkInterfaceMockClockSource(NetworkInterfaceMock* net)
+    : _net(net) {
+    _tracksSystemClock = false;
+}
+
 }  // namespace executor
 }  // namespace mongo

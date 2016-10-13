@@ -248,16 +248,28 @@ static NOINLINE_DECL stdx::cv_status cvWaitUntilWithClockSource(ClockSource* clo
     auto alarmInfo = std::make_shared<AlarmInfo>();
     alarmInfo->waitCV = &cv;
     alarmInfo->waitMutex = m.mutex();
-    invariantOK(clockSource->setAlarm(deadline, [alarmInfo] {
+    const auto waiterThreadId = stdx::this_thread::get_id();
+    bool invokedAlarmInline = false;
+    invariantOK(clockSource->setAlarm(deadline, [alarmInfo, waiterThreadId, &invokedAlarmInline] {
         stdx::lock_guard<stdx::mutex> controlLk(alarmInfo->controlMutex);
         alarmInfo->cvWaitResult = stdx::cv_status::timeout;
         if (!alarmInfo->waitMutex) {
             return;
         }
+        if (stdx::this_thread::get_id() == waiterThreadId) {
+            // In NetworkInterfaceMock, setAlarm may invoke its callback immediately if the deadline
+            // has expired, so we detect that case and avoid self-deadlock by returning early, here.
+            // It is safe to set invokedAlarmInline without synchronization in this case, because it
+            // is exactly the case where the same thread is writing and consulting the value.
+            invokedAlarmInline = true;
+            return;
+        }
         stdx::lock_guard<stdx::mutex> waitLk(*alarmInfo->waitMutex);
         alarmInfo->waitCV->notify_all();
     }));
-    cv.wait(m);
+    if (!invokedAlarmInline) {
+        cv.wait(m);
+    }
     m.unlock();
     stdx::lock_guard<stdx::mutex> controlLk(alarmInfo->controlMutex);
     m.lock();

@@ -41,6 +41,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -517,6 +518,24 @@ public:
 private:
     NetworkInterfaceMock* _net;
     bool _callExitNetwork = true;
+};
+
+class NetworkInterfaceMockClockSource : public ClockSource {
+public:
+    explicit NetworkInterfaceMockClockSource(NetworkInterfaceMock* net);
+
+    Milliseconds getPrecision() override {
+        return Milliseconds{1};
+    }
+    Date_t now() override {
+        return _net->now();
+    }
+    Status setAlarm(Date_t when, stdx::function<void()> action) override {
+        return _net->setAlarm(when, action);
+    }
+
+private:
+    NetworkInterfaceMock* _net;
 };
 
 }  // namespace executor

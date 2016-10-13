@@ -46,7 +46,6 @@
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/storage/snapshot_name.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/unordered_map.h"
@@ -85,14 +84,10 @@ class StorageInterface;
 class TopologyCoordinator;
 class VoteRequester;
 
-class ReplicationCoordinatorImpl : public ReplicationCoordinator, public KillOpListenerInterface {
+class ReplicationCoordinatorImpl : public ReplicationCoordinator {
     MONGO_DISALLOW_COPYING(ReplicationCoordinatorImpl);
 
 public:
-    // For testing only.
-    using StepDownNonBlockingResult =
-        std::pair<std::unique_ptr<mongo::Lock::GlobalLock>, ReplicationExecutor::EventHandle>;
-
     // Takes ownership of the "externalState", "topCoord" and "network" objects.
     ReplicationCoordinatorImpl(const ReplSettings& settings,
                                ReplicationCoordinatorExternalState* externalState,
@@ -133,18 +128,6 @@ public:
     virtual Seconds getSlaveDelaySecs() const override;
 
     virtual void clearSyncSourceBlacklist() override;
-
-    /*
-     * Implementation of the KillOpListenerInterface interrupt method so that we can wake up
-     * threads blocked in awaitReplication() when a killOp command comes in.
-     */
-    virtual void interrupt(unsigned opId);
-
-    /*
-     * Implementation of the KillOpListenerInterface interruptAll method so that we can wake up
-     * threads blocked in awaitReplication() when we kill all operations.
-     */
-    virtual void interruptAll();
 
     virtual ReplicationCoordinator::StatusAndDuration awaitReplication(
         OperationContext* txn, const OpTime& opTime, const WriteConcernOptions& writeConcern);
@@ -371,22 +354,6 @@ public:
      */
     Status setLastAppliedOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
     Status setLastDurableOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
-
-    /**
-     * Non-blocking version of stepDown.
-     * Returns a pair of global shared lock and event handle which are used to wait for the step
-     * down operation to complete. The global shared lock prevents writes until the step down has
-     * completed (or failed).
-     * When the operation is complete (wait() returns), 'result' will be set to the
-     * final status of the operation.
-     * If the handle is invalid, step down failed before we could schedule the rest of
-     * the step down processing and the error will be available immediately in 'result'.
-     */
-    StepDownNonBlockingResult stepDown_nonBlocking(OperationContext* txn,
-                                                   bool force,
-                                                   const Milliseconds& waitTime,
-                                                   const Milliseconds& stepdownTime,
-                                                   Status* result);
 
     /**
      * Non-blocking version of setFollowerMode.
@@ -644,17 +611,14 @@ private:
     void _handleTimePassing(const ReplicationExecutor::CallbackArgs& cbData);
 
     /**
-     * Helper method for _awaitReplication that takes an already locked unique_lock and a
-     * Timer for timing the operation which has been counting since before the lock was
-     * acquired.
+     * Helper method for _awaitReplication that takes an already locked unique_lock, but leaves
+     * operation timing to the caller.
      */
-    ReplicationCoordinator::StatusAndDuration _awaitReplication_inlock(
-        const Timer* timer,
-        stdx::unique_lock<stdx::mutex>* lock,
-        OperationContext* txn,
-        const OpTime& opTime,
-        SnapshotName minSnapshot,
-        const WriteConcernOptions& writeConcern);
+    Status _awaitReplication_inlock(stdx::unique_lock<stdx::mutex>* lock,
+                                    OperationContext* txn,
+                                    const OpTime& opTime,
+                                    SnapshotName minSnapshot,
+                                    const WriteConcernOptions& writeConcern);
 
     /**
      * Returns true if the given writeConcern is satisfied up to "optime" or is unsatisfiable.
@@ -690,17 +654,11 @@ private:
     void _signalStepDownWaiter_inlock();
 
     /**
-     * Helper for stepDown run within a ReplicationExecutor callback.  This method assumes
-     * it is running within a global shared lock, and thus that no writes are going on at the
-     * same time.
+     * Non-blocking helper method for the stepDown method, that represents executing
+     * one attempt to step down. See implementation of this method and stepDown for
+     * details.
      */
-    void _stepDownContinue(const ReplicationExecutor::EventHandle finishedEvent,
-                           OperationContext* txn,
-                           Date_t waitUntil,
-                           Date_t stepdownUntil,
-                           bool force,
-                           bool restartHeartbeats,
-                           Status* result);
+    bool _tryToStepDown(Date_t waitUntil, Date_t stepdownUntil, bool force);
 
     OID _getMyRID_inlock() const;
 
@@ -1280,8 +1238,8 @@ private:
     // This member's index position in the current config.
     int _selfIndex;  // (MX)
 
-    // Event handle that should be signaled whenever new heartbeat data comes in.
-    ReplicationExecutor::EventHandle _stepDownWaiter;  // (M)
+    // Condition to signal when new heartbeat data comes in.
+    stdx::condition_variable _stepDownWaiters;  // (X)
 
     // State for conducting an election of this node.
     // the presence of a non-null _freshnessChecker pointer indicates that an election is

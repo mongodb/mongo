@@ -105,6 +105,9 @@ public:
 
     // Timeout in milliseconds.
     int wTimeout;
+    // Deadline. If this is set to something other than Date_t::max(), this takes precedence over
+    // wTimeout.
+    Date_t wDeadline = Date_t::max();
 
     // True if the default write concern was used.
     bool usedDefault = false;
