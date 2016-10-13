@@ -160,4 +160,47 @@
         coll.getName(),
         [{$facet: {nested: graphLookupPipeline}}],
         [{nested: [{_id: "New York", matchedId1: "New York", matchedId2: "New York"}]}]);
+
+    // Test that an aggregate on a view propagates the 'bypassDocumentValidation' option.
+    const validatedCollName = "collectionWithValidator";
+    viewsDB[validatedCollName].drop();
+    assert.commandWorked(
+        viewsDB.createCollection(validatedCollName, {validator: {illegalField: {$exists: false}}}));
+
+    viewsDB.invalidDocs.drop();
+    viewsDB.invalidDocsView.drop();
+    assert.writeOK(viewsDB.invalidDocs.insert({illegalField: "present"}));
+    assert.commandWorked(viewsDB.createView("invalidDocsView", "invalidDocs", []));
+
+    assert.commandWorked(
+        viewsDB.runCommand({
+            aggregate: "invalidDocsView",
+            pipeline: [{$out: validatedCollName}],
+            bypassDocumentValidation: true
+        }),
+        "Expected $out insertions to succeed since 'bypassDocumentValidation' was specified");
+
+    // Test that an aggregate on a view propagates the 'allowDiskUse' option.
+    const extSortLimit = 100 * 1024 * 1024;
+    const largeStrSize = 10 * 1024 * 1024;
+    const largeStr = new Array(largeStrSize).join('x');
+    viewsDB.largeColl.drop();
+    for (let i = 0; i <= extSortLimit / largeStrSize; ++i) {
+        assert.writeOK(viewsDB.largeColl.insert({x: i, largeStr: largeStr}));
+    }
+    assertErrorCode(viewsDB.largeColl,
+                    [{$sort: {x: -1}}],
+                    16819,
+                    "Expected in-memory sort to fail due to excessive memory usage");
+    viewsDB.largeView.drop();
+    assert.commandWorked(viewsDB.createView("largeView", "largeColl", []));
+    assertErrorCode(viewsDB.largeView,
+                    [{$sort: {x: -1}}],
+                    16819,
+                    "Expected in-memory sort to fail due to excessive memory usage");
+
+    assert.commandWorked(
+        viewsDB.runCommand(
+            {aggregate: "largeView", pipeline: [{$sort: {x: -1}}], allowDiskUse: true}),
+        "Expected aggregate to succeed since 'allowDiskUse' was specified");
 }());

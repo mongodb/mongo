@@ -92,8 +92,17 @@ StatusWith<BSONObj> ResolvedView::asExpandedViewAggregation(
         aggregationBuilder.append("cursor", BSONObj());
     }
 
-    if (request.isExplain())
+    if (request.isExplain()) {
         aggregationBuilder.append("explain", true);
+    }
+
+    if (request.shouldBypassDocumentValidation()) {
+        aggregationBuilder.append("bypassDocumentValidation", true);
+    }
+
+    if (request.shouldAllowDiskUse()) {
+        aggregationBuilder.append("allowDiskUse", true);
+    }
 
     return aggregationBuilder.obj();
 }
