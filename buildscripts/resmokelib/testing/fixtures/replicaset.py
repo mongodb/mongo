@@ -137,8 +137,12 @@ class ReplicaSetFixture(interface.ReplFixture):
             self.logger.info("Waiting for primary on port %d to be elected.", self.port)
             time.sleep(0.1)  # Wait a little bit before trying again.
 
+        secondaries = self.get_secondaries()
+        if self.initial_sync_node:
+            secondaries.append(self.initial_sync_node)
+
         # Wait for the secondaries to become available.
-        for secondary in self.get_secondaries():
+        for secondary in secondaries:
             client = utils.new_mongo_client(port=secondary.port,
                                             read_preference=pymongo.ReadPreference.SECONDARY)
             while True:
