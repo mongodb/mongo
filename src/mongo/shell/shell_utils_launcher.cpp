@@ -108,9 +108,11 @@ inline int pipe(int fds[2]) {
  */
 namespace shell_utils {
 
+#ifdef _WIN32
 namespace {
 stdx::mutex _createProcessMtx;
 }  // namespace
+#endif
 
 ProgramOutputMultiplexer programOutputLogger;
 
