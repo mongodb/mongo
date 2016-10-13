@@ -327,7 +327,7 @@ private:
     // Schedules a fetcher to get the last oplog entry from the sync source.
     void _scheduleLastOplogEntryFetcher_inlock(Fetcher::CallbackFn callback);
 
-    Status _scheduleDoNextActions();
+    Status _scheduleDoNextActions(Date_t when = Date_t());
     Status _scheduleApplyBatch();
     Status _scheduleApplyBatch_inlock();
     Status _scheduleApplyBatch_inlock(const Operations& ops);
@@ -340,7 +340,6 @@ private:
     bool _anyActiveHandles_inlock() const;
 
     Status _shutdown(OperationContext* txn);
-    void _changeStateIfNeeded();
 
     // Counts how many documents have been refetched from the source in the current batch.
     AtomicUInt32 _fetchCount;
@@ -364,15 +363,17 @@ private:
     DataReplicatorState _state;                                                 // (MX)
     std::unique_ptr<InitialSyncState> _initialSyncState;                        // (M)
     StorageInterface* _storage;                                                 // (M)
-    bool _fetcherPaused = false;                                                // (X)
+    bool _oplogFetcherPaused = false;                                           // (X)
+    bool _oplogFetcherActive = false;                                           // (M)
     std::unique_ptr<OplogFetcher> _oplogFetcher;                                // (S)
     std::unique_ptr<Fetcher> _lastOplogEntryFetcher;                            // (S)
     bool _reporterPaused = false;                                               // (M)
+    bool _reporterActive = false;                                               // (M)
     Handle _reporterHandle;                                                     // (M)
     std::unique_ptr<Reporter> _reporter;                                        // (M)
     bool _applierPaused = false;                                                // (X)
+    bool _applierActive = false;                                                // (M)
     std::unique_ptr<MultiApplier> _applier;                                     // (M)
-    std::unique_ptr<MultiApplier> _shuttingDownApplier;                         // (M)
     HostAndPort _syncSource;                                                    // (M)
     OpTimeWithHash _lastFetched;                                                // (MX)
     OpTimeWithHash _lastApplied;                                                // (MX)
