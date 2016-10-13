@@ -51,7 +51,6 @@ variables:
     vars:
       resmoke_args: --help
       run_multiple_jobs: false
-      enable_coredumps: false
       max_jobs: 0  # If set in combination with run_multiple_jobs, will cap the number of jobs used.
 
 - &jepsen_config_vars
@@ -407,9 +406,16 @@ functions:
           # Set the shell process (and its children processes) to dump ELF headers (bit 4),
           # anonymous shared mappings (bit 1), and anonymous private mappings (bit 0).
           echo 0x13 > /proc/self/coredump_filter
-
-          if [ ${build_variant} = ubuntu1604 ] && [ ${enable_coredumps|false} = true ]; then
-            ulimit -c unlimited
+        
+          if [ -f /sbin/sysctl ]; then
+            # Check that the core pattern is set explicitly on our distro image instead
+            # of being the OS's default value. This ensures that coredump names are consistent
+            # across distros and can be picked up by Evergreen.
+            core_pattern=$(/sbin/sysctl -n "kernel.core_pattern")
+            if [ "$core_pattern" = "dump_%e.%p.core" ]; then
+              echo "Enabling coredumps"
+              ulimit -c unlimited
+            fi
           fi
         fi
 
@@ -1734,7 +1740,6 @@ tasks:
     vars:
       resmoke_args: --suites=core --storageEngine=wiredTiger
       run_multiple_jobs: true
-      enable_coredumps: true
 
 - <<: *task_template
   name: jsCore_WT_ese
