@@ -38,4 +38,12 @@ load('jstests/libs/analyze_plan.js');
     ]);
 
     assert(planHasStage(explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
+
+    // Make sure a $count stage can use the COUNT_SCAN optimization.
+    explained = coll.explain().aggregate([{$match: {foo: {$gt: 0}}}, {$count: "count"}]);
+    assert(planHasStage(explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
+
+    // A $match that is not a single range cannot use the COUNT_SCAN optimization.
+    explained = coll.explain().aggregate([{$match: {foo: {$in: [0, 1]}}}, {$count: "count"}]);
+    assert(!planHasStage(explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
 }());

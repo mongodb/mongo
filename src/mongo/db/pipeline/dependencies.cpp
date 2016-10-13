@@ -42,6 +42,24 @@ using std::vector;
 namespace str = mongoutils::str;
 
 BSONObj DepsTracker::toProjection() const {
+    if (fields.empty()) {
+        if (_needTextScore) {
+            // We only need the text score, but there is no easy way to express this in the query
+            // projection language. We use $noFieldsNeeded with a textScore meta-projection since
+            // this is an inclusion projection which will exclude all existing fields but add the
+            // textScore metadata.
+            return BSON("_id" << 0 << "$noFieldsNeeded" << 1 << Document::metaFieldTextScore
+                              << BSON("$meta"
+                                      << "textScore"));
+        } else {
+            // We truly need no information (we are doing a count or something similar). In this
+            // case, the DocumentSourceCursor will know there aren't any dependencies, and we can
+            // ignore the documents returned from the query system. We pass an empty object as the
+            // projection so that we have a chance of using the COUNT_SCAN optimization.
+            return BSONObj();
+        }
+    }
+
     BSONObjBuilder bb;
 
     if (_needTextScore)
@@ -51,10 +69,6 @@ BSONObj DepsTracker::toProjection() const {
 
     if (needWholeDocument)
         return bb.obj();
-
-    if (fields.empty()) {
-        return BSONObj();
-    }
 
     bool needId = false;
     string last;
