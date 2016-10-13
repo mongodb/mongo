@@ -69,7 +69,7 @@ ReplicationExecutor::~ReplicationExecutor() {
     invariant(!_executorThread.joinable());
 }
 
-BSONObj ReplicationExecutor::getDiagnosticBSON() {
+BSONObj ReplicationExecutor::getDiagnosticBSON() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     BSONObjBuilder builder;
 
@@ -104,7 +104,7 @@ BSONObj ReplicationExecutor::getDiagnosticBSON() {
     return builder.obj();
 }
 
-std::string ReplicationExecutor::getDiagnosticString() {
+std::string ReplicationExecutor::getDiagnosticString() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _getDiagnosticString_inlock();
 }

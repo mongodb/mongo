@@ -105,8 +105,8 @@ public:
      */
     virtual ~ReplicationExecutor();
 
-    std::string getDiagnosticString() override;
-    BSONObj getDiagnosticBSON();
+    std::string getDiagnosticString() const override;
+    BSONObj getDiagnosticBSON() const;
     Date_t now() override;
     void startup() override;
     void shutdown() override;
@@ -314,7 +314,7 @@ private:
     // Thread which executes the run method. Started by startup and must be jointed after shutdown.
     stdx::thread _executorThread;
 
-    stdx::mutex _mutex;
+    mutable stdx::mutex _mutex;
     stdx::mutex _terribleExLockSyncMutex;
     stdx::condition_variable _noMoreWaitingThreads;
     WorkQueue _freeQueue;

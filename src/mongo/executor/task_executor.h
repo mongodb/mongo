@@ -136,7 +136,7 @@ public:
     /**
      * Returns diagnostic information.
      */
-    virtual std::string getDiagnosticString() = 0;
+    virtual std::string getDiagnosticString() const = 0;
 
     /**
      * Gets the current time.  Callbacks should use this method to read the system clock.

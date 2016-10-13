@@ -57,7 +57,7 @@ void TaskExecutorProxy::join() {
     _executor->join();
 }
 
-std::string TaskExecutorProxy::getDiagnosticString() {
+std::string TaskExecutorProxy::getDiagnosticString() const {
     return _executor->getDiagnosticString();
 }
 
