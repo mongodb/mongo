@@ -674,10 +674,7 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
             IndexAccessMethod* iam = ii.accessMethod(descriptor);
 
             InsertDeleteOptions options;
-            options.logIfError = false;
-            options.dupsAllowed =
-                !(KeyPattern::isIdKeyPattern(descriptor->keyPattern()) || descriptor->unique()) ||
-                repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(descriptor);
+            IndexCatalog::prepareInsertDeleteOptions(txn, descriptor, &options);
             UpdateTicket* updateTicket = new UpdateTicket();
             updateTickets.mutableMap()[descriptor] = updateTicket;
             Status ret = iam->validateUpdate(txn,
@@ -1105,7 +1102,10 @@ public:
             // There's no need to compute the prefixes of the indexed fields that cause the
             // index to be multikey when validating the index keys.
             MultikeyPaths* multikeyPaths = nullptr;
-            iam->getKeys(recordBson, &documentKeySet, multikeyPaths);
+            iam->getKeys(recordBson,
+                         IndexAccessMethod::GetKeysMode::kEnforceConstraints,
+                         &documentKeySet,
+                         multikeyPaths);
 
             if (!descriptor->isMultikey(_txn) && documentKeySet.size() > 1) {
                 string msg = str::stream() << "Index " << descriptor->indexName()

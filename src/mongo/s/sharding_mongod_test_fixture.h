@@ -58,7 +58,7 @@ class TaskExecutorPool;
 }  // namespace executor
 
 namespace repl {
-class ReplicationCoordinator;
+class ReplicationCoordinatorMock;
 class ReplSettings;
 }  // namespace repl
 
@@ -117,7 +117,7 @@ public:
     executor::TaskExecutor* executor() const;
     executor::NetworkInterfaceMock* network() const;
 
-    repl::ReplicationCoordinator* replicationCoordinator() const;
+    repl::ReplicationCoordinatorMock* replicationCoordinator() const;
 
     /**
      * Returns the stored raw pointer to the DistLockCatalog, if it has been initialized.
@@ -182,7 +182,7 @@ protected:
     /**
      * Base class returns ReplicationCoordinatorMock.
      */
-    virtual std::unique_ptr<repl::ReplicationCoordinator> makeReplicationCoordinator(
+    virtual std::unique_ptr<repl::ReplicationCoordinatorMock> makeReplicationCoordinator(
         repl::ReplSettings replSettings);
 
     /**
@@ -264,7 +264,7 @@ private:
     // store a raw pointer to it here.
     DistLockManager* _distLockManager = nullptr;
 
-    repl::ReplicationCoordinator* _replCoord = nullptr;
+    repl::ReplicationCoordinatorMock* _replCoord = nullptr;
 
     // Allows for processing tasks through the NetworkInterfaceMock/ThreadPoolMock subsystem.
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;

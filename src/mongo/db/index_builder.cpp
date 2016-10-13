@@ -66,9 +66,10 @@ void _setBgIndexStarting() {
 }
 }  // namespace
 
-IndexBuilder::IndexBuilder(const BSONObj& index)
+IndexBuilder::IndexBuilder(const BSONObj& index, bool relaxConstraints)
     : BackgroundJob(true /* self-delete */),
       _index(index.getOwned()),
+      _relaxConstraints(relaxConstraints),
       _name(str::stream() << "repl index builder " << _indexBuildCount.addAndFetch(1)) {}
 
 IndexBuilder::~IndexBuilder() {}
@@ -162,7 +163,9 @@ Status IndexBuilder::_build(OperationContext* txn,
 
             try {
                 status = indexer.init(_index).getStatus();
-                if (status.code() == ErrorCodes::IndexAlreadyExists) {
+                if (status == ErrorCodes::IndexAlreadyExists ||
+                    (status == ErrorCodes::IndexOptionsConflict && _relaxConstraints)) {
+                    LOG(1) << "Ignoring indexing error: " << redact(status);
                     if (allowBackgroundBuilding) {
                         // Must set this in case anyone is waiting for this build.
                         _setBgIndexStarting();

@@ -46,6 +46,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
@@ -98,6 +99,9 @@ ConfigServerTestFixture::~ConfigServerTestFixture() = default;
 
 void ConfigServerTestFixture::setUp() {
     ShardingMongodTestFixture::setUp();
+    // TODO: SERVER-26919 set the flag on the mock repl coordinator just for the window where it
+    // actually needs to bypass the op observer.
+    replicationCoordinator()->alwaysAllowWrites(true);
 
     // Initialize sharding components as a config server.
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;

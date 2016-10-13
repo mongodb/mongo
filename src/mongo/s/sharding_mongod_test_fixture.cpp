@@ -120,9 +120,7 @@ void ShardingMongodTestFixture::setUp() {
     replSetConfig.initialize(BSON("_id" << _setName << "protocolVersion" << 1 << "version" << 3
                                         << "members"
                                         << serversBob.arr()));
-    auto replCoordMockPtr = dynamic_cast<ReplicationCoordinatorMock*>(replicationCoordinator());
-    invariant(replCoordMockPtr);
-    replCoordMockPtr->setGetConfigReturnValue(replSetConfig);
+    replCoordPtr->setGetConfigReturnValue(replSetConfig);
 
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoordPtr));
 
@@ -131,7 +129,7 @@ void ShardingMongodTestFixture::setUp() {
     repl::createOplog(_opCtx.get());
 }
 
-std::unique_ptr<ReplicationCoordinator> ShardingMongodTestFixture::makeReplicationCoordinator(
+std::unique_ptr<ReplicationCoordinatorMock> ShardingMongodTestFixture::makeReplicationCoordinator(
     ReplSettings replSettings) {
     return stdx::make_unique<repl::ReplicationCoordinatorMock>(replSettings);
 }
@@ -372,7 +370,7 @@ executor::TaskExecutor* ShardingMongodTestFixture::executor() const {
     return Grid::get(operationContext())->getExecutorPool()->getFixedExecutor();
 }
 
-repl::ReplicationCoordinator* ShardingMongodTestFixture::replicationCoordinator() const {
+repl::ReplicationCoordinatorMock* ShardingMongodTestFixture::replicationCoordinator() const {
     invariant(_replCoord);
     return _replCoord;
 }

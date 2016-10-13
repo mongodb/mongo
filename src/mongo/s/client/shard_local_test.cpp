@@ -86,6 +86,7 @@ void ShardLocalTest::setUp() {
     _shardLocal = stdx::make_unique<ShardLocal>(ShardId("config"));
     const repl::ReplSettings replSettings = {};
     repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
+    repl::getGlobalReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY);
 }
 
 void ShardLocalTest::tearDown() {

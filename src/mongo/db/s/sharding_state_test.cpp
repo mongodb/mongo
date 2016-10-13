@@ -34,6 +34,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_options.h"
@@ -447,6 +448,8 @@ TEST_F(ShardingStateTest,
 TEST_F(ShardingStateTest,
        InitializeShardingAwarenessIfNeededNotReadOnlyAndShardServerAndInvalidShardIdentity) {
 
+    replicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY);
+
     // Insert the shardIdentity doc to disk before setting the clusterRole, since if the clusterRole
     // is ShardServer, the OpObserver for inserts will prevent the insert from occurring, since the
     // shardIdentity doc is invalid.
@@ -470,6 +473,8 @@ TEST_F(ShardingStateTest,
 
 TEST_F(ShardingStateTest,
        InitializeShardingAwarenessIfNeededNotReadOnlyAndShardServerAndValidShardIdentity) {
+
+    replicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY);
 
     // Insert the shardIdentity doc to disk before setting the clusterRole, since if the clusterRole
     // is ShardServer, the OpObserver for inserts will trigger sharding initialization from the

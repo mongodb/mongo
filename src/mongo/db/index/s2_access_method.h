@@ -63,7 +63,7 @@ private:
      * and fills each element with the prefixes of the indexed field that would cause this index to
      * be multikey as a result of inserting 'keys'.
      */
-    void getKeys(const BSONObj& obj, BSONObjSet* keys, MultikeyPaths* multikeyPaths) const final;
+    void doGetKeys(const BSONObj& obj, BSONObjSet* keys, MultikeyPaths* multikeyPaths) const final;
 
     S2IndexingParams _params;
 

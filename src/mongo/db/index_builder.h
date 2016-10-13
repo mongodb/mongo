@@ -59,10 +59,12 @@ class OperationContext;
  * ensured by the replication system, since commands are effectively run single-threaded
  * by the replication applier, and index builds are treated as commands even though they look
  * like inserts on system.indexes.
+ * The argument "relaxConstraints" specifies whether we should honor or ignore index constraints,
+ * The ignoring of constraints is for replication due to idempotency reasons.
  */
 class IndexBuilder : public BackgroundJob {
 public:
-    IndexBuilder(const BSONObj& index);
+    IndexBuilder(const BSONObj& index, bool relaxConstraints);
     virtual ~IndexBuilder();
 
     virtual void run();
@@ -88,6 +90,7 @@ private:
                   Lock::DBLock* dbLock) const;
 
     const BSONObj _index;
+    const bool _relaxConstraints;
     std::string _name;  // name of this builder, not related to the index
     static AtomicUInt32 _indexBuildCount;
 };

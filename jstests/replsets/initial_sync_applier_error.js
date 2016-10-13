@@ -4,9 +4,8 @@
  * 2) copies all non-local databases from the source and fetches operations from sync source; and
  * 3) applies operations from the source after op_start1.
  *
- * This test creates, deletes and creates again an index on the source between phases 1 and 2.
- * The index that we create again is not exactly the same as the first index we created, but
- * it will have the same name. The secondary will initially fail to apply the operations in phase 3
+ * This test renames a collection on the source between phases 1 and 2, but renameCollection is not
+ * supported in initial sync. The secondary will initially fail to apply the command in phase 3
  * and subsequently have to retry the initial sync.
  */
 
@@ -54,23 +53,18 @@
     };
     checkLog(secondary, 'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');
 
-    assert.commandWorked(coll.createIndex({content: "text"}, {default_language: "spanish"}));
-    assert.commandWorked(coll.dropIndex("content_text"));
-    assert.commandWorked(coll.createIndex({content: "text"}, {default_language: "english"}));
-
+    var newCollName = name + '_2';
+    assert.commandWorked(coll.renameCollection(newCollName, true));
     assert.commandWorked(secondary.getDB('admin').runCommand(
         {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
 
-    checkLog(secondary, 'content_text already exists with different options');
+    checkLog(secondary, 'Applying renameCollection not supported');
     checkLog(secondary, 'initial sync done');
 
     replSet.awaitReplication();
     replSet.awaitSecondaryNodes();
 
-    var textIndexes =
-        secondary.getDB('test').getCollection(name).getIndexes().filter(function(index) {
-            return index.name == "content_text";
-        });
-    assert.eq(1, textIndexes.length);
-    assert.eq("english", textIndexes[0].default_language);
+    assert.eq(0, secondary.getDB('test').getCollection(name).count());
+    assert.eq(1, secondary.getDB('test').getCollection(newCollName).count());
+    assert.eq("hi", secondary.getDB('test').getCollection(newCollName).findOne({_id: 0}).content);
 })();

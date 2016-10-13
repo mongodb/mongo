@@ -48,6 +48,7 @@ class Collection;
 
 class IndexDescriptor;
 class IndexAccessMethod;
+struct InsertDeleteOptions;
 
 /**
  * how many: 1 per Collection
@@ -336,6 +337,14 @@ public:
     // public static helpers
 
     static BSONObj fixIndexKey(const BSONObj& key);
+
+    /**
+     * Fills out 'options' in order to indicate whether to allow dups or relax
+     * index constraints, as needed by replication.
+     */
+    static void prepareInsertDeleteOptions(OperationContext* txn,
+                                           const IndexDescriptor* desc,
+                                           InsertDeleteOptions* options);
 
 private:
     static const BSONObj _idObj;  // { _id : 1 }
