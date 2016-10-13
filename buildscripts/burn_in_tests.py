@@ -344,15 +344,19 @@ def _load_tests_file(pathname):
         return json.load(fstream)
 
 
-def _save_report_data(saved_data, pathname):
+def _save_report_data(saved_data, pathname, task):
     """
     Read in the report file from the previous resmoke.py run if it exists. We'll concat it to the
     passed saved_data dict.
     """
     if not os.path.isfile(pathname):
         return None
+
     with open(pathname, "r") as fstream:
         current_data = json.load(fstream)
+    for result in current_data["results"]:
+        result["test_file"] += ":" + task
+
     saved_data["failures"] += current_data["failures"]
     saved_data["results"] += current_data["results"]
 
@@ -408,11 +412,11 @@ def main():
                                       " ".join(tests_by_task[task]["tests"]), shell=True)
             except subprocess.CalledProcessError as err:
                 print "Resmoke returned an error with task:", task
-                _save_report_data(test_results, values.report_file)
+                _save_report_data(test_results, values.report_file, task)
                 _write_report_file(test_results, values.report_file)
                 sys.exit(err.returncode)
 
-            _save_report_data(test_results, values.report_file)
+            _save_report_data(test_results, values.report_file, task)
         _write_report_file(test_results, values.report_file)
 
     sys.exit(0)
