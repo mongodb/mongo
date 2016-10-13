@@ -74,6 +74,8 @@ selector:
     - jstests/sharding/mongos_wait_csrs_initiate.js
     # v3.2 cluster does not support parallel migrations.
     - jstests/sharding/migration_ignore_interrupts_1.js
+    # Temporarily blacklisted (see SERVER-26615).
+    - jstests/sharding/addshard2.js
 
 executor:
   js_test:
