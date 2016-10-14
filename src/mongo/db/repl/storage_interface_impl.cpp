@@ -443,9 +443,9 @@ namespace {
 /**
  * Returns DeleteStageParams for deleteOne with fetch.
  */
-DeleteStageParams makeDeleteStageParamsForDeleteOne() {
+DeleteStageParams makeDeleteStageParamsForDeleteDocuments() {
     DeleteStageParams deleteStageParams;
-    invariant(!deleteStageParams.isMulti);
+    deleteStageParams.isMulti = true;
     deleteStageParams.returnDeleted = true;
     return deleteStageParams;
 }
@@ -463,8 +463,6 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
     BoundInclusion boundInclusion,
     std::size_t limit,
     FindDeleteMode mode) {
-    invariant(limit == 1U);
-
     auto isFind = mode == FindDeleteMode::kFind;
     auto opStr = isFind ? "StorageInterfaceImpl::findOne" : "StorageInterfaceImpl::deleteOne";
 
@@ -496,11 +494,12 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
             planExecutor = isFind
                 ? InternalPlanner::collectionScan(
                       txn, nss.ns(), collection, PlanExecutor::YIELD_MANUAL, direction)
-                : InternalPlanner::deleteWithCollectionScan(txn,
-                                                            collection,
-                                                            makeDeleteStageParamsForDeleteOne(),
-                                                            PlanExecutor::YIELD_MANUAL,
-                                                            direction);
+                : InternalPlanner::deleteWithCollectionScan(
+                      txn,
+                      collection,
+                      makeDeleteStageParamsForDeleteDocuments(),
+                      PlanExecutor::YIELD_MANUAL,
+                      direction);
         } else {
             // Use index scan.
             auto indexCatalog = collection->getIndexCatalog();
@@ -541,7 +540,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                                              InternalPlanner::IXSCAN_FETCH)
                 : InternalPlanner::deleteWithIndexScan(txn,
                                                        collection,
-                                                       makeDeleteStageParamsForDeleteOne(),
+                                                       makeDeleteStageParamsForDeleteDocuments(),
                                                        indexDescriptor,
                                                        bounds.first,
                                                        bounds.second,
@@ -550,15 +549,17 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                                                        direction);
         }
 
-        BSONObj doc;
-        auto state = planExecutor->getNext(&doc, nullptr);
-        if (PlanExecutor::IS_EOF == state) {
-            return {ErrorCodes::CollectionIsEmpty,
-                    str::stream() << "Collection is empty, ns: " << nss.ns()};
-        }
-        invariant(PlanExecutor::ADVANCED == state);
         std::vector<BSONObj> docs;
-        docs.push_back(doc.getOwned());
+        while (docs.size() < limit) {
+            BSONObj doc;
+            auto state = planExecutor->getNext(&doc, nullptr);
+            if (PlanExecutor::ADVANCED == state) {
+                docs.push_back(doc.getOwned());
+            } else {
+                invariant(PlanExecutor::IS_EOF == state);
+                break;
+            }
+        }
         return docs;
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, opStr, nss.ns());

@@ -232,6 +232,8 @@ bool OplogBufferCollection::_pop_inlock(OperationContext* txn, Value* value) {
 bool OplogBufferCollection::_peekOneSide_inlock(OperationContext* txn,
                                                 Value* value,
                                                 bool front) const {
+    invariant(_count > 0);
+
     // If there is a sentinel, and it was pushed right after the last BSONObj to be popped was
     // pushed, then we return an empty BSONObj for the sentinel.
     if (!_sentinels.empty() && (_lastPoppedTimestamp == _sentinels.front())) {
@@ -251,16 +253,11 @@ bool OplogBufferCollection::_peekOneSide_inlock(OperationContext* txn,
         boundInclusion = BoundInclusion::kIncludeEndKeyOnly;
     }
 
-    auto result = _storageInterface->findDocuments(
-        txn, _nss, kIdIdxName, scanDirection, startKey, boundInclusion, 1U);
-    if (!result.isOK()) {
-        if (result != ErrorCodes::CollectionIsEmpty) {
-            fassert(40163, result.getStatus());
-        }
-        return false;
-    }
-    auto&& docs = result.getValue();
-    invariant(!docs.empty());
+    const auto docs =
+        fassertStatusOK(40163,
+                        _storageInterface->findDocuments(
+                            txn, _nss, kIdIdxName, scanDirection, startKey, boundInclusion, 1U));
+    invariant(1U == docs.size());
     *value = extractEmbeddedOplogDocument(docs.front()).getOwned();
     return true;
 }

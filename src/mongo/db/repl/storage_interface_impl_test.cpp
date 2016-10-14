@@ -653,23 +653,36 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
                       .getStatus());
 }
 
-TEST_F(StorageInterfaceImplWithReplCoordTest,
-       FindDocumentsReturnsCollectionIsEmptyIfCollectionIsEmpty) {
+TEST_F(StorageInterfaceImplWithReplCoordTest, FindDocumentsReturnsEmptyVectorIfCollectionIsEmpty) {
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
     auto indexName = "_id_"_sd;
     ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty,
-                  storage
-                      .findDocuments(txn,
-                                     nss,
-                                     indexName,
-                                     StorageInterface::ScanDirection::kForward,
-                                     {},
-                                     BoundInclusion::kIncludeStartKeyOnly,
-                                     1U)
-                      .getStatus());
+    ASSERT_TRUE(unittest::assertGet(storage.findDocuments(txn,
+                                                          nss,
+                                                          indexName,
+                                                          StorageInterface::ScanDirection::kForward,
+                                                          {},
+                                                          BoundInclusion::kIncludeStartKeyOnly,
+                                                          1U))
+                    .empty());
+}
+
+std::string _toString(const std::vector<BSONObj>& docs) {
+    str::stream ss;
+    ss << "[";
+    bool first = true;
+    for (const auto& doc : docs) {
+        if (first) {
+            ss << doc;
+            first = false;
+        } else {
+            ss << ", " << doc;
+        }
+    }
+    ss << "]";
+    return ss;
 }
 
 /**
@@ -686,6 +699,22 @@ void _assertDocumentsInCollectionEquals(OperationContext* txn,
         ASSERT_BSONOBJ_EQ(doc, unittest::assertGet(iter->next()).first);
     }
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
+/**
+ * Check StatusWith<std::vector<BSONObj>> value.
+ */
+void _assertDocumentsEqual(const StatusWith<std::vector<BSONObj>>& statusWithDocs,
+                           const std::vector<BSONObj>& expectedDocs) {
+    const auto actualDocs = unittest::assertGet(statusWithDocs);
+    auto iter = actualDocs.cbegin();
+    std::string msg = str::stream() << "expected: " << _toString(expectedDocs)
+                                    << "; actual: " << _toString(actualDocs);
+    for (const auto& doc : expectedDocs) {
+        ASSERT_TRUE(iter != actualDocs.cend()) << msg;
+        ASSERT_BSONOBJ_EQ(doc, *(iter++));
+    }
+    ASSERT_TRUE(iter == actualDocs.cend()) << msg;
 }
 
 /**
@@ -722,6 +751,26 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
                                              {},
                                              BoundInclusion::kIncludeStartKeyOnly,
                                              1U)));
+
+    // startKey not provided. limit is 0.
+    _assertDocumentsEqual(storage.findDocuments(txn,
+                                                nss,
+                                                indexName,
+                                                StorageInterface::ScanDirection::kForward,
+                                                {},
+                                                BoundInclusion::kIncludeStartKeyOnly,
+                                                0U),
+                          {});
+
+    // startKey not provided. limit of 2.
+    _assertDocumentsEqual(storage.findDocuments(txn,
+                                                nss,
+                                                indexName,
+                                                StorageInterface::ScanDirection::kForward,
+                                                {},
+                                                BoundInclusion::kIncludeStartKeyOnly,
+                                                2U),
+                          {BSON("_id" << 0), BSON("_id" << 1)});
 
     // startKey provided; include start key
     ASSERT_BSONOBJ_EQ(
@@ -796,6 +845,17 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
                                              BoundInclusion::kExcludeBothStartAndEndKeys,
                                              1U)));
 
+    // startKey provided; exclude both start and end keys.
+    // A limit of 3 should return 2 documents because we reached the end of the collection.
+    _assertDocumentsEqual(storage.findDocuments(txn,
+                                                nss,
+                                                indexName,
+                                                StorageInterface::ScanDirection::kForward,
+                                                BSON("" << 2),
+                                                BoundInclusion::kExcludeBothStartAndEndKeys,
+                                                3U),
+                          {BSON("_id" << 3), BSON("_id" << 4)});
+
     _assertDocumentsInCollectionEquals(
         txn,
         nss,
@@ -827,6 +887,26 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
                                              {},
                                              BoundInclusion::kIncludeStartKeyOnly,
                                              1U)));
+
+    // startKey not provided. limit is 0.
+    _assertDocumentsEqual(storage.findDocuments(txn,
+                                                nss,
+                                                indexName,
+                                                StorageInterface::ScanDirection::kBackward,
+                                                {},
+                                                BoundInclusion::kIncludeStartKeyOnly,
+                                                0U),
+                          {});
+
+    // startKey not provided. limit of 2.
+    _assertDocumentsEqual(storage.findDocuments(txn,
+                                                nss,
+                                                indexName,
+                                                StorageInterface::ScanDirection::kBackward,
+                                                {},
+                                                BoundInclusion::kIncludeStartKeyOnly,
+                                                2U),
+                          {BSON("_id" << 4), BSON("_id" << 3)});
 
     // startKey provided; include start key
     ASSERT_BSONOBJ_EQ(
@@ -880,6 +960,17 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
                                              BSON("" << 3),
                                              BoundInclusion::kExcludeBothStartAndEndKeys,
                                              1U)));
+
+    // startKey provided; exclude both start and end keys.
+    // A limit of 3 should return 2 documents because we reached the beginning of the collection.
+    _assertDocumentsEqual(storage.findDocuments(txn,
+                                                nss,
+                                                indexName,
+                                                StorageInterface::ScanDirection::kBackward,
+                                                BSON("" << 2),
+                                                BoundInclusion::kExcludeBothStartAndEndKeys,
+                                                3U),
+                          {BSON("_id" << 1), BSON("_id" << 0)});
 
     _assertDocumentsInCollectionEquals(
         txn,
@@ -1013,22 +1104,21 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, DeleteDocumentsReturnsIndexNotFoun
 }
 
 TEST_F(StorageInterfaceImplWithReplCoordTest,
-       DeleteDocumentsReturnsCollectionIsEmptyIfCollectionIsEmpty) {
+       DeleteDocumentsReturnsEmptyVectorIfCollectionIsEmpty) {
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
     auto indexName = "_id_"_sd;
     ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty,
-                  storage
-                      .deleteDocuments(txn,
-                                       nss,
-                                       indexName,
-                                       StorageInterface::ScanDirection::kForward,
-                                       {},
-                                       BoundInclusion::kIncludeStartKeyOnly,
-                                       1U)
-                      .getStatus());
+    ASSERT_TRUE(
+        unittest::assertGet(storage.deleteDocuments(txn,
+                                                    nss,
+                                                    indexName,
+                                                    StorageInterface::ScanDirection::kForward,
+                                                    {},
+                                                    BoundInclusion::kIncludeStartKeyOnly,
+                                                    1U))
+            .empty());
 }
 
 TEST_F(StorageInterfaceImplWithReplCoordTest,
@@ -1059,6 +1149,26 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
                                                {},
                                                BoundInclusion::kIncludeStartKeyOnly,
                                                1U)));
+
+    _assertDocumentsInCollectionEquals(txn,
+                                       nss,
+                                       {BSON("_id" << 1),
+                                        BSON("_id" << 2),
+                                        BSON("_id" << 3),
+                                        BSON("_id" << 4),
+                                        BSON("_id" << 5),
+                                        BSON("_id" << 6),
+                                        BSON("_id" << 7)});
+
+    // startKey not provided. limit is 0.
+    _assertDocumentsEqual(storage.deleteDocuments(txn,
+                                                  nss,
+                                                  indexName,
+                                                  StorageInterface::ScanDirection::kForward,
+                                                  {},
+                                                  BoundInclusion::kIncludeStartKeyOnly,
+                                                  0U),
+                          {});
 
     _assertDocumentsInCollectionEquals(txn,
                                        nss,
@@ -1105,6 +1215,20 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
         txn,
         nss,
         {BSON("_id" << 1), BSON("_id" << 3), BSON("_id" << 4), BSON("_id" << 6), BSON("_id" << 7)});
+
+    // startKey provided; exclude start key.
+    // A limit of 3 should return 2 documents because we reached the end of the collection.
+    _assertDocumentsEqual(storage.deleteDocuments(txn,
+                                                  nss,
+                                                  indexName,
+                                                  StorageInterface::ScanDirection::kForward,
+                                                  BSON("" << 4),
+                                                  BoundInclusion::kIncludeEndKeyOnly,
+                                                  3U),
+                          {BSON("_id" << 6), BSON("_id" << 7)});
+
+    _assertDocumentsInCollectionEquals(
+        txn, nss, {BSON("_id" << 1), BSON("_id" << 3), BSON("_id" << 4)});
 }
 
 TEST_F(StorageInterfaceImplWithReplCoordTest,
@@ -1135,6 +1259,26 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
                                                {},
                                                BoundInclusion::kIncludeStartKeyOnly,
                                                1U)));
+
+    _assertDocumentsInCollectionEquals(txn,
+                                       nss,
+                                       {BSON("_id" << 0),
+                                        BSON("_id" << 1),
+                                        BSON("_id" << 2),
+                                        BSON("_id" << 3),
+                                        BSON("_id" << 4),
+                                        BSON("_id" << 5),
+                                        BSON("_id" << 6)});
+
+    // startKey not provided. limit is 0.
+    _assertDocumentsEqual(storage.deleteDocuments(txn,
+                                                  nss,
+                                                  indexName,
+                                                  StorageInterface::ScanDirection::kBackward,
+                                                  {},
+                                                  BoundInclusion::kIncludeStartKeyOnly,
+                                                  0U),
+                          {});
 
     _assertDocumentsInCollectionEquals(txn,
                                        nss,
@@ -1181,6 +1325,20 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
         txn,
         nss,
         {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 3), BSON("_id" << 4), BSON("_id" << 6)});
+
+    // startKey provided; exclude start key.
+    // A limit of 3 should return 2 documents because we reached the beginning of the collection.
+    _assertDocumentsEqual(storage.deleteDocuments(txn,
+                                                  nss,
+                                                  indexName,
+                                                  StorageInterface::ScanDirection::kBackward,
+                                                  BSON("" << 3),
+                                                  BoundInclusion::kIncludeEndKeyOnly,
+                                                  3U),
+                          {BSON("_id" << 1), BSON("_id" << 0)});
+
+    _assertDocumentsInCollectionEquals(
+        txn, nss, {BSON("_id" << 3), BSON("_id" << 4), BSON("_id" << 6)});
 }
 
 TEST_F(StorageInterfaceImplWithReplCoordTest,
