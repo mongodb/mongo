@@ -35,6 +35,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
+#include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/sharding_catalog_test_fixture.h"
@@ -97,7 +98,8 @@ public:
                                           << BSON("w" << 0 << "wtimeout" << 0)),
                               request.cmdObj);
 
-            ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
+            ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(),
+                              rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
             return BSON("ns" << _dropNS.ns() << "ok" << 1);
         });
@@ -105,7 +107,8 @@ public:
 
     void expectRemoveChunksAndMarkCollectionDropped() {
         onCommand([this](const RemoteCommandRequest& request) {
-            ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
+                              rpc::TrackingMetadata::removeTrackingData(request.metadata));
             ASSERT_EQ(_configHost, request.target);
             ASSERT_EQ("config", request.dbname);
 
@@ -141,7 +144,8 @@ public:
             ASSERT_EQ("admin", request.dbname);
             ASSERT_BSONOBJ_EQ(BSON("unsetSharding" << 1), request.cmdObj);
 
-            ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
+            ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(),
+                              rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
             return BSON("n" << 1 << "ok" << 1);
         });
@@ -222,7 +226,8 @@ TEST_F(DropColl2ShardTest, NSNotFound) {
             BSON("drop" << dropNS().coll() << "writeConcern" << BSON("w" << 0 << "wtimeout" << 0)),
             request.cmdObj);
 
-        ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
+        ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(),
+                          rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         return BSON("ok" << 0 << "code" << ErrorCodes::NamespaceNotFound);
     });
@@ -234,7 +239,8 @@ TEST_F(DropColl2ShardTest, NSNotFound) {
             BSON("drop" << dropNS().coll() << "writeConcern" << BSON("w" << 0 << "wtimeout" << 0)),
             request.cmdObj);
 
-        ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
+        ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(),
+                          rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         return BSON("ok" << 0 << "code" << ErrorCodes::NamespaceNotFound);
     });

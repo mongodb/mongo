@@ -35,6 +35,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
+#include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/sharding_catalog_test_fixture.h"
 #include "mongo/stdx/future.h"
@@ -67,7 +68,8 @@ TEST_F(ShardingCatalogClientAppendDbStatsTest, BasicAppendDBStats) {
     });
 
     onCommand([](const RemoteCommandRequest& request) {
-        ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata, request.metadata);
+        ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata,
+                          rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         ASSERT_EQ("admin", request.dbname);
         ASSERT_BSONOBJ_EQ(BSON("listDatabases" << 1), request.cmdObj);

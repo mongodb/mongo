@@ -49,6 +49,7 @@
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
+#include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
@@ -413,7 +414,8 @@ void ShardingTestFixture::expectUpdateCollection(const HostAndPort& expectedHost
                                                  const CollectionType& coll) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(expectedHost, request.target);
-        ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+        ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
+                          rpc::TrackingMetadata::removeTrackingData(request.metadata));
         ASSERT_EQUALS("config", request.dbname);
 
         BatchedUpdateRequest actualBatchedUpdate;
@@ -444,7 +446,8 @@ void ShardingTestFixture::expectSetShardVersion(const HostAndPort& expectedHost,
                                                 const ChunkVersion& expectedChunkVersion) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(expectedHost, request.target);
-        ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(), request.metadata);
+        ASSERT_BSONOBJ_EQ(rpc::makeEmptyMetadata(),
+                          rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         SetShardVersionRequest ssv =
             assertGet(SetShardVersionRequest::parseFromBSON(request.cmdObj));

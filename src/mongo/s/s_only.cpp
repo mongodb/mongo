@@ -42,6 +42,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/request_interface.h"
 #include "mongo/s/cluster_last_error_info.h"
@@ -133,6 +134,11 @@ void Command::execCommandClient(OperationContext* txn,
         return;
     }
 
+
+    // attach tracking
+    rpc::TrackingMetadata trackingMetadata;
+    trackingMetadata.initWithOperName(c->getName());
+    rpc::TrackingMetadata::get(txn) = trackingMetadata;
 
     std::string errmsg;
     bool ok = false;

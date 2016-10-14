@@ -150,6 +150,7 @@ env.Library(
         'metadata/server_selection_metadata.cpp',
         'metadata/sharding_metadata.cpp',
         'metadata/repl_set_metadata.cpp',
+        'metadata/tracking_metadata.cpp',
     ],
     LIBDEPS=[
         'client_metadata',
@@ -168,6 +169,7 @@ env.CppUnitTest(
     source=[
         'metadata/server_selection_metadata_test.cpp',
         'metadata/sharding_metadata_test.cpp',
+        'metadata/tracking_metadata_test.cpp',
     ],
     LIBDEPS=[
         'metadata',

@@ -965,6 +965,10 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         if (baseProgramName === 'mongod' || baseProgramName === 'mongos') {
             if (jsTest.options().enableTestCommands) {
                 argArray.push(...['--setParameter', "enableTestCommands=1"]);
+                if (!programVersion || (parseInt(programVersion.split(".")[0]) >= 3 &&
+                                        parseInt(programVersion.split(".")[1]) >= 3)) {
+                    argArray.push(...['--setParameter', "logComponentVerbosity={tracking:1}"]);
+                }
             }
             if (jsTest.options().authMechanism && jsTest.options().authMechanism != "SCRAM-SHA-1") {
                 var hasAuthMechs = false;

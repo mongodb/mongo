@@ -39,6 +39,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
+#include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/sharding_catalog_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -155,7 +156,8 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
         ASSERT_EQUALS(configHost, request.target);
         ASSERT_EQUALS("config", request.dbname);
 
-        ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+        ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
+                          rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         BatchedUpdateRequest actualBatchedUpdate;
         std::string errmsg;
@@ -180,7 +182,8 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
     // Respond to request to reload information about existing shards
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
-        ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata, request.metadata);
+        ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata,
+                          rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
@@ -329,7 +332,8 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
         ASSERT_EQUALS(configHost, request.target);
         ASSERT_EQUALS("config", request.dbname);
 
-        ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+        ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
+                          rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         BatchedDeleteRequest actualBatchedDelete;
         std::string errmsg;
@@ -352,7 +356,8 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     // Respond to request to reload information about existing shards
     onFindCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
-        ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata, request.metadata);
+        ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata,
+                          rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));

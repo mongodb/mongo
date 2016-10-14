@@ -39,6 +39,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
+#include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_config_version.h"
@@ -76,7 +77,8 @@ public:
     void expectConfigVersionLoad(StatusWith<OID> result) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
-            ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata, request.metadata);
+            ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata,
+                              rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.ns(), "config.version");

@@ -79,11 +79,8 @@ private:
     /**
      * Returns the metadata that should be used when running commands against this shard with
      * the given read preference.
-     *
-     * NOTE: This method returns a reference to a constant defined in shard_remote.cpp.  Be careful
-     * to never change it to return a reference to a temporary.
      */
-    const BSONObj& _getMetadataForCommand(const ReadPreferenceSetting& readPref);
+    BSONObj _appendMetadataForCommand(OperationContext* txn, const ReadPreferenceSetting& readPref);
 
     Shard::HostWithResponse _runCommand(OperationContext* txn,
                                         const ReadPreferenceSetting& readPref,

@@ -42,6 +42,7 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
+#include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/sharding_catalog_test_fixture.h"
@@ -90,7 +91,8 @@ public:
     void expectGetDatabase(const DatabaseType& expectedDb) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
-            ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata, request.metadata);
+            ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata,
+                              rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(DatabaseType::ConfigNS, nss.ns());
@@ -118,7 +120,8 @@ public:
             ASSERT_EQUALS(configHost, request.target);
             ASSERT_EQUALS("config", request.dbname);
 
-            ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
+                              rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
             BatchedInsertRequest actualBatchedInsert;
             std::string errmsg;
@@ -154,7 +157,8 @@ public:
     void expectReloadChunks(const std::string& ns, const vector<ChunkType>& chunks) {
         onFindCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
-            ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata, request.metadata);
+            ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata,
+                              rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
             const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
             ASSERT_EQ(nss.ns(), ChunkType::ConfigNS);
@@ -186,7 +190,8 @@ public:
             ASSERT_EQUALS(configHost, request.target);
             ASSERT_EQUALS("config", request.dbname);
 
-            ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1), request.metadata);
+            ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
+                              rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
             BatchedUpdateRequest actualBatchedUpdate;
             std::string errmsg;
@@ -755,7 +760,7 @@ TEST_F(ShardCollectionTest, withInitialData) {
         ASSERT_EQUALS(0, request.cmdObj["maxChunkObjects"].numberLong());
 
         ASSERT_BSONOBJ_EQ(rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
-                          request.metadata);
+                          rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         return BSON("ok" << 1 << "splitKeys"
                          << BSON_ARRAY(splitPoint0 << splitPoint1 << splitPoint2 << splitPoint3));
