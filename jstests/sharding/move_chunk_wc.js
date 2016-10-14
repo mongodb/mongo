@@ -28,8 +28,8 @@ load('jstests/libs/write_concern_util.js');
     var collName = 'leaves';
     var coll = db[collName];
     var numberDoc = 20;
-    var s0 = st._shardNames[0];
-    var s1 = st._shardNames[1];
+    var s0 = st.shard0.shardName;
+    var s1 = st.shard1.shardName;
 
     coll.ensureIndex({x: 1}, {unique: true});
     st.ensurePrimaryShard(db.toString(), s0);

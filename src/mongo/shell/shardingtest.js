@@ -1411,21 +1411,16 @@ var ShardingTest = function(params) {
 
     try {
         if (!otherParams.manualAddShard) {
-            this._shardNames = [];
-
             var testName = this._testName;
             var admin = this.admin;
-            var shardNames = this._shardNames;
 
             this._connections.forEach(function(z) {
                 var n = z.name || z.host || z;
 
                 print("ShardingTest " + testName + " going to add shard : " + n);
 
-                var result = admin.runCommand({addshard: n});
-                assert.commandWorked(result, "Failed to add shard " + n);
-
-                shardNames.push(result.shardAdded);
+                var result = assert.commandWorked(admin.runCommand({addshard: n}),
+                                                  "Failed to add shard " + n);
                 z.shardName = result.shardAdded;
             });
         }

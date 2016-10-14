@@ -7,7 +7,7 @@ function shardCollectionWithChunks(st, coll) {
     var _db = coll.getDB();
     var numberDoc = 20;
     coll.ensureIndex({x: 1}, {unique: true});
-    st.ensurePrimaryShard(_db.toString(), st._shardNames[0]);
+    st.ensurePrimaryShard(_db.toString(), st.shard0.shardName);
     st.shardColl(
         coll.getName(), {x: 1}, {x: numberDoc / 2}, {x: numberDoc / 2}, _db.toString(), true);
 

@@ -6,8 +6,8 @@ var st = new ShardingTest({shards: 2, mongos: 1});
 assert.throws(sh.disableBalancing, [], "sh.disableBalancing requires a collection");
 assert.throws(sh.enableBalancing, [], "sh.enableBalancing requires a collection");
 
-var shardAName = st._shardNames[0];
-var shardBName = st._shardNames[1];
+var shardAName = st.shard0.shardName;
+var shardBName = st.shard1.shardName;
 
 var collA = st.s.getCollection(jsTest.name() + ".collA");
 var collB = st.s.getCollection(jsTest.name() + ".collB");

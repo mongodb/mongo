@@ -21,7 +21,7 @@
 
     var testDB = st.s.getDB("test");
     assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName()}));
-    st.ensurePrimaryShard(testDB.getName(), st._shardNames[0]);
+    st.ensurePrimaryShard(testDB.getName(), st.shard0.shardName);
 
     // Create a collection sharded on {a: 1}. Add 2dsphere index to test geoNear.
     var coll = testDB.getCollection("sharded");
@@ -38,10 +38,10 @@
     var chunk3Min = 10;
     assert.commandWorked(testDB.adminCommand({split: coll.getFullName(), middle: {a: chunk2Min}}));
     assert.commandWorked(testDB.adminCommand({split: coll.getFullName(), middle: {a: chunk3Min}}));
-    assert.commandWorked(
-        testDB.adminCommand({moveChunk: coll.getFullName(), find: {a: 5}, to: st._shardNames[1]}));
-    assert.commandWorked(
-        testDB.adminCommand({moveChunk: coll.getFullName(), find: {a: 15}, to: st._shardNames[2]}));
+    assert.commandWorked(testDB.adminCommand(
+        {moveChunk: coll.getFullName(), find: {a: 5}, to: st.shard1.shardName}));
+    assert.commandWorked(testDB.adminCommand(
+        {moveChunk: coll.getFullName(), find: {a: 15}, to: st.shard2.shardName}));
 
     // Put data on each shard.
     // Note that the balancer is off by default, so the chunks will stay put.
