@@ -104,19 +104,21 @@ public:
 
     Status dropCollection(OperationContext* txn, const NamespaceString& nss) override;
 
-    StatusWith<BSONObj> findOne(OperationContext* txn,
-                                const NamespaceString& nss,
-                                boost::optional<StringData> indexName,
-                                ScanDirection scanDirection,
-                                const BSONObj& startKey,
-                                BoundInclusion boundInclusion) override;
+    StatusWith<std::vector<BSONObj>> findDocuments(OperationContext* txn,
+                                                   const NamespaceString& nss,
+                                                   boost::optional<StringData> indexName,
+                                                   ScanDirection scanDirection,
+                                                   const BSONObj& startKey,
+                                                   BoundInclusion boundInclusion,
+                                                   std::size_t limit) override;
 
-    StatusWith<BSONObj> deleteOne(OperationContext* txn,
-                                  const NamespaceString& nss,
-                                  boost::optional<StringData> indexName,
-                                  ScanDirection scanDirection,
-                                  const BSONObj& startKey,
-                                  BoundInclusion boundInclusion) override;
+    StatusWith<std::vector<BSONObj>> deleteDocuments(OperationContext* txn,
+                                                     const NamespaceString& nss,
+                                                     boost::optional<StringData> indexName,
+                                                     ScanDirection scanDirection,
+                                                     const BSONObj& startKey,
+                                                     BoundInclusion boundInclusion,
+                                                     std::size_t limit) override;
 
     Status isAdminDbValid(OperationContext* txn) override;
 

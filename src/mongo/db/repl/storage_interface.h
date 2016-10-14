@@ -30,6 +30,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <cstddef>
 #include <iosfwd>
 #include <string>
 
@@ -225,8 +226,10 @@ public:
     virtual Status isAdminDbValid(OperationContext* txn) = 0;
 
     /**
-     * Finds the first document returned by a collection or index scan on the collection in the
-     * requested direction.
+     * Finds at most "limit" documents returned by a collection or index scan on the collection in
+     * the requested direction.
+     * The documents returned will be copied and buffered. No cursors on the underlying collection
+     * will be kept open once this function returns.
      * If "indexName" is boost::none, a collection scan is used to locate the document.
      * Index scan options:
      *     If "startKey" is not empty, the index scan will start from the given key (instead of
@@ -239,24 +242,28 @@ public:
         kForward = 1,
         kBackward = -1,
     };
-    virtual StatusWith<BSONObj> findOne(OperationContext* txn,
-                                        const NamespaceString& nss,
-                                        boost::optional<StringData> indexName,
-                                        ScanDirection scanDirection,
-                                        const BSONObj& startKey,
-                                        BoundInclusion boundInclusion) = 0;
+    virtual StatusWith<std::vector<BSONObj>> findDocuments(OperationContext* txn,
+                                                           const NamespaceString& nss,
+                                                           boost::optional<StringData> indexName,
+                                                           ScanDirection scanDirection,
+                                                           const BSONObj& startKey,
+                                                           BoundInclusion boundInclusion,
+                                                           std::size_t limit) = 0;
 
     /**
-     * Deletes the first document returned by a collection or index scan on the collection in the
-     * requested direction. Returns deleted document on success.
+     * Deletes at most "limit" documents returned by a collection or index scan on the collection in
+     * the requested direction. Returns deleted documents on success.
+     * The documents returned will be copied and buffered. No cursors on the underlying collection
+     * will be kept open once this function returns.
      * If "indexName" is null, a collection scan is used to locate the document.
      */
-    virtual StatusWith<BSONObj> deleteOne(OperationContext* txn,
-                                          const NamespaceString& nss,
-                                          boost::optional<StringData> indexName,
-                                          ScanDirection scanDirection,
-                                          const BSONObj& startKey,
-                                          BoundInclusion boundInclusion) = 0;
+    virtual StatusWith<std::vector<BSONObj>> deleteDocuments(OperationContext* txn,
+                                                             const NamespaceString& nss,
+                                                             boost::optional<StringData> indexName,
+                                                             ScanDirection scanDirection,
+                                                             const BSONObj& startKey,
+                                                             BoundInclusion boundInclusion,
+                                                             std::size_t limit) = 0;
 };
 
 }  // namespace repl

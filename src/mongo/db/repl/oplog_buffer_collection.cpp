@@ -251,15 +251,17 @@ bool OplogBufferCollection::_peekOneSide_inlock(OperationContext* txn,
         boundInclusion = BoundInclusion::kIncludeEndKeyOnly;
     }
 
-    auto result =
-        _storageInterface->findOne(txn, _nss, kIdIdxName, scanDirection, startKey, boundInclusion);
+    auto result = _storageInterface->findDocuments(
+        txn, _nss, kIdIdxName, scanDirection, startKey, boundInclusion, 1U);
     if (!result.isOK()) {
         if (result != ErrorCodes::CollectionIsEmpty) {
             fassert(40163, result.getStatus());
         }
         return false;
     }
-    *value = extractEmbeddedOplogDocument(result.getValue()).getOwned();
+    auto&& docs = result.getValue();
+    invariant(!docs.empty());
+    *value = extractEmbeddedOplogDocument(docs.front()).getOwned();
     return true;
 }
 
