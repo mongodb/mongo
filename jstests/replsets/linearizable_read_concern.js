@@ -31,39 +31,9 @@ load('jstests/libs/write_concern_util.js');
             ErrorCodes.InterruptedDueToReplStateChange);
     };
 
-    // Linearizable read concern is an opt-in feature. Replica sets started with the startup
-    // parameter --setParameter enableLinearizableReadConcern=true should error on receiving a
-    // linearizable read command.
-    {
-        jsTestLog('Testing that linearizable read is disabled by default');
-        let replTest = new ReplSetTest({nodes: 1});
-        replTest.startSet();
-        replTest.initiate();
-        let primary = replTest.getPrimary();
-
-        // Linearizable read concern is a startup-only server parameter.
-        assert.commandFailed(
-            primary.adminCommand({setParameter: 1, enableLinearizableReadConcern: true}));
-        assert.commandFailed(
-            primary.adminCommand({setParameter: 1, enableLinearizableReadConcern: false}));
-
-        let coll = primary.getDB('test').foo;
-        assert.writeOK(coll.insert({x: 1}));
-        assert.commandFailedWithCode(
-            coll.runCommand(
-                {'find': coll.getName(), readConcern: {level: "linearizable"}, maxTimeMS: 60000}),
-            ErrorCodes.LinearizableReadConcernNotEnabled);
-        replTest.stopSet();
-    }
-
     var num_nodes = 3;
     var name = 'linearizable_read_concern';
-    var replTest = new ReplSetTest({
-        name: name,
-        nodes: num_nodes,
-        nodeOptions: {setParameter: 'enableLinearizableReadConcern=true'},
-        useBridge: true,
-    });
+    var replTest = new ReplSetTest({name: name, nodes: num_nodes, useBridge: true});
     var config = replTest.getReplSetConfig();
 
     // Increased election timeout to avoid having the primary step down while we are

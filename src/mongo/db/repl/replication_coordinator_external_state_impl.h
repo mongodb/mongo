@@ -113,7 +113,6 @@ public:
         OperationContext* txn) const override;
     virtual bool shouldUseDataReplicatorInitialSync() const override;
     virtual std::size_t getOplogFetcherMaxFetcherRestarts() const override;
-    virtual bool isLinearizableReadConcernEnabled() const override;
 
     // Methods from JournalListener.
     virtual JournalListener::Token getToken();

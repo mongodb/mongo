@@ -467,9 +467,5 @@ Status ReplicationCoordinatorMock::stepUpIfEligible() {
     return Status::OK();
 }
 
-bool ReplicationCoordinatorMock::isLinearizableReadConcernEnabled() const {
-    return false;
-}
-
 }  // namespace repl
 }  // namespace mongo

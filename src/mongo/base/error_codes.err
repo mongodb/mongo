@@ -194,7 +194,6 @@ error_code("FailPointEnabled", 192)
 error_code("NoShardingEnabled", 193)
 error_code("BalancerInterrupted", 194)
 error_code("ViewPipelineMaxSizeExceeded", 195)
-error_code("LinearizableReadConcernNotEnabled", 196)
 error_code("InvalidIndexSpecificationOption", 197)
 
 # Non-sequential error codes (for compatibility only)

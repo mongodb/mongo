@@ -1412,22 +1412,6 @@ bool Command::run(OperationContext* txn,
         return result;
     }
 
-    if (readConcernArgsStatus.getValue().getLevel() ==
-        repl::ReadConcernLevel::kLinearizableReadConcern) {
-        auto replCoord = repl::ReplicationCoordinator::get(txn);
-        if (!replCoord->isLinearizableReadConcernEnabled()) {
-            Status status(ErrorCodes::LinearizableReadConcernNotEnabled,
-                          "Linearizable read concern requested, but server was not started with "
-                          "--setParameter enableLinearizableReadConcern=true");
-            inPlaceReplyBob.resetToEmpty();
-            auto result = appendCommandStatus(inPlaceReplyBob, status);
-            inPlaceReplyBob.doneFast();
-            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-            return result;
-        }
-    }
-
-
     Status rcStatus = waitForReadConcern(txn, readConcernArgsStatus.getValue());
     if (!rcStatus.isOK()) {
         if (rcStatus == ErrorCodes::ExceededTimeLimit) {
