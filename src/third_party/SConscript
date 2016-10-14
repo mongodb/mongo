@@ -5,7 +5,7 @@ Import("wiredtiger")
 
 snappySuffix = '-1.1.2'
 zlibSuffix = '-1.2.8'
-pcreSuffix = "-8.38"
+pcreSuffix = "-8.39"
 mozjsSuffix = '-38'
 
 thirdPartyIncludePathList = [
