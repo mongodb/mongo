@@ -236,11 +236,7 @@ bool mergeChunks(OperationContext* txn,
     //
     // Run apply ops command
     //
-    Status applyOpsStatus = runApplyOpsCmd(txn, chunksToMerge, shardVersion, mergeVersion);
-    if (!applyOpsStatus.isOK()) {
-        warning() << applyOpsStatus;
-        return false;
-    }
+    uassertStatusOK(runApplyOpsCmd(txn, chunksToMerge, metadata->getCollVersion(), mergeVersion));
 
     //
     // Install merged chunk metadata
@@ -320,7 +316,7 @@ BSONObj buildOpRemoveChunk(const ChunkType& chunkToRemove) {
 
 BSONArray buildOpPrecond(const string& ns,
                          const string& shardName,
-                         const ChunkVersion& shardVersion) {
+                         const ChunkVersion& collectionVersion) {
     BSONArrayBuilder preCond;
     BSONObjBuilder condB;
     condB.append("ns", ChunkType::ConfigNS);
@@ -329,7 +325,7 @@ BSONArray buildOpPrecond(const string& ns,
                               << BSON(ChunkType::DEPRECATED_lastmod() << -1)));
     {
         BSONObjBuilder resB(condB.subobjStart("res"));
-        shardVersion.addToBSON(resB, ChunkType::DEPRECATED_lastmod());
+        collectionVersion.addToBSON(resB, ChunkType::DEPRECATED_lastmod());
         resB.done();
     }
     preCond.append(condB.obj());
@@ -338,7 +334,7 @@ BSONArray buildOpPrecond(const string& ns,
 
 Status runApplyOpsCmd(OperationContext* txn,
                       const std::vector<ChunkType>& chunksToMerge,
-                      const ChunkVersion& currShardVersion,
+                      const ChunkVersion& collectionVersion,
                       const ChunkVersion& newMergedVersion) {
     BSONArrayBuilder updatesB;
 
@@ -360,9 +356,11 @@ Status runApplyOpsCmd(OperationContext* txn,
         updatesB.append(buildOpRemoveChunk(chunkToMerge));
     }
 
-    BSONArray preCond = buildOpPrecond(firstChunk.getNS(), firstChunk.getShard(), currShardVersion);
+    BSONArray preCond =
+        buildOpPrecond(firstChunk.getNS(), firstChunk.getShard(), collectionVersion);
 
     return grid.catalogManager(txn)->applyChunkOpsDeprecated(
         txn, updatesB.arr(), preCond, firstChunk.getNS(), newMergedVersion);
 }
-}
+
+}  // namespace mongo
