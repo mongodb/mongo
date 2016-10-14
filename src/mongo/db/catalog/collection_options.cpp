@@ -86,6 +86,13 @@ Status checkStorageEngineOptions(const BSONElement& elem) {
     return Status::OK();
 }
 
+// These are collection creation options which are either created by other versions and no longer
+// used, or handled elsewhere. If we encounter a field which CollectionOptions doesn't know about,
+// parsing the options should fail unless we find the field name in this whitelist.
+const std::set<StringData> collectionOptionsWhitelist{
+    "create"_sd, "maxTimeMS"_sd, "writeConcern"_sd,
+};
+
 }  // namespace
 
 void CollectionOptions::reset() {
@@ -245,11 +252,7 @@ Status CollectionOptions::parse(const BSONObj& options) {
             }
 
             pipeline = e.Obj().getOwned();
-        } else if (fieldName == "writeConcern") {
-            continue;
-        } else if (fieldName == "maxTimeMS") {
-            continue;
-        } else {
+        } else if (collectionOptionsWhitelist.find(fieldName) == collectionOptionsWhitelist.end()) {
             return Status(ErrorCodes::InvalidOptions,
                           str::stream() << "The field '" << fieldName
                                         << "' is not a valid collection option. Options: "

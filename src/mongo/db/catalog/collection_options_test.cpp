@@ -269,4 +269,22 @@ TEST(CollectionOptions, UnknownTopLevelOptionFailsToParse) {
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status.code(), ErrorCodes::InvalidOptions);
 }
+
+TEST(CollectionOptions, CreateWhitelistedOptionIgnored) {
+    CollectionOptions options;
+    auto status = options.parse(fromjson("{create: 1}"));
+    ASSERT_OK(status);
+}
+
+TEST(CollectionOptions, MaxTimeMSWhitelistedOptionIgnored) {
+    CollectionOptions options;
+    auto status = options.parse(fromjson("{maxTimeMS: 1}"));
+    ASSERT_OK(status);
+}
+
+TEST(CollectionOptions, WriteConcernWhitelistedOptionIgnored) {
+    CollectionOptions options;
+    auto status = options.parse(fromjson("{writeConcern: 1}"));
+    ASSERT_OK(status);
+}
 }  // namespace mongo
