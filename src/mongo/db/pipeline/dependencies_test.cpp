@@ -131,5 +131,32 @@ TEST(DependenciesToProjectionTest,
         BSON(Document::metaFieldTextScore << metaTextScore << "a" << 1 << "_id" << 0));
 }
 
+TEST(DependenciesToProjectionTest, ShouldProduceEmptyObjectIfThereAreNoDependencies) {
+    DepsTracker deps(DepsTracker::MetadataAvailable::kTextScore);
+    deps.fields = {};
+    deps.needWholeDocument = false;
+    deps.setNeedTextScore(false);
+    ASSERT_BSONOBJ_EQ(deps.toProjection(), BSONObj());
+}
+
+TEST(DependenciesToProjectionTest, ShouldAttemptToExcludeOtherFieldsIfOnlyTextScoreIsNeeded) {
+    DepsTracker deps(DepsTracker::MetadataAvailable::kTextScore);
+    deps.fields = {};
+    deps.needWholeDocument = false;
+    deps.setNeedTextScore(true);
+    ASSERT_BSONOBJ_EQ(deps.toProjection(),
+                      BSON("_id" << 0 << "$noFieldsNeeded" << 1 << Document::metaFieldTextScore
+                                 << metaTextScore));
+}
+
+TEST(DependenciesToProjectionTest,
+     ShouldRequireTextScoreIfNoFieldsPresentButWholeDocumentIsNeeded) {
+    DepsTracker deps(DepsTracker::MetadataAvailable::kTextScore);
+    deps.fields = {};
+    deps.needWholeDocument = true;
+    deps.setNeedTextScore(true);
+    ASSERT_BSONOBJ_EQ(deps.toProjection(), BSON(Document::metaFieldTextScore << metaTextScore));
+}
+
 }  // namespace
 }  // namespace mongo

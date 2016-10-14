@@ -42,7 +42,7 @@ using std::vector;
 namespace str = mongoutils::str;
 
 BSONObj DepsTracker::toProjection() const {
-    if (fields.empty()) {
+    if (fields.empty() && !needWholeDocument) {
         if (_needTextScore) {
             // We only need the text score, but there is no easy way to express this in the query
             // projection language. We use $noFieldsNeeded with a textScore meta-projection since
