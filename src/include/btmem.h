@@ -619,6 +619,8 @@ struct __wt_page {
 #define	WT_READGEN_START_VALUE	100
 #define	WT_READGEN_STEP		100
 	uint64_t read_gen;
+	/* The evict pass generation for the page */
+	uint64_t evict_pass_gen;
 
 	size_t memory_footprint;	/* Memory attached to the page */
 

@@ -9,7 +9,8 @@
 #
 # Data-source statistics are normally aggregated across the set of underlying
 # objects. Additional optional configuration flags are available:
-#       all_only        Only gets reported when statistics=all set
+#       cache_walk      Only reported when statistics=cache_walk is set
+#       tree_walk       Only reported when statistics=tree_walk is set
 #       max_aggregate   Take the maximum value when aggregating statistics
 #       no_clear        Value not cleared when statistics cleared
 #       no_scale        Don't scale value per second in the logging tool script
@@ -46,6 +47,11 @@ class CacheStat(Stat):
     prefix = 'cache'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, CacheStat.prefix, desc, flags)
+class CacheWalkStat(Stat):
+    prefix = 'cache_walk'
+    def __init__(self, name, desc, flags=''):
+        flags += ',cache_walk'
+        Stat.__init__(self, name, CacheWalkStat.prefix, desc, flags)
 class CompressStat(Stat):
     prefix = 'compression'
     def __init__(self, name, desc, flags=''):
@@ -109,11 +115,16 @@ groups['cursor'] = [CursorStat.prefix, SessionStat.prefix]
 groups['evict'] = [
     BlockStat.prefix,
     CacheStat.prefix,
+    CacheWalkStat.prefix,
     ConnStat.prefix,
     ThreadStat.prefix
 ]
 groups['lsm'] = [LSMStat.prefix, TxnStat.prefix]
-groups['memory'] = [CacheStat.prefix, ConnStat.prefix, RecStat.prefix]
+groups['memory'] = [
+    CacheStat.prefix,
+    CacheWalkStat.prefix,
+    ConnStat.prefix,
+    RecStat.prefix]
 groups['system'] = [
     ConnStat.prefix,
     DhandleStat.prefix,
@@ -438,13 +449,13 @@ dsrc_stats = [
     # Btree statistics
     ##########################################
     BtreeStat('btree_checkpoint_generation', 'btree checkpoint generation', 'no_clear,no_scale'),
-    BtreeStat('btree_column_deleted', 'column-store variable-size deleted values', 'no_scale,all_only'),
-    BtreeStat('btree_column_fix', 'column-store fixed-size leaf pages', 'no_scale,all_only'),
-    BtreeStat('btree_column_internal', 'column-store internal pages', 'no_scale,all_only'),
-    BtreeStat('btree_column_rle', 'column-store variable-size RLE encoded values', 'no_scale,all_only'),
-    BtreeStat('btree_column_variable', 'column-store variable-size leaf pages', 'no_scale,all_only'),
+    BtreeStat('btree_column_deleted', 'column-store variable-size deleted values', 'no_scale,tree_walk'),
+    BtreeStat('btree_column_fix', 'column-store fixed-size leaf pages', 'no_scale,tree_walk'),
+    BtreeStat('btree_column_internal', 'column-store internal pages', 'no_scale,tree_walk'),
+    BtreeStat('btree_column_rle', 'column-store variable-size RLE encoded values', 'no_scale,tree_walk'),
+    BtreeStat('btree_column_variable', 'column-store variable-size leaf pages', 'no_scale,tree_walk'),
     BtreeStat('btree_compact_rewrite', 'pages rewritten by compaction'),
-    BtreeStat('btree_entries', 'number of key/value pairs', 'no_scale,all_only'),
+    BtreeStat('btree_entries', 'number of key/value pairs', 'no_scale,tree_walk'),
     BtreeStat('btree_fixed_len', 'fixed-record size', 'max_aggregate,no_scale,size'),
     BtreeStat('btree_maximum_depth', 'maximum tree depth', 'max_aggregate,no_scale'),
     BtreeStat('btree_maxintlkey', 'maximum internal page key size', 'max_aggregate,no_scale,size'),
@@ -452,9 +463,9 @@ dsrc_stats = [
     BtreeStat('btree_maxleafkey', 'maximum leaf page key size', 'max_aggregate,no_scale,size'),
     BtreeStat('btree_maxleafpage', 'maximum leaf page size', 'max_aggregate,no_scale,size'),
     BtreeStat('btree_maxleafvalue', 'maximum leaf page value size', 'max_aggregate,no_scale,size'),
-    BtreeStat('btree_overflow', 'overflow pages', 'no_scale,all_only'),
-    BtreeStat('btree_row_internal', 'row-store internal pages', 'no_scale,all_only'),
-    BtreeStat('btree_row_leaf', 'row-store leaf pages', 'no_scale,all_only'),
+    BtreeStat('btree_overflow', 'overflow pages', 'no_scale,tree_walk'),
+    BtreeStat('btree_row_internal', 'row-store internal pages', 'no_scale,tree_walk'),
+    BtreeStat('btree_row_leaf', 'row-store leaf pages', 'no_scale,tree_walk'),
 
     ##########################################
     # Cache and eviction statistics
@@ -481,6 +492,28 @@ dsrc_stats = [
     CacheStat('cache_write', 'pages written from cache'),
     CacheStat('cache_write_lookaside', 'page written requiring lookaside records'),
     CacheStat('cache_write_restore', 'pages written requiring in-memory restoration'),
+
+    ##########################################
+    # Cache content statistics
+    ##########################################
+    CacheWalkStat('cache_state_avg_written_size', 'Average on-disk page image size seen', 'no_clear,no_scale'),
+    CacheWalkStat('cache_state_gen_avg_gap', 'Average difference between current eviction generation when the page was last considered', 'no_clear,no_scale'),
+    CacheWalkStat('cache_state_gen_current', 'Current eviction generation', 'no_clear,no_scale'),
+    CacheWalkStat('cache_state_gen_max_gap', 'Maximum difference between current eviction generation when the page was last considered', 'no_clear,no_scale'),
+    CacheWalkStat('cache_state_max_pagesize', 'Maximum page size seen', 'no_clear,no_scale'),
+    CacheWalkStat('cache_state_memory', 'Pages created in memory and never written', 'no_clear,no_scale'),
+    CacheWalkStat('cache_state_min_written_size', 'Minimum on-disk page image size seen', 'no_clear,no_scale'),
+    CacheWalkStat('cache_state_not_queueable', 'Pages that could not be queued for eviction', 'no_clear,no_scale'),
+    CacheWalkStat('cache_state_pages', 'Total number of pages currently in cache', 'no_clear,no_scale'),
+    CacheWalkStat('cache_state_pages_clean', 'Clean pages currently in cache', 'no_clear,no_scale'),
+    CacheWalkStat('cache_state_pages_dirty', 'Dirty pages currently in cache', 'no_clear,no_scale'),
+    CacheWalkStat('cache_state_pages_internal', 'Internal pages currently in cache', 'no_clear,no_scale'),
+    CacheWalkStat('cache_state_pages_leaf', 'Leaf pages currently in cache', 'no_clear,no_scale'),
+    CacheWalkStat('cache_state_queued', 'Pages currently queued for eviction', 'no_clear,no_scale'),
+    CacheWalkStat('cache_state_refs_skipped', 'Refs skipped during cache traversal', 'no_clear,no_scale'),
+    CacheWalkStat('cache_state_root_entries', 'Entries in the root page', 'no_clear,no_scale'),
+    CacheWalkStat('cache_state_root_size', 'Size of the root page', 'no_clear,no_scale'),
+    CacheWalkStat('cache_state_smaller_alloc_size', 'On-disk page image sizes smaller than a single allocation unit', 'no_clear,no_scale'),
 
     ##########################################
     # Compression statistics

@@ -137,7 +137,7 @@ __wt_curstat_table_init(WT_SESSION_IMPL *session,
 	 * If only gathering table size statistics, try a fast path that
 	 * avoids the schema and table list locks.
 	 */
-	if (F_ISSET(cst, WT_CONN_STAT_SIZE)) {
+	if (F_ISSET(cst, WT_STAT_TYPE_SIZE)) {
 		WT_RET(__curstat_size_only(session, uri, &was_fast, cst));
 		if (was_fast)
 			return (0);

@@ -165,7 +165,7 @@ class test_stat_cursor_conn_error(wttest.WiredTigerTestCase):
         args = ['none', 'all', 'fast']
         for i in list(itertools.permutations(args, 2)):
             config = 'create,statistics=(' + i[0] + ',' + i[1] + ')'
-            msg = '/only one statistics configuration value/'
+            msg = '/Only one of/'
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                 lambda: self.wiredtiger_open('.', config), msg)
 
@@ -188,10 +188,76 @@ class test_stat_cursor_dsrc_error(wttest.WiredTigerTestCase):
         args = ['all', 'fast']
         for i in list(itertools.permutations(args, 2)):
             config = 'statistics=(' + i[0] + ',' + i[1] + ')'
-            msg = '/only one statistics configuration value/'
+            msg = '/Only one of/'
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                 lambda: self.session.open_cursor(
                 'statistics:' + self.uri, None, config), msg)
+
+# Test data-source cache walk statistics
+class test_stat_cursor_dsrc_cache_walk(wttest.WiredTigerTestCase):
+    uri = 'file:test_stat_cursor_dsrc_cache_walk'
+
+    conn_config = 'statistics=(none)'
+
+    def test_stat_cursor_dsrc_cache_walk(self):
+        simple_populate(self, self.uri, 'key_format=S', 100)
+        # Ensure that it's an error to get cache_walk stats if none is set
+        msg = '/doesn\'t match the database statistics/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor(
+            'statistics:' + self.uri, None, None), msg)
+
+        # Test configurations that are valid but should not collect
+        # cache walk information. Do these first since the cache walk
+        # statistics are mostly marked as not cleared - so once they are
+        # populated the values will always be returned
+        self.conn.reconfigure('statistics=(cache_walk,fast,clear)')
+        c = self.session.open_cursor(
+            'statistics:' + self.uri, None, 'statistics=(fast)')
+        self.assertEqual(c[stat.dsrc.cache_state_root_size][2], 0)
+        c.close()
+
+        self.conn.reconfigure('statistics=(all,clear)')
+        c = self.session.open_cursor(
+            'statistics:' + self.uri, None, 'statistics=(fast)')
+        self.assertEqual(c[stat.dsrc.cache_state_root_size][2], 0)
+        c.close()
+
+        self.conn.reconfigure('statistics=(cache_walk,fast,clear)')
+        c = self.session.open_cursor('statistics:' + self.uri, None, None)
+        self.assertGreater(c[stat.dsrc.cache_state_root_size][2], 0)
+        # Verify that cache_walk didn't imply tree_walk
+        self.assertEqual(c[stat.dsrc.btree_entries][2], 0)
+        c.close()
+
+        self.conn.reconfigure('statistics=(cache_walk,tree_walk,fast,clear)')
+        c = self.session.open_cursor('statistics:' + self.uri, None, None)
+        self.assertGreater(c[stat.dsrc.cache_state_root_size][2], 0)
+        # Verify that cache_walk didn't exclude tree_walk
+        self.assertGreater(c[stat.dsrc.btree_entries][2], 0)
+        c.close()
+
+        self.conn.reconfigure('statistics=(all,clear)')
+        c = self.session.open_cursor(
+            'statistics:' + self.uri, None, 'statistics=(all)')
+        self.assertGreater(c[stat.dsrc.cache_state_root_size][2], 0)
+        self.assertGreater(c[stat.dsrc.btree_entries][2], 0)
+        c.close()
+
+        # Verify that cache and tree walk can operate independantly
+        self.conn.reconfigure('statistics=(all,clear)')
+        c = self.session.open_cursor(
+            'statistics:' + self.uri, None, 'statistics=(cache_walk,fast)')
+        self.assertGreater(c[stat.dsrc.cache_state_root_size][2], 0)
+        self.assertEqual(c[stat.dsrc.btree_entries][2], 0)
+        c.close()
+
+        self.conn.reconfigure('statistics=(all,clear)')
+        c = self.session.open_cursor(
+            'statistics:' + self.uri, None, 'statistics=(tree_walk,fast)')
+        # Don't check the cache walk stats for empty - they won't be cleared
+        self.assertGreater(c[stat.dsrc.btree_entries][2], 0)
+        c.close()
 
 if __name__ == '__main__':
     wttest.run()

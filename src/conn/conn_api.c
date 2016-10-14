@@ -1668,31 +1668,59 @@ __conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	if ((ret = __wt_config_subgets(
 	    session, &cval, "fast", &sval)) == 0 && sval.val != 0) {
-		LF_SET(WT_CONN_STAT_FAST);
+		LF_SET(WT_STAT_TYPE_FAST);
 		++set;
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	if ((ret = __wt_config_subgets(
 	    session, &cval, "all", &sval)) == 0 && sval.val != 0) {
-		LF_SET(WT_CONN_STAT_ALL | WT_CONN_STAT_FAST);
+		LF_SET(
+		    WT_STAT_TYPE_ALL | WT_STAT_TYPE_CACHE_WALK |
+		    WT_STAT_TYPE_FAST | WT_STAT_TYPE_TREE_WALK);
 		++set;
-	}
-	WT_RET_NOTFOUND_OK(ret);
-
-	if ((ret = __wt_config_subgets(
-	    session, &cval, "clear", &sval)) == 0 && sval.val != 0) {
-		if (!LF_ISSET(WT_CONN_STAT_FAST | WT_CONN_STAT_ALL))
-			WT_RET_MSG(session, EINVAL,
-			    "the value \"clear\" can be specified only if "
-			    "either \"all\" or \"fast\" is specified");
-		LF_SET(WT_CONN_STAT_CLEAR);
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	if (set > 1)
 		WT_RET_MSG(session, EINVAL,
-		    "only one statistics configuration value may be specified");
+		    "Only one of all, fast, none configuration values should "
+		    "be specified");
+
+	/*
+	 * Now that we've parsed general statistics categories, process
+	 * sub-categories.
+	 */
+	if ((ret = __wt_config_subgets(
+	    session, &cval, "cache_walk", &sval)) == 0 && sval.val != 0)
+		/*
+		 * Configuring cache walk statistics implies fast statistics.
+		 * Keep that knowledge internal for now - it may change in the
+		 * future.
+		 */
+		LF_SET(WT_STAT_TYPE_FAST | WT_STAT_TYPE_CACHE_WALK);
+	WT_RET_NOTFOUND_OK(ret);
+
+	if ((ret = __wt_config_subgets(
+	    session, &cval, "tree_walk", &sval)) == 0 && sval.val != 0)
+		/*
+		 * Configuring tree walk statistics implies fast statistics.
+		 * Keep that knowledge internal for now - it may change in the
+		 * future.
+		 */
+		LF_SET(WT_STAT_TYPE_FAST | WT_STAT_TYPE_TREE_WALK);
+	WT_RET_NOTFOUND_OK(ret);
+
+	if ((ret = __wt_config_subgets(
+	    session, &cval, "clear", &sval)) == 0 && sval.val != 0) {
+		if (!LF_ISSET(WT_STAT_TYPE_ALL | WT_STAT_TYPE_CACHE_WALK |
+		    WT_STAT_TYPE_FAST | WT_STAT_TYPE_TREE_WALK))
+			WT_RET_MSG(session, EINVAL,
+			    "the value \"clear\" can only be specified if "
+			    "statistics are enabled");
+		LF_SET(WT_STAT_CLEAR);
+	}
+	WT_RET_NOTFOUND_OK(ret);
 
 	/* Configuring statistics clears any existing values. */
 	conn->stat_flags = flags;

@@ -962,8 +962,9 @@ struct __wt_session {
 	 * where appropriate (for example\, a cache size statistic is not
 	 * cleared\, while the count of cursor insert operations will be
 	 * cleared). See @ref statistics for more information., a list\, with
-	 * values chosen from the following options: \c "all"\, \c "fast"\, \c
-	 * "clear"\, \c "size"; default empty.}
+	 * values chosen from the following options: \c "all"\, \c
+	 * "cache_walk"\, \c "fast"\, \c "clear"\, \c "size"\, \c "tree_walk";
+	 * default empty.}
 	 * @config{target, if non-empty\, backup the list of objects; valid only
 	 * for a backup data source., a list of strings; default empty.}
 	 * @configend
@@ -1903,8 +1904,9 @@ struct __wt_connection {
 	 * reset each time a statistics cursor is used to gather statistics\, as
 	 * well as each time statistics are logged using the \c statistics_log
 	 * configuration.  See @ref statistics for more information., a list\,
-	 * with values chosen from the following options: \c "all"\, \c "fast"\,
-	 * \c "none"\, \c "clear"; default \c none.}
+	 * with values chosen from the following options: \c "all"\, \c
+	 * "cache_walk"\, \c "fast"\, \c "none"\, \c "clear"\, \c "tree_walk";
+	 * default \c none.}
 	 * @config{statistics_log = (, log any statistics the database is
 	 * configured to maintain\, to a file.  See @ref statistics for more
 	 * information.  Enabling the statistics log server uses a session from
@@ -2406,8 +2408,9 @@ struct __wt_connection {
  * statistics are reset each time a statistics cursor is used to gather
  * statistics\, as well as each time statistics are logged using the \c
  * statistics_log configuration.  See @ref statistics for more information., a
- * list\, with values chosen from the following options: \c "all"\, \c "fast"\,
- * \c "none"\, \c "clear"; default \c none.}
+ * list\, with values chosen from the following options: \c "all"\, \c
+ * "cache_walk"\, \c "fast"\, \c "none"\, \c "clear"\, \c "tree_walk"; default
+ * \c none.}
  * @config{statistics_log = (, log any statistics the database is configured to
  * maintain\, to a file.  See @ref statistics for more information.  Enabling
  * the statistics log server uses a session from the configured session_max., a
@@ -4757,28 +4760,28 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*! btree: btree checkpoint generation */
 #define	WT_STAT_DSRC_BTREE_CHECKPOINT_GENERATION	2022
 /*!
- * btree: column-store fixed-size leaf pages, only reported if
- * statistics=all is set
+ * btree: column-store fixed-size leaf pages, only reported if tree_walk
+ * or all statistics are enabled
  */
 #define	WT_STAT_DSRC_BTREE_COLUMN_FIX			2023
 /*!
- * btree: column-store internal pages, only reported if statistics=all is
- * set
+ * btree: column-store internal pages, only reported if tree_walk or all
+ * statistics are enabled
  */
 #define	WT_STAT_DSRC_BTREE_COLUMN_INTERNAL		2024
 /*!
  * btree: column-store variable-size RLE encoded values, only reported if
- * statistics=all is set
+ * tree_walk or all statistics are enabled
  */
 #define	WT_STAT_DSRC_BTREE_COLUMN_RLE			2025
 /*!
  * btree: column-store variable-size deleted values, only reported if
- * statistics=all is set
+ * tree_walk or all statistics are enabled
  */
 #define	WT_STAT_DSRC_BTREE_COLUMN_DELETED		2026
 /*!
  * btree: column-store variable-size leaf pages, only reported if
- * statistics=all is set
+ * tree_walk or all statistics are enabled
  */
 #define	WT_STAT_DSRC_BTREE_COLUMN_VARIABLE		2027
 /*! btree: fixed-record size */
@@ -4796,20 +4799,26 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*! btree: maximum tree depth */
 #define	WT_STAT_DSRC_BTREE_MAXIMUM_DEPTH		2034
 /*!
- * btree: number of key/value pairs, only reported if statistics=all is
- * set
+ * btree: number of key/value pairs, only reported if tree_walk or all
+ * statistics are enabled
  */
 #define	WT_STAT_DSRC_BTREE_ENTRIES			2035
-/*! btree: overflow pages, only reported if statistics=all is set */
+/*!
+ * btree: overflow pages, only reported if tree_walk or all statistics
+ * are enabled
+ */
 #define	WT_STAT_DSRC_BTREE_OVERFLOW			2036
 /*! btree: pages rewritten by compaction */
 #define	WT_STAT_DSRC_BTREE_COMPACT_REWRITE		2037
 /*!
- * btree: row-store internal pages, only reported if statistics=all is
- * set
+ * btree: row-store internal pages, only reported if tree_walk or all
+ * statistics are enabled
  */
 #define	WT_STAT_DSRC_BTREE_ROW_INTERNAL			2038
-/*! btree: row-store leaf pages, only reported if statistics=all is set */
+/*!
+ * btree: row-store leaf pages, only reported if tree_walk or all
+ * statistics are enabled
+ */
 #define	WT_STAT_DSRC_BTREE_ROW_LEAF			2039
 /*! cache: bytes currently in the cache */
 #define	WT_STAT_DSRC_CACHE_BYTES_INUSE			2040
@@ -4855,87 +4864,179 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_CACHE_WRITE_RESTORE		2060
 /*! cache: unmodified pages evicted */
 #define	WT_STAT_DSRC_CACHE_EVICTION_CLEAN		2061
+/*!
+ * cache_walk: Average difference between current eviction generation
+ * when the page was last considered, only reported if cache_walk or all
+ * statistics are enabled
+ */
+#define	WT_STAT_DSRC_CACHE_STATE_GEN_AVG_GAP		2062
+/*!
+ * cache_walk: Average on-disk page image size seen, only reported if
+ * cache_walk or all statistics are enabled
+ */
+#define	WT_STAT_DSRC_CACHE_STATE_AVG_WRITTEN_SIZE	2063
+/*!
+ * cache_walk: Clean pages currently in cache, only reported if
+ * cache_walk or all statistics are enabled
+ */
+#define	WT_STAT_DSRC_CACHE_STATE_PAGES_CLEAN		2064
+/*!
+ * cache_walk: Current eviction generation, only reported if cache_walk
+ * or all statistics are enabled
+ */
+#define	WT_STAT_DSRC_CACHE_STATE_GEN_CURRENT		2065
+/*!
+ * cache_walk: Dirty pages currently in cache, only reported if
+ * cache_walk or all statistics are enabled
+ */
+#define	WT_STAT_DSRC_CACHE_STATE_PAGES_DIRTY		2066
+/*!
+ * cache_walk: Entries in the root page, only reported if cache_walk or
+ * all statistics are enabled
+ */
+#define	WT_STAT_DSRC_CACHE_STATE_ROOT_ENTRIES		2067
+/*!
+ * cache_walk: Internal pages currently in cache, only reported if
+ * cache_walk or all statistics are enabled
+ */
+#define	WT_STAT_DSRC_CACHE_STATE_PAGES_INTERNAL		2068
+/*!
+ * cache_walk: Leaf pages currently in cache, only reported if cache_walk
+ * or all statistics are enabled
+ */
+#define	WT_STAT_DSRC_CACHE_STATE_PAGES_LEAF		2069
+/*!
+ * cache_walk: Maximum difference between current eviction generation
+ * when the page was last considered, only reported if cache_walk or all
+ * statistics are enabled
+ */
+#define	WT_STAT_DSRC_CACHE_STATE_GEN_MAX_GAP		2070
+/*!
+ * cache_walk: Maximum page size seen, only reported if cache_walk or all
+ * statistics are enabled
+ */
+#define	WT_STAT_DSRC_CACHE_STATE_MAX_PAGESIZE		2071
+/*!
+ * cache_walk: Minimum on-disk page image size seen, only reported if
+ * cache_walk or all statistics are enabled
+ */
+#define	WT_STAT_DSRC_CACHE_STATE_MIN_WRITTEN_SIZE	2072
+/*!
+ * cache_walk: On-disk page image sizes smaller than a single allocation
+ * unit, only reported if cache_walk or all statistics are enabled
+ */
+#define	WT_STAT_DSRC_CACHE_STATE_SMALLER_ALLOC_SIZE	2073
+/*!
+ * cache_walk: Pages created in memory and never written, only reported
+ * if cache_walk or all statistics are enabled
+ */
+#define	WT_STAT_DSRC_CACHE_STATE_MEMORY			2074
+/*!
+ * cache_walk: Pages currently queued for eviction, only reported if
+ * cache_walk or all statistics are enabled
+ */
+#define	WT_STAT_DSRC_CACHE_STATE_QUEUED			2075
+/*!
+ * cache_walk: Pages that could not be queued for eviction, only reported
+ * if cache_walk or all statistics are enabled
+ */
+#define	WT_STAT_DSRC_CACHE_STATE_NOT_QUEUEABLE		2076
+/*!
+ * cache_walk: Refs skipped during cache traversal, only reported if
+ * cache_walk or all statistics are enabled
+ */
+#define	WT_STAT_DSRC_CACHE_STATE_REFS_SKIPPED		2077
+/*!
+ * cache_walk: Size of the root page, only reported if cache_walk or all
+ * statistics are enabled
+ */
+#define	WT_STAT_DSRC_CACHE_STATE_ROOT_SIZE		2078
+/*!
+ * cache_walk: Total number of pages currently in cache, only reported if
+ * cache_walk or all statistics are enabled
+ */
+#define	WT_STAT_DSRC_CACHE_STATE_PAGES			2079
 /*! compression: compressed pages read */
-#define	WT_STAT_DSRC_COMPRESS_READ			2062
+#define	WT_STAT_DSRC_COMPRESS_READ			2080
 /*! compression: compressed pages written */
-#define	WT_STAT_DSRC_COMPRESS_WRITE			2063
+#define	WT_STAT_DSRC_COMPRESS_WRITE			2081
 /*! compression: page written failed to compress */
-#define	WT_STAT_DSRC_COMPRESS_WRITE_FAIL		2064
+#define	WT_STAT_DSRC_COMPRESS_WRITE_FAIL		2082
 /*! compression: page written was too small to compress */
-#define	WT_STAT_DSRC_COMPRESS_WRITE_TOO_SMALL		2065
+#define	WT_STAT_DSRC_COMPRESS_WRITE_TOO_SMALL		2083
 /*! compression: raw compression call failed, additional data available */
-#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL_TEMPORARY	2066
+#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL_TEMPORARY	2084
 /*! compression: raw compression call failed, no additional data available */
-#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL			2067
+#define	WT_STAT_DSRC_COMPRESS_RAW_FAIL			2085
 /*! compression: raw compression call succeeded */
-#define	WT_STAT_DSRC_COMPRESS_RAW_OK			2068
+#define	WT_STAT_DSRC_COMPRESS_RAW_OK			2086
 /*! cursor: bulk-loaded cursor-insert calls */
-#define	WT_STAT_DSRC_CURSOR_INSERT_BULK			2069
+#define	WT_STAT_DSRC_CURSOR_INSERT_BULK			2087
 /*! cursor: create calls */
-#define	WT_STAT_DSRC_CURSOR_CREATE			2070
+#define	WT_STAT_DSRC_CURSOR_CREATE			2088
 /*! cursor: cursor-insert key and value bytes inserted */
-#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		2071
+#define	WT_STAT_DSRC_CURSOR_INSERT_BYTES		2089
 /*! cursor: cursor-remove key bytes removed */
-#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		2072
+#define	WT_STAT_DSRC_CURSOR_REMOVE_BYTES		2090
 /*! cursor: cursor-update value bytes updated */
-#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		2073
+#define	WT_STAT_DSRC_CURSOR_UPDATE_BYTES		2091
 /*! cursor: insert calls */
-#define	WT_STAT_DSRC_CURSOR_INSERT			2074
+#define	WT_STAT_DSRC_CURSOR_INSERT			2092
 /*! cursor: next calls */
-#define	WT_STAT_DSRC_CURSOR_NEXT			2075
+#define	WT_STAT_DSRC_CURSOR_NEXT			2093
 /*! cursor: prev calls */
-#define	WT_STAT_DSRC_CURSOR_PREV			2076
+#define	WT_STAT_DSRC_CURSOR_PREV			2094
 /*! cursor: remove calls */
-#define	WT_STAT_DSRC_CURSOR_REMOVE			2077
+#define	WT_STAT_DSRC_CURSOR_REMOVE			2095
 /*! cursor: reset calls */
-#define	WT_STAT_DSRC_CURSOR_RESET			2078
+#define	WT_STAT_DSRC_CURSOR_RESET			2096
 /*! cursor: restarted searches */
-#define	WT_STAT_DSRC_CURSOR_RESTART			2079
+#define	WT_STAT_DSRC_CURSOR_RESTART			2097
 /*! cursor: search calls */
-#define	WT_STAT_DSRC_CURSOR_SEARCH			2080
+#define	WT_STAT_DSRC_CURSOR_SEARCH			2098
 /*! cursor: search near calls */
-#define	WT_STAT_DSRC_CURSOR_SEARCH_NEAR			2081
+#define	WT_STAT_DSRC_CURSOR_SEARCH_NEAR			2099
 /*! cursor: truncate calls */
-#define	WT_STAT_DSRC_CURSOR_TRUNCATE			2082
+#define	WT_STAT_DSRC_CURSOR_TRUNCATE			2100
 /*! cursor: update calls */
-#define	WT_STAT_DSRC_CURSOR_UPDATE			2083
+#define	WT_STAT_DSRC_CURSOR_UPDATE			2101
 /*! reconciliation: dictionary matches */
-#define	WT_STAT_DSRC_REC_DICTIONARY			2084
+#define	WT_STAT_DSRC_REC_DICTIONARY			2102
 /*! reconciliation: fast-path pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE_FAST		2085
+#define	WT_STAT_DSRC_REC_PAGE_DELETE_FAST		2103
 /*!
  * reconciliation: internal page key bytes discarded using suffix
  * compression
  */
-#define	WT_STAT_DSRC_REC_SUFFIX_COMPRESSION		2086
+#define	WT_STAT_DSRC_REC_SUFFIX_COMPRESSION		2104
 /*! reconciliation: internal page multi-block writes */
-#define	WT_STAT_DSRC_REC_MULTIBLOCK_INTERNAL		2087
+#define	WT_STAT_DSRC_REC_MULTIBLOCK_INTERNAL		2105
 /*! reconciliation: internal-page overflow keys */
-#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_INTERNAL		2088
+#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_INTERNAL		2106
 /*! reconciliation: leaf page key bytes discarded using prefix compression */
-#define	WT_STAT_DSRC_REC_PREFIX_COMPRESSION		2089
+#define	WT_STAT_DSRC_REC_PREFIX_COMPRESSION		2107
 /*! reconciliation: leaf page multi-block writes */
-#define	WT_STAT_DSRC_REC_MULTIBLOCK_LEAF		2090
+#define	WT_STAT_DSRC_REC_MULTIBLOCK_LEAF		2108
 /*! reconciliation: leaf-page overflow keys */
-#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_LEAF		2091
+#define	WT_STAT_DSRC_REC_OVERFLOW_KEY_LEAF		2109
 /*! reconciliation: maximum blocks required for a page */
-#define	WT_STAT_DSRC_REC_MULTIBLOCK_MAX			2092
+#define	WT_STAT_DSRC_REC_MULTIBLOCK_MAX			2110
 /*! reconciliation: overflow values written */
-#define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			2093
+#define	WT_STAT_DSRC_REC_OVERFLOW_VALUE			2111
 /*! reconciliation: page checksum matches */
-#define	WT_STAT_DSRC_REC_PAGE_MATCH			2094
+#define	WT_STAT_DSRC_REC_PAGE_MATCH			2112
 /*! reconciliation: page reconciliation calls */
-#define	WT_STAT_DSRC_REC_PAGES				2095
+#define	WT_STAT_DSRC_REC_PAGES				2113
 /*! reconciliation: page reconciliation calls for eviction */
-#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2096
+#define	WT_STAT_DSRC_REC_PAGES_EVICTION			2114
 /*! reconciliation: pages deleted */
-#define	WT_STAT_DSRC_REC_PAGE_DELETE			2097
+#define	WT_STAT_DSRC_REC_PAGE_DELETE			2115
 /*! session: object compaction */
-#define	WT_STAT_DSRC_SESSION_COMPACT			2098
+#define	WT_STAT_DSRC_SESSION_COMPACT			2116
 /*! session: open cursor count */
-#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2099
+#define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		2117
 /*! transaction: update conflicts */
-#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2100
+#define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		2118
 
 /*!
  * @}
