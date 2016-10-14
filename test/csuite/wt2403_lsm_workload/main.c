@@ -29,7 +29,6 @@
 #include "test_util.h"
 
 static const char name[] = "lsm:test";
-void (*custom_die)(void) = NULL;
 #define	NUM_DOCS 100000
 #define	NUM_QUERIES (NUM_DOCS/100)
 
