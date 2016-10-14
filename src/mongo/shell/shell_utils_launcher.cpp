@@ -108,11 +108,36 @@ inline int pipe(int fds[2]) {
  */
 namespace shell_utils {
 
-#ifdef _WIN32
 namespace {
-stdx::mutex _createProcessMtx;
-}  // namespace
+void safeClose(int fd) {
+#ifndef _WIN32
+    struct ScopedSignalBlocker {
+        ScopedSignalBlocker() {
+            sigset_t mask;
+            sigfillset(&mask);
+            pthread_sigmask(SIG_SETMASK, &mask, &_oldMask);
+        }
+
+        ~ScopedSignalBlocker() {
+            pthread_sigmask(SIG_SETMASK, &_oldMask, NULL);
+        }
+
+    private:
+        sigset_t _oldMask;
+    };
+    const ScopedSignalBlocker block;
 #endif
+    if (close(fd) != 0) {
+        const auto ewd = errnoWithDescription();
+        error() << "failed to close fd " << fd << ": " << ewd;
+        fassertFailed(40318);
+    }
+}
+
+#ifdef _WIN32
+stdx::mutex _createProcessMtx;
+#endif
+}  // namespace
 
 ProgramOutputMultiplexer programOutputLogger;
 
@@ -129,36 +154,32 @@ ProcessId ProgramRegistry::pidForPort(int port) const {
 
 int ProgramRegistry::portForPid(ProcessId pid) const {
     stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
-    for (auto&& it = _portToPidMap.begin(); it != _portToPidMap.end(); ++it) {
-        if (it->second == pid)
-            return it->first;
+    for (const auto& portPid : _portToPidMap) {
+        if (portPid.second == pid)
+            return portPid.first;
     }
     return -1;
 }
 
-void ProgramRegistry::registerProgram(ProcessId pid, int output, int port) {
+void ProgramRegistry::registerProgram(ProcessId pid, int port) {
     stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
     invariant(!isPidRegistered(pid));
-    _portToPidMap.emplace(port, pid);
-    _outputs.emplace(pid, output);
+    _registeredPids.emplace(pid);
+    if (port != -1) {
+        _portToPidMap.emplace(port, pid);
+    }
 }
 
 void ProgramRegistry::unregisterProgram(ProcessId pid) {
     stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
     invariant(isPidRegistered(pid));
 
-    int ret = close(_outputs[pid]);
-    if (ret != 0) {
-        const auto ewd = errnoWithDescription();
-        error() << "failed to close pipe " << _outputs.find(pid)->second << " for process "
-                << pid.toString() << " " << ewd;
-    }
     _outputReaderThreads[pid].join();
 
     // Remove the PID from the registry.
-    _outputs.erase(pid);
     _outputReaderThreads.erase(pid);
     _portToPidMap.erase(portForPid(pid));
+    _registeredPids.erase(pid);
 }
 
 void ProgramRegistry::registerReaderThread(ProcessId pid, stdx::thread reader) {
@@ -170,20 +191,20 @@ void ProgramRegistry::registerReaderThread(ProcessId pid, stdx::thread reader) {
 
 void ProgramRegistry::getRegisteredPorts(vector<int>& ports) {
     stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
-    for (auto&& it = _portToPidMap.begin(); it != _portToPidMap.end(); ++it) {
-        ports.push_back(it->first);
+    for (const auto& portPid : _portToPidMap) {
+        ports.push_back(portPid.first);
     }
 }
 
 bool ProgramRegistry::isPidRegistered(ProcessId pid) const {
     stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
-    return _outputs.count(pid) == 1;
+    return _registeredPids.count(pid) == 1;
 }
 
 void ProgramRegistry::getRegisteredPids(vector<ProcessId>& pids) {
     stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
-    for (auto&& v : _outputs) {
-        pids.emplace_back(v.first);
+    for (const auto& pid : _registeredPids) {
+        pids.emplace_back(pid);
     }
 }
 
@@ -337,22 +358,18 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env) {
         ++environEntry;
     }
 #endif
+    bool needsPort = isMongodProgram || isMongosProgram || (program == "mongobridge");
+    if (!needsPort) {
+        _port = -1;
+    }
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "a port number is expected when running " << program
+                          << " from the shell",
+            !needsPort || _port >= 0);
 
-    if (!isMongodProgram && !isMongosProgram && program != "mongobridge")
-        _port = 0;
-    else {
-        if (_port <= 0)
-            log() << "error: a port number is expected when running " << program
-                  << " from the shell";
-        verify(_port > 0);
-    }
-    if (_port > 0) {
-        bool haveDbForPort = registry.isPortRegistered(_port);
-        if (haveDbForPort) {
-            log() << "already have db for port: " << _port;
-            verify(!haveDbForPort);
-        }
-    }
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "can't start " << program << ", port " << _port << " already in use",
+            _port < 0 || !registry.isPortRegistered(_port));
 }
 
 void ProgramRunner::start() {
@@ -386,10 +403,15 @@ void ProgramRunner::start() {
 
     launchProcess(pipeEnds[1]);  // sets _pid
 
-    if (_port > 0)
-        registry.registerProgram(_pid, pipeEnds[1], _port);
-    else
-        registry.registerProgram(_pid, pipeEnds[1]);
+    // Close the write end of the pipe.
+    safeClose(pipeEnds[1]);
+
+    if (_port >= 0) {
+        registry.registerProgram(_pid, _port);
+    } else {
+        registry.registerProgram(_pid);
+    }
+
     _pipe = pipeEnds[0];
 
     {
@@ -403,8 +425,9 @@ void ProgramRunner::start() {
 }
 
 void ProgramRunner::operator()() {
+    // Send the never_close_handle flag so that we can handle closing the fd below with safeClose.
     boost::iostreams::stream_buffer<boost::iostreams::file_descriptor_source> fdBuf(
-        _pipe, boost::iostreams::file_descriptor_flags::close_handle);
+        _pipe, boost::iostreams::file_descriptor_flags::never_close_handle);
     std::istream fdStream(&fdBuf);
 
     std::string line;
@@ -415,6 +438,9 @@ void ProgramRunner::operator()() {
         }
         programOutputLogger.appendLine(_port, _pid, _name, line);
     }
+
+    // Close the read end of the pipe.
+    safeClose(_pipe);
 }
 
 boost::filesystem::path ProgramRunner::findProgram(const string& prog) {
@@ -589,7 +615,7 @@ void ProgramRunner::launchProcess(int child_stdout) {
         // Fork failed so it is time for the process to exit
         const auto ewd = errnoWithDescription();
         cout << "ProgramRunner is unable to fork child process: " << ewd << endl;
-        fassert(34363, false);
+        fassertFailed(34363);
     }
 
     if (nativePid == 0) {

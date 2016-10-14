@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/platform/unordered_map.h"
+#include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 
@@ -82,7 +83,7 @@ public:
     /** @return port (-1 if doesn't exist) for a registered pid. */
     int portForPid(ProcessId pid) const;
     /** Register an unregistered program. */
-    void registerProgram(ProcessId pid, int output, int port = 0);
+    void registerProgram(ProcessId pid, int port = -1);
     /** Registers the reader thread for the PID. Must be called before `joinReaderThread`. */
     void registerReaderThread(ProcessId pid, stdx::thread reader);
     /** Closes the registered program's write pipe and waits for all of the written output to be
@@ -94,8 +95,8 @@ public:
     void getRegisteredPids(std::vector<ProcessId>& pids);
 
 private:
+    stdx::unordered_set<ProcessId> _registeredPids;
     stdx::unordered_map<int, ProcessId> _portToPidMap;
-    stdx::unordered_map<ProcessId, int> _outputs;
     stdx::unordered_map<ProcessId, stdx::thread> _outputReaderThreads;
     mutable stdx::recursive_mutex _mutex;
 
