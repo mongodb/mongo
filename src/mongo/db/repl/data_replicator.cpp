@@ -562,6 +562,7 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
     _initialSyncState->oplogSeedDoc = lastOplogEntry.getValue().getOwned();
     const auto lastOpTimeWithHash = lastOplogEntryOpTimeWithHashStatus.getValue();
     _initialSyncState->beginTimestamp = lastOpTimeWithHash.opTime.getTimestamp();
+    _stats.initialSyncOplogStart = _initialSyncState->beginTimestamp;
 
     if (_oplogFetcher) {
         if (_oplogFetcher->isActive()) {
@@ -877,6 +878,7 @@ void DataReplicator::_onApplierReadyStart(const QueryResponseStatus& fetchResult
         LockGuard lk(_mutex);
         auto&& optimeWithHash = optimeWithHashStatus.getValue();
         _initialSyncState->stopTimestamp = optimeWithHash.opTime.getTimestamp();
+        _stats.initialSyncOplogEnd = _initialSyncState->stopTimestamp;
 
         // Check if applied to/past our stopTimestamp.
         if (_initialSyncState->beginTimestamp < _initialSyncState->stopTimestamp) {
@@ -1603,6 +1605,12 @@ void DataReplicator::Stats::append(BSONObjBuilder* builder) const {
             long long elapsedMillis = duration_cast<Milliseconds>(elapsed).count();
             builder->appendNumber("initialSyncElapsedMillis", elapsedMillis);
         }
+    }
+    if (!initialSyncOplogStart.isNull()) {
+        builder->append("initialSyncOplogStart", initialSyncOplogStart);
+    }
+    if (!initialSyncOplogEnd.isNull()) {
+        builder->append("initialSyncOplogEnd", initialSyncOplogEnd);
     }
     BSONArrayBuilder arrBuilder(builder->subarrayStart("initialSyncAttempts"));
     for (unsigned int i = 0; i < initialSyncAttemptInfos.size(); ++i) {

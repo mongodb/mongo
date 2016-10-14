@@ -1343,24 +1343,25 @@ TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
     startSync(2);
 
     // Play first 2 responses to ensure data replicator has started the oplog fetcher.
-    setResponses({failedResponses.begin(), failedResponses.begin() + 2});
+    setResponses({failedResponses.begin(), failedResponses.begin() + 3});
     numGetMoreOplogEntriesMax = failedResponses.size() + successfulResponses.size();
     playResponses();
     log() << "Done playing first failed response";
 
     auto progress = getInitialSyncProgress();
     log() << "Progress after first failed response: " << progress;
-    ASSERT_EQUALS(progress.nFields(), 7) << progress;
+    ASSERT_EQUALS(progress.nFields(), 8) << progress;
     ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 0) << progress;
     ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
     ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
+    ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
     ASSERT_BSONOBJ_EQ(progress.getObjectField("initialSyncAttempts"), BSONObj());
     ASSERT_EQUALS(progress.getIntField("fetchedMissingDocs"), 0) << progress;
     ASSERT_EQUALS(progress.getIntField("appliedOps"), 0) << progress;
     ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"), BSON("databasesCloned" << 0));
 
     // Play rest of the failed round of responses.
-    setResponses({failedResponses.begin() + 2, failedResponses.end()});
+    setResponses({failedResponses.begin() + 3, failedResponses.end()});
     playResponses();
     log() << "Done playing failed responses";
 
@@ -1373,10 +1374,11 @@ TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     progress = getInitialSyncProgress();
     log() << "Progress after failure: " << progress;
-    ASSERT_EQUALS(progress.nFields(), 7) << progress;
+    ASSERT_EQUALS(progress.nFields(), 8) << progress;
     ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
     ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
     ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
+    ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
     ASSERT_EQUALS(progress.getIntField("fetchedMissingDocs"), 0) << progress;
     ASSERT_EQUALS(progress.getIntField("appliedOps"), 0) << progress;
     ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"), BSON("databasesCloned" << 0));
@@ -1401,9 +1403,11 @@ TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     progress = getInitialSyncProgress();
     log() << "Progress after all but last successful response: " << progress;
-    ASSERT_EQUALS(progress.nFields(), 7) << progress;
+    ASSERT_EQUALS(progress.nFields(), 9) << progress;
     ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
     ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
+    ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
+    ASSERT_EQUALS(progress["initialSyncOplogEnd"].timestamp(), Timestamp(7, 1)) << progress;
     ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
     ASSERT_EQUALS(progress.getIntField("fetchedMissingDocs"), 0) << progress;
     // Expected applied ops to be a superset of this range: Timestamp(2,1) ... Timestamp(7,1).
@@ -1443,11 +1447,13 @@ TEST_F(InitialSyncTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     progress = getInitialSyncProgress();
     log() << "Progress at end: " << progress;
-    ASSERT_EQUALS(progress.nFields(), 8) << progress;
+    ASSERT_EQUALS(progress.nFields(), 10) << progress;
     ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
     ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
     ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
     ASSERT_EQUALS(progress["initialSyncEnd"].type(), Date) << progress;
+    ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
+    ASSERT_EQUALS(progress["initialSyncOplogEnd"].timestamp(), Timestamp(7, 1)) << progress;
     ASSERT_EQUALS(progress["initialSyncElapsedMillis"].type(), NumberInt) << progress;
     ASSERT_EQUALS(progress.getIntField("fetchedMissingDocs"), 0) << progress;
     // Expected applied ops to be a superset of this range: Timestamp(2,1) ... Timestamp(7,1).

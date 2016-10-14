@@ -193,6 +193,8 @@ public:
         size_t maxFailedInitialSyncAttempts{0};
         Date_t initialSyncStart;
         Date_t initialSyncEnd;
+        Timestamp initialSyncOplogStart;
+        Timestamp initialSyncOplogEnd;
         std::vector<DataReplicator::InitialSyncAttemptInfo> initialSyncAttemptInfos;
 
         std::string toString() const;
