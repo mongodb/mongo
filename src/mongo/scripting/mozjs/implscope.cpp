@@ -44,6 +44,7 @@
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/log.h"
@@ -218,7 +219,8 @@ bool MozJSImplScope::_interruptCallback(JSContext* cx) {
     }
     // If we are on the right thread, in the middle of an operation, and we have a registered opCtx,
     // then we should check the opCtx for interrupts.
-    if ((scope->_mr._thread == PR_GetCurrentThread()) && (scope->_inOp > 0) && scope->_opCtx) {
+    if ((scope->_mr._thread.get() == PR_GetCurrentThread()) && (scope->_inOp > 0) &&
+        scope->_opCtx) {
         auto status = scope->_opCtx->checkForInterruptNoAssert();
         if (!status.isOK()) {
             scope->_status = status;
@@ -263,7 +265,15 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
     // without falling over.
     auto thread = PR_GetCurrentThread();
     if (!thread) {
-        PR_BindThread(_thread = PR_CreateFakeThread());
+        _thread = std::unique_ptr<PRThread, std::function<void(PRThread*)>>(
+            PR_CreateFakeThread(), [](PRThread* ptr) {
+                if (ptr) {
+                    invariant(PR_GetCurrentThread() == ptr);
+                    PR_DestroyFakeThread(ptr);
+                    PR_BindThread(nullptr);
+                }
+            });
+        PR_BindThread(_thread.get());
     }
 
     {
@@ -278,12 +288,13 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
             gFirstRuntimeCreated = true;
         }
 
-        _runtime = JS_NewRuntime(kMaxBytesBeforeGC);
+        _runtime = std::unique_ptr<JSRuntime, std::function<void(JSRuntime*)>>(
+            JS_NewRuntime(kMaxBytesBeforeGC), [](JSRuntime* ptr) { JS_DestroyRuntime(ptr); });
         uassert(ErrorCodes::JSInterpreterFailure, "Failed to initialize JSRuntime", _runtime);
 
         // We turn on a variety of optimizations if the jit is enabled
         if (engine->isJITEnabled()) {
-            JS::RuntimeOptionsRef(_runtime)
+            JS::RuntimeOptionsRef(_runtime.get())
                 .setAsmJS(true)
                 .setThrowOnAsmJSValidationFailure(true)
                 .setBaseline(true)
@@ -318,36 +329,27 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
             const int reserve_stack_space = 64 * 1024;
 #endif
 
-            JS_SetNativeStackQuota(_runtime, available_stack_space - reserve_stack_space);
+            JS_SetNativeStackQuota(_runtime.get(), available_stack_space - reserve_stack_space);
         }
 
         // The memory limit is in megabytes
-        JS_SetGCParametersBasedOnAvailableMemory(_runtime, engine->getJSHeapLimitMB());
+        JS_SetGCParametersBasedOnAvailableMemory(_runtime.get(), engine->getJSHeapLimitMB());
     }
 
-    _context = JS_NewContext(_runtime, kStackChunkSize);
+    _context = std::unique_ptr<JSContext, std::function<void(JSContext*)>>(
+        JS_NewContext(_runtime.get(), kStackChunkSize),
+        [](JSContext* ptr) { JS_DestroyContext(ptr); });
     uassert(ErrorCodes::JSInterpreterFailure, "Failed to initialize JSContext", _context);
     uassert(ErrorCodes::ExceededMemoryLimit,
             "Out of memory while trying to initialize javascript scope",
             mallocMemoryLimit == 0 || mongo::sm::get_total_bytes() < mallocMemoryLimit);
 }
 
-MozJSImplScope::MozRuntime::~MozRuntime() {
-    JS_DestroyContext(_context);
-    JS_DestroyRuntime(_runtime);
-
-    if (_thread) {
-        invariant(PR_GetCurrentThread() == _thread);
-        PR_DestroyFakeThread(_thread);
-        PR_BindThread(nullptr);
-    }
-}
-
 MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
     : _engine(engine),
       _mr(engine),
-      _runtime(_mr._runtime),
-      _context(_mr._context),
+      _runtime(_mr._runtime.get()),
+      _context(_mr._context.get()),
       _globalProto(_context),
       _global(_globalProto.getProto()),
       _funcs(),

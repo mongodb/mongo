@@ -330,11 +330,10 @@ private:
     struct MozRuntime {
     public:
         MozRuntime(const MozJSScriptEngine* engine);
-        ~MozRuntime();
 
-        PRThread* _thread = nullptr;
-        JSRuntime* _runtime = nullptr;
-        JSContext* _context = nullptr;
+        std::unique_ptr<PRThread, std::function<void(PRThread*)>> _thread;
+        std::unique_ptr<JSRuntime, std::function<void(JSRuntime*)>> _runtime;
+        std::unique_ptr<JSContext, std::function<void(JSContext*)>> _context;
     };
 
     /**

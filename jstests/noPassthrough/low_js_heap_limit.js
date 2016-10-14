@@ -3,6 +3,9 @@
 (function() {
     'use strict';
 
+    const conn = MongoRunner.runMongod();
+    var db = conn.getDB('db');
+
     assert.commandWorked(db.adminCommand({setParameter: 1, jsHeapLimitMB: 1}));
 
     assert.commandFailedWithCode(db.runCommand({$eval: 'sleep(10000);'}),
