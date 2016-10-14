@@ -513,7 +513,7 @@ functions:
         script: |
           set -o verbose
           start_time=$(date +%s)
-          lein run --tarball "file:///root/mongo-binaries.tgz" ${jepsen_key_time_limit} ${jepsen_protocol_version} ${jepsen_read_concern} ${jepsen_read_with_find_and_modify} ${jepsen_storage_engine} ${jepsen_time_limit} ${jepsen_write_concern}
+          lein run --tarball "file:///root/mongo-binaries.tgz" ${jepsen_key_time_limit} ${jepsen_protocol_version} ${jepsen_read_concern} ${jepsen_read_with_find_and_modify} ${jepsen_storage_engine} ${jepsen_time_limit} ${jepsen_write_concern} 2>&1 | tee jepsen_${task_name}_${execution}.log
           exit_code=$?
           end_time=$(date +%s)
           elapsed_secs=$((end_time-start_time))
@@ -521,12 +521,28 @@ functions:
             status='"pass"'
             failures=0
           else
-            status='"fail"'
-            failures=1
+            grep -q "Analysis invalid" jepsen_${task_name}_${execution}.log
+            if [ $? -eq 0 ]; then
+              status='"fail"'
+              failures=1
+            else
+              # If the failure is due to setup, then this is considered a system failure.
+              echo $exit_code > jepsen_system_failure_${task_name}_${execution}
+              exit 0
+            fi
           fi
           # Create report.json
           echo "{\"failures\": $failures, \"results\": [{\"status\": $status, \"exit_code\": $exit_code, \"test_file\": \"${task_name}\", \"start\": $start_time, \"end\": $end_time, \"elapsed\": $elapsed_secs}]}" > ../../report.json
           exit $exit_code
+    - command: shell.exec
+      params:
+        working_dir: src/jepsen/mongodb
+        script: |
+          set -o verbose
+          # Jepsen system failure if file exists.
+          if [ -f jepsen_systemfailure_${task_name}_${execution} ]; then
+            exit $(cat jepsen_system_failure_${task_name}_${execution})
+          fi
 
   "run jstestfuzz":
     - command: shell.exec
