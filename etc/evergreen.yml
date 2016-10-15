@@ -2189,6 +2189,7 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
+    timeout_secs: 10800 # 3 hour timeout
     vars:
       resmoke_args: --executor=concurrency jstests/concurrency/fsm_all_simultaneous.js --storageEngine=mmapv1
 
