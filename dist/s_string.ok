@@ -419,6 +419,7 @@ argc
 args
 argv
 asm
+assertfmt
 async
 asyncopp
 asyncops
@@ -1000,6 +1001,7 @@ rS
 rb
 rbrace
 rbracket
+rcursor
 rdonly
 rduppo
 readlock
@@ -1206,6 +1208,7 @@ waitpid
 walk's
 warmup
 wb
+wcursor
 wiredTiger
 wiredtiger
 workFactor

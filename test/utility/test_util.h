@@ -85,6 +85,16 @@ typedef struct {
 } while (0)
 
 /*
+ * testutil_assertfmt --
+ *	Complain and quit if something isn't true.
+ */
+#define	testutil_assertfmt(a, fmt, ...) do {				\
+	if (!(a))							\
+		testutil_die(0, "%s/%d: %s: " fmt,			\
+		__func__, __LINE__, #a, __VA_ARGS__);			\
+} while (0)
+
+/*
  * testutil_check --
  *	Complain and quit if a function call fails.
  */

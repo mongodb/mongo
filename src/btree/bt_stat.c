@@ -44,7 +44,7 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 	    __wt_btree_bytes_inuse(session));
 
 	if (F_ISSET(cst, WT_STAT_TYPE_CACHE_WALK))
-		WT_RET(__wt_curstat_cache_walk(session));
+		__wt_curstat_cache_walk(session);
 
 	if (F_ISSET(cst, WT_STAT_TYPE_TREE_WALK))
 		WT_RET(__stat_tree_walk(session));

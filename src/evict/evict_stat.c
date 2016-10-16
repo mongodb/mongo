@@ -12,14 +12,13 @@
  * __evict_stat_walk --
  *	Walk all the pages in cache for a dhandle gathering stats information
  */
-static int
+static void
 __evict_stat_walk(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page;
 	WT_REF *next_walk;
 	uint64_t dsk_size, gen_gap, size;
-	uint64_t bytes_inmem;
 	uint64_t written_size_cnt, written_size_sum;
 	uint64_t gen_gap_cnt, gen_gap_max, gen_gap_sum;
 	uint64_t max_pagesize, min_written_size;
@@ -29,7 +28,7 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
 
 	btree = S2BT(session);
 	next_walk = NULL;
-	bytes_inmem = written_size_cnt = written_size_sum = 0;
+	written_size_cnt = written_size_sum = 0;
 	gen_gap_cnt = gen_gap_max = gen_gap_sum = 0;
 	max_pagesize = 0;
 	num_memory = num_queued = num_not_queueable = num_smaller_allocsz = 0;
@@ -43,8 +42,6 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
 		++seen_count;
 		page = next_walk->page;
 		size = page->memory_footprint;
-
-		bytes_inmem += size;
 
 		if (__wt_page_is_modified(page))
 			++pages_dirty;
@@ -72,11 +69,10 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
 		} else
 			++num_memory;
 
-		if (WT_PAGE_IS_INTERNAL(page)) {
+		if (WT_PAGE_IS_INTERNAL(page))
 			++pages_internal;
-		} else {
+		else
 			++pages_leaf;
-		}
 
 		/* Skip root pages since they are never considered */
 		if (__wt_ref_is_root(next_walk))
@@ -90,12 +86,10 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
 		++gen_gap_cnt;
 	}
 
-	WT_STAT_DATA_SET(session,
-	    cache_state_avg_written_size, written_size_cnt == 0 ?
-	    0 : written_size_sum / written_size_cnt);
-	WT_STAT_DATA_SET(session,
-	    cache_state_gen_avg_gap, gen_gap_cnt == 0 ?
-	    0 : gen_gap_sum / gen_gap_cnt);
+	WT_STAT_DATA_SET(session, cache_state_avg_written_size,
+	    written_size_cnt == 0 ? 0 : written_size_sum / written_size_cnt);
+	WT_STAT_DATA_SET(session, cache_state_gen_avg_gap,
+	    gen_gap_cnt == 0 ? 0 : gen_gap_sum / gen_gap_cnt);
 
 	WT_STAT_DATA_SET(session, cache_state_gen_max_gap, gen_gap_max);
 	WT_STAT_DATA_SET(session, cache_state_max_pagesize, max_pagesize);
@@ -103,8 +97,7 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
 	    cache_state_min_written_size, min_written_size);
 	WT_STAT_DATA_SET(session, cache_state_memory, num_memory);
 	WT_STAT_DATA_SET(session, cache_state_queued, num_queued);
-	WT_STAT_DATA_SET(session,
-	    cache_state_not_queueable, num_not_queueable);
+	WT_STAT_DATA_SET(session, cache_state_not_queueable, num_not_queueable);
 	WT_STAT_DATA_SET(session,
 	    cache_state_smaller_alloc_size, num_smaller_allocsz);
 	WT_STAT_DATA_SET(session, cache_state_pages, walk_count);
@@ -114,20 +107,17 @@ __evict_stat_walk(WT_SESSION_IMPL *session)
 	WT_STAT_DATA_SET(session, cache_state_pages_leaf, pages_leaf);
 	WT_STAT_DATA_SET(session,
 	    cache_state_refs_skipped, walk_count - seen_count);
-
-	return (0);
 }
 
 /*
  * __wt_curstat_cache_walk --
  *	Initialize the statistics for a cache cache_walk pass.
  */
-int
+void
 __wt_curstat_cache_walk(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	WT_PAGE_INDEX *root_idx;
 
 	btree = S2BT(session);
@@ -144,7 +134,5 @@ __wt_curstat_cache_walk(WT_SESSION_IMPL *session)
 	WT_STAT_DATA_SET(session,
 	    cache_state_root_size, btree->root.page->memory_footprint);
 
-	WT_WITH_HANDLE_LIST_LOCK(session, ret = __evict_stat_walk(session));
-
-	return (ret);
+	WT_WITH_HANDLE_LIST_LOCK(session, __evict_stat_walk(session));
 }

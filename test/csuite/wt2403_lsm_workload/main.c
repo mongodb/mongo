@@ -36,82 +36,77 @@ static void
 rand_str(uint64_t i, char *str)
 {
 	uint64_t x, y;
+
 	y = strlen(str);
-	for (x = y; x > y - 8; x--)
-	{
-		str[x-1] = (char)(i%10)+48;
+	for (x = y; x > y - 8; x--) {
+		str[x - 1] = (char)(i % 10) + 48;
 		i = i / 10;
 	}
 }
 
-static int
+static void
 check_str(uint64_t i, char *str, bool mod)
 {
-	int ret;
 	char str2[] = "0000000000000000";
+
 	rand_str(i, str2);
 	if (mod)
 		str2[0] = 'A';
-	ret = strcmp(str, str2);
-	if (ret != 0) {
-		printf("strcmp failed, got %s, expected %s\n", str, str2);
-	}
-	return (ret);
+	testutil_checkfmt(strcmp(str, str2),
+	    "strcmp failed, got %s, expected %s", str, str2);
 }
 
-static int
+static void
 query_docs(WT_CURSOR *cursor, bool mod)
 {
 	WT_ITEM key, value;
 	uint64_t stash;
 	int count, i;
+
 	stash = INT_MAX;
 	count = 0;
 
 	for (i = 0; i < NUM_QUERIES; i++) {
 		testutil_check(cursor->next(cursor));
-		cursor->get_key(cursor, &key);
-		cursor->get_value(cursor, &value);
+		testutil_check(cursor->get_key(cursor, &key));
+		testutil_check(cursor->get_value(cursor, &value));
 		/* Check to see if we get the same value back multiple times */
 		if (stash == (uint64_t)key.data)
 			count++;
 		stash = (uint64_t)key.data;
-		testutil_check(
-		    check_str((uint64_t)key.data, (char*)value.data, mod));
+		check_str((uint64_t)key.data, (char *)value.data, mod);
 	}
+
 	/*
 	 * Its possible that we may randomly return the same doc a few times,
 	 * more than say 1% is not a co-incidence. This likely means random is
 	 * broken or we aren't ignoring "new" deletes that we shouldn't see yet.
 	 */
-	if (count > NUM_QUERIES/100) {
-		printf("Error: same document was returned %d"
-		    " times, likely we are seeing the one remaining value\n",
-		    count);
-		exit(1);
-	}
+	testutil_assertfmt(count <= NUM_QUERIES / 100,
+	    "same document was returned %d times, likely we are "
+	    "seeing the one remaining value", count);
 	printf("%d documents read\n", NUM_QUERIES);
-	return (0);
 }
 
-static void
-*compact_thread(void *args)
+static void *
+compact_thread(void *args)
 {
 	WT_SESSION *session;
+
 	session = (WT_SESSION *)args;
 	testutil_check(session->compact(session, name, NULL));
-	return (0);
+	return (NULL);
 }
 
 int
 main(int argc, char *argv[])
 {
 	TEST_OPTS *opts, _opts;
-	WT_SESSION *session, *session2;
 	WT_CURSOR *rcursor, *wcursor;
 	WT_ITEM key, value;
-	uint64_t i;
+	WT_SESSION *session, *session2;
 	pthread_t thread;
+	uint64_t i;
 
 	char str[] = "0000000000000000";
 
@@ -193,12 +188,12 @@ main(int argc, char *argv[])
 	/* Delete all but one document */
 	testutil_check(session->open_cursor(
 	    session, name, NULL, "overwrite", &wcursor));
-	for (i = 0; i < NUM_DOCS-1; i++) {
+	for (i = 0; i < NUM_DOCS - 1; i++) {
 		wcursor->set_key(wcursor, i);
 		testutil_check(wcursor->remove(wcursor));
 	}
 	testutil_check(wcursor->close(wcursor));
-	printf("%d documents deleted\n", NUM_DOCS-1);
+	printf("%d documents deleted\n", NUM_DOCS - 1);
 
 	/* Random reads, which should not see the deletes */
 	query_docs(rcursor, true);
@@ -212,16 +207,13 @@ main(int argc, char *argv[])
 	    session2, name, NULL, "next_random=true", &rcursor));
 	for (i = 0; i < 3; i++) {
 		testutil_check(rcursor->next(rcursor));
-		rcursor->get_key(rcursor, &key);
-		rcursor->get_value(rcursor, &value);
+		testutil_check(rcursor->get_key(rcursor, &key));
+		testutil_check(rcursor->get_value(rcursor, &value));
 		/* There should only be one value available to us */
-		if ((uint64_t)key.data != NUM_DOCS-1) {
-			printf("Error: expected %d and got %"
-			    PRIu64 "\n", NUM_DOCS-1, (uint64_t)key.data);
-			exit(1);
-		}
-		testutil_check(
-		    check_str((uint64_t)key.data, (char*)value.data, true));
+		testutil_assertfmt((uint64_t)key.data == NUM_DOCS - 1,
+		    "expected %d and got %" PRIu64,
+		    NUM_DOCS - 1, (uint64_t)key.data);
+		check_str((uint64_t)key.data, (char *)value.data, true);
 	}
 	printf("Found the deleted doc 3 times\n");
 	testutil_check(rcursor->close(rcursor));
@@ -229,7 +221,7 @@ main(int argc, char *argv[])
 	/* Repopulate the table for compact. */
 	testutil_check(session->open_cursor(
 	    session, name, NULL, "overwrite", &wcursor));
-	for (i = 0; i < NUM_DOCS-1; i++) {
+	for (i = 0; i < NUM_DOCS - 1; i++) {
 		wcursor->set_key(wcursor, i);
 		rand_str(i, str);
 		str[0] = 'A';
@@ -244,7 +236,7 @@ main(int argc, char *argv[])
 	testutil_check(pthread_create(&thread, NULL, compact_thread, session));
 	query_docs(rcursor, true);
 	testutil_check(rcursor->close(rcursor));
-	pthread_join(thread, NULL);
+	testutil_check(pthread_join(thread, NULL));
 
 	/* Delete everything. Check for infinite loops */
 	testutil_check(session->open_cursor(
@@ -257,11 +249,10 @@ main(int argc, char *argv[])
 
 	testutil_check(session2->open_cursor(
 	    session2, name, NULL, "next_random=true", &rcursor));
-	for (i = 0; i < 3; i++) {
+	for (i = 0; i < 3; i++)
 		testutil_assert(rcursor->next(rcursor) == WT_NOTFOUND);
-	}
 	printf("Successfully got WT_NOTFOUND\n");
 
 	testutil_cleanup(opts);
-	return (0);
+	return (EXIT_SUCCESS);
 }
