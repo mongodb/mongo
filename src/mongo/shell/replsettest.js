@@ -885,20 +885,40 @@ var ReplSetTest = function(opts) {
         var primary = this.getPrimary();
         assert(primary, 'calling getPrimary() failed');
 
-        // Since we cannot determine if there is a background index in progress (SERVER-25176),
+        // Since we cannot determine if there is a background index in progress (SERVER-26624),
         // we flush indexing as follows:
-        //  1. Create a foreground index on a dummy collection/database
-        //  2. Insert a document into the dummy collection with a writeConcern for all nodes
-        //  3. Drop the dummy database
-        var dbNames = new Set(primary.getDBNames());
-        var uniqueDbName = generateUniqueDbName(dbNames, "flush_all_background_indexes_");
+        //  1. Iterate through all collections and run collMod against each (collMod will block
+        //     replication to wait for any active background index builds to complete)
+        //  2. Insert a document into a dummy collection with a writeConcern for all nodes (which
+        //     will block on completion of the background index build + collMod)
+        var dbNameSet = new Set(primary.getDBNames());
+        var uniqueDbName = generateUniqueDbName(dbNameSet, "flush_all_background_indexes_");
 
-        var dummyDB = primary.getDB(uniqueDbName);
-        var dummyColl = dummyDB.dummy;
-        dummyColl.drop();
-        assert.commandWorked(dummyColl.createIndex({x: 1}));
+        for (let dbName of dbNameSet.values()) {
+            if (dbName === "local") {
+                continue;
+            }
+
+            let dbHandle = primary.getDB(dbName);
+            dbHandle
+                .getCollectionInfos({
+                    $or: [{type: "collection"}, {type: {$exists: false}}],
+                    name: {$not: /^system\./}
+                })
+                .forEach(function(collInfo) {
+                    // 'usePowerOf2Sizes' is ignored by the server so no actual collection
+                    // modification takes place.
+                    assert.commandWorked(
+                        dbHandle.runCommand({collMod: collInfo.name, usePowerOf2Sizes: true}));
+                });
+        }
+
+        let dummyDB = primary.getDB(uniqueDbName);
+        let dummyColl = dummyDB.dummy;
         assert.writeOK(dummyColl.insert(
             {x: 1}, {writeConcern: {w: this.nodeList().length, wtimeout: self.kDefaultTimeoutMS}}));
+
+        // We drop the dummy database for cleanup purposes only.
         assert.commandWorked(dummyDB.dropDatabase());
 
         var activeException = false;
