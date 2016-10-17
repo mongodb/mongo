@@ -74,7 +74,9 @@ NetworkInterfaceASIO::NetworkInterfaceASIO(Options options)
                       _options.instanceName,
                       _options.connectionPoolOptions),
       _isExecutorRunnable(false),
-      _strand(_io_service) {}
+      _strand(_io_service) {
+    invariant(_timerFactory);
+}
 
 std::string NetworkInterfaceASIO::getDiagnosticString() {
     stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
@@ -214,7 +216,7 @@ void NetworkInterfaceASIO::_signalWorkAvailable_inlock() {
 }
 
 Date_t NetworkInterfaceASIO::now() {
-    return Date_t::now();
+    return _timerFactory->now();
 }
 
 namespace {

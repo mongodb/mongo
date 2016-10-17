@@ -284,6 +284,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/concurrency/thread_pool_test_fixture',
+        'async_timer_mock',
         'connection_pool',
         'network_interface_asio',
         'network_interface_thread_pool',

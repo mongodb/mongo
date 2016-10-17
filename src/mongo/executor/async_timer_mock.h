@@ -77,6 +77,7 @@ private:
     void _expire();
 
     Milliseconds _timeLeft;
+    stdx::mutex _handlersMutex;
     std::vector<AsyncTimerInterface::Handler> _handlers;
 };
 
@@ -127,9 +128,15 @@ public:
      */
     void fastForward(Milliseconds time);
 
+    /**
+     * This will start at 0ms since the epoch and increment when fastForward is called.
+     */
+    Date_t now() override;
+
 private:
     stdx::mutex _timersMutex;
     stdx::unordered_set<std::shared_ptr<AsyncTimerMockImpl>> _timers;
+    Milliseconds _curTime;
 };
 
 }  // namespace executor

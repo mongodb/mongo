@@ -84,6 +84,8 @@ public:
     virtual std::unique_ptr<AsyncTimerInterface> make(asio::io_service::strand* strand,
                                                       Milliseconds expiration) = 0;
 
+    virtual Date_t now() = 0;
+
 protected:
     AsyncTimerFactoryInterface() = default;
 };

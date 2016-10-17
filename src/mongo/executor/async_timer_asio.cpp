@@ -58,5 +58,10 @@ std::unique_ptr<AsyncTimerInterface> AsyncTimerFactoryASIO::make(asio::io_servic
     return stdx::make_unique<AsyncTimerASIO>(strand, expiration);
 }
 
+Date_t AsyncTimerFactoryASIO::now() {
+    return Date_t::fromDurationSinceEpoch(asio::system_timer::clock_type::now() -
+                                          asio::system_timer::clock_type::from_time_t(0));
+}
+
 }  // namespace executor
 }  // namespace mongo

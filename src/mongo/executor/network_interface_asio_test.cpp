@@ -390,7 +390,7 @@ TEST_F(NetworkInterfaceASIOTest, AsyncOpTimeout) {
         ASSERT(!deferred.hasCompleted());
 
         // Advance clock and force timeout
-        factory.fastForward(Milliseconds(800));
+        factory.fastForward(Milliseconds(500));
     }
 
     auto& result = deferred.get();
@@ -580,6 +580,7 @@ public:
         NetworkInterfaceASIO::Options options{};
         options.streamFactory = std::move(factory);
         options.networkConnectionHook = std::move(hook);
+        options.timerFactory = stdx::make_unique<AsyncTimerFactoryMock>();
         _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
         _net->startup();
     }
@@ -975,6 +976,7 @@ protected:
         NetworkInterfaceASIO::Options options{};
         options.streamFactory = std::move(factory);
         options.metadataHook = std::move(metadataHook);
+        options.timerFactory = stdx::make_unique<AsyncTimerFactoryMock>();
         _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
         _net->startup();
     }

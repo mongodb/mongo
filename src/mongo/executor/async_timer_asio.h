@@ -55,6 +55,8 @@ public:
 
     std::unique_ptr<AsyncTimerInterface> make(asio::io_service::strand* strand,
                                               Milliseconds expiration) override;
+
+    Date_t now() override;
 };
 
 }  // namespace executor
