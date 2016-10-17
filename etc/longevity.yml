@@ -98,7 +98,7 @@ functions:
           set -e
           set -o verbose
           source ./dsienv.sh
-          $DSI_PATH/bin/setup-cluster.sh ${cluster} ../terraform
+          $DSI_PATH/bin/setup-cluster.sh ${cluster} false
 
   "configure mongodb cluster":
     - command: shell.exec

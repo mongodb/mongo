@@ -118,16 +118,12 @@ functions:
           set -o verbose
           source ./dsienv.sh
           if [ ! -e $HOME/infrastructure_provisioning/terraform/provisioned.${cluster} ]; then
-            echo "Provisinging new resources."
-            $DSI_PATH/bin/setup-cluster.sh ${cluster} ../terraform
+            EXISTING="false"
           else
-            # on host with pre-existing resources, call terraform directly to
-            # avoid recreating instances due to terraform apply concurrency limitation
-            echo "Update expire-on tag for existing resources."
-            ./terraform apply -var-file=cluster.json
-            # call env.sh to generate ips.sh, etc. for downstream modules
-            $DSI_PATH/bin/env.sh
+            EXISTING="true"
           fi
+
+          $DSI_PATH/bin/setup-cluster.sh ${cluster} $EXISTING
           # handle the case when setup-cluster.sh fail
           if [ $? -eq 0 ]; then
             echo "Resource provisioned/updated."
