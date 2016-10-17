@@ -310,8 +310,15 @@ void startFTDC() {
     // GetDiagnosticDataCommand
 
     // CmdServerStatus
+    // The "sharding" section is filtered out because at this time it only consists of strings in
+    // migration status. This section triggers too many schema changes in the serverStatus which
+    // hurt ftdc compression efficiency, because its output varies depending on the list of active
+    // migrations.
     controller->addPeriodicCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(
-        "serverStatus", "serverStatus", "", BSON("serverStatus" << 1 << "tcMalloc" << true)));
+        "serverStatus",
+        "serverStatus",
+        "",
+        BSON("serverStatus" << 1 << "tcMalloc" << true << "sharding" << false)));
 
     // These metrics are only collected if replication is enabled
     if (repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
