@@ -60,31 +60,14 @@ static void
 query_docs(WT_CURSOR *cursor, bool mod)
 {
 	WT_ITEM key, value;
-	uint64_t stash;
-	int count, i;
-
-	stash = INT_MAX;
-	count = 0;
+	int i;
 
 	for (i = 0; i < NUM_QUERIES; i++) {
 		testutil_check(cursor->next(cursor));
 		testutil_check(cursor->get_key(cursor, &key));
 		testutil_check(cursor->get_value(cursor, &value));
-		/* Check to see if we get the same value back multiple times */
-		if (stash == (uint64_t)key.data)
-			count++;
-		stash = (uint64_t)key.data;
 		check_str((uint64_t)key.data, (char *)value.data, mod);
 	}
-
-	/*
-	 * Its possible that we may randomly return the same doc a few times,
-	 * more than say 1% is not a co-incidence. This likely means random is
-	 * broken or we aren't ignoring "new" deletes that we shouldn't see yet.
-	 */
-	testutil_assertfmt(count <= NUM_QUERIES / 100,
-	    "same document was returned %d times, likely we are "
-	    "seeing the one remaining value", count);
 	printf("%d documents read\n", NUM_QUERIES);
 }
 
