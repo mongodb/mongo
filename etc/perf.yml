@@ -154,7 +154,7 @@ functions:
           # We could change dsi/analysis/master to dsi/analysis/perf in DSI to get dsi/analysis/${project}/perf_override.json
           # Note project_id performance doesn't match string perf used elsewhere for ${project}
           PROJECT_OPTS="--overrideFile ../dsi/analysis/master/perf_override.json --project_id performance"
-          python -u ../dsi/analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag $REFTAGS $PROJECT_OPTS --task_name ${task_name} --variant ${build_variant} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
+          python -u ../dsi/analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag $REFTAGS $PROJECT_OPTS --task_name ${task_name} --variant ${build_variant} --task ${task_name} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
     - command: "json.send"
       params:
          name: "dashboard"
@@ -175,7 +175,7 @@ functions:
           cmd_flags=$([ "${reports_analysis}" = "true" ] && echo "$reports_analysis_flags" || echo "")
           REFTAG="3.2.10-Baseline"
           OVERRIDE="../dsi/analysis/master/perf_override.json" # Note use of master here cannot use ${project}
-          python ../dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag $REFTAG --overrideFile $OVERRIDE --variant ${build_variant} --threshold 0.10 --threadThreshold 0.15
+          python ../dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag $REFTAG --overrideFile $OVERRIDE --variant ${build_variant} --task ${task_name} --threshold 0.10 --threadThreshold 0.15
   "run perf tests":
     - command: shell.exec
       params:
