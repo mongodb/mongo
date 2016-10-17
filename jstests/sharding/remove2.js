@@ -1,5 +1,7 @@
 // Test that removing and re-adding shard works correctly.
 
+load("jstests/replsets/rslib.js");
+
 seedString = function(replTest) {
     members = replTest.getReplSetConfig().members.map(function(elem) {
         return elem.host;
@@ -32,7 +34,7 @@ addShard = function(st, replTest) {
         // transport error on first attempt is expected.  Make sure second attempt goes through
         assert.eq(true, st.adminCommand({addshard: seed}));
     }
-    ReplSetTest.awaitRSClientHosts(
+    awaitRSClientHosts(
         new Mongo(st.s.host), replTest.getSecondaries(), {ok: true, secondary: true});
 
     assert.soon(function() {

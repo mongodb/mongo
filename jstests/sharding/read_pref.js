@@ -3,6 +3,8 @@
  * can be found in dbtests/replica_set_monitor_test.cpp.
  */
 
+load("jstests/replsets/rslib.js");
+
 var PRI_TAG = {dc: 'ny'};
 var SEC_TAGS = [{dc: 'sf', s: "1"}, {dc: 'ma', s: "2"}, {dc: 'eu', s: "3"}, {dc: 'jp', s: "4"}];
 var NODES = SEC_TAGS.length + 1;
@@ -72,7 +74,7 @@ var doTest = function(useDollarQuerySyntax) {
     var replConfig = replTest.getReplSetConfigFromNode();
     replConfig.members.forEach(function(node) {
         var nodeConn = new Mongo(node.host);
-        ReplSetTest.awaitRSClientHosts(conn, nodeConn, {ok: true, tags: node.tags}, replTest);
+        awaitRSClientHosts(conn, nodeConn, {ok: true, tags: node.tags}, replTest);
     });
     replTest.awaitReplication();
 
@@ -172,11 +174,11 @@ var doTest = function(useDollarQuerySyntax) {
     }
 
     // Wait for ReplicaSetMonitor to realize nodes are down
-    ReplSetTest.awaitRSClientHosts(conn, stoppedNodes, {ok: false}, replTest.name);
+    awaitRSClientHosts(conn, stoppedNodes, {ok: false}, replTest.name);
 
     // Wait for the last node to be in steady state -> secondary (not recovering)
     var lastNode = replTest.nodes[NODES - 1];
-    ReplSetTest.awaitRSClientHosts(conn, lastNode, {ok: true, secondary: true}, replTest.name);
+    awaitRSClientHosts(conn, lastNode, {ok: true, secondary: true}, replTest.name);
 
     jsTest.log('connpool: ' + tojson(conn.getDB('admin').runCommand({connPoolStats: 1})));
 

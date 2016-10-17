@@ -285,18 +285,6 @@ var ReplSetTest = function(opts) {
     }
 
     /**
-     * Returns the last committed OpTime for the replicaset as known by the host.
-     * This function may return an OpTime with Timestamp(0,0) and Term(0) if there is no
-     * last committed OpTime.
-     */
-    function _getLastCommittedOpTime(conn) {
-        var replSetStatus =
-            assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1}));
-        return (replSetStatus.OpTimes || replSetStatus.optimes).lastCommittedOpTime ||
-            {ts: Timestamp(0, 0), t: NumberLong(0)};
-    }
-
-    /**
      * Returns the {readConcern: majority} OpTime for the host.
      * This is the OpTime of the host's "majority committed" snapshot.
      * This function may return an OpTime with Timestamp(0,0) and Term(0) if read concern majority
@@ -1645,95 +1633,4 @@ ReplSetTest.State = {
 ReplSetTest.OpTimeType = {
     LAST_APPLIED: 1,
     LAST_DURABLE: 2,
-};
-
-/**
- * Waits for the specified hosts to enter a certain state.
- */
-ReplSetTest.awaitRSClientHosts = function(conn, host, hostOk, rs, timeout) {
-    var hostCount = host.length;
-    if (hostCount) {
-        for (var i = 0; i < hostCount; i++) {
-            ReplSetTest.awaitRSClientHosts(conn, host[i], hostOk, rs);
-        }
-
-        return;
-    }
-
-    timeout = timeout || 5 * 60 * 1000;
-
-    if (hostOk == undefined)
-        hostOk = {ok: true};
-    if (host.host)
-        host = host.host;
-    if (rs)
-        rs = rs.name;
-
-    print("Awaiting " + host + " to be " + tojson(hostOk) + " for " + conn + " (rs: " + rs + ")");
-
-    var tests = 0;
-
-    assert.soon(function() {
-        var rsClientHosts = conn.adminCommand('connPoolStats').replicaSets;
-        if (tests++ % 10 == 0) {
-            printjson(rsClientHosts);
-        }
-
-        for (var rsName in rsClientHosts) {
-            if (rs && rs != rsName)
-                continue;
-
-            for (var i = 0; i < rsClientHosts[rsName].hosts.length; i++) {
-                var clientHost = rsClientHosts[rsName].hosts[i];
-                if (clientHost.addr != host)
-                    continue;
-
-                // Check that *all* host properties are set correctly
-                var propOk = true;
-                for (var prop in hostOk) {
-                    // Use special comparator for tags because isMaster can return the fields in
-                    // different order. The fields of the tags should be treated like a set of
-                    // strings and 2 tags should be considered the same if the set is equal.
-                    if (prop == 'tags') {
-                        if (!clientHost.tags) {
-                            propOk = false;
-                            break;
-                        }
-
-                        for (var hostTag in hostOk.tags) {
-                            if (clientHost.tags[hostTag] != hostOk.tags[hostTag]) {
-                                propOk = false;
-                                break;
-                            }
-                        }
-
-                        for (var clientTag in clientHost.tags) {
-                            if (clientHost.tags[clientTag] != hostOk.tags[clientTag]) {
-                                propOk = false;
-                                break;
-                            }
-                        }
-
-                        continue;
-                    }
-
-                    if (isObject(hostOk[prop])) {
-                        if (!friendlyEqual(hostOk[prop], clientHost[prop])) {
-                            propOk = false;
-                            break;
-                        }
-                    } else if (clientHost[prop] != hostOk[prop]) {
-                        propOk = false;
-                        break;
-                    }
-                }
-
-                if (propOk) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }, 'timed out waiting for replica set client to recognize hosts', timeout);
 };

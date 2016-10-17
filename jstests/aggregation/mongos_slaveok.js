@@ -3,6 +3,7 @@
  * please refer to jstests/sharding/read_pref_cmd.js.
  */
 (function() {
+    load('jstests/replsets/rslib.js');
 
     var NODES = 2;
 
@@ -21,7 +22,7 @@
         secNode.getDB('test').setProfilingLevel(2);
 
         // wait for mongos to recognize that the slave is up
-        ReplSetTest.awaitRSClientHosts(st.s, secNode, {ok: true});
+        awaitRSClientHosts(st.s, secNode, {ok: true});
 
         var res = testDB.runCommand({aggregate: 'user', pipeline: [{$project: {x: 1}}]});
         assert(res.ok, 'aggregate command failed: ' + tojson(res));

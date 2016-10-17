@@ -14,6 +14,7 @@
  */
 (function() {
     'use strict';
+    load("jstests/replsets/rslib.js");
 
     var st = new ShardingTest({shards: 1, rs: {oplogSize: 10}});
     var replTest = st.rs0;
@@ -33,7 +34,7 @@
     replTest.awaitSecondaryNodes();
 
     // Verify that the replSetMonitor can reach the restarted set
-    ReplSetTest.awaitRSClientHosts(st.s0, replTest.nodes, {ok: true});
+    awaitRSClientHosts(st.s0, replTest.nodes, {ok: true});
 
     assert.writeOK(st.s0.getDB('test').user.insert({x: 1}));
 

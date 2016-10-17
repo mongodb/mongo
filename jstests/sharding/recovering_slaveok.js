@@ -3,6 +3,7 @@
 
 (function() {
     'use strict';
+    load("jstests/replsets/rslib.js");
 
     var shardTest =
         new ShardingTest({name: "recovering_slaveok", shards: 2, mongos: 2, other: {rs: true}});
@@ -91,15 +92,13 @@
 
     // We need to make sure our nodes are considered accessible from mongos - otherwise we fail
     // See SERVER-7274
-    ReplSetTest.awaitRSClientHosts(coll.getMongo(), rsA.nodes, {ok: true});
-    ReplSetTest.awaitRSClientHosts(coll.getMongo(), rsB.nodes, {ok: true});
+    awaitRSClientHosts(coll.getMongo(), rsA.nodes, {ok: true});
+    awaitRSClientHosts(coll.getMongo(), rsB.nodes, {ok: true});
 
     // We need to make sure at least one secondary is accessible from mongos - otherwise we fail
     // See SERVER-7699
-    ReplSetTest.awaitRSClientHosts(
-        collSOk.getMongo(), [rsA.getSecondaries()[0]], {secondary: true, ok: true});
-    ReplSetTest.awaitRSClientHosts(
-        collSOk.getMongo(), [rsB.getSecondaries()[0]], {secondary: true, ok: true});
+    awaitRSClientHosts(collSOk.getMongo(), [rsA.getSecondaries()[0]], {secondary: true, ok: true});
+    awaitRSClientHosts(collSOk.getMongo(), [rsB.getSecondaries()[0]], {secondary: true, ok: true});
 
     print("SlaveOK Query...");
     var sOKCount = collSOk.find().itcount();

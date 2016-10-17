@@ -270,7 +270,7 @@ var testAllModes = function(conn, hostList, isMongos) {
 var st = new ShardingTest({shards: {rs0: {nodes: NODE_COUNT}}});
 st.stopBalancer();
 
-ReplSetTest.awaitRSClientHosts(st.s, st.rs0.nodes);
+awaitRSClientHosts(st.s, st.rs0.nodes);
 
 // Tag primary with { dc: 'ny', tag: 'one' }, secondary with { dc: 'ny', tag: 'two' }
 var primary = st.rs0.getPrimary();
