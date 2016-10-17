@@ -63,7 +63,7 @@ functions:
           set -e
           set -o verbose
           cd ./clusters/${cluster}
-          ../../bin/setup-cluster.sh ${cluster}
+          ../../bin/setup-cluster.sh ${cluster} false
           echo "EC2 Cluster CREATED."
 
   "configure mongodb cluster":
