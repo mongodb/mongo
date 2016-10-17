@@ -3653,11 +3653,13 @@ TEST(ExpressionSubstrCPTest, WithStandardValue) {
 }
 
 TEST(ExpressionSubstrCPTest, WithNullCharacter) {
-    assertExpectedResults("$substrCP", {{{Value("abc\0d"), Value(2), Value(3)}, Value("c\0d")}});
+    assertExpectedResults("$substrCP",
+                          {{{Value("abc\0d"_sd), Value(2), Value(3)}, Value("c\0d"_sd)}});
 }
 
 TEST(ExpressionSubstrCPTest, WithNullCharacterAtEnd) {
-    assertExpectedResults("$substrCP", {{{Value("abc\0"), Value(2), Value(2)}, Value("c\0")}});
+    assertExpectedResults("$substrCP",
+                          {{{Value("abc\0"_sd), Value(2), Value(2)}, Value("c\0"_sd)}});
 }
 
 TEST(ExpressionSubstrCPTest, WithOutOfRangeString) {
