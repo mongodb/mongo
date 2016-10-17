@@ -68,30 +68,16 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 Seconds(15));
 
 /**
- * Parses the specified asynchronous command response and converts it to status to use as outcome of
- * an asynchronous migration command. It is necessary for two reasons:
- *  - Preserve backwards compatibility with 3.2 and earlier, where the move chunk command instead of
- * returning a ChunkTooBig status includes an extra field in the response.
- *  - Convert CallbackCanceled errors into BalancerInterrupted for the cases where the migration
- * manager is being stopped at replica set stepdown. This return code allows the mongos calling
- * logic to retry the operation on a new primary.
+ * Parses the 'commandResponse' and converts it to a status to use as the outcome of the command.
+ * Preserves backwards compatibility with 3.2 and earlier shards that, rather than use a ChunkTooBig
+ * error code, include an extra field in the response.
  */
-Status extractMigrationStatusFromRemoteCommandResponse(const RemoteCommandResponse& response,
-                                                       bool isStopping) {
-    if (!response.isOK()) {
-        if (response.status == ErrorCodes::CallbackCanceled && isStopping) {
-            return {ErrorCodes::BalancerInterrupted,
-                    "Migration interrupted because the balancer is stopping"};
-        }
-
-        return response.status;
-    }
-
-    Status commandStatus = getStatusFromCommandResult(response.data);
+Status extractMigrationStatusFromCommandResponse(const BSONObj& commandResponse) {
+    Status commandStatus = getStatusFromCommandResult(commandResponse);
 
     if (!commandStatus.isOK()) {
         bool chunkTooBig = false;
-        bsonExtractBooleanFieldWithDefault(response.data, kChunkTooBig, false, &chunkTooBig);
+        bsonExtractBooleanFieldWithDefault(commandResponse, kChunkTooBig, false, &chunkTooBig);
         if (chunkTooBig) {
             commandStatus = {ErrorCodes::ChunkTooBig, commandStatus.reason()};
         }
@@ -136,11 +122,10 @@ StatusWith<DistLockHandle> acquireDistLock(OperationContext* txn,
  * Returns whether the specified status is an error caused by stepdown of the primary config node
  * currently running the balancer.
  */
-bool isErrorDueToBalancerStepdown(Status status) {
-    return (status == ErrorCodes::BalancerInterrupted ||
-            status == ErrorCodes::InterruptedAtShutdown ||
-            status == ErrorCodes::InterruptedDueToReplStateChange ||
-            ErrorCodes::isShutdownError(status.code()));
+bool isErrorDueToConfigStepdown(Status status, bool isStopping) {
+    return ((status == ErrorCodes::CallbackCanceled && isStopping) ||
+            status == ErrorCodes::BalancerInterrupted ||
+            status == ErrorCodes::InterruptedDueToReplStateChange);
 }
 
 }  // namespace
@@ -166,7 +151,7 @@ MigrationStatuses MigrationManager::executeMigrationsForAutoBalance(
 
     {
         std::map<MigrationIdentifier, ScopedMigrationRequest> scopedMigrationRequests;
-        vector<std::pair<shared_ptr<Notification<Status>>, MigrateInfo>> responses;
+        vector<std::pair<shared_ptr<Notification<RemoteCommandResponse>>, MigrateInfo>> responses;
 
         for (const auto& migrateInfo : migrateInfos) {
             // Write a document to the config.migrations collection, in case this migration must be
@@ -197,18 +182,16 @@ MigrationStatuses MigrationManager::executeMigrationsForAutoBalance(
             auto notification = std::move(response.first);
             auto migrateInfo = std::move(response.second);
 
-            Status responseStatus = notification->get();
+            const auto& remoteCommandResponse = notification->get();
 
-            if (responseStatus == ErrorCodes::LockBusy) {
+            auto it = scopedMigrationRequests.find(migrateInfo.getName());
+            invariant(it != scopedMigrationRequests.end());
+            Status commandStatus =
+                _processRemoteCommandResponse(remoteCommandResponse, &it->second);
+            if (commandStatus == ErrorCodes::LockBusy) {
                 rescheduledMigrations.emplace_back(std::move(migrateInfo));
             } else {
-                if (isErrorDueToBalancerStepdown(responseStatus)) {
-                    auto it = scopedMigrationRequests.find(migrateInfo.getName());
-                    invariant(it != scopedMigrationRequests.end());
-                    it->second.keepDocumentOnDestruct();
-                }
-
-                migrationStatuses.emplace(migrateInfo.getName(), std::move(responseStatus));
+                migrationStatuses.emplace(migrateInfo.getName(), std::move(commandStatus));
             }
         }
     }
@@ -225,19 +208,19 @@ MigrationStatuses MigrationManager::executeMigrationsForAutoBalance(
             continue;
         }
 
-        Status responseStatus = _schedule(txn,
-                                          migrateInfo,
-                                          true,  // Shard takes the collection dist lock
-                                          maxChunkSizeBytes,
-                                          secondaryThrottle,
-                                          waitForDelete)
-                                    ->get();
+        RemoteCommandResponse remoteCommandResponse =
+            _schedule(txn,
+                      migrateInfo,
+                      true,  // Shard takes the collection dist lock
+                      maxChunkSizeBytes,
+                      secondaryThrottle,
+                      waitForDelete)
+                ->get();
 
-        if (isErrorDueToBalancerStepdown(responseStatus)) {
-            statusWithScopedMigrationRequest.getValue().keepDocumentOnDestruct();
-        }
+        Status commandStatus = _processRemoteCommandResponse(
+            remoteCommandResponse, &statusWithScopedMigrationRequest.getValue());
 
-        migrationStatuses.emplace(migrateInfo.getName(), std::move(responseStatus));
+        migrationStatuses.emplace(migrateInfo.getName(), std::move(commandStatus));
     }
 
     invariant(migrationStatuses.size() == migrateInfos.size());
@@ -261,13 +244,14 @@ Status MigrationManager::executeManualMigration(
         return statusWithScopedMigrationRequest.getStatus();
     }
 
-    Status status = _schedule(txn,
-                              migrateInfo,
-                              false,  // Config server takes the collection dist lock
-                              maxChunkSizeBytes,
-                              secondaryThrottle,
-                              waitForDelete)
-                        ->get();
+    RemoteCommandResponse remoteCommandResponse =
+        _schedule(txn,
+                  migrateInfo,
+                  false,  // Config server takes the collection dist lock
+                  maxChunkSizeBytes,
+                  secondaryThrottle,
+                  waitForDelete)
+            ->get();
 
     auto scopedCMStatus = ScopedChunkManager::getExisting(txn, NamespaceString(migrateInfo.ns));
     if (!scopedCMStatus.isOK()) {
@@ -280,23 +264,18 @@ Status MigrationManager::executeManualMigration(
     auto chunk = cm->findIntersectingChunkWithSimpleCollation(txn, migrateInfo.minKey);
     invariant(chunk);
 
-    // The order of the checks below is important due to the need for interrupted migration calls to
-    // be able to join any possibly completed migrations, which are still running in the
-    // waitForDelete step.
-    if (isErrorDueToBalancerStepdown(status)) {
-        statusWithScopedMigrationRequest.getValue().keepDocumentOnDestruct();
+    Status commandStatus = _processRemoteCommandResponse(
+        remoteCommandResponse, &statusWithScopedMigrationRequest.getValue());
 
-        // We want the mongos to get a retriable error, and not make its replica set monitor
-        // interpret something like InterruptedDueToReplStateChange as the config server when the
-        // error comes from the shard.
-        return {ErrorCodes::BalancerInterrupted, status.reason()};
-    } else if (chunk->getShardId() == migrateInfo.to) {
-        // Regardless of the status, if the chunk's current shard matches the destination, deem the
-        // move as success.
+    // Migration calls can be interrupted after the metadata is committed but before the command
+    // finishes the waitForDelete stage. Any failovers, therefore, must always cause the moveChunk
+    // command to be retried so as to assure that the waitForDelete promise of a successful command
+    // has been fulfilled.
+    if (chunk->getShardId() == migrateInfo.to && commandStatus != ErrorCodes::BalancerInterrupted) {
         return Status::OK();
     }
 
-    return status;
+    return commandStatus;
 }
 
 void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* txn) {
@@ -404,7 +383,7 @@ void MigrationManager::finishRecovery(OperationContext* txn,
 
     // Schedule recovered migrations.
     vector<ScopedMigrationRequest> scopedMigrationRequests;
-    vector<shared_ptr<Notification<Status>>> responses;
+    vector<shared_ptr<Notification<RemoteCommandResponse>>> responses;
 
     for (auto& nssAndMigrateInfos : _migrationRecoveryMap) {
         auto& nss = nssAndMigrateInfos.first;
@@ -521,7 +500,7 @@ void MigrationManager::drainActiveMigrations() {
     _state = State::kStopped;
 }
 
-shared_ptr<Notification<Status>> MigrationManager::_schedule(
+shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule(
     OperationContext* txn,
     const MigrateInfo& migrateInfo,
     bool shardTakesCollectionDistLock,
@@ -534,7 +513,7 @@ shared_ptr<Notification<Status>> MigrationManager::_schedule(
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (_state != State::kEnabled && _state != State::kRecovering) {
-            return std::make_shared<Notification<Status>>(
+            return std::make_shared<Notification<RemoteCommandResponse>>(
                 Status(ErrorCodes::BalancerInterrupted,
                        "Migration cannot be executed because the balancer is not running"));
         }
@@ -545,7 +524,7 @@ shared_ptr<Notification<Status>> MigrationManager::_schedule(
     // shard as well, but doing them here saves an extra network call, which might otherwise fail.
     auto statusWithScopedChunkManager = ScopedChunkManager::getExisting(txn, nss);
     if (!statusWithScopedChunkManager.isOK()) {
-        return std::make_shared<Notification<Status>>(
+        return std::make_shared<Notification<RemoteCommandResponse>>(
             std::move(statusWithScopedChunkManager.getStatus()));
     }
 
@@ -557,7 +536,7 @@ shared_ptr<Notification<Status>> MigrationManager::_schedule(
     // If the chunk is not found exactly as requested, the caller must have stale data
     if (SimpleBSONObjComparator::kInstance.evaluate(chunk->getMin() != migrateInfo.minKey) ||
         SimpleBSONObjComparator::kInstance.evaluate(chunk->getMax() != migrateInfo.maxKey)) {
-        return std::make_shared<Notification<Status>>(Status(
+        return std::make_shared<Notification<RemoteCommandResponse>>(Status(
             ErrorCodes::IncompatibleShardingMetadata,
             stream() << "Chunk " << ChunkRange(migrateInfo.minKey, migrateInfo.maxKey).toString()
                      << " does not exist."));
@@ -565,14 +544,16 @@ shared_ptr<Notification<Status>> MigrationManager::_schedule(
 
     const auto fromShardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, migrateInfo.from);
     if (!fromShardStatus.isOK()) {
-        return std::make_shared<Notification<Status>>(std::move(fromShardStatus.getStatus()));
+        return std::make_shared<Notification<RemoteCommandResponse>>(
+            std::move(fromShardStatus.getStatus()));
     }
 
     const auto fromShard = fromShardStatus.getValue();
     auto fromHostStatus =
         fromShard->getTargeter()->findHost(txn, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
     if (!fromHostStatus.isOK()) {
-        return std::make_shared<Notification<Status>>(std::move(fromHostStatus.getStatus()));
+        return std::make_shared<Notification<RemoteCommandResponse>>(
+            std::move(fromHostStatus.getStatus()));
     }
 
     BSONObjBuilder builder;
@@ -593,7 +574,7 @@ shared_ptr<Notification<Status>> MigrationManager::_schedule(
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     if (_state != State::kEnabled && _state != State::kRecovering) {
-        return std::make_shared<Notification<Status>>(
+        return std::make_shared<Notification<RemoteCommandResponse>>(
             Status(ErrorCodes::BalancerInterrupted,
                    "Migration cannot be executed because the balancer is not running"));
     }
@@ -652,11 +633,7 @@ void MigrationManager::_scheduleWithDistLock_inlock(OperationContext* txn,
                 auto txn = cc().makeOperationContext();
 
                 stdx::lock_guard<stdx::mutex> lock(_mutex);
-                _completeWithDistLock_inlock(
-                    txn.get(),
-                    itMigration,
-                    extractMigrationStatusFromRemoteCommandResponse(
-                        args.response, _state != State::kEnabled && _state != State::kRecovering));
+                _completeWithDistLock_inlock(txn.get(), itMigration, args.response);
             });
 
     if (callbackHandleWithStatus.isOK()) {
@@ -667,9 +644,10 @@ void MigrationManager::_scheduleWithDistLock_inlock(OperationContext* txn,
     _completeWithDistLock_inlock(txn, itMigration, std::move(callbackHandleWithStatus.getStatus()));
 }
 
-void MigrationManager::_completeWithDistLock_inlock(OperationContext* txn,
-                                                    MigrationsList::iterator itMigration,
-                                                    Status status) {
+void MigrationManager::_completeWithDistLock_inlock(
+    OperationContext* txn,
+    MigrationsList::iterator itMigration,
+    const RemoteCommandResponse& remoteCommandResponse) {
     const NamespaceString nss(itMigration->nss);
 
     // Make sure to signal the notification last, after the distributed lock is freed, so that we
@@ -690,7 +668,7 @@ void MigrationManager::_completeWithDistLock_inlock(OperationContext* txn,
         _checkDrained_inlock();
     }
 
-    notificationToSignal->set(status);
+    notificationToSignal->set(remoteCommandResponse);
 }
 
 void MigrationManager::_scheduleWithoutDistLock_inlock(OperationContext* txn,
@@ -715,8 +693,7 @@ void MigrationManager::_scheduleWithoutDistLock_inlock(OperationContext* txn,
                 _activeMigrationsWithoutDistLock.erase(itMigration);
                 _checkDrained_inlock();
 
-                notificationToSignal->set(extractMigrationStatusFromRemoteCommandResponse(
-                    args.response, _state != State::kEnabled && _state != State::kRecovering));
+                notificationToSignal->set(args.response);
             });
 
     if (callbackHandleWithStatus.isOK()) {
@@ -771,10 +748,30 @@ void MigrationManager::_abandonActiveMigrationsAndEnableManager(OperationContext
     _condVar.notify_all();
 }
 
+Status MigrationManager::_processRemoteCommandResponse(
+    const RemoteCommandResponse& remoteCommandResponse,
+    ScopedMigrationRequest* scopedMigrationRequest) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    Status commandStatus(ErrorCodes::InternalError, "Uninitialized value.");
+    if (isErrorDueToConfigStepdown(remoteCommandResponse.status,
+                                   _state != State::kEnabled && _state != State::kRecovering)) {
+        scopedMigrationRequest->keepDocumentOnDestruct();
+        commandStatus = Status(ErrorCodes::BalancerInterrupted,
+                               stream() << "Migration interrupted because the balancer is stopping."
+                                        << causedBy(remoteCommandResponse.status));
+    } else if (!remoteCommandResponse.isOK()) {
+        commandStatus = remoteCommandResponse.status;
+    } else {
+        commandStatus = extractMigrationStatusFromCommandResponse(remoteCommandResponse.data);
+    }
+
+    return commandStatus;
+}
+
 MigrationManager::Migration::Migration(NamespaceString inNss, BSONObj inMoveChunkCmdObj)
     : nss(std::move(inNss)),
       moveChunkCmdObj(std::move(inMoveChunkCmdObj)),
-      completionNotification(std::make_shared<Notification<Status>>()) {}
+      completionNotification(std::make_shared<Notification<RemoteCommandResponse>>()) {}
 
 MigrationManager::Migration::~Migration() {
     invariant(completionNotification);
