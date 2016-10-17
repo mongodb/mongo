@@ -347,11 +347,13 @@ BSONObj DBClientCursor::next() {
 
     uassert(13422, "DBClientCursor next() called but more() is false", batch.pos < batch.nReturned);
 
-    auto status = validateBSON(batch.data, batch.remainingBytes, _enabledBSONVersion);
-    uassert(ErrorCodes::InvalidBSON,
-            str::stream() << "Got invalid BSON from external server while reading from cursor"
-                          << causedBy(status),
-            status.isOK());
+    if (serverGlobalParams.objcheck) {
+        auto status = validateBSON(batch.data, batch.remainingBytes, _enabledBSONVersion);
+        uassert(ErrorCodes::InvalidBSON,
+                str::stream() << "Got invalid BSON from external server while reading from cursor"
+                              << causedBy(status),
+                status.isOK());
+    }
 
     BSONObj o(batch.data);
 
