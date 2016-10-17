@@ -106,12 +106,14 @@ public:
     Refresher startOrContinueRefresh();
 
     /**
-     * Notifies this Monitor that a host has failed and should be considered down.
+     * Notifies this Monitor that a host has failed because of the specified error 'status' and
+     * should be considered down.
      *
-     * Call this when you get a connection error. If you get an error while trying to refresh
-     * our view of a host, call Refresher::hostFailed() instead.
+     * Call this when you get a connection error. If you get an error while trying to refresh our
+     * view of a host, call Refresher::failedHost instead because it bypasses taking the monitor's
+     * mutex.
      */
-    void failedHost(const HostAndPort& host);
+    void failedHost(const HostAndPort& host, const Status& status);
 
     /**
      * Returns true if this node is the master based ONLY on local data. Be careful, return may
@@ -339,7 +341,7 @@ public:
     /**
      * Call this if a host returned from getNextStep failed to reply to an isMaster call.
      */
-    void failedHost(const HostAndPort& host);
+    void failedHost(const HostAndPort& host, const Status& status);
 
     /**
      * True if this Refresher started a new full scan rather than joining an existing one.
@@ -355,15 +357,17 @@ public:
 
 private:
     /**
-     * First, checks that the "reply" is not from a stale primary by
-     * comparing the electionId of "reply" to the maxElectionId recorded by the SetState.
-     * Returns true if "reply" belongs to a non-stale primary.
+     * First, checks that the "reply" is not from a stale primary by comparing the electionId of
+     * "reply" to the maxElectionId recorded by the SetState and returns OK status if "reply"
+     * belongs to a non-stale primary. Otherwise returns a failed status.
+     *
+     * The 'from' parameter specifies the node from which the response is received.
      *
      * Updates _set and _scan based on set-membership information from a master.
      * Applies _scan->unconfirmedReplies to confirmed nodes.
      * Does not update this host's node in _set->nodes.
      */
-    bool receivedIsMasterFromMaster(const IsMasterReply& reply);
+    Status receivedIsMasterFromMaster(const HostAndPort& from, const IsMasterReply& reply);
 
     /**
      * Adjusts the _scan work queue based on information from this host.

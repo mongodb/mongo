@@ -88,16 +88,16 @@ StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(OperationContext* txn,
     }
 }
 
-void RemoteCommandTargeterRS::markHostNotMaster(const HostAndPort& host) {
+void RemoteCommandTargeterRS::markHostNotMaster(const HostAndPort& host, const Status& status) {
     invariant(_rsMonitor);
 
-    _rsMonitor->failedHost(host);
+    _rsMonitor->failedHost(host, status);
 }
 
-void RemoteCommandTargeterRS::markHostUnreachable(const HostAndPort& host) {
+void RemoteCommandTargeterRS::markHostUnreachable(const HostAndPort& host, const Status& status) {
     invariant(_rsMonitor);
 
-    _rsMonitor->failedHost(host);
+    _rsMonitor->failedHost(host, status);
 }
 
 }  // namespace mongo

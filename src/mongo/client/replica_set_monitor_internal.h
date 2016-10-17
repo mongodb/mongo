@@ -93,7 +93,7 @@ public:
     struct Node {
         explicit Node(const HostAndPort& host);
 
-        void markFailed();
+        void markFailed(const Status& status);
 
         bool matches(const ReadPreference pref) const;
 
