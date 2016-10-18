@@ -241,9 +241,13 @@ connection_stats = [
     CacheStat('cache_pages_inuse', 'pages currently held in the cache', 'no_clear,no_scale'),
     CacheStat('cache_pages_requested', 'pages requested from the cache'),
     CacheStat('cache_read', 'pages read into cache'),
+    CacheStat('cache_read_app_count', 'application threads page read from disk to cache count'),
+    CacheStat('cache_read_app_time', 'application threads page read from disk to cache time (usecs)'),
     CacheStat('cache_read_lookaside', 'pages read into cache requiring lookaside entries'),
     CacheStat('cache_read_overflow', 'overflow pages read into cache'),
     CacheStat('cache_write', 'pages written from cache'),
+    CacheStat('cache_write_app_count', 'application threads page write from cache to disk count'),
+    CacheStat('cache_write_app_time', 'application threads page write from cache to disk time (usecs)'),
     CacheStat('cache_write_lookaside', 'page written requiring lookaside records'),
     CacheStat('cache_write_restore', 'pages written requiring in-memory restoration'),
 
