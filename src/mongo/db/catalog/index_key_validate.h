@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/server_options.h"
 
 namespace mongo {
@@ -38,9 +39,10 @@ template <typename T>
 class StatusWith;
 
 /**
- * Checks if the key is valid for building an index.
+ * Checks if the key is valid for building an index according to the validation rules for the given
+ * index version.
  */
-Status validateKeyPattern(const BSONObj& key);
+Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion indexVersion);
 
 /**
  * Validates the index specification 'indexSpec' and returns an equivalent index specification that

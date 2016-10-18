@@ -155,7 +155,7 @@ StatusWith<CompactStats> Collection::compact(OperationContext* txn,
 
             const BSONObj spec = _compactAdjustIndexSpec(descriptor->infoObj());
             const BSONObj key = spec.getObjectField("key");
-            const Status keyStatus = validateKeyPattern(key);
+            const Status keyStatus = validateKeyPattern(key, descriptor->version());
             if (!keyStatus.isOK()) {
                 return StatusWith<CompactStats>(
                     ErrorCodes::CannotCreateIndex,

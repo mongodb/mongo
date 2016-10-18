@@ -104,6 +104,10 @@ bool IndexDescriptor::isIndexVersionSupported(IndexVersion indexVersion) {
     return false;
 }
 
+std::set<IndexVersion> IndexDescriptor::getSupportedIndexVersions() {
+    return {IndexVersion::kV0, IndexVersion::kV1, IndexVersion::kV2};
+}
+
 Status IndexDescriptor::isIndexVersionAllowedForCreation(
     IndexVersion indexVersion,
     const ServerGlobalParams::FeatureCompatibility& featureCompatibility,

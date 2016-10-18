@@ -562,7 +562,7 @@ Status IndexCatalog::_isSpecOk(OperationContext* txn, const BSONObj& spec) const
                                     << "\" is too long (127 byte max)");
 
     const BSONObj key = spec.getObjectField("key");
-    const Status keyStatus = validateKeyPattern(key);
+    const Status keyStatus = validateKeyPattern(key, indexVersion);
     if (!keyStatus.isOK()) {
         return Status(ErrorCodes::CannotCreateIndex,
                       str::stream() << "bad index key pattern " << key << ": "

@@ -172,7 +172,9 @@ BSONObj isKeyTooLarge(const BSONObj& a, void* data) {
 
 BSONObj validateIndexKey(const BSONObj& a, void* data) {
     BSONObj key = a[0].Obj();
-    Status indexValid = validateKeyPattern(key);
+    // This is related to old upgrade-checking code when v:1 indexes were the latest version, hence
+    // always validate using v:1 rules here.
+    Status indexValid = validateKeyPattern(key, IndexDescriptor::IndexVersion::kV1);
     if (!indexValid.isOK()) {
         return BSON("" << BSON("ok" << false << "type" << indexValid.codeString() << "errmsg"
                                     << indexValid.reason()));

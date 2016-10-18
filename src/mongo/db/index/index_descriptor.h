@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <set>
 #include <string>
 
 #include "mongo/db/catalog/collection.h"
@@ -55,6 +56,7 @@ class IndexCatalogEntryContainer;
 class IndexDescriptor {
 public:
     enum class IndexVersion { kV0 = 0, kV1 = 1, kV2 = 2 };
+    static constexpr IndexVersion kLatestIndexVersion = IndexVersion::kV2;
 
     static constexpr StringData k2dIndexBitsFieldName = "bits"_sd;
     static constexpr StringData k2dIndexMinFieldName = "min"_sd;
@@ -111,6 +113,11 @@ public:
      * Returns true if the specified index version is supported, and returns false otherwise.
      */
     static bool isIndexVersionSupported(IndexVersion indexVersion);
+
+    /**
+     * Returns a set of the currently supported index versions.
+     */
+    static std::set<IndexVersion> getSupportedIndexVersions();
 
     /**
      * Returns Status::OK() if indexes of version 'indexVersion' are allowed to be created, and

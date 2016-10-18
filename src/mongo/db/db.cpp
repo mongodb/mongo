@@ -469,14 +469,6 @@ void repairDatabasesAndCheckVersion(OperationContext* txn) {
                       << "http://dochub.mongodb.org/core/upgrade-2.4" << startupWarningsLog;
             }
 
-            const Status keyStatus = validateKeyPattern(key);
-            if (!keyStatus.isOK()) {
-                log() << "Problem with index " << index << ": " << redact(keyStatus)
-                      << " This index can still be used however it cannot be rebuilt."
-                      << " For more info see"
-                      << " http://dochub.mongodb.org/core/index-validation" << startupWarningsLog;
-            }
-
             if (index["v"].isNumber() && index["v"].numberInt() == 0) {
                 log() << "WARNING: The index: " << index << " was created with the deprecated"
                       << " v:0 format.  This format will not be supported in a future release."

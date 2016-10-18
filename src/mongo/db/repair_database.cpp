@@ -75,6 +75,7 @@ Status rebuildIndexesOnCollection(OperationContext* txn,
             const string& name = indexNames[i];
             BSONObj spec = cce->getIndexSpec(txn, name);
 
+            IndexVersion newIndexVersion = IndexVersion::kV0;
             {
                 BSONObjBuilder bob;
 
@@ -85,12 +86,13 @@ Status rebuildIndexesOnCollection(OperationContext* txn,
                             static_cast<IndexVersion>(indexSpecElem.numberInt());
                         if (IndexVersion::kV0 == indexVersion) {
                             // We automatically upgrade v=0 indexes to v=1 indexes.
-                            bob.append(IndexDescriptor::kIndexVersionFieldName,
-                                       static_cast<int>(IndexVersion::kV1));
+                            newIndexVersion = IndexVersion::kV1;
                         } else {
-                            bob.append(IndexDescriptor::kIndexVersionFieldName,
-                                       static_cast<int>(indexVersion));
+                            newIndexVersion = indexVersion;
                         }
+
+                        bob.append(IndexDescriptor::kIndexVersionFieldName,
+                                   static_cast<int>(newIndexVersion));
                     } else {
                         bob.append(indexSpecElem);
                     }
@@ -100,7 +102,7 @@ Status rebuildIndexesOnCollection(OperationContext* txn,
             }
 
             const BSONObj key = spec.getObjectField("key");
-            const Status keyStatus = validateKeyPattern(key);
+            const Status keyStatus = validateKeyPattern(key, newIndexVersion);
             if (!keyStatus.isOK()) {
                 return Status(
                     ErrorCodes::CannotCreateIndex,

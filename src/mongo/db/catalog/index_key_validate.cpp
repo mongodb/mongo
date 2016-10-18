@@ -59,7 +59,7 @@ namespace {
 MONGO_FP_DECLARE(skipIndexCreateFieldNameValidation);
 }
 
-Status validateKeyPattern(const BSONObj& key) {
+Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion indexVersion) {
     const ErrorCodes::Error code = ErrorCodes::CannotCreateIndex;
 
     if (key.objsize() > 2048)
@@ -79,18 +79,39 @@ Status validateKeyPattern(const BSONObj& key) {
     while (it.more()) {
         BSONElement keyElement = it.next();
 
-        if (keyElement.isNumber()) {
-            double value = keyElement.number();
-            if (std::isnan(value)) {
-                return {code, "Values in the index key pattern cannot be NaN."};
-            } else if (value == 0.0) {
-                return {code, "Values in the index key pattern cannot be 0."};
+        switch (indexVersion) {
+            case IndexVersion::kV0:
+            case IndexVersion::kV1: {
+                if (keyElement.type() == BSONType::Object || keyElement.type() == BSONType::Array) {
+                    return {code,
+                            str::stream() << "Values in index key pattern cannot be of type "
+                                          << typeName(keyElement.type())
+                                          << " for index version v:"
+                                          << static_cast<int>(indexVersion)};
+                }
+
+                break;
             }
-        } else if (keyElement.type() != String) {
-            return {code,
-                    str::stream() << "Values in index key pattern cannot be of type "
-                                  << typeName(keyElement.type())
-                                  << ". Only numbers > 0, numbers < 0, and strings are allowed."};
+            case IndexVersion::kV2: {
+                if (keyElement.isNumber()) {
+                    double value = keyElement.number();
+                    if (std::isnan(value)) {
+                        return {code, "Values in the index key pattern cannot be NaN."};
+                    } else if (value == 0.0) {
+                        return {code, "Values in the index key pattern cannot be 0."};
+                    }
+                } else if (keyElement.type() != BSONType::String) {
+                    return {code,
+                            str::stream()
+                                << "Values in v:2 index key pattern cannot be of type "
+                                << typeName(keyElement.type())
+                                << ". Only numbers > 0, numbers < 0, and strings are allowed."};
+                }
+
+                break;
+            }
+            default:
+                MONGO_UNREACHABLE;
         }
 
         if (keyElement.type() == String && pluginName != keyElement.str()) {
@@ -183,6 +204,14 @@ StatusWith<BSONObj> validateIndexSpec(
                                           << indexSpecElem.Obj()};
                 }
                 keys.push_back(keyElemFieldName);
+            }
+
+            // Here we always validate the key pattern according to the most recent rules, in order
+            // to enforce that all new indexes have well-formed key patterns.
+            Status keyPatternValidateStatus =
+                validateKeyPattern(indexSpecElem.Obj(), IndexDescriptor::kLatestIndexVersion);
+            if (!keyPatternValidateStatus.isOK()) {
+                return keyPatternValidateStatus;
             }
 
             hasKeyPatternField = true;
