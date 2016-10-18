@@ -900,16 +900,17 @@ var ReplSetTest = function(opts) {
             }
 
             let dbHandle = primary.getDB(dbName);
-            dbHandle
-                .getCollectionInfos({
-                    $or: [{type: "collection"}, {type: {$exists: false}}],
-                    name: {$not: /^system\./}
-                })
+            dbHandle.getCollectionInfos({$or: [{type: "collection"}, {type: {$exists: false}}]})
                 .forEach(function(collInfo) {
-                    // 'usePowerOf2Sizes' is ignored by the server so no actual collection
-                    // modification takes place.
-                    assert.commandWorked(
-                        dbHandle.runCommand({collMod: collInfo.name, usePowerOf2Sizes: true}));
+                    // Skip system collections. We handle here rather than in the getCollectionInfos
+                    // filter to take advantage of the fact that a simple 'collection' filter will
+                    // skip view evaluation, and therefore won't fail on an invalid view.
+                    if (!collInfo.name.startsWith('system.')) {
+                        // 'usePowerOf2Sizes' is ignored by the server so no actual collection
+                        // modification takes place.
+                        assert.commandWorked(
+                            dbHandle.runCommand({collMod: collInfo.name, usePowerOf2Sizes: true}));
+                    }
                 });
         }
 
