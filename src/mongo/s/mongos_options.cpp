@@ -98,9 +98,6 @@ Status addMongosOptions(moe::OptionSection* options) {
     sharding_options.addOptionChaining("test", "test", moe::Switch, "just run unit tests")
         .setSources(moe::SourceAllLegacy);
 
-    sharding_options.addOptionChaining(
-        "sharding.chunkSize", "chunkSize", moe::Int, "maximum amount of data per chunk");
-
     sharding_options
         .addOptionChaining("net.http.JSONPEnabled",
                            "jsonp",
