@@ -219,7 +219,7 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint) {
     JournalListener::Token token = _journalListener->getToken();
 
     // Use the journal when available, or a checkpoint otherwise.
-    if (_engine->isDurable()) {
+    if (_engine && _engine->isDurable()) {
         invariantWTOK(s->log_flush(s, "sync=on"));
         LOG(4) << "flushed journal";
     } else {

@@ -48,6 +48,8 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -773,7 +775,7 @@ TEST(WiredTigerRecordStoreTest, CappedCursorRollover) {
     ASSERT(!cursor->next());
 }
 
-RecordId _oplogOrderInsertOplog(OperationContext* txn, unique_ptr<RecordStore>& rs, int inc) {
+RecordId _oplogOrderInsertOplog(OperationContext* txn, const unique_ptr<RecordStore>& rs, int inc) {
     Timestamp opTime = Timestamp(5, inc);
     WiredTigerRecordStore* wrs = checked_cast<WiredTigerRecordStore*>(rs.get());
     Status status = wrs->oplogDiskLocRegister(txn, opTime);
@@ -853,6 +855,8 @@ TEST(WiredTigerRecordStoreTest, OplogOrder) {
         w1.commit();
     }
 
+    rs->waitForAllEarlierOplogWritesToBeVisible(harnessHelper->newOperationContext().get());
+
     {  // now all 3 docs should be visible
         auto client2 = harnessHelper->serviceContext()->makeClient("c2");
         auto opCtx = harnessHelper->newOperationContext(client2.get());
@@ -912,6 +916,8 @@ TEST(WiredTigerRecordStoreTest, OplogOrder) {
         w1.commit();
     }
 
+    rs->waitForAllEarlierOplogWritesToBeVisible(harnessHelper->newOperationContext().get());
+
     {  // now all 3 docs should be visible
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         auto cursor = rs->getCursor(opCtx.get());
@@ -921,6 +927,84 @@ TEST(WiredTigerRecordStoreTest, OplogOrder) {
         ASSERT(cursor->next());
         ASSERT(!cursor->next());
     }
+}
+
+// Test that even when the oplog durability loop is paused, we can still advance the commit point as
+// long as the commit for each insert comes before the next insert starts.
+TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
+    ON_BLOCK_EXIT([] { WTPausePrimaryOplogDurabilityLoop.setMode(FailPoint::off); });
+    WTPausePrimaryOplogDurabilityLoop.setMode(FailPoint::alwaysOn);
+
+    unique_ptr<WiredTigerHarnessHelper> harnessHelper(new WiredTigerHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newCappedRecordStore("local.oplog.foo", 100000, -1));
+    auto wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
+
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        WriteUnitOfWork uow(opCtx.get());
+        RecordId id = _oplogOrderInsertOplog(opCtx.get(), rs, 1);
+        ASSERT(wtrs->isCappedHidden(id));
+        uow.commit();
+        ASSERT(!wtrs->isCappedHidden(id));
+    }
+
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        WriteUnitOfWork uow(opCtx.get());
+        RecordId id = _oplogOrderInsertOplog(opCtx.get(), rs, 2);
+        ASSERT(wtrs->isCappedHidden(id));
+        uow.commit();
+        ASSERT(!wtrs->isCappedHidden(id));
+    }
+}
+
+// Test that Oplog entries inserted while there are hidden entries do not become visible until the
+// op and all earlier ops are durable.
+TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
+    ON_BLOCK_EXIT([] { WTPausePrimaryOplogDurabilityLoop.setMode(FailPoint::off); });
+    WTPausePrimaryOplogDurabilityLoop.setMode(FailPoint::alwaysOn);
+
+    unique_ptr<WiredTigerHarnessHelper> harnessHelper(new WiredTigerHarnessHelper());
+    unique_ptr<RecordStore> rs(harnessHelper->newCappedRecordStore("local.oplog.foo", 100000, -1));
+
+    auto wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
+
+    ServiceContext::UniqueOperationContext longLivedOp(harnessHelper->newOperationContext());
+    WriteUnitOfWork uow(longLivedOp.get());
+    RecordId id1 = _oplogOrderInsertOplog(longLivedOp.get(), rs, 1);
+    ASSERT(wtrs->isCappedHidden(id1));
+
+
+    RecordId id2;
+    {
+        auto innerClient = harnessHelper->serviceContext()->makeClient("inner");
+        ServiceContext::UniqueOperationContext opCtx(
+            harnessHelper->newOperationContext(innerClient.get()));
+        WriteUnitOfWork uow(opCtx.get());
+        id2 = _oplogOrderInsertOplog(opCtx.get(), rs, 2);
+        ASSERT(wtrs->isCappedHidden(id2));
+        uow.commit();
+    }
+
+    ASSERT(wtrs->isCappedHidden(id1));
+    ASSERT(wtrs->isCappedHidden(id2));
+
+    uow.commit();
+
+    ASSERT(wtrs->isCappedHidden(id1));
+    ASSERT(wtrs->isCappedHidden(id2));
+
+    // Wait a bit and check again to make sure they don't become visible automatically.
+    sleepsecs(1);
+    ASSERT(wtrs->isCappedHidden(id1));
+    ASSERT(wtrs->isCappedHidden(id2));
+
+    WTPausePrimaryOplogDurabilityLoop.setMode(FailPoint::off);
+
+    rs->waitForAllEarlierOplogWritesToBeVisible(longLivedOp.get());
+
+    ASSERT(!wtrs->isCappedHidden(id1));
+    ASSERT(!wtrs->isCappedHidden(id2));
 }
 
 TEST(WiredTigerRecordStoreTest, StorageSizeStatisticsDisabled) {

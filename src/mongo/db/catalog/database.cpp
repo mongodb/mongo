@@ -423,10 +423,11 @@ Status Database::dropCollection(OperationContext* txn, StringData fullns) {
 
     Top::get(txn->getClient()->getServiceContext()).collectionDropped(fullns);
 
-    s = _dbEntry->dropCollection(txn, fullns);
-
-    // we want to do this always
+    // We want to destroy the Collection object before telling the StorageEngine to destroy the
+    // RecordStore.
     _clearCollectionCache(txn, fullns, "collection dropped");
+
+    s = _dbEntry->dropCollection(txn, fullns);
 
     if (!s.isOK())
         return s;

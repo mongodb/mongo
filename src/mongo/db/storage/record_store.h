@@ -132,12 +132,11 @@ enum ValidateCmdLevel : int {
  * IMPORTANT NOTE FOR DOCUMENT-LOCKING ENGINES: If you implement capped collections with a
  * "visibility" system such that documents that exist in your snapshot but were inserted after
  * the last uncommitted document are hidden, you must follow the following rules:
- *   - next() must never return invisible documents.
+ *   - next() on forward cursors must never return invisible documents.
  *   - If next() on a forward cursor hits an invisible document, it should behave as if it hit
  *     the end of the collection.
- *   - When next() on a reverse cursor seeks to the end of the collection it must return the
- *     newest visible document. This should only return boost::none if there are no visible
- *     documents in the collection.
+ *   - Reverse cursors must ignore the visibility filter. That means that they initially return the
+ *     newest committed record in the collection and may skip over uncommitted records.
  *   - SeekableRecordCursor::seekExact() must ignore the visibility filter and return the requested
  *     document even if it is supposed to be invisible.
  * TODO SERVER-18934 Handle this above the storage engine layer so storage engines don't have to
@@ -602,6 +601,15 @@ public:
     virtual Status oplogDiskLocRegister(OperationContext* txn, const Timestamp& opTime) {
         return Status::OK();
     }
+
+    /**
+     * Waits for all writes that completed before this call to be visible to forward scans.
+     * See the comment on RecordCursor for more details about the visibility rules.
+     *
+     * It is only legal to call this on an oplog. It is illegal to call this inside a
+     * WriteUnitOfWork.
+     */
+    virtual void waitForAllEarlierOplogWritesToBeVisible(OperationContext* txn) const = 0;
 
     /**
      * Called after a repair operation is run with the recomputed numRecords and dataSize.

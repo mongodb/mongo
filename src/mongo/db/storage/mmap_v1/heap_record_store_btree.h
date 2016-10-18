@@ -154,6 +154,10 @@ public:
         invariant(false);
     }
 
+    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* txn) const override {
+        invariant(false);
+    }
+
     virtual void updateStatsAfterRepair(OperationContext* txn,
                                         long long numRecords,
                                         long long dataSize) {

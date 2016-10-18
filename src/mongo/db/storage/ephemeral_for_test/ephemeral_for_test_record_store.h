@@ -121,6 +121,8 @@ public:
     virtual boost::optional<RecordId> oplogStartHack(OperationContext* txn,
                                                      const RecordId& startingPosition) const;
 
+    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* txn) const override {}
+
     virtual void updateStatsAfterRepair(OperationContext* txn,
                                         long long numRecords,
                                         long long dataSize) {

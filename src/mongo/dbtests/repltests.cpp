@@ -155,37 +155,17 @@ protected:
         return count;
     }
     int opCount() {
-        ScopedTransaction transaction(&_txn, MODE_X);
-        Lock::GlobalWrite lk(_txn.lockState());
-        OldClientContext ctx(&_txn, cllNS());
-
-        Database* db = ctx.db();
-        Collection* coll = db->getCollection(cllNS());
-        if (!coll) {
-            WriteUnitOfWork wunit(&_txn);
-            coll = db->createCollection(&_txn, cllNS());
-            wunit.commit();
-        }
-
-        int count = 0;
-        auto cursor = coll->getCursor(&_txn);
-        while (auto record = cursor->next()) {
-            ++count;
-        }
-        return count;
+        return DBDirectClient(&_txn).query(cllNS(), BSONObj())->itcount();
     }
     void applyAllOperations() {
         ScopedTransaction transaction(&_txn, MODE_X);
         Lock::GlobalWrite lk(_txn.lockState());
         vector<BSONObj> ops;
         {
-            OldClientContext ctx(&_txn, cllNS());
-            Database* db = ctx.db();
-            Collection* coll = db->getCollection(cllNS());
-
-            auto cursor = coll->getCursor(&_txn);
-            while (auto record = cursor->next()) {
-                ops.push_back(record->data.releaseToBson().getOwned());
+            DBDirectClient db(&_txn);
+            auto cursor = db.query(cllNS(), BSONObj());
+            while (cursor->more()) {
+                ops.push_back(cursor->nextSafeOwned());
             }
         }
         {
