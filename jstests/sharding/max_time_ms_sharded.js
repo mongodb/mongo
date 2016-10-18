@@ -13,7 +13,6 @@
     var shards = [st.shard0, st.shard1];
     var coll = mongos.getCollection("foo.bar");
     var admin = mongos.getDB("admin");
-    var exceededTimeLimit = 50;  // ErrorCodes::ExceededTimeLimit
     var cursor;
     var res;
 
@@ -117,12 +116,11 @@
 
     // Positive test for "validate".
     configureMaxTimeAlwaysTimeOut("alwaysOn");
-    res = coll.runCommand("validate", {maxTimeMS: 60 * 1000});
-    assert.commandFailed(
-        res, "expected validate to fail in mongod due to maxTimeAlwaysTimeOut fail point");
-    assert.eq(res["code"],
-              exceededTimeLimit,
-              "expected code " + exceededTimeLimit + " from validate, instead got: " + tojson(res));
+    assert.commandFailedWithCode(
+        coll.runCommand("validate", {maxTimeMS: 60 * 1000}),
+        ErrorCodes.ExceededTimeLimit,
+        "expected vailidate to fail with code " + ErrorCodes.ExceededTimeLimit +
+            " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
 
     // Negative test for "validate".
     configureMaxTimeAlwaysTimeOut("off");
@@ -131,12 +129,11 @@
 
     // Positive test for "count".
     configureMaxTimeAlwaysTimeOut("alwaysOn");
-    res = coll.runCommand("count", {maxTimeMS: 60 * 1000});
-    assert.commandFailed(res,
-                         "expected count to fail in mongod due to maxTimeAlwaysTimeOut fail point");
-    assert.eq(res["code"],
-              exceededTimeLimit,
-              "expected code " + exceededTimeLimit + " from count , instead got: " + tojson(res));
+    assert.commandFailedWithCode(
+        coll.runCommand("count", {maxTimeMS: 60 * 1000}),
+        ErrorCodes.ExceededTimeLimit,
+        "expected count to fail with code " + ErrorCodes.ExceededTimeLimit +
+            " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
 
     // Negative test for "count".
     configureMaxTimeAlwaysTimeOut("off");
@@ -145,13 +142,11 @@
 
     // Positive test for "collStats".
     configureMaxTimeAlwaysTimeOut("alwaysOn");
-    res = coll.runCommand("collStats", {maxTimeMS: 60 * 1000});
-    assert.commandFailed(
-        res, "expected collStats to fail in mongod due to maxTimeAlwaysTimeOut fail point");
-    assert.eq(
-        res["code"],
-        exceededTimeLimit,
-        "expected code " + exceededTimeLimit + " from collStats, instead got: " + tojson(res));
+    assert.commandFailedWithCode(
+        coll.runCommand("collStats", {maxTimeMS: 60 * 1000}),
+        ErrorCodes.ExceededTimeLimit,
+        "expected collStats to fail with code " + ErrorCodes.ExceededTimeLimit +
+            " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
 
     // Negative test for "collStats".
     configureMaxTimeAlwaysTimeOut("off");
@@ -170,12 +165,11 @@
         out: {inline: 1},
         maxTimeMS: 60 * 1000
     });
-    assert.commandFailed(
-        res, "expected mapReduce to fail in mongod due to maxTimeAlwaysTimeOut fail point");
-    assert.eq(
-        res["code"],
-        exceededTimeLimit,
-        "expected code " + exceededTimeLimit + " from mapReduce, instead got: " + tojson(res));
+    assert.commandFailedWithCode(
+        res,
+        ErrorCodes.ExceededTimeLimit,
+        "expected mapReduce to fail with code " + ErrorCodes.ExceededTimeLimit +
+            " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
 
     // Negative test for "mapReduce".
     configureMaxTimeAlwaysTimeOut("off");
@@ -193,13 +187,11 @@
 
     // Positive test for "aggregate".
     configureMaxTimeAlwaysTimeOut("alwaysOn");
-    res = coll.runCommand("aggregate", {pipeline: [], maxTimeMS: 60 * 1000});
-    assert.commandFailed(
-        res, "expected aggregate to fail in mongod due to maxTimeAlwaysTimeOut fail point");
-    assert.eq(
-        res["code"],
-        exceededTimeLimit,
-        "expected code " + exceededTimeLimit + " from aggregate , instead got: " + tojson(res));
+    assert.commandFailedWithCode(
+        coll.runCommand("aggregate", {pipeline: [], maxTimeMS: 60 * 1000}),
+        ErrorCodes.ExceededTimeLimit,
+        "expected aggregate to fail with code " + ErrorCodes.ExceededTimeLimit +
+            " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
 
     // Negative test for "aggregate".
     configureMaxTimeAlwaysTimeOut("off");
@@ -215,11 +207,9 @@
         maxTimeMS: 1000 * 60 * 60 * 24
     });
     assert.commandFailed(
-        res, "expected moveChunk to fail in mongod due to maxTimeAlwaysTimeOut fail point");
-    assert.eq(
-        res["code"],
-        exceededTimeLimit,
-        "expected code " + exceededTimeLimit + " from moveChunk, instead got: " + tojson(res));
+        res,
+        "expected moveChunk to fail due to maxTimeAlwaysTimeOut fail point, but instead got: " +
+            tojson(res));
 
     // Negative test for "moveChunk".
     configureMaxTimeAlwaysTimeOut("off");

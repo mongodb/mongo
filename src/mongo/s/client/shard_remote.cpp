@@ -118,6 +118,7 @@ const ConnectionString ShardRemote::getConnString() const {
     return _targeter->connectionString();
 }
 
+// Any error code changes should possibly also be made to Shard::shouldErrorBePropagated!
 void ShardRemote::updateReplSetMonitor(const HostAndPort& remoteHost,
                                        const Status& remoteCommandStatus) {
     if (remoteCommandStatus.isOK())

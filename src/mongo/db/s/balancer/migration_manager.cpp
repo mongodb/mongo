@@ -44,7 +44,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/move_chunk_request.h"
 #include "mongo/s/sharding_raii.h"
@@ -765,6 +764,11 @@ Status MigrationManager::_processRemoteCommandResponse(
         commandStatus = remoteCommandResponse.status;
     } else {
         commandStatus = extractMigrationStatusFromCommandResponse(remoteCommandResponse.data);
+        if (!Shard::shouldErrorBePropagated(commandStatus.code())) {
+            commandStatus = {ErrorCodes::OperationFailed,
+                             stream() << "moveChunk command failed on source shard."
+                                      << causedBy(commandStatus)};
+        }
     }
 
     // Any failure to remove the migration document should be because the config server is

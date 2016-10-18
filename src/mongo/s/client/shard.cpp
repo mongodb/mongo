@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -91,6 +92,13 @@ Status Shard::CommandResponse::processBatchWriteResponse(
 }
 
 const Milliseconds Shard::kDefaultConfigCommandTimeout = Seconds{30};
+
+bool Shard::shouldErrorBePropagated(ErrorCodes::Error code) {
+    return std::find(RemoteCommandRetryScheduler::kAllRetriableErrors.begin(),
+                     RemoteCommandRetryScheduler::kAllRetriableErrors.end(),
+                     code) == RemoteCommandRetryScheduler::kAllRetriableErrors.end() &&
+        code != ErrorCodes::ExceededTimeLimit;
+}
 
 Shard::Shard(const ShardId& id) : _id(id) {}
 

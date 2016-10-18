@@ -223,6 +223,14 @@ public:
     // explicitly overridden
     static const Milliseconds kDefaultConfigCommandTimeout;
 
+    /**
+     * Returns false if the error is a retriable error and/or causes a replset monitor update. These
+     * errors, if from a remote call, should not be further propagated back to another server
+     * because that server will interpret them as orignating on this server rather than the one this
+     * server called.
+     */
+    static bool shouldErrorBePropagated(ErrorCodes::Error code);
+
 protected:
     struct HostWithResponse {
         HostWithResponse(boost::optional<HostAndPort> _host,
