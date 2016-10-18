@@ -256,6 +256,8 @@ public:
     /* return which "deleted bucket" for this size object */
     static int bucket(int size);
 
+    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* txn) const override {}
+
     virtual void updateStatsAfterRepair(OperationContext* txn,
                                         long long numRecords,
                                         long long dataSize) {

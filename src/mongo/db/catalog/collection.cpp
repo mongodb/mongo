@@ -196,10 +196,11 @@ Collection::Collection(OperationContext* txn,
 
 Collection::~Collection() {
     verify(ok());
-    _magic = 0;
-    if (_cappedNotifier) {
+    if (isCapped()) {
+        _recordStore->setCappedCallback(nullptr);
         _cappedNotifier->kill();
     }
+    _magic = 0;
 }
 
 bool Collection::requiresIdIndex() const {

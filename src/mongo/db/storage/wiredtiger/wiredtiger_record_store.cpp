@@ -39,6 +39,7 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/namespace_string.h"
@@ -91,7 +92,7 @@ bool shouldUseOplogHack(OperationContext* opCtx, const std::string& uri) {
 }  // namespace
 
 MONGO_FP_DECLARE(WTWriteConflictException);
-MONGO_FP_DECLARE(WTEmulateOutOfOrderNextRecordId);
+MONGO_FP_DECLARE(WTPausePrimaryOplogDurabilityLoop);
 
 const std::string kWiredTigerEngineName = "wiredTiger";
 
@@ -445,31 +446,7 @@ public:
 
         WT_CURSOR* c = _cursor->get();
 
-        bool mustAdvance = !_skipNextAdvance;
-        if (_lastReturnedId.isNull() && !_forward && _rs._isCapped) {
-            // In this case we need to seek to the highest visible record.
-            const RecordId reverseCappedInitialSeekPoint =
-                _readUntilForOplog.isNull() ? _rs.lowestCappedHiddenRecord() : _readUntilForOplog;
-
-            if (!reverseCappedInitialSeekPoint.isNull()) {
-                c->set_key(c, _makeKey(reverseCappedInitialSeekPoint));
-                int cmp;
-                int seekRet = WT_OP_CHECK(c->search_near(c, &cmp));
-                if (seekRet == WT_NOTFOUND) {
-                    _eof = true;
-                    return {};
-                }
-                invariantWTOK(seekRet);
-
-                // If we landed at or past the lowest hidden record, we must advance to be in
-                // the visible range.
-                mustAdvance = _rs.isCappedHidden(reverseCappedInitialSeekPoint)
-                    ? (cmp >= 0)
-                    : (cmp > 0);  // No longer hidden.
-            }
-        }
-
-        if (mustAdvance) {
+        if (!_skipNextAdvance) {
             // Nothing after the next line can throw WCEs.
             // Note that an unpositioned (or eof) WT_CURSOR returns the first/last entry in the
             // table when you call next/prev.
@@ -485,13 +462,6 @@ public:
         int64_t key;
         invariantWTOK(c->get_key(c, &key));
         RecordId id = _fromKey(key);
-
-        if (_forward && MONGO_FAIL_POINT(WTEmulateOutOfOrderNextRecordId)) {
-            log() << "WTEmulateOutOfOrderNextRecordId fail point has triggerd so RecordId is now "
-                     "RecordId(1) instead of " << id;
-            // Replace the found RecordId with a (small) fake one.
-            id = RecordId{1};
-        }
 
         if (_forward && _lastReturnedId >= id) {
             log() << "WTCursor::next -- c->next_key ( " << id
@@ -610,6 +580,9 @@ public:
 private:
     bool isVisible(const RecordId& id) {
         if (!_rs._isCapped)
+            return true;
+
+        if (!_forward)
             return true;
 
         if (_readUntilForOplog.isNull() || !_rs._isOplog) {
@@ -866,11 +839,18 @@ WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx,
     if (WiredTigerKVEngine::initRsOplogBackgroundThread(ns)) {
         _oplogStones = std::make_shared<OplogStones>(ctx, this);
     }
+
+    if (_isOplog) {
+        _oplogJournalThread = stdx::thread(&WiredTigerRecordStore::_oplogJournalThreadLoop,
+                                           this,
+                                           WiredTigerRecoveryUnit::get(ctx)->getSessionCache());
+    }
 }
 
 WiredTigerRecordStore::~WiredTigerRecordStore() {
     {
         stdx::lock_guard<boost::timed_mutex> lk(_cappedDeleterMutex);  // NOLINT
+        stdx::lock_guard<stdx::mutex> lk2(_uncommittedRecordIdsMutex);
         _shuttingDown = true;
     }
 
@@ -881,6 +861,11 @@ WiredTigerRecordStore::~WiredTigerRecordStore() {
 
     if (_oplogStones) {
         _oplogStones->kill();
+    }
+
+    if (_oplogJournalThread.joinable()) {
+        _opsWaitingForJournalCV.notify_one();
+        _oplogJournalThread.join();
     }
 }
 
@@ -1121,6 +1106,7 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded_inlock(OperationContext* txn
             ++docsRemoved;
             sizeSaved += old_value.size;
 
+            stdx::lock_guard<stdx::mutex> cappedCallbackLock(_cappedCallbackMutex);
             if (_cappedCallback) {
                 uassertStatusOK(_cappedCallback->aboutToDeleteCapped(
                     txn,
@@ -1337,10 +1323,25 @@ StatusWith<RecordId> WiredTigerRecordStore::insertRecord(OperationContext* txn,
     return StatusWith<RecordId>(records[0].id);
 }
 
-void WiredTigerRecordStore::_dealtWithCappedId(SortedRecordIds::iterator it) {
+void WiredTigerRecordStore::_dealtWithCappedId(SortedRecordIds::iterator it, bool didCommit) {
     invariant(&(*it) != NULL);
     stdx::lock_guard<stdx::mutex> lk(_uncommittedRecordIdsMutex);
-    _uncommittedRecordIds.erase(it);
+    if (didCommit && _isOplog && *it != _oplog_highestSeen) {
+        // Defer removal from _uncommittedRecordIds until it is durable. We don't need to wait for
+        // durability of ops that didn't commit because they won't become durable.
+        // As an optimization, we only defer visibility until durable if new ops were created while
+        // we were pending. This makes single-threaded w>1 workloads faster and is safe because
+        // durability follows commit order for commits that are fully sequenced (B doesn't call
+        // commit until after A's commit call returns).
+        const bool wasEmpty = _opsWaitingForJournal.empty();
+        _opsWaitingForJournal.push_back(it);
+        if (wasEmpty) {
+            _opsWaitingForJournalCV.notify_one();
+        }
+    } else {
+        _uncommittedRecordIds.erase(it);
+        _opsBecameVisibleCV.notify_all();
+    }
 }
 
 bool WiredTigerRecordStore::isCappedHidden(const RecordId& id) const {
@@ -1431,10 +1432,13 @@ std::unique_ptr<SeekableRecordCursor> WiredTigerRecordStore::getCursor(Operation
                                                                        bool forward) const {
     if (_isOplog && forward) {
         WiredTigerRecoveryUnit* wru = WiredTigerRecoveryUnit::get(txn);
-        if (!wru->inActiveTxn() || wru->getOplogReadTill().isNull()) {
-            // if we don't have a session, we have no snapshot, so we can update our view
-            _oplogSetStartHack(wru);
+        // If we already have a snapshot we don't know what it can see, unless we know no one
+        // else could be writing (because we hold an exclusive lock).
+        if (wru->inActiveTxn() && !txn->lockState()->isNoop() &&
+            !txn->lockState()->isCollectionLockedForMode(_ns, MODE_X)) {
+            throw WriteConflictException();
         }
+        _oplogSetStartHack(wru);
     }
 
     return stdx::make_unique<Cursor>(txn, *this, forward);
@@ -1627,21 +1631,77 @@ public:
         : _rs(rs), _it(it) {}
 
     virtual void commit() {
+        _rs->_dealtWithCappedId(_it, true);
         // Do not notify here because all committed inserts notify, always.
-        _rs->_dealtWithCappedId(_it);
     }
 
     virtual void rollback() {
         // Notify on rollback since it might make later commits visible.
-        _rs->_dealtWithCappedId(_it);
+        _rs->_dealtWithCappedId(_it, false);
+        stdx::lock_guard<stdx::mutex> lk(_rs->_cappedCallbackMutex);
         if (_rs->_cappedCallback)
             _rs->_cappedCallback->notifyCappedWaitersIfNeeded();
     }
 
 private:
-    WiredTigerRecordStore* _rs;
-    SortedRecordIds::iterator _it;
+    WiredTigerRecordStore* const _rs;
+    const SortedRecordIds::iterator _it;
 };
+
+void WiredTigerRecordStore::_oplogJournalThreadLoop(WiredTigerSessionCache* sessionCache) try {
+    Client::initThread("WTOplogJournalThread");
+    while (true) {
+        stdx::unique_lock<stdx::mutex> lk(_uncommittedRecordIdsMutex);
+        _opsWaitingForJournalCV.wait(
+            lk, [&] { return _shuttingDown || !_opsWaitingForJournal.empty(); });
+
+        while (!_shuttingDown && MONGO_FAIL_POINT(WTPausePrimaryOplogDurabilityLoop)) {
+            lk.unlock();
+            sleepmillis(10);
+            lk.lock();
+        }
+
+        if (_shuttingDown)
+            return;
+
+        decltype(_opsWaitingForJournal) opsAboutToBeJournaled = {};
+        _opsWaitingForJournal.swap(opsAboutToBeJournaled);
+
+        lk.unlock();
+        sessionCache->waitUntilDurable(/*forceCheckpoint=*/false);
+        lk.lock();
+
+        for (auto&& op : opsAboutToBeJournaled) {
+            _uncommittedRecordIds.erase(op);
+        }
+
+        _opsBecameVisibleCV.notify_all();
+        lk.unlock();
+
+        stdx::lock_guard<stdx::mutex> cappedCallbackLock(_cappedCallbackMutex);
+        if (_cappedCallback) {
+            _cappedCallback->notifyCappedWaitersIfNeeded();
+        }
+    }
+} catch (...) {
+    std::terminate();
+}
+
+void WiredTigerRecordStore::waitForAllEarlierOplogWritesToBeVisible(OperationContext* txn) const {
+    invariant(txn->lockState()->isNoop() || !txn->lockState()->inAWriteUnitOfWork());
+
+    // This function must not start a WT transaction, otherwise we will get stuck in an infinite
+    // loop of WCE handling when the getCursor() is called.
+
+    stdx::unique_lock<stdx::mutex> lk(_uncommittedRecordIdsMutex);
+    const auto waitingFor = _oplog_highestSeen;
+    while (!_uncommittedRecordIds.empty() && _uncommittedRecordIds.front() <= waitingFor) {
+        // We can't use a simple wait() here because we need to wake up periodically to check for
+        // interrupt and OperationContext::waitForConditionOrInterrupt doesn't exist on this branch.
+        txn->checkForInterrupt();
+        _opsBecameVisibleCV.wait_for(lk, Microseconds(Seconds(10)));
+    }
+}
 
 void WiredTigerRecordStore::_addUncommitedRecordId_inlock(OperationContext* txn,
                                                           const RecordId& id) {
@@ -1784,13 +1844,17 @@ void WiredTigerRecordStore::temp_cappedTruncateAfter(OperationContext* txn,
     }
 
     // Compute the number and associated sizes of the records to delete.
-    do {
-        if (_cappedCallback) {
-            uassertStatusOK(_cappedCallback->aboutToDeleteCapped(txn, record->id, record->data));
-        }
-        recordsRemoved++;
-        bytesRemoved += record->data.size();
-    } while ((record = cursor.next()));
+    {
+        stdx::lock_guard<stdx::mutex> cappedCallbackLock(_cappedCallbackMutex);
+        do {
+            if (_cappedCallback) {
+                uassertStatusOK(
+                    _cappedCallback->aboutToDeleteCapped(txn, record->id, record->data));
+            }
+            recordsRemoved++;
+            bytesRemoved += record->data.size();
+        } while ((record = cursor.next()));
+    }
 
     // Truncate the collection starting from the record located at 'firstRemovedId' to the end of
     // the collection.

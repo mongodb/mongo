@@ -163,6 +163,8 @@ public:
         return Status::OK();
     }
 
+    void waitForAllEarlierOplogWritesToBeVisible(OperationContext* txn) const override {}
+
     virtual void updateStatsAfterRepair(OperationContext* txn,
                                         long long numRecords,
                                         long long dataSize) {}

@@ -213,6 +213,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     }
     _active = false;
     _mySnapshotId = nextSnapshotId.fetchAndAdd(1);
+    _oplogReadTill = RecordId();
 }
 
 SnapshotId WiredTigerRecoveryUnit::getSnapshotId() const {

@@ -49,7 +49,19 @@ public:
     virtual ~Locker() {}
 
     /**
-     * Require global lock attempts with obtain tickets from 'reading' (for MODE_S and MODE_IS),
+     * Returns true if this is an instance of LockerNoop. Because LockerNoop doesn't implement many
+     * methods, some users may need to check this first to find out what is safe to call. LockerNoop
+     * is only used in unittests and for a brief period at startup, so you can assume you hold the
+     * equivalent of a MODE_X lock when using it.
+     *
+     * TODO get rid of this once we kill LockerNoop.
+     */
+    virtual bool isNoop() const {
+        return false;
+    }
+
+    /**
+     * Require global lock attempts to obtain tickets from 'reading' (for MODE_S and MODE_IS),
      * and from 'writing' (for MODE_IX), which must have static lifetimes. There is no throttling
      * for MODE_X, as there can only ever be a single locker using this mode. The throttling is
      * intended to defend against arge drops in throughput under high load due to too much
