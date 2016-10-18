@@ -900,6 +900,40 @@ TEST_F(NetworkInterfaceASIOTest, SetAlarmReturnsNotOKIfShutdownHasStarted) {
     ASSERT_NOT_OK(net().setAlarm(net().now() + Milliseconds(100), [] {}));
 }
 
+TEST_F(NetworkInterfaceASIOTest, IsMasterRequestContainsOutgoingWireVersionInternalClientInfo) {
+    RemoteCommandRequest request{testHost, "testDB", BSON("ping" << 1), BSONObj(), nullptr};
+    auto deferred = startCommand(makeCallbackHandle(), request);
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+
+    // Verify that the isMaster reply has the expected internalClient data.
+    stream->simulateServer(
+        rpc::Protocol::kOpQuery, [](RemoteCommandRequest request) -> RemoteCommandResponse {
+            auto internalClientElem = request.cmdObj["internalClient"];
+            ASSERT_EQ(internalClientElem.type(), BSONType::Object);
+            auto minWireVersionElem = internalClientElem.Obj()["minWireVersion"];
+            auto maxWireVersionElem = internalClientElem.Obj()["maxWireVersion"];
+            ASSERT_EQ(minWireVersionElem.type(), BSONType::NumberInt);
+            ASSERT_EQ(maxWireVersionElem.type(), BSONType::NumberInt);
+            ASSERT_EQ(minWireVersionElem.numberInt(), WireSpec::instance().outgoing.minWireVersion);
+            ASSERT_EQ(maxWireVersionElem.numberInt(), WireSpec::instance().outgoing.maxWireVersion);
+            return simulateIsMaster(request);
+        });
+
+    // Simulate ping reply.
+    stream->simulateServer(rpc::Protocol::kOpCommandV1,
+                           [&](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               RemoteCommandResponse response;
+                               response.data = BSON("ok" << 1);
+                               return response;
+                           });
+
+    // Verify that the ping op is counted as a success.
+    auto& res = deferred.get();
+    ASSERT(res.elapsedMillis);
+    assertNumOps(0u, 0u, 0u, 1u);
+}
+
 class NetworkInterfaceASIOMetadataTest : public NetworkInterfaceASIOTest {
 protected:
     void setUp() override {}

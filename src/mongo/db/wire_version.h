@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
 
@@ -78,10 +79,26 @@ struct WireVersionInfo {
 struct WireSpec {
     MONGO_DISALLOW_COPYING(WireSpec);
 
-    static WireSpec& instance() {
-        static WireSpec instance;
-        return instance;
-    }
+    static WireSpec& instance();
+
+    /**
+     * Appends the min and max versions in 'wireVersionInfo' to 'builder' in the format expected for
+     * reporting information about the internal client.
+     *
+     * Intended for use as part of performing the isMaster handshake with a remote node. When an
+     * internal clients make a connection to another node in the cluster, it includes internal
+     * client information as a parameter to the isMaster command. This parameter has the following
+     * format:
+     *
+     *    internalClient: {
+     *        minWireVersion: <int>,
+     *        maxWireVersion: <int>
+     *    }
+     *
+     * This information can be used to ensure correctness during upgrade in mixed version clusters.
+     */
+    static void appendInternalClientWireVersion(WireVersionInfo wireVersionInfo,
+                                                BSONObjBuilder* builder);
 
     // incoming.minWireVersion - Minimum version that the server accepts on incoming requests. We
     // should bump this whenever we don't want to allow incoming connections from clients that are

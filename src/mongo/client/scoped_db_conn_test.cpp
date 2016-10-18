@@ -99,6 +99,8 @@ private:
         }
 
         auto request = rpc::makeRequest(&inMessage);
+        commandRequestHook(request.get());
+
         auto reply = rpc::makeReplyBuilder(request->getProtocol());
 
         BSONObjBuilder commandResponse;
@@ -119,6 +121,11 @@ private:
             return;
         }
     }
+
+    /**
+     * Subclasses can override this in order to make assertions about the command request.
+     */
+    virtual void commandRequestHook(const rpc::RequestInterface* request) {}
 
     std::vector<stdx::thread> _threads;
 };
@@ -217,8 +224,8 @@ public:
         _maxPoolSizePerHost = globalConnPool.getMaxPoolSize();
         _dummyServer = stdx::make_unique<DummyServer>(TARGET_PORT);
 
-        _dummyServicEntryPoint = stdx::make_unique<DummyServiceEntryPoint>();
-        _dummyServer->run(_dummyServicEntryPoint.get());
+        _dummyServiceEntryPoint = makeServiceEntryPoint();
+        _dummyServer->run(_dummyServiceEntryPoint.get());
         DBClientConnection conn;
         Timer timer;
 
@@ -238,7 +245,7 @@ public:
     void tearDown() {
         ScopedDbConnection::clearPool();
         _dummyServer.reset();
-        _dummyServicEntryPoint.reset();
+        _dummyServiceEntryPoint.reset();
 
         globalConnPool.setMaxPoolSize(_maxPoolSizePerHost);
     }
@@ -315,8 +322,15 @@ private:
         server->start();
     }
 
+    /**
+     * Subclasses can override this in order to use a specialized service entry point.
+     */
+    virtual std::unique_ptr<DummyServiceEntryPoint> makeServiceEntryPoint() {
+        return stdx::make_unique<DummyServiceEntryPoint>();
+    }
+
     std::unique_ptr<DummyServer> _dummyServer;
-    std::unique_ptr<DummyServiceEntryPoint> _dummyServicEntryPoint;
+    std::unique_ptr<DummyServiceEntryPoint> _dummyServiceEntryPoint;
     uint32_t _maxPoolSizePerHost;
 };
 
@@ -431,6 +445,40 @@ TEST_F(DummyServerFixture, DontReturnConnGoneBadToPool) {
     checkNewConns(assertNotEqual, conn2CreationTime, 10);
 
     conn1Again.done();
+}
+
+class DummyServiceEntryPointWithIsMasterCheck : public DummyServiceEntryPoint {
+private:
+    virtual void commandRequestHook(const rpc::RequestInterface* request) {
+        if (request->getCommandName() != "isMaster") {
+            // It's not an isMaster request. Nothing to do.
+            return;
+        }
+
+        BSONObj commandArgs = request->getCommandArgs();
+        auto internalClientElem = commandArgs["internalClient"];
+        ASSERT_EQ(internalClientElem.type(), BSONType::Object);
+        auto minWireVersionElem = internalClientElem.Obj()["minWireVersion"];
+        auto maxWireVersionElem = internalClientElem.Obj()["maxWireVersion"];
+        ASSERT_EQ(minWireVersionElem.type(), BSONType::NumberInt);
+        ASSERT_EQ(maxWireVersionElem.type(), BSONType::NumberInt);
+        ASSERT_EQ(minWireVersionElem.numberInt(), WireSpec::instance().outgoing.minWireVersion);
+        ASSERT_EQ(maxWireVersionElem.numberInt(), WireSpec::instance().outgoing.maxWireVersion);
+    }
+};
+
+class DummyServerFixtureWithIsMasterCheck : public DummyServerFixture {
+private:
+    virtual std::unique_ptr<DummyServiceEntryPoint> makeServiceEntryPoint() {
+        return stdx::make_unique<DummyServiceEntryPointWithIsMasterCheck>();
+    }
+};
+
+TEST_F(DummyServerFixtureWithIsMasterCheck, VerifyIsMasterRequestOnConnectionOpen) {
+    // The isMaster handshake will occur on connection open. The request is verified by the test
+    // fixture.
+    ScopedDbConnection conn(TARGET_HOST);
+    conn.done();
 }
 
 }  // namespace

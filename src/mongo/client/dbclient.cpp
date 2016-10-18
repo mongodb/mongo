@@ -752,6 +752,8 @@ executor::RemoteCommandResponse initWireVersion(DBClientConnection* conn,
 
         conn->getCompressorManager().clientBegin(&bob);
 
+        WireSpec::appendInternalClientWireVersion(WireSpec::instance().outgoing, &bob);
+
         Date_t start{Date_t::now()};
         auto result =
             conn->runCommandWithMetadata("admin", "isMaster", rpc::makeEmptyMetadata(), bob.done());
