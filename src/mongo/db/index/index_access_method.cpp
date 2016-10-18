@@ -244,21 +244,28 @@ Status IndexAccessMethod::touch(OperationContext* txn) const {
     return _newInterface->touch(txn);
 }
 
-RecordId IndexAccessMethod::findSingle(OperationContext* txn, const BSONObj& key) const {
+RecordId IndexAccessMethod::findSingle(OperationContext* txn, const BSONObj& requestedKey) const {
     // Generate the key for this index.
-    BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-    MultikeyPaths* multikeyPaths = nullptr;
-    getKeys(key, &keys, multikeyPaths);
-    invariant(keys.size() == 1);
+    BSONObj actualKey;
+    if (_btreeState->getCollator()) {
+        // For performance, call get keys only if there is a non-simple collation.
+        BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+        MultikeyPaths* multikeyPaths = nullptr;
+        getKeys(requestedKey, &keys, multikeyPaths);
+        invariant(keys.size() == 1);
+        actualKey = *keys.begin();
+    } else {
+        actualKey = requestedKey;
+    }
 
     std::unique_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(txn));
     const auto requestedInfo = kDebugBuild ? SortedDataInterface::Cursor::kKeyAndLoc
                                            : SortedDataInterface::Cursor::kWantLoc;
-    if (auto kv = cursor->seekExact(*keys.begin(), requestedInfo)) {
+    if (auto kv = cursor->seekExact(actualKey, requestedInfo)) {
         // StorageEngine should guarantee these.
         dassert(!kv->loc.isNull());
-        dassert(kv->key.woCompare(
-                    *keys.begin(), /*order*/ BSONObj(), /*considerFieldNames*/ false) == 0);
+        dassert(kv->key.woCompare(actualKey, /*order*/ BSONObj(), /*considerFieldNames*/ false) ==
+                0);
 
         return kv->loc;
     }
