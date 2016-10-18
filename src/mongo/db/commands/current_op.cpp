@@ -166,8 +166,6 @@ public:
                 fillLockerInfo(lockerInfo, infoBuilder);
             }
 
-            infoBuilder.done();
-
             // If we want to include all results or if the filter is empty, then we can append
             // straight to the inprogBuilder, but otherwise we should run the filter Matcher
             // outside this loop so we don't lock the ServiceContext while matching - in some cases
@@ -184,9 +182,8 @@ public:
             // support the use case of having a $where filter with currentOp. However, since we
             // don't have a collection, we pass in a fake collection name (and this is okay,
             // because $where parsing only relies on the database part of the namespace).
-            const NamespaceString fakeNS(db, "$cmd");
-            const CollatorInterface* collator = nullptr;
-            const Matcher matcher(filter, ExtensionsCallbackReal(txn, &fakeNS), collator);
+            const NamespaceString fakeNS(db, "$dummyNamespaceForCurrop");
+            const Matcher matcher(filter, ExtensionsCallbackReal(txn, &fakeNS), nullptr);
 
             for (const auto& info : inprogInfos) {
                 if (matcher.matches(info)) {
