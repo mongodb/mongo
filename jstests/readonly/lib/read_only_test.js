@@ -5,7 +5,7 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
 
     function makeDirectoryReadOnly(dir) {
         if (_isWindows()) {
-            run("attrib", "+r", dir, "/s");
+            run("attrib", "+r", dir + "\\*.*", "/s");
         } else {
             run("chmod", "-R", "a-w", dir);
         }
@@ -13,7 +13,7 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
 
     function makeDirectoryWritable(dir) {
         if (_isWindows()) {
-            run("attrib", "-r", dir, "/s");
+            run("attrib", "-r", dir + "\\*.*", "/s");
         } else {
             run("chmod", "-R", "a+w", dir);
         }
