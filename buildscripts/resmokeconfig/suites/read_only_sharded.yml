@@ -3,13 +3,6 @@ selector:
     roots:
       - jstests/readonly/*.js
     exclude_files:
-      # TODO: re-enable in SERVER-25549
-      - jstests/readonly/aggregate.js
-      - jstests/readonly/count.js
-      - jstests/readonly/distinct.js
-      - jstests/readonly/find.js
-      - jstests/readonly/get_more.js
-      - jstests/readonly/temp_collection.js
 
 executor:
   js_test:

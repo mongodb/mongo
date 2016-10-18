@@ -67,8 +67,35 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
         jsTest.log("restarting shards...");
         try {
             for (var i = 0; i < this.nShards; ++i) {
-                // TODO(esha): add shardsvr: "" option when this test is re-enabled in SERVER-25549
-                var opts = {queryableBackupMode: "", dbpath: this.paths[i]};
+                // Write the shard's shardIdentity to a config file under
+                // sharding._overrideShardIdentity, since the shardIdentity must be provided through
+                // overrideShardIdentity when running in queryableBackupMode, and is only allowed to
+                // be set via config file.
+
+                var shardIdentity = this.shardingTest["d" + i]
+                                        .getDB("admin")
+                                        .getCollection("system.version")
+                                        .findOne({_id: "shardIdentity"});
+                assert.neq(null, shardIdentity);
+
+                // Construct a string representation of the config file (replace all instances of
+                // multiple consecutive whitespace characters in the string representation of the
+                // shardIdentity JSON document, including newlines, with single white spaces).
+                var configFileStr = "sharding:\n  _overrideShardIdentity: '" +
+                    tojson(shardIdentity).replace(/\s+/g, ' ') + "'";
+
+                // Use the os-specific path delimiter.
+                var delim = _isWindows() ? '\\' : '/';
+                var configFilePath = this.paths[i] + delim + "config-for-shard-" + i + ".yml";
+
+                writeFile(configFilePath, configFileStr);
+
+                var opts = {
+                    config: configFilePath,
+                    queryableBackupMode: "",
+                    shardsvr: "",
+                    dbpath: this.paths[i]
+                };
 
                 assert.commandWorked(this.shardingTest["d" + i].getDB("local").dropDatabase());
                 this.shardingTest.restartMongod(i, opts, () => {
