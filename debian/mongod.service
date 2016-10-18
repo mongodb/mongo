@@ -7,13 +7,20 @@ Documentation=https://docs.mongodb.org/manual
 User=mongodb
 Group=mongodb
 ExecStart=/usr/bin/mongod --quiet --config /etc/mongod.conf
-LimitFSIZE=infinity # file size
-LimitCPU=infinity # cpu time 
-LimitAS=infinity # virtual memory size
-LimitNOFILE=64000 # open files
-LimitNPROC=64000 # processes/threads
-TasksMax=infinity # total threads (user+kernel)
+# file size
+LimitFSIZE=infinity
+# cpu time
+LimitCPU=infinity
+# virtual memory size
+LimitAS=infinity
+# open files
+LimitNOFILE=64000
+# processes/threads
+LimitNPROC=64000
+# total threads (user+kernel)
+TasksMax=infinity
 TasksAccounting=false
+
 # Recommended limits for for mongod as specified in
 # http://docs.mongodb.org/manual/reference/ulimit/#recommended-settings
 
