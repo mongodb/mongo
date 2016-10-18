@@ -120,10 +120,9 @@ int ConfigDiffTracker<ValType>::calculateConfigDiff(OperationContext* txn,
     _validDiffs = 0;
 
     for (const ChunkType& chunk : chunks) {
-        ChunkVersion chunkVersion =
-            ChunkVersion::fromBSON(chunk.toBSON(), ChunkType::DEPRECATED_lastmod());
+        const ChunkVersion& chunkVersion = chunk.getVersion();
 
-        if (!chunkVersion.isSet() || !chunkVersion.hasEqualEpoch(currEpoch)) {
+        if (!chunkVersion.hasEqualEpoch(currEpoch)) {
             warning() << "got invalid chunk version " << chunkVersion << " in document "
                       << redact(chunk.toString())
                       << " when trying to load differing chunks at version "
