@@ -79,6 +79,8 @@ selector:
     # This test checks the behavior of a singleBatch fix for mongos that does not exist in 3.2.
     # Enable when 3.4 becomes last-stable or after backporting SERVER-26112 to the 3.2 branch.
     - jstests/sharding/sharded_limit_batchsize.js
+    # Enable when 3.2.11 becomes last-stable
+    - jstests/sharding/merge_chunks_test.js
 
 executor:
   js_test:
