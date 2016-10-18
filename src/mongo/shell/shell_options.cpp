@@ -80,6 +80,24 @@ Status addMongoShellOptions(moe::OptionSection* options) {
 
     options->addOptionChaining("eval", "eval", moe::String, "evaluate javascript");
 
+    options
+        ->addOptionChaining("objcheck",
+                            "objcheck",
+                            moe::Switch,
+                            "inspect client data for validity on receipt (DEFAULT)")
+        .hidden()
+        .setSources(moe::SourceAllLegacy)
+        .incompatibleWith("noobjcheck");
+
+    options
+        ->addOptionChaining("noobjcheck",
+                            "noobjcheck",
+                            moe::Switch,
+                            "do NOT inspect client data for validity on receipt")
+        .hidden()
+        .setSources(moe::SourceAllLegacy)
+        .incompatibleWith("objcheck");
+
     moe::OptionSection authenticationOptions("Authentication Options");
 
     authenticationOptions.addOptionChaining(
@@ -252,6 +270,16 @@ Status storeMongoShellOptions(const moe::Environment& params,
     }
     if (params.count("verbose")) {
         logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
+    }
+
+    // `objcheck` option is part of `serverGlobalParams` to avoid making common parts depend upon
+    // the client options.  The option is set to false in clients by default.
+    if (params.count("objcheck")) {
+        serverGlobalParams.objcheck = true;
+    } else if (params.count("noobjcheck")) {
+        serverGlobalParams.objcheck = false;
+    } else {
+        serverGlobalParams.objcheck = false;
     }
 
     if (params.count("port")) {
