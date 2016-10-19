@@ -105,6 +105,7 @@ env.Library(
     target='progress_meter',
     source=[
         'progress_meter.cpp',
+        'thread_safe_string.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -147,7 +148,6 @@ env.Library(
         "startup_test.cpp",
         'file.cpp',
         'platform_init.cpp',
-        'thread_safe_string.cpp',
         'timer.cpp',
     ],
     LIBDEPS=[
