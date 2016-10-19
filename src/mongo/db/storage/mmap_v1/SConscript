@@ -1,3 +1,5 @@
+# -*- mode: python -*-
+
 Import("env")
 Import("mmapv1")
 
@@ -125,6 +127,7 @@ env.Library(
         'record_store_v1_repair_iterator.cpp',
         'record_store_v1_simple.cpp',
         'record_store_v1_simple_iterator.cpp',
+        'touch_pages.cpp',
         ],
     LIBDEPS= [
         '$BUILD_DIR/mongo/db/commands/server_status_core',

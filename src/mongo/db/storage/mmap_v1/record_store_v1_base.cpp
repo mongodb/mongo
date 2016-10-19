@@ -30,8 +30,9 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
-#include "mongo/db/storage/mmap_v1/record_store_v1_base.h"
+#include "mongo/platform/basic.h"
 
+#include "mongo/db/storage/mmap_v1/record_store_v1_base.h"
 
 #include "mongo/base/static_assert.h"
 #include "mongo/db/catalog/collection.h"
@@ -41,11 +42,11 @@
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_repair_iterator.h"
+#include "mongo/db/storage/mmap_v1/touch_pages.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/timer.h"
-#include "mongo/util/touch_pages.h"
 
 namespace mongo {
 

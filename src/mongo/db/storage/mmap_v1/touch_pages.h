@@ -28,12 +28,11 @@
 #pragma once
 
 #include <cstdlib>
-#include <fcntl.h>
 
 namespace mongo {
 
-// Touch a range of pages using an OS-specific method.
-// Takes a file descriptor, offset, and length, for Linux use.
-// Additionally takes an Extent pointer for use on other platforms.
+/**
+ * Touches a range of pages, to encourage the OS to get them into the buffer pool.
+ */
 void touch_pages(const char* buf, size_t length, size_t pageSize = 4096);
 }

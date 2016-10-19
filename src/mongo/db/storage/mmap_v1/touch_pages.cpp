@@ -25,8 +25,9 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
 
-#include "mongo/util/touch_pages.h"
+#include "mongo/db/storage/mmap_v1/touch_pages.h"
 
 namespace mongo {
 

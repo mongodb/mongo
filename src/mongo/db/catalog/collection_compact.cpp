@@ -45,7 +45,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
-#include "mongo/util/touch_pages.h"
 
 namespace mongo {
 

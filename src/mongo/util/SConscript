@@ -145,7 +145,6 @@ env.Library(
     target='foundation',
     source=[
         "startup_test.cpp",
-        "touch_pages.cpp",
         'file.cpp',
         'platform_init.cpp',
         'thread_safe_string.cpp',
