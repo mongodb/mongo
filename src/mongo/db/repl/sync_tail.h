@@ -209,12 +209,22 @@ public:
     void setHostname(const std::string& hostname);
 
     /**
+     * Resets the count of fetched documents to 0.
+     */
+    void resetFetchCount();
+
+    /**
+     * Returns the number of documents that have been fetched from source.
+     */
+    unsigned getFetchCount() const;
+
+    /**
      * Returns writer thread pool.
      * Used by ReplicationCoordinatorExternalStateImpl only.
      */
     OldThreadPool* getWriterPool();
 
-    static std::atomic<int> replBatchLimitOperations;  // NOLINT (sever params must use std::atomic)
+    static std::atomic<int> replBatchLimitOperations;  // NOLINT (server param must use std::atomic)
 
 protected:
     static const unsigned int replBatchLimitBytes = 100 * 1024 * 1024;
@@ -236,6 +246,9 @@ private:
 
     // persistent pool of worker threads for writing ops to the databases
     std::unique_ptr<OldThreadPool> _writerPool;
+
+    // Counts how many documents have been refetched from the source since the last reset.
+    AtomicUInt32 _fetchCount;
 };
 
 /**

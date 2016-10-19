@@ -60,6 +60,10 @@ public:
 
     StatusWith<ReplicaSetConfig> getCurrentConfig() const override;
 
+    void resetSyncSourceHostAndFetchCount(const HostAndPort& source) override;
+
+    unsigned getApplierFetchCount() const override;
+
     // Task executor. Not owned by us.
     executor::TaskExecutor* taskExecutor = nullptr;
 
@@ -93,8 +97,7 @@ private:
 
     Status _multiSyncApply(MultiApplier::OperationPtrs* ops) override;
 
-    Status _multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
-                                  const HostAndPort& source) override;
+    Status _multiInitialSyncApply(MultiApplier::OperationPtrs* ops) override;
 };
 
 

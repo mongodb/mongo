@@ -269,7 +269,7 @@ SyncTail::SyncTail(BackgroundSync* q, MultiSyncApplyFunc func)
 SyncTail::SyncTail(BackgroundSync* q,
                    MultiSyncApplyFunc func,
                    std::unique_ptr<OldThreadPool> writerPool)
-    : _networkQueue(q), _applyFunc(func), _writerPool(std::move(writerPool)) {}
+    : _networkQueue(q), _applyFunc(func), _writerPool(std::move(writerPool)), _fetchCount(0) {}
 
 SyncTail::~SyncTail() {}
 
@@ -926,11 +926,20 @@ void SyncTail::setHostname(const std::string& hostname) {
     _hostname = hostname;
 }
 
+void SyncTail::resetFetchCount() {
+    _fetchCount.store(0);
+}
+
+unsigned SyncTail::getFetchCount() const {
+    return _fetchCount.load();
+}
+
 OldThreadPool* SyncTail::getWriterPool() {
     return _writerPool.get();
 }
 
 BSONObj SyncTail::getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o) {
+    _fetchCount.fetchAndAdd(1);
     OplogReader missingObjReader;  // why are we using OplogReader to run a non-oplog query?
     const char* ns = o.getStringField("ns");
 

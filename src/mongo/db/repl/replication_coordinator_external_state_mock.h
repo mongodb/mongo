@@ -99,8 +99,9 @@ public:
                                           MultiApplier::Operations ops,
                                           MultiApplier::ApplyOperationFn applyOperation) override;
     virtual Status multiSyncApply(MultiApplier::OperationPtrs* ops) override;
-    virtual Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
-                                         const HostAndPort& source) override;
+    virtual Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops) override;
+    virtual unsigned getApplierFetchCount() const override;
+    virtual void resetSyncSourceHostAndFetchCount(const HostAndPort& source) override;
     virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
         OperationContext* txn) const override;
     virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(

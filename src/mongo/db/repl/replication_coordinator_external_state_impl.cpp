@@ -64,7 +64,6 @@
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/snapshot_thread.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
@@ -186,7 +185,8 @@ ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl
     StorageInterface* storageInterface)
     : _storageInterface(storageInterface),
       _initialSyncThreadPool(OldThreadPool::DoNotStartThreadsTag(), 1, "initial sync-"),
-      _initialSyncRunner(&_initialSyncThreadPool) {
+      _initialSyncRunner(&_initialSyncThreadPool),
+      _syncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr) {
     uassert(ErrorCodes::BadValue, "A StorageInterface is required.", _storageInterface);
 }
 ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
@@ -871,15 +871,18 @@ Status ReplicationCoordinatorExternalStateImpl::multiSyncApply(MultiApplier::Ope
 }
 
 Status ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
-    MultiApplier::OperationPtrs* ops, const HostAndPort& source) {
+    MultiApplier::OperationPtrs* ops) {
+    return repl::multiInitialSyncApply(ops, &_syncTail);
+}
 
-    // repl::multiInitialSyncApply uses SyncTail::shouldRetry() (and implicitly getMissingDoc())
-    // to fetch missing documents during initial sync. Therefore, it is fine to construct SyncTail
-    // with invalid BackgroundSync, MultiSyncApplyFunc and writerPool arguments because we will not
-    // be accessing any SyncTail functionality that require these constructor parameters.
-    SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr);
-    syncTail.setHostname(source.toString());
-    return repl::multiInitialSyncApply(ops, &syncTail);
+void ReplicationCoordinatorExternalStateImpl::resetSyncSourceHostAndFetchCount(
+    const HostAndPort& source) {
+    _syncTail.setHostname(source.toString());
+    _syncTail.resetFetchCount();
+}
+
+unsigned ReplicationCoordinatorExternalStateImpl::getApplierFetchCount() const {
+    return _syncTail.getFetchCount();
 }
 
 std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitialSyncOplogBuffer(

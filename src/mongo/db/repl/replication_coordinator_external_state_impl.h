@@ -36,6 +36,7 @@
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/sync_source_feedback.h"
+#include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/snapshot_manager.h"
@@ -105,8 +106,9 @@ public:
                                           MultiApplier::Operations ops,
                                           MultiApplier::ApplyOperationFn applyOperation) override;
     virtual Status multiSyncApply(MultiApplier::OperationPtrs* ops) override;
-    virtual Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
-                                         const HostAndPort& source) override;
+    virtual Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops) override;
+    virtual void resetSyncSourceHostAndFetchCount(const HostAndPort& source) override;
+    virtual unsigned getApplierFetchCount() const override;
     virtual std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(
         OperationContext* txn) const override;
     virtual std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(
@@ -191,6 +193,13 @@ private:
 
     // Used by repl::multiApply() to apply the sync source's operations in parallel.
     std::unique_ptr<OldThreadPool> _writerPool;
+
+    // Used by repl::multiInitialSyncApply() to apply the sync source's operations.
+    // repl::multiInitialSyncApply uses SyncTail::shouldRetry() (and implicitly getMissingDoc())
+    // to fetch missing documents during initial sync. Therefore, it is fine to construct SyncTail
+    // with invalid BackgroundSync, MultiSyncApplyFunc and writerPool arguments because we will not
+    // be accessing any SyncTail functionality that require these constructor parameters.
+    SyncTail _syncTail;
 
     // Writes a noop every 10 seconds.
     std::unique_ptr<NoopWriter> _noopWriter;
