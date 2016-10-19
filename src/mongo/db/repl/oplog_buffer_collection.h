@@ -93,6 +93,8 @@ public:
 
     // ---- Testing API ----
     std::queue<Timestamp> getSentinels_forTest() const;
+    Timestamp getLastPushedTimestamp_forTest() const;
+    Timestamp getLastPoppedTimestamp_forTest() const;
 
 
 private:
@@ -106,12 +108,16 @@ private:
      */
     void _dropCollection(OperationContext* txn);
 
+    enum class PeekMode { kExtractEmbeddedDocument, kReturnUnmodifiedDocumentFromCollection };
     /**
      * Returns the last oplog entry on the given side of the buffer. If front is true it will
      * return the oldest entry, otherwise it will return the newest one. If the buffer is empty
      * or peeking fails this returns false.
      */
-    bool _peekOneSide_inlock(OperationContext* txn, Value* value, bool front) const;
+    bool _peekOneSide_inlock(OperationContext* txn,
+                             Value* value,
+                             bool front,
+                             PeekMode peekMode) const;
 
     // Storage interface used to perform storage engine level functions on the collection.
     StorageInterface* _storageInterface;
@@ -120,6 +126,8 @@ private:
      * Pops an entry off the buffer in a lock.
      */
     bool _pop_inlock(OperationContext* txn, Value* value);
+
+    Timestamp _getLastPoppedTimestamp_inlock() const;
 
     // The namespace for the oplog buffer collection.
     const NamespaceString _nss;
@@ -141,7 +149,7 @@ private:
 
     Timestamp _lastPushedTimestamp;
 
-    Timestamp _lastPoppedTimestamp;
+    BSONObj _lastPoppedKey;
 };
 
 }  // namespace repl

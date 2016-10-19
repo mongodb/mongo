@@ -480,14 +480,52 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_txn.get());
-    BSONObj oplog = makeOplogEntry(1);
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    ASSERT_EQUALS(oplogBuffer.getSize(), 0UL);
+    ASSERT_EQUALS(oplogBuffer.getSentinels_forTest().size(), 0UL);
+    ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
+    ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
+
+    BSONObj oplog = makeOplogEntry(1);
     oplogBuffer.push(_txn.get(), oplog);
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
+    ASSERT_EQUALS(oplogBuffer.getSize(), std::size_t(oplog.objsize()));
+    ASSERT_EQUALS(oplogBuffer.getSentinels_forTest().size(), 0UL);
+    ASSERT_EQUALS(oplog["ts"].timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
+    ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
+
+    BSONObj sentinel;
+    oplogBuffer.push(_txn.get(), sentinel);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
+    ASSERT_EQUALS(oplogBuffer.getSize(), std::size_t(oplog.objsize()));
+    ASSERT_EQUALS(oplogBuffer.getSentinels_forTest().size(), 1UL);
+    ASSERT_EQUALS(oplog["ts"].timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
+    ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
+
+    BSONObj oplog2 = makeOplogEntry(2);
+    oplogBuffer.push(_txn.get(), oplog2);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
+    ASSERT_EQUALS(oplogBuffer.getSize(), std::size_t(oplog.objsize() + oplog2.objsize()));
+    ASSERT_EQUALS(oplogBuffer.getSentinels_forTest().size(), 1UL);
+    ASSERT_EQUALS(oplog2["ts"].timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
+    ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
+
+    BSONObj poppedDoc;
+    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &poppedDoc));
+    ASSERT_BSONOBJ_EQ(oplog, poppedDoc);
+    ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
+    ASSERT_EQUALS(oplogBuffer.getSize(), std::size_t(oplog.objsize()));
+    ASSERT_EQUALS(oplogBuffer.getSentinels_forTest().size(), 1UL);
+    ASSERT_EQUALS(oplog2["ts"].timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
+    ASSERT_EQUALS(oplog["ts"].timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
 
     oplogBuffer.clear(_txn.get());
     ASSERT_TRUE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
+    ASSERT_EQUALS(oplogBuffer.getSize(), 0UL);
+    ASSERT_EQUALS(oplogBuffer.getSentinels_forTest().size(), 0UL);
+    ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
+    ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
 
     {
         OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
