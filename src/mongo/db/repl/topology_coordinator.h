@@ -138,7 +138,7 @@ public:
      * Chooses and sets a new sync source, based on our current knowledge of the world.
      */
     virtual HostAndPort chooseNewSyncSource(Date_t now,
-                                            const Timestamp& lastTimestampApplied,
+                                            const Timestamp& lastTimestampFetched,
                                             ChainingPreference chainingPreference) = 0;
 
     /**

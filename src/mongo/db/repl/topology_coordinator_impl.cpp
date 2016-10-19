@@ -149,7 +149,7 @@ HostAndPort TopologyCoordinatorImpl::getSyncSourceAddress() const {
 }
 
 HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
-                                                         const Timestamp& lastTimestampApplied,
+                                                         const Timestamp& lastTimestampFetched,
                                                          ChainingPreference chainingPreference) {
     // If we are not a member of the current replica set configuration, no sync source is valid.
     if (_selfIndex == -1) {
@@ -278,8 +278,10 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
                 }
                 // Candidates cannot be excessively behind.
                 if (it->getAppliedOpTime() < oldestSyncOpTime) {
-                    LOG(2) << "Cannot select sync source because it is too far behind: "
-                           << itMemberConfig.getHostAndPort();
+                    LOG(2) << "Cannot select sync source because it is too far behind."
+                           << "Latest optime of sync candidate " << itMemberConfig.getHostAndPort()
+                           << ": " << it->getAppliedOpTime()
+                           << ", oldest acceptable optime: " << oldestSyncOpTime;
                     continue;
                 }
                 // Candidate must not have a configured delay larger than ours.
@@ -294,14 +296,16 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
                 if (!itMemberConfig.shouldBuildIndexes()) {
                     LOG(2) << "Cannot select sync source with shouldBuildIndex differences: "
                            << itMemberConfig.getHostAndPort();
-
                     continue;
                 }
             }
             // only consider candidates that are ahead of where we are
-            if (it->getAppliedOpTime().getTimestamp() <= lastTimestampApplied) {
-                LOG(1) << "Cannot select sync source behind our last applied optime: "
-                       << itMemberConfig.getHostAndPort();
+            if (it->getAppliedOpTime().getTimestamp() <= lastTimestampFetched) {
+                LOG(1) << "Cannot select sync source equal to or behind our last fetched optime. "
+                       << "My last fetched oplog timestamp: " << lastTimestampFetched.toBSON()
+                       << ", latest oplog timestamp of sync candidate "
+                       << itMemberConfig.getHostAndPort() << ": "
+                       << it->getAppliedOpTime().getTimestamp().toBSON();
                 continue;
             }
             // Candidate cannot be more latent than anything we've already considered.
