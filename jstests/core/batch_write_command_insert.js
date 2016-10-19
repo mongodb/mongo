@@ -343,7 +343,7 @@ print(tojson(result));
 assert(result.ok, tojson(result));
 assert.eq(0, result.n);
 assert.eq(0, result.writeErrors[0].index);
-assert.eq(coll.getIndexes().length, 1);
+assert.eq(coll.getIndexes().length, 0);
 
 //
 // Invalid index desc

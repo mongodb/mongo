@@ -42,6 +42,7 @@ namespace mongo {
 namespace {
 
 using IndexVersion = IndexDescriptor::IndexVersion;
+using index_key_validate::validateKeyPattern;
 
 TEST(IndexKeyValidateTest, KeyElementValueOfSmallPositiveIntSucceeds) {
     for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {

@@ -560,7 +560,8 @@ Status Database::createView(OperationContext* txn,
 Collection* Database::createCollection(OperationContext* txn,
                                        StringData ns,
                                        const CollectionOptions& options,
-                                       bool createIdIndex) {
+                                       bool createIdIndex,
+                                       const BSONObj& idIndex) {
     invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
     invariant(!options.isView());
 
@@ -594,7 +595,9 @@ Collection* Database::createCollection(OperationContext* txn,
                     serverGlobalParams.featureCompatibility.version.load();
                 IndexCatalog* ic = collection->getIndexCatalog();
                 uassertStatusOK(ic->createIndexOnEmptyCollection(
-                    txn, ic->getDefaultIdIndexSpec(featureCompatibilityVersion)));
+                    txn,
+                    !idIndex.isEmpty() ? idIndex
+                                       : ic->getDefaultIdIndexSpec(featureCompatibilityVersion)));
             }
         }
 
@@ -667,15 +670,12 @@ void Database::dropDatabase(OperationContext* txn, Database* db) {
     getGlobalServiceContext()->getGlobalStorageEngine()->dropDatabase(txn, name);
 }
 
-/** { ..., capped: true, size: ..., max: ... }
- * @param createDefaultIndexes - if false, defers id (and other) index creation.
- * @return true if successful
-*/
 Status userCreateNS(OperationContext* txn,
                     Database* db,
                     StringData ns,
                     BSONObj options,
-                    bool createDefaultIndexes) {
+                    bool createDefaultIndexes,
+                    const BSONObj& idIndex) {
     invariant(db);
 
     LOG(1) << "create collection " << ns << ' ' << options;
@@ -740,7 +740,7 @@ Status userCreateNS(OperationContext* txn,
     if (collectionOptions.isView()) {
         uassertStatusOK(db->createView(txn, ns, collectionOptions));
     } else {
-        invariant(db->createCollection(txn, ns, collectionOptions, createDefaultIndexes));
+        invariant(db->createCollection(txn, ns, collectionOptions, createDefaultIndexes, idIndex));
     }
 
     return Status::OK();

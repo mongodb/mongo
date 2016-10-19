@@ -156,7 +156,8 @@ public:
     Collection* createCollection(OperationContext* txn,
                                  StringData ns,
                                  const CollectionOptions& options = CollectionOptions(),
-                                 bool createDefaultIndexes = true);
+                                 bool createDefaultIndexes = true,
+                                 const BSONObj& idIndex = BSONObj());
 
     Status createView(OperationContext* txn, StringData viewName, const CollectionOptions& options);
 
@@ -258,10 +259,17 @@ private:
 
 void dropAllDatabasesExceptLocal(OperationContext* txn);
 
+/**
+ * Creates the namespace 'ns' in the database 'db' according to 'options'. If 'createDefaultIndexes'
+ * is true, creates the _id index for the collection (and the system indexes, in the case of system
+ * collections). Creates the collection's _id index according to 'idIndex', if it is non-empty. When
+ * 'idIndex' is empty, creates the default _id index.
+ */
 Status userCreateNS(OperationContext* txn,
                     Database* db,
                     StringData ns,
                     BSONObj options,
-                    bool createDefaultIndexes = true);
+                    bool createDefaultIndexes = true,
+                    const BSONObj& idIndex = BSONObj());
 
 }  // namespace mongo

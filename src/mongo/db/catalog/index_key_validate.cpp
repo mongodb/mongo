@@ -42,11 +42,14 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/represent_as.h"
 
 namespace mongo {
+namespace index_key_validate {
 
 using std::string;
 
@@ -57,6 +60,41 @@ namespace {
 // names will be disabled. This will allow for creation of indexes with invalid field names in their
 // specification.
 MONGO_FP_DECLARE(skipIndexCreateFieldNameValidation);
+
+static const std::set<StringData> allowedFieldNames = {
+    IndexDescriptor::k2dIndexMaxFieldName,
+    IndexDescriptor::k2dIndexBitsFieldName,
+    IndexDescriptor::k2dIndexMaxFieldName,
+    IndexDescriptor::k2dIndexMinFieldName,
+    IndexDescriptor::k2dsphereCoarsestIndexedLevel,
+    IndexDescriptor::k2dsphereFinestIndexedLevel,
+    IndexDescriptor::k2dsphereVersionFieldName,
+    IndexDescriptor::kBackgroundFieldName,
+    IndexDescriptor::kCollationFieldName,
+    IndexDescriptor::kDefaultLanguageFieldName,
+    IndexDescriptor::kDropDuplicatesFieldName,
+    IndexDescriptor::kExpireAfterSecondsFieldName,
+    IndexDescriptor::kGeoHaystackBucketSize,
+    IndexDescriptor::kIndexNameFieldName,
+    IndexDescriptor::kIndexVersionFieldName,
+    IndexDescriptor::kKeyPatternFieldName,
+    IndexDescriptor::kLanguageOverrideFieldName,
+    IndexDescriptor::kNamespaceFieldName,
+    IndexDescriptor::kPartialFilterExprFieldName,
+    IndexDescriptor::kSparseFieldName,
+    IndexDescriptor::kStorageEngineFieldName,
+    IndexDescriptor::kTextVersionFieldName,
+    IndexDescriptor::kUniqueFieldName,
+    IndexDescriptor::kWeightsFieldName,
+    // Index creation under legacy writeMode can result in an index spec with an _id field.
+    "_id"};
+
+static const std::set<StringData> allowedIdIndexFieldNames = {
+    IndexDescriptor::kCollationFieldName,
+    IndexDescriptor::kIndexNameFieldName,
+    IndexDescriptor::kIndexVersionFieldName,
+    IndexDescriptor::kKeyPatternFieldName,
+    IndexDescriptor::kNamespaceFieldName};
 }
 
 Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion indexVersion) {
@@ -173,6 +211,7 @@ StatusWith<BSONObj> validateIndexSpec(
     const NamespaceString& expectedNamespace,
     const ServerGlobalParams::FeatureCompatibility& featureCompatibility) {
     bool hasKeyPatternField = false;
+    bool hasIndexNameField = false;
     bool hasNamespaceField = false;
     bool hasVersionField = false;
     bool hasCollationField = false;
@@ -215,6 +254,15 @@ StatusWith<BSONObj> validateIndexSpec(
             }
 
             hasKeyPatternField = true;
+        } else if (IndexDescriptor::kIndexNameFieldName == indexSpecElemFieldName) {
+            if (indexSpecElem.type() != BSONType::String) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << "The field '" << IndexDescriptor::kIndexNameFieldName
+                                      << "' must be a string, but got "
+                                      << typeName(indexSpecElem.type())};
+            }
+
+            hasIndexNameField = true;
         } else if (IndexDescriptor::kNamespaceFieldName == indexSpecElemFieldName) {
             if (indexSpecElem.type() != BSONType::String) {
                 return {ErrorCodes::TypeMismatch,
@@ -271,9 +319,15 @@ StatusWith<BSONObj> validateIndexSpec(
         } else if (IndexDescriptor::kCollationFieldName == indexSpecElemFieldName) {
             if (indexSpecElem.type() != BSONType::Object) {
                 return {ErrorCodes::TypeMismatch,
-                        str::stream() << "The field '" << IndexDescriptor::kNamespaceFieldName
+                        str::stream() << "The field '" << IndexDescriptor::kCollationFieldName
                                       << "' must be an object, but got "
                                       << typeName(indexSpecElem.type())};
+            }
+
+            if (indexSpecElem.Obj().isEmpty()) {
+                return {ErrorCodes::BadValue,
+                        str::stream() << "The field '" << IndexDescriptor::kCollationFieldName
+                                      << "' cannot be an empty object."};
             }
 
             hasCollationField = true;
@@ -292,6 +346,12 @@ StatusWith<BSONObj> validateIndexSpec(
     if (!hasKeyPatternField) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << "The '" << IndexDescriptor::kKeyPatternFieldName
+                              << "' field is a required property of an index specification"};
+    }
+
+    if (!hasIndexNameField) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "The '" << IndexDescriptor::kIndexNameFieldName
                               << "' field is a required property of an index specification"};
     }
 
@@ -329,6 +389,41 @@ StatusWith<BSONObj> validateIndexSpec(
     return indexSpec;
 }
 
+Status validateIdIndexSpec(const BSONObj& indexSpec) {
+    for (auto&& indexSpecElem : indexSpec) {
+        auto indexSpecElemFieldName = indexSpecElem.fieldNameStringData();
+        if (!allowedIdIndexFieldNames.count(indexSpecElemFieldName)) {
+            return {
+                ErrorCodes::InvalidIndexSpecificationOption,
+                str::stream() << "The field '" << indexSpecElemFieldName
+                              << "' is not valid for an _id index specification. Specification: "
+                              << indexSpec};
+        }
+    }
+
+    auto keyPatternElem = indexSpec[IndexDescriptor::kKeyPatternFieldName];
+    // validateIndexSpec() should have already verified that 'keyPatternElem' is an object.
+    invariant(keyPatternElem.type() == BSONType::Object);
+    if (SimpleBSONObjComparator::kInstance.evaluate(keyPatternElem.Obj() != BSON("_id" << 1))) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "The field '" << IndexDescriptor::kKeyPatternFieldName
+                              << "' for an _id index must be {_id: 1}, but got "
+                              << keyPatternElem.Obj()};
+    }
+
+    auto nameElem = indexSpec[IndexDescriptor::kIndexNameFieldName];
+    // validateIndexSpec() should have already verified that 'nameElem' is a string.
+    invariant(nameElem.type() == BSONType::String);
+    if (nameElem.String() != "_id_"_sd) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "The field '" << IndexDescriptor::kIndexNameFieldName
+                              << "' for an _id index must be '_id_', but got "
+                              << nameElem.String()};
+    }
+
+    return Status::OK();
+}
+
 /**
  * Top-level index spec field names are validated here. When adding a new field with a document as
  * value, is the the sub-module's responsibility to ensure that the content is valid and that only
@@ -338,34 +433,6 @@ Status validateIndexSpecFieldNames(const BSONObj& indexSpec) {
     if (MONGO_FAIL_POINT(skipIndexCreateFieldNameValidation)) {
         return Status::OK();
     }
-
-    const std::set<StringData> allowedFieldNames = {
-        IndexDescriptor::k2dIndexMaxFieldName,
-        IndexDescriptor::k2dIndexBitsFieldName,
-        IndexDescriptor::k2dIndexMaxFieldName,
-        IndexDescriptor::k2dIndexMinFieldName,
-        IndexDescriptor::k2dsphereCoarsestIndexedLevel,
-        IndexDescriptor::k2dsphereFinestIndexedLevel,
-        IndexDescriptor::k2dsphereVersionFieldName,
-        IndexDescriptor::kBackgroundFieldName,
-        IndexDescriptor::kCollationFieldName,
-        IndexDescriptor::kDefaultLanguageFieldName,
-        IndexDescriptor::kDropDuplicatesFieldName,
-        IndexDescriptor::kExpireAfterSecondsFieldName,
-        IndexDescriptor::kGeoHaystackBucketSize,
-        IndexDescriptor::kIndexNameFieldName,
-        IndexDescriptor::kIndexVersionFieldName,
-        IndexDescriptor::kKeyPatternFieldName,
-        IndexDescriptor::kLanguageOverrideFieldName,
-        IndexDescriptor::kNamespaceFieldName,
-        IndexDescriptor::kPartialFilterExprFieldName,
-        IndexDescriptor::kSparseFieldName,
-        IndexDescriptor::kStorageEngineFieldName,
-        IndexDescriptor::kTextVersionFieldName,
-        IndexDescriptor::kUniqueFieldName,
-        IndexDescriptor::kWeightsFieldName,
-        // Index creation under legacy writeMode can result in an index spec with an _id field.
-        "_id"};
 
     for (auto&& indexSpecElem : indexSpec) {
         auto indexSpecElemFieldName = indexSpecElem.fieldNameStringData();
@@ -380,4 +447,62 @@ Status validateIndexSpecFieldNames(const BSONObj& indexSpec) {
     return Status::OK();
 }
 
+StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* txn,
+                                               const BSONObj& indexSpec,
+                                               const CollatorInterface* defaultCollator) {
+    if (auto collationElem = indexSpec[IndexDescriptor::kCollationFieldName]) {
+        // validateIndexSpec() should have already verified that 'collationElem' is an object.
+        invariant(collationElem.type() == BSONType::Object);
+
+        auto collator = CollatorFactoryInterface::get(txn->getServiceContext())
+                            ->makeFromBSON(collationElem.Obj());
+        if (!collator.isOK()) {
+            return collator.getStatus();
+        }
+
+        if (collator.getValue()) {
+            // If the collator factory returned a non-null collator, then inject the entire
+            // collation specification into the index specification. This is necessary to fill
+            // in any options that the user omitted.
+            BSONObjBuilder bob;
+
+            for (auto&& indexSpecElem : indexSpec) {
+                if (IndexDescriptor::kCollationFieldName != indexSpecElem.fieldNameStringData()) {
+                    bob.append(indexSpecElem);
+                }
+            }
+            bob.append(IndexDescriptor::kCollationFieldName,
+                       collator.getValue()->getSpec().toBSON());
+
+            return bob.obj();
+        } else {
+            // If the collator factory returned a null collator (representing the "simple"
+            // collation), then we simply omit the "collation" from the index specification.
+            // This is desirable to make the representation for the "simple" collation
+            // consistent between v=1 and v=2 indexes.
+            return indexSpec.removeField(IndexDescriptor::kCollationFieldName);
+        }
+    } else if (defaultCollator) {
+        // validateIndexSpec() should have added the "v" field if it was not present and
+        // verified that 'versionElem' is a number.
+        auto versionElem = indexSpec[IndexDescriptor::kIndexVersionFieldName];
+        invariant(versionElem.isNumber());
+
+        if (IndexVersion::kV2 <= static_cast<IndexVersion>(versionElem.numberInt())) {
+            // The user did not specify an explicit collation for this index and the collection
+            // has a default collator. If we're building a v=2 index, then we should inherit the
+            // collection default. However, if we're building a v=1 index, then we're implicitly
+            // building an index that's using the "simple" collation.
+            BSONObjBuilder bob;
+
+            bob.appendElements(indexSpec);
+            bob.append(IndexDescriptor::kCollationFieldName, defaultCollator->getSpec().toBSON());
+
+            return bob.obj();
+        }
+    }
+    return indexSpec;
+}
+
+}  // namespace index_key_validate
 }  // namespace mongo

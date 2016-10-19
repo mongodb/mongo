@@ -55,6 +55,7 @@
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_database.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
@@ -77,6 +78,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
@@ -533,6 +535,8 @@ public:
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
+        const NamespaceString ns(parseNs(dbname, cmdObj));
+
         if (cmdObj.hasField("autoIndexId")) {
             const char* deprecationWarning =
                 "the autoIndexId option is deprecated and will be removed in a future release";
@@ -553,7 +557,79 @@ public:
                  "http://dochub.mongodb.org/core/3.4-feature-compatibility."});
         }
 
-        return appendCommandStatus(result, createCollection(txn, dbname, cmdObj));
+        // Validate _id index spec and fill in missing fields.
+        if (auto idIndexElem = cmdObj["idIndex"]) {
+            if (cmdObj["viewOn"]) {
+                return appendCommandStatus(
+                    result,
+                    {ErrorCodes::InvalidOptions,
+                     str::stream() << "'idIndex' is not allowed with 'viewOn': " << idIndexElem});
+            }
+            if (cmdObj["autoIndexId"]) {
+                return appendCommandStatus(result,
+                                           {ErrorCodes::InvalidOptions,
+                                            str::stream()
+                                                << "'idIndex' is not allowed with 'autoIndexId': "
+                                                << idIndexElem});
+            }
+
+            if (idIndexElem.type() != BSONType::Object) {
+                return appendCommandStatus(
+                    result,
+                    {ErrorCodes::TypeMismatch,
+                     str::stream() << "'idIndex' has to be a document: " << idIndexElem});
+            }
+
+            auto idIndexSpec = idIndexElem.Obj();
+
+            // Perform index spec validation.
+            idIndexSpec = uassertStatusOK(index_key_validate::validateIndexSpec(
+                idIndexSpec, ns, serverGlobalParams.featureCompatibility));
+            uassertStatusOK(index_key_validate::validateIdIndexSpec(idIndexSpec));
+
+            // Validate or fill in _id index collation.
+            std::unique_ptr<CollatorInterface> defaultCollator;
+            if (auto collationElem = cmdObj["collation"]) {
+                if (collationElem.type() != BSONType::Object) {
+                    return appendCommandStatus(
+                        result,
+                        {ErrorCodes::TypeMismatch,
+                         str::stream() << "'collation' has to be a document: " << collationElem});
+                }
+                auto collatorStatus = CollatorFactoryInterface::get(txn->getServiceContext())
+                                          ->makeFromBSON(collationElem.Obj());
+                if (!collatorStatus.isOK()) {
+                    return appendCommandStatus(result, collatorStatus.getStatus());
+                }
+                defaultCollator = std::move(collatorStatus.getValue());
+            }
+            idIndexSpec = uassertStatusOK(index_key_validate::validateIndexSpecCollation(
+                txn, idIndexSpec, defaultCollator.get()));
+            std::unique_ptr<CollatorInterface> idIndexCollator;
+            if (auto collationElem = idIndexSpec["collation"]) {
+                auto collatorStatus = CollatorFactoryInterface::get(txn->getServiceContext())
+                                          ->makeFromBSON(collationElem.Obj());
+                // validateIndexSpecCollation() should have checked that the _id index collation
+                // spec is valid.
+                invariant(collatorStatus.isOK());
+                idIndexCollator = std::move(collatorStatus.getValue());
+            }
+            if (!CollatorInterface::collatorsMatch(defaultCollator.get(), idIndexCollator.get())) {
+                return appendCommandStatus(
+                    result,
+                    {ErrorCodes::BadValue,
+                     "'idIndex' must have the same collation as the collection."});
+            }
+
+            // Remove "idIndex" field from command.
+            auto resolvedCmdObj = cmdObj.removeField("idIndex");
+
+            return appendCommandStatus(result,
+                                       createCollection(txn, dbname, resolvedCmdObj, idIndexSpec));
+        }
+
+        BSONObj idIndexSpec;
+        return appendCommandStatus(result, createCollection(txn, dbname, cmdObj, idIndexSpec));
     }
 } cmdCreate;
 

@@ -102,7 +102,7 @@ Status rebuildIndexesOnCollection(OperationContext* txn,
             }
 
             const BSONObj key = spec.getObjectField("key");
-            const Status keyStatus = validateKeyPattern(key, newIndexVersion);
+            const Status keyStatus = index_key_validate::validateKeyPattern(key, newIndexVersion);
             if (!keyStatus.isOK()) {
                 return Status(
                     ErrorCodes::CannotCreateIndex,

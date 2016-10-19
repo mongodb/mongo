@@ -149,6 +149,14 @@
     indexSpec = getIndexSpecByName(testDB.index_version, "_id_");
     assert.eq(1, indexSpec.v, tojson(indexSpec));
 
+    // Test that the _id index of a collection is created with v=1 when the
+    // featureCompatibilityVersion is 3.2 and an "idIndex" spec is provided without a version.
+    testDB.index_version.drop();
+    assert.commandWorked(
+        testDB.runCommand({create: "index_version", idIndex: {key: {_id: 1}, name: "_id_"}}));
+    indexSpec = getIndexSpecByName(testDB.index_version, "_id_");
+    assert.eq(1, indexSpec.v, tojson(indexSpec));
+
     // Test that an index created on an existing collection is created with v=1 when the
     // featureCompatibilityVersion is 3.2.
     assert.commandWorked(testDB.index_version.createIndex({defaultToV1: 1}, {name: "defaultToV1"}));
