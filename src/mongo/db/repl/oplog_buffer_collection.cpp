@@ -56,14 +56,19 @@ NamespaceString OplogBufferCollection::getDefaultNamespace() {
     return NamespaceString(kDefaultOplogCollectionNamespace);
 }
 
-std::pair<BSONObj, Timestamp> OplogBufferCollection::addIdToDocument(const BSONObj& orig) {
-    invariant(!orig.isEmpty());
-    BSONObjBuilder bob;
-    Timestamp ts = orig["ts"].timestamp();
+std::tuple<BSONObj, Timestamp, std::size_t> OplogBufferCollection::addIdToDocument(
+    const BSONObj& orig, const Timestamp& lastTimestamp, std::size_t sentinelCount) {
+    if (orig.isEmpty()) {
+        return std::make_tuple(
+            BSON("_id" << BSON("ts" << lastTimestamp << "s"
+                                    << static_cast<long long>(sentinelCount + 1))),
+            lastTimestamp,
+            sentinelCount + 1);
+    }
+    const auto ts = orig["ts"].timestamp();
     invariant(!ts.isNull());
-    bob.append("_id", ts);
-    bob.append(kOplogEntryFieldName, orig);
-    return std::pair<BSONObj, Timestamp>{bob.obj(), ts};
+    auto doc = BSON("_id" << BSON("ts" << ts << "s" << 0) << kOplogEntryFieldName << orig);
+    return std::make_tuple(doc, ts, 0);
 }
 
 BSONObj OplogBufferCollection::extractEmbeddedOplogDocument(const BSONObj& orig) {
@@ -118,19 +123,22 @@ void OplogBufferCollection::pushAllNonBlocking(OperationContext* txn,
     }
     size_t numDocs = std::distance(begin, end);
     Batch docsToInsert(numDocs);
-    Timestamp ts;
-    std::transform(begin, end, docsToInsert.begin(), [&ts](const Value& value) {
-        auto pair = addIdToDocument(value);
-        invariant(ts.isNull() || pair.second > ts);
-        ts = pair.second;
-        return pair.first;
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    auto ts = _lastPushedTimestamp;
+    auto sentinelCount = _sentinelCount;
+    std::transform(begin, end, docsToInsert.begin(), [&sentinelCount, &ts](const Value& value) {
+        BSONObj doc;
+        auto previousTimestamp = ts;
+        std::tie(doc, ts, sentinelCount) = addIdToDocument(value, ts, sentinelCount);
+        invariant(value.isEmpty() ? ts == previousTimestamp : ts > previousTimestamp);
+        return doc;
     });
 
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
     auto status = _storageInterface->insertDocuments(txn, _nss, docsToInsert);
     fassertStatusOK(40161, status);
 
     _lastPushedTimestamp = ts;
+    _sentinelCount = sentinelCount;
     _count += numDocs;
     _size += std::accumulate(begin, end, 0U, [](const size_t& docSize, const Value& value) {
         return docSize + size_t(value.objsize());
@@ -166,6 +174,7 @@ void OplogBufferCollection::clear(OperationContext* txn) {
     _size = 0;
     _count = 0;
     std::queue<Timestamp>().swap(_sentinels);
+    _sentinelCount = 0;
     _lastPushedTimestamp = {};
     _lastPoppedKey = {};
 }
@@ -291,6 +300,10 @@ std::queue<Timestamp> OplogBufferCollection::getSentinels_forTest() const {
     return _sentinels;
 }
 
+std::size_t OplogBufferCollection::getSentinelCount_forTest() const {
+    return _sentinelCount;
+}
+
 Timestamp OplogBufferCollection::getLastPushedTimestamp_forTest() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _lastPushedTimestamp;
@@ -302,7 +315,7 @@ Timestamp OplogBufferCollection::getLastPoppedTimestamp_forTest() const {
 }
 
 Timestamp OplogBufferCollection::_getLastPoppedTimestamp_inlock() const {
-    return _lastPoppedKey.isEmpty() ? Timestamp() : _lastPoppedKey[""].timestamp();
+    return _lastPoppedKey.isEmpty() ? Timestamp() : _lastPoppedKey[""].Obj()["ts"].timestamp();
 }
 
 }  // namespace repl

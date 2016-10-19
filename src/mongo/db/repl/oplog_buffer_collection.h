@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <tuple>
+
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/stdx/mutex.h"
@@ -54,12 +56,33 @@ public:
      */
     static BSONObj extractEmbeddedOplogDocument(const BSONObj& orig);
 
+
     /**
-     * Returns a pair of a BSONObj with an '_id' field equal to the 'ts' field of the provided
-     * document and an 'entry' field equal to the provided document, and the timestamp of the
-     * BSONObj. Assumes there is a 'ts' field in the original document.
+     * Creates and returns a document suitable for storing in the collection together with the
+     * associated timestamp and sentinel count that determines the position of this document in the
+     * _id index.
+     *
+     * If 'orig' is a valid oplog entry, the '_id' field of the returned BSONObj will be:
+     * {
+     *     ts: 'ts' field of the provided document,
+     *     s: 0
+     * }
+     * The timestamp returned will be equal to as the 'ts' field in the BSONObj.
+     * Assumes there is a 'ts' field in the original document.
+     *
+     * If 'orig' is an empty document (ie. we're inserting a sentinel value), the '_id' field will
+     * be generated based on the timestamp of the last document processed and the total number of
+     * sentinels with the same timestamp (including the document about to be inserted. For example,
+     * the first sentinel to be inserted after a valid oplog entry will have the following '_id'
+     * field:
+     * {
+     *     ts: 'ts' field of the last inserted valid oplog entry,
+     *     s: 1
+     * }
+     * The sentinel counter will be reset to 0 on inserting the next valid oplog entry.
      */
-    static std::pair<BSONObj, Timestamp> addIdToDocument(const BSONObj& orig);
+    static std::tuple<BSONObj, Timestamp, std::size_t> addIdToDocument(
+        const BSONObj& orig, const Timestamp& lastTimestamp, std::size_t sentinelCount);
 
     explicit OplogBufferCollection(StorageInterface* storageInterface);
     OplogBufferCollection(StorageInterface* storageInterface, const NamespaceString& nss);
@@ -93,9 +116,9 @@ public:
 
     // ---- Testing API ----
     std::queue<Timestamp> getSentinels_forTest() const;
+    std::size_t getSentinelCount_forTest() const;
     Timestamp getLastPushedTimestamp_forTest() const;
     Timestamp getLastPoppedTimestamp_forTest() const;
-
 
 private:
     /*
@@ -146,6 +169,9 @@ private:
     std::size_t _size;
 
     std::queue<Timestamp> _sentinels;
+
+    // Number of sentinel values inserted so far with the same timestamp as '_lastPoppedKey'.
+    std::size_t _sentinelCount = 0;
 
     Timestamp _lastPushedTimestamp;
 

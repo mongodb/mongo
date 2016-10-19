@@ -186,21 +186,65 @@ TEST_F(OplogBufferCollectionTest, extractEmbeddedOplogDocumentChangesIdToTimesta
     ASSERT_BSONOBJ_EQ(expectedOp, OplogBufferCollection::extractEmbeddedOplogDocument(originalOp));
 }
 
-TEST_F(OplogBufferCollectionTest, addIdToDocumentChangesTimestampToId) {
-    auto nss = makeNamespace(_agent);
-    OplogBufferCollection oplogBuffer(_storageInterface, nss);
+void _assertOplogDocAndTimestampEquals(
+    const BSONObj& oplog,
+    const std::tuple<BSONObj, Timestamp, std::size_t>& actualDocTimestampSentinelTuple) {
+    auto expectedTimestamp = oplog["ts"].timestamp();
+    auto expectedDoc =
+        BSON("_id" << BSON("ts" << expectedTimestamp << "s" << 0) << "entry" << oplog);
+    ASSERT_BSONOBJ_EQ(expectedDoc, std::get<0>(actualDocTimestampSentinelTuple));
+    ASSERT_EQUALS(expectedTimestamp, std::get<1>(actualDocTimestampSentinelTuple));
+    ASSERT_EQUALS(0U, std::get<2>(actualDocTimestampSentinelTuple));
+}
 
+void _assertSentinelDocAndTimestampEquals(
+    const Timestamp& expectedTimestamp,
+    std::size_t expectedSentinelCount,
+    const std::tuple<BSONObj, Timestamp, std::size_t>& actualDocTimestampSentinelTuple) {
+    auto expectedDoc =
+        BSON("_id" << BSON("ts" << expectedTimestamp << "s" << int(expectedSentinelCount)));
+    ASSERT_BSONOBJ_EQ(expectedDoc, std::get<0>(actualDocTimestampSentinelTuple));
+    ASSERT_EQUALS(expectedTimestamp, std::get<1>(actualDocTimestampSentinelTuple));
+    ASSERT_EQUALS(expectedSentinelCount, std::get<2>(actualDocTimestampSentinelTuple));
+}
+
+TEST_F(OplogBufferCollectionTest, addIdToDocumentChangesTimestampToId) {
     const BSONObj originalOp = makeOplogEntry(1);
-    BSONObj expectedOp = BSON("_id" << Timestamp(1, 1) << "entry" << originalOp);
-    auto testOpPair = OplogBufferCollection::addIdToDocument(originalOp);
-    ASSERT_BSONOBJ_EQ(expectedOp, testOpPair.first);
-    ASSERT_EQUALS(Timestamp(1, 1), testOpPair.second);
+    _assertOplogDocAndTimestampEquals(originalOp,
+                                      OplogBufferCollection::addIdToDocument(originalOp, {}, 0));
+}
+
+TEST_F(OplogBufferCollectionTest, addIdToDocumentGeneratesIdForSentinelFromLastPushedTimestamp) {
+    const BSONObj oplog1 = makeOplogEntry(1);
+    _assertOplogDocAndTimestampEquals(oplog1,
+                                      OplogBufferCollection::addIdToDocument(oplog1, {}, 0U));
+    auto ts1 = oplog1["ts"].timestamp();
+
+    _assertSentinelDocAndTimestampEquals(
+        ts1, 1U, OplogBufferCollection::addIdToDocument({}, ts1, 0U));
+    _assertSentinelDocAndTimestampEquals(
+        ts1, 2U, OplogBufferCollection::addIdToDocument({}, ts1, 1U));
+    _assertSentinelDocAndTimestampEquals(
+        ts1, 3U, OplogBufferCollection::addIdToDocument({}, ts1, 2U));
+
+    // Processing valid oplog entry resets the sentinel count.
+    const BSONObj oplog2 = makeOplogEntry(2);
+    _assertOplogDocAndTimestampEquals(oplog1,
+                                      OplogBufferCollection::addIdToDocument(oplog1, ts1, 3U));
+    auto ts2 = oplog2["ts"].timestamp();
+
+    _assertSentinelDocAndTimestampEquals(
+        ts2, 1U, OplogBufferCollection::addIdToDocument({}, ts2, 0U));
+    _assertSentinelDocAndTimestampEquals(
+        ts2, 2U, OplogBufferCollection::addIdToDocument({}, ts2, 1U));
+    _assertSentinelDocAndTimestampEquals(
+        ts2, 3U, OplogBufferCollection::addIdToDocument({}, ts2, 2U));
 }
 
 DEATH_TEST_F(OplogBufferCollectionTest,
              addIdToDocumentWithMissingTimestampFieldTriggersInvariantFailure,
              "Invariant failure !ts.isNull()") {
-    OplogBufferCollection::addIdToDocument(BSON("x" << 1));
+    OplogBufferCollection::addIdToDocument(BSON("x" << 1), {}, 0);
 }
 
 TEST_F(OplogBufferCollectionTest, PushOneDocumentWithPushAllNonBlockingAddsDocument) {
@@ -483,6 +527,7 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
     ASSERT_EQUALS(oplogBuffer.getSize(), 0UL);
     ASSERT_EQUALS(oplogBuffer.getSentinels_forTest().size(), 0UL);
+    ASSERT_EQUALS(0U, oplogBuffer.getSentinelCount_forTest());
     ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
     ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
 
@@ -491,6 +536,7 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
     ASSERT_EQUALS(oplogBuffer.getSize(), std::size_t(oplog.objsize()));
     ASSERT_EQUALS(oplogBuffer.getSentinels_forTest().size(), 0UL);
+    ASSERT_EQUALS(0U, oplogBuffer.getSentinelCount_forTest());
     ASSERT_EQUALS(oplog["ts"].timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
     ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
 
@@ -499,6 +545,7 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
     ASSERT_EQUALS(oplogBuffer.getSize(), std::size_t(oplog.objsize()));
     ASSERT_EQUALS(oplogBuffer.getSentinels_forTest().size(), 1UL);
+    ASSERT_EQUALS(0U, oplogBuffer.getSentinelCount_forTest());
     ASSERT_EQUALS(oplog["ts"].timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
     ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
 
@@ -507,6 +554,7 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     ASSERT_EQUALS(oplogBuffer.getCount(), 3UL);
     ASSERT_EQUALS(oplogBuffer.getSize(), std::size_t(oplog.objsize() + oplog2.objsize()));
     ASSERT_EQUALS(oplogBuffer.getSentinels_forTest().size(), 1UL);
+    ASSERT_EQUALS(0U, oplogBuffer.getSentinelCount_forTest());
     ASSERT_EQUALS(oplog2["ts"].timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
     ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
 
@@ -516,6 +564,7 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
     ASSERT_EQUALS(oplogBuffer.getSize(), std::size_t(oplog.objsize()));
     ASSERT_EQUALS(oplogBuffer.getSentinels_forTest().size(), 1UL);
+    ASSERT_EQUALS(0U, oplogBuffer.getSentinelCount_forTest());
     ASSERT_EQUALS(oplog2["ts"].timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
     ASSERT_EQUALS(oplog["ts"].timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
 
@@ -524,6 +573,7 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
     ASSERT_EQUALS(oplogBuffer.getSize(), 0UL);
     ASSERT_EQUALS(oplogBuffer.getSentinels_forTest().size(), 0UL);
+    ASSERT_EQUALS(0U, oplogBuffer.getSentinelCount_forTest());
     ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
     ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
 
@@ -715,9 +765,10 @@ TEST_F(OplogBufferCollectionTest, PushEvenIfFullPushesOnSentinelsProperly) {
     }
 }
 
-DEATH_TEST_F(OplogBufferCollectionTest,
-             PushAllNonBlockingWithOutOfOrderDocumentsTriggersInvariantFailure,
-             "Invariant failure ts.isNull() || pair.second > ts") {
+DEATH_TEST_F(
+    OplogBufferCollectionTest,
+    PushAllNonBlockingWithOutOfOrderDocumentsTriggersInvariantFailure,
+    "Invariant failure value.isEmpty() ? ts == previousTimestamp : ts > previousTimestamp") {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
@@ -729,18 +780,37 @@ DEATH_TEST_F(OplogBufferCollectionTest,
     oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end());
 }
 
-DEATH_TEST_F(OplogBufferCollectionTest,
-             PushAllNonBlockingWithSentinelTriggersInvariantFailure,
-             "Invariant failure !orig.isEmpty()") {
+TEST_F(OplogBufferCollectionTest, PushAllNonBlockingInsertsSentinelsIntoCollection) {
     auto nss = makeNamespace(_agent);
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_txn.get());
     const std::vector<BSONObj> oplog = {
-        BSONObj(), makeOplogEntry(1),
-    };
+        BSONObj(), makeOplogEntry(1), BSONObj(), BSONObj(), makeOplogEntry(2), BSONObj()};
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
     oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.begin(), oplog.end());
+
+    OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
+    auto iter = collectionReader.makeIterator();
+    auto doc = unittest::assertGet(iter->next()).first;
+    ASSERT_BSONOBJ_EQ(BSON("_id" << BSON("ts" << Timestamp(2, 2) << "s" << 1)), doc);
+    ASSERT_BSONOBJ_EQ(oplog[5], OplogBufferCollection::extractEmbeddedOplogDocument(doc));
+    ASSERT_BSONOBJ_EQ(oplog[4],
+                      OplogBufferCollection::extractEmbeddedOplogDocument(
+                          unittest::assertGet(iter->next()).first));
+    doc = unittest::assertGet(iter->next()).first;
+    ASSERT_BSONOBJ_EQ(BSON("_id" << BSON("ts" << Timestamp(1, 1) << "s" << 2)), doc);
+    ASSERT_BSONOBJ_EQ(oplog[3], OplogBufferCollection::extractEmbeddedOplogDocument(doc));
+    doc = unittest::assertGet(iter->next()).first;
+    ASSERT_BSONOBJ_EQ(BSON("_id" << BSON("ts" << Timestamp(1, 1) << "s" << 1)), doc);
+    ASSERT_BSONOBJ_EQ(oplog[2], OplogBufferCollection::extractEmbeddedOplogDocument(doc));
+    ASSERT_BSONOBJ_EQ(oplog[1],
+                      OplogBufferCollection::extractEmbeddedOplogDocument(
+                          unittest::assertGet(iter->next()).first));
+    doc = unittest::assertGet(iter->next()).first;
+    ASSERT_BSONOBJ_EQ(BSON("_id" << BSON("ts" << Timestamp() << "s" << 1)), doc);
+    ASSERT_BSONOBJ_EQ(oplog[0], OplogBufferCollection::extractEmbeddedOplogDocument(doc));
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
 
 TEST_F(OplogBufferCollectionTest, SentinelInMiddleIsReturnedInOrder) {
