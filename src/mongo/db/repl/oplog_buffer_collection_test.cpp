@@ -1016,5 +1016,100 @@ TEST_F(OplogBufferCollectionTest, TwoWaitForDataInvocationsBlockAndFindSameSenti
     ASSERT_EQUALS(count2, 1UL);
 }
 
+OplogBufferCollection::Options _makeOptions(std::size_t peekCacheSize) {
+    OplogBufferCollection::Options options;
+    options.peekCacheSize = peekCacheSize;
+    return options;
+}
+
+/**
+ * Converts expectedDocs to collection format (with _id field) and compare with peek cache contents.
+ */
+void _assertDocumentsEqualCache(const std::vector<BSONObj>& expectedDocs,
+                                std::queue<BSONObj> actualDocsInCache) {
+    for (const auto& doc : expectedDocs) {
+        ASSERT_FALSE(actualDocsInCache.empty());
+        ASSERT_BSONOBJ_EQ(
+            doc, OplogBufferCollection::extractEmbeddedOplogDocument(actualDocsInCache.front()));
+        actualDocsInCache.pop();
+    }
+    ASSERT_TRUE(actualDocsInCache.empty());
+}
+
+TEST_F(OplogBufferCollectionTest, PeekFillsCacheWithDocumentsFromCollection) {
+    auto nss = makeNamespace(_agent);
+    std::size_t peekCacheSize = 3U;
+    OplogBufferCollection oplogBuffer(_storageInterface, nss, _makeOptions(3));
+    ASSERT_EQUALS(peekCacheSize, oplogBuffer.getOptions().peekCacheSize);
+    oplogBuffer.startup(_txn.get());
+
+    std::vector<BSONObj> oplog;
+    for (int i = 0; i < 5; ++i) {
+        oplog.push_back(makeOplogEntry(i + 1));
+    };
+    oplogBuffer.pushAllNonBlocking(_txn.get(), oplog.cbegin(), oplog.cend());
+    _assertDocumentsInCollectionEquals(_txn.get(), nss, oplog);
+
+    // Before any peek operations, peek cache should be empty.
+    _assertDocumentsEqualCache({}, oplogBuffer.getPeekCache_forTest());
+
+    // First peek operation should trigger a read of 'peekCacheSize' documents from the collection.
+    BSONObj doc;
+    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_BSONOBJ_EQ(oplog[0], doc);
+    _assertDocumentsEqualCache({oplog[0], oplog[1], oplog[2]}, oplogBuffer.getPeekCache_forTest());
+
+    // Repeated peek operation should not modify the cache.
+    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_BSONOBJ_EQ(oplog[0], doc);
+    _assertDocumentsEqualCache({oplog[0], oplog[1], oplog[2]}, oplogBuffer.getPeekCache_forTest());
+
+    // Pop operation should remove the first element in the cache
+    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_BSONOBJ_EQ(oplog[0], doc);
+    _assertDocumentsEqualCache({oplog[1], oplog[2]}, oplogBuffer.getPeekCache_forTest());
+
+    // Next peek operation should not modify the cache.
+    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_BSONOBJ_EQ(oplog[1], doc);
+    _assertDocumentsEqualCache({oplog[1], oplog[2]}, oplogBuffer.getPeekCache_forTest());
+
+    // Pop the rest of the items in the cache.
+    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_BSONOBJ_EQ(oplog[1], doc);
+    _assertDocumentsEqualCache({oplog[2]}, oplogBuffer.getPeekCache_forTest());
+
+    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_BSONOBJ_EQ(oplog[2], doc);
+    _assertDocumentsEqualCache({}, oplogBuffer.getPeekCache_forTest());
+
+    // Next peek operation should replenish the cache.
+    // Cache size will be less than the configured 'peekCacheSize' because
+    // there will not be enough documents left unread in the collection.
+    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_BSONOBJ_EQ(oplog[3], doc);
+    _assertDocumentsEqualCache({oplog[3], oplog[4]}, oplogBuffer.getPeekCache_forTest());
+
+    // Pop the remaining documents from the buffer.
+    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_BSONOBJ_EQ(oplog[3], doc);
+    _assertDocumentsEqualCache({oplog[4]}, oplogBuffer.getPeekCache_forTest());
+
+    // Verify state of cache between pops using peek.
+    ASSERT_TRUE(oplogBuffer.peek(_txn.get(), &doc));
+    ASSERT_BSONOBJ_EQ(oplog[4], doc);
+    _assertDocumentsEqualCache({oplog[4]}, oplogBuffer.getPeekCache_forTest());
+
+    ASSERT_TRUE(oplogBuffer.tryPop(_txn.get(), &doc));
+    ASSERT_BSONOBJ_EQ(oplog[4], doc);
+    _assertDocumentsEqualCache({}, oplogBuffer.getPeekCache_forTest());
+
+    // Nothing left in the collection.
+    ASSERT_FALSE(oplogBuffer.peek(_txn.get(), &doc));
+    _assertDocumentsEqualCache({}, oplogBuffer.getPeekCache_forTest());
+
+    ASSERT_FALSE(oplogBuffer.tryPop(_txn.get(), &doc));
+    _assertDocumentsEqualCache({}, oplogBuffer.getPeekCache_forTest());
+}
 
 }  // namespace

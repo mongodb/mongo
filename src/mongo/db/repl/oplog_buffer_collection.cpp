@@ -36,6 +36,7 @@
 #include <numeric>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/util/assert_util.h"
@@ -76,15 +77,20 @@ BSONObj OplogBufferCollection::extractEmbeddedOplogDocument(const BSONObj& orig)
 }
 
 
-OplogBufferCollection::OplogBufferCollection(StorageInterface* storageInterface)
-    : OplogBufferCollection(storageInterface, getDefaultNamespace()) {}
+OplogBufferCollection::OplogBufferCollection(StorageInterface* storageInterface, Options options)
+    : OplogBufferCollection(storageInterface, getDefaultNamespace(), std::move(options)) {}
 
 OplogBufferCollection::OplogBufferCollection(StorageInterface* storageInterface,
-                                             const NamespaceString& nss)
-    : _storageInterface(storageInterface), _nss(nss), _count(0), _size(0) {}
+                                             const NamespaceString& nss,
+                                             Options options)
+    : _storageInterface(storageInterface), _nss(nss), _options(std::move(options)) {}
 
 NamespaceString OplogBufferCollection::getNamespace() const {
     return _nss;
+}
+
+OplogBufferCollection::Options OplogBufferCollection::getOptions() const {
+    return _options;
 }
 
 void OplogBufferCollection::startup(OperationContext* txn) {
@@ -168,6 +174,7 @@ void OplogBufferCollection::clear(OperationContext* txn) {
     _sentinelCount = 0;
     _lastPushedTimestamp = {};
     _lastPoppedKey = {};
+    _peekCache = std::queue<BSONObj>();
 }
 
 bool OplogBufferCollection::tryPop(OperationContext* txn, Value* value) {
@@ -220,6 +227,11 @@ bool OplogBufferCollection::_pop_inlock(OperationContext* txn, Value* value) {
         _peek_inlock(txn, PeekMode::kReturnUnmodifiedDocumentFromCollection);
     _lastPoppedKey = docFromCollection["_id"].wrap("");
     *value = extractEmbeddedOplogDocument(docFromCollection).getOwned();
+
+    invariant(!_peekCache.empty());
+    invariant(!SimpleBSONObjComparator::kInstance.compare(docFromCollection, _peekCache.front()));
+    _peekCache.pop();
+
     invariant(_count > 0);
     invariant(_size >= std::size_t(value->objsize()));
     _count--;
@@ -240,20 +252,34 @@ BSONObj OplogBufferCollection::_peek_inlock(OperationContext* txn, PeekMode peek
         boundInclusion = BoundInclusion::kIncludeEndKeyOnly;
     }
 
-    auto scanDirection = StorageInterface::ScanDirection::kForward;
-    const auto docs =
-        fassertStatusOK(40163,
-                        _storageInterface->findDocuments(
-                            txn, _nss, kIdIdxName, scanDirection, startKey, boundInclusion, 1U));
-    invariant(1U == docs.size());
+    bool isPeekCacheEnabled = _options.peekCacheSize > 0;
+    // Check read ahead cache and read additional documents into cache if necessary - only valid
+    // when size of read ahead cache is greater than zero in the options.
+    if (_peekCache.empty()) {
+        std::size_t limit = isPeekCacheEnabled ? _options.peekCacheSize : 1U;
+        const auto docs = fassertStatusOK(
+            40163,
+            _storageInterface->findDocuments(txn,
+                                             _nss,
+                                             kIdIdxName,
+                                             StorageInterface::ScanDirection::kForward,
+                                             startKey,
+                                             boundInclusion,
+                                             limit));
+        invariant(!docs.empty());
+        for (const auto& doc : docs) {
+            _peekCache.push(doc);
+        }
+    }
+    auto&& doc = _peekCache.front();
 
     switch (peekMode) {
         case PeekMode::kExtractEmbeddedDocument:
-            return extractEmbeddedOplogDocument(docs.front()).getOwned();
+            return extractEmbeddedOplogDocument(doc).getOwned();
             break;
         case PeekMode::kReturnUnmodifiedDocumentFromCollection:
-            invariant(docs.front().isOwned());
-            return docs.front();
+            invariant(doc.isOwned());
+            return doc;
             break;
     }
 
@@ -282,6 +308,11 @@ Timestamp OplogBufferCollection::getLastPushedTimestamp_forTest() const {
 Timestamp OplogBufferCollection::getLastPoppedTimestamp_forTest() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _lastPoppedKey.isEmpty() ? Timestamp() : _lastPoppedKey[""].Obj()["ts"].timestamp();
+}
+
+std::queue<BSONObj> OplogBufferCollection::getPeekCache_forTest() const {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    return _peekCache;
 }
 
 }  // namespace repl

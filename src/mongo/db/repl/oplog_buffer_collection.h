@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <queue>
 #include <tuple>
 
 #include "mongo/db/namespace_string.h"
@@ -46,6 +47,15 @@ class StorageInterface;
  */
 class OplogBufferCollection : public OplogBuffer {
 public:
+    /**
+     * Structure used to configure an instance of OplogBufferCollection.
+     */
+    struct Options {
+        // If equal to 0, the cache size will be set to 1.
+        std::size_t peekCacheSize = 0;
+        Options() {}
+    };
+
     /**
      * Returns default namespace for temporary collection used to hold data in oplog buffer.
      */
@@ -84,13 +94,20 @@ public:
     static std::tuple<BSONObj, Timestamp, std::size_t> addIdToDocument(
         const BSONObj& orig, const Timestamp& lastTimestamp, std::size_t sentinelCount);
 
-    explicit OplogBufferCollection(StorageInterface* storageInterface);
-    OplogBufferCollection(StorageInterface* storageInterface, const NamespaceString& nss);
+    explicit OplogBufferCollection(StorageInterface* storageInterface, Options options = Options());
+    OplogBufferCollection(StorageInterface* storageInterface,
+                          const NamespaceString& nss,
+                          Options options = Options());
 
     /**
      * Returns the namespace string of the collection used by this oplog buffer.
      */
     NamespaceString getNamespace() const;
+
+    /**
+     * Returns the options used to configure this OplogBufferCollection
+     */
+    Options getOptions() const;
 
     void startup(OperationContext* txn) override;
     void shutdown(OperationContext* txn) override;
@@ -118,6 +135,7 @@ public:
     std::size_t getSentinelCount_forTest() const;
     Timestamp getLastPushedTimestamp_forTest() const;
     Timestamp getLastPoppedTimestamp_forTest() const;
+    std::queue<BSONObj> getPeekCache_forTest() const;
 
 private:
     /*
@@ -148,6 +166,9 @@ private:
     // The namespace for the oplog buffer collection.
     const NamespaceString _nss;
 
+    // These are the options with which the oplog buffer was configured at construction time.
+    const Options _options;
+
     // Allows functions to wait until the queue has data. This condition variable is used with
     // _mutex below.
     stdx::condition_variable _cvNoLongerEmpty;
@@ -156,10 +177,10 @@ private:
     mutable stdx::mutex _mutex;
 
     // Number of documents in buffer.
-    std::size_t _count;
+    std::size_t _count = 0;
 
     // Size of documents in buffer.
-    std::size_t _size;
+    std::size_t _size = 0;
 
     // Number of sentinel values inserted so far with the same timestamp as '_lastPoppedKey'.
     std::size_t _sentinelCount = 0;
@@ -167,6 +188,10 @@ private:
     Timestamp _lastPushedTimestamp;
 
     BSONObj _lastPoppedKey;
+
+    // Used by _peek_inlock() to hold results of the read ahead query that will be used for pop/peek
+    // results.
+    std::queue<BSONObj> _peekCache;
 };
 
 }  // namespace repl
