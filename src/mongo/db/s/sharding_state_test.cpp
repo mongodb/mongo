@@ -46,7 +46,7 @@ namespace mongo {
 
 using executor::RemoteCommandRequest;
 
-class ShardingStateTest : public MongodTestFixture {
+class ShardingStateTest : public ShardingMongodTestFixture {
 public:
     ShardingState* shardingState() {
         return &_shardingState;
@@ -58,7 +58,7 @@ protected:
 
     void setUp() override {
         serverGlobalParams.clusterRole = ClusterRole::None;
-        MongodTestFixture::setUp();
+        ShardingMongodTestFixture::setUp();
 
         // When sharding initialization is triggered, initialize sharding state as a shard server.
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
@@ -91,7 +91,7 @@ protected:
         // ShardingState initialize can modify ReplicaSetMonitor state.
         ReplicaSetMonitor::cleanup();
 
-        MongodTestFixture::tearDown();
+        ShardingMongodTestFixture::tearDown();
     }
 
 private:

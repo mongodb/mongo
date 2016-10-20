@@ -71,10 +71,10 @@ class ReplSettings;
  * components (including a NetworkInterface/TaskExecutor subsystem backed by the NetworkTestEnv),
  * but allows subclasses to replace any component with its real implementation, a mock, or nullptr.
  */
-class MongodTestFixture : public ServiceContextMongoDTest {
+class ShardingMongodTestFixture : public ServiceContextMongoDTest {
 public:
-    MongodTestFixture();
-    ~MongodTestFixture();
+    ShardingMongodTestFixture();
+    ~ShardingMongodTestFixture();
 
     static const Seconds kFutureTimeout;
 

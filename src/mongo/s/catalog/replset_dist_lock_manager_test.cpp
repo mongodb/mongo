@@ -88,7 +88,7 @@ const Seconds kLockExpiration(10);
  * Basic fixture for ReplSetDistLockManager that starts it up before the test begins
  * and shuts it down when a test finishes.
  */
-class ReplSetDistLockManagerFixture : public MongodTestFixture {
+class ReplSetDistLockManagerFixture : public ShardingMongodTestFixture {
 public:
     /**
      * Returns the mocked catalog used by the lock manager being tested.
@@ -112,7 +112,7 @@ protected:
     }
 
     void setUp() override {
-        MongodTestFixture::setUp();
+        ShardingMongodTestFixture::setUp();
 
         getServiceContext()->setTickSource(makeTickSource());
 
@@ -126,7 +126,7 @@ protected:
     void tearDown() override {
         // Don't care about what shutDown passes to stopPing here.
         getMockCatalog()->expectStopPing([](StringData) {}, Status::OK());
-        MongodTestFixture::tearDown();
+        ShardingMongodTestFixture::tearDown();
     }
 
     std::unique_ptr<DistLockCatalog> makeDistLockCatalog(ShardRegistry* shardRegistry) override {

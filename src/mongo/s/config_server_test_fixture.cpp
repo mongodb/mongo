@@ -97,7 +97,7 @@ ConfigServerTestFixture::ConfigServerTestFixture() = default;
 ConfigServerTestFixture::~ConfigServerTestFixture() = default;
 
 void ConfigServerTestFixture::setUp() {
-    MongodTestFixture::setUp();
+    ShardingMongodTestFixture::setUp();
 
     // Initialize sharding components as a config server.
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;

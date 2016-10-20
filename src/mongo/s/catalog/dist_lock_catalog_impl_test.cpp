@@ -76,7 +76,7 @@ const HostAndPort dummyHost("dummy", 123);
 /**
  * Sets up the mocked out objects for testing the replica-set backed catalog manager.
  */
-class DistLockCatalogFixture : public MongodTestFixture {
+class DistLockCatalogFixture : public ShardingMongodTestFixture {
 public:
     std::shared_ptr<RemoteCommandTargeterMock> configTargeter() {
         return RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter());
@@ -84,7 +84,7 @@ public:
 
 protected:
     void setUp() override {
-        MongodTestFixture::setUp();
+        ShardingMongodTestFixture::setUp();
 
         // Initialize sharding components as a shard server.
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
