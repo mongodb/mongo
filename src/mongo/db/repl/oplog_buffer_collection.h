@@ -115,7 +115,6 @@ public:
     boost::optional<Value> lastObjectPushed(OperationContext* txn) const override;
 
     // ---- Testing API ----
-    std::queue<Timestamp> getSentinels_forTest() const;
     std::size_t getSentinelCount_forTest() const;
     Timestamp getLastPushedTimestamp_forTest() const;
     Timestamp getLastPoppedTimestamp_forTest() const;
@@ -150,8 +149,6 @@ private:
      */
     bool _pop_inlock(OperationContext* txn, Value* value);
 
-    Timestamp _getLastPoppedTimestamp_inlock() const;
-
     // The namespace for the oplog buffer collection.
     const NamespaceString _nss;
 
@@ -167,8 +164,6 @@ private:
 
     // Size of documents in buffer.
     std::size_t _size;
-
-    std::queue<Timestamp> _sentinels;
 
     // Number of sentinel values inserted so far with the same timestamp as '_lastPoppedKey'.
     std::size_t _sentinelCount = 0;

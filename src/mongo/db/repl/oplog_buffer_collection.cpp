@@ -99,14 +99,6 @@ void OplogBufferCollection::shutdown(OperationContext* txn) {
 }
 
 void OplogBufferCollection::pushEvenIfFull(OperationContext* txn, const Value& value) {
-    // This oplog entry is a sentinel
-    if (value.isEmpty()) {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        _sentinels.push(_lastPushedTimestamp);
-        _count++;
-        _cvNoLongerEmpty.notify_all();
-        return;
-    }
     Batch valueBatch = {value};
     pushAllNonBlocking(txn, valueBatch.begin(), valueBatch.end());
 }
@@ -173,7 +165,6 @@ void OplogBufferCollection::clear(OperationContext* txn) {
     _createCollection(txn);
     _size = 0;
     _count = 0;
-    std::queue<Timestamp>().swap(_sentinels);
     _sentinelCount = 0;
     _lastPushedTimestamp = {};
     _lastPoppedKey = {};
@@ -219,15 +210,6 @@ boost::optional<OplogBuffer::Value> OplogBufferCollection::lastObjectPushed(
 }
 
 bool OplogBufferCollection::_pop_inlock(OperationContext* txn, Value* value) {
-    // If there is a sentinel, and it was pushed right after the last BSONObj to be popped was
-    // pushed, then we pop off a sentinel instead and decrease the count by 1.
-    if (!_sentinels.empty() && (_getLastPoppedTimestamp_inlock() == _sentinels.front())) {
-        _sentinels.pop();
-        _count--;
-        *value = BSONObj();
-        return true;
-    }
-
     BSONObj docFromCollection;
     if (!_peekOneSide_inlock(
             txn, &docFromCollection, true, PeekMode::kReturnUnmodifiedDocumentFromCollection)) {
@@ -249,12 +231,6 @@ bool OplogBufferCollection::_peekOneSide_inlock(OperationContext* txn,
                                                 PeekMode peekMode) const {
     invariant(_count > 0);
 
-    // If there is a sentinel, and it was pushed right after the last BSONObj to be popped was
-    // pushed, then we return an empty BSONObj for the sentinel.
-    if (!_sentinels.empty() && (_getLastPoppedTimestamp_inlock() == _sentinels.front())) {
-        *value = BSONObj();
-        return true;
-    }
     auto scanDirection = front ? StorageInterface::ScanDirection::kForward
                                : StorageInterface::ScanDirection::kBackward;
     BSONObj startKey;
@@ -295,11 +271,6 @@ void OplogBufferCollection::_dropCollection(OperationContext* txn) {
     fassert(40155, _storageInterface->dropCollection(txn, _nss));
 }
 
-std::queue<Timestamp> OplogBufferCollection::getSentinels_forTest() const {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _sentinels;
-}
-
 std::size_t OplogBufferCollection::getSentinelCount_forTest() const {
     return _sentinelCount;
 }
@@ -311,10 +282,6 @@ Timestamp OplogBufferCollection::getLastPushedTimestamp_forTest() const {
 
 Timestamp OplogBufferCollection::getLastPoppedTimestamp_forTest() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _getLastPoppedTimestamp_inlock();
-}
-
-Timestamp OplogBufferCollection::_getLastPoppedTimestamp_inlock() const {
     return _lastPoppedKey.isEmpty() ? Timestamp() : _lastPoppedKey[""].Obj()["ts"].timestamp();
 }
 
