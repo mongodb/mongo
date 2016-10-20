@@ -901,6 +901,8 @@ TEST_F(NetworkInterfaceASIOTest, SetAlarmReturnsNotOKIfShutdownHasStarted) {
 }
 
 TEST_F(NetworkInterfaceASIOTest, IsMasterRequestContainsOutgoingWireVersionInternalClientInfo) {
+    WireSpec::instance().isInternalClient = true;
+
     RemoteCommandRequest request{testHost, "testDB", BSON("ping" << 1), BSONObj(), nullptr};
     auto deferred = startCommand(makeCallbackHandle(), request);
     auto stream = streamFactory().blockUntilStreamExists(testHost);
@@ -919,6 +921,35 @@ TEST_F(NetworkInterfaceASIOTest, IsMasterRequestContainsOutgoingWireVersionInter
             ASSERT_EQ(maxWireVersionElem.numberInt(), WireSpec::instance().outgoing.maxWireVersion);
             return simulateIsMaster(request);
         });
+
+    // Simulate ping reply.
+    stream->simulateServer(rpc::Protocol::kOpCommandV1,
+                           [&](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               RemoteCommandResponse response;
+                               response.data = BSON("ok" << 1);
+                               return response;
+                           });
+
+    // Verify that the ping op is counted as a success.
+    auto& res = deferred.get();
+    ASSERT(res.elapsedMillis);
+    assertNumOps(0u, 0u, 0u, 1u);
+}
+
+TEST_F(NetworkInterfaceASIOTest, IsMasterRequestMissingInternalClientInfoWhenNotInternalClient) {
+    WireSpec::instance().isInternalClient = false;
+
+    RemoteCommandRequest request{testHost, "testDB", BSON("ping" << 1), BSONObj(), nullptr};
+    auto deferred = startCommand(makeCallbackHandle(), request);
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+
+    // Verify that the isMaster reply has the expected internalClient data.
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               ASSERT_FALSE(request.cmdObj["internalClient"]);
+                               return simulateIsMaster(request);
+                           });
 
     // Simulate ping reply.
     stream->simulateServer(rpc::Protocol::kOpCommandV1,

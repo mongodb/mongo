@@ -226,6 +226,8 @@ static void _initWireSpec() {
     // connect to version supporting Write Concern only
     spec.outgoing.minWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
     spec.outgoing.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
+
+    spec.isInternalClient = true;
 }
 
 static ExitCode runMongosServer() {

@@ -125,7 +125,7 @@ private:
     /**
      * Subclasses can override this in order to make assertions about the command request.
      */
-    virtual void commandRequestHook(const rpc::RequestInterface* request) {}
+    virtual void commandRequestHook(const rpc::RequestInterface* request) const {}
 
     std::vector<stdx::thread> _threads;
 };
@@ -221,6 +221,8 @@ private:
 class DummyServerFixture : public unittest::Test {
 public:
     void setUp() {
+        WireSpec::instance().isInternalClient = isInternalClient();
+
         _maxPoolSizePerHost = globalConnPool.getMaxPoolSize();
         _dummyServer = stdx::make_unique<DummyServer>(TARGET_PORT);
 
@@ -322,8 +324,16 @@ private:
     /**
      * Subclasses can override this in order to use a specialized service entry point.
      */
-    virtual std::unique_ptr<DummyServiceEntryPoint> makeServiceEntryPoint() {
+    virtual std::unique_ptr<DummyServiceEntryPoint> makeServiceEntryPoint() const {
         return stdx::make_unique<DummyServiceEntryPoint>();
+    }
+
+    /**
+     * Subclasses can override this to make the client code behave like an internal client (e.g.
+     * mongod or mongos) as opposed to an external one (e.g. the shell).
+     */
+    virtual bool isInternalClient() const {
+        return false;
     }
 
     std::unique_ptr<DummyServer> _dummyServer;
@@ -444,9 +454,9 @@ TEST_F(DummyServerFixture, DontReturnConnGoneBadToPool) {
     conn1Again.done();
 }
 
-class DummyServiceEntryPointWithIsMasterCheck : public DummyServiceEntryPoint {
+class DummyServiceEntryPointWithInternalClientInfoCheck final : public DummyServiceEntryPoint {
 private:
-    virtual void commandRequestHook(const rpc::RequestInterface* request) {
+    void commandRequestHook(const rpc::RequestInterface* request) const final {
         if (request->getCommandName() != "isMaster") {
             // It's not an isMaster request. Nothing to do.
             return;
@@ -464,14 +474,45 @@ private:
     }
 };
 
-class DummyServerFixtureWithIsMasterCheck : public DummyServerFixture {
+class DummyServerFixtureWithInternalClientInfoCheck : public DummyServerFixture {
 private:
-    virtual std::unique_ptr<DummyServiceEntryPoint> makeServiceEntryPoint() {
-        return stdx::make_unique<DummyServiceEntryPointWithIsMasterCheck>();
+    std::unique_ptr<DummyServiceEntryPoint> makeServiceEntryPoint() const final {
+        return stdx::make_unique<DummyServiceEntryPointWithInternalClientInfoCheck>();
+    }
+
+    bool isInternalClient() const final {
+        return true;
     }
 };
 
-TEST_F(DummyServerFixtureWithIsMasterCheck, VerifyIsMasterRequestOnConnectionOpen) {
+TEST_F(DummyServerFixtureWithInternalClientInfoCheck, VerifyIsMasterRequestOnConnectionOpen) {
+    // The isMaster handshake will occur on connection open. The request is verified by the test
+    // fixture.
+    ScopedDbConnection conn(TARGET_HOST);
+    conn.done();
+}
+
+class DummyServiceEntryPointWithInternalClientMissingCheck final : public DummyServiceEntryPoint {
+private:
+    void commandRequestHook(const rpc::RequestInterface* request) const final {
+        if (request->getCommandName() != "isMaster") {
+            // It's not an isMaster request. Nothing to do.
+            return;
+        }
+
+        BSONObj commandArgs = request->getCommandArgs();
+        ASSERT_FALSE(commandArgs["internalClient"]);
+    }
+};
+
+class DummyServerFixtureWithInternalClientMissingCheck : public DummyServerFixture {
+private:
+    std::unique_ptr<DummyServiceEntryPoint> makeServiceEntryPoint() const final {
+        return stdx::make_unique<DummyServiceEntryPointWithInternalClientMissingCheck>();
+    }
+};
+
+TEST_F(DummyServerFixtureWithInternalClientMissingCheck, VerifyIsMasterRequestOnConnectionOpen) {
     // The isMaster handshake will occur on connection open. The request is verified by the test
     // fixture.
     ScopedDbConnection conn(TARGET_HOST);

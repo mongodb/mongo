@@ -115,6 +115,10 @@ struct WireSpec {
     // requests.
     WireVersionInfo outgoing;
 
+    // Set to true if the client is internal to the cluster---this is a mongod or mongos connecting
+    // to another mongod.
+    bool isInternalClient = false;
+
 private:
     WireSpec() = default;
 };

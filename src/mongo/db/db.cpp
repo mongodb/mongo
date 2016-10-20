@@ -513,6 +513,8 @@ void _initWireSpec() {
     // connect to any version
     spec.outgoing.minWireVersion = RELEASE_2_4_AND_BEFORE;
     spec.outgoing.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
+
+    spec.isInternalClient = true;
 }
 
 ExitCode _initAndListen(int listenPort) {
