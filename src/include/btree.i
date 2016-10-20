@@ -485,6 +485,38 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __wt_tree_modify_set --
+ *	Mark the tree dirty.
+ */
+static inline void
+__wt_tree_modify_set(WT_SESSION_IMPL *session)
+{
+	/*
+	 * Test before setting the dirty flag, it's a hot cache line.
+	 *
+	 * The tree's modified flag is cleared by the checkpoint thread: set it
+	 * and insert a barrier before dirtying the page.  (I don't think it's
+	 * a problem if the tree is marked dirty with all the pages clean, it
+	 * might result in an extra checkpoint that doesn't do any work but it
+	 * shouldn't cause problems; regardless, let's play it safe.)
+	 */
+	if (!S2BT(session)->modified) {
+		/* Assert we never dirty a checkpoint handle. */
+		WT_ASSERT(session, session->dhandle->checkpoint == NULL);
+
+		S2BT(session)->modified = true;
+		WT_FULL_BARRIER();
+	}
+
+	/*
+	 * The btree may already be marked dirty while the connection is still
+	 * clean; mark the connection dirty outside the test of the btree state.
+	 */
+	if (!S2C(session)->modified)
+		S2C(session)->modified = true;
+}
+
+/*
  * __wt_page_modify_clear --
  *	Clean a modified page.
  */
@@ -513,30 +545,9 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/*
 	 * Mark the tree dirty (even if the page is already marked dirty), newly
 	 * created pages to support "empty" files are dirty, but the file isn't
-	 * marked dirty until there's a real change needing to be written. Test
-	 * before setting the dirty flag, it's a hot cache line.
-	 *
-	 * The tree's modified flag is cleared by the checkpoint thread: set it
-	 * and insert a barrier before dirtying the page.  (I don't think it's
-	 * a problem if the tree is marked dirty with all the pages clean, it
-	 * might result in an extra checkpoint that doesn't do any work but it
-	 * shouldn't cause problems; regardless, let's play it safe.)
+	 * marked dirty until there's a real change needing to be written.
 	 */
-	if (!S2BT(session)->modified) {
-		/* Assert we never dirty a checkpoint handle. */
-		WT_ASSERT(session, session->dhandle->checkpoint == NULL);
-
-		S2BT(session)->modified = true;
-		WT_FULL_BARRIER();
-	}
-
-	/*
-	 * There is a possibility of btree being dirty whereas connection being
-	 * clean when entering this function. So make sure to update connection
-	 * to dirty outside a condition on btree modified flag.
-	 */
-	if (!S2C(session)->modified)
-		S2C(session)->modified = true;
+	__wt_tree_modify_set(session);
 
 	__wt_page_only_modify_set(session, page);
 }
