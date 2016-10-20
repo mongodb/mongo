@@ -13,7 +13,6 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
         '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/db/matcher/expressions',
     ],
 )

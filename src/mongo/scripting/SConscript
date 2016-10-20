@@ -19,7 +19,6 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/shell/mongojs',
-        '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/md5',
     ],
 )

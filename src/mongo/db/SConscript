@@ -47,7 +47,6 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/write_concern_options',
-        '$BUILD_DIR/mongo/util/foundation',
     ]
 )
 
@@ -197,7 +196,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/md5',
     ]
 )
@@ -210,7 +208,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/foundation',
     ],
 )
 
@@ -241,7 +238,7 @@ env.Library(
         'namespace_string.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -262,7 +259,6 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/util/foundation",
     ],
 )
 
@@ -506,7 +502,6 @@ env.Library(
         "lasterror.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/foundation',
         'service_context',
     ],
 )

@@ -14,7 +14,6 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/util/foundation'
     ],
 )
 

@@ -75,7 +75,6 @@ env.Library(
         '$BUILD_DIR/mongo/transport/message_compressor',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
-        '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/ntservice',
         '$BUILD_DIR/mongo/util/processinfo',
         'server_status_core',

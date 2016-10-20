@@ -120,7 +120,6 @@ dbtest = env.Program(
         "$BUILD_DIR/mongo/db/repl/replmocks",
         "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/db/storage/paths",
-        "$BUILD_DIR/mongo/platform/platform",
         "$BUILD_DIR/mongo/util/concurrency/rwlock",
         "$BUILD_DIR/mongo/util/net/network",
         "$BUILD_DIR/mongo/util/progress_meter",

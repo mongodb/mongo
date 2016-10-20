@@ -100,7 +100,6 @@ env.Library(
         'task_runner',
         '$BUILD_DIR/mongo/executor/network_interface',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
-        '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/net/hostandport',
     ],
 )
@@ -1050,7 +1049,6 @@ env.Library(
     LIBDEPS=[
         'optime',
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/foundation',
     ],
 )
 

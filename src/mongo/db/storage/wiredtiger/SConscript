@@ -1,3 +1,4 @@
+# -*- mode: python -*-
 Import("env")
 Import("wiredtiger")
 Import("get_option")
@@ -55,7 +56,6 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/storage/storage_options',
             '$BUILD_DIR/mongo/util/concurrency/ticketholder',
             '$BUILD_DIR/mongo/util/elapsed_tracker',
-            '$BUILD_DIR/mongo/util/foundation',
             '$BUILD_DIR/mongo/util/processinfo',
             '$BUILD_DIR/third_party/shim_wiredtiger',
             '$BUILD_DIR/third_party/shim_snappy',

@@ -8,7 +8,7 @@ env.CppUnitTest(
         'ingress_header_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -20,7 +20,6 @@ env.Library(
         'transport_layer.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/transport/message_compressor',
     ],

@@ -1,3 +1,4 @@
+# -*- mode: python -*-
 Import("env")
 
 env.Library(
@@ -8,7 +9,6 @@ env.Library(
     LIBDEPS= [
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/storage/oplog_hack',
-        '$BUILD_DIR/mongo/util/foundation',
         ]
     )
 
@@ -28,7 +28,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
         '$BUILD_DIR/mongo/db/storage/journal_listener',
-        '$BUILD_DIR/mongo/util/foundation',
         ]
     )
 
