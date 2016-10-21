@@ -132,14 +132,10 @@ private:
 
     enum class PeekMode { kExtractEmbeddedDocument, kReturnUnmodifiedDocumentFromCollection };
     /**
-     * Returns the last oplog entry on the given side of the buffer. If front is true it will
-     * return the oldest entry, otherwise it will return the newest one. If the buffer is empty
-     * or peeking fails this returns false.
+     * Returns the oldest oplog entry in the buffer.
+     * Assumes the buffer is not empty.
      */
-    bool _peekOneSide_inlock(OperationContext* txn,
-                             Value* value,
-                             bool front,
-                             PeekMode peekMode) const;
+    BSONObj _peek_inlock(OperationContext* txn, PeekMode peekMode);
 
     // Storage interface used to perform storage engine level functions on the collection.
     StorageInterface* _storageInterface;

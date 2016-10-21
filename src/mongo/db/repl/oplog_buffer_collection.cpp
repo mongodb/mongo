@@ -192,7 +192,8 @@ bool OplogBufferCollection::peek(OperationContext* txn, Value* value) {
     if (_count == 0) {
         return false;
     }
-    return _peekOneSide_inlock(txn, value, true, PeekMode::kExtractEmbeddedDocument);
+    *value = _peek_inlock(txn, PeekMode::kExtractEmbeddedDocument);
+    return true;
 }
 
 boost::optional<OplogBuffer::Value> OplogBufferCollection::lastObjectPushed(
@@ -201,21 +202,22 @@ boost::optional<OplogBuffer::Value> OplogBufferCollection::lastObjectPushed(
     if (_count == 0) {
         return boost::none;
     }
-    Value value;
-    bool res = _peekOneSide_inlock(txn, &value, false, PeekMode::kExtractEmbeddedDocument);
-    if (!res) {
-        return boost::none;
-    }
-    return value;
+    const auto docs =
+        fassertStatusOK(40348,
+                        _storageInterface->findDocuments(txn,
+                                                         _nss,
+                                                         kIdIdxName,
+                                                         StorageInterface::ScanDirection::kBackward,
+                                                         {},
+                                                         BoundInclusion::kIncludeStartKeyOnly,
+                                                         1U));
+    invariant(1U == docs.size());
+    return extractEmbeddedOplogDocument(docs.front()).getOwned();
 }
 
 bool OplogBufferCollection::_pop_inlock(OperationContext* txn, Value* value) {
-    BSONObj docFromCollection;
-    if (!_peekOneSide_inlock(
-            txn, &docFromCollection, true, PeekMode::kReturnUnmodifiedDocumentFromCollection)) {
-        return false;
-    }
-
+    BSONObj docFromCollection =
+        _peek_inlock(txn, PeekMode::kReturnUnmodifiedDocumentFromCollection);
     _lastPoppedKey = docFromCollection["_id"].wrap("");
     *value = extractEmbeddedOplogDocument(docFromCollection).getOwned();
     invariant(_count > 0);
@@ -225,40 +227,37 @@ bool OplogBufferCollection::_pop_inlock(OperationContext* txn, Value* value) {
     return true;
 }
 
-bool OplogBufferCollection::_peekOneSide_inlock(OperationContext* txn,
-                                                Value* value,
-                                                bool front,
-                                                PeekMode peekMode) const {
+BSONObj OplogBufferCollection::_peek_inlock(OperationContext* txn, PeekMode peekMode) {
     invariant(_count > 0);
 
-    auto scanDirection = front ? StorageInterface::ScanDirection::kForward
-                               : StorageInterface::ScanDirection::kBackward;
     BSONObj startKey;
     auto boundInclusion = BoundInclusion::kIncludeStartKeyOnly;
 
-    // Previously popped documents are not actually removed from the collection. When peeking at the
-    // front of the buffer, we use the last popped timestamp to skip ahead to the first document
-    // that has not been popped.
-    if (front && !_lastPoppedKey.isEmpty()) {
+    // Previously popped documents are not actually removed from the collection. We use the last
+    // popped key to skip ahead to the first document that has not been popped.
+    if (!_lastPoppedKey.isEmpty()) {
         startKey = _lastPoppedKey;
         boundInclusion = BoundInclusion::kIncludeEndKeyOnly;
     }
 
+    auto scanDirection = StorageInterface::ScanDirection::kForward;
     const auto docs =
         fassertStatusOK(40163,
                         _storageInterface->findDocuments(
                             txn, _nss, kIdIdxName, scanDirection, startKey, boundInclusion, 1U));
     invariant(1U == docs.size());
+
     switch (peekMode) {
         case PeekMode::kExtractEmbeddedDocument:
-            *value = extractEmbeddedOplogDocument(docs.front()).getOwned();
+            return extractEmbeddedOplogDocument(docs.front()).getOwned();
             break;
         case PeekMode::kReturnUnmodifiedDocumentFromCollection:
-            *value = docs.front();
-            invariant(value->isOwned());
+            invariant(docs.front().isOwned());
+            return docs.front();
             break;
     }
-    return true;
+
+    MONGO_UNREACHABLE;
 }
 
 void OplogBufferCollection::_createCollection(OperationContext* txn) {
