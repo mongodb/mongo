@@ -144,7 +144,7 @@ TEST_F(ConfigInitializationTest, InitInvalidConfigVersionDoc) {
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString(VersionType::ConfigNS), versionDoc));
 
-    ASSERT_EQ(ErrorCodes::UnsupportedFormat,
+    ASSERT_EQ(ErrorCodes::TypeMismatch,
               catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
 }
 

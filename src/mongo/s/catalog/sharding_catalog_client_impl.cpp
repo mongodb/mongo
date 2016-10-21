@@ -159,9 +159,9 @@ Status ShardingCatalogClientImpl::updateCollection(OperationContext* txn,
                                        true,
                                        ShardingCatalogClient::kMajorityWriteConcern);
     if (!status.isOK()) {
-        return Status(status.getStatus().code(),
-                      str::stream() << "collection metadata write failed"
-                                    << causedBy(status.getStatus()));
+        return {status.getStatus().code(),
+                str::stream() << "Collection metadata write failed due to "
+                              << status.getStatus().reason()};
     }
 
     return Status::OK();
@@ -179,9 +179,9 @@ Status ShardingCatalogClientImpl::updateDatabase(OperationContext* txn,
                                        true,
                                        ShardingCatalogClient::kMajorityWriteConcern);
     if (!status.isOK()) {
-        return Status(status.getStatus().code(),
-                      str::stream() << "database metadata write failed"
-                                    << causedBy(status.getStatus()));
+        return {status.getStatus().code(),
+                str::stream() << "Database metadata write failed due to "
+                              << status.getStatus().reason()};
     }
 
     return Status::OK();
@@ -516,7 +516,7 @@ Status ShardingCatalogClientImpl::shardCollection(OperationContext* txn,
                                      : std::move(ssvResponse.getStatus());
     if (!status.isOK()) {
         warning() << "could not update initial version of " << ns << " on shard primary "
-                  << dbPrimaryShardId << causedBy(status);
+                  << dbPrimaryShardId << causedBy(redact(status));
     }
 
     logChange(txn,
@@ -572,7 +572,8 @@ StatusWith<ShardDrainingStatus> ShardingCatalogClientImpl::removeShard(Operation
                                                  false,
                                                  ShardingCatalogClient::kMajorityWriteConcern);
         if (!updateStatus.isOK()) {
-            log() << "error starting removeShard: " << name << causedBy(updateStatus.getStatus());
+            log() << "error starting removeShard: " << name
+                  << causedBy(redact(updateStatus.getStatus()));
             return updateStatus.getStatus();
         }
 
@@ -660,11 +661,10 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::getDatabas
         result =
             _fetchDatabaseMetadata(txn, dbName, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
         if (!result.isOK() && (result != ErrorCodes::NamespaceNotFound)) {
-            return Status(result.getStatus().code(),
-                          str::stream() << "Could not confirm non-existence of database \""
-                                        << dbName
-                                        << "\" due to inability to query the config server primary"
-                                        << causedBy(result.getStatus()));
+            return {result.getStatus().code(),
+                    str::stream() << "Could not confirm non-existence of database " << dbName
+                                  << " due to "
+                                  << result.getStatus().reason()};
         }
     }
 
@@ -1001,16 +1001,18 @@ StatusWith<VersionType> ShardingCatalogClientImpl::getConfigVersion(
     BSONObj versionDoc = queryResults.front();
     auto versionTypeResult = VersionType::fromBSON(versionDoc);
     if (!versionTypeResult.isOK()) {
-        return Status(ErrorCodes::UnsupportedFormat,
-                      str::stream() << "invalid config.version document: " << versionDoc
-                                    << causedBy(versionTypeResult.getStatus()));
+        return {versionTypeResult.getStatus().code(),
+                str::stream() << "Unable to parse config.version document " << versionDoc
+                              << " due to "
+                              << versionTypeResult.getStatus().reason()};
     }
 
     auto validationStatus = versionTypeResult.getValue().validate();
     if (!validationStatus.isOK()) {
         return Status(validationStatus.code(),
-                      str::stream() << "invalid config.version document: " << versionDoc
-                                    << causedBy(validationStatus.reason()));
+                      str::stream() << "Unable to validate config.version document " << versionDoc
+                                    << " due to "
+                                    << validationStatus.reason());
     }
 
     return versionTypeResult.getValue();
@@ -1065,19 +1067,20 @@ Status ShardingCatalogClientImpl::getChunks(OperationContext* txn,
                                               sort,
                                               longLimit);
     if (!findStatus.isOK()) {
-        return findStatus.getStatus();
+        return {findStatus.getStatus().code(),
+                str::stream() << "Failed to load chunks due to "
+                              << findStatus.getStatus().reason()};
     }
 
-    const auto chunkDocsOpTimePair = findStatus.getValue();
+    const auto& chunkDocsOpTimePair = findStatus.getValue();
     for (const BSONObj& obj : chunkDocsOpTimePair.value) {
         auto chunkRes = ChunkType::fromBSON(obj);
         if (!chunkRes.isOK()) {
             chunks->clear();
-            return {ErrorCodes::FailedToParse,
-                    stream() << "Failed to parse chunk with id ("
-                             << obj[ChunkType::name()].toString()
-                             << "): "
-                             << chunkRes.getStatus().toString()};
+            return {chunkRes.getStatus().code(),
+                    stream() << "Failed to parse chunk with id " << obj[ChunkType::name()]
+                             << " due to "
+                             << chunkRes.getStatus().reason()};
         }
 
         chunks->push_back(chunkRes.getValue());
@@ -1103,15 +1106,19 @@ Status ShardingCatalogClientImpl::getTagsForCollection(OperationContext* txn,
                                               BSON(TagsType::min() << 1),
                                               boost::none);  // no limit
     if (!findStatus.isOK()) {
-        return findStatus.getStatus();
+        return {findStatus.getStatus().code(),
+                str::stream() << "Failed to load tags due to " << findStatus.getStatus().reason()};
     }
-    for (const BSONObj& obj : findStatus.getValue().value) {
+
+    const auto& tagDocsOpTimePair = findStatus.getValue();
+    for (const BSONObj& obj : tagDocsOpTimePair.value) {
         auto tagRes = TagsType::fromBSON(obj);
         if (!tagRes.isOK()) {
             tags->clear();
-            return Status(ErrorCodes::FailedToParse,
-                          str::stream() << "Failed to parse tag: "
-                                        << tagRes.getStatus().toString());
+            return {tagRes.getStatus().code(),
+                    str::stream() << "Failed to parse tag with id " << obj[TagsType::tag()]
+                                  << " due to "
+                                  << tagRes.getStatus().toString()};
         }
 
         tags->push_back(tagRes.getValue());
@@ -1173,14 +1180,16 @@ StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientImpl::
     for (const BSONObj& doc : findStatus.getValue().value) {
         auto shardRes = ShardType::fromBSON(doc);
         if (!shardRes.isOK()) {
-            return {ErrorCodes::FailedToParse,
-                    stream() << "Failed to parse shard " << causedBy(shardRes.getStatus()) << doc};
+            return {shardRes.getStatus().code(),
+                    stream() << "Failed to parse shard document " << doc << " due to "
+                             << shardRes.getStatus().reason()};
         }
 
         Status validateStatus = shardRes.getValue().validate();
         if (!validateStatus.isOK()) {
             return {validateStatus.code(),
-                    stream() << "Failed to validate shard " << causedBy(validateStatus) << doc};
+                    stream() << "Failed to validate shard document " << doc << " due to "
+                             << validateStatus.reason()};
         }
 
         shards.push_back(shardRes.getValue());
@@ -1362,25 +1371,22 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* txn,
             getChunks(txn, query.obj(), BSONObj(), 1, &newestChunk, nullptr, readConcern);
 
         if (!chunkStatus.isOK()) {
-            warning() << "getChunks function failed, unable to validate chunk operation metadata"
-                      << causedBy(redact(chunkStatus));
-            errMsg = str::stream()
-                << "getChunks function failed, unable to validate chunk "
-                << "operation metadata: " << causedBy(redact(chunkStatus))
-                << ". applyChunkOpsDeprecated failed to get confirmation "
-                << "of commit. Unable to save chunk ops. Command: " << redact(cmd)
-                << ". Result: " << redact(response.getValue().response);
+            errMsg = str::stream() << "getChunks function failed, unable to validate chunk "
+                                   << "operation metadata: " << chunkStatus.toString()
+                                   << ". applyChunkOpsDeprecated failed to get confirmation "
+                                   << "of commit. Unable to save chunk ops. Command: " << cmd
+                                   << ". Result: " << response.getValue().response;
         } else if (!newestChunk.empty()) {
             invariant(newestChunk.size() == 1);
-            log() << "chunk operation commit confirmed";
             return Status::OK();
         } else {
             errMsg = str::stream() << "chunk operation commit failed: version "
                                    << lastChunkVersion.toString()
-                                   << " doesn't exist in namespace: " << redact(nss)
-                                   << ". Unable to save chunk ops. Command: " << redact(cmd)
-                                   << ". Result: " << redact(response.getValue().response);
+                                   << " doesn't exist in namespace: " << nss
+                                   << ". Unable to save chunk ops. Command: " << cmd
+                                   << ". Result: " << response.getValue().response;
         }
+
         return Status(status.code(), errMsg);
     }
 
@@ -1463,11 +1469,11 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* txn,
 
             auto existingDocs = fetchDuplicate.getValue().value;
             if (existingDocs.empty()) {
-                return Status(ErrorCodes::DuplicateKey,
-                              stream() << "DuplicateKey error" << causedBy(status)
-                                       << " was returned after a retry attempt, but no documents "
-                                          "were found. This means a concurrent change occurred "
-                                          "together with the retries.");
+                return {ErrorCodes::DuplicateKey,
+                        stream() << "DuplicateKey error was returned after a retry attempt, but no "
+                                    "documents were found. This means a concurrent change occurred "
+                                    "together with the retries. Original error was "
+                                 << status.toString()};
             }
 
             invariant(existingDocs.size() == 1);

@@ -432,7 +432,7 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsWithInvalidShard) {
         auto status = catalogClient()->getAllShards(operationContext(),
                                                     repl::ReadConcernLevel::kMajorityReadConcern);
 
-        ASSERT_EQ(ErrorCodes::FailedToParse, status.getStatus());
+        ASSERT_EQ(ErrorCodes::NoSuchKey, status.getStatus());
     });
 
     onFindCommand([](const RemoteCommandRequest& request) {
@@ -591,7 +591,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSInvalidChunk) {
                                                    nullptr,
                                                    repl::ReadConcernLevel::kMajorityReadConcern);
 
-        ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey, status);
         ASSERT_EQ(0U, chunks.size());
     });
 
@@ -1183,7 +1183,7 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollectionInvalidTag) {
         Status status =
             catalogClient()->getTagsForCollection(operationContext(), "TestDB.TestColl", &tags);
 
-        ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey, status);
         ASSERT_EQ(0U, tags.size());
     });
 

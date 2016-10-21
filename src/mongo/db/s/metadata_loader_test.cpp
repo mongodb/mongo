@@ -226,7 +226,7 @@ TEST_F(MetadataLoaderFixture, BadChunk) {
                                                     "shard0000",
                                                     NULL, /* no old metadata */
                                                     &metadata);
-        ASSERT_EQUALS(status.code(), ErrorCodes::FailedToParse);
+        ASSERT_EQUALS(status.code(), ErrorCodes::NoSuchKey);
     });
 
     expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{collType.toBSON()});
