@@ -270,10 +270,28 @@ TEST(CollectionOptions, UnknownTopLevelOptionFailsToParse) {
     ASSERT_EQ(status.code(), ErrorCodes::InvalidOptions);
 }
 
-TEST(CollectionOptions, CreateWhitelistedOptionIgnored) {
+TEST(CollectionOptions, CreateOptionIgnoredIfFirst) {
     CollectionOptions options;
     auto status = options.parse(fromjson("{create: 1}"));
     ASSERT_OK(status);
+}
+
+TEST(CollectionOptions, UnknownOptionIgnoredIfCreateOptionFirst) {
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{create: 1, invalidOption: 1}")));
+}
+
+TEST(CollectionOptions, DuplicateCreateOptionIgnoredIfCreateOptionFirst) {
+    CollectionOptions options;
+    auto status = options.parse(BSON("create" << 1 << "create" << 1));
+    ASSERT_OK(status);
+}
+
+TEST(CollectionOptions, CreateOptionRejectedIfNotFirst) {
+    CollectionOptions options;
+    auto status = options.parse(fromjson("{validator: {a: 1}, create: 1}"));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status.code(), ErrorCodes::InvalidOptions);
 }
 
 TEST(CollectionOptions, MaxTimeMSWhitelistedOptionIgnored) {
