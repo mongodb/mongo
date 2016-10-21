@@ -345,28 +345,30 @@ Status NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cb
         // This ditches the lock and gets us onto the strand (so we're
         // threadsafe)
         op->_strand.post([this, op, getConnectionStartTime] {
+            const auto timeout = op->_request.timeout;
+
             // Set timeout now that we have the correct request object
-            if (op->_request.timeout != RemoteCommandRequest::kNoTimeout) {
+            if (timeout != RemoteCommandRequest::kNoTimeout) {
                 // Subtract the time it took to get the connection from the pool from the request
                 // timeout.
                 auto getConnectionDuration = now() - getConnectionStartTime;
-                if (getConnectionDuration >= op->_request.timeout) {
+                if (getConnectionDuration >= timeout) {
                     // We only assume that the request timer is guaranteed to fire *after* the
                     // timeout duration - but make no stronger assumption. It is thus possible that
                     // we have already exceeded the timeout. In this case we timeout the operation
                     // manually.
                     std::stringstream msg;
                     msg << "Remote command timed out while waiting to get a connection from the "
-                        << "pool, took " << getConnectionDuration;
+                        << "pool, took " << getConnectionDuration << ", timeout was set to "
+                        << timeout;
                     auto rs = ResponseStatus(
                         ErrorCodes::ExceededTimeLimit, msg.str(), getConnectionDuration);
                     return _completeOperation(op, rs);
                 }
 
                 // The above conditional guarantees that the adjusted timeout will never underflow.
-                MONGO_ASIO_INVARIANT(
-                    op->_request.timeout > getConnectionDuration, "timeout underflowed", op);
-                const auto adjustedTimeout = op->_request.timeout - getConnectionDuration;
+                MONGO_ASIO_INVARIANT(timeout > getConnectionDuration, "timeout underflowed", op);
+                const auto adjustedTimeout = timeout - getConnectionDuration;
                 const auto requestId = op->_request.id;
 
                 try {
