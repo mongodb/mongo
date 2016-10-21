@@ -64,6 +64,13 @@
 
     // Decimal check is skipped.
     assert.writeOK(coll.insert({a: NumberDecimal(2.0)}));
+
+    // Even with internalValidateFeaturesAsMaster=false, the validate command should fail when it
+    // finds decimal data.
+    let validateResult = coll.validate({full: true});
+    assert.commandWorked(validateResult);
+    assert.eq(false, validateResult.valid, tojson(validateResult));
+
     coll.drop();
 
     // Collection creation with collation check is skipped.
