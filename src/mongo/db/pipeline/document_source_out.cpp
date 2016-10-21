@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_out.h"
 
 #include "mongo/stdx/memory.h"
 #include "mongo/util/destructor_guard.h"

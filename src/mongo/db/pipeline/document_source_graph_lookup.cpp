@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "document_source.h"
+#include "mongo/db/pipeline/document_source_graph_lookup.h"
 
 #include "mongo/base/init.h"
 #include "mongo/db/bson/dotted_path_support.h"

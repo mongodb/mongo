@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_sample_from_random_cursor.h"
 
 #include <boost/math/distributions/beta.hpp>
 

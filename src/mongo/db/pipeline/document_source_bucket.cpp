@@ -26,8 +26,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_bucket.h"
 
+#include "mongo/db/pipeline/document_source_group.h"
+#include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 
 namespace mongo {

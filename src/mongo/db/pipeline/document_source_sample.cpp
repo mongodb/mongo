@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_sample.h"
 
 #include "mongo/db/client.h"
 #include "mongo/db/pipeline/document.h"

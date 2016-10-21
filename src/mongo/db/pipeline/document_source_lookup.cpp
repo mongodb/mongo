@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "document_source.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
 
 #include "mongo/base/init.h"
 #include "mongo/db/jsobj.h"

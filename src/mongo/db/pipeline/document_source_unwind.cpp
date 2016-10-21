@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_unwind.h"
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"

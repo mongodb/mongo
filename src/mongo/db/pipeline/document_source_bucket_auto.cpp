@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_bucket_auto.h"
 
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"

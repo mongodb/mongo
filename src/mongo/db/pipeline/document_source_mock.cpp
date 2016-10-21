@@ -28,8 +28,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/document_source_mock.h"
+
 #include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source.h"
 
 namespace mongo {
 

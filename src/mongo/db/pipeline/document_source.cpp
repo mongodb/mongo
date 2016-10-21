@@ -28,9 +28,12 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/pipeline/document_source.h"
+
+#include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/util/string_map.h"
 

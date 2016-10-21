@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_replace_root.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 

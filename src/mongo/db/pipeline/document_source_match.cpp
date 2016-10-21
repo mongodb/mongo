@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_match.h"
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_algo.h"

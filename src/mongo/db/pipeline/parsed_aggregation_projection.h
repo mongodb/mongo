@@ -34,7 +34,7 @@
 #include <memory>
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/field_path.h"
 
 namespace mongo {
