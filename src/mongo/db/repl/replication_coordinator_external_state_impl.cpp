@@ -125,6 +125,9 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(initialSyncOplogBuffer,
                                       std::string,
                                       kCollectionOplogBufferName);
 
+// Set this to specify size of read ahead buffer in the OplogBufferCollection.
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(initialSyncOplogBufferPeekCacheSize, int, 10000);
+
 // Set this to specify maximum number of times the oplog fetcher will consecutively restart the
 // oplog tailing query on non-cancellation errors.
 server_parameter_storage_type<int, ServerParameterType::kStartupAndRuntime>::value_type
@@ -888,8 +891,11 @@ unsigned ReplicationCoordinatorExternalStateImpl::getApplierFetchCount() const {
 std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitialSyncOplogBuffer(
     OperationContext* txn) const {
     if (initialSyncOplogBuffer == kCollectionOplogBufferName) {
+        invariant(initialSyncOplogBufferPeekCacheSize >= 0);
+        OplogBufferCollection::Options options;
+        options.peekCacheSize = std::size_t(initialSyncOplogBufferPeekCacheSize);
         return stdx::make_unique<OplogBufferProxy>(
-            stdx::make_unique<OplogBufferCollection>(StorageInterface::get(txn)));
+            stdx::make_unique<OplogBufferCollection>(StorageInterface::get(txn), options));
     } else {
         return stdx::make_unique<OplogBufferBlockingQueue>();
     }
