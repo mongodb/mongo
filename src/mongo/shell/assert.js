@@ -149,7 +149,30 @@ assert.contains = function(o, arr, msg) {
     }
 };
 
-assert.soon = function(f, msg, timeout /*ms*/, interval) {
+/*
+ * This function transforms a given function, 'func', into a function 'safeFunc',
+ * where 'safeFunc' matches the behavior of 'func', except that it returns false
+ * in any instance where 'func' throws an exception. 'safeFunc' also prints
+ * message 'excMsg' upon catching such a thrown exception.
+ */
+function _convertExceptionToReturnStatus(func, excMsg) {
+    var safeFunc = () => {
+        try {
+            return func();
+        } catch (e) {
+            print(excMsg + ", exception: " + e);
+            return false;
+        }
+    };
+    return safeFunc;
+}
+
+/*
+ * Calls a function 'func' at repeated intervals until either func() returns true
+ * or more than 'timeout' milliseconds have elapsed. Throws an exception with
+ * message 'msg' after timing out.
+ */
+assert.soon = function(func, msg, timeout, interval) {
     if (assert._debug && msg)
         print("in assert for: " + msg);
 
@@ -158,7 +181,7 @@ assert.soon = function(f, msg, timeout /*ms*/, interval) {
             msg = "assert.soon failed, msg:" + msg;
         }
     } else {
-        msg = "assert.soon failed: " + f;
+        msg = "assert.soon failed: " + func;
     }
 
     var start = new Date();
@@ -166,11 +189,11 @@ assert.soon = function(f, msg, timeout /*ms*/, interval) {
     interval = interval || 200;
     var last;
     while (1) {
-        if (typeof(f) == "string") {
-            if (eval(f))
+        if (typeof(func) == "string") {
+            if (eval(func))
                 return;
         } else {
-            if (f())
+            if (func())
                 return;
         }
 
@@ -182,24 +205,43 @@ assert.soon = function(f, msg, timeout /*ms*/, interval) {
     }
 };
 
-/**
- * Wraps assert.soon to try...catch any function passed in.
+/*
+ * Calls a function 'func' at repeated intervals until either func() returns true without
+ * throwing an exception or more than 'timeout' milliseconds have elapsed. Throws an exception
+ * with message 'msg' after timing out.
  */
-assert.soonNoExcept = function(func, msg, timeout /*ms*/) {
-    /**
-     * Surrounds a function call by a try...catch to convert any exception to a print statement
-     * and return false.
-     */
-    function _convertExceptionToReturnStatus(func) {
-        try {
-            return func();
-        } catch (e) {
-            print("caught exception " + e);
-            return false;
+assert.soonNoExcept = function(func, msg, timeout) {
+    var safeFunc = _convertExceptionToReturnStatus(func, "assert.soonNoExcept caught exception");
+    assert.soon(safeFunc, msg, timeout);
+};
+
+/*
+ * Calls the given function 'func' repeatedly until either func() returns true
+ * or the number of attempted function calls is equal to 'num_attempts'.
+ * Throws an exception with message 'msg' after all attempts are used up.
+ */
+assert.retry = function(func, msg, num_attempts) {
+    var attempts_made = 0;
+    while (attempts_made < num_attempts) {
+        if (func()) {
+            return;
+        } else {
+            attempts_made += 1;
+            print("assert.retry failed on attempt " + attempts_made + " of " + num_attempts);
         }
     }
+    // Used up all attempts
+    doassert(msg);
+};
 
-    assert.soon((() => _convertExceptionToReturnStatus(func)), msg, timeout);
+/*
+ * Calls the given function 'func' repeatedly until either func() returns true without
+ * throwing an exception or the number of attempted function calls is equal to 'num_attempts'.
+ * Throws an exception with message 'msg' after all attempts are used up.
+ */
+assert.retryNoExcept = function(func, msg, num_attempts) {
+    var safeFunc = _convertExceptionToReturnStatus(func, "assert.retryNoExcept caught exception");
+    assert.retry(safeFunc, msg, num_attempts);
 };
 
 assert.time = function(f, msg, timeout /*ms*/) {
