@@ -95,10 +95,6 @@ public:
                                 const std::string& collectionNs,
                                 std::vector<TagsType>* tags) override;
 
-    StatusWith<std::string> getTagForChunk(OperationContext* txn,
-                                           const std::string& collectionNs,
-                                           const ChunkType& chunk) override;
-
     StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
         OperationContext* txn, repl::ReadConcernLevel readConcern) override;
 

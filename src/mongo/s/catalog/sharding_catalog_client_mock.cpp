@@ -136,12 +136,6 @@ Status ShardingCatalogClientMock::getTagsForCollection(OperationContext* txn,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-StatusWith<string> ShardingCatalogClientMock::getTagForChunk(OperationContext* txn,
-                                                             const string& collectionNs,
-                                                             const ChunkType& chunk) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
-}
-
 StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientMock::getAllShards(
     OperationContext* txn, repl::ReadConcernLevel readConcern) {
     return {ErrorCodes::InternalError, "Method not implemented"};

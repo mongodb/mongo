@@ -1127,42 +1127,6 @@ Status ShardingCatalogClientImpl::getTagsForCollection(OperationContext* txn,
     return Status::OK();
 }
 
-StatusWith<string> ShardingCatalogClientImpl::getTagForChunk(OperationContext* txn,
-                                                             const std::string& collectionNs,
-                                                             const ChunkType& chunk) {
-    BSONObj query =
-        BSON(TagsType::ns(collectionNs) << TagsType::min() << BSON("$lte" << chunk.getMin())
-                                        << TagsType::max()
-                                        << BSON("$gte" << chunk.getMax()));
-    auto findStatus = _exhaustiveFindOnConfig(txn,
-                                              kConfigReadSelector,
-                                              repl::ReadConcernLevel::kMajorityReadConcern,
-                                              NamespaceString(TagsType::ConfigNS),
-                                              query,
-                                              BSONObj(),
-                                              1);
-    if (!findStatus.isOK()) {
-        return findStatus.getStatus();
-    }
-
-    const auto& docs = findStatus.getValue().value;
-    if (docs.empty()) {
-        return string{};
-    }
-
-    invariant(docs.size() == 1);
-    BSONObj tagsDoc = docs.front();
-
-    const auto tagsResult = TagsType::fromBSON(tagsDoc);
-    if (!tagsResult.isOK()) {
-        return {ErrorCodes::FailedToParse,
-                stream() << "error while parsing " << TagsType::ConfigNS << " document: " << tagsDoc
-                         << " : "
-                         << tagsResult.getStatus().toString()};
-    }
-    return tagsResult.getValue().getTag();
-}
-
 StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientImpl::getAllShards(
     OperationContext* txn, repl::ReadConcernLevel readConcern) {
     std::vector<ShardType> shards;

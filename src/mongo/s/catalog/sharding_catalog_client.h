@@ -264,14 +264,6 @@ public:
                                         std::vector<TagsType>* tags) = 0;
 
     /**
-     * Retrieves the most appropriate tag, which overlaps with the specified chunk. If no tags
-     * overlap, returns an empty string.
-     */
-    virtual StatusWith<std::string> getTagForChunk(OperationContext* txn,
-                                                   const std::string& collectionNs,
-                                                   const ChunkType& chunk) = 0;
-
-    /**
      * Retrieves all shards in this sharded cluster.
      * Returns a !OK status if an error occurs.
      */
