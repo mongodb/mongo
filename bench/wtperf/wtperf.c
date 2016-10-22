@@ -2078,6 +2078,11 @@ config_compress(WTPERF *wtperf)
 		wtperf->compress_ext = ZLIB_EXT;
 #endif
 		wtperf->compress_table = ZLIB_BLK;
+	} else if (strcmp(s, "zstd") == 0) {
+#ifndef HAVE_BUILTIN_EXTENSION_ZSTD
+		wtperf->compress_ext = ZSTD_EXT;
+#endif
+		wtperf->compress_table = ZSTD_BLK;
 	} else {
 		fprintf(stderr,
 	    "invalid compression configuration: %s\n", s);

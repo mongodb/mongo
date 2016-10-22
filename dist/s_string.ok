@@ -60,6 +60,7 @@ COVERITY
 CPUs
 CRC
 CSV
+CStream
 CURSORs
 CURSTD
 CallsCustDate
@@ -69,6 +70,7 @@ Checksum
 Checksums
 CityHash
 CloseHandle
+Collet
 Comparator
 Config
 Coverity
@@ -125,6 +127,7 @@ FORALL
 FOREACH
 FS
 FULLFSYNC
+Facebook
 FindClose
 FindFirstFile
 Fixup
@@ -398,6 +401,12 @@ WriteFile
 Wuninitialized
 Wunused
 XP
+Yann
+ZSTD
+Zlib
+Zlib's
+Zstd
+Zstd's
 abcdef
 abcdefghijklmnopqrstuvwxyz
 addl
@@ -515,6 +524,7 @@ collatorp
 comparator
 comparep
 compat
+compressStream
 concat
 cond
 conf
@@ -534,6 +544,7 @@ cp
 cpuid
 crc
 create's
+createCStream
 crypto
 cryptobad
 csv
@@ -626,6 +637,7 @@ emp
 encodings
 encryptor
 encryptors
+endStream
 endian
 english
 enqueue
@@ -753,6 +765,7 @@ infeasible
 inflateInit
 infmt
 init
+initCStream
 initializers
 initn
 initsize
@@ -854,6 +867,7 @@ majorp
 malloc
 marshall
 marshalled
+maxCLevel
 maxcpu
 maxdbs
 mbll
@@ -1233,4 +1247,7 @@ zalloc
 zf
 zfree
 zlib
+zlib's
+zstd
+zstd's
 zu

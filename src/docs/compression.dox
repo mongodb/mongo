@@ -1,7 +1,7 @@
 /*! @m_page{{c,java},compression,Compressors}
 
 This section explains how to configure WiredTiger's builtin support for
-the lz4, snappy and zlib compression engines.
+the lz4, snappy, zlib and zstd compression engines.
 
 @section compression_lz4 Using LZ4 compression
 
@@ -85,10 +85,52 @@ an extension.  For example, with the WiredTiger library installed in
 
 @snippet ex_all.c Configure zlib extension
 
+The default compression level for the zlib compression is
+\c Z_DEFAULT_COMPRESSION (see the zlib documentation for further
+information); compression can be configured to other levels using the
+additional configuration argument \c compression_level.
+
+@snippet ex_all.c Configure zlib extension with compression level
+
 Finally, when creating the WiredTiger object, set \c block_compressor
 to \c zlib:
 
 @snippet ex_all.c Create a zlib compressed table
+
+@section compression_zstd Using Zstd compression
+
+To use the builtin support for Facebook's
+<a href="https://github.com/facebook/zstd">Zstd</a>
+compression, first check that Zstd is installed in include and library
+directories searched by the compiler.  Once Zstd is installed, you can
+enable Zstd using the \c --enable-zstd option to configure.
+
+If Zstd is installed in a location not normally searched by the
+compiler toolchain, you'll need to modify the \c CPPFLAGS and \c LDFLAGS
+to indicate these locations.  For example, with the Zstd includes and
+libraries installed in \c /usr/local/include and \c /usr/local/lib, you
+would run configure with the following additional arguments:
+
+@code
+--enable-zstd CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
+@endcode
+
+When opening the WiredTiger database, load the Zstd shared library as
+an extension.  For example, with the WiredTiger library installed in
+\c /usr/local/lib, you would use the following extension:
+
+@snippet ex_all.c Configure zstd extension
+
+The default compression level for the zstd compression is 3; compression
+can be configured to other levels using the additional configuration
+argument \c compression_level.
+
+@snippet ex_all.c Configure zstd extension with compression level
+
+Finally, when creating the WiredTiger object, set \c block_compressor
+to \c zstd:
+
+@snippet ex_all.c Create a zstd compressed table
 
 @section compression_upgrading Upgrading compression engines
 

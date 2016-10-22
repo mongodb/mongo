@@ -611,6 +611,13 @@ session_ops(WT_SESSION *session)
 	    "block_compressor=zlib,key_format=S,value_format=S");
 	/*! [Create a zlib compressed table] */
 	ret = session->drop(session, "table:mytable", NULL);
+
+	/*! [Create a zstd compressed table] */
+	ret = session->create(session,
+	    "table:mytable",
+	    "block_compressor=zstd,key_format=S,value_format=S");
+	/*! [Create a zstd compressed table] */
+	ret = session->drop(session, "table:mytable", NULL);
 #endif
 
 	/*! [Configure checksums to uncompressed] */
@@ -1105,6 +1112,32 @@ main(void)
 	    "create,"
 	    "extensions=[/usr/local/lib/libwiredtiger_zlib.so]", &conn);
 	/*! [Configure zlib extension] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+
+	/*! [Configure zlib extension with compression level] */
+	ret = wiredtiger_open(home, NULL,
+	    "create,"
+	    "extensions=[/usr/local/lib/"
+	    "libwiredtiger_zlib.so=[config=[compression_level=3]]]", &conn);
+	/*! [Configure zlib extension with compression level] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+
+	/*! [Configure zstd extension] */
+	ret = wiredtiger_open(home, NULL,
+	    "create,"
+	    "extensions=[/usr/local/lib/libwiredtiger_zstd.so]", &conn);
+	/*! [Configure zstd extension] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+
+	/*! [Configure zstd extension with compression level] */
+	ret = wiredtiger_open(home, NULL,
+	    "create,"
+	    "extensions=[/usr/local/lib/"
+	    "libwiredtiger_zstd.so=[config=[compression_level=9]]]", &conn);
+	/*! [Configure zstd extension with compression level] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
 
