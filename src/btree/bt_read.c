@@ -327,24 +327,27 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	if (__wt_hazard_count(session, page) > 1)
 		return (false);
 
+	/* If we can do an in-memory split, do it. */
+	if (__wt_leaf_page_can_split(session, page))
+		return (true);
+	if (page->memory_footprint < btree->maxmempage)
+		return (false);
+
+	/* Bump the oldest ID, we're about to do some visibility checks. */
+	WT_IGNORE_RET(__wt_txn_update_oldest(session, 0));
+
 	/*
 	 * Allow some leeway if the transaction ID isn't moving forward since
 	 * it is unlikely eviction will be able to evict the page. Don't keep
 	 * skipping the page indefinitely or large records can lead to
 	 * extremely large memory footprints.
 	 */
-	if (page->memory_footprint < btree->maxmempage &&
+	if (page->modify->update_restored &&
 	    page->modify->last_eviction_id == __wt_txn_oldest_id(session))
 		return (false);
 
-	if (page->memory_footprint < btree->maxmempage)
-		return (__wt_leaf_page_can_split(session, page));
-
 	/* Trigger eviction on the next page release. */
 	__wt_page_evict_soon(session, ref);
-
-	/* Bump the oldest ID, we're about to do some visibility checks. */
-	WT_IGNORE_RET(__wt_txn_update_oldest(session, 0));
 
 	/* If eviction cannot succeed, don't try. */
 	return (__wt_page_can_evict(session, ref, NULL));
