@@ -187,8 +187,17 @@ config_setup(void)
 	/* Give in-memory configuration a final review. */
 	config_in_memory_check();
 
-	/* Make the default maximum-run length 20 minutes. */
-	if (!config_is_perm("timer"))
+	/*
+	 * Run-length configured by a number of operations and a timer. If the
+	 * operation count and the timer are both set by a configuration, there
+	 * isn't anything to do. If only the operation count was configured,
+	 * set a default maximum-run of 20 minutes. If only the timer is set,
+	 * clear the operations count (which was set randomly).
+	 */
+	if (config_is_perm("timer")) {
+		if (!config_is_perm("ops"))
+			config_single("ops=0", 0);
+	} else
 		config_single("timer=20", 0);
 
 	/*
