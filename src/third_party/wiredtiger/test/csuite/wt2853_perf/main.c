@@ -42,8 +42,6 @@
  * continues until the test ends (~30 seconds).
  */
 
-void (*custom_die)(void) = NULL;
-
 static void *thread_insert(void *);
 static void *thread_get(void *);
 

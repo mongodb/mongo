@@ -31,9 +31,19 @@
 #include <stdlib.h>
 #include <string.h>
 
+/*
+ * We need to include the configuration file to detect whether this extension
+ * is being built into the WiredTiger library; application-loaded compression
+ * functions won't need it.
+ */
 #include <wiredtiger_config.h>
+
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
+
+#ifdef _MSC_VER
+#define	inline	__inline
+#endif
 
 /* Local compressor structure. */
 typedef struct {
@@ -171,8 +181,6 @@ lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	int decoded;
 	uint8_t *dst_tmp;
 
-	(void)src_len;					/* Unused parameters */
-
 	wt_api = ((LZ4_COMPRESSOR *)compressor)->wt_api;
 
 	/*
@@ -183,6 +191,13 @@ lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 #ifdef WORDS_BIGENDIAN
 	lz4_prefix_swap(&prefix);
 #endif
+	if (prefix.compressed_len + sizeof(LZ4_PREFIX) > src_len) {
+		(void)wt_api->err_printf(wt_api,
+		    session,
+		    "WT_COMPRESSOR.decompress: stored size exceeds source "
+		    "size");
+		return (WT_ERROR);
+	}
 
 	/*
 	 * Decompress, starting after the prefix bytes. Use safe decompression:
@@ -267,18 +282,24 @@ lz4_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
     size_t *result_lenp, uint32_t *result_slotsp)
 {
 	LZ4_PREFIX prefix;
-	int lz4_len;
 	uint32_t slot;
-	int sourceSize, targetDestSize;
+	int lz4_len, sourceSize, targetDestSize;
 
 	(void)compressor;				/* Unused parameters */
 	(void)session;
 	(void)split_pct;
 	(void)final;
 
-	sourceSize = (int)offsets[slots];		/* Type conversion */
-	targetDestSize =
-	    (int)((dst_len < page_max ? dst_len : page_max) - extra);
+	/*
+	 * Set the source and target sizes. The target size is complicated: we
+	 * don't want to exceed the smaller of the maximum page size or the
+	 * destination buffer length, and in both cases we have to take into
+	 * account the space for our overhead and the extra bytes required by
+	 * our caller.
+	 */
+	sourceSize = (int)offsets[slots];
+	targetDestSize = (int)(page_max < dst_len ? page_max : dst_len);
+	targetDestSize -= (int)(sizeof(LZ4_PREFIX) + extra);
 
 	/* Compress, starting after the prefix bytes. */
 	lz4_len = LZ4_compress_destSize((const char *)src,
@@ -352,7 +373,7 @@ lz4_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
  *	Add a LZ4 compressor.
  */
 static int
-lz_add_compressor(WT_CONNECTION *connection, int raw, const char *name)
+lz_add_compressor(WT_CONNECTION *connection, bool raw, const char *name)
 {
 	LZ4_COMPRESSOR *lz4_compressor;
 
@@ -391,9 +412,9 @@ lz4_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 
 	(void)config;    				/* Unused parameters */
 
-	if ((ret = lz_add_compressor(connection, 1, "lz4")) != 0)
+	if ((ret = lz_add_compressor(connection, true, "lz4")) != 0)
 		return (ret);
-	if ((ret = lz_add_compressor(connection, 0, "lz4-noraw")) != 0)
+	if ((ret = lz_add_compressor(connection, false, "lz4-noraw")) != 0)
 		return (ret);
 	return (0);
 }

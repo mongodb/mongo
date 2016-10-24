@@ -354,7 +354,7 @@ __curstat_conn_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 	 */
 	__wt_conn_stat_init(session);
 	__wt_stat_connection_aggregate(conn->stats, &cst->u.conn_stats);
-	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
+	if (F_ISSET(cst, WT_STAT_CLEAR))
 		__wt_stat_connection_clear_all(conn->stats);
 
 	cst->stats = (int64_t *)&cst->u.conn_stats;
@@ -380,7 +380,7 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 	 * If we are only getting the size of the file, we don't need to open
 	 * the tree.
 	 */
-	if (F_ISSET(cst, WT_CONN_STAT_SIZE)) {
+	if (F_ISSET(cst, WT_STAT_TYPE_SIZE)) {
 		filename = uri;
 		if (!WT_PREFIX_SKIP(filename, "file:"))
 			return (EINVAL);
@@ -401,7 +401,7 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 	if ((ret = __wt_btree_stat_init(session, cst)) == 0) {
 		__wt_stat_dsrc_init_single(&cst->u.dsrc_stats);
 		__wt_stat_dsrc_aggregate(dhandle->stats, &cst->u.dsrc_stats);
-		if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
+		if (F_ISSET(cst, WT_STAT_CLEAR))
 			__wt_stat_dsrc_clear_all(dhandle->stats);
 		__wt_curstat_dsrc_final(cst);
 	}
@@ -604,50 +604,79 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	if ((ret = __wt_config_gets(session, cfg, "statistics", &cval)) == 0) {
 		if ((ret = __wt_config_subgets(
 		    session, &cval, "all", &sval)) == 0 && sval.val != 0) {
-			if (!FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ALL))
+			if (!FLD_ISSET(conn->stat_flags, WT_STAT_TYPE_ALL))
 				goto config_err;
-			F_SET(cst, WT_CONN_STAT_ALL | WT_CONN_STAT_FAST);
+			F_SET(cst, WT_STAT_TYPE_ALL | WT_STAT_TYPE_CACHE_WALK |
+			    WT_STAT_TYPE_FAST | WT_STAT_TYPE_TREE_WALK);
 		}
 		WT_ERR_NOTFOUND_OK(ret);
 		if ((ret = __wt_config_subgets(
 		    session, &cval, "fast", &sval)) == 0 && sval.val != 0) {
-			if (F_ISSET(cst, WT_CONN_STAT_ALL))
+			if (F_ISSET(cst, WT_STAT_TYPE_ALL))
 				WT_ERR_MSG(session, EINVAL,
-				    "only one statistics configuration value "
-				    "may be specified");
-			F_SET(cst, WT_CONN_STAT_FAST);
+				    "Only one of all, fast, none "
+				    "configuration values should be specified");
+			F_SET(cst, WT_STAT_TYPE_FAST);
 		}
 		WT_ERR_NOTFOUND_OK(ret);
+
+		if ((ret = __wt_config_subgets(session,
+		    &cval, "cache_walk", &sval)) == 0 && sval.val != 0) {
+			/*
+			 * Configuring cache walk statistics implies fast
+			 * statistics. Keep that knowledge internal for now -
+			 * it may change in the future.
+			 */
+			F_SET(cst, WT_STAT_TYPE_CACHE_WALK | WT_STAT_TYPE_FAST);
+		}
+		WT_ERR_NOTFOUND_OK(ret);
+
+		if ((ret = __wt_config_subgets(session,
+		    &cval, "tree_walk", &sval)) == 0 && sval.val != 0) {
+			/*
+			 * Configuring tree walk statistics implies fast
+			 * statistics. Keep that knowledge internal for now -
+			 * it may change in the future.
+			 */
+			F_SET(cst, WT_STAT_TYPE_FAST | WT_STAT_TYPE_TREE_WALK);
+		}
+		WT_ERR_NOTFOUND_OK(ret);
+
 		if ((ret = __wt_config_subgets(
 		    session, &cval, "size", &sval)) == 0 && sval.val != 0) {
-			if (F_ISSET(cst, WT_CONN_STAT_FAST | WT_CONN_STAT_ALL))
+			if (F_ISSET(cst, WT_STAT_TYPE_FAST | WT_STAT_TYPE_ALL))
 				WT_ERR_MSG(session, EINVAL,
-				    "only one statistics configuration value "
-				    "may be specified");
-			F_SET(cst, WT_CONN_STAT_SIZE);
+				    "Only one of all, fast, none "
+				    "configuration values should be specified");
+			F_SET(cst, WT_STAT_TYPE_SIZE);
 		}
 		WT_ERR_NOTFOUND_OK(ret);
 		if ((ret = __wt_config_subgets(
 		    session, &cval, "clear", &sval)) == 0 && sval.val != 0) {
-			if (F_ISSET(cst, WT_CONN_STAT_SIZE))
+			if (F_ISSET(cst, WT_STAT_TYPE_SIZE))
 				WT_ERR_MSG(session, EINVAL,
 				    "clear is incompatible with size "
 				    "statistics");
-			F_SET(cst, WT_CONN_STAT_CLEAR);
+			F_SET(cst, WT_STAT_CLEAR);
 		}
 		WT_ERR_NOTFOUND_OK(ret);
 
 		/* If no configuration, use the connection's configuration. */
 		if (cst->flags == 0) {
-			if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ALL))
-				F_SET(cst, WT_CONN_STAT_ALL);
-			if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_FAST))
-				F_SET(cst, WT_CONN_STAT_FAST);
+			if (FLD_ISSET(conn->stat_flags, WT_STAT_TYPE_ALL))
+				F_SET(cst, WT_STAT_TYPE_ALL);
+			if (FLD_ISSET(
+			    conn->stat_flags, WT_STAT_TYPE_CACHE_WALK))
+				F_SET(cst, WT_STAT_TYPE_CACHE_WALK);
+			if (FLD_ISSET(conn->stat_flags, WT_STAT_TYPE_FAST))
+				F_SET(cst, WT_STAT_TYPE_FAST);
+			if (FLD_ISSET(conn->stat_flags, WT_STAT_TYPE_TREE_WALK))
+				F_SET(cst, WT_STAT_TYPE_TREE_WALK);
 		}
 
 		/* If the connection configures clear, so do we. */
-		if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_CLEAR))
-			F_SET(cst, WT_CONN_STAT_CLEAR);
+		if (FLD_ISSET(conn->stat_flags, WT_STAT_CLEAR))
+			F_SET(cst, WT_STAT_CLEAR);
 	}
 
 	/*
@@ -670,9 +699,9 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 
 	/*
 	 * Do the initial statistics snapshot: there won't be cursor operations
-	 * to trigger initialization when aggregating statistics for upper-level
-	 * objects like tables, we need to a valid set of statistics when before
-	 * the open returns.
+	 * to trigger initialization with aggregating statistics for upper-level
+	 * objects like tables so we need a valid set of statistics before the
+	 * open returns.
 	 */
 	WT_ERR(__wt_curstat_init(session, uri, other, cst->cfg, cst));
 	cst->notinitialized = false;

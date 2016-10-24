@@ -171,6 +171,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
     uint8_t *addr, size_t *addr_sizep,
     bool checkpoint, bool checkpoint_io, bool compressed)
 {
+	struct timespec start, stop;
 	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_DECL_ITEM(ctmp);
@@ -356,12 +357,22 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		data_checksum = !compressed;
 		break;
 	}
+	if (!F_ISSET(session, WT_SESSION_INTERNAL))
+		__wt_epoch(session, &start);
 
 	/* Call the block manager to write the block. */
 	WT_ERR(checkpoint ?
 	    bm->checkpoint(bm, session, ip, btree->ckpt, data_checksum) :
 	    bm->write(
 	    bm, session, ip, addr, addr_sizep, data_checksum, checkpoint_io));
+
+	/* Update some statistics now that the write is done */
+	if (!F_ISSET(session, WT_SESSION_INTERNAL)) {
+		__wt_epoch(session, &stop);
+		WT_STAT_CONN_INCR(session, cache_write_app_count);
+		WT_STAT_CONN_INCRV(session, cache_write_app_time,
+		    WT_TIMEDIFF_US(stop, start));
+	}
 
 	WT_STAT_CONN_INCR(session, cache_write);
 	WT_STAT_DATA_INCR(session, cache_write);

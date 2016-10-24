@@ -52,8 +52,6 @@
  * of inserts set low as a default.
  */
 
-void (*custom_die)(void) = NULL;
-
 #define	N_RECORDS	10000
 #define	N_INSERT	500000
 #define	N_INSERT_THREAD	2

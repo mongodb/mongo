@@ -485,6 +485,38 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __wt_tree_modify_set --
+ *	Mark the tree dirty.
+ */
+static inline void
+__wt_tree_modify_set(WT_SESSION_IMPL *session)
+{
+	/*
+	 * Test before setting the dirty flag, it's a hot cache line.
+	 *
+	 * The tree's modified flag is cleared by the checkpoint thread: set it
+	 * and insert a barrier before dirtying the page.  (I don't think it's
+	 * a problem if the tree is marked dirty with all the pages clean, it
+	 * might result in an extra checkpoint that doesn't do any work but it
+	 * shouldn't cause problems; regardless, let's play it safe.)
+	 */
+	if (!S2BT(session)->modified) {
+		/* Assert we never dirty a checkpoint handle. */
+		WT_ASSERT(session, session->dhandle->checkpoint == NULL);
+
+		S2BT(session)->modified = true;
+		WT_FULL_BARRIER();
+	}
+
+	/*
+	 * The btree may already be marked dirty while the connection is still
+	 * clean; mark the connection dirty outside the test of the btree state.
+	 */
+	if (!S2C(session)->modified)
+		S2C(session)->modified = true;
+}
+
+/*
  * __wt_page_modify_clear --
  *	Clean a modified page.
  */
@@ -513,30 +545,9 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/*
 	 * Mark the tree dirty (even if the page is already marked dirty), newly
 	 * created pages to support "empty" files are dirty, but the file isn't
-	 * marked dirty until there's a real change needing to be written. Test
-	 * before setting the dirty flag, it's a hot cache line.
-	 *
-	 * The tree's modified flag is cleared by the checkpoint thread: set it
-	 * and insert a barrier before dirtying the page.  (I don't think it's
-	 * a problem if the tree is marked dirty with all the pages clean, it
-	 * might result in an extra checkpoint that doesn't do any work but it
-	 * shouldn't cause problems; regardless, let's play it safe.)
+	 * marked dirty until there's a real change needing to be written.
 	 */
-	if (!S2BT(session)->modified) {
-		/* Assert we never dirty a checkpoint handle. */
-		WT_ASSERT(session, session->dhandle->checkpoint == NULL);
-
-		S2BT(session)->modified = true;
-		WT_FULL_BARRIER();
-	}
-
-	/*
-	 * There is a possibility of btree being dirty whereas connection being
-	 * clean when entering this function. So make sure to update connection
-	 * to dirty outside a condition on btree modified flag.
-	 */
-	if (!S2C(session)->modified)
-		S2C(session)->modified = true;
+	__wt_tree_modify_set(session);
 
 	__wt_page_only_modify_set(session, page);
 }
@@ -1167,7 +1178,37 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * There is no point doing an in-memory split unless there is a lot of
 	 * data in the last skiplist on the page.  Split if there are enough
 	 * items and the skiplist does not fit within a single disk page.
-	 *
+	 */
+
+	ins_head = page->type == WT_PAGE_ROW_LEAF ?
+	    (page->pg_row_entries == 0 ?
+	    WT_ROW_INSERT_SMALLEST(page) :
+	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1)) :
+	    WT_COL_APPEND(page);
+	if (ins_head == NULL)
+		return (false);
+
+	/*
+	 * In the extreme case, where the page is much larger than the maximum
+	 * size, split as soon as there are 5 items on the page.
+	 */
+#define	WT_MAX_SPLIT_COUNT	5
+	if (page->memory_footprint > btree->maxleafpage * 2) {
+		for (count = 0, ins = ins_head->head[0];
+		    ins != NULL;
+		    ins = ins->next[0]) {
+			if (++count < WT_MAX_SPLIT_COUNT)
+				continue;
+
+			WT_STAT_CONN_INCR(session, cache_inmem_splittable);
+			WT_STAT_DATA_INCR(session, cache_inmem_splittable);
+			return (true);
+		}
+
+		return (false);
+	}
+
+	/*
 	 * Rather than scanning the whole list, walk a higher level, which
 	 * gives a sample of the items -- at level 0 we have all the items, at
 	 * level 1 we have 1/4 and at level 2 we have 1/16th.  If we see more
@@ -1177,15 +1218,9 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 #define	WT_MIN_SPLIT_COUNT	30
 #define	WT_MIN_SPLIT_MULTIPLIER 16      /* At level 2, we see 1/16th entries */
 
-	ins_head = page->type == WT_PAGE_ROW_LEAF ?
-	    (page->pg_row_entries == 0 ?
-	    WT_ROW_INSERT_SMALLEST(page) :
-	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1)) :
-	    WT_COL_APPEND(page);
-	if (ins_head == NULL)
-		return (false);
 	for (count = 0, size = 0, ins = ins_head->head[WT_MIN_SPLIT_DEPTH];
-	    ins != NULL; ins = ins->next[WT_MIN_SPLIT_DEPTH]) {
+	    ins != NULL;
+	    ins = ins->next[WT_MIN_SPLIT_DEPTH]) {
 		count += WT_MIN_SPLIT_MULTIPLIER;
 		size += WT_MIN_SPLIT_MULTIPLIER *
 		    (WT_INSERT_KEY_SIZE(ins) + WT_UPDATE_MEMSIZE(ins->upd));

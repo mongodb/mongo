@@ -187,8 +187,17 @@ config_setup(void)
 	/* Give in-memory configuration a final review. */
 	config_in_memory_check();
 
-	/* Make the default maximum-run length 20 minutes. */
-	if (!config_is_perm("timer"))
+	/*
+	 * Run-length configured by a number of operations and a timer. If the
+	 * operation count and the timer are both set by a configuration, there
+	 * isn't anything to do. If only the operation count was configured,
+	 * set a default maximum-run of 20 minutes. If only the timer is set,
+	 * clear the operations count (which was set randomly).
+	 */
+	if (config_is_perm("timer")) {
+		if (!config_is_perm("ops"))
+			config_single("ops=0", 0);
+	} else
 		config_single("timer=20", 0);
 
 	/*
@@ -270,28 +279,33 @@ config_compression(const char *conf_name)
 	 */
 	switch (mmrand(NULL, 1, 20)) {
 #ifdef HAVE_BUILTIN_EXTENSION_LZ4
-	case 1: case 2: case 3: case 4:		/* 20% lz4 */
+	case 1: case 2:				/* 10% lz4 */
 		cstr = "lz4";
 		break;
-	case 5:					/* 5% lz4-no-raw */
+	case 3:					/* 5% lz4-no-raw */
 		cstr = "lz4-noraw";
 		break;
 #endif
 #ifdef HAVE_BUILTIN_EXTENSION_SNAPPY
-	case 6: case 7: case 8: case 9:		/* 30% snappy */
-	case 10: case 11:
+	case 4: case 5: case 6: case 7:		/* 30% snappy */
+	case 8: case 9:
 		cstr = "snappy";
 		break;
 #endif
 #ifdef HAVE_BUILTIN_EXTENSION_ZLIB
-	case 12: case 13: case 14: case 15:	/* 20% zlib */
+	case 10: case 11: case 12: case 13:	/* 20% zlib */
 		cstr = "zlib";
 		break;
-	case 16:				/* 5% zlib-no-raw */
+	case 14:				/* 5% zlib-no-raw */
 		cstr = "zlib-noraw";
 		break;
 #endif
-	case 17: case 18: case 19: case 20:	/* 20% no compression */
+#ifdef HAVE_BUILTIN_EXTENSION_ZSTD
+	case 15: case 16 case 17:		/* 15% zstd */
+		cstr = "zstd";
+		break;
+#endif
+	case 18: case 19: case 20:		/* 15% no compression */
 	default:
 		break;
 	}
@@ -748,6 +762,8 @@ config_map_compression(const char *s, u_int *vp)
 		*vp = COMPRESS_ZLIB;
 	else if (strcmp(s, "zlib-noraw") == 0)
 		*vp = COMPRESS_ZLIB_NO_RAW;
+	else if (strcmp(s, "zstd") == 0)
+		*vp = COMPRESS_ZSTD;
 	else
 		testutil_die(EINVAL,
 		    "illegal compression configuration: %s", s);

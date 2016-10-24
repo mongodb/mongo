@@ -54,6 +54,9 @@ typedef struct __truncate_queue_entry TRUNCATE_QUEUE_ENTRY;
 #define	ZLIB_BLK BLKCMP_PFX "zlib"
 #define	ZLIB_EXT							\
 	EXT_PFX EXTPATH "zlib/.libs/libwiredtiger_zlib.so" EXT_SFX
+#define	ZSTD_BLK BLKCMP_PFX "zstd"
+#define	ZSTD_EXT							\
+	EXT_PFX EXTPATH "zstd/.libs/libwiredtiger_zstd.so" EXT_SFX
 
 typedef struct {
 	int64_t threads;		/* Thread count */

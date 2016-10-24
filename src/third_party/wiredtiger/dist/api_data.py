@@ -136,8 +136,8 @@ file_config = format_meta + [
         configure a compressor for file blocks.  Permitted values are \c "none"
         or custom compression engine name created with
         WT_CONNECTION::add_compressor.  If WiredTiger has builtin support for
-        \c "snappy", \c "lz4" or \c "zlib" compression, these names are also
-        available.  See @ref compression for more information'''),
+        \c "lz4", \c "snappy", \c "zlib" or \c "zstd" compression, these names
+        are also available.  See @ref compression for more information'''),
     Config('cache_resident', 'false', r'''
         do not ever evict the object's pages from cache. Not compatible with
         LSM tables; see @ref tuning_cache_resident for more information''',
@@ -502,7 +502,8 @@ connection_runtime_config = [
         is used to gather statistics, as well as each time statistics
         are logged using the \c statistics_log configuration.  See
         @ref statistics for more information''',
-        type='list', choices=['all', 'fast', 'none', 'clear']),
+        type='list',
+        choices=['all', 'cache_walk', 'fast', 'none', 'clear', 'tree_walk']),
     Config('verbose', '', r'''
         enable messages for various events. Only available if WiredTiger
         is configured with --enable-verbose. Options are given as a
@@ -569,8 +570,9 @@ wiredtiger_open_log_configuration = [
             configure a compressor for log records.  Permitted values are
             \c "none" or custom compression engine name created with
             WT_CONNECTION::add_compressor.  If WiredTiger has builtin support
-            for \c "snappy", \c "lz4" or \c "zlib" compression, these names
-            are also available. See @ref compression for more information'''),
+            for \c "lz4", \c "snappy", \c "zlib" or \c "zstd" compression,
+            these names are also available. See @ref compression for more
+            information'''),
         Config('file_max', '100MB', r'''
             the maximum size of log files''',
             min='100KB', max='2GB'),
@@ -976,7 +978,8 @@ methods = {
         gathering them, where appropriate (for example, a cache size statistic
         is not cleared, while the count of cursor insert operations will be
         cleared).  See @ref statistics for more information''',
-        type='list', choices=['all', 'fast', 'clear', 'size']),
+        type='list',
+        choices=['all', 'cache_walk', 'fast', 'clear', 'size', 'tree_walk']),
     Config('target', '', r'''
         if non-empty, backup the list of objects; valid only for a
         backup data source''',

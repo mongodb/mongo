@@ -32,8 +32,6 @@
  * Test case description: Smoke-test the CRC.
  */
 
-void (*custom_die)(void) = NULL;
-
 static inline void
 check(uint32_t hw, uint32_t sw, size_t len, const char *msg)
 {

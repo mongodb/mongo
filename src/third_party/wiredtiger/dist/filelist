@@ -90,6 +90,7 @@ src/cursor/cur_table.c
 src/evict/evict_file.c
 src/evict/evict_lru.c
 src/evict/evict_page.c
+src/evict/evict_stat.c
 src/log/log.c
 src/log/log_auto.c
 src/log/log_slot.c

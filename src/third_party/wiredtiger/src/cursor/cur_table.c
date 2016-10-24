@@ -757,13 +757,36 @@ err:	API_END_RET(session, ret);
 }
 
 /*
+ * __curtable_complete --
+ *	Return failure if the table is not yet fully created.
+ */
+static int
+__curtable_complete(WT_SESSION_IMPL *session, WT_TABLE *table)
+{
+	WT_DECL_RET;
+	bool complete;
+
+	if (table->cg_complete)
+		return (0);
+
+	/* If the table is incomplete, wait on the table lock and recheck. */
+	complete = false;
+	WT_WITH_TABLE_LOCK(session, ret, complete = table->cg_complete);
+	WT_RET(ret);
+	if (!complete)
+		WT_RET_MSG(session, EINVAL,
+		    "'%s' not available until all column groups are created",
+		    table->name);
+	return (0);
+}
+
+/*
  * __curtable_open_colgroups --
  *	Open cursors on column groups for a table cursor.
  */
 static int
 __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 {
-	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	WT_TABLE *table;
 	WT_CURSOR **cp;
@@ -775,21 +798,11 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 		cfg_arg[0], cfg_arg[1], "dump=\"\",readonly=0", NULL, NULL
 	};
 	u_int i;
-	bool complete;
 
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
 	table = ctable->table;
 
-	/* If the table is incomplete, wait on the table lock and recheck. */
-	complete = table->cg_complete;
-	if (!complete) {
-		WT_WITH_TABLE_LOCK(session, ret, complete = table->cg_complete);
-		WT_RET(ret);
-	}
-	if (!complete)
-		WT_RET_MSG(session, EINVAL,
-		    "Can't use '%s' until all column groups are created",
-		    table->name);
+	WT_RET(__curtable_complete(session, table));	/* completeness check */
 
 	WT_RET(__wt_calloc_def(session,
 	    WT_COLGROUPS(table), &ctable->cg_cursors));
@@ -886,6 +899,8 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	else
 		size = WT_PTRDIFF(columns, tablename);
 	WT_RET(__wt_schema_get_table(session, tablename, size, false, &table));
+
+	WT_RET(__curtable_complete(session, table));	/* completeness check */
 
 	if (table->is_simple) {
 		/* Just return a cursor on the underlying data source. */

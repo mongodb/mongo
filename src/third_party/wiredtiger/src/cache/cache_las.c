@@ -49,7 +49,7 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
 	 * don't have to worry about users seeing inconsistent data source
 	 * information.
 	 */
-	if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_CLEAR)) {
+	if (FLD_ISSET(conn->stat_flags, WT_STAT_CLEAR)) {
 		WT_STAT_SET(session, dstats, cursor_insert, 0);
 		WT_STAT_SET(session, dstats, cursor_remove, 0);
 	}

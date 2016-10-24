@@ -19,10 +19,12 @@ AH_TEMPLATE(HAVE_BUILTIN_EXTENSION_SNAPPY,
 	    [Snappy support automatically loaded.])
 AH_TEMPLATE(HAVE_BUILTIN_EXTENSION_ZLIB,
 	    [Zlib support automatically loaded.])
+AH_TEMPLATE(HAVE_BUILTIN_EXTENSION_ZSTD,
+	    [ZSTD support automatically loaded.])
 AC_MSG_CHECKING(if --with-builtins option specified)
 AC_ARG_WITH(builtins,
 	[AS_HELP_STRING([--with-builtins],
-	    [builtin extension names (lz4, snappy, zlib).])],
+	    [builtin extension names (lz4, snappy, zlib, zstd).])],
 	    [with_builtins=$withval],
 	    [with_builtins=])
 
@@ -36,6 +38,8 @@ for builtin_i in $builtin_list; do
 		wt_cv_with_builtin_extension_snappy=yes;;
 	zlib)	AC_DEFINE(HAVE_BUILTIN_EXTENSION_ZLIB)
 		wt_cv_with_builtin_extension_zlib=yes;;
+	zstd)	AC_DEFINE(HAVE_BUILTIN_EXTENSION_ZSTD)
+		wt_cv_with_builtin_extension_zstd=yes;;
 	*)	AC_MSG_ERROR([Unknown builtin extension "$builtin_i"]);;
 	esac
 done
@@ -45,6 +49,8 @@ AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_SNAPPY],
     [test "$wt_cv_with_builtin_extension_snappy" = "yes"])
 AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_ZLIB],
     [test "$wt_cv_with_builtin_extension_zlib" = "yes"])
+AM_CONDITIONAL([HAVE_BUILTIN_EXTENSION_ZSTD],
+    [test "$wt_cv_with_builtin_extension_zstd" = "yes"])
 AC_MSG_RESULT($with_builtins)
 
 AH_TEMPLATE(
@@ -275,5 +281,31 @@ if test "$wt_cv_enable_zlib" = "yes"; then
 	    [AC_MSG_ERROR([--enable-zlib requires zlib library])])
 fi
 AM_CONDITIONAL([ZLIB], [test "$wt_cv_enable_zlib" = "yes"])
+
+AC_MSG_CHECKING(if --enable-zstd option specified)
+AC_ARG_ENABLE(zstd,
+	[AS_HELP_STRING([--enable-zstd],
+	    [Build the zstd compressor extension.])], r=$enableval, r=no)
+case "$r" in
+no)	if test "$wt_cv_with_builtin_extension_zstd" = "yes"; then
+		wt_cv_enable_zstd=yes
+	else
+		wt_cv_enable_zstd=no
+	fi
+	;;
+*)	if test "$wt_cv_with_builtin_extension_zstd" = "yes"; then
+		AC_MSG_ERROR(
+		   [Only one of --enable-zstd --with-builtins=zstd allowed])
+	fi
+	wt_cv_enable_zstd=yes;;
+esac
+AC_MSG_RESULT($wt_cv_enable_zstd)
+if test "$wt_cv_enable_zstd" = "yes"; then
+	AC_CHECK_HEADER(zstd.h,,
+	    [AC_MSG_ERROR([--enable-zstd requires zstd.h])])
+	AC_CHECK_LIB(zstd, ZSTD_compress,,
+	    [AC_MSG_ERROR([--enable-zstd requires Zstd library])])
+fi
+AM_CONDITIONAL([ZSTD], [test "$wt_cv_enable_zstd" = "yes"])
 
 ])

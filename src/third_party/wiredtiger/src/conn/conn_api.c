@@ -789,14 +789,17 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 	return (&conn->extension_api);
 }
 
+#ifdef HAVE_BUILTIN_EXTENSION_LZ4
+	extern int lz4_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
+#endif
 #ifdef HAVE_BUILTIN_EXTENSION_SNAPPY
 	extern int snappy_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
 #endif
 #ifdef HAVE_BUILTIN_EXTENSION_ZLIB
 	extern int zlib_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
 #endif
-#ifdef HAVE_BUILTIN_EXTENSION_LZ4
-	extern int lz4_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
+#ifdef HAVE_BUILTIN_EXTENSION_ZSTD
+	extern int zstd_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
 #endif
 
 /*
@@ -808,14 +811,17 @@ __conn_load_default_extensions(WT_CONNECTION_IMPL *conn)
 {
 	WT_UNUSED(conn);
 
+#ifdef HAVE_BUILTIN_EXTENSION_LZ4
+	WT_RET(lz4_extension_init(&conn->iface, NULL));
+#endif
 #ifdef HAVE_BUILTIN_EXTENSION_SNAPPY
 	WT_RET(snappy_extension_init(&conn->iface, NULL));
 #endif
 #ifdef HAVE_BUILTIN_EXTENSION_ZLIB
 	WT_RET(zlib_extension_init(&conn->iface, NULL));
 #endif
-#ifdef HAVE_BUILTIN_EXTENSION_LZ4
-	WT_RET(lz4_extension_init(&conn->iface, NULL));
+#ifdef HAVE_BUILTIN_EXTENSION_ZSTD
+	WT_RET(zstd_extension_init(&conn->iface, NULL));
 #endif
 	return (0);
 }
@@ -1668,31 +1674,59 @@ __conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	if ((ret = __wt_config_subgets(
 	    session, &cval, "fast", &sval)) == 0 && sval.val != 0) {
-		LF_SET(WT_CONN_STAT_FAST);
+		LF_SET(WT_STAT_TYPE_FAST);
 		++set;
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	if ((ret = __wt_config_subgets(
 	    session, &cval, "all", &sval)) == 0 && sval.val != 0) {
-		LF_SET(WT_CONN_STAT_ALL | WT_CONN_STAT_FAST);
+		LF_SET(
+		    WT_STAT_TYPE_ALL | WT_STAT_TYPE_CACHE_WALK |
+		    WT_STAT_TYPE_FAST | WT_STAT_TYPE_TREE_WALK);
 		++set;
-	}
-	WT_RET_NOTFOUND_OK(ret);
-
-	if ((ret = __wt_config_subgets(
-	    session, &cval, "clear", &sval)) == 0 && sval.val != 0) {
-		if (!LF_ISSET(WT_CONN_STAT_FAST | WT_CONN_STAT_ALL))
-			WT_RET_MSG(session, EINVAL,
-			    "the value \"clear\" can be specified only if "
-			    "either \"all\" or \"fast\" is specified");
-		LF_SET(WT_CONN_STAT_CLEAR);
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	if (set > 1)
 		WT_RET_MSG(session, EINVAL,
-		    "only one statistics configuration value may be specified");
+		    "Only one of all, fast, none configuration values should "
+		    "be specified");
+
+	/*
+	 * Now that we've parsed general statistics categories, process
+	 * sub-categories.
+	 */
+	if ((ret = __wt_config_subgets(
+	    session, &cval, "cache_walk", &sval)) == 0 && sval.val != 0)
+		/*
+		 * Configuring cache walk statistics implies fast statistics.
+		 * Keep that knowledge internal for now - it may change in the
+		 * future.
+		 */
+		LF_SET(WT_STAT_TYPE_FAST | WT_STAT_TYPE_CACHE_WALK);
+	WT_RET_NOTFOUND_OK(ret);
+
+	if ((ret = __wt_config_subgets(
+	    session, &cval, "tree_walk", &sval)) == 0 && sval.val != 0)
+		/*
+		 * Configuring tree walk statistics implies fast statistics.
+		 * Keep that knowledge internal for now - it may change in the
+		 * future.
+		 */
+		LF_SET(WT_STAT_TYPE_FAST | WT_STAT_TYPE_TREE_WALK);
+	WT_RET_NOTFOUND_OK(ret);
+
+	if ((ret = __wt_config_subgets(
+	    session, &cval, "clear", &sval)) == 0 && sval.val != 0) {
+		if (!LF_ISSET(WT_STAT_TYPE_ALL | WT_STAT_TYPE_CACHE_WALK |
+		    WT_STAT_TYPE_FAST | WT_STAT_TYPE_TREE_WALK))
+			WT_RET_MSG(session, EINVAL,
+			    "the value \"clear\" can only be specified if "
+			    "statistics are enabled");
+		LF_SET(WT_STAT_CLEAR);
+	}
+	WT_RET_NOTFOUND_OK(ret);
 
 	/* Configuring statistics clears any existing values. */
 	conn->stat_flags = flags;
@@ -1943,6 +1977,42 @@ __conn_chk_file_system(WT_SESSION_IMPL *session, bool readonly)
 }
 
 /*
+ * wiredtiger_dummy_session_init --
+ *	Initialize the connection's dummy session.
+ */
+static void
+wiredtiger_dummy_session_init(
+    WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler)
+{
+	WT_SESSION_IMPL *session;
+
+	session = &conn->dummy_session;
+
+	/*
+	 * We use a fake session until we can allocate and initialize the real
+	 * ones. Initialize the necessary fields (unfortunately, the fields we
+	 * initialize have been selected by core dumps, we need to do better).
+	 */
+	session->iface.connection = &conn->iface;
+	session->name = "wiredtiger_open";
+
+	/* Standard I/O and error handling first. */
+	__wt_os_stdio(session);
+	__wt_event_handler_set(session, event_handler);
+
+	/* Statistics */
+	session->stat_bucket = 0;
+
+	/*
+	 * Set the default session's strerror method. If one of the extensions
+	 * being loaded reports an error via the WT_EXTENSION_API strerror
+	 * method, but doesn't supply that method a WT_SESSION handle, we'll
+	 * use the WT_CONNECTION_IMPL's default session and its strerror method.
+	 */
+	session->iface.strerror = __wt_session_strerror;
+}
+
+/*
  * wiredtiger_open --
  *	Main library entry point: open a new connection to a WiredTiger
  *	database.
@@ -2013,21 +2083,11 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	TAILQ_INSERT_TAIL(&__wt_process.connqh, conn, q);
 	__wt_spin_unlock(NULL, &__wt_process.spinlock);
 
-	session = conn->default_session = &conn->dummy_session;
-	session->iface.connection = &conn->iface;
-	session->name = "wiredtiger_open";
-
-	/* Do standard I/O and error handling first. */
-	__wt_os_stdio(session);
-	__wt_event_handler_set(session, event_handler);
-
 	/*
-	 * Set the default session's strerror method. If one of the extensions
-	 * being loaded reports an error via the WT_EXTENSION_API strerror
-	 * method, but doesn't supply that method a WT_SESSION handle, we'll
-	 * use the WT_CONNECTION_IMPL's default session and its strerror method.
+	 * Initialize the fake session used until we can create real sessions.
 	 */
-	conn->default_session->iface.strerror = __wt_session_strerror;
+	wiredtiger_dummy_session_init(conn, event_handler);
+	session = conn->default_session = &conn->dummy_session;
 
 	/* Basic initialization of the connection structure. */
 	WT_ERR(__wt_connection_init(conn));
