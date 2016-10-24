@@ -371,8 +371,7 @@ retry:		/* If we reached our maximum reserve, quit. */
 		ret = 0;
 	}
 
-err:	if (zs != NULL &&
-	    (tret = deflateEnd(zs)) != Z_OK && tret != Z_DATA_ERROR)
+err:	if ((tret = deflateEnd(zs)) != Z_OK && tret != Z_DATA_ERROR)
 		ret = zlib_error(compressor, session, "deflateEnd", tret);
 	if (last_zs != NULL &&
 	    (tret = deflateEnd(last_zs)) != Z_OK && tret != Z_DATA_ERROR)
