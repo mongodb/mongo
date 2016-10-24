@@ -279,17 +279,12 @@ protected:
             newConnList.push_back(newConn);
         }
 
-        const uint64_t oldCreationTime = curTimeMicros64();
-
-        uint64_t validConnCount = 0;
+        std::set<long long> connIds;
         for (vector<ScopedDbConnection*>::iterator iter = newConnList.begin();
              iter != newConnList.end();
              ++iter) {
 
-            if ((*iter)->get()->isStillConnected()) {
-                validConnCount++;
-            }
-            // Connection(s) could still go bad after this point and cause the test to fail.
+            connIds.insert((*iter)->get()->getConnectionId());
 
             (*iter)->done();
             delete *iter;
@@ -297,16 +292,18 @@ protected:
 
         newConnList.clear();
 
-        uint64_t reusedConnCount = 0;
-        // Check that valid connections created after the purge were put back to the pool.
+        // Check that connections created after the purge were put back to the pool.
+        int notReusedConns = 0;
+        int prevNumBadConns = globalConnPool.getNumBadConns(TARGET_HOST);
         for (size_t x = 0; x < newConnsToCreate; x++) {
             ScopedDbConnection* newConn = new ScopedDbConnection(TARGET_HOST);
-            if (newConn->get()->getSockCreationMicroSec() < oldCreationTime) {
-                reusedConnCount++;
+
+            if (connIds.count(newConn->get()->getConnectionId()) == 0) {
+                notReusedConns++;
             }
+            ASSERT_EQ(notReusedConns, prevNumBadConns - globalConnPool.getNumBadConns(TARGET_HOST));
             newConnList.push_back(newConn);
         }
-        ASSERT_EQ(validConnCount, reusedConnCount);
 
         for (vector<ScopedDbConnection*>::iterator iter = newConnList.begin();
              iter != newConnList.end();
