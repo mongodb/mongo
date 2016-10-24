@@ -2683,7 +2683,7 @@ Value ExpressionRange::evaluateInternal(Variables* vars) const {
         Value stepVal(vpOperand[2]->evaluateInternal(vars));
 
         uassert(34447,
-                str::stream() << "$range requires a numeric starting value, found value of type:"
+                str::stream() << "$range requires a numeric step value, found value of type:"
                               << typeName(stepVal.getType()),
                 stepVal.numeric());
         uassert(34448,
