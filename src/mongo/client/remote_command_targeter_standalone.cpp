@@ -47,11 +47,13 @@ StatusWith<HostAndPort> RemoteCommandTargeterStandalone::findHost(
     return _hostAndPort;
 }
 
-void RemoteCommandTargeterStandalone::markHostNotMaster(const HostAndPort& host) {
+void RemoteCommandTargeterStandalone::markHostNotMaster(const HostAndPort& host,
+                                                        const Status& status) {
     dassert(host == _hostAndPort);
 }
 
-void RemoteCommandTargeterStandalone::markHostUnreachable(const HostAndPort& host) {
+void RemoteCommandTargeterStandalone::markHostUnreachable(const HostAndPort& host,
+                                                          const Status& status) {
     dassert(host == _hostAndPort);
 }
 

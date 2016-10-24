@@ -871,13 +871,13 @@ void ShardRegistry::updateReplSetMonitor(const std::shared_ptr<RemoteCommandTarg
 
     if (ErrorCodes::isNotMasterError(remoteCommandStatus.code()) ||
         (remoteCommandStatus == ErrorCodes::InterruptedDueToReplStateChange)) {
-        targeter->markHostNotMaster(remoteHost);
+        targeter->markHostNotMaster(remoteHost, remoteCommandStatus);
     } else if (ErrorCodes::isNetworkError(remoteCommandStatus.code())) {
-        targeter->markHostUnreachable(remoteHost);
+        targeter->markHostUnreachable(remoteHost, remoteCommandStatus);
     } else if (remoteCommandStatus == ErrorCodes::NotMasterOrSecondary) {
-        targeter->markHostUnreachable(remoteHost);
+        targeter->markHostUnreachable(remoteHost, remoteCommandStatus);
     } else if (remoteCommandStatus == ErrorCodes::ExceededTimeLimit) {
-        targeter->markHostUnreachable(remoteHost);
+        targeter->markHostUnreachable(remoteHost, remoteCommandStatus);
     }
 }
 

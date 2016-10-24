@@ -28,14 +28,13 @@
 
 #include "mongo/platform/basic.h"
 
-
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_internal.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
 namespace {
 
-using namespace mongo;
 using std::set;
 
 // Pull nested types to top-level scope
@@ -768,7 +767,7 @@ TEST(ReplicaSetMonitor, OutOfBandFailedHost) {
 
         if (i >= 1) {
             HostAndPort a("a");
-            rsm->failedHost(a);
+            rsm->failedHost(a, {ErrorCodes::InternalError, "Test error"});
             Node* node = state->findNode(a);
             ASSERT(node);
             ASSERT(!node->isUp);
@@ -1065,3 +1064,4 @@ TEST(ReplicaSetMonitorTests, TwoPrimaries2ndHasOlderConfigVersion) {
 }
 
 }  // namespace
+}  // namespace mongo

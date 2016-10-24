@@ -706,7 +706,8 @@ TEST_F(TaggedFiveMemberRS, ConnShouldNotPinIfHostMarkedAsFailed) {
     // This is the only difference from ConnShouldPinIfSameSettings which tests that we *do* pin
     // in if the host is still marked as up. Note that this only notifies the RSM, and does not
     // directly effect the DBClientRS.
-    ReplicaSetMonitor::get(replSet->getSetName())->failedHost(HostAndPort(dest));
+    ReplicaSetMonitor::get(replSet->getSetName())
+        ->failedHost(HostAndPort(dest), {ErrorCodes::InternalError, "Test error"});
 
     {
         Query query;

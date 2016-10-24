@@ -170,6 +170,16 @@ std::ostream& operator<<(std::ostream& os, const HostAndPort& hp) {
     return os << hp.toString();
 }
 
+template <typename Allocator>
+StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, const HostAndPort& hp) {
+    return os << hp.toString();
+}
+
+template StringBuilderImpl<TrivialAllocator>& operator<<(StringBuilderImpl<TrivialAllocator>&,
+                                                         const HostAndPort&);
+template StringBuilderImpl<StackAllocator>& operator<<(StringBuilderImpl<StackAllocator>&,
+                                                       const HostAndPort&);
+
 }  // namespace mongo
 
 MONGO_HASH_NAMESPACE_START

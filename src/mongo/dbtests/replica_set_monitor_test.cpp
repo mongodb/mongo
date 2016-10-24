@@ -26,6 +26,11 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
+#include <set>
+#include <vector>
+
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/dbclient_rs.h"
@@ -35,12 +40,8 @@
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/unittest/unittest.h"
 
-#include <set>
-#include <vector>
-
+namespace mongo {
 namespace {
-
-using namespace mongo;
 
 using std::map;
 using std::vector;
@@ -301,4 +302,5 @@ TEST_F(TwoNodeWithTags, SecDownRetryWithTag) {
     ASSERT_EQUALS(secHost, node.toString());
 }
 
+}  // namespace
 }  // namespace mongo

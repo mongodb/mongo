@@ -34,7 +34,10 @@
 #include "mongo/platform/hash_namespace.h"
 
 namespace mongo {
+
 class Status;
+template <typename Allocator>
+class StringBuilderImpl;
 class StringData;
 template <typename T>
 class StatusWith;
@@ -123,6 +126,9 @@ private:
 };
 
 std::ostream& operator<<(std::ostream& os, const HostAndPort& hp);
+
+template <typename Allocator>
+StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, const HostAndPort& hp);
 
 }  // namespace mongo
 
