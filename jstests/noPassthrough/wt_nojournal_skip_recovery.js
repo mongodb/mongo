@@ -47,14 +47,17 @@
 
     // After some journaled write operations have been performed against the mongod, send a SIGKILL
     // to the process to trigger an unclean shutdown.
-    assert.soon(function() {
-        var count = conn.getDB('test').nojournal.count({journaled: {$exists: true}});
-        if (count >= 100) {
-            MongoRunner.stopMongod(conn, 9);
-            return true;
-        }
-        return false;
-    }, 'the parallel shell did not perform at least 100 journaled inserts');
+    assert.soon(
+        function() {
+            var count = conn.getDB('test').nojournal.count({journaled: {$exists: true}});
+            if (count >= 100) {
+                MongoRunner.stopMongod(conn, 9);
+                return true;
+            }
+            return false;
+        },
+        'the parallel shell did not perform at least 100 journaled inserts',
+        5 * 60 * 1000 /*timeout ms*/);
 
     var exitCode = awaitShell({checkExitSuccess: false});
     assert.neq(0, exitCode, 'expected shell to exit abnormally due to mongod being terminated');
