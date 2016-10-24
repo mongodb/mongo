@@ -63,10 +63,6 @@ public:
 
     StatusWith<ReplicaSetConfig> getCurrentConfig() const override;
 
-    void resetSyncSourceHostAndFetchCount(const HostAndPort& source) override;
-
-    unsigned getApplierFetchCount() const override;
-
 private:
     StatusWith<OpTime> _multiApply(OperationContext* txn,
                                    MultiApplier::Operations ops,
@@ -74,7 +70,9 @@ private:
 
     Status _multiSyncApply(MultiApplier::OperationPtrs* ops) override;
 
-    Status _multiInitialSyncApply(MultiApplier::OperationPtrs* ops) override;
+    Status _multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
+                                  const HostAndPort& source,
+                                  AtomicUInt32* fetchCount) override;
 
 protected:
     ReplicationCoordinator* getReplicationCoordinator() const;

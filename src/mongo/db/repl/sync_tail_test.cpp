@@ -827,7 +827,9 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyDisablesDocumentValidationWhileApplyin
     auto op = makeUpdateDocumentOplogEntry(
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
     MultiApplier::OperationPtrs ops = {&op};
-    ASSERT_OK(multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail));
+    AtomicUInt32 fetchCount(0);
+    ASSERT_OK(multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail, &fetchCount));
+    ASSERT_EQUALS(fetchCount.load(), 1U);
 }
 
 TEST_F(SyncTailTest,
@@ -838,11 +840,13 @@ TEST_F(SyncTailTest,
     auto op = makeUpdateDocumentOplogEntry(
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
     MultiApplier::OperationPtrs ops = {&op};
-    ASSERT_OK(multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail));
+    AtomicUInt32 fetchCount(0);
+    ASSERT_OK(multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail, &fetchCount));
 
     // Since the missing document is not found on the sync source, the collection referenced by
     // the failed operation should not be automatically created.
     ASSERT_FALSE(AutoGetCollectionForRead(_txn.get(), nss).getCollection());
+    ASSERT_EQUALS(fetchCount.load(), 1U);
 }
 
 TEST_F(SyncTailTest, MultiInitialSyncApplySkipsDocumentOnNamespaceNotFound) {
@@ -858,7 +862,9 @@ TEST_F(SyncTailTest, MultiInitialSyncApplySkipsDocumentOnNamespaceNotFound) {
     auto op2 = makeInsertDocumentOplogEntry({Timestamp(Seconds(3), 0), 1LL}, badNss, doc2);
     auto op3 = makeInsertDocumentOplogEntry({Timestamp(Seconds(4), 0), 1LL}, nss, doc3);
     MultiApplier::OperationPtrs ops = {&op0, &op1, &op2, &op3};
-    ASSERT_OK(multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail));
+    AtomicUInt32 fetchCount(0);
+    ASSERT_OK(multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail, &fetchCount));
+    ASSERT_EQUALS(fetchCount.load(), 0U);
 
     OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
     auto iter = collectionReader.makeIterator();
@@ -874,7 +880,9 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyRetriesFailedUpdateIfDocumentIsAvailab
     auto op = makeUpdateDocumentOplogEntry(
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), updatedDocument);
     MultiApplier::OperationPtrs ops = {&op};
-    ASSERT_OK(multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail));
+    AtomicUInt32 fetchCount(0);
+    ASSERT_OK(multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail, &fetchCount));
+    ASSERT_EQUALS(fetchCount.load(), 1U);
 
     // The collection referenced by "ns" in the failed operation is automatically created to hold
     // the missing document fetched from the sync source. We verify the contents of the collection
@@ -893,7 +901,10 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyPassesThroughSyncApplyErrorAfterFailin
                        << "ns"
                        << nss.ns()));
     MultiApplier::OperationPtrs ops = {&op};
-    ASSERT_EQUALS(ErrorCodes::BadValue, multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail));
+    AtomicUInt32 fetchCount(0);
+    ASSERT_EQUALS(ErrorCodes::BadValue,
+                  multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail, &fetchCount));
+    ASSERT_EQUALS(fetchCount.load(), 1U);
 }
 
 TEST_F(SyncTailTest, MultiInitialSyncApplyPassesThroughShouldSyncTailRetryError) {
@@ -904,8 +915,10 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyPassesThroughShouldSyncTailRetryError)
     ASSERT_THROWS_CODE(
         syncTail.shouldRetry(_txn.get(), op.raw), mongo::UserException, ErrorCodes::FailedToParse);
     MultiApplier::OperationPtrs ops = {&op};
+    AtomicUInt32 fetchCount(0);
     ASSERT_EQUALS(ErrorCodes::FailedToParse,
-                  multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail));
+                  multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail, &fetchCount));
+    ASSERT_EQUALS(fetchCount.load(), 1U);
 }
 
 TEST_F(SyncTailTest, MultiInitialSyncApplyFailsOnRenameCollection) {
@@ -928,8 +941,10 @@ TEST_F(SyncTailTest, MultiInitialSyncApplyFailsOnRenameCollection) {
     auto op = OplogEntry(bob.obj());
 
     MultiApplier::OperationPtrs ops = {&op};
+    AtomicUInt32 fetchCount(0);
     ASSERT_EQUALS(ErrorCodes::OplogOperationUnsupported,
-                  multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail));
+                  multiInitialSyncApply_noAbort(_txn.get(), &ops, &syncTail, &fetchCount));
+    ASSERT_EQUALS(fetchCount.load(), 0U);
 }
 
 }  // namespace

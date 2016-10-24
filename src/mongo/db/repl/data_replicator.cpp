@@ -247,7 +247,8 @@ DataReplicator::DataReplicator(
     DataReplicatorOptions opts,
     std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
     StorageInterface* storage)
-    : _opts(opts),
+    : _fetchCount(0),
+      _opts(opts),
       _dataReplicatorExternalState(std::move(dataReplicatorExternalState)),
       _exec(_dataReplicatorExternalState->getTaskExecutor()),
       _state(DataReplicatorState::Uninitialized),
@@ -1216,9 +1217,11 @@ void DataReplicator::_onApplyBatchFinish(const Status& status,
         }
     }
 
-    int fetchedDocs = _dataReplicatorExternalState->getApplierFetchCount();
-    if (fetchedDocs > 0) {
-        _onFetchMissingDocument_inlock(fetchedDocs, lastApplied, numApplied);
+    auto fetchCount = _fetchCount.load();
+    if (fetchCount > 0) {
+        _initialSyncState->fetchedMissingDocs += fetchCount;
+        _fetchCount.store(0);
+        _onFetchMissingDocument_inlock(lastApplied, numApplied);
         // TODO (SERVER-25662): Remove this line.
         _applierPaused = true;
         return;
@@ -1245,12 +1248,8 @@ void DataReplicator::_onApplyBatchFinish(const Status& status,
     _doNextActions();
 }
 
-void DataReplicator::_onFetchMissingDocument_inlock(int fetchedDocs,
-                                                    OpTimeWithHash lastApplied,
+void DataReplicator::_onFetchMissingDocument_inlock(OpTimeWithHash lastApplied,
                                                     std::size_t numApplied) {
-    _initialSyncState->fetchedMissingDocs += fetchedDocs;
-    _dataReplicatorExternalState->resetSyncSourceHostAndFetchCount(_syncSource);
-
     _scheduleLastOplogEntryFetcher_inlock([this, lastApplied, numApplied](
         const QueryResponseStatus& fetchResult, Fetcher::NextAction*, BSONObjBuilder*) {
         auto&& lastOplogEntryOpTimeWithHashStatus = parseOpTimeWithHash(fetchResult);
@@ -1334,11 +1333,14 @@ Status DataReplicator::_scheduleApplyBatch_inlock(const Operations& ops) {
                                stdx::placeholders::_1);
     } else {
         invariant(_state == DataReplicatorState::InitialSync);
+        _fetchCount.store(0);
         // "_syncSource" has to be copied to stdx::bind result.
-        _dataReplicatorExternalState->resetSyncSourceHostAndFetchCount(_syncSource);
+        HostAndPort source = _syncSource;
         applierFn = stdx::bind(&DataReplicatorExternalState::_multiInitialSyncApply,
                                _dataReplicatorExternalState.get(),
-                               stdx::placeholders::_1);
+                               stdx::placeholders::_1,
+                               source,
+                               &_fetchCount);
     }
 
     auto multiApplyFn = stdx::bind(&DataReplicatorExternalState::_multiApply,

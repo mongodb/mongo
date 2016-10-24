@@ -323,9 +323,7 @@ private:
     // Called after _onDataClonerFinish when the new Timestamp is avail, to use for minvalid.
     void _onApplierReadyStart(const QueryResponseStatus& fetchResult);
     // Called during _onApplyBatchFinish when we fetched a missing document and must reset minValid.
-    void _onFetchMissingDocument_inlock(int retchedDocs,
-                                        OpTimeWithHash lastApplied,
-                                        std::size_t numApplied);
+    void _onFetchMissingDocument_inlock(OpTimeWithHash lastApplied, std::size_t numApplied);
     // Schedules a fetcher to get the last oplog entry from the sync source.
     void _scheduleLastOplogEntryFetcher_inlock(Fetcher::CallbackFn callback);
 
@@ -343,6 +341,9 @@ private:
 
     Status _shutdown(OperationContext* txn);
     void _changeStateIfNeeded();
+
+    // Counts how many documents have been refetched from the source in the current batch.
+    AtomicUInt32 _fetchCount;
 
     //
     // All member variables are labeled with one of the following codes indicating the

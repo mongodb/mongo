@@ -90,14 +90,10 @@ Status DataReplicatorExternalStateMock::_multiSyncApply(MultiApplier::OperationP
     return Status::OK();
 }
 
-Status DataReplicatorExternalStateMock::_multiInitialSyncApply(MultiApplier::OperationPtrs* ops) {
+Status DataReplicatorExternalStateMock::_multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
+                                                               const HostAndPort& source,
+                                                               AtomicUInt32* fetchCount) {
     return Status::OK();
-}
-
-void DataReplicatorExternalStateMock::resetSyncSourceHostAndFetchCount(const HostAndPort& source) {}
-
-unsigned DataReplicatorExternalStateMock::getApplierFetchCount() const {
-    return 0;
 }
 
 }  // namespace repl

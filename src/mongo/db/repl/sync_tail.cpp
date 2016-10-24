@@ -269,7 +269,7 @@ SyncTail::SyncTail(BackgroundSync* q, MultiSyncApplyFunc func)
 SyncTail::SyncTail(BackgroundSync* q,
                    MultiSyncApplyFunc func,
                    std::unique_ptr<OldThreadPool> writerPool)
-    : _networkQueue(q), _applyFunc(func), _writerPool(std::move(writerPool)), _fetchCount(0) {}
+    : _networkQueue(q), _applyFunc(func), _writerPool(std::move(writerPool)) {}
 
 SyncTail::~SyncTail() {}
 
@@ -926,20 +926,11 @@ void SyncTail::setHostname(const std::string& hostname) {
     _hostname = hostname;
 }
 
-void SyncTail::resetFetchCount() {
-    _fetchCount.store(0);
-}
-
-unsigned SyncTail::getFetchCount() const {
-    return _fetchCount.load();
-}
-
 OldThreadPool* SyncTail::getWriterPool() {
     return _writerPool.get();
 }
 
 BSONObj SyncTail::getMissingDoc(OperationContext* txn, Database* db, const BSONObj& o) {
-    _fetchCount.fetchAndAdd(1);
     OplogReader missingObjReader;  // why are we using OplogReader to run a non-oplog query?
     const char* ns = o.getStringField("ns");
 
@@ -1170,18 +1161,22 @@ Status multiSyncApply_noAbort(OperationContext* txn,
 void multiInitialSyncApply_abortOnFailure(MultiApplier::OperationPtrs* ops, SyncTail* st) {
     initializeWriterThread();
     auto txn = cc().makeOperationContext();
-    fassertNoTrace(15915, multiInitialSyncApply_noAbort(txn.get(), ops, st));
+    AtomicUInt32 fetchCount(0);
+    fassertNoTrace(15915, multiInitialSyncApply_noAbort(txn.get(), ops, st, &fetchCount));
 }
 
-Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops, SyncTail* st) {
+Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
+                             SyncTail* st,
+                             AtomicUInt32* fetchCount) {
     initializeWriterThread();
     auto txn = cc().makeOperationContext();
-    return multiInitialSyncApply_noAbort(txn.get(), ops, st);
+    return multiInitialSyncApply_noAbort(txn.get(), ops, st, fetchCount);
 }
 
 Status multiInitialSyncApply_noAbort(OperationContext* txn,
                                      MultiApplier::OperationPtrs* ops,
-                                     SyncTail* st) {
+                                     SyncTail* st,
+                                     AtomicUInt32* fetchCount) {
     txn->setReplicatedWrites(false);
     DisableDocumentValidation validationDisabler(txn);
 
@@ -1204,6 +1199,7 @@ Status multiInitialSyncApply_noAbort(OperationContext* txn,
                 }
 
                 // We might need to fetch the missing docs from the sync source.
+                fetchCount->fetchAndAdd(1);
                 if (st->shouldRetry(txn, entry.raw)) {
                     const Status s2 = SyncTail::syncApply(txn, entry.raw, inSteadyStateReplication);
                     if (!s2.isOK()) {

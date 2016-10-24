@@ -311,20 +311,13 @@ public:
     virtual Status multiSyncApply(MultiApplier::OperationPtrs* ops) = 0;
 
     /**
-     * Used by multiApply() to writes operations to database during initial sync.
+     * Used by multiApply() to writes operations to database during initial sync. `fetchCount` is a
+     * pointer to a counter that is incremented every time we fetch a missing document.
+     *
      */
-    virtual Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops) = 0;
-
-    /**
-     * Resets the sync source used to fetch missing documents from the source and resets the
-     * count of the number of fetched documents to 0.
-     */
-    virtual void resetSyncSourceHostAndFetchCount(const HostAndPort& source) = 0;
-
-    /**
-     * Returns the number of missing documents fetched from the sync source by the applier.
-     */
-    virtual unsigned getApplierFetchCount() const = 0;
+    virtual Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
+                                         const HostAndPort& source,
+                                         AtomicUInt32* fetchCount) = 0;
 
     /**
      * This function creates an oplog buffer of the type specified at server startup.

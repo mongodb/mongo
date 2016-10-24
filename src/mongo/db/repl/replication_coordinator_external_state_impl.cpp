@@ -188,8 +188,7 @@ ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl
     StorageInterface* storageInterface)
     : _storageInterface(storageInterface),
       _initialSyncThreadPool(OldThreadPool::DoNotStartThreadsTag(), 1, "initial sync-"),
-      _initialSyncRunner(&_initialSyncThreadPool),
-      _syncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr) {
+      _initialSyncRunner(&_initialSyncThreadPool) {
     uassert(ErrorCodes::BadValue, "A StorageInterface is required.", _storageInterface);
 }
 ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
@@ -874,18 +873,14 @@ Status ReplicationCoordinatorExternalStateImpl::multiSyncApply(MultiApplier::Ope
 }
 
 Status ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
-    MultiApplier::OperationPtrs* ops) {
-    return repl::multiInitialSyncApply(ops, &_syncTail);
-}
-
-void ReplicationCoordinatorExternalStateImpl::resetSyncSourceHostAndFetchCount(
-    const HostAndPort& source) {
-    _syncTail.setHostname(source.toString());
-    _syncTail.resetFetchCount();
-}
-
-unsigned ReplicationCoordinatorExternalStateImpl::getApplierFetchCount() const {
-    return _syncTail.getFetchCount();
+    MultiApplier::OperationPtrs* ops, const HostAndPort& source, AtomicUInt32* fetchCount) {
+    // repl::multiInitialSyncApply uses SyncTail::shouldRetry() (and implicitly getMissingDoc())
+    // to fetch missing documents during initial sync. Therefore, it is fine to construct SyncTail
+    // with invalid BackgroundSync, MultiSyncApplyFunc and writerPool arguments because we will not
+    // be accessing any SyncTail functionality that require these constructor parameters.
+    SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr);
+    syncTail.setHostname(source.toString());
+    return repl::multiInitialSyncApply(ops, &syncTail, fetchCount);
 }
 
 std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitialSyncOplogBuffer(

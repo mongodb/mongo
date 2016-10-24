@@ -272,15 +272,8 @@ Status ReplicationCoordinatorExternalStateMock::multiSyncApply(MultiApplier::Ope
 }
 
 Status ReplicationCoordinatorExternalStateMock::multiInitialSyncApply(
-    MultiApplier::OperationPtrs* ops) {
+    MultiApplier::OperationPtrs* ops, const HostAndPort& source, AtomicUInt32* fetchCount) {
     return Status::OK();
-}
-
-void ReplicationCoordinatorExternalStateMock::resetSyncSourceHostAndFetchCount(
-    const HostAndPort& source) {}
-
-unsigned ReplicationCoordinatorExternalStateMock::getApplierFetchCount() const {
-    return 0;
 }
 
 std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateMock::makeInitialSyncOplogBuffer(

@@ -116,17 +116,6 @@ public:
      */
     virtual StatusWith<ReplicaSetConfig> getCurrentConfig() const = 0;
 
-    /**
-     * Resets the sync source used to fetch missing documents from the source and resets the
-     * count of the number of fetched documents to 0.
-     */
-    virtual void resetSyncSourceHostAndFetchCount(const HostAndPort& source) = 0;
-
-    /**
-     * Returns the number of missing documents fetched from the sync source by the applier.
-     */
-    virtual unsigned getApplierFetchCount() const = 0;
-
 private:
     /**
      * Applies the operations described in the oplog entries contained in "ops" using the
@@ -146,11 +135,14 @@ private:
     virtual Status _multiSyncApply(MultiApplier::OperationPtrs* ops) = 0;
 
     /**
-     * Used by _multiApply() to write operations to database during initial sync.
+     * Used by _multiApply() to write operations to database during initial sync. `fetchCount` is a
+     * pointer to a counter that is incremented every time we fetch a missing document.
      *
      * Used exclusively by the DataReplicator to construct a MultiApplier.
      */
-    virtual Status _multiInitialSyncApply(MultiApplier::OperationPtrs* ops) = 0;
+    virtual Status _multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
+                                          const HostAndPort& source,
+                                          AtomicUInt32* fetchCount) = 0;
 
     // Provides DataReplicator with access to _multiApply, _multiSyncApply and
     // _multiInitialSyncApply.

@@ -209,16 +209,6 @@ public:
     void setHostname(const std::string& hostname);
 
     /**
-     * Resets the count of fetched documents to 0.
-     */
-    void resetFetchCount();
-
-    /**
-     * Returns the number of documents that have been fetched from source.
-     */
-    unsigned getFetchCount() const;
-
-    /**
      * Returns writer thread pool.
      * Used by ReplicationCoordinatorExternalStateImpl only.
      */
@@ -246,9 +236,6 @@ private:
 
     // persistent pool of worker threads for writing ops to the databases
     std::unique_ptr<OldThreadPool> _writerPool;
-
-    // Counts how many documents have been refetched from the source since the last reset.
-    AtomicUInt32 _fetchCount;
 };
 
 /**
@@ -275,7 +262,9 @@ void multiSyncApply(MultiApplier::OperationPtrs* ops, SyncTail* st);
 void multiInitialSyncApply_abortOnFailure(MultiApplier::OperationPtrs* ops, SyncTail* st);
 
 // Used by 3.4 initial sync.
-Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops, SyncTail* st);
+Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
+                             SyncTail* st,
+                             AtomicUInt32* fetchCount);
 
 /**
  * Testing-only version of multiSyncApply that returns an error instead of aborting.
@@ -294,7 +283,8 @@ Status multiSyncApply_noAbort(OperationContext* txn,
  */
 Status multiInitialSyncApply_noAbort(OperationContext* txn,
                                      MultiApplier::OperationPtrs* ops,
-                                     SyncTail* st);
+                                     SyncTail* st,
+                                     AtomicUInt32* fetchCount);
 
 }  // namespace repl
 }  // namespace mongo

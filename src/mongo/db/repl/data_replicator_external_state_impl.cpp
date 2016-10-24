@@ -104,15 +104,10 @@ Status DataReplicatorExternalStateImpl::_multiSyncApply(MultiApplier::OperationP
     return _replicationCoordinatorExternalState->multiSyncApply(ops);
 }
 
-Status DataReplicatorExternalStateImpl::_multiInitialSyncApply(MultiApplier::OperationPtrs* ops) {
-    return _replicationCoordinatorExternalState->multiInitialSyncApply(ops);
-}
-void DataReplicatorExternalStateImpl::resetSyncSourceHostAndFetchCount(const HostAndPort& source) {
-    _replicationCoordinatorExternalState->resetSyncSourceHostAndFetchCount(source);
-}
-
-unsigned DataReplicatorExternalStateImpl::getApplierFetchCount() const {
-    return _replicationCoordinatorExternalState->getApplierFetchCount();
+Status DataReplicatorExternalStateImpl::_multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
+                                                               const HostAndPort& source,
+                                                               AtomicUInt32* fetchCount) {
+    return _replicationCoordinatorExternalState->multiInitialSyncApply(ops, source, fetchCount);
 }
 
 ReplicationCoordinator* DataReplicatorExternalStateImpl::getReplicationCoordinator() const {
