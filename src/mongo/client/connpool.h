@@ -51,6 +51,8 @@ struct ConnectionPoolStats;
  * thread safety is handled by DBConnectionPool
  */
 class PoolForHost {
+    MONGO_DISALLOW_COPYING(PoolForHost);
+
 public:
     // Sentinel value indicating pool has no cleanup limit
     static const int kPoolSizeUnlimited;
@@ -61,16 +63,6 @@ public:
           _type(ConnectionString::INVALID),
           _maxPoolSize(kPoolSizeUnlimited),
           _checkedOut(0) {}
-
-    PoolForHost(const PoolForHost& other)
-        : _created(other._created),
-          _minValidCreationTimeMicroSec(other._minValidCreationTimeMicroSec),
-          _type(other._type),
-          _maxPoolSize(other._maxPoolSize),
-          _checkedOut(other._checkedOut) {
-        verify(_created == 0);
-        verify(other._pool.size() == 0);
-    }
 
     ~PoolForHost();
 

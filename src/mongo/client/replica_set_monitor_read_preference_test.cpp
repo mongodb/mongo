@@ -36,9 +36,9 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
 namespace {
 
-using namespace mongo;
 using std::set;
 using std::vector;
 
@@ -145,7 +145,7 @@ TEST(ReplSetMonitorReadPref, PrimaryOnlyPriNotOk) {
     vector<Node> nodes = getThreeMemberWithTags();
     TagSet tags(getDefaultTagSet());
 
-    nodes[1].markFailed();
+    nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host =
@@ -183,7 +183,7 @@ TEST(ReplSetMonitorReadPref, PriPrefWithPriNotOk) {
     vector<Node> nodes = getThreeMemberWithTags();
     TagSet tags(getDefaultTagSet());
 
-    nodes[1].markFailed();
+    nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host =
@@ -197,7 +197,7 @@ TEST(ReplSetMonitorReadPref, SecOnly) {
     vector<Node> nodes = getThreeMemberWithTags();
     TagSet tags(getDefaultTagSet());
 
-    nodes[2].markFailed();
+    nodes[2].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host =
@@ -211,8 +211,8 @@ TEST(ReplSetMonitorReadPref, SecOnlyOnlyPriOk) {
     vector<Node> nodes = getThreeMemberWithTags();
     TagSet tags(getDefaultTagSet());
 
-    nodes[0].markFailed();
-    nodes[2].markFailed();
+    nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
+    nodes[2].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host =
@@ -225,7 +225,7 @@ TEST(ReplSetMonitorReadPref, SecPref) {
     vector<Node> nodes = getThreeMemberWithTags();
     TagSet tags(getDefaultTagSet());
 
-    nodes[2].markFailed();
+    nodes[2].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host =
@@ -239,8 +239,8 @@ TEST(ReplSetMonitorReadPref, SecPrefWithNoSecOk) {
     vector<Node> nodes = getThreeMemberWithTags();
     TagSet tags(getDefaultTagSet());
 
-    nodes[0].markFailed();
-    nodes[2].markFailed();
+    nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
+    nodes[2].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host =
@@ -254,9 +254,9 @@ TEST(ReplSetMonitorReadPref, SecPrefWithNoNodeOk) {
     vector<Node> nodes = getThreeMemberWithTags();
     TagSet tags(getDefaultTagSet());
 
-    nodes[0].markFailed();
-    nodes[1].markFailed();
-    nodes[2].markFailed();
+    nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
+    nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
+    nodes[2].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host =
@@ -315,7 +315,7 @@ TEST(ReplSetMonitorReadPref, PriPrefPriNotOkWithTags) {
     vector<Node> nodes = getThreeMemberWithTags();
     TagSet tags(getP2TagSet());
 
-    nodes[1].markFailed();
+    nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host =
@@ -341,7 +341,7 @@ TEST(ReplSetMonitorReadPref, PriPrefPriNotOkWithTagsNoMatch) {
     vector<Node> nodes = getThreeMemberWithTags();
     TagSet tags(getSingleNoMatchTag());
 
-    nodes[1].markFailed();
+    nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host =
@@ -397,7 +397,7 @@ TEST(ReplSetMonitorReadPref, SecPrefSecNotOkWithTags) {
                              << "nyc"));
     TagSet tags(arrayBuilder.arr());
 
-    nodes[2].markFailed();
+    nodes[2].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host =
@@ -423,7 +423,7 @@ TEST(ReplSetMonitorReadPref, SecPrefPriNotOkWithTagsNoMatch) {
     vector<Node> nodes = getThreeMemberWithTags();
     TagSet tags(getSingleNoMatchTag());
 
-    nodes[1].markFailed();
+    nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host =
@@ -487,7 +487,7 @@ TEST(ReplSetMonitorReadPref, MultiPriOnlyPriNotOkTag) {
     vector<Node> nodes = getThreeMemberWithTags();
     TagSet tags(getMultiNoMatchTag());
 
-    nodes[1].markFailed();
+    nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host =
@@ -595,7 +595,7 @@ private:
 TEST_F(MultiTags, MultiTagsMatchesFirst) {
     vector<Node> nodes = getThreeMemberWithTags();
 
-    nodes[1].markFailed();
+    nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
@@ -611,8 +611,8 @@ TEST_F(MultiTags, MultiTagsMatchesFirst) {
 TEST_F(MultiTags, PriPrefPriNotOkMatchesFirstNotOk) {
     vector<Node> nodes = getThreeMemberWithTags();
 
-    nodes[0].markFailed();
-    nodes[1].markFailed();
+    nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
+    nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
@@ -628,7 +628,7 @@ TEST_F(MultiTags, PriPrefPriNotOkMatchesFirstNotOk) {
 TEST_F(MultiTags, PriPrefPriNotOkMatchesSecondTest) {
     vector<Node> nodes = getThreeMemberWithTags();
 
-    nodes[1].markFailed();
+    nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
@@ -644,8 +644,8 @@ TEST_F(MultiTags, PriPrefPriNotOkMatchesSecondTest) {
 TEST_F(MultiTags, PriPrefPriNotOkMatchesSecondNotOkTest) {
     vector<Node> nodes = getThreeMemberWithTags();
 
-    nodes[1].markFailed();
-    nodes[2].markFailed();
+    nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
+    nodes[2].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
@@ -661,7 +661,7 @@ TEST_F(MultiTags, PriPrefPriNotOkMatchesSecondNotOkTest) {
 TEST_F(MultiTags, PriPrefPriNotOkMatchesLastTest) {
     vector<Node> nodes = getThreeMemberWithTags();
 
-    nodes[1].markFailed();
+    nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
@@ -677,8 +677,8 @@ TEST_F(MultiTags, PriPrefPriNotOkMatchesLastTest) {
 TEST_F(MultiTags, PriPrefPriNotOkMatchesLastNotOkTest) {
     vector<Node> nodes = getThreeMemberWithTags();
 
-    nodes[0].markFailed();
-    nodes[1].markFailed();
+    nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
+    nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
@@ -707,7 +707,7 @@ TEST(MultiTags, PriPrefPriNotOkNoMatch) {
     vector<Node> nodes = getThreeMemberWithTags();
     TagSet tags(getMultiNoMatchTag());
 
-    nodes[1].markFailed();
+    nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host =
@@ -733,7 +733,7 @@ TEST_F(MultiTags, SecOnlyMatchesFirstTest) {
 TEST_F(MultiTags, SecOnlyMatchesFirstNotOk) {
     vector<Node> nodes = getThreeMemberWithTags();
 
-    nodes[0].markFailed();
+    nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
@@ -763,7 +763,7 @@ TEST_F(MultiTags, SecOnlyMatchesSecond) {
 TEST_F(MultiTags, SecOnlyMatchesSecondNotOk) {
     vector<Node> nodes = getThreeMemberWithTags();
 
-    nodes[2].markFailed();
+    nodes[2].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
@@ -790,7 +790,7 @@ TEST_F(MultiTags, SecOnlyMatchesLast) {
 TEST_F(MultiTags, SecOnlyMatchesLastNotOk) {
     vector<Node> nodes = getThreeMemberWithTags();
 
-    nodes[0].markFailed();
+    nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(
@@ -838,7 +838,7 @@ TEST_F(MultiTags, SecPrefMatchesFirst) {
 TEST_F(MultiTags, SecPrefMatchesFirstNotOk) {
     vector<Node> nodes = getThreeMemberWithTags();
 
-    nodes[0].markFailed();
+    nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
@@ -868,7 +868,7 @@ TEST_F(MultiTags, SecPrefMatchesSecond) {
 TEST_F(MultiTags, SecPrefMatchesSecondNotOk) {
     vector<Node> nodes = getThreeMemberWithTags();
 
-    nodes[2].markFailed();
+    nodes[2].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
@@ -898,7 +898,7 @@ TEST_F(MultiTags, SecPrefMatchesLast) {
 TEST_F(MultiTags, SecPrefMatchesLastNotOk) {
     vector<Node> nodes = getThreeMemberWithTags();
 
-    nodes[0].markFailed();
+    nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(nodes,
@@ -941,7 +941,7 @@ TEST(MultiTags, SecPrefMultiTagsNoMatchPriNotOk) {
     vector<Node> nodes = getThreeMemberWithTags();
     TagSet tags(getMultiNoMatchTag());
 
-    nodes[1].markFailed();
+    nodes[1].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host =
@@ -972,7 +972,7 @@ TEST(MultiTags, NearestMatchesFirstNotOk) {
 
     TagSet tags(arrayBuilder.arr());
 
-    nodes[0].markFailed();
+    nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host =
@@ -1006,7 +1006,7 @@ TEST_F(MultiTags, NearestMatchesSecondNotOk) {
 
     TagSet tags(arrayBuilder.arr());
 
-    nodes[2].markFailed();
+    nodes[2].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host =
@@ -1030,7 +1030,7 @@ TEST_F(MultiTags, NearestMatchesLast) {
 TEST_F(MultiTags, NeatestMatchesLastNotOk) {
     vector<Node> nodes = getThreeMemberWithTags();
 
-    nodes[0].markFailed();
+    nodes[0].markFailed({ErrorCodes::InternalError, "Test error"});
 
     bool isPrimarySelected = false;
     HostAndPort host = selectNode(
@@ -1065,4 +1065,6 @@ TEST(TagSet, DefaultConstructorMatchesAll) {
     TagSet tags;
     ASSERT_BSONOBJ_EQ(tags.getTagBSON(), BSON_ARRAY(BSONObj()));
 }
-}
+
+}  // namespace
+}  // namespace mongo
