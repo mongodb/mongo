@@ -7,15 +7,12 @@ selector:
     - jstests/replsets/config_server_checks.js
     - jstests/replsets/disallow_adding_initialized_node1.js
     - jstests/replsets/disallow_adding_initialized_node2.js
-    - jstests/replsets/last_op_visible.js
     # Linearizable reads not supported on PV0
     - jstests/replsets/linearizable_read_concern.js
     - jstests/replsets/oplog_truncated_on_recovery.js
     - jstests/replsets/priority_takeover_cascading_priorities.js
     - jstests/replsets/priority_takeover_one_node_higher_priority.js
     - jstests/replsets/priority_takeover_two_nodes_equal_priority.js
-    - jstests/replsets/read_committed*.js
-    - jstests/replsets/read_majority_two_arbs.js
     - jstests/replsets/stepup.js
     # The combination of new bridges and PV0 can lead to an improper spanning tree in sync2.js.
     - jstests/replsets/sync2.js

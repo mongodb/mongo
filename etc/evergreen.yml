@@ -1391,6 +1391,18 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: aggregation_read_concern_majority_passthrough_pv0_WT
+  depends_on:
+  - name: aggregation_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=aggregation_read_concern_majority_passthrough_pv0 --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+
+- <<: *task_template
   name: aggregation_sharded_collections_passthrough_WT
   depends_on:
   - name: aggregation_WT
@@ -2228,6 +2240,17 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=read_concern_majority_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: read_concern_majority_passthrough_pv0_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=read_concern_majority_passthrough_pv0 --storageEngine=wiredTiger
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -4604,6 +4627,7 @@ buildvariants:
   - name: aggregation_WT
   - name: aggregation_facet_unwind_passthrough_WT
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_read_concern_majority_passthrough_pv0_WT
   - name: aggregation_sharded_collections_passthrough_WT
   - name: auth
   - name: auth_WT
@@ -4681,6 +4705,9 @@ buildvariants:
     distros:
     - windows-64-vs2015-large
   - name: read_concern_majority_passthrough_WT
+    distros:
+    - windows-64-vs2015-large
+  - name: read_concern_majority_passthrough_pv0_WT
     distros:
     - windows-64-vs2015-large
   - name: read_only
@@ -5081,6 +5108,7 @@ buildvariants:
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_read_concern_majority_passthrough_pv0_WT
   - name: aggregation_sharded_collections_passthrough_WT
   - name: auth
   - name: auth_WT
@@ -5141,6 +5169,7 @@ buildvariants:
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_WT
   - name: read_concern_majority_passthrough_WT
+  - name: read_concern_majority_passthrough_pv0_WT
   - name: replicasets
   - name: replicasets_WT
   - name: replication
@@ -5296,6 +5325,7 @@ buildvariants:
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough_WT
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_read_concern_majority_passthrough_pv0_WT
   - name: aggregation_sharded_collections_passthrough_WT
   - name: audit
   - name: audit_WT
@@ -5387,6 +5417,9 @@ buildvariants:
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
   - name: read_concern_majority_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: read_concern_majority_passthrough_pv0_WT
     distros:
     - rhel62-large
   - name: read_only
@@ -7454,6 +7487,7 @@ buildvariants:
   - name: aggregation_WT
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_read_concern_majority_passthrough_pv0_WT
   - name: aggregation_sharded_collections_passthrough_WT
   - name: audit
   - name: auth
@@ -7493,6 +7527,7 @@ buildvariants:
   - name: parallel
   - name: parallel_compatibility
   - name: read_concern_majority_passthrough_WT
+  - name: read_concern_majority_passthrough_pv0_WT
   - name: replicasets_WT
   - name: replicasets_auth
   - name: replicasets_legacy
@@ -7859,6 +7894,7 @@ buildvariants:
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough_WT
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_read_concern_majority_passthrough_pv0_WT
   - name: aggregation_sharded_collections_passthrough_WT
   - name: audit
   - name: audit_WT
@@ -7930,6 +7966,7 @@ buildvariants:
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
   - name: read_concern_majority_passthrough_WT
+  - name: read_concern_majority_passthrough_pv0_WT
   - name: read_only
   - name: read_only_WT
   - name: read_only_sharded
@@ -8030,6 +8067,7 @@ buildvariants:
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough_WT
   - name: aggregation_read_concern_majority_passthrough_WT
+  - name: aggregation_read_concern_majority_passthrough_pv0_WT
   - name: aggregation_sharded_collections_passthrough_WT
   - name: audit
   - name: audit_WT
@@ -8101,6 +8139,7 @@ buildvariants:
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
   - name: read_concern_majority_passthrough_WT
+  - name: read_concern_majority_passthrough_pv0_WT
   - name: read_only
   - name: read_only_WT
   - name: read_only_sharded

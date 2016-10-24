@@ -109,12 +109,6 @@ Status waitForReadConcern(OperationContext* txn, const repl::ReadConcernArgs& re
     if ((replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet ||
          testingSnapshotBehaviorInIsolation) &&
         readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
-        // ReadConcern Majority is not supported in ProtocolVersion 0.
-        if (!testingSnapshotBehaviorInIsolation && !replCoord->isV1ElectionProtocol()) {
-            return {ErrorCodes::ReadConcernMajorityNotEnabled,
-                    str::stream() << "Replica sets running protocol version 0 do not support "
-                                     "readConcern: majority"};
-        }
 
         const int debugLevel = serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 1 : 2;
 
