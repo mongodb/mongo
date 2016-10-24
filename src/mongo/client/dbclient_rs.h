@@ -269,10 +269,9 @@ private:
     bool checkLastHost(const ReadPreferenceSetting* readPref);
 
     /**
-     * Destroys all cached information about the last slaveOk operation and reports the host as
-     * failed in the replica set monitor with the specified 'status'.
+     * Destroys all cached information about the last slaveOk operation.
      */
-    void _invalidateLastSlaveOkCache(const Status& status);
+    void invalidateLastSlaveOkCache();
 
     void _authConnection(DBClientConnection* conn);
 
@@ -291,6 +290,12 @@ private:
      * Clears the slaveOk connection and returns it to the pool if not the same as _master.
      */
     void resetSlaveOkConn();
+
+    /**
+     * Maximum number of retries to make for auto-retry logic when performing a slave ok
+     * operation.
+     */
+    static const size_t MAX_RETRY;
 
     // TODO: remove this when processes other than mongos uses the driver version.
     static bool _authPooledSecondaryConn;

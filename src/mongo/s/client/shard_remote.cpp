@@ -126,13 +126,13 @@ void ShardRemote::updateReplSetMonitor(const HostAndPort& remoteHost,
     if (ErrorCodes::isNotMasterError(remoteCommandStatus.code()) ||
         (remoteCommandStatus == ErrorCodes::InterruptedDueToReplStateChange) ||
         (remoteCommandStatus == ErrorCodes::PrimarySteppedDown)) {
-        _targeter->markHostNotMaster(remoteHost, remoteCommandStatus);
+        _targeter->markHostNotMaster(remoteHost);
     } else if (ErrorCodes::isNetworkError(remoteCommandStatus.code())) {
-        _targeter->markHostUnreachable(remoteHost, remoteCommandStatus);
+        _targeter->markHostUnreachable(remoteHost);
     } else if (remoteCommandStatus == ErrorCodes::NotMasterOrSecondary) {
-        _targeter->markHostUnreachable(remoteHost, remoteCommandStatus);
+        _targeter->markHostUnreachable(remoteHost);
     } else if (remoteCommandStatus == ErrorCodes::ExceededTimeLimit) {
-        _targeter->markHostUnreachable(remoteHost, remoteCommandStatus);
+        _targeter->markHostUnreachable(remoteHost);
     }
 }
 
