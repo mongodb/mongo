@@ -548,6 +548,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 * does need to do some work.
 		 */
 		__wt_cache_read_gen_incr(session);
+		++cache->evict_pass_gen;
 
 		/*
 		 * Update the oldest ID: we use it to decide whether pages are
@@ -1055,7 +1056,7 @@ __evict_walk(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue)
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	u_int max_entries, retries, slot, start_slot, spins;
+	u_int max_entries, retries, slot, spins, start_slot, total_candidates;
 	bool dhandle_locked, incr;
 
 	conn = S2C(session);
@@ -1076,12 +1077,9 @@ __evict_walk(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue)
 	 * Another pathological case: if there are only a tiny number of
 	 * candidate pages in cache, don't put all of them on one queue.
 	 */
-	if (F_ISSET(cache, WT_CACHE_EVICT_CLEAN))
-		max_entries = WT_MIN(max_entries,
-		    1 + (uint32_t)(__wt_cache_pages_inuse(cache) / 2));
-	else
-		max_entries = WT_MIN(max_entries,
-		    1 + (uint32_t)(cache->pages_dirty_leaf / 2));
+	total_candidates = (u_int)(F_ISSET(cache, WT_CACHE_EVICT_CLEAN) ?
+	    __wt_cache_pages_inuse(cache) : cache->pages_dirty_leaf);
+	max_entries = WT_MIN(max_entries, 1 + total_candidates / 2);
 
 retry:	while (slot < max_entries) {
 		/*
@@ -1286,8 +1284,8 @@ __evict_push_candidate(WT_SESSION_IMPL *session,
  *	Get a few page eviction candidates from a single underlying file.
  */
 static int
-__evict_walk_file(WT_SESSION_IMPL *session,
-    WT_EVICT_QUEUE *queue, u_int max_entries, u_int *slotp)
+__evict_walk_file(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue,
+    u_int max_entries, u_int *slotp)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
@@ -1414,6 +1412,7 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 
 		page = ref->page;
 		modified = __wt_page_is_modified(page);
+		page->evict_pass_gen = cache->evict_pass_gen;
 
 		/*
 		 * Use the EVICT_LRU flag to avoid putting pages onto the list
@@ -1560,7 +1559,7 @@ __evict_get_ref(
 	server_only = is_server && !WT_EVICT_HAS_WORKERS(session);
 	urgent_ok = (!is_app && !is_server) ||
 	    !WT_EVICT_HAS_WORKERS(session) ||
-	    __wt_cache_aggressive(session);
+	    (is_app && __wt_cache_aggressive(session));
 	urgent_queue = cache->evict_urgent_queue;
 	*btreep = NULL;
 	*refp = NULL;

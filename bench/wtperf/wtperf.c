@@ -2078,6 +2078,11 @@ config_compress(WTPERF *wtperf)
 		wtperf->compress_ext = ZLIB_EXT;
 #endif
 		wtperf->compress_table = ZLIB_BLK;
+	} else if (strcmp(s, "zstd") == 0) {
+#ifndef HAVE_BUILTIN_EXTENSION_ZSTD
+		wtperf->compress_ext = ZSTD_EXT;
+#endif
+		wtperf->compress_table = ZSTD_BLK;
 	} else {
 		fprintf(stderr,
 	    "invalid compression configuration: %s\n", s);
@@ -2300,7 +2305,7 @@ err:		if (ret == 0)
 			ret = t_ret;
 	}
 
-	if (wtperf->conn != NULL &&
+	if (wtperf->conn != NULL && opts->close_conn &&
 	    (t_ret = wtperf->conn->close(wtperf->conn, NULL)) != 0) {
 		lprintf(wtperf, t_ret, 0,
 		    "Error closing connection to %s", wtperf->home);
@@ -2329,7 +2334,6 @@ err:		if (ret == 0)
 
 extern int __wt_optind, __wt_optreset;
 extern char *__wt_optarg;
-void (*custom_die)(void) = NULL;
 
 /*
  * usage --

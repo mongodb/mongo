@@ -179,8 +179,6 @@ fill_db(uint32_t nth)
 extern int __wt_optind;
 extern char *__wt_optarg;
 
-void (*custom_die)(void) = NULL;
-
 int
 main(int argc, char *argv[])
 {

@@ -130,12 +130,12 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 
 	WT_RET(__wt_config_gets(session, cfg, "statistics_log.json", &cval));
 	if (cval.val != 0)
-		FLD_SET(conn->stat_flags, WT_CONN_STAT_JSON);
+		FLD_SET(conn->stat_flags, WT_STAT_JSON);
 
 	WT_RET(__wt_config_gets(
 	    session, cfg, "statistics_log.on_close", &cval));
 	if (cval.val != 0)
-		FLD_SET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE);
+		FLD_SET(conn->stat_flags, WT_STAT_ON_CLOSE);
 
 	/*
 	 * We don't allow the log path to be reconfigured for security reasons.
@@ -206,7 +206,7 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 #define	WT_TIMESTAMP_JSON_DEFAULT	"%Y-%m-%dT%H:%M:%S.000Z"
 	WT_ERR(__wt_config_gets(
 	    session, cfg, "statistics_log.timestamp", &cval));
-	if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_JSON) &&
+	if (FLD_ISSET(conn->stat_flags, WT_STAT_JSON) &&
 	    WT_STRING_MATCH(WT_TIMESTAMP_DEFAULT, cval.str, cval.len))
 		WT_ERR(__wt_strdup(
 		    session, WT_TIMESTAMP_JSON_DEFAULT, &conn->stat_format));
@@ -264,7 +264,7 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, bool conn_stats)
 		goto err;
 	}
 
-	if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_JSON)) {
+	if (FLD_ISSET(conn->stat_flags, WT_STAT_JSON)) {
 		WT_ERR(__wt_fprintf(session, conn->stat_fs,
 		     "{\"version\":\"%s\",\"localTime\":\"%s\"",
 		     WIREDTIGER_VERSION_STRING, conn->stat_stamp));
@@ -482,7 +482,7 @@ __wt_statlog_log_one(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 
-	if (!FLD_ISSET(conn->stat_flags, WT_CONN_STAT_ON_CLOSE))
+	if (!FLD_ISSET(conn->stat_flags, WT_STAT_ON_CLOSE))
 		return (0);
 
 	if (F_ISSET(conn, WT_CONN_SERVER_RUN) &&

@@ -36,8 +36,6 @@
  * Failure mode: Check that the data is correct at the end of the run.
  */
 
-void (*custom_die)(void) = NULL;
-
 void *thread_insert_race(void *);
 
 int

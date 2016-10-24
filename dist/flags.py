@@ -133,6 +133,16 @@ flags = {
         'SESSION_QUIET_CORRUPT_FILE',
         'SESSION_SERVER_ASYNC',
     ],
+    'stat' : [
+        'STAT_CLEAR',
+        'STAT_JSON',
+        'STAT_ON_CLOSE',
+        'STAT_TYPE_ALL',
+        'STAT_TYPE_CACHE_WALK',
+        'STAT_TYPE_FAST',
+        'STAT_TYPE_SIZE',
+        'STAT_TYPE_TREE_WALK',
+    ],
 }
 
 flag_cnt = {}    # Dictionary [flag] : [reference count]

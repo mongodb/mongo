@@ -216,6 +216,8 @@ struct __wt_logslot;
     typedef struct __wt_logslot WT_LOGSLOT;
 struct __wt_lsm_chunk;
     typedef struct __wt_lsm_chunk WT_LSM_CHUNK;
+struct __wt_lsm_cursor_chunk;
+    typedef struct __wt_lsm_cursor_chunk WT_LSM_CURSOR_CHUNK;
 struct __wt_lsm_data_source;
     typedef struct __wt_lsm_data_source WT_LSM_DATA_SOURCE;
 struct __wt_lsm_manager;

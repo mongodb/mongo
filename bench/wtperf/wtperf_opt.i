@@ -94,10 +94,13 @@ DEF_OPT_AS_UINT32(checkpoint_stress_rate, 0,
 DEF_OPT_AS_UINT32(checkpoint_threads, 0, "number of checkpoint threads")
 DEF_OPT_AS_CONFIG_STRING(conn_config, "create",
     "connection configuration string")
+DEF_OPT_AS_BOOL(close_conn, 1, "properly close connection at end of test. "
+    "Setting to false does not sync data to disk and can result in lost "
+    "data after test exits.")
 DEF_OPT_AS_BOOL(compact, 0, "post-populate compact for LSM merging activity")
 DEF_OPT_AS_STRING(compression, "none",
     "compression extension.  Allowed configuration values are: "
-    "'none', 'lz4', 'snappy', 'zlib'")
+    "'none', 'lz4', 'snappy', 'zlib', 'zstd'")
 DEF_OPT_AS_BOOL(create, 1,
     "do population phase; false to use existing database")
 DEF_OPT_AS_UINT32(database_count, 1,

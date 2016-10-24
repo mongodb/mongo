@@ -95,6 +95,7 @@ WiredTigerStat
 WiredTigerTestCase
 Yann
 Za
+Zstd
 aR
 abstime
 ack'ed
@@ -507,3 +508,4 @@ xa
 yieldcpu
 zlib
 zseries
+zstd

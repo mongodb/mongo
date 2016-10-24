@@ -96,10 +96,13 @@ func_ok()
 	    -e '/int wiredtiger_extension_init$/d' \
 	    -e '/int wiredtiger_extension_terminate$/d' \
 	    -e '/int wiredtiger_pack_close$/d' \
-	    -e '/int wt_snappy_pre_size$/d' \
-	    -e '/int wt_snappy_terminate$/d' \
+	    -e '/int snappy_pre_size$/d' \
+	    -e '/int snappy_terminate$/d' \
 	    -e '/int zlib_error$/d' \
-	    -e '/int zlib_terminate$/d'
+	    -e '/int zlib_terminate$/d' \
+	    -e '/int zstd_error$/d' \
+	    -e '/int zstd_pre_size$/d' \
+	    -e '/int zstd_terminate$/d'
 }
 
 # Complain about functions which return an "int" but which don't return except

@@ -86,11 +86,11 @@ struct __wt_table {
 	if (F_ISSET(session, (flag))) {					\
 		op;							\
 	}  else {							\
-		__wt_spin_lock(session, (lock));			\
+		__wt_spin_lock_track(session, lock);			\
 		F_SET(session, (flag));					\
 		op;							\
 		F_CLR(session, (flag));					\
-		__wt_spin_unlock(session, (lock));			\
+		__wt_spin_unlock(session, lock);			\
 	}								\
 } while (0)
 
@@ -102,11 +102,11 @@ struct __wt_table {
 	ret = 0;							\
 	if (!F_ISSET(session, (flag)) &&				\
 	    F_ISSET(session, WT_SESSION_LOCK_NO_WAIT)) {		\
-		if ((ret = __wt_spin_trylock(session, (lock))) == 0) {	\
+		if ((ret = __wt_spin_trylock(session, lock)) == 0) {	\
 			F_SET(session, (flag));				\
 			op;						\
 			F_CLR(session, (flag));				\
-			__wt_spin_unlock(session, (lock));		\
+			__wt_spin_unlock(session, lock);		\
 		}							\
 	} else								\
 		WT_WITH_LOCK_WAIT(session, lock, flag, op);		\

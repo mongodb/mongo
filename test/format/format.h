@@ -48,6 +48,8 @@
 	EXTPATH "compressors/snappy/.libs/libwiredtiger_snappy.so"
 #define	ZLIB_PATH							\
 	EXTPATH "compressors/zlib/.libs/libwiredtiger_zlib.so"
+#define	ZSTD_PATH							\
+	EXTPATH "compressors/zstd/.libs/libwiredtiger_zstd.so"
 
 #define	REVERSE_PATH							\
 	EXTPATH "collators/reverse/.libs/libwiredtiger_reverse_collator.so"
@@ -219,6 +221,7 @@ typedef struct {
 #define	COMPRESS_SNAPPY			5
 #define	COMPRESS_ZLIB			6
 #define	COMPRESS_ZLIB_NO_RAW		7
+#define	COMPRESS_ZSTD			8
 	u_int c_compression_flag;		/* Compression flag value */
 	u_int c_logging_compression_flag;	/* Log compression flag value */
 

@@ -68,10 +68,8 @@ typedef struct {
 	 * resources.
 	 */
 	WT_CONNECTION *conn;
-	char	  *conn_config;
 	WT_SESSION    *session;
 	bool	   running;
-	char	  *table_config;
 	char	  *uri;
 	volatile uint64_t   next_threadid;
 	uint64_t   max_inserted_id;
@@ -84,6 +82,16 @@ typedef struct {
 #define	testutil_assert(a) do {						\
 	if (!(a))							\
 		testutil_die(0, "%s/%d: %s", __func__, __LINE__, #a);	\
+} while (0)
+
+/*
+ * testutil_assertfmt --
+ *	Complain and quit if something isn't true.
+ */
+#define	testutil_assertfmt(a, fmt, ...) do {				\
+	if (!(a))							\
+		testutil_die(0, "%s/%d: %s: " fmt,			\
+		__func__, __LINE__, #a, __VA_ARGS__);			\
 } while (0)
 
 /*

@@ -39,8 +39,6 @@
  *
  * Failure mode: We get results back from our join.
  */
-void (*custom_die)(void) = NULL;
-
 #define	N_RECORDS	100000
 #define	N_INSERT	1000000
 
@@ -103,8 +101,8 @@ main(int argc, char *argv[])
 	    &maincur));
 	maincur->set_key(maincur, N_RECORDS);
 	maincur->set_value(maincur, 54321, 0, "", 0, N_RECORDS);
-	maincur->insert(maincur);
-	maincur->close(maincur);
+	testutil_check(maincur->insert(maincur));
+	testutil_check(maincur->close(maincur));
 	testutil_check(session->close(session, NULL));
 
 	populate(opts);
@@ -153,6 +151,7 @@ main(int argc, char *argv[])
 		    key, key2, post, balance, flag);
 		count++;
 	}
+	testutil_assert(ret == WT_NOTFOUND);
 	testutil_assert(count == 0);
 
 	testutil_cleanup(opts);
@@ -197,6 +196,6 @@ populate(TEST_OPTS *opts)
 		testutil_check(maincur->insert(maincur));
 		testutil_check(session->commit_transaction(session, NULL));
 	}
-	maincur->close(maincur);
-	session->close(session, NULL);
+	testutil_check(maincur->close(maincur));
+	testutil_check(session->close(session, NULL));
 }

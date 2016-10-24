@@ -19,6 +19,9 @@
 /* Zlib support automatically loaded. */
 /* #undef HAVE_BUILTIN_EXTENSION_ZLIB */
 
+/* ZSTD support automatically loaded. */
+/* #undef HAVE_BUILTIN_EXTENSION_ZSTD */
+
 /* Define to 1 if you have the `clock_gettime' function. */
 /* #undef HAVE_CLOCK_GETTIME */
 
@@ -69,6 +72,9 @@
 
 /* Define to 1 if you have the `z' library (-lz). */
 /* #undef HAVE_LIBZ */
+
+/* Define to 1 if you have the `zstd' library (-lzstd). */
+/* #undef HAVE_LIBZSTD */
 
 /* Define to 1 if you have the <memory.h> header file. */
 /* #undef HAVE_MEMORY_H */

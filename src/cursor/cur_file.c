@@ -117,12 +117,12 @@ err:	API_END_RET(session, ret);
 }
 
 /*
- * __curfile_next_random --
+ * __wt_curfile_next_random --
  *	WT_CURSOR->next method for the btree cursor type when configured with
- * next_random.
+ * next_random. This is exported because it is called directly within LSM.
  */
-static int
-__curfile_next_random(WT_CURSOR *cursor)
+int
+__wt_curfile_next_random(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BTREE *cbt;
 	WT_DECL_RET;
@@ -473,7 +473,7 @@ __curfile_create(WT_SESSION_IMPL *session,
 			    "column-store objects");
 
 		__wt_cursor_set_notsup(cursor);
-		cursor->next = __curfile_next_random;
+		cursor->next = __wt_curfile_next_random;
 		cursor->reset = __curfile_reset;
 
 		WT_ERR(__wt_config_gets_def(

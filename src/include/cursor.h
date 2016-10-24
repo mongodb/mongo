@@ -467,7 +467,7 @@ struct __wt_cursor_stat {
 	uint64_t v;			/* Current stats value */
 	WT_ITEM	 pv;			/* Current stats value (string) */
 
-	/* Uses the same values as WT_CONNECTION::stat_flags field */
+	/* Options declared in flags.py, shared by WT_CONNECTION::stat_flags */
 	uint32_t flags;
 };
 
