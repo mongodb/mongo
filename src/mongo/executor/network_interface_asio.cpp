@@ -259,10 +259,12 @@ void NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cbHa
                     // timeout duration - but make no stronger assumption. It is thus possible that
                     // we have already exceeded the timeout. In this case we timeout the operation
                     // manually.
-                    return _completeOperation(op,
-                                              {ErrorCodes::ExceededTimeLimit,
-                                               "Remote command timed out while waiting to get a "
-                                               "connection from the pool."});
+                    std::stringstream msg;
+                    msg << "Remote command timed out while waiting to get a connection from the "
+                        << "pool, took " << getConnectionDuration << ", timeout was set to "
+                        << op->_request.timeout;
+                    auto rs = ResponseStatus(ErrorCodes::ExceededTimeLimit, msg.str());
+                    return _completeOperation(op, rs);
                 }
 
                 // The above conditional guarantees that the adjusted timeout will never underflow.
