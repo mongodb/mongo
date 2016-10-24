@@ -641,8 +641,10 @@ live_update:
 			 * check the value, that would require walking the tree
 			 * as part of the checkpoint. Bound any bug at the size
 			 * of the file.
+			 * It isn't practical to assert that the value is within
+			 * bounds since databases created with older versions
+			 * of WiredTiger (2.8.0) would likely see an error.
 			 */
-			WT_ASSERT(session, ckpt_size <= (uint64_t)block->size);
 			ci->ckpt_size =
 			    WT_MIN(ckpt_size, (uint64_t)block->size);
 
