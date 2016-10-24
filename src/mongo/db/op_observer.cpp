@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/commands/dbhash.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
@@ -173,11 +174,23 @@ void OpObserver::onOpMessage(OperationContext* txn, const BSONObj& msgObj) {
 
 void OpObserver::onCreateCollection(OperationContext* txn,
                                     const NamespaceString& collectionName,
-                                    const CollectionOptions& options) {
+                                    const CollectionOptions& options,
+                                    const BSONObj& idIndex) {
     std::string dbName = collectionName.db().toString() + ".$cmd";
     BSONObjBuilder b;
     b.append("create", collectionName.coll().toString());
     b.appendElements(options.toBSON());
+
+    // Include the full _id index spec in the oplog for index versions >= 2.
+    if (!idIndex.isEmpty()) {
+        auto versionElem = idIndex[IndexDescriptor::kIndexVersionFieldName];
+        invariant(versionElem.isNumber());
+        if (IndexDescriptor::IndexVersion::kV2 <=
+            static_cast<IndexDescriptor::IndexVersion>(versionElem.numberInt())) {
+            b.append("idIndex", idIndex);
+        }
+    }
+
     BSONObj cmdObj = b.obj();
 
     if (!collectionName.isSystemDotProfile()) {

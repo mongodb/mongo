@@ -211,9 +211,10 @@ public:
 
     /**
      * Call this only on an empty collection from inside a WriteUnitOfWork. Index creation on an
-     * empty collection can be rolled back as part of a larger WUOW.
+     * empty collection can be rolled back as part of a larger WUOW. Returns the full specification
+     * of the created index, as it is stored in this index catalog.
      */
-    Status createIndexOnEmptyCollection(OperationContext* txn, BSONObj spec);
+    StatusWith<BSONObj> createIndexOnEmptyCollection(OperationContext* txn, BSONObj spec);
 
     StatusWith<BSONObj> prepareSpecForCreate(OperationContext* txn, const BSONObj& original) const;
 

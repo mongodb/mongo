@@ -299,7 +299,8 @@ StatusWith<BSONObj> IndexCatalog::prepareSpecForCreate(OperationContext* txn,
     return fixed;
 }
 
-Status IndexCatalog::createIndexOnEmptyCollection(OperationContext* txn, BSONObj spec) {
+StatusWith<BSONObj> IndexCatalog::createIndexOnEmptyCollection(OperationContext* txn,
+                                                               BSONObj spec) {
     invariant(txn->lockState()->isCollectionLockedForMode(_collection->ns().toString(), MODE_X));
     invariant(_collection->numRecords(txn) == 0);
 
@@ -342,7 +343,7 @@ Status IndexCatalog::createIndexOnEmptyCollection(OperationContext* txn, BSONObj
     // sanity check
     invariant(_collection->getCatalogEntry()->isIndexReady(txn, descriptor->indexName()));
 
-    return Status::OK();
+    return spec;
 }
 
 IndexCatalog::IndexBuildBlock::IndexBuildBlock(OperationContext* txn,

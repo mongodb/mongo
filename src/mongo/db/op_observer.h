@@ -95,7 +95,8 @@ public:
     void onOpMessage(OperationContext* txn, const BSONObj& msgObj);
     void onCreateCollection(OperationContext* txn,
                             const NamespaceString& collectionName,
-                            const CollectionOptions& options);
+                            const CollectionOptions& options,
+                            const BSONObj& idIndex);
     void onCollMod(OperationContext* txn, const std::string& dbName, const BSONObj& collModCmd);
     void onDropDatabase(OperationContext* txn, const std::string& dbName);
     void onDropCollection(OperationContext* txn, const NamespaceString& collectionName);

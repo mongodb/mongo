@@ -215,6 +215,13 @@
     // returns an error.
     assert.commandFailed(testDB.index_version.createIndex({withV2: 1}, {v: 2, name: "withV2"}));
 
+    testDB.dropDatabase();
+
+    // Test that attempting to create an _id index with v=2 when the featureCompatibilityVersion is
+    // 3.2 returns an error.
+    assert.commandFailed(
+        testDB.runCommand({create: "index_version", idIndex: {key: {_id: 1}, name: "_id_", v: 2}}));
+
     //
     // Index version v=0 and featureCompatibilityVersion=3.2
     //

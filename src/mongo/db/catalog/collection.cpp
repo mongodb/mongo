@@ -918,7 +918,7 @@ Status Collection::truncate(OperationContext* txn) {
 
     // 4) re-create indexes
     for (size_t i = 0; i < indexSpecs.size(); i++) {
-        status = _indexCatalog.createIndexOnEmptyCollection(txn, indexSpecs[i]);
+        status = _indexCatalog.createIndexOnEmptyCollection(txn, indexSpecs[i]).getStatus();
         if (!status.isOK())
             return status;
     }

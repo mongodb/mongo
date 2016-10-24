@@ -63,5 +63,12 @@
         spec.v,
         "Expected 3.4 secondary to build a v=1 index when explicitly requested: " + tojson(spec));
 
+    // Verify that the 3.4 secondary builds a v=1 _id index.
+    allIndexes = secondaryDB.index_version_missing.getIndexes();
+    spec = GetIndexHelpers.findByKeyPattern(allIndexes, {_id: 1});
+    assert.neq(null, spec, "Index with key pattern {_id: 1} not found: " + tojson(allIndexes));
+    assert.eq(
+        1, spec.v, "Expected 3.4 secondary to implicitly build a v=1 _id index: " + tojson(spec));
+
     rst.stopSet();
 })();
