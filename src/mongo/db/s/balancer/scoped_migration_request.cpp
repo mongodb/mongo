@@ -180,7 +180,21 @@ ScopedMigrationRequest ScopedMigrationRequest::createForRecovery(OperationContex
     return ScopedMigrationRequest(txn, nss, minKey);
 }
 
+Status ScopedMigrationRequest::tryToRemoveMigration() {
+    invariant(_txn);
+    BSONObj migrationDocumentIdentifier =
+        BSON(MigrationType::ns(_nss.ns()) << MigrationType::min(_minKey));
+    Status status = grid.catalogClient(_txn)->removeConfigDocuments(
+        _txn, MigrationType::ConfigNS, migrationDocumentIdentifier, kMajorityWriteConcern);
+    if (status.isOK()) {
+        // Don't try to do a no-op remove in the destructor.
+        _txn = nullptr;
+    }
+    return status;
+}
+
 void ScopedMigrationRequest::keepDocumentOnDestruct() {
+    invariant(_txn);
     _txn = nullptr;
     LOG(1) << "Keeping config.migrations document with namespace '" << _nss << "' and minKey '"
            << _minKey << "' for balancer recovery";

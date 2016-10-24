@@ -756,13 +756,28 @@ Status MigrationManager::_processRemoteCommandResponse(
     if (isErrorDueToConfigStepdown(remoteCommandResponse.status,
                                    _state != State::kEnabled && _state != State::kRecovering)) {
         scopedMigrationRequest->keepDocumentOnDestruct();
-        commandStatus = Status(ErrorCodes::BalancerInterrupted,
-                               stream() << "Migration interrupted because the balancer is stopping."
-                                        << causedBy(remoteCommandResponse.status));
+        return {ErrorCodes::BalancerInterrupted,
+                stream() << "Migration interrupted because the balancer is stopping."
+                         << " Command status: "
+                         << remoteCommandResponse.status.toString()};
     } else if (!remoteCommandResponse.isOK()) {
         commandStatus = remoteCommandResponse.status;
     } else {
         commandStatus = extractMigrationStatusFromCommandResponse(remoteCommandResponse.data);
+    }
+
+    // Any failure to remove the migration document should be because the config server is
+    // stepping/shutting down. In this case we must fail the moveChunk command with a retryable
+    // error so that the caller does not move on to other distlock requiring operations that could
+    // fail when the balancer recovers and takes distlocks for migration recovery.
+    Status status = scopedMigrationRequest->tryToRemoveMigration();
+    if (!status.isOK()) {
+        commandStatus = {
+            ErrorCodes::BalancerInterrupted,
+            stream() << "Migration interrupted because the balancer is stopping"
+                     << " and failed to remove the config.migrations document."
+                     << " Command status: "
+                     << (commandStatus.isOK() ? status.toString() : commandStatus.toString())};
     }
 
     return commandStatus;

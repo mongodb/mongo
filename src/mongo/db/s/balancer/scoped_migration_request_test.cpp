@@ -194,6 +194,20 @@ TEST_F(ScopedMigrationRequestTest, CreateMultipleScopedMigrationRequestsForIdent
     checkMigrationsCollectionForDocument(migrateInfo.getName(), 0);
 }
 
+TEST_F(ScopedMigrationRequestTest, TryToRemoveScopedMigrationRequestBeforeDestruct) {
+    MigrateInfo migrateInfo = makeMigrateInfo();
+
+    // Remove the migration document with tryToRemoveMigration().
+    ScopedMigrationRequest scopedMigrationRequest =
+        assertGet(ScopedMigrationRequest::writeMigration(operationContext(), migrateInfo));
+
+    checkMigrationsCollectionForDocument(migrateInfo.getName(), 1);
+
+    ASSERT_OK(scopedMigrationRequest.tryToRemoveMigration());
+
+    checkMigrationsCollectionForDocument(migrateInfo.getName(), 0);
+}
+
 TEST_F(ScopedMigrationRequestTest, MoveAndAssignmentConstructors) {
     MigrateInfo migrateInfo = makeMigrateInfo();
 
