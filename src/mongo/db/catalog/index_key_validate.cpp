@@ -94,7 +94,9 @@ static const std::set<StringData> allowedIdIndexFieldNames = {
     IndexDescriptor::kIndexNameFieldName,
     IndexDescriptor::kIndexVersionFieldName,
     IndexDescriptor::kKeyPatternFieldName,
-    IndexDescriptor::kNamespaceFieldName};
+    IndexDescriptor::kNamespaceFieldName,
+    // Index creation under legacy writeMode can result in an index spec with an _id field.
+    "_id"};
 }
 
 Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion indexVersion) {
@@ -409,16 +411,6 @@ Status validateIdIndexSpec(const BSONObj& indexSpec) {
                 str::stream() << "The field '" << IndexDescriptor::kKeyPatternFieldName
                               << "' for an _id index must be {_id: 1}, but got "
                               << keyPatternElem.Obj()};
-    }
-
-    auto nameElem = indexSpec[IndexDescriptor::kIndexNameFieldName];
-    // validateIndexSpec() should have already verified that 'nameElem' is a string.
-    invariant(nameElem.type() == BSONType::String);
-    if (nameElem.String() != "_id_"_sd) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "The field '" << IndexDescriptor::kIndexNameFieldName
-                              << "' for an _id index must be '_id_', but got "
-                              << nameElem.String()};
     }
 
     return Status::OK();

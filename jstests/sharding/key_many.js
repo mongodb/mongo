@@ -229,7 +229,7 @@
         assert.writeOK(
             c.update(makeObjectDotted(curT.values[3]), {$set: {xx: 17}}, {upsert: true}));
 
-        assert.commandWorked(c.ensureIndex({_id: 1}, {unique: true}));
+        assert.commandWorked(c.ensureIndex({_id: 1}));
 
         // multi update
         var mysum = 0;

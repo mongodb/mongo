@@ -710,19 +710,9 @@ TEST(IdIndexSpecValidateTest, ReturnsAnErrorIfKeyPatternIsIncorrectForIdIndex) {
                                              << 2)));
 }
 
-TEST(IdIndexSpecValidateTest, ReturnsAnErrorIfNameIsIncorrectForIdIndex) {
-    ASSERT_EQ(ErrorCodes::BadValue,
-              validateIdIndexSpec(BSON("key" << BSON("_id" << 1) << "name"
-                                             << "indexName"
-                                             << "ns"
-                                             << kTestNamespace.ns()
-                                             << "v"
-                                             << 2)));
-}
-
-TEST(IdIndexSpecValidateTest, ReturnsOKStatusIfKeyAndNameCorrectForIdIndex) {
+TEST(IdIndexSpecValidateTest, ReturnsOKStatusIfKeyPatternCorrectForIdIndex) {
     ASSERT_OK(validateIdIndexSpec(BSON("key" << BSON("_id" << 1) << "name"
-                                             << "_id_"
+                                             << "anyname"
                                              << "ns"
                                              << kTestNamespace.ns()
                                              << "v"

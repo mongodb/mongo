@@ -45,6 +45,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_metadata.h"
@@ -97,12 +98,27 @@ StatusWith<std::vector<BSONObj>> parseAndValidateIndexSpecs(
                                           << typeName(indexesElem.type())};
                 }
 
-                auto indexSpec = index_key_validate::validateIndexSpec(
+                auto indexSpecStatus = index_key_validate::validateIndexSpec(
                     indexesElem.Obj(), ns, featureCompatibility);
-                if (!indexSpec.isOK()) {
-                    return indexSpec.getStatus();
+                if (!indexSpecStatus.isOK()) {
+                    return indexSpecStatus.getStatus();
                 }
-                indexSpecs.push_back(std::move(indexSpec.getValue()));
+                auto indexSpec = indexSpecStatus.getValue();
+
+                if (IndexDescriptor::isIdIndexPattern(
+                        indexSpec[IndexDescriptor::kKeyPatternFieldName].Obj())) {
+                    auto status = index_key_validate::validateIdIndexSpec(indexSpec);
+                    if (!status.isOK()) {
+                        return status;
+                    }
+                } else if (indexSpec[IndexDescriptor::kIndexNameFieldName].String() == "_id_"_sd) {
+                    return {ErrorCodes::BadValue,
+                            str::stream() << "The index name '_id_' is reserved for the _id index, "
+                                             "which must have key pattern {_id: 1}, found "
+                                          << indexSpec[IndexDescriptor::kKeyPatternFieldName]};
+                }
+
+                indexSpecs.push_back(std::move(indexSpec));
             }
 
             hasIndexesField = true;
@@ -144,12 +160,39 @@ StatusWith<std::vector<BSONObj>> resolveCollectionDefaultProperties(
     std::vector<BSONObj> indexSpecsWithDefaults = std::move(indexSpecs);
 
     for (size_t i = 0, numIndexSpecs = indexSpecsWithDefaults.size(); i < numIndexSpecs; ++i) {
-        auto validatedSpec = index_key_validate::validateIndexSpecCollation(
+        auto indexSpecStatus = index_key_validate::validateIndexSpecCollation(
             txn, indexSpecsWithDefaults[i], collection->getDefaultCollator());
-        if (!validatedSpec.isOK()) {
-            return validatedSpec.getStatus();
+        if (!indexSpecStatus.isOK()) {
+            return indexSpecStatus.getStatus();
         }
-        indexSpecsWithDefaults[i] = validatedSpec.getValue();
+        auto indexSpec = indexSpecStatus.getValue();
+
+        if (IndexDescriptor::isIdIndexPattern(
+                indexSpec[IndexDescriptor::kKeyPatternFieldName].Obj())) {
+            std::unique_ptr<CollatorInterface> indexCollator;
+            if (auto collationElem = indexSpec[IndexDescriptor::kCollationFieldName]) {
+                auto collatorStatus = CollatorFactoryInterface::get(txn->getServiceContext())
+                                          ->makeFromBSON(collationElem.Obj());
+                // validateIndexSpecCollation() should have checked that the index collation spec is
+                // valid.
+                invariantOK(collatorStatus.getStatus());
+                indexCollator = std::move(collatorStatus.getValue());
+            }
+            if (!CollatorInterface::collatorsMatch(collection->getDefaultCollator(),
+                                                   indexCollator.get())) {
+                return {ErrorCodes::BadValue,
+                        str::stream() << "The _id index must have the same collation as the "
+                                         "collection. Index collation: "
+                                      << (indexCollator.get() ? indexCollator->getSpec().toBSON()
+                                                              : CollationSpec::kSimpleSpec)
+                                      << ", collection collation: "
+                                      << (collection->getDefaultCollator()
+                                              ? collection->getDefaultCollator()->getSpec().toBSON()
+                                              : CollationSpec::kSimpleSpec)};
+            }
+        }
+
+        indexSpecsWithDefaults[i] = indexSpec;
     }
 
     return indexSpecsWithDefaults;

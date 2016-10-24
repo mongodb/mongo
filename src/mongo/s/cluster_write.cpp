@@ -104,7 +104,7 @@ BSONObj createIndexDoc(const string& ns,
         indexDoc.append("collation", collation);
     }
 
-    if (unique) {
+    if (unique && !IndexDescriptor::isIdIndexPattern(keys)) {
         indexDoc.appendBool("unique", unique);
     }
 

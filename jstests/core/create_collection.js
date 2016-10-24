@@ -52,11 +52,13 @@
         db.createCollection("create_collection", {idIndex: {key: {a: 1}, name: "_id_"}}),
         ErrorCodes.BadValue);
 
-    // "idIndex" field must have name equal to "_id_".
+    // The name of an _id index gets corrected to "_id_".
     db.create_collection.drop();
-    assert.commandFailedWithCode(
-        db.createCollection("create_collection", {idIndex: {key: {_id: 1}, name: "a_1"}}),
-        ErrorCodes.BadValue);
+    assert.commandWorked(
+        db.createCollection("create_collection", {idIndex: {key: {_id: 1}, name: "a_1"}}));
+    var indexSpec = GetIndexHelpers.findByKeyPattern(db.create_collection.getIndexes(), {_id: 1});
+    assert.neq(indexSpec, null);
+    assert.eq(indexSpec.name, "_id_", tojson(indexSpec));
 
     // "idIndex" field must only contain fields that are allowed for an _id index.
     db.create_collection.drop();
@@ -69,7 +71,7 @@
     db.create_collection.drop();
     assert.commandWorked(
         db.createCollection("create_collection", {idIndex: {key: {_id: 1}, name: "_id_"}}));
-    var indexSpec = GetIndexHelpers.findByName(db.create_collection.getIndexes(), "_id_");
+    indexSpec = GetIndexHelpers.findByName(db.create_collection.getIndexes(), "_id_");
     assert.neq(indexSpec, null);
     assert.eq(indexSpec.v, 2, tojson(indexSpec));
 
