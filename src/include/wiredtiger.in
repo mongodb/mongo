@@ -1284,6 +1284,9 @@ struct __wt_session {
 	 * @configstart{WT_SESSION.join, see dist/api_data.py}
 	 * @config{bloom_bit_count, the number of bits used per item for the
 	 * bloom filter., an integer between 2 and 1000; default \c 16.}
+	 * @config{bloom_false_positives, return all values that pass the bloom
+	 * filter\, without eliminating any false positives., a boolean flag;
+	 * default \c false.}
 	 * @config{bloom_hash_count, the number of hash values per item for the
 	 * bloom filter., an integer between 2 and 100; default \c 8.}
 	 * @config{compare, modifies the set of items to be returned so that the

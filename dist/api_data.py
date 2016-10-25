@@ -869,6 +869,10 @@ methods = {
     Config('bloom_bit_count', '16', r'''
         the number of bits used per item for the bloom filter''',
         min='2', max='1000'),
+    Config('bloom_false_positives', 'false', r'''
+        return all values that pass the bloom filter, without eliminating
+        any false positives''',
+        type='boolean'),
     Config('bloom_hash_count', '8', r'''
         the number of hash values per item for the bloom filter''',
         min='2', max='100'),

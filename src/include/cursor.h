@@ -365,9 +365,11 @@ struct __wt_cursor_join_entry {
 	uint32_t		 bloom_hash_count; /* hash functions in bloom */
 	uint64_t		 count;		/* approx number of matches */
 
-#define	WT_CURJOIN_ENTRY_BLOOM		0x01	/* use a bloom filter */
-#define	WT_CURJOIN_ENTRY_DISJUNCTION	0x02	/* endpoints are or-ed */
-#define	WT_CURJOIN_ENTRY_OWN_BLOOM	0x04	/* this entry owns the bloom */
+#define	WT_CURJOIN_ENTRY_BLOOM		 0x01	/* use a bloom filter */
+#define	WT_CURJOIN_ENTRY_DISJUNCTION	 0x02	/* endpoints are or-ed */
+#define	WT_CURJOIN_ENTRY_FALSE_POSITIVES 0x04	/* after bloom filter do not
+						 * filter false positives */
+#define	WT_CURJOIN_ENTRY_OWN_BLOOM	 0x08	/* this entry owns the bloom */
 	uint8_t			 flags;
 
 	WT_CURSOR_JOIN_ENDPOINT	*ends;		/* reference endpoints */

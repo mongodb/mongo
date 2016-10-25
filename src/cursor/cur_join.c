@@ -613,8 +613,8 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 	if (entry->bloom != NULL) {
 		/*
 		 * If the item is not in the Bloom filter, we return
-		 * immediately, otherwise, we still need to check the long
-		 * way, since it may be a false positive.
+		 * immediately, otherwise, we still may need to check the
+		 * long way, since it may be a false positive.
 		 *
 		 * If we don't own the Bloom filter, we must be sharing one
 		 * in a previous entry. So the shared filter has already
@@ -623,6 +623,8 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 		 */
 		if (F_ISSET(entry, WT_CURJOIN_ENTRY_OWN_BLOOM))
 			WT_ERR(__wt_bloom_inmem_get(entry->bloom, key));
+		if (F_ISSET(entry, WT_CURJOIN_ENTRY_FALSE_POSITIVES))
+			return (0);
 		bloom_found = true;
 	}
 	if (entry->subjoin != NULL) {
@@ -1441,6 +1443,11 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		    F_MASK(entry, WT_CURJOIN_ENTRY_BLOOM))
 			WT_RET_MSG(session, EINVAL,
 			    "join has incompatible strategy "
+			    "values for the same index");
+		if (LF_MASK(WT_CURJOIN_ENTRY_FALSE_POSITIVES) !=
+		    F_MASK(entry, WT_CURJOIN_ENTRY_FALSE_POSITIVES))
+			WT_RET_MSG(session, EINVAL,
+			    "join has incompatible bloom_false_positives "
 			    "values for the same index");
 
 		/*

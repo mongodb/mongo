@@ -963,6 +963,10 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 	if (LF_ISSET(WT_CURJOIN_ENTRY_BLOOM) && count == 0)
 		WT_ERR_MSG(session, EINVAL,
 		    "count must be nonzero when strategy=bloom");
+	WT_ERR(__wt_config_gets_def(
+	    session, cfg, "bloom_false_positives", 0, &cval));
+	if (cval.val != 0)
+		LF_SET(WT_CURJOIN_ENTRY_FALSE_POSITIVES);
 
 	WT_ERR(__wt_config_gets(session, cfg, "operation", &cval));
 	if (cval.len != 0 && WT_STRING_MATCH("or", cval.str, cval.len))
