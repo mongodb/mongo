@@ -327,9 +327,23 @@ void Balancer::_mainThread() {
         break;
     }
 
+    auto balancerConfig = shardingContext->getBalancerConfiguration();
+    while (!_stopRequested()) {
+        Status refreshStatus = balancerConfig->refreshAndCheck(txn.get());
+        if (!refreshStatus.isOK()) {
+            warning() << "Balancer settings could not be loaded and will be retried in "
+                      << durationCount<Seconds>(kInitBackoffInterval) << " seconds"
+                      << causedBy(refreshStatus);
+
+            _sleepFor(txn.get(), kInitBackoffInterval);
+            continue;
+        }
+
+        break;
+    }
+
     log() << "CSRS balancer thread is recovering";
 
-    auto balancerConfig = Grid::get(txn.get())->getBalancerConfiguration();
     _migrationManager.finishRecovery(txn.get(),
                                      balancerConfig->getMaxChunkSizeBytes(),
                                      balancerConfig->getSecondaryThrottle(),
@@ -339,8 +353,6 @@ void Balancer::_mainThread() {
 
     // Main balancer loop
     while (!_stopRequested()) {
-        auto balancerConfig = shardingContext->getBalancerConfiguration();
-
         BalanceRoundDetails roundDetails;
 
         _beginRound(txn.get());
