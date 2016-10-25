@@ -303,7 +303,7 @@ protected:
             if (connIds.count(newConn->get()->getConnectionId()) == 0) {
                 notReusedConns++;
             }
-            ASSERT_EQ(notReusedConns, prevNumBadConns - globalConnPool.getNumBadConns(TARGET_HOST));
+            ASSERT_EQ(notReusedConns, globalConnPool.getNumBadConns(TARGET_HOST) - prevNumBadConns);
             newConnList.push_back(newConn);
         }
 
