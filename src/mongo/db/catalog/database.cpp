@@ -667,7 +667,10 @@ void Database::dropDatabase(OperationContext* txn, Database* db) {
     dbHolder().close(txn, name);
     db = NULL;  // d is now deleted
 
-    getGlobalServiceContext()->getGlobalStorageEngine()->dropDatabase(txn, name);
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        getGlobalServiceContext()->getGlobalStorageEngine()->dropDatabase(txn, name);
+    }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "dropDatabase", db->name());
 }
 
 Status userCreateNS(OperationContext* txn,
