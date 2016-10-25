@@ -131,7 +131,6 @@ BackgroundSync::BackgroundSync(
     : _oplogBuffer(std::move(oplogBuffer)),
       _replCoord(getGlobalReplicationCoordinator()),
       _replicationCoordinatorExternalState(replicationCoordinatorExternalState),
-      _syncSourceResolver(_replCoord),
       _lastOpTimeFetched(Timestamp(std::numeric_limits<int>::max(), 0),
                          std::numeric_limits<long long>::max()) {
     // Update "repl.buffer.maxSizeBytes" server status metric to reflect the current oplog buffer's
@@ -288,7 +287,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
     }
 
     SyncSourceResolverResponse syncSourceResp =
-        _syncSourceResolver.findSyncSource(txn, lastOpTimeFetched);
+        _replCoord->selectSyncSource(txn, lastOpTimeFetched);
 
     if (syncSourceResp.syncSourceStatus == ErrorCodes::OplogStartMissing) {
         // All (accessible) sync sources were too stale.

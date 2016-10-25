@@ -37,7 +37,6 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
@@ -173,10 +172,6 @@ private:
 
     // A pointer to the replication coordinator external state.
     ReplicationCoordinatorExternalState* _replicationCoordinatorExternalState;
-
-    // Used to determine sync source.
-    // TODO(dannenberg) move into DataReplicator.
-    SyncSourceResolver _syncSourceResolver;
 
     // _mutex protects all of the class variables declared below.
     mutable stdx::mutex _mutex;
