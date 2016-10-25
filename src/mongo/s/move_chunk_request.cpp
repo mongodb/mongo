@@ -32,6 +32,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/logger/redaction.h"
 
 namespace mongo {
 namespace {
@@ -190,6 +191,14 @@ bool MoveChunkRequest::operator==(const MoveChunkRequest& other) const {
 
 bool MoveChunkRequest::operator!=(const MoveChunkRequest& other) const {
     return !(*this == other);
+}
+
+std::string MoveChunkRequest::toString() const {
+    std::stringstream ss;
+    ss << "ns: " << getNss().ns() << ", " << redact(ChunkRange(getMinKey(), getMaxKey()).toString())
+       << ", fromShard: " << getFromShardId() << ", toShard: " << getToShardId();
+
+    return ss.str();
 }
 
 }  // namespace mongo

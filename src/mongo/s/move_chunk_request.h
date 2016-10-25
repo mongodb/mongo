@@ -130,6 +130,11 @@ public:
     bool operator==(const MoveChunkRequest& other) const;
     bool operator!=(const MoveChunkRequest& other) const;
 
+    /**
+     *  Print logging info for the request.
+     */
+    std::string toString() const;
+
 private:
     MoveChunkRequest(NamespaceString nss,
                      ChunkRange range,
