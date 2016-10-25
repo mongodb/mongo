@@ -753,6 +753,33 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='sync_source_resolver',
+    source=[
+        'sync_source_resolver.cpp',
+    ],
+    LIBDEPS=[
+        'oplog_entry',
+        'optime',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/fetcher',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
+		'$BUILD_DIR/mongo/rpc/metadata',
+        '$BUILD_DIR/mongo/util/net/hostandport',
+    ],
+)
+
+env.CppUnitTest(
+    target='sync_source_resolver_test',
+    source='sync_source_resolver_test.cpp',
+    LIBDEPS=[
+        'sync_source_resolver',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
+    ],
+)
+
+env.Library(
     target='base_cloner_test_fixture',
     source=[
         'base_cloner_test_fixture.cpp',
@@ -1091,7 +1118,6 @@ env.Library(
         "rs_initialsync.cpp",
         "rs_sync.cpp",
         "sync_source_feedback.cpp",
-        "sync_source_resolver.cpp", # TODO(dannenberg) move this into DataReplicator in repl/SConscript.
     ],
     LIBDEPS=[
         'bgsync',

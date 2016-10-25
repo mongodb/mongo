@@ -515,6 +515,11 @@ public:
      */
     ~InNetworkGuard();
 
+    /**
+     * Returns network interface mock pointer.
+     */
+    NetworkInterfaceMock* operator->() const;
+
 private:
     NetworkInterfaceMock* _net;
     bool _callExitNetwork = true;

@@ -28,22 +28,32 @@
 
 #pragma once
 
+#include <memory>
+
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/client/fetcher.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
 class OperationContext;
 class Status;
+class OperationContext;
 
 namespace repl {
 
-class ReplicationCoordinator;
+class SyncSourceSelector;
 
 /**
- * SyncSourceResolverResponse contains the result of a call to findSyncSource. This result will
+ * SyncSourceResolverResponse contains the result from running SyncSourceResolver. This result will
  * indicate one of the following:
  *          1. A new sync source was selected. isOK() will return true and getSyncSource() will
  *              return the HostAndPort of the new sync source.
@@ -72,28 +82,117 @@ struct SyncSourceResolverResponse {
 
 /**
  * Supplies a sync source to Fetcher, Rollback and Reporter.
+ * Obtains sync source candidates to probe from SyncSourceSelector.
+ * Each instance is created as needed whenever a new sync source is required and
+ * is meant to be discarded after the sync source resolution is finished - 'onCompletion'
+ * callback is invoked with the results contained in SyncSourceResolverResponse.
  */
 class SyncSourceResolver {
 public:
-    SyncSourceResolver(ReplicationCoordinator* replCoord) : _replCoord(replCoord){};
+    static const NamespaceString kLocalOplogNss;
+    static const Seconds kFetcherTimeout;
+    static const Seconds kFetcherErrorBlacklistDuration;
+    static const Seconds kOplogEmptyBlacklistDuration;
+    static const Seconds kFirstOplogEntryEmptyBlacklistDuration;
+    static const Seconds kFirstOplogEntryNullTimestampBlacklistDuration;
+    static const Minutes kTooStaleBlacklistDuration;
 
     /**
-     * Uses the provided lastOpTimeFetched and replCoord to find a new sync source for
-     * DataReplicator components.
+     * Callback function to report final status of resolving sync source.
      */
-    SyncSourceResolverResponse findSyncSource(OperationContext* txn,
-                                              const OpTime& lastOpTimeFetched);
+    typedef stdx::function<void(const SyncSourceResolverResponse&)> OnCompletionFn;
+
+    SyncSourceResolver(executor::TaskExecutor* taskExecutor,
+                       SyncSourceSelector* syncSourceSelector,
+                       const OpTime& lastOpTimeFetched,
+                       const OnCompletionFn& onCompletion);
+    virtual ~SyncSourceResolver();
 
     /**
-     * Returns current sync source, which may be empty if there is no valid sync source available.
+     * Returns true if we are currently probing sync source candidates.
      */
-    HostAndPort getActiveSyncSource();
+    bool isActive() const;
+
+    /**
+     * Starts probing sync source candidates returned by the sync source selector.
+     */
+    Status startup();
+
+    /**
+     * Cancels all remote commands.
+     */
+    void shutdown();
+
+    /**
+     * Block until inactive.
+     */
+    void join();
 
 private:
-    ReplicationCoordinator* _replCoord;
-    // Protects _syncSource.
-    stdx::mutex _mutex;
-    HostAndPort _syncSource;
+    bool _isActive_inlock() const;
+    bool _isShuttingDown() const;
+
+    /**
+     * Returns new sync source from selector.
+     */
+    StatusWith<HostAndPort> _chooseNewSyncSource();
+
+    /**
+     * Creates fetcher to read the first oplog entry on sync source.
+     */
+    std::unique_ptr<Fetcher> _makeFirstOplogEntryFetcher(HostAndPort candidate,
+                                                         OpTime earliestOpTimeSeen);
+
+    /**
+     * Schedules fetcher to read oplog on sync source.
+     * Saves fetcher in '_fetcher' on success.
+     */
+    Status _scheduleFetcher(std::unique_ptr<Fetcher> fetcher);
+
+    /**
+     * Returns optime of first oplog entry from fetcher response.
+     * Returns null optime on error.
+     */
+    OpTime _parseRemoteEarliestOpTime(const HostAndPort& candidate,
+                                      const Fetcher::QueryResponse& queryResponse);
+
+    /**
+     * Callback for fetching first oplog entry on sync source.
+     */
+    void _firstOplogEntryFetcherCallback(const StatusWith<Fetcher::QueryResponse>& queryResult,
+                                         HostAndPort candidate,
+                                         OpTime earliestOpTimeSeen);
+
+    /**
+     * Obtains new sync source candidate and schedules remote command to fetcher first oplog entry.
+     * May transition state to Complete.
+     * Returns status that could be used as result for startup().
+     */
+    Status _chooseAndProbeNextSyncSource(OpTime earliestOpTimeSeen);
+
+    /**
+     * Invokes completion callback and transitions state to State::kComplete.
+     * Returns result.getStatus().
+     */
+    Status _finishCallback(StatusWith<HostAndPort> result);
+    Status _finishCallback(const SyncSourceResolverResponse& response);
+
+    executor::TaskExecutor* const _taskExecutor;
+    SyncSourceSelector* const _syncSourceSelector;
+    const OpTime _lastOpTimeFetched;
+    const OnCompletionFn _onCompletion;
+
+    // Protects members of this sync source resolver.
+    mutable stdx::mutex _mutex;
+    mutable stdx::condition_variable _condition;
+    enum class State { kPreStart, kRunning, kShuttingDown, kComplete };
+    State _state = State::kPreStart;
+
+    // Fetches first oplog entry on sync source candidate.
+    std::unique_ptr<Fetcher> _fetcher;
+
+    // Holds reference to fetcher in the process of shutting down.
+    std::unique_ptr<Fetcher> _shuttingDownFetcher;
 };
 
 }  // namespace repl

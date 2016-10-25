@@ -664,6 +664,10 @@ NetworkInterfaceMock::InNetworkGuard::~InNetworkGuard() {
         _net->exitNetwork();
 }
 
+NetworkInterfaceMock* NetworkInterfaceMock::InNetworkGuard::operator->() const {
+    return _net;
+}
+
 NetworkInterfaceMockClockSource::NetworkInterfaceMockClockSource(NetworkInterfaceMock* net)
     : _net(net) {
     _tracksSystemClock = false;
