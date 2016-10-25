@@ -81,18 +81,30 @@ public:
     StatusWith<std::vector<BSONObj>> filterCollectionsForClone(
         const CloneOptions& opts, const std::list<BSONObj>& initialCollections);
 
-    // Executes 'createCollection' for each collection specified in 'collections', in 'dbName'.
+    struct CreateCollectionParams {
+        std::string collectionName;
+        BSONObj collectionInfo;
+        BSONObj idIndexSpec;
+    };
+
+    // Executes 'createCollection' for each collection described in 'createCollectionParams', in
+    // 'dbName'.
     Status createCollectionsForDb(OperationContext* txn,
-                                  const std::vector<BSONObj>& collections,
+                                  const std::vector<CreateCollectionParams>& createCollectionParams,
                                   const std::string& dbName);
+
+    /*
+     * Returns the _id index spec from 'indexSpecs', or an empty BSONObj if none is found.
+     */
+    static BSONObj getIdIndexSpec(const std::list<BSONObj>& indexSpecs);
 
 private:
     void copy(OperationContext* txn,
               const std::string& toDBName,
               const NamespaceString& from_ns,
               const BSONObj& from_opts,
+              const BSONObj& from_id_index,
               const NamespaceString& to_ns,
-              bool masterSameProcess,
               const CloneOptions& opts,
               Query q);
 
@@ -100,9 +112,8 @@ private:
                      const std::string& toDBName,
                      const NamespaceString& from_ns,
                      const BSONObj& from_opts,
-                     const NamespaceString& to_ns,
-                     bool masterSameProcess,
-                     bool slaveOk);
+                     const std::list<BSONObj>& from_indexes,
+                     const NamespaceString& to_ns);
 
     struct Fun;
     std::unique_ptr<DBClientBase> _conn;

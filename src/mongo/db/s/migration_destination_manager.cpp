@@ -467,6 +467,21 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
 
     DisableDocumentValidation validationDisabler(txn);
 
+    std::vector<BSONObj> indexSpecs;
+    BSONObj idIndexSpec;
+    {
+        auto indexes = conn->getIndexSpecs(_nss.ns());
+        for (auto&& spec : indexes) {
+            indexSpecs.push_back(spec);
+            if (auto indexNameElem = spec[IndexDescriptor::kIndexNameFieldName]) {
+                if (indexNameElem.type() == BSONType::String &&
+                    indexNameElem.valueStringData() == "_id_"_sd) {
+                    idIndexSpec = spec;
+                }
+            }
+        }
+    }
+
     {
         // 0. copy system.namespaces entry if collection doesn't already exist
 
@@ -496,7 +511,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
             }
 
             WriteUnitOfWork wuow(txn);
-            Status status = userCreateNS(txn, db, _nss.ns(), options, false);
+            Status status = userCreateNS(txn, db, _nss.ns(), options, true, idIndexSpec);
             if (!status.isOK()) {
                 warning() << "failed to create collection [" << _nss << "] "
                           << " with options " << options << ": " << redact(status);
@@ -507,13 +522,6 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
 
     {
         // 1. copy indexes
-
-        std::vector<BSONObj> indexSpecs;
-
-        {
-            const std::list<BSONObj> indexes = conn->getIndexSpecs(_nss.ns());
-            indexSpecs.insert(indexSpecs.begin(), indexes.begin(), indexes.end());
-        }
 
         ScopedTransaction scopedXact(txn, MODE_IX);
         Lock::DBLock lk(txn->lockState(), _nss.db(), MODE_X);

@@ -339,10 +339,27 @@ Status _initialSync(OperationContext* txn, BackgroundSync* bgsync) {
         }
         auto collections = fetchStatus.getValue();
 
+        std::vector<Cloner::CreateCollectionParams> createCollectionParams;
+        for (auto&& collection : collections) {
+            Cloner::CreateCollectionParams params;
+            params.collectionName = collection["name"].String();
+            params.collectionInfo = collection;
+
+            if (auto idIndex = collection["idIndex"]) {
+                params.idIndexSpec = idIndex.Obj();
+            } else {
+                const NamespaceString nss(options.fromDB, params.collectionName);
+                auto indexSpecs = r.conn()->getIndexSpecs(nss.ns());
+                params.idIndexSpec = Cloner::getIdIndexSpec(indexSpecs);
+            }
+
+            createCollectionParams.push_back(params);
+        }
+
         ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock dbWrite(txn->lockState(), db, MODE_X);
 
-        auto createStatus = cloner.createCollectionsForDb(txn, collections, db);
+        auto createStatus = cloner.createCollectionsForDb(txn, createCollectionParams, db);
         if (!createStatus.isOK()) {
             return createStatus;
         }
