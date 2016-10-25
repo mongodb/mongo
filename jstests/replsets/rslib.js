@@ -186,9 +186,17 @@ var awaitRSClientHosts;
                 assert.eq(rs.length, rsStatus.members.length, tojson(rsStatus));
                 ot = rsStatus.members[0].optime;
                 for (var i = 1; i < rsStatus.members.length; ++i) {
-                    otherOt = rsStatus.members[i].optime;
-                    if (bsonWoCompare({ts: otherOt.ts}, {ts: ot.ts}) ||
-                        bsonWoCompare({t: otherOt.t}, {t: ot.t})) {
+                    var otherNode = rsStatus.members[i];
+
+                    // Must be in PRIMARY or SECONDARY state.
+                    if (otherNode.state != ReplSetTest.State.PRIMARY &&
+                        otherNode.state != ReplSetTest.State.SECONDARY) {
+                        return false;
+                    }
+
+                    // Fail if optimes are not equal.
+                    otherOt = otherNode.optime;
+                    if (!friendlyEqual(otherOt, ot)) {
                         firstConflictingIndex = i;
                         return false;
                     }
