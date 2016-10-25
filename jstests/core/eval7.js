@@ -1,5 +1,5 @@
 assert.writeOK(db.evalprep.insert({}), "db must exist for eval to succeed");
-assert(db.evalprep.drop());
+db.evalprep.drop();
 
 assert.eq(6, db.eval("5 + 1"), "A");
 assert.throws(function(z) {

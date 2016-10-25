@@ -1,5 +1,5 @@
 assert.writeOK(db.evalprep.insert({}), "db must exist for eval to succeed");
-assert(db.evalprep.drop());
+db.evalprep.drop();
 
 a = [1, "asd", null, [2, 3], new Date(), {x: 1}];
 
