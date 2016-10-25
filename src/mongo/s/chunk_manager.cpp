@@ -77,8 +77,7 @@ using std::vector;
 namespace {
 
 /**
- * This is an adapter so we can use config diffs - mongos and mongod do them slightly
- * differently
+ * This is an adapter so we can use config diffs - mongos and mongod do them slightly differently.
  *
  * The mongos adapter here tracks all shards, and stores ranges by (max, Chunk) in the map.
  */
@@ -115,7 +114,6 @@ public:
 private:
     ChunkManager* const _manager;
 };
-
 
 bool allOfType(BSONType type, const BSONObj& o) {
     BSONObjIterator it(o);
@@ -207,6 +205,8 @@ ChunkManager::ChunkManager(OperationContext* txn, const CollectionType& coll)
 }
 
 void ChunkManager::loadExistingRanges(OperationContext* txn, const ChunkManager* oldManager) {
+    invariant(!_version.isSet());
+
     int tries = 3;
 
     while (tries--) {
@@ -217,24 +217,29 @@ void ChunkManager::loadExistingRanges(OperationContext* txn, const ChunkManager*
 
         Timer t;
 
-        bool success = _load(txn, chunkMap, shardIds, &shardVersions, oldManager);
-        if (success) {
-            log() << "ChunkManager: time to load chunks for " << _ns << ": " << t.millis() << "ms"
-                  << " sequenceNumber: " << _sequenceNumber << " version: " << _version.toString()
-                  << " based on: "
-                  << (oldManager ? oldManager->getVersion().toString() : "(empty)");
+        log() << "ChunkManager loading chunks for " << _ns << " sequenceNumber: " << _sequenceNumber
+              << " based on: " << (oldManager ? oldManager->getVersion().toString() : "(empty)");
 
+        if (_load(txn, chunkMap, shardIds, &shardVersions, oldManager)) {
             // TODO: Merge into diff code above, so we validate in one place
             if (isChunkMapValid(chunkMap)) {
-                _chunkMap.swap(chunkMap);
-                _shardIds.swap(shardIds);
-                _shardVersions.swap(shardVersions);
+                _chunkMap = std::move(chunkMap);
+                _shardIds = std::move(shardIds);
+                _shardVersions = std::move(shardVersions);
                 _chunkRangeMap = _constructRanges(_chunkMap);
-                return;
+
+                log() << "ChunkManager load took " << t.millis() << " ms and found version "
+                      << _version;
+            } else {
+                warning() << "ChunkManager load took " << t.millis()
+                          << " ms and found invalid chunk ranges at version " << _version;
             }
+
+            return;
         }
 
-        warning() << "ChunkManager loaded an invalid config for " << _ns << ", trying again";
+        warning() << "ChunkManager load failed after " << t.millis()
+                  << " ms and will be retried up to " << tries << " more times";
 
         sleepmillis(10 * (3 - tries));
     }

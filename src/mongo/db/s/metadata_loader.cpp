@@ -95,9 +95,9 @@ Status MetadataLoader::makeCollectionMetadata(OperationContext* txn,
                                               const string& shard,
                                               const CollectionMetadata* oldMetadata,
                                               CollectionMetadata* metadata) {
-    Status status = _initCollection(txn, catalogClient, ns, shard, metadata);
-    if (!status.isOK() || metadata->getKeyPattern().isEmpty()) {
-        return status;
+    Status initCollectionStatus = _initCollection(txn, catalogClient, ns, shard, metadata);
+    if (!initCollectionStatus.isOK()) {
+        return initCollectionStatus;
     }
 
     return _initChunks(txn, catalogClient, ns, shard, oldMetadata, metadata);
@@ -183,11 +183,6 @@ Status MetadataLoader::_initChunks(OperationContext* txn,
                                                  nullptr,
                                                  repl::ReadConcernLevel::kMajorityReadConcern);
         if (!status.isOK()) {
-            if (status == ErrorCodes::HostUnreachable) {
-                // Make our metadata invalid
-                metadata->_collVersion = ChunkVersion(0, 0, OID());
-                metadata->_chunksMap.clear();
-            }
             return status;
         }
 
@@ -221,35 +216,22 @@ Status MetadataLoader::_initChunks(OperationContext* txn,
             // TODO: drop the config.collections entry *before* the chunks and eliminate this
             // ambiguity
 
-            string errMsg = str::stream()
-                << "no chunks found when reloading " << ns << ", previous version was "
-                << metadata->_collVersion.toString() << (fullReload ? ", this is a drop" : "");
-
-            warning() << errMsg;
-
-            metadata->_collVersion = ChunkVersion(0, 0, OID());
-            metadata->_chunksMap.clear();
-
-            return fullReload ? Status(ErrorCodes::NamespaceNotFound, errMsg)
-                              : Status(ErrorCodes::RemoteChangeDetected, errMsg);
+            return {fullReload ? ErrorCodes::NamespaceNotFound : ErrorCodes::RemoteChangeDetected,
+                    str::stream() << "No chunks found when reloading " << ns
+                                  << ", previous version was "
+                                  << metadata->_collVersion.toString()
+                                  << (fullReload ? ", this is a drop" : "")};
         } else {
-            // Invalid chunks found, our epoch may have changed because we dropped/recreated
-            // the collection.
-            string errMsg = str::stream()
-                << "invalid chunks found when reloading " << ns << ", previous version was "
-                << metadata->_collVersion.toString() << ", this should be rare";
-            warning() << errMsg;
-
-            metadata->_collVersion = ChunkVersion(0, 0, OID());
-            metadata->_chunksMap.clear();
-
-            return Status(ErrorCodes::RemoteChangeDetected, errMsg);
+            // Invalid chunks found, our epoch may have changed because we dropped/recreated the
+            // collection
+            return {ErrorCodes::RemoteChangeDetected,
+                    str::stream() << "Invalid chunks found when reloading " << ns
+                                  << ", previous version was "
+                                  << metadata->_collVersion.toString()
+                                  << ", this should be rare"};
         }
-    } catch (const DBException& e) {
-        // We deliberately do not return connPtr to the pool, since it was involved with the
-        // error here.
-        return Status(ErrorCodes::HostUnreachable,
-                      str::stream() << "problem querying chunks metadata" << causedBy(e));
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 }
 

@@ -105,8 +105,15 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
             }
 
             coll._keyPattern = KeyPattern(obj.getOwned());
-        } else if ((status == ErrorCodes::NoSuchKey) && coll.getDropped()) {
-            // Sharding key can be missing if the collection is dropped
+        } else if (status == ErrorCodes::NoSuchKey) {
+            // Sharding key can only be missing if the collection is dropped
+            if (!coll.getDropped()) {
+                return {status.code(),
+                        str::stream() << "Shard key for collection " << coll._fullNs->ns()
+                                      << " is missing, but the collection is not marked as "
+                                         "dropped. This is an indication of corrupted sharding "
+                                         "metadata."};
+            }
         } else {
             return status;
         }

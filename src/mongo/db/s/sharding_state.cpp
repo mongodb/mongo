@@ -668,49 +668,56 @@ StatusWith<ChunkVersion> ShardingState::_refreshMetadata(
         }
     }
 
-    // The _configServerTickets serializes this process such that only a small number of threads
-    // can try to refresh at the same time
+    // The _configServerTickets serializes this process such that only a small number of threads can
+    // try to refresh at the same time in order to avoid overloading the config server
     _configServerTickets.waitForTicket();
     TicketHolderReleaser needTicketFrom(&_configServerTickets);
 
-    LOG(1) << "Remotely refreshing metadata for " << nss.ns() << ", based on collection version "
-           << (metadataForDiff ? metadataForDiff->getCollVersion().toString() : "(empty)");
+    Timer t;
+
+    log() << "MetadataLoader loading chunks for " << nss.ns() << " based on: "
+          << (metadataForDiff ? metadataForDiff->getCollVersion().toString() : "(empty)");
 
     std::unique_ptr<CollectionMetadata> remoteMetadata(stdx::make_unique<CollectionMetadata>());
 
-    {
-        Timer refreshTimer;
+    Status status = MetadataLoader::makeCollectionMetadata(txn,
+                                                           grid.catalogClient(txn),
+                                                           nss.ns(),
+                                                           getShardName(),
+                                                           metadataForDiff,
+                                                           remoteMetadata.get());
 
-        Status status = MetadataLoader::makeCollectionMetadata(txn,
-                                                               grid.catalogClient(txn),
-                                                               nss.ns(),
-                                                               getShardName(),
-                                                               metadataForDiff,
-                                                               remoteMetadata.get());
+    if (!status.isOK() && status != ErrorCodes::NamespaceNotFound) {
+        warning() << "MetadataLoader failed after " << t.millis() << " ms"
+                  << causedBy(redact(status));
 
-        if (status.code() == ErrorCodes::NamespaceNotFound) {
-            remoteMetadata.reset();
-        } else if (!status.isOK()) {
-            warning() << "Could not remotely refresh metadata for " << nss.ns()
-                      << causedBy(redact(status));
-
-            return status;
-        }
+        return status;
     }
 
-    // Exclusive collection lock needed since we're now potentially changing the metadata, and
-    // don't want reads/writes to be ongoing
+    // Exclusive collection lock needed since we're now changing the metadata
     ScopedTransaction transaction(txn, MODE_IX);
     AutoGetCollection autoColl(txn, nss, MODE_IX, MODE_X);
 
     auto css = CollectionShardingState::get(txn, nss);
 
-    // Resolve newer pending chunks with the remote metadata, finish construction
-    css->refreshMetadata(txn, std::move(remoteMetadata));
+    if (status.isOK()) {
+        css->refreshMetadata(txn, std::move(remoteMetadata));
 
-    auto metadata = css->getMetadata();
+        auto metadata = css->getMetadata();
 
-    return (metadata ? metadata->getShardVersion() : ChunkVersion::UNSHARDED());
+        log() << "MetadataLoader took " << t.millis() << " ms and found version "
+              << metadata->getCollVersion();
+
+        return metadata->getShardVersion();
+    }
+
+    invariant(status == ErrorCodes::NamespaceNotFound);
+
+    css->refreshMetadata(txn, nullptr);
+
+    log() << "MetadataLoader took " << t.millis() << " ms and did not find the namespace";
+
+    return ChunkVersion::UNSHARDED();
 }
 
 StatusWith<ScopedRegisterDonateChunk> ShardingState::registerDonateChunk(
