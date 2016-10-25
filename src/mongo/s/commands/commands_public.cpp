@@ -1262,7 +1262,7 @@ public:
                    ExplainCommon::Verbosity verbosity,
                    const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                    BSONObjBuilder* out) const {
-        const string fullns = parseNs(dbname, cmdObj);
+        const NamespaceString nss = parseNsCollectionRequired(dbname, cmdObj);
 
         // Extract the targeting query.
         BSONObj targetingQuery;
@@ -1299,7 +1299,7 @@ public:
                             dbname,
                             explainCmdBob.obj(),
                             options,
-                            fullns,
+                            nss.ns(),
                             targetingQuery,
                             targetingCollation.getValue(),
                             &shardResults);

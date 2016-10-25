@@ -81,6 +81,8 @@ selector:
     - jstests/sharding/sharded_limit_batchsize.js
     # Enable when 3.2.11 becomes last-stable
     - jstests/sharding/merge_chunks_test.js
+    # TODO Change in error reporting, enable when 3.4 becomes last-stable. See SERVER-26440.
+    - jstests/sharding/explain_cmd_invalid_namespace.js
 
 executor:
   js_test:
