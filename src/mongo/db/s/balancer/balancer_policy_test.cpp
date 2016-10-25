@@ -214,6 +214,23 @@ TEST(BalancerPolicy, ParallelBalancingDoesNotPutChunksOnShardsAboveTheOptimal) {
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId1][0].getMax(), migrations[1].maxKey);
 }
 
+TEST(BalancerPolicy, ParallelBalancingDoesNotMoveChunksFromShardsBelowOptimal) {
+    auto cluster = generateCluster(
+        {{ShardStatistics(kShardId0, kNoMaxSize, 100, false, emptyTagSet, emptyShardVersion), 100},
+         {ShardStatistics(kShardId1, kNoMaxSize, 30, false, emptyTagSet, emptyShardVersion), 30},
+         {ShardStatistics(kShardId2, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 5},
+         {ShardStatistics(kShardId3, kNoMaxSize, 0, false, emptyTagSet, emptyShardVersion), 0}});
+
+    const auto migrations(BalancerPolicy::balance(
+        cluster.first, DistributionStatus(kNamespace, cluster.second), false));
+    ASSERT_EQ(1U, migrations.size());
+
+    ASSERT_EQ(kShardId0, migrations[0].from);
+    ASSERT_EQ(kShardId3, migrations[0].to);
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMin(), migrations[0].minKey);
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMax(), migrations[0].maxKey);
+}
+
 TEST(BalancerPolicy, JumboChunksNotMoved) {
     auto cluster = generateCluster(
         {{ShardStatistics(kShardId0, kNoMaxSize, 2, false, emptyTagSet, emptyShardVersion), 4},

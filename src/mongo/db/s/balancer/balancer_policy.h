@@ -214,7 +214,11 @@ private:
     /**
      * Selects one chunk for the specified zone (if appropriate) to be moved in order to bring the
      * deviation of the shards chunk contents closer to even across all shards in the specified
-     * zone. Takes into account the shards, which have already been used for migrations.
+     * zone. Takes into account and updates the shards, which have already been used for migrations.
+     *
+     * The 'idealNumberOfChunksPerShardForTag' indicates what is the ideal number of chunks which
+     * each shard must have and is used to determine the imbalance and also to prevent chunks from
+     * moving when not necessary.
      *
      * Returns true if a migration was suggested, false otherwise. This method is intented to be
      * called multiple times until all posible migrations for a zone have been selected.
@@ -222,6 +226,7 @@ private:
     static bool _singleZoneBalance(const ShardStatisticsVector& shardStats,
                                    const DistributionStatus& distribution,
                                    const std::string& tag,
+                                   size_t idealNumberOfChunksPerShardForTag,
                                    size_t imbalanceThreshold,
                                    std::vector<MigrateInfo>* migrations,
                                    std::set<ShardId>* usedShards);
