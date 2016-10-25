@@ -10,7 +10,7 @@ benchArgs = {
         update: {$inc: {x: 1}}
     }],
     parallel: 2,
-    seconds: 5,
+    seconds: 10,
     host: db.getMongo().host
 };
 

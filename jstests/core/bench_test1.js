@@ -10,7 +10,7 @@ ops = [
     {op: "update", ns: t.getFullName(), query: {_id: 1}, update: {$inc: {x: 1}}}
 ];
 
-seconds = 2;
+seconds = 10;
 
 benchArgs = {
     ops: ops,
