@@ -125,6 +125,7 @@ void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
     ReplicaSetMonitorsMap::const_iterator it = _monitors.find(setName);
     if (it != _monitors.end()) {
         _monitors.erase(it);
+        log() << "Removed ReplicaSetMonitor for replica set " << setName;
     }
 }
 

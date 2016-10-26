@@ -302,7 +302,6 @@ bool ShardRegistry::reload(OperationContext* txn) {
         invariant(shard);
 
         auto name = shard->getConnString().getSetName();
-        log() << "ShardRegistry::reload: Removing RSM for " << name;
         ReplicaSetMonitor::remove(name);
     }
 
