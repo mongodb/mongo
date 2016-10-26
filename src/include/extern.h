@@ -583,6 +583,7 @@ extern int __wt_curstat_table_init(WT_SESSION_IMPL *session, const char *uri, co
 extern int __wt_schema_truncate( WT_SESSION_IMPL *session, const char *uri, const char *cfg[]) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_range_truncate(WT_CURSOR *start, WT_CURSOR *stop) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_schema_range_truncate( WT_SESSION_IMPL *session, WT_CURSOR *start, WT_CURSOR *stop) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_schema_backup_check(WT_SESSION_IMPL *session, const char *name) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern WT_DATA_SOURCE *__wt_schema_get_source(WT_SESSION_IMPL *session, const char *name);
 extern int __wt_str_name_check(WT_SESSION_IMPL *session, const char *str) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_name_check(WT_SESSION_IMPL *session, const char *str, size_t len) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

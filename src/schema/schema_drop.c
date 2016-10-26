@@ -28,6 +28,7 @@ __drop_file(
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		return (EINVAL);
 
+	WT_RET(__wt_schema_backup_check(session, filename));
 	/* Close all btree handles associated with this file. */
 	WT_WITH_HANDLE_LIST_LOCK(session,
 	    ret = __wt_conn_dhandle_close_all(session, uri, force));
