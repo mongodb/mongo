@@ -314,6 +314,7 @@ __backup_stop(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	int i;
 
 	conn = S2C(session);
 
@@ -321,8 +322,11 @@ __backup_stop(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 	__wt_writelock(session, conn->hot_backup_lock);
 	conn->hot_backup_list = NULL;
 	__wt_writeunlock(session, conn->hot_backup_lock);
-	if (cb->list != NULL)
+	if (cb->list != NULL) {
+		for (i = 0; cb->list[i] != NULL; ++i)
+			__wt_free(session, cb->list[i]);
 		__wt_free(session, cb->list);
+	}
 
 	/* Remove any backup specific file. */
 	WT_TRET(__wt_backup_file_remove(session));

@@ -40,7 +40,7 @@ from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
 class test_backup06(wttest.WiredTigerTestCase, suite_subprocess):
     conn_config = 'statistics=(fast)'
     # This will create several hundred tables.
-    num_table_sets = 20
+    num_table_sets = 10
     pfx='test_backup'
 
     # We try to do some schema operations.  Have some well
