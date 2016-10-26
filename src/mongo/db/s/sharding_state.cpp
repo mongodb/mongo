@@ -681,13 +681,12 @@ StatusWith<ChunkVersion> ShardingState::_refreshMetadata(
     {
         Timer refreshTimer;
 
-        MetadataLoader mdLoader;
-        Status status = mdLoader.makeCollectionMetadata(txn,
-                                                        grid.catalogClient(txn),
-                                                        nss.ns(),
-                                                        getShardName(),
-                                                        metadataForDiff,
-                                                        remoteMetadata.get());
+        Status status = MetadataLoader::makeCollectionMetadata(txn,
+                                                               grid.catalogClient(txn),
+                                                               nss.ns(),
+                                                               getShardName(),
+                                                               metadataForDiff,
+                                                               remoteMetadata.get());
 
         if (status.code() == ErrorCodes::NamespaceNotFound) {
             remoteMetadata.reset();

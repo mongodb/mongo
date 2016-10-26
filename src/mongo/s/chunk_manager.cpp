@@ -84,7 +84,13 @@ namespace {
  */
 class CMConfigDiffTracker : public ConfigDiffTracker<shared_ptr<Chunk>> {
 public:
-    CMConfigDiffTracker(ChunkManager* manager) : _manager(manager) {}
+    CMConfigDiffTracker(const std::string& ns,
+                        RangeMap* currMap,
+                        ChunkVersion* maxVersion,
+                        MaxChunkVersionMap* maxShardVersions,
+                        ChunkManager* manager)
+        : ConfigDiffTracker<shared_ptr<Chunk>>(ns, currMap, maxVersion, maxShardVersions),
+          _manager(manager) {}
 
     bool isTracked(const ChunkType& chunk) const final {
         // Mongos tracks all shards
@@ -280,8 +286,7 @@ bool ChunkManager::_load(OperationContext* txn,
     }
 
     // Attach a diff tracker for the versioned chunk data
-    CMConfigDiffTracker differ(this);
-    differ.attach(_ns, chunkMap, _version, *shardVersions);
+    CMConfigDiffTracker differ(_ns, &chunkMap, &_version, shardVersions, this);
 
     // Diff tracker should *always* find at least one chunk if collection exists
     // Get the diff query required

@@ -44,7 +44,6 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::make_pair;
 using std::map;
 using std::pair;
@@ -60,7 +59,13 @@ namespace {
  */
 class SCMConfigDiffTracker : public ConfigDiffTracker<BSONObj> {
 public:
-    SCMConfigDiffTracker(const ShardId& currShard) : _currShard(currShard) {}
+    SCMConfigDiffTracker(const std::string& ns,
+                         RangeMap* currMap,
+                         ChunkVersion* maxVersion,
+                         MaxChunkVersionMap* maxShardVersions,
+                         const ShardId& currShard)
+        : ConfigDiffTracker<BSONObj>(ns, currMap, maxVersion, maxShardVersions),
+          _currShard(currShard) {}
 
     virtual bool isTracked(const ChunkType& chunk) const {
         return chunk.getShard() == _currShard;
@@ -84,33 +89,25 @@ private:
 
 }  // namespace
 
-//
-// MetadataLoader implementation
-//
-
-MetadataLoader::MetadataLoader() = default;
-
-MetadataLoader::~MetadataLoader() = default;
-
 Status MetadataLoader::makeCollectionMetadata(OperationContext* txn,
                                               ShardingCatalogClient* catalogClient,
                                               const string& ns,
                                               const string& shard,
                                               const CollectionMetadata* oldMetadata,
-                                              CollectionMetadata* metadata) const {
+                                              CollectionMetadata* metadata) {
     Status status = _initCollection(txn, catalogClient, ns, shard, metadata);
     if (!status.isOK() || metadata->getKeyPattern().isEmpty()) {
         return status;
     }
 
-    return initChunks(txn, catalogClient, ns, shard, oldMetadata, metadata);
+    return _initChunks(txn, catalogClient, ns, shard, oldMetadata, metadata);
 }
 
 Status MetadataLoader::_initCollection(OperationContext* txn,
                                        ShardingCatalogClient* catalogClient,
                                        const string& ns,
                                        const string& shard,
-                                       CollectionMetadata* metadata) const {
+                                       CollectionMetadata* metadata) {
     auto coll = catalogClient->getCollection(txn, ns);
     if (!coll.isOK()) {
         return coll.getStatus();
@@ -118,9 +115,9 @@ Status MetadataLoader::_initCollection(OperationContext* txn,
 
     const auto& collInfo = coll.getValue().value;
     if (collInfo.getDropped()) {
-        return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "could not load metadata, collection " << ns
-                                    << " was dropped");
+        return {ErrorCodes::NamespaceNotFound,
+                str::stream() << "Could not load metadata because collection " << ns
+                              << " was dropped"};
     }
 
     metadata->_keyPattern = collInfo.getKeyPattern().toBSON();
@@ -131,17 +128,17 @@ Status MetadataLoader::_initCollection(OperationContext* txn,
     return Status::OK();
 }
 
-Status MetadataLoader::initChunks(OperationContext* txn,
-                                  ShardingCatalogClient* catalogClient,
-                                  const string& ns,
-                                  const string& shard,
-                                  const CollectionMetadata* oldMetadata,
-                                  CollectionMetadata* metadata) const {
-    map<ShardId, ChunkVersion> versionMap;  // TODO: use .h defined type
+Status MetadataLoader::_initChunks(OperationContext* txn,
+                                   ShardingCatalogClient* catalogClient,
+                                   const string& ns,
+                                   const string& shard,
+                                   const CollectionMetadata* oldMetadata,
+                                   CollectionMetadata* metadata) {
+    const OID epoch = metadata->getCollVersion().epoch();
 
-    // Preserve the epoch
+    SCMConfigDiffTracker::MaxChunkVersionMap versionMap;
     versionMap[shard] = metadata->_shardVersion;
-    OID epoch = metadata->getCollVersion().epoch();
+
     bool fullReload = true;
 
     // Check to see if we should use the old version or not.
@@ -170,10 +167,10 @@ Status MetadataLoader::initChunks(OperationContext* txn,
         }
     }
 
-    // Exposes the new metadata's range map and version to the "differ," who
-    // would ultimately be responsible of filling them up.
-    SCMConfigDiffTracker differ(shard);
-    differ.attach(ns, metadata->_chunksMap, metadata->_collVersion, versionMap);
+    // Exposes the new metadata's range map and version to the "differ" which would ultimately be
+    // responsible for filling them up
+    SCMConfigDiffTracker differ(
+        ns, &metadata->_chunksMap, &metadata->_collVersion, &versionMap, shard);
 
     try {
         std::vector<ChunkType> chunks;
@@ -209,7 +206,7 @@ Status MetadataLoader::initChunks(OperationContext* txn,
             // zero (if we did not conduct a full reload and oldMetadata was present,
             // versionMap[shard] was previously set to the oldMetadata's shardVersion for
             // performance gains).
-            if (!fullReload && metadata->_chunksMap.size() == 0) {
+            if (!fullReload && metadata->_chunksMap.empty()) {
                 versionMap[shard] = ChunkVersion(0, 0, epoch);
             }
 

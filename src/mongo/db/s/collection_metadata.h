@@ -38,7 +38,6 @@
 namespace mongo {
 
 class ChunkType;
-class MetadataLoader;
 
 /**
  * The collection metadata has metadata information about a collection, in particular the

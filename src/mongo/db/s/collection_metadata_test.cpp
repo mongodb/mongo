@@ -75,13 +75,12 @@ protected:
         std::vector<BSONObj> chunksToSend{chunkType.toBSON()};
 
         auto future = launchAsync([this] {
-            MetadataLoader loader;
-            auto status = loader.makeCollectionMetadata(operationContext(),
-                                                        catalogClient(),
-                                                        "test.foo",
-                                                        "shard0000",
-                                                        NULL, /* no old metadata */
-                                                        &_metadata);
+            auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
+                                                                 catalogClient(),
+                                                                 "test.foo",
+                                                                 "shard0000",
+                                                                 NULL, /* no old metadata */
+                                                                 &_metadata);
             ASSERT_OK(status);
             ASSERT_EQUALS(0u, _metadata.getNumChunks());
         });
@@ -308,13 +307,12 @@ protected:
         std::vector<BSONObj> chunksToSend{fooSingle};
 
         auto future = launchAsync([this] {
-            MetadataLoader loader;
-            auto status = loader.makeCollectionMetadata(operationContext(),
-                                                        catalogClient(),
-                                                        "test.foo",
-                                                        "shard0000",
-                                                        NULL, /* no old metadata */
-                                                        &_metadata);
+            auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
+                                                                 catalogClient(),
+                                                                 "test.foo",
+                                                                 "shard0000",
+                                                                 NULL, /* no old metadata */
+                                                                 &_metadata);
             ASSERT_OK(status);
         });
 
@@ -430,13 +428,12 @@ protected:
         std::vector<BSONObj> chunksToSend{fooSingle};
 
         auto future = launchAsync([this] {
-            MetadataLoader loader;
-            auto status = loader.makeCollectionMetadata(operationContext(),
-                                                        catalogClient(),
-                                                        "test.foo",
-                                                        "shard0000",
-                                                        NULL, /* no old metadata */
-                                                        &_metadata);
+            auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
+                                                                 catalogClient(),
+                                                                 "test.foo",
+                                                                 "shard0000",
+                                                                 NULL, /* no old metadata */
+                                                                 &_metadata);
             ASSERT_OK(status);
         });
 
@@ -506,13 +503,12 @@ protected:
             << ChunkType::shard("shard0000")));
 
         auto future = launchAsync([this] {
-            MetadataLoader loader;
-            auto status = loader.makeCollectionMetadata(operationContext(),
-                                                        catalogClient(),
-                                                        "test.foo",
-                                                        "shard0000",
-                                                        NULL, /* no old metadata */
-                                                        &_metadata);
+            auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
+                                                                 catalogClient(),
+                                                                 "test.foo",
+                                                                 "shard0000",
+                                                                 NULL, /* no old metadata */
+                                                                 &_metadata);
             ASSERT_OK(status);
         });
 
@@ -630,13 +626,12 @@ protected:
         }
 
         auto future = launchAsync([this] {
-            MetadataLoader loader;
-            auto status = loader.makeCollectionMetadata(operationContext(),
-                                                        catalogClient(),
-                                                        "test.foo",
-                                                        "shard0000",
-                                                        NULL, /* no old metadata */
-                                                        &_metadata);
+            auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
+                                                                 catalogClient(),
+                                                                 "test.foo",
+                                                                 "shard0000",
+                                                                 NULL, /* no old metadata */
+                                                                 &_metadata);
             ASSERT_OK(status);
         });
 

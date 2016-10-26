@@ -81,21 +81,17 @@ public:
     // Map of shard identifiers to the maximum chunk version on that shard
     typedef typename std::map<ShardId, ChunkVersion> MaxChunkVersionMap;
 
-    ConfigDiffTracker();
-    virtual ~ConfigDiffTracker();
-
     /**
-     * The tracker attaches to a set of ranges with versions, and uses a config server
-     * connection to update these. Because the set of ranges and versions may be large, they
-     * aren't owned by the tracker, they're just passed in and updated.  Therefore they must all
-     * stay in scope while the tracker is working.
-     *
-     * TODO: Make a standard VersionedRange to encapsulate this info in both mongod and mongos?
+     * The tracker attaches to a set of ranges with versions, and uses the catalog client to update
+     * these. Because the set of ranges and versions may be large, they aren't owned by the tracker,
+     * they're just passed in and updated. Therefore they must all stay in scope while the tracker
+     * is working.
      */
-    void attach(const std::string& ns,
-                RangeMap& currMap,
-                ChunkVersion& maxVersion,
-                MaxChunkVersionMap& maxShardVersions);
+    ConfigDiffTracker(const std::string& ns,
+                      RangeMap* currMap,
+                      ChunkVersion* maxVersion,
+                      MaxChunkVersionMap* maxShardVersions);
+    virtual ~ConfigDiffTracker();
 
     // Call after load for more information
     int numValidDiffs() const {
@@ -131,21 +127,19 @@ protected:
     virtual ShardId shardFor(OperationContext* txn, const ShardId& name) const = 0;
 
 private:
-    void _assertAttached() const;
-
     // Whether or not a range exists in the min/max region
     bool _isOverlapping(const BSONObj& min, const BSONObj& max);
 
     // Returns a subset of ranges overlapping the region min/max
     RangeOverlap _overlappingRange(const BSONObj& min, const BSONObj& max);
 
-    std::string _ns;
-    RangeMap* _currMap;
-    ChunkVersion* _maxVersion;
-    MaxChunkVersionMap* _maxShardVersions;
+    const std::string _ns;
+    RangeMap* const _currMap;
+    ChunkVersion* const _maxVersion;
+    MaxChunkVersionMap* const _maxShardVersions;
 
     // Store for later use
-    int _validDiffs;
+    int _validDiffs{0};
 };
 
 }  // namespace mongo

@@ -58,8 +58,7 @@ PseudoRandom rand(1);
  */
 class DefaultDiffAdapter : public ConfigDiffTracker<BSONObj> {
 public:
-    DefaultDiffAdapter() {}
-    virtual ~DefaultDiffAdapter() {}
+    using ConfigDiffTracker<BSONObj>::ConfigDiffTracker;
 
     virtual bool isTracked(const ChunkType& chunk) const {
         return true;
@@ -79,8 +78,7 @@ public:
  */
 class InverseDiffAdapter : public DefaultDiffAdapter {
 public:
-    InverseDiffAdapter() {}
-    virtual ~InverseDiffAdapter() {}
+    using DefaultDiffAdapter::DefaultDiffAdapter;
 
     virtual bool isMinKeyIndexed() const {
         return false;
@@ -169,9 +167,9 @@ protected:
         VersionMap maxShardVersions;
 
         // Create a differ which will track our progress
-        std::shared_ptr<DefaultDiffAdapter> differ(isInverse ? new InverseDiffAdapter()
-                                                             : new DefaultDiffAdapter());
-        differ->attach("test", ranges, maxVersion, maxShardVersions);
+        std::shared_ptr<DefaultDiffAdapter> differ(
+            isInverse ? new InverseDiffAdapter("test", &ranges, &maxVersion, &maxShardVersions)
+                      : new DefaultDiffAdapter("test", &ranges, &maxVersion, &maxShardVersions));
 
         std::vector<ChunkType> chunksVector;
         convertBSONArrayToChunkTypes(chunks, &chunksVector);
