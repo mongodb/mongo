@@ -22,7 +22,7 @@ load('jstests/top/util/mongotop_common.js');
       var authCommand = '\n db.getSiblingDB(\'admin\').auth(\'' + authUser + '\',\'' + authPassword + '\'); \n';
       test.shellCommand = authCommand + test.shellCommand;
     }
-    startParallelShell(test.shellCommand);
+    var shellWorkload = startParallelShell(test.shellCommand);
 
     // allow for command to actually start
     sleep(5000);
@@ -91,6 +91,9 @@ load('jstests/top/util/mongotop_common.js');
       });
     }
     t.stop();
+
+    // Swallow the exit code for the shell per SERVER-25777.
+    shellWorkload();
   };
 
   var runTests = function(topology, passthrough) {

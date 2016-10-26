@@ -68,15 +68,15 @@
   // restore the data to another different db
   ret = toolTest.runTool.apply(toolTest, ['restore',
       '--nsFrom', '$db$.$collection$',
-      '--nsTo', 'otherdest.$collection$_$db$']
+      '--nsTo', 'otherdest.$db$_$collection$']
     .concat(getRestoreTarget(dumpTarget))
     .concat(commonToolArgs));
   assert.eq(0, ret);
   destDB = toolTest.db.getSiblingDB('otherdest');
   collNames.forEach(function(collName) {
-    assert.eq(500, destDB[collName+'_source'].count());
+    assert.eq(500, destDB['source_'+collName].count());
     for (var i = 0; i < 500; i++) {
-      assert.eq(1, destDB[collName+'_source'].count({_id: i+'_'+collName}));
+      assert.eq(1, destDB['source_'+collName].count({_id: i+'_'+collName}));
     }
   });
 

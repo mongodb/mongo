@@ -25,8 +25,9 @@ load('jstests/top/util/mongotop_common.js');
     '       sleep(1);\n' +
     '   }\n';
 
+    var shells = [];
     for (var i = 0; i < 10; ++i) {
-      startParallelShell(stressShell);
+      shells.push(startParallelShell(stressShell));
     }
 
     // wait a bit for the stress to kick in
@@ -39,6 +40,12 @@ load('jstests/top/util/mongotop_common.js');
     assert.eq(runMongoProgram.apply(this, ['mongotop', '--port', conn.port, '--json', '--rowcount', 1].concat(passthrough.args)), 0, 'failed 1');
 
     t.stop();
+
+    // Wait for all the shells to finish per SERVER-25777.
+    shells.forEach(function(join) {
+      join();
+    });
+
   };
 
   // run with plain and auth passthroughs

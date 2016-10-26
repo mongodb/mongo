@@ -387,13 +387,14 @@
       };
 
       var addOptionsToFullArgs = function(k, v) {
-        if (v === undefined || v === null)
-            return;
+        if (v === undefined || v === null) {
+          return;
+        }
 
         fullArgs.push("--" + k);
 
-        if (v != "") {
-            fullArgs.push("" + v);
+        if (v !== "") {
+          fullArgs.push("" + v);
         }
       };
 
@@ -420,11 +421,12 @@
         } else if (k === "setParameter" && isObject(o[k])) {
             // If the value associated with the setParameter option is an object, we want
             // to add all key-value pairs in that object as separate --setParameters.
-            Object.keys(o[k]).forEach(function(paramKey) {
-                addOptionsToFullArgs(k, "" + paramKey + "=" + o[k][paramKey]);
-            });
+          for (var l = 0; l < Object.keys(o[k]).length; l++) {
+            var paramKey = Object.keys(o[k])[l];
+            addOptionsToFullArgs(k, "" + paramKey + "=" + o[k][paramKey]);
+          }
         } else {
-            addOptionsToFullArgs(k, o[k]);
+          addOptionsToFullArgs(k, o[k]);
         }
       }
     } else {

@@ -225,13 +225,14 @@ functions:
         if [ -f bsondump ]; then
           chmod +x bsondump
         fi
-        rm -rf /data/install /data/multiversion
+        rm -rf /data/mci/install /data/mci/multiversion
+        mkdir -p /data/mci/install /data/mci/multiversion
         if [ "${multiversion_override}" != "skip" ]; then
-          python buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${arch} ${multiversion_override|2.6 2.4} --latest ${smoke_use_ssl} --os="${mongo_os}"
+          python buildscripts/setup_multiversion_mongodb.py /data/mci/install /data/mci/multiversion ${arch} ${multiversion_override|2.6 2.4} --latest ${smoke_use_ssl} --os="${mongo_os}"
         fi
         chmod 400 jstests/libs/key*
 
-        PATH=$PATH:/data/multiversion python buildscripts/resmoke.py --suite=${resmoke_suite} --continueOnFailure --log=buildlogger --reportFile=report.json ${resmoke_args}
+        PATH=$PATH:/data/mci/multiversion python buildscripts/resmoke.py --suite=${resmoke_suite} --continueOnFailure --log=buildlogger --reportFile=report.json ${resmoke_args} --excludeWithAnyTags="${excludes}"
 
   "build tool":
     command: shell.exec
@@ -588,6 +589,8 @@ post:
     params:
       script: |
         rm -rf /data/db/*
+        rm -rf /data/mci/multiversion
+        rm -rf /data/mci/install
         exit 0
 
 timeout:
@@ -973,6 +976,7 @@ tasks:
         working_dir: src
         script: |
           set -o verbose
+          PATH="/opt/node/bin:$PATH"
           /opt/node/bin/npm install eslint@3.2
           /opt/node/bin/node node_modules/eslint/bin/eslint.js test/qa-tests/jstests/**/*.js
 
@@ -1067,7 +1071,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "core${resmoke_use_ssl}"
-        resmoke_args: "--excludeWithAnyTags=requires_unstable ${resmoke_args}"
+        excludes: "requires_unstable,${excludes}"
 
 - name: native-cert-ssl
   depends_on:
@@ -1124,11 +1128,12 @@ tasks:
           mv test/qa-tests/* .
           chmod +x mongo*
           chmod +x bsondump*
-          rm -rf /data/install /data/multiversion
-          python buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${arch} "2.6" "2.4" --latest ${smoke_use_ssl} --os="${mongo_os}" || true
+          rm -rf /data/mci/install /data/mci/multiversion
+          mkdir -p /data/mci/install /data/mci/multiversion
+          python buildscripts/setup_multiversion_mongodb.py /data/mci/install /data/mci/multiversion ${arch} "2.6" "2.4" --latest ${smoke_use_ssl} --os="${mongo_os}" || true
           chmod 400 jstests/libs/key*
 
-          PATH=$PATH:/data/multiversion python buildscripts/resmoke.py --suite=native_cert_ssl  --continueOnFailure --log=buildlogger --reportFile=report.json ${resmoke_args}
+          PATH=$PATH:/data/mci/multiversion python buildscripts/resmoke.py --suite=native_cert_ssl  --continueOnFailure --log=buildlogger --reportFile=report.json ${resmoke_args} --excludeWithAnyTags="${excludes}"
 
 - name: qa-dump-restore-archiving
   depends_on:
@@ -1154,7 +1159,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "restore_archive"
-        resmoke_args: "--excludeWithAnyTags=requires_unstable ${resmoke_args}"
+        excludes: "requires_unstable,${excludes}"
 
 - name: qa-dump-restore-gzip
   depends_on:
@@ -1180,7 +1185,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "restore_gzip"
-        resmoke_args: "--excludeWithAnyTags=requires_unstable ${resmoke_args}"
+        excludes: "requires_unstable,${excludes}"
 
 - name: qa-tests-wt
   depends_on:
@@ -1227,7 +1232,8 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "core"
-        resmoke_args: "--excludeWithAnyTags=requires_unstable --storageEngine=wiredTiger ${resmoke_args}"
+        resmoke_args: "--storageEngine=wiredTiger ${resmoke_args}"
+        excludes: "requires_unstable,${excludes}"
 
 - name: unit
   commands:
@@ -1318,7 +1324,7 @@ buildvariants:
     mongo_os: "osx"
     arch: "osx/x86_64"
     build_tags: "ssl"
-    resmoke_args: --excludeWithAnyTags=requires_many_files
+    excludes: requires_many_files
   tasks: *osx_1010_tasks
 
 - name: osx-1010-ssl
@@ -1333,7 +1339,7 @@ buildvariants:
     arch: "osx/x86_64"
     build_tags: "ssl"
     edition: ssl
-    resmoke_args: --excludeWithAnyTags=requires_many_files
+    excludes: requires_many_files
   tasks: *osx_1010_ssl_tasks
 
 #######################################
@@ -1408,7 +1414,8 @@ buildvariants:
     build_tags: 'ssl'
     resmoke_use_ssl: _ssl
     library_path: PATH="/opt/mongodbtoolchain/v2/bin/:$PATH"
-    resmoke_args: --excludeWithAnyTags=requires_mmap_available,requires_large_ram,requires_mongo_24,requires_mongo_26,requires_mongo_30 -j 4
+    resmoke_args: -j 4
+    excludes: requires_mmap_available,requires_large_ram,requires_mongo_24,requires_mongo_26,requires_mongo_30
     multiversion_override: "skip"
     arch: "linux/ppc64le"
     edition: enterprise
@@ -1430,7 +1437,8 @@ buildvariants:
     build_tags: "sasl ssl"
     resmoke_use_ssl: _ssl
     library_path: PATH="/opt/mongodbtoolchain/v2/bin/:$PATH"
-    resmoke_args: --excludeWithAnyTags=requires_mmap_available,requires_mongo_24,requires_mongo_26,requires_mongo_30 -j 2
+    excludes: requires_mmap_available,requires_mongo_24,requires_mongo_26,requires_mongo_30
+    resmoke_args: -j 2
     multiversion_override: "skip"
     mongo_version_always_use_latest: true
     arch: "linux/s390x"
@@ -1453,7 +1461,8 @@ buildvariants:
     build_tags: "ssl"
     resmoke_use_ssl: _ssl
     library_path: PATH="/opt/mongodbtoolchain/v2/bin/:$PATH"
-    resmoke_args: --excludeWithAnyTags=requires_mmap_available,requires_large_ram,requires_mongo_24,requires_mongo_26,requires_mongo_30 -j 2
+    excludes: requires_mmap_available,requires_large_ram,requires_mongo_24,requires_mongo_26,requires_mongo_30
+    resmoke_args: -j 2
     multiversion_override: "skip"
     mongo_version_always_use_latest: true
     arch: "linux/arm64"
@@ -1474,7 +1483,8 @@ buildvariants:
     mongo_os: "sunos5"
     library_path: PATH="/opt/mongodbtoolchain/v2/bin/:$PATH"
     args: -gccgoflags "-lsocket -lnsl"
-    resmoke_args: --excludeWithAnyTags=requires_large_ram -j$(kstat cpu | sort -u | grep -c "^module")
+    excludes: requires_large_ram
+    resmoke_args: -j$(kstat cpu | sort -u | grep -c "^module")
   tasks: *solaris_tasks
 
 #######################################
@@ -1491,7 +1501,7 @@ buildvariants:
     mongo_arch: "i386"
     extension: .exe
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
-    resmoke_args: --excludeWithAnyTags=requires_large_ram
+    excludes: requires_large_ram
     integration_test_args: "integration"
   tasks: *windows_32_tasks
 
@@ -1504,7 +1514,7 @@ buildvariants:
     <<: *mongo_default_startup_args
     mongo_os: "windows-64"
     mongo_target: "windows_x86_64-2008plus"
-    resmoke_args: --excludeWithAnyTags=requires_large_ram
+    excludes: requires_large_ram
     extension: .exe
     arch: "win32/x86_64"
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
@@ -1524,7 +1534,7 @@ buildvariants:
     edition: ssl
     smoke_use_ssl: --use-ssl
     resmoke_use_ssl: _ssl
-    resmoke_args: --excludeWithAnyTags=requires_large_ram,requires_mongo_24
+    excludes: requires_large_ram,requires_mongo_24
     multiversion_override: "2.6"
     extension: .exe
     arch: "win32/x86_64"
@@ -1546,7 +1556,7 @@ buildvariants:
     build_tags: "sasl ssl"
     smoke_use_ssl: --use-ssl
     resmoke_use_ssl: _ssl
-    resmoke_args: --excludeWithAnyTags=requires_large_ram,requires_mongo_24
+    excludes: requires_large_ram,requires_mongo_24
     multiversion_override: "2.6"
     edition: enterprise
     extension: .exe
@@ -1574,7 +1584,7 @@ buildvariants:
     build_tags: "ssl"
     arch: "linux/x86_64"
     args: "-race"
-    resmoke_args: --excludeWithAnyTags=requires_large_ram
+    excludes: requires_large_ram
     integration_test_args: integration
   tasks: *ubuntu1204_race_tasks
 

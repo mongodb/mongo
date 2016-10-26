@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/progress"
 	"github.com/mongodb/mongo-tools/common/util"
@@ -30,6 +31,9 @@ func (restore *MongoRestore) RestoreOplog() error {
 	}
 	if err := intent.BSONFile.Open(); err != nil {
 		return err
+	}
+	if fileNeedsIOBuffer, ok := intent.BSONFile.(intents.FileNeedsIOBuffer); ok {
+		fileNeedsIOBuffer.TakeIOBuffer(make([]byte, db.MaxBSONSize))
 	}
 	defer intent.BSONFile.Close()
 	// NewBufferlessBSONSource reads each bson document into its own buffer
@@ -83,6 +87,9 @@ func (restore *MongoRestore) RestoreOplog() error {
 		if err != nil {
 			return fmt.Errorf("error applying oplog: %v", err)
 		}
+	}
+	if fileNeedsIOBuffer, ok := intent.BSONFile.(intents.FileNeedsIOBuffer); ok {
+		fileNeedsIOBuffer.ReleaseIOBuffer()
 	}
 
 	log.Logvf(log.Info, "applied %v ops", totalOps)
