@@ -218,12 +218,19 @@ protected:
 
     /**
      * Brings the repl coord from SECONDARY to PRIMARY by simulating the messages required to
-     * elect it.
+     * elect it, after progressing the mocked-out notion of time past the election timeout.
      *
      * Behavior is unspecified if node does not have a clean config, is not in SECONDARY, etc.
      */
     void simulateSuccessfulElection();
     void simulateSuccessfulV1Election();
+
+    /**
+     * Same as simulateSuccessfulV1Election, but rather than getting the election timeout and
+     * progressing time past that point, takes in what time to expect an election to occur at.
+     * Useful for simulating elections triggered via priority takeover.
+     */
+    void simulateSuccessfulV1ElectionAt(Date_t electionTime);
 
     /**
      * Shuts down the objects under test.

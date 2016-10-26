@@ -735,8 +735,70 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringActualElection) {
                   countLogLinesContaining("not becoming primary, we have been superceded already"));
 }
 
-TEST_F(ReplCoordTest, SchedulesPriorityTakeoverIfNodeHasHigherPriorityThanCurrentPrimary) {
-    startCapturingLogMessages();
+class PriorityTakeoverTest : public ReplCoordTest {
+public:
+    void respondToAllHeartbeats(const ReplicaSetConfig& config,
+                                Date_t runUntil,
+                                const HostAndPort& primaryHostAndPort,
+                                const OpTime& otherNodesOpTime) {
+        auto replCoord = getReplCoord();
+
+        auto net = getNet();
+        net->enterNetwork();
+        while (net->now() < runUntil || net->hasReadyRequests()) {
+            if (net->now() < runUntil) {
+                net->runUntil(runUntil);
+            }
+            auto noi = net->getNextReadyRequest();
+            auto&& request = noi->getRequest();
+            log() << request.target << " processing " << request.cmdObj;
+            ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+            ReplSetHeartbeatArgsV1 hbArgs;
+            if (hbArgs.initialize(request.cmdObj).isOK()) {
+                ReplSetHeartbeatResponse hbResp;
+                hbResp.setSetName(config.getReplSetName());
+                if (request.target == primaryHostAndPort) {
+                    hbResp.setState(MemberState::RS_PRIMARY);
+                } else {
+                    hbResp.setState(MemberState::RS_SECONDARY);
+                }
+                hbResp.setConfigVersion(config.getConfigVersion());
+                hbResp.setTerm(replCoord->getTerm());
+                hbResp.setAppliedOpTime(otherNodesOpTime);
+                hbResp.setDurableOpTime(otherNodesOpTime);
+                auto response =
+                    makeResponseStatus(hbResp.toBSON(replCoord->isV1ElectionProtocol()));
+                net->scheduleResponse(noi, net->now(), response);
+            } else {
+                error() << "Black holing unexpected request to " << request.target << ": "
+                        << request.cmdObj;
+                net->blackHole(noi);
+            }
+        }
+        net->runReadyNetworkOperations();
+        net->exitNetwork();
+    }
+
+    void performSuccessfulPriorityTakeover(Date_t priorityTakeoverTime) {
+        startCapturingLogMessages();
+        simulateSuccessfulV1ElectionAt(priorityTakeoverTime);
+        getReplCoord()->waitForElectionFinish_forTest();
+        stopCapturingLogMessages();
+
+        ASSERT(getReplCoord()->getMemberState().primary());
+
+        // Check last vote
+        auto lastVote = getExternalState()->loadLocalLastVoteDocument(nullptr);
+        ASSERT(lastVote.isOK());
+        ASSERT_EQ(0, lastVote.getValue().getCandidateIndex());
+        ASSERT_EQ(1, lastVote.getValue().getTerm());
+
+        ASSERT_EQUALS(1, countLogLinesContaining("Starting an election for a priority takeover"));
+        ASSERT_EQUALS(1, countLogLinesContaining("election succeeded"));
+    }
+};
+
+TEST_F(PriorityTakeoverTest, SchedulesPriorityTakeoverIfNodeHasHigherPriorityThanCurrentPrimary) {
     BSONObj configObj = BSON("_id"
                              << "mySet"
                              << "version"
@@ -765,35 +827,8 @@ TEST_F(ReplCoordTest, SchedulesPriorityTakeoverIfNodeHasHigherPriorityThanCurren
 
     ASSERT_EQUALS(Date_t(), replCoord->getPriorityTakeover_forTest());
 
-    auto net = getNet();
-    net->enterNetwork();
-    auto now = net->now();
-    while (net->hasReadyRequests()) {
-        auto noi = net->getNextReadyRequest();
-        auto&& request = noi->getRequest();
-        log() << request.target << " processing " << request.cmdObj;
-        ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
-        ReplSetHeartbeatArgsV1 hbArgs;
-        if (hbArgs.initialize(request.cmdObj).isOK()) {
-            ReplSetHeartbeatResponse hbResp;
-            hbResp.setSetName(config.getReplSetName());
-            if (request.target == HostAndPort("node2", 12345)) {
-                hbResp.setState(MemberState::RS_PRIMARY);
-            } else {
-                hbResp.setState(MemberState::RS_SECONDARY);
-            }
-            hbResp.setConfigVersion(config.getConfigVersion());
-            hbResp.setTerm(replCoord->getTerm());
-            auto response = makeResponseStatus(hbResp.toBSON(replCoord->isV1ElectionProtocol()));
-            net->scheduleResponse(noi, net->now(), response);
-        } else {
-            error() << "Black holing unexpected request to " << request.target << ": "
-                    << request.cmdObj;
-            net->blackHole(noi);
-        }
-    }
-    net->runReadyNetworkOperations();
-    net->exitNetwork();
+    auto now = getNet()->now();
+    respondToAllHeartbeats(config, now, HostAndPort("node2", 12345), time1);
 
     ASSERT_NOT_EQUALS(Date_t(), replCoord->getPriorityTakeover_forTest());
     ASSERT_EQUALS(now + config.getPriorityTakeoverDelay(0),
@@ -802,6 +837,179 @@ TEST_F(ReplCoordTest, SchedulesPriorityTakeoverIfNodeHasHigherPriorityThanCurren
     // Updating term cancels priority takeover callback.
     ASSERT_EQUALS(ErrorCodes::StaleTerm, replCoord->updateTerm(&txn, replCoord->getTerm() + 1));
     ASSERT_EQUALS(Date_t(), replCoord->getPriorityTakeover_forTest());
+}
+
+TEST_F(PriorityTakeoverTest, SuccessfulPriorityTakeover) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version"
+                             << 1
+                             << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345"
+                                                      << "priority"
+                                                      << 2)
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345"))
+                             << "protocolVersion"
+                             << 1);
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+
+    auto replCoord = getReplCoord();
+
+    OperationContextNoop txn;
+    OpTime time1(Timestamp(100, 1), 0);
+    replCoord->setMyLastAppliedOpTime(time1);
+    replCoord->setMyLastDurableOpTime(time1);
+    ASSERT(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+
+    ASSERT_EQUALS(Date_t(), replCoord->getPriorityTakeover_forTest());
+
+    auto now = getNet()->now();
+    respondToAllHeartbeats(config, now, HostAndPort("node2", 12345), time1);
+
+    auto priorityTakeoverTime = replCoord->getPriorityTakeover_forTest();
+    ASSERT_NOT_EQUALS(Date_t(), priorityTakeoverTime);
+    ASSERT_EQUALS(now + config.getPriorityTakeoverDelay(0), priorityTakeoverTime);
+
+    performSuccessfulPriorityTakeover(priorityTakeoverTime);
+}
+
+TEST_F(PriorityTakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version"
+                             << 1
+                             << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345"
+                                                      << "priority"
+                                                      << 2)
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345"))
+                             << "protocolVersion"
+                             << 1);
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+    HostAndPort primaryHostAndPort("node2", 12345);
+
+    auto replCoord = getReplCoord();
+
+    OperationContextNoop txn;
+    OpTime currentOpTime(Timestamp(100, 5000), 0);
+    OpTime behindOpTime(Timestamp(100, 3999), 0);
+    OpTime closeEnoughOpTime(Timestamp(100, 4000), 0);
+    replCoord->setMyLastAppliedOpTime(behindOpTime);
+    replCoord->setMyLastDurableOpTime(behindOpTime);
+    ASSERT(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+
+    ASSERT_EQUALS(Date_t(), replCoord->getPriorityTakeover_forTest());
+
+    auto now = getNet()->now();
+
+    respondToAllHeartbeats(config, now, primaryHostAndPort, currentOpTime);
+
+    auto priorityTakeoverTime = replCoord->getPriorityTakeover_forTest();
+    ASSERT_NOT_EQUALS(Date_t(), priorityTakeoverTime);
+    ASSERT_EQUALS(now + config.getPriorityTakeoverDelay(0), priorityTakeoverTime);
+
+
+    // At this point the other nodes are all ahead of the current node, so it can't call for
+    // priority takeover.
+    startCapturingLogMessages();
+    respondToAllHeartbeats(config, priorityTakeoverTime, primaryHostAndPort, currentOpTime);
+    stopCapturingLogMessages();
+
+
+    ASSERT(replCoord->getMemberState().secondary());
+    ASSERT_EQUALS(1,
+                  countLogLinesContaining("Not standing for election because member is not "
+                                          "caught up enough to the most up-to-date member to "
+                                          "call for priority takeover"));
+
+    now = getNet()->now();
+    ASSERT_EQUALS(now, priorityTakeoverTime);
+    priorityTakeoverTime = replCoord->getPriorityTakeover_forTest();
+    ASSERT_NOT_EQUALS(Date_t(), priorityTakeoverTime);
+    ASSERT_EQUALS(now + config.getPriorityTakeoverDelay(0), priorityTakeoverTime);
+
+    // Now make us caught up enough to call for priority takeover to succeed.
+    replCoord->setMyLastAppliedOpTime(closeEnoughOpTime);
+    replCoord->setMyLastDurableOpTime(closeEnoughOpTime);
+
+    performSuccessfulPriorityTakeover(priorityTakeoverTime);
+}
+
+TEST_F(PriorityTakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecond) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version"
+                             << 1
+                             << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345"
+                                                      << "priority"
+                                                      << 2)
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345"))
+                             << "protocolVersion"
+                             << 1);
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+    HostAndPort primaryHostAndPort("node2", 12345);
+
+    auto replCoord = getReplCoord();
+
+    OperationContextNoop txn;
+    OpTime currentOpTime(Timestamp(100, 0), 0);
+    OpTime behindOpTime(Timestamp(97, 0), 0);
+    OpTime closeEnoughOpTime(Timestamp(98, 0), 0);
+    replCoord->setMyLastAppliedOpTime(behindOpTime);
+    replCoord->setMyLastDurableOpTime(behindOpTime);
+    ASSERT(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+
+    ASSERT_EQUALS(Date_t(), replCoord->getPriorityTakeover_forTest());
+
+    auto now = getNet()->now();
+
+    respondToAllHeartbeats(config, now, primaryHostAndPort, currentOpTime);
+
+    auto priorityTakeoverTime = replCoord->getPriorityTakeover_forTest();
+    ASSERT_NOT_EQUALS(Date_t(), priorityTakeoverTime);
+    ASSERT_EQUALS(now + config.getPriorityTakeoverDelay(0), priorityTakeoverTime);
+
+
+    // At this point the other nodes are all ahead of the current node, so it can't call for
+    // priority takeover.
+    startCapturingLogMessages();
+    respondToAllHeartbeats(config, priorityTakeoverTime, primaryHostAndPort, currentOpTime);
+    stopCapturingLogMessages();
+
+
+    ASSERT(replCoord->getMemberState().secondary());
+    ASSERT_EQUALS(1,
+                  countLogLinesContaining("Not standing for election because member is not "
+                                          "caught up enough to the most up-to-date member to "
+                                          "call for priority takeover"));
+
+    now = getNet()->now();
+    ASSERT_EQUALS(now, priorityTakeoverTime);
+    priorityTakeoverTime = replCoord->getPriorityTakeover_forTest();
+    ASSERT_NOT_EQUALS(Date_t(), priorityTakeoverTime);
+    ASSERT_EQUALS(now + config.getPriorityTakeoverDelay(0), priorityTakeoverTime);
+
+    // Now make us caught up enough to call for priority takeover to succeed.
+    replCoord->setMyLastAppliedOpTime(closeEnoughOpTime);
+    replCoord->setMyLastDurableOpTime(closeEnoughOpTime);
+
+    performSuccessfulPriorityTakeover(priorityTakeoverTime);
 }
 
 TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringDryRun) {

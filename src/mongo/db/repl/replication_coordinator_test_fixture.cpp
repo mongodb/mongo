@@ -281,12 +281,16 @@ void ReplCoordTest::simulateSuccessfulDryRun() {
 }
 
 void ReplCoordTest::simulateSuccessfulV1Election() {
-    ReplicationCoordinatorImpl* replCoord = getReplCoord();
-    NetworkInterfaceMock* net = getNet();
-
-    auto electionTimeoutWhen = replCoord->getElectionTimeout_forTest();
+    auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
     ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
     log() << "Election timeout scheduled at " << electionTimeoutWhen << " (simulator time)";
+
+    simulateSuccessfulV1ElectionAt(electionTimeoutWhen);
+}
+
+void ReplCoordTest::simulateSuccessfulV1ElectionAt(Date_t electionTime) {
+    ReplicationCoordinatorImpl* replCoord = getReplCoord();
+    NetworkInterfaceMock* net = getNet();
 
     ReplicaSetConfig rsConfig = replCoord->getReplicaSetConfig_forTest();
     ASSERT(replCoord->getMemberState().secondary()) << replCoord->getMemberState().toString();
@@ -296,8 +300,8 @@ void ReplCoordTest::simulateSuccessfulV1Election() {
     while (!replCoord->getMemberState().primary() || hasReadyRequests) {
         log() << "Waiting on network in state " << replCoord->getMemberState();
         getNet()->enterNetwork();
-        if (net->now() < electionTimeoutWhen) {
-            net->runUntil(electionTimeoutWhen);
+        if (net->now() < electionTime) {
+            net->runUntil(electionTime);
         }
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
