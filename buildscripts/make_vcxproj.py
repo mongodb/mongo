@@ -1,51 +1,31 @@
-# generate vcxproj file(s)
+# Generate vcxproj and vcxproj.filters files for browsing code in Visual Studio 2015.
+# To build mongodb, you must use scons. You can use this project to navigate code during debugging.
 #
-#   HOW TO USE
+#  HOW TO USE
 #
-#   scons --clean
-#   # verify build/* is empty...
-#   scons TARGET.exe > out
-#   python buildscripts/make_vcxproj.py TARGET < out > my.vcxproj
+#  First, you need a compile_commands.json file, to generate run the following command:
+#    scons compiledb
 #
-#   where TARGET is your target e.g., "mongod"
+#  Next, run the following command
+#    python buildscripts/make_vcxproj.py FILE_NAME
 #
-#   NOTES
-#
-#   (1)
-#       directory paths are such that it is assumed the vcxproj is in the top level project directory.
-#       this is easy and likely to change...
-#
-#   (2)
-#       machine generated files (error_codes, action_types, ...) are, for now, copied by this script
-#       into the source tree -- see note below in function pyth() as to why.
-#       if those files need refreshing, run scons to generate them, and then run make_vcxproj.py again
-#       to copy them over.  the rebuilding of the vcxproj file in that case should be moot, it is just
-#       the copying over of the updated files we really want to happen.
-#
-#   (3)
-#       todo: i don't think the generated vcxproj perfectly handles switching from debug to release and
-#       such yet.  so for example:
-#
-#         scons --clean all && scons --dd --win2008plus --64 mongod.exe && python ...
-#
-#       should generate a file that will work for building mongod.exe, *if* you pick win2008plus and
-#       Debug and 64 bit from the drop downs.  The other variations so far, ymmv.
+#   where FILE_NAME is the of the file to generate e.g., "mongod"
 #
 
-import sys
+import json
 import os
+import re
+import sys
+import uuid
 
-target = sys.argv[1]
+VCXPROJ_FOOTER = r"""
 
-footer= """
+  <ItemGroup>
+    <None Include="src\mongo\db\mongo.ico" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="src\\mongo\\db\\mongo.ico" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ResourceCompile Include="src\\mongo\\db\\db.rc" />
+    <ResourceCompile Include="src\mongo\db\db.rc" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
@@ -53,95 +33,224 @@ footer= """
 </Project>
 """
 
-common_defines_str = "/DBOOST_ALL_NO_LIB /DMONGO_EXPOSE_MACROS /DSUPPORT_UTF8 /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /D_WIN32_WINNT=0x0502 /DMONGO_HAVE___DECLSPEC_THREAD"
+def get_defines(args):
+    """Parse a compiler argument list looking for defines"""
+    ret = set()
+    for arg in args:
+        if arg.startswith('/D'):
+            ret.add(arg[2:])
+    return ret
 
-def get_defines(x):
-    res = set()
-    for s in x:
-        if s.startswith('/D') or s.startswith('-D'):
-            d = s[2:]
-            res.add(d)
-    return res
+def get_includes(args):
+    """Parse a compiler argument list  looking for includes"""
+    ret = set()
+    for arg in args:
+        if arg.startswith('/I'):
+            ret.add(arg[2:])
+    return ret
 
-common_defines = get_defines(common_defines_str.split(' '))
+class ProjFileGenerator(object):
+    """Generate a .vcxproj and .vcxprof.filters file"""
+    def __init__(self, target):
+        # we handle DEBUG in the vcxproj header:
+        self.common_defines = set()
+        self.common_defines.add("DEBUG")
+        self.common_defines.add("_DEBUG")
 
-f = open('buildscripts/vcxproj.header', 'r')
-header = f.read().replace("%_TARGET_%", target)
-print header
+        self.includes = set()
+        self.target = target
+        self.compiles = []
+        self.files = set()
+        self.all_defines = set()
+        self.vcxproj = None
+        self.filters = None
+        self.all_defines = set(self.common_defines)
 
-print "<!-- common_defines -->"
-print "<ItemDefinitionGroup><ClCompile><PreprocessorDefinitions>"
-print ';'.join(common_defines) + ";%(PreprocessorDefinitions)"
-print "</PreprocessorDefinitions></ClCompile></ItemDefinitionGroup>\n"
-print "<ItemGroup>\n"
+    def __enter__(self):
+        return self
 
-# we don't use _SCONS in vcxproj files, but it's in the input to this script, so add it to common_defines
-# so that it is ignored below and not declared:
-common_defines.add("_SCONS")
-# likewise we handle DEBUG and such in the vcxproj header:
-common_defines.add("DEBUG")
-common_defines.add("_DEBUG")
-common_defines.add("V8_TARGET_ARCH_X64")
-common_defines.add("V8_TARGET_ARCH_IA32")
-common_defines.add("NTDDI_VERSION")
-common_defines.add("_WIN32_WINNT")
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.vcxproj = open(self.target + ".vcxproj", "wb")
 
-machine_path = ""
+        with open('buildscripts/vcxproj.header', 'r') as header_file:
+            header_str = header_file.read()
+            header_str = header_str.replace("%_TARGET_%", self.target)
+            header_str = header_str.replace("%AdditionalIncludeDirectories%",
+                                            ';'.join(sorted(self.includes)))
+            self.vcxproj.write(header_str)
 
-def add_globally(path):
-    print "\n</ItemGroup>\n"
-    print "<ItemDefinitionGroup><ClCompile><AdditionalIncludeDirectories>" + machine_path + "</AdditionalIncludeDirectories></ClCompile></ItemDefinitionGroup>"
-    print "<ItemGroup>\n"
+        common_defines = self.all_defines
+        for c in self.compiles:
+            common_defines = common_defines.intersection(c['defines'])
 
-def parse_line(x,line):
-    # buildinfo.cpp is for scons only -- see version.cpp for more info
-    if not "buildinfo.cpp" in x:
-        xtra = ""
-        if x.startswith('build\\'):
-            parts = x.split(os.sep)
-            if "mongo" in parts:
-                x = os.sep.join(parts[parts.index("mongo"):])
-            elif "third_party" in parts:
-                x = os.sep.join(parts[parts.index("third_party"):])
+        self.vcxproj.write("<!-- common_defines -->\n")
+        self.vcxproj.write("<ItemDefinitionGroup><ClCompile><PreprocessorDefinitions>"
+                           + ';'.join(common_defines) + ";%(PreprocessorDefinitions)\n")
+        self.vcxproj.write("</PreprocessorDefinitions></ClCompile></ItemDefinitionGroup>\n")
+
+        self.vcxproj.write("  <ItemGroup>\n")
+        for command in self.compiles:
+            defines = command["defines"].difference(common_defines)
+            if len(defines) > 0:
+                self.vcxproj.write("    <ClCompile Include=\"" + command["file"] +
+                                   "\"><PreprocessorDefinitions>" +
+                                   ';'.join(defines) +
+                                   ";%(PreprocessorDefinitions)" +
+                                   "</PreprocessorDefinitions></ClCompile>\n")
             else:
-                raise NameError("Bad input string for source file")
-            x = "src" + os.sep + x
-        if "v8\\src" in x: # or machine_path:
-            xtra = "<AdditionalIncludeDirectories>"
-            # it would be better to look at the command line inclusions comprehensively instead of hard code
-            # this way, but this will get us going...
-            if "v8\\src" in x:
-                xtra += "src\\third_party\\v8\\src;"
-            #if machine_path:
-            #    xtra += machine_path
-            xtra += "</AdditionalIncludeDirectories>"
-        # add /D command line items that are uncommon
-        defines = ""
-        for s in get_defines(line):
-            if s.split('=')[0] not in common_defines:
-                defines += s
-                defines += ';'
-        if defines:
-            xtra += "<PreprocessorDefinitions>" + defines + "%(PreprocessorDefinitions)</PreprocessorDefinitions>"
-        if xtra != "":
-            return "    <ClCompile Include=\"" + x + "\">" + xtra + "</ClCompile>"
-        else:
-            return "    <ClCompile Include=\"" + x + "\" />"
+                self.vcxproj.write("    <ClCompile Include=\"" + command["file"] + "\" />\n")
+        self.vcxproj.write("  </ItemGroup>\n")
 
-from shutil import copyfile
+        self.filters = open(self.target + ".vcxproj.filters", "wb")
+        self.filters.write("<?xml version='1.0' encoding='utf-8'?>\n")
+        self.filters.write("<Project ToolsVersion='14.0' " +
+                           "xmlns='http://schemas.microsoft.com/developer/msbuild/2003'>\n")
 
-def main ():
-    lines = set()
-    for line in sys.stdin:
-        x = line.split(' ')
-        # Skip lines that use temp files as the argument to cl.exe
-        if x[0] == "cl" and len(x) > 3:
-            lines.add(parse_line(x[3],x))
+        self.__write_filters()
 
-    for line in lines:
-        if line != None:
-            print line
+        self.vcxproj.write(VCXPROJ_FOOTER)
+        self.vcxproj.close()
 
-    print footer
+        self.filters.write("</Project>\n")
+        self.filters.close()
+
+    def parse_line(self, line):
+        """Parse a build line"""
+        if line.startswith("cl"):
+            self.__parse_cl_line(line[3:])
+
+    def __parse_cl_line(self, line):
+        """Parse a compiler line"""
+        # Get the file we are compilong
+        file_name = re.search(r"/c ([\w\\.-]+) ", line).group(1)
+
+        # Skip files made by scons for configure testing
+        if "sconf_temp" in file_name:
+            return
+
+        self.files.add(file_name)
+
+        args = line.split(' ')
+
+        file_defines = set()
+        for arg in get_defines(args):
+            if arg not in self.common_defines:
+                file_defines.add(arg)
+        self.all_defines = self.all_defines.union(file_defines)
+
+        for arg in get_includes(args):
+            self.includes.add(arg)
+
+        self.compiles.append({"file" : file_name, "defines" : file_defines})
+
+    def __is_header(self, name):
+        """Is this a header file?"""
+        headers = [".h", ".hpp", ".hh", ".hxx"]
+        for header in headers:
+            if name.endswith(header):
+                return True
+        return False
+
+    def __write_filters(self):
+        """Generate the vcxproj.filters file"""
+        # 1. get a list of directories for all the files
+        # 2. get all the headers in each of these dirs
+        # 3. Output these lists of files to vcxproj and vcxproj.headers
+        # Note: order of these lists does not matter, VS will sort them anyway
+        dirs = set()
+        scons_files = set()
+
+        for file_name in self.files:
+            dirs.add(os.path.dirname(file_name))
+
+        base_dirs = set()
+        for directory in dirs:
+            if not os.path.exists(directory):
+                print(("Warning: skipping include file scan for directory '%s'" +
+                      " because it does not exist.") % str(directory))
+                continue
+
+            # Get all the header files
+            for file_name in os.listdir(directory):
+                if self.__is_header(file_name):
+                    self.files.add(directory + "\\" + file_name)
+
+            # Make sure the set also includes the base directories
+            # (i.e. src/mongo and src as examples)
+            base_name = os.path.dirname(directory)
+            while base_name:
+                base_dirs.add(base_name)
+                base_name = os.path.dirname(base_name)
+
+        dirs = dirs.union(base_dirs)
+
+        # Get all the scons files
+        for directory in dirs:
+            if os.path.exists(directory):
+                for file_name in os.listdir(directory):
+                    if "SConstruct" == file_name or "SConscript" in file_name:
+                        scons_files.add(directory + "\\" + file_name)
+        scons_files.add("SConstruct")
+
+        # Write a list of directory entries with unique guids
+        self.filters.write("  <ItemGroup>\n")
+        for file_name in sorted(dirs):
+            self.filters.write("    <Filter Include='%s'>\n" % file_name)
+            self.filters.write("        <UniqueIdentifier>{%s}</UniqueIdentifier>\n" % uuid.uuid4())
+            self.filters.write("    </Filter>\n")
+        self.filters.write("  </ItemGroup>\n")
+
+        # Write a list of files to compile
+        self.filters.write("  <ItemGroup>\n")
+        for file_name in sorted(self.files):
+            if not self.__is_header(file_name):
+                self.filters.write("    <ClCompile Include='%s'>\n" % file_name)
+                self.filters.write("        <Filter>%s</Filter>\n" % os.path.dirname(file_name))
+                self.filters.write("    </ClCompile>\n")
+        self.filters.write("  </ItemGroup>\n")
+
+        # Write a list of headers
+        self.filters.write("  <ItemGroup>\n")
+        for file_name in sorted(self.files):
+            if self.__is_header(file_name):
+                self.filters.write("    <ClInclude Include='%s'>\n" % file_name)
+                self.filters.write("        <Filter>%s</Filter>\n" % os.path.dirname(file_name))
+                self.filters.write("    </ClInclude>\n")
+        self.filters.write("  </ItemGroup>\n")
+
+        # Write a list of scons files
+        self.filters.write("  <ItemGroup>\n")
+        for file_name in sorted(scons_files):
+            self.filters.write("    <None Include='%s'>\n" % file_name)
+            self.filters.write("        <Filter>%s</Filter>\n" % os.path.dirname(file_name))
+            self.filters.write("    </None>\n")
+        self.filters.write("  </ItemGroup>\n")
+
+        # Write a list of headers into the vcxproj
+        self.vcxproj.write("  <ItemGroup>\n")
+        for file_name in sorted(self.files):
+            if self.__is_header(file_name):
+                self.vcxproj.write("    <ClInclude Include='%s' />\n" % file_name)
+        self.vcxproj.write("  </ItemGroup>\n")
+
+        # Write a list of scons files into the vcxproj
+        self.vcxproj.write("  <ItemGroup>\n")
+        for file_name in sorted(scons_files):
+            self.vcxproj.write("    <None Include='%s' />\n" % file_name)
+        self.vcxproj.write("  </ItemGroup>\n")
+
+def main():
+    if len(sys.argv) != 2:
+        print r"Usage: python buildscripts\make_vcxproj.py FILE_NAME"
+        return
+
+    with ProjFileGenerator(sys.argv[1]) as projfile:
+        with open("compile_commands.json", "rb") as sjh:
+            contents = sjh.read().decode('utf-8')
+            commands = json.loads(contents)
+
+        for command in commands:
+            command_str = command["command"]
+            projfile.parse_line(command_str)
 
 main()

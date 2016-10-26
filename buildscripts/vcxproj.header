@@ -6,36 +6,20 @@
      writes it back out you will use the comments and semi-neat formatting below.
 -->
 
-<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="Debug|Win32">
-      <Configuration>Debug</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug|x64">
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Release|Win32">
-      <Configuration>Release</Configuration>
-      <Platform>Win32</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Release|x64">
       <Configuration>Release</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Win2008PlusDebug|Win32">
-      <Configuration>Win2008PlusDebug</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Win2008PlusDebug|x64">
       <Configuration>Win2008PlusDebug</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Win2008PlusRelease|Win32">
-      <Configuration>Win2008PlusRelease</Configuration>
-      <Platform>Win32</Platform>
-  </ProjectConfiguration>
     <ProjectConfiguration Include="Win2008PlusRelease|x64">
       <Configuration>Win2008PlusRelease</Configuration>
       <Platform>x64</Platform>
@@ -45,7 +29,7 @@
   <PropertyGroup Label="Globals">
     <ProjectName>%_TARGET_%</ProjectName>
     <RootNamespace>mongod</RootNamespace>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v140</PlatformToolset>
     <!-- <ProjectGuid>{215B2D68-0A70-4D10-8E75-B31010C62A91}</ProjectGuid> -->
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>%_TARGET_%</RootNamespace>
@@ -57,24 +41,6 @@
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
-
-<!-- given we do final official build with scons, it is reasonable to consider leaving this off for better
-     compile speed during development:
--->
-<!--
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <WholeProgramOptimization>true</WholeProgramOptimization>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'" Label="Configuration">
-    <WholeProgramOptimization>true</WholeProgramOptimization>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <WholeProgramOptimization>true</WholeProgramOptimization>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'" Label="Configuration">
-    <WholeProgramOptimization>true</WholeProgramOptimization>
-  </PropertyGroup>
--->
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="PropertySheets">
@@ -100,11 +66,8 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <ObjectFileName>Build/%(RelativeDir)/</ObjectFileName>
-      <AdditionalIncludeDirectories>src;src\mongo;src\third_party\mozjs-45\include;src\third_party\pcre-8.39;src\third_party\boost-1.60.0;src\third_party\snappy-1.1.3;src\third_party\s2;src\third_party\yaml-cpp-0.5.3\include;src\third_party\wiredtiger\src\include</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>NTDDI_VERSION=0x06010000;_WIN32_WINNT=0x0601;WIN32;XP_WIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>    
-      <!-- above is temp - NTDDI etc. should be configurable, not finished yet, this gets us compiling some for now. 
-         <PreprocessorDefinitions>WIN32;XP_WIN;%(PreprocessorDefinitions)</PreprocessorDefinitions>    
-      -->
+      <AdditionalIncludeDirectories>%AdditionalIncludeDirectories%</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>    
       <DisableSpecificWarnings>4290;4355;4800;4267;4244;4351</DisableSpecificWarnings>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinimalRebuild>No</MinimalRebuild>
@@ -148,104 +111,13 @@
     </ClCompile>
   </ItemDefinitionGroup>
 
-  <!-- 32 bit -->
-  <ItemDefinitionGroup Condition="'$(Platform)'=='Win32'">
-    <ClCompile>
-      <PreprocessorDefinitions>V8_TARGET_ARCH_IA32;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-    </ClCompile>
-    <Link>
-      <TargetMachine>MachineX86</TargetMachine>
-      <LargeAddressAware>true</LargeAddressAware>
-    </Link>
-  </ItemDefinitionGroup>
-
-<!-- temp commented out, not working yet
--->
-  <!-- SRW / Windows2008+ -->
-<!--
-  <ItemDefinitionGroup Condition="'$(Configuration)'=='Win2008PlusRelease' Or '(Configuration)'=='Win2008PlusDebug'">
-    <ClCompile>
-      <PreprocessorDefinitions>NTDDI_VERSION=0x06010000;_WIN32_WINNT=0x0601;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-    </ClCompile>
-  </ItemDefinitionGroup>
--->
-  <!-- legacy -->
-<!--
-  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release' Or '(Configuration)'=='Debug'">
-    <ClCompile>
-      <PreprocessorDefinitions>NTDDI_VERSION=0x05020200;_WIN32_WINNT=0x0502;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-    </ClCompile>
-  </ItemDefinitionGroup>
--->
 
    <!-- SPECIFICS -->
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <Link>
-      <!-- this is likely unnecessary and should be removed, but was in the old vcxproj: -->
-      <IgnoreSpecificDefaultLibraries>msvcrtd;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
-    </Link>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">
-  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">
   </ItemDefinitionGroup>
-
-  <PropertyGroup>
-      <MongoBase>src\mongo\base</MongoBase>
-      <MongoAuth>src\mongo\db\auth</MongoAuth>
-      <MongoFts>src\mongo\db\fts</MongoFts>
-      <MongoShell>src\mongo\shell</MongoShell>
-      <MongoV8>src\third_party\v8</MongoV8>
-  </PropertyGroup>
-  <Target Name="ErrorCodes"
-      BeforeTargets="ClCompile"
-      Outputs="$(MongoBase)\error_codes.h;$(MongoBase)\error_codes.cpp"
-      Inputs="src\mongo\base\generate_error_codes.py;$(MongoBase)\error_codes.err">
-
-      <Exec Command="python src\mongo\base\generate_error_codes.py  $(MongoBase)\error_codes.err $(MongoBase)\error_codes.h $(MongoBase)\error_codes.cpp" />
-  </Target>
-  <Target Name="ActionTypes"
-      BeforeTargets="ClCompile"
-      Outputs="$(MongoAuth)\action_type.h;$(MongoAuth)\action_type.cpp"
-      Inputs="$(MongoAuth)\generate_action_types.py;$(MongoAuth)\action_types.txt">
-
-      <Exec Command="python $(MongoAuth)\generate_action_types.py  $(MongoAuth)\action_types.txt $(MongoAuth)\action_type.h $(MongoAuth)\action_type.cpp" />
-  </Target>
-  <Target Name="StopWords"
-      BeforeTargets="ClCompile"
-      Outputs="$(MongoFts)\stop_words_list.h;$(MongoFts)\stop_words_list.cpp"
-      Inputs="$(MongoFts)\generate_stop_words.py;$(MongoFts)\stop_words_danish.txt;$(MongoFts)\stop_words_dutch.txt;$(MongoFts)\stop_words_english.txt;$(MongoFts)\stop_words_finnish.txt;$(MongoFts)\stop_words_french.txt;$(MongoFts)\stop_words_german.txt;$(MongoFts)\stop_words_hungarian.txt;$(MongoFts)\stop_words_italian.txt;$(MongoFts)\stop_words_norwegian.txt;$(MongoFts)\stop_words_portuguese.txt;$(MongoFts)\stop_words_romanian.txt;$(MongoFts)\stop_words_russian.txt;$(MongoFts)\stop_words_spanish.txt;$(MongoFts)\stop_words_swedish.txt;$(MongoFts)\stop_words_turkish.txt" >
-
-      <Exec Command="python $(MongoFts)\generate_stop_words.py $(MongoFts)\stop_words_danish.txt $(MongoFts)\stop_words_dutch.txt $(MongoFts)\stop_words_english.txt $(MongoFts)\stop_words_finnish.txt $(MongoFts)\stop_words_french.txt $(MongoFts)\stop_words_german.txt $(MongoFts)\stop_words_hungarian.txt $(MongoFts)\stop_words_italian.txt $(MongoFts)\stop_words_norwegian.txt $(MongoFts)\stop_words_portuguese.txt $(MongoFts)\stop_words_romanian.txt $(MongoFts)\stop_words_russian.txt $(MongoFts)\stop_words_spanish.txt $(MongoFts)\stop_words_swedish.txt $(MongoFts)\stop_words_turkish.txt $(MongoFts)\stop_words_list.h $(MongoFts)\stop_words_list.cpp"/>
-  </Target>
-  <Target Name="V8ExperimentalLibraries"
-      BeforeTargets="ClCompile"
-      Outputs="$(MongoV8)\src\experimental-libraries.cc"
-      Inputs="$(MongoV8)\tools\js2c.py;$(MongoV8)\src\proxy.js;$(MongoV8)\src\collection.js;$(MongoV8)\src\macros.py" >
-
-      <Exec Command="python $(MongoV8)\tools\js2c.py $(MongoV8)\src\experimental-libraries.cc EXPERIMENTAL off $(MongoV8)\src\proxy.js $(MongoV8)\src\collection.js $(MongoV8)\src\macros.py" />
-  </Target>
-  <Target Name="V8Libraries"
-      BeforeTargets="ClCompile"
-      Outputs="$(MongoV8)\src\libraries.cc"
-      Inputs="$(MongoV8)\tools\js2c.py;$(MongoV8)\src\runtime.js;$(MongoV8)\src\v8natives.js;$(MongoV8)\src\array.js;$(MongoV8)\src\string.js;$(MongoV8)\src\uri.js;$(MongoV8)\src\math.js;$(MongoV8)\src\messages.js;$(MongoV8)\src\apinatives.js;$(MongoV8)\src\date.js;$(MongoV8)\src\regexp.js;$(MongoV8)\src\json.js;$(MongoV8)\src\liveedit-debugger.js;$(MongoV8)\src\mirror-debugger.js;$(MongoV8)\src\debug-debugger.js;$(MongoV8)\src\macros.py" >
-
-      <Exec Command="python $(MongoV8)\tools\js2c.py $(MongoV8)\src\libraries.cc CORE off $(MongoV8)\src\runtime.js $(MongoV8)\src\v8natives.js $(MongoV8)\src\array.js $(MongoV8)\src\string.js $(MongoV8)\src\uri.js $(MongoV8)\src\math.js $(MongoV8)\src\messages.js $(MongoV8)\src\apinatives.js $(MongoV8)\src\date.js $(MongoV8)\src\regexp.js $(MongoV8)\src\json.js $(MongoV8)\src\liveedit-debugger.js $(MongoV8)\src\mirror-debugger.js $(MongoV8)\src\debug-debugger.js $(MongoV8)\src\macros.py" />
-  </Target>
-  <Target Name="MongoShell"
-      BeforeTargets="ClCompile"
-      Outputs="$(MongoShell)\mongo.cpp"
-      Inputs="$(MongoShell)\assert.js;$(MongoShell)\bulk_api.js;$(MongoShell)\collection.js;$(MongoShell)\crud_api.js;$(MongoShell)\db.js;$(MongoShell)\mongo.js;$(MongoShell)\mr.js;$(MongoShell)\query.js;$(MongoShell)\types.js;$(MongoShell)\upgrade_check.js;$(MongoShell)\utils.js;$(MongoShell)\utils_sh.js;$(MongoShell)\utils_auth.js" >
-
-      <Exec Command="python site_scons\site_tools\jstoh.py $(MongoShell)\mongo.cpp $(MongoShell)\assert.js $(MongoShell)\bulk_api.js $(MongoShell)\collection.js $(MongoShell)\crud_api.js $(MongoShell)\db.js $(MongoShell)\mongo.js $(MongoShell)\mr.js $(MongoShell)\query.js $(MongoShell)\types.js $(MongoShell)\upgrade_check.js $(MongoShell)\utils.js $(MongoShell)\utils_sh.js $(MongoShell)\utils_auth.js" />
-  </Target>

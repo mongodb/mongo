@@ -2967,7 +2967,15 @@ def injectMongoIncludePaths(thisEnv):
     thisEnv.AppendUnique(CPPPATH=['$BUILD_DIR'])
 env.AddMethod(injectMongoIncludePaths, 'InjectMongoIncludePaths')
 
-compileDb = env.Alias("compiledb", env.CompilationDatabase('compile_commands.json'))
+compileCommands = env.CompilationDatabase('compile_commands.json')
+compileDb = env.Alias("compiledb", compileCommands)
+
+# Microsoft Visual Studio Project generation for code browsing
+vcxprojFile = env.Command(
+    "mongodb.vcxproj",
+    compileCommands,
+    r"$PYTHON buildscripts\make_vcxproj.py mongodb")
+vcxproj = env.Alias("vcxproj", vcxprojFile)
 
 env.Alias("distsrc-tar", env.DistSrc("mongodb-src-${MONGO_VERSION}.tar"))
 env.Alias("distsrc-tgz", env.GZip(
