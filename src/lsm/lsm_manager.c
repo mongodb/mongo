@@ -55,6 +55,7 @@ __lsm_general_worker_start(WT_SESSION_IMPL *session)
 	 * as many worker threads as are required to keep up with demand.
 	 */
 	WT_ASSERT(session, manager->lsm_workers > 0);
+	WT_ASSERT(session, manager->lsm_workers < manager->lsm_workers_max);
 	for (; manager->lsm_workers < manager->lsm_workers_max;
 	    manager->lsm_workers++) {
 		worker_args =
@@ -116,17 +117,18 @@ __lsm_stop_workers(WT_SESSION_IMPL *session)
 {
 	WT_LSM_MANAGER *manager;
 	WT_LSM_WORKER_ARGS *worker_args;
-	uint32_t i;
 
 	manager = &S2C(session)->lsm_manager;
 	/*
-	 * Start at the end of the list of threads and stop them until we
-	 * have the desired number.  We want to keep all active threads
-	 * packed at the front of the worker array.
+	 * Start at the end of the list of threads and stop them until we have
+	 * the desired number. We want to keep all active threads packed at the
+	 * front of the worker array.
 	 */
-	WT_ASSERT(session, manager->lsm_workers != 0);
-	for (i = manager->lsm_workers - 1; i >= manager->lsm_workers_max; i--) {
-		worker_args = &manager->lsm_worker_cookies[i];
+	WT_ASSERT(session, manager->lsm_workers > manager->lsm_workers_max);
+	for (; manager->lsm_workers > manager->lsm_workers_max;
+	    manager->lsm_workers--) {
+		worker_args =
+		    &manager->lsm_worker_cookies[manager->lsm_workers - 1];
 		/*
 		 * Clear this worker's flag so it stops.
 		 */
@@ -136,7 +138,6 @@ __lsm_stop_workers(WT_SESSION_IMPL *session)
 		worker_args->tid = 0;
 		worker_args->type = 0;
 		worker_args->flags = 0;
-		manager->lsm_workers--;
 		/*
 		 * We do not clear the session because they are allocated
 		 * statically when the connection was opened.
