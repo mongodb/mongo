@@ -74,7 +74,7 @@ AM_CONDITIONAL([ARM64_HOST], [test "$wt_cv_arm64" = "yes"])
 # support compiling the ASM code we have to perform the CRC checks on PowerPC.
 # To compile with clang we need to override the ASM compiler with CCAS to use
 # gcc. Unfortunately, doing the compilation in this manner means libtool can't
-# determine what tag to use for that one .S file. If we catch that we are using
+# determine what tag to use for that one .sx file. If we catch that we are using
 # two different compilers for CC and CCAS and we are on a PowerPC system we
 # overload the libtool flags to provide CC by default.
 if test "$wt_cv_powerpc" = "yes" -a "$CC" != "$CCAS"; then

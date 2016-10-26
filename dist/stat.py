@@ -42,8 +42,11 @@ compare_srcfile(tmp_file, '../src/include/stat.h')
 def print_defines_one(capname, base, stats):
     for v, l in enumerate(stats, base):
         desc = l.desc
-        if 'all_only' in l.flags:
-            desc += ', only reported if statistics=all is set'
+        if 'cache_walk' in l.flags:
+            desc += \
+                ', only reported if cache_walk or all statistics are enabled'
+        if 'tree_walk' in l.flags:
+            desc += ', only reported if tree_walk or all statistics are enabled'
         if len(textwrap.wrap(desc, 70)) > 1:
             f.write('/*!\n')
             f.write(' * %s\n' % '\n * '.join(textwrap.wrap(desc, 70)))

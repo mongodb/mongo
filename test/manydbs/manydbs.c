@@ -68,8 +68,6 @@ usage(void)
 extern int __wt_optind;
 extern char *__wt_optarg;
 
-void (*custom_die)(void) = NULL;
-
 static WT_CONNECTION **connections = NULL;
 static WT_CURSOR **cursors = NULL;
 static WT_RAND_STATE rnd;

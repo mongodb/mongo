@@ -1217,7 +1217,7 @@ err:	if (FLD_ISSET(S2C(session)->log_flags, WT_CONN_LOG_ENABLED))
 
 /*
  * __wt_btcur_init --
- *	Initialize an cursor used for internal purposes.
+ *	Initialize a cursor used for internal purposes.
  */
 void
 __wt_btcur_init(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)

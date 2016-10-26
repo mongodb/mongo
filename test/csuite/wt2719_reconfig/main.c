@@ -34,9 +34,7 @@
  * Test case description: Fuzz testing for WiredTiger reconfiguration.
  */
 
-void (*custom_die)(void) = NULL;
-
-static const char *list[] = {
+static const char * const list[] = {
 	",async=(enabled=0)",
 	",async=(enabled=1)",
 	",async=(ops_max=2048)",
@@ -256,7 +254,7 @@ main(int argc, char *argv[])
 	    session, opts->uri, "type=lsm,key_format=S,value_format=S"));
 
 	/* Initialize the RNG. */
-	testutil_check(__wt_random_init_seed(NULL, &rnd));
+	__wt_random_init_seed(NULL, &rnd);
 
 	/* Allocate memory for the config. */
 	len = WT_ELEMENTS(list) * 64;

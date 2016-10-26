@@ -42,8 +42,6 @@
  * continues until the test ends (~30 seconds).
  */
 
-void (*custom_die)(void) = NULL;
-
 static void *thread_insert(void *);
 static void *thread_get(void *);
 
@@ -201,7 +199,7 @@ thread_insert(void *arg)
 
 	threadargs = (THREAD_ARGS *)arg;
 	opts = threadargs->testopts;
-	testutil_check(__wt_random_init_seed(NULL, &rnd));
+	__wt_random_init_seed(NULL, &rnd);
 	(void)time(&prevtime);
 
 	testutil_check(opts->conn->open_session(

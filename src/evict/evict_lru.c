@@ -233,10 +233,10 @@ __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 
 #ifdef HAVE_DIAGNOSTIC
 	/*
-	 * Ensure the cache stuck timer is initialized when starting eviction
+	 * Ensure the cache stuck timer is initialized when starting eviction.
 	 */
 	if (thread->id == 0)
-		WT_ERR(__wt_epoch(session, &cache->stuck_ts));
+		__wt_epoch(session, &cache->stuck_ts);
 #endif
 
 	while (F_ISSET(conn, WT_CONN_EVICTION_RUN) &&
@@ -350,10 +350,10 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 	} else if (cache->pages_evicted != cache->pages_evict) {
 		cache->pages_evicted = cache->pages_evict;
 #ifdef HAVE_DIAGNOSTIC
-		WT_RET(__wt_epoch(session, &cache->stuck_ts));
+		__wt_epoch(session, &cache->stuck_ts);
 	} else {
 		/* After being stuck for 5 minutes, give up. */
-		WT_RET(__wt_epoch(session, &now));
+		__wt_epoch(session, &now);
 		if (WT_TIMEDIFF_SEC(now, cache->stuck_ts) > 300) {
 			ret = ETIMEDOUT;
 			__wt_err(session, ret,
@@ -465,16 +465,16 @@ __evict_update_work(WT_SESSION_IMPL *session)
 	 */
 	bytes_max = conn->cache_size + 1;
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
-	if (bytes_inuse > (cache->eviction_target * bytes_max) / 100)
-		F_SET(cache, WT_CACHE_EVICT_CLEAN);
 	if (__wt_eviction_clean_needed(session, NULL))
 		F_SET(cache, WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_CLEAN_HARD);
+	else if (bytes_inuse > (cache->eviction_target * bytes_max) / 100)
+		F_SET(cache, WT_CACHE_EVICT_CLEAN);
 
 	dirty_inuse = __wt_cache_dirty_leaf_inuse(cache);
-	if (dirty_inuse > (cache->eviction_dirty_target * bytes_max) / 100)
-		F_SET(cache, WT_CACHE_EVICT_DIRTY);
 	if (__wt_eviction_dirty_needed(session, NULL))
 		F_SET(cache, WT_CACHE_EVICT_DIRTY | WT_CACHE_EVICT_DIRTY_HARD);
+	else if (dirty_inuse > (cache->eviction_dirty_target * bytes_max) / 100)
+		F_SET(cache, WT_CACHE_EVICT_DIRTY);
 
 	/*
 	 * If application threads are blocked by the total volume of data in
@@ -505,12 +505,6 @@ __evict_update_work(WT_SESSION_IMPL *session)
 			F_SET(cache, WT_CACHE_EVICT_DIRTY_HARD);
 		F_CLR(cache, WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_CLEAN_HARD);
 	}
-
-	/* If threads are blocked by eviction we should be looking for pages. */
-	WT_ASSERT(session, !F_ISSET(cache, WT_CACHE_EVICT_CLEAN_HARD) ||
-	    F_ISSET(cache, WT_CACHE_EVICT_CLEAN));
-	WT_ASSERT(session, !F_ISSET(cache, WT_CACHE_EVICT_DIRTY_HARD) ||
-	    F_ISSET(cache, WT_CACHE_EVICT_DIRTY));
 
 	WT_STAT_CONN_SET(session, cache_eviction_state,
 	    F_MASK(cache, WT_CACHE_EVICT_MASK));
@@ -543,7 +537,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 
 	/* Evict pages from the cache. */
 	for (loop = 0; cache->pass_intr == 0; loop++) {
-		WT_RET(__wt_epoch(session, &now));
+		__wt_epoch(session, &now);
 		if (loop == 0)
 			prev = now;
 
@@ -554,6 +548,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 * does need to do some work.
 		 */
 		__wt_cache_read_gen_incr(session);
+		++cache->evict_pass_gen;
 
 		/*
 		 * Update the oldest ID: we use it to decide whether pages are
@@ -895,12 +890,11 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 	/* Fill the next queue (that isn't the urgent queue). */
 	queue = cache->evict_fill_queue;
 	other_queue = cache->evict_queues + (1 - (queue - cache->evict_queues));
+	cache->evict_fill_queue = other_queue;
 
 	/* If this queue is full, try the other one. */
 	if (__evict_queue_full(queue) && !__evict_queue_full(other_queue))
 		queue = other_queue;
-	cache->evict_fill_queue =
-	    &cache->evict_queues[1 - (queue - cache->evict_queues)];
 
 	/*
 	 * If both queues are full and haven't been empty on recent refills,
@@ -1062,7 +1056,7 @@ __evict_walk(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue)
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	u_int max_entries, retries, slot, start_slot, spins;
+	u_int max_entries, retries, slot, spins, start_slot, total_candidates;
 	bool dhandle_locked, incr;
 
 	conn = S2C(session);
@@ -1078,6 +1072,14 @@ __evict_walk(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue)
 	 */
 	start_slot = slot = queue->evict_entries;
 	max_entries = WT_MIN(slot + WT_EVICT_WALK_INCR, cache->evict_slots);
+
+	/*
+	 * Another pathological case: if there are only a tiny number of
+	 * candidate pages in cache, don't put all of them on one queue.
+	 */
+	total_candidates = (u_int)(F_ISSET(cache, WT_CACHE_EVICT_CLEAN) ?
+	    __wt_cache_pages_inuse(cache) : cache->pages_dirty_leaf);
+	max_entries = WT_MIN(max_entries, 1 + total_candidates / 2);
 
 retry:	while (slot < max_entries) {
 		/*
@@ -1282,8 +1284,8 @@ __evict_push_candidate(WT_SESSION_IMPL *session,
  *	Get a few page eviction candidates from a single underlying file.
  */
 static int
-__evict_walk_file(WT_SESSION_IMPL *session,
-    WT_EVICT_QUEUE *queue, u_int max_entries, u_int *slotp)
+__evict_walk_file(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue,
+    u_int max_entries, u_int *slotp)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
@@ -1410,6 +1412,7 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 
 		page = ref->page;
 		modified = __wt_page_is_modified(page);
+		page->evict_pass_gen = cache->evict_pass_gen;
 
 		/*
 		 * Use the EVICT_LRU flag to avoid putting pages onto the list
@@ -1508,19 +1511,22 @@ fast:		/* If the page can't be evicted, give up. */
 		btree->evict_walk_period = 0;
 
 	/*
-	 * If we happen to end up on the root page, clear it.  We have to track
-	 * hazard pointers, and the root page complicates that calculation.
+	 * If we happen to end up on the root page or a page requiring urgent
+	 * eviction, clear it.  We have to track hazard pointers, and the root
+	 * page complicates that calculation.
 	 *
 	 * Likewise if we found no new candidates during the walk: there is no
-	 * point keeping a page pinned, since it may be the only candidate in an
-	 * idle tree.
+	 * point keeping a page pinned, since it may be the only candidate in
+	 * an idle tree.
 	 *
 	 * If we land on a page requiring forced eviction, move on to the next
 	 * page: we want this page evicted as quickly as possible.
 	 */
 	if ((ref = btree->evict_ref) != NULL) {
 		/* Give up the walk occasionally. */
-		if (__wt_ref_is_root(ref) || evict == start || give_up)
+		if (__wt_ref_is_root(ref) || evict == start || give_up ||
+		    ref->page->read_gen == WT_READGEN_OLDEST ||
+		    ref->page->memory_footprint >= btree->splitmempage)
 			WT_RET(__evict_clear_walk(session, restarts == 0));
 		else if (ref->page->read_gen == WT_READGEN_OLDEST)
 			WT_RET_NOTFOUND_OK(__wt_tree_walk_count(
@@ -1543,17 +1549,17 @@ __evict_get_ref(
     WT_SESSION_IMPL *session, bool is_server, WT_BTREE **btreep, WT_REF **refp)
 {
 	WT_CACHE *cache;
-	WT_DECL_RET;
 	WT_EVICT_ENTRY *evict;
 	WT_EVICT_QUEUE *queue, *other_queue, *urgent_queue;
 	uint32_t candidates;
-	bool is_app, urgent_ok;
+	bool is_app, server_only, urgent_ok;
 
 	cache = S2C(session)->cache;
 	is_app = !F_ISSET(session, WT_SESSION_INTERNAL);
+	server_only = is_server && !WT_EVICT_HAS_WORKERS(session);
 	urgent_ok = (!is_app && !is_server) ||
 	    !WT_EVICT_HAS_WORKERS(session) ||
-	    __wt_cache_aggressive(session);
+	    (is_app && __wt_cache_aggressive(session));
 	urgent_queue = cache->evict_urgent_queue;
 	*btreep = NULL;
 	*refp = NULL;
@@ -1569,7 +1575,8 @@ __evict_get_ref(
 	}
 
 	/*
-	 * The server repopulates whenever the other queue is not full.
+	 * The server repopulates whenever the other queue is not full, as long
+	 * as at least one page has been evicted out of the current queue.
 	 *
 	 * Note that there are pathological cases where there are only enough
 	 * eviction candidates in the cache to fill one queue.  In that case,
@@ -1577,18 +1584,14 @@ __evict_get_ref(
 	 * Such cases are extremely rare in real applications.
 	 */
 	if (is_server &&
+	    (!urgent_ok || __evict_queue_empty(urgent_queue, false)) &&
+	    !__evict_queue_full(cache->evict_current_queue) &&
+	    !__evict_queue_full(cache->evict_fill_queue) &&
 	    (cache->evict_empty_score > WT_EVICT_SCORE_CUTOFF ||
-	    __evict_queue_empty(cache->evict_fill_queue, false))) {
-		while ((ret = __wt_spin_trylock(
-		    session, &cache->evict_queue_lock)) == EBUSY)
-			if ((!urgent_ok ||
-			    __evict_queue_empty(urgent_queue, false)) &&
-			    !__evict_queue_full(cache->evict_fill_queue))
-				return (WT_NOTFOUND);
+	    __evict_queue_empty(cache->evict_fill_queue, false)))
+		return (WT_NOTFOUND);
 
-		WT_RET(ret);
-	} else
-		__wt_spin_lock(session, &cache->evict_queue_lock);
+	__wt_spin_lock(session, &cache->evict_queue_lock);
 
 	/* Check the urgent queue first. */
 	if (urgent_ok && !__evict_queue_empty(urgent_queue, false))
@@ -1596,17 +1599,15 @@ __evict_get_ref(
 	else {
 		/*
 		 * Check if the current queue needs to change.
-		 * The current queue could have changed while we waited for
-		 * the lock.
 		 *
 		 * The server will only evict half of the pages before looking
-		 * for more. The remainder are left to eviction workers (if any
-		 * configured), or application threads if necessary.
+		 * for more, but should only switch queues if there are no
+		 * other eviction workers.
 		 */
 		queue = cache->evict_current_queue;
 		other_queue = cache->evict_other_queue;
-		if (__evict_queue_empty(queue, is_server) &&
-		    !__evict_queue_empty(other_queue, is_server)) {
+		if (__evict_queue_empty(queue, server_only) &&
+		    !__evict_queue_empty(other_queue, server_only)) {
 			cache->evict_current_queue = other_queue;
 			cache->evict_other_queue = queue;
 		}
@@ -1715,15 +1716,19 @@ __evict_get_ref(
 static int
 __evict_page(WT_SESSION_IMPL *session, bool is_server)
 {
+	struct timespec enter, leave;
 	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_DECL_RET;
 	WT_REF *ref;
+	bool app_timer;
 
 	WT_RET(__evict_get_ref(session, is_server, &btree, &ref));
 	WT_ASSERT(session, ref->state == WT_REF_LOCKED);
 
+	app_timer = false;
 	cache = S2C(session)->cache;
+
 	/*
 	 * An internal session flags either the server itself or an eviction
 	 * worker thread.
@@ -1739,6 +1744,10 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 			WT_STAT_CONN_INCR(session, cache_eviction_app_dirty);
 		WT_STAT_CONN_INCR(session, cache_eviction_app);
 		cache->app_evicts++;
+		if (WT_STAT_ENABLED(session)) {
+			app_timer = true;
+			__wt_epoch(session, &enter);
+		}
 	}
 
 	/*
@@ -1756,6 +1765,11 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 
 	(void)__wt_atomic_subv32(&btree->evict_busy, 1);
 
+	if (app_timer) {
+		__wt_epoch(session, &leave);
+		WT_STAT_CONN_INCRV(session,
+		    application_evict_time, WT_TIMEDIFF_US(leave, enter));
+	}
 	return (ret);
 }
 
@@ -1767,6 +1781,7 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 int
 __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 {
+	struct timespec enter, leave;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -1792,9 +1807,11 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 	/* Wake the eviction server if we need to do work. */
 	__wt_evict_server_wake(session);
 
-	init_evict_count = cache->pages_evict;
+	/* Track how long application threads spend doing eviction. */
+	if (WT_STAT_ENABLED(session) && !F_ISSET(session, WT_SESSION_INTERNAL))
+		__wt_epoch(session, &enter);
 
-	for (;;) {
+	for (init_evict_count = cache->pages_evict;; ret = 0) {
 		/*
 		 * A pathological case: if we're the oldest transaction in the
 		 * system and the eviction server is stuck trying to find space,
@@ -1804,7 +1821,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 		if (__wt_cache_stuck(session) && __wt_txn_am_oldest(session)) {
 			--cache->evict_aggressive_score;
 			WT_STAT_CONN_INCR(session, txn_fail_cache);
-			return (WT_ROLLBACK);
+			WT_ERR(WT_ROLLBACK);
 		}
 
 		/*
@@ -1816,7 +1833,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 		 * limit the work to 5 evictions and return. If that's not the
 		 * case, we can do more.
 		 */
-		if (!busy && txn_state->snap_min != WT_TXN_NONE &&
+		if (!busy && txn_state->pinned_id != WT_TXN_NONE &&
 		    txn_global->current != txn_global->oldest_id)
 			busy = true;
 		max_pages_evicted = busy ? 5 : 20;
@@ -1825,7 +1842,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 		if (!__wt_eviction_needed(session, busy, &pct_full) ||
 		    (pct_full < 100 &&
 		    cache->pages_evict > init_evict_count + max_pages_evicted))
-			return (0);
+			break;
 
 		/*
 		 * Don't make application threads participate in scrubbing for
@@ -1842,7 +1859,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 		switch (ret = __evict_page(session, false)) {
 		case 0:
 			if (busy)
-				return (0);
+				goto err;
 			/* FALLTHROUGH */
 		case EBUSY:
 			break;
@@ -1853,9 +1870,18 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, u_int pct_full)
 			cache->app_waits++;
 			break;
 		default:
-			return (ret);
+			goto err;
 		}
 	}
+
+err:	if (WT_STAT_ENABLED(session) &&
+	    !F_ISSET(session, WT_SESSION_INTERNAL)) {
+		__wt_epoch(session, &leave);
+		WT_STAT_CONN_INCRV(session,
+		    application_cache_time, WT_TIMEDIFF_US(leave, enter));
+	}
+
+	return (ret);
 	/* NOTREACHED */
 }
 

@@ -271,6 +271,17 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	else
 		F_CLR(btree, WT_BTREE_IN_MEMORY | WT_BTREE_NO_EVICTION);
 
+	WT_RET(__wt_config_gets(session,
+	    cfg, "ignore_in_memory_cache_size", &cval));
+	if (cval.val) {
+		if (!F_ISSET(conn, WT_CONN_IN_MEMORY))
+			WT_RET_MSG(session, EINVAL,
+			    "ignore_in_memory_cache_size setting is only valid "
+			    "with databases configured to run in-memory");
+		F_SET(btree, WT_BTREE_IGNORE_CACHE);
+	} else
+		F_CLR(btree, WT_BTREE_IGNORE_CACHE);
+
 	WT_RET(__wt_config_gets(session, cfg, "log.enabled", &cval));
 	if (cval.val)
 		F_CLR(btree, WT_BTREE_NO_LOGGING);
@@ -353,7 +364,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_RET(__wt_spin_init(session, &btree->flush_lock, "btree flush"));
 
 	btree->checkpointing = WT_CKPT_OFF;		/* Not checkpointing */
-	btree->modified = 0;				/* Clean */
+	btree->modified = false;			/* Clean */
 	btree->write_gen = ckpt->write_gen;		/* Write generation */
 
 	return (0);

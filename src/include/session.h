@@ -147,6 +147,9 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
 	void	*reconcile;		/* Reconciliation support */
 	int	(*reconcile_cleanup)(WT_SESSION_IMPL *);
 
+	/* Sessions have an associated statistics bucket based on its ID. */
+	u_int	stat_bucket;		/* Statistics bucket offset */
+
 	uint32_t flags;
 
 	/*

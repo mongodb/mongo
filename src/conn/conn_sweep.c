@@ -271,7 +271,7 @@ __sweep_server(void *arg)
 		/* Wait until the next event. */
 		__wt_cond_wait(session,
 		    conn->sweep_cond, conn->sweep_interval * WT_MILLION);
-		WT_ERR(__wt_seconds(session, &now));
+		__wt_seconds(session, &now);
 
 		WT_STAT_CONN_INCR(session, dh_sweeps);
 

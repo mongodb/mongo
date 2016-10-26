@@ -42,11 +42,11 @@ __curstat_lsm_init(
 	if (cst->flags != 0) {
 		(void)snprintf(config, sizeof(config),
 		    "statistics=(%s%s%s%s)",
-		    F_ISSET(cst, WT_CONN_STAT_ALL) ? "all," : "",
-		    F_ISSET(cst, WT_CONN_STAT_CLEAR) ? "clear," : "",
-		    !F_ISSET(cst, WT_CONN_STAT_ALL) &&
-		    F_ISSET(cst, WT_CONN_STAT_FAST) ? "fast," : "",
-		    F_ISSET(cst, WT_CONN_STAT_SIZE) ? "size," : "");
+		    F_ISSET(cst, WT_STAT_TYPE_ALL) ? "all," : "",
+		    F_ISSET(cst, WT_STAT_CLEAR) ? "clear," : "",
+		    !F_ISSET(cst, WT_STAT_TYPE_ALL) &&
+		    F_ISSET(cst, WT_STAT_TYPE_FAST) ? "fast," : "",
+		    F_ISSET(cst, WT_STAT_TYPE_SIZE) ? "size," : "");
 		cfg[1] = disk_cfg[1] = config;
 	}
 
@@ -132,26 +132,26 @@ __curstat_lsm_init(
 
 	/* Include, and optionally clear, LSM-level specific information. */
 	WT_STAT_WRITE(session, stats, bloom_miss, lsm_tree->bloom_miss);
-	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
+	if (F_ISSET(cst, WT_STAT_CLEAR))
 		lsm_tree->bloom_miss = 0;
 	WT_STAT_WRITE(session, stats, bloom_hit, lsm_tree->bloom_hit);
-	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
+	if (F_ISSET(cst, WT_STAT_CLEAR))
 		lsm_tree->bloom_hit = 0;
 	WT_STAT_WRITE(session,
 	    stats, bloom_false_positive, lsm_tree->bloom_false_positive);
-	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
+	if (F_ISSET(cst, WT_STAT_CLEAR))
 		lsm_tree->bloom_false_positive = 0;
 	WT_STAT_WRITE(session,
 	    stats, lsm_lookup_no_bloom, lsm_tree->lsm_lookup_no_bloom);
-	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
+	if (F_ISSET(cst, WT_STAT_CLEAR))
 		lsm_tree->lsm_lookup_no_bloom = 0;
 	WT_STAT_WRITE(session,
 	    stats, lsm_checkpoint_throttle, lsm_tree->lsm_checkpoint_throttle);
-	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
+	if (F_ISSET(cst, WT_STAT_CLEAR))
 		lsm_tree->lsm_checkpoint_throttle = 0;
 	WT_STAT_WRITE(session,
 	    stats, lsm_merge_throttle, lsm_tree->lsm_merge_throttle);
-	if (F_ISSET(cst, WT_CONN_STAT_CLEAR))
+	if (F_ISSET(cst, WT_STAT_CLEAR))
 		lsm_tree->lsm_merge_throttle = 0;
 
 	__wt_curstat_dsrc_final(cst);

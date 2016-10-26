@@ -36,12 +36,6 @@
  * Failure mode: The failure seen in WT-2592 was that no items were returned
  * by a join.
  */
-#include <inttypes.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include <wiredtiger.h>
 
 /* The C struct for the data we are storing in a WiredTiger table. */
 typedef struct {
@@ -65,8 +59,6 @@ static POP_RECORD pop_data[] = {
 	{ "USA", 2000,	301279593 },
 	{ "", 0, 0 }
 };
-
-void (*custom_die)(void) = NULL;
 
 int
 main(int argc, char *argv[])

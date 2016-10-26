@@ -32,8 +32,6 @@
  * Test case description: Smoke-test the CRC.
  */
 
-void (*custom_die)(void) = NULL;
-
 static inline void
 check(uint32_t hw, uint32_t sw, size_t len, const char *msg)
 {
@@ -61,7 +59,7 @@ main(int argc, char *argv[])
 	    wiredtiger_open(opts->home, NULL, "create", &opts->conn));
 
 	/* Initialize the RNG. */
-	testutil_check(__wt_random_init_seed(NULL, &rnd));
+	__wt_random_init_seed(NULL, &rnd);
 
 	/* Allocate aligned memory for the data. */
 	data = dcalloc(DATASIZE, sizeof(uint8_t));

@@ -42,8 +42,6 @@
 
 #define	MILLION		1000000
 
-void (*custom_die)(void) = NULL;
-
 /* Needs to be global for signal handling. */
 static TEST_OPTS *opts, _opts;
 
@@ -104,6 +102,8 @@ main(int argc, char *argv[])
 	char buf[100];
 
 	opts = &_opts;
+	if (testutil_disable_long_tests())
+		return (0);
 	memset(opts, 0, sizeof(*opts));
 	opts->table_type = TABLE_ROW;
 	opts->n_append_threads = N_APPEND_THREADS;

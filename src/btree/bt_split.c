@@ -1582,6 +1582,13 @@ __split_multi_inmem(
 	 */
 	page->modify->first_dirty_txn = WT_TXN_FIRST;
 
+	/*
+	 * If the new page is modified, save the oldest ID from reconciliation
+	 * to avoid repeatedly attempting eviction on the same page.
+	 */
+	page->modify->last_eviction_id = orig->modify->last_eviction_id;
+	page->modify->update_restored = 1;
+
 err:	/* Free any resources that may have been cached in the cursor. */
 	WT_TRET(__wt_btcur_close(&cbt, true));
 
@@ -2243,14 +2250,6 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi)
 	new->ref_recno = ref->ref_recno;
 
 	WT_ERR(__split_multi_inmem(session, page, multi, new));
-
-	/*
-	 * If the new page is modified, save the oldest ID from reconciliation
-	 * to avoid repeatedly attempting eviction on the same page.
-	 */
-	if (new->page->modify != NULL)
-		new->page->modify->last_eviction_id =
-		    page->modify->last_eviction_id;
 
 	/*
 	 * The rewrite succeeded, we can no longer fail.

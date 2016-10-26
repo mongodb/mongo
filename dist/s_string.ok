@@ -18,6 +18,7 @@ ASYNC
 Addr
 Ailamaki
 Alakuijala
+Alexandrescu's
 Alloc
 Async
 Athanassoulis
@@ -59,6 +60,7 @@ COVERITY
 CPUs
 CRC
 CSV
+CStream
 CURSORs
 CURSTD
 CallsCustDate
@@ -68,6 +70,7 @@ Checksum
 Checksums
 CityHash
 CloseHandle
+Collet
 Comparator
 Config
 Coverity
@@ -124,6 +127,7 @@ FORALL
 FOREACH
 FS
 FULLFSYNC
+Facebook
 FindClose
 FindFirstFile
 Fixup
@@ -165,6 +169,7 @@ INSN
 INTL
 ISA
 ITEMs
+ITER
 InitializeCriticalSectionAndSpinCount
 Inline
 Intra
@@ -372,6 +377,7 @@ WILLNEED
 WIREDTIGER
 WRLSN
 WRNOLOCK
+WTPERF
 WaitForSingleObject
 WakeAllConditionVariable
 Wconditional
@@ -395,6 +401,12 @@ WriteFile
 Wuninitialized
 Wunused
 XP
+Yann
+ZSTD
+Zlib
+Zlib's
+Zstd
+Zstd's
 abcdef
 abcdefghijklmnopqrstuvwxyz
 addl
@@ -416,6 +428,7 @@ argc
 args
 argv
 asm
+assertfmt
 async
 asyncopp
 asyncops
@@ -511,6 +524,7 @@ collatorp
 comparator
 comparep
 compat
+compressStream
 concat
 cond
 conf
@@ -530,6 +544,7 @@ cp
 cpuid
 crc
 create's
+createCStream
 crypto
 cryptobad
 csv
@@ -622,6 +637,7 @@ emp
 encodings
 encryptor
 encryptors
+endStream
 endian
 english
 enqueue
@@ -749,6 +765,7 @@ infeasible
 inflateInit
 infmt
 init
+initCStream
 initializers
 initn
 initsize
@@ -784,6 +801,7 @@ isupper
 isxdigit
 iter
 iteratively
+iters
 jnr
 jrx
 json
@@ -849,6 +867,7 @@ majorp
 malloc
 marshall
 marshalled
+maxCLevel
 maxcpu
 maxdbs
 mbll
@@ -989,12 +1008,14 @@ qdown
 qrrSS
 qsort
 quartile
+queueable
 qup
 rN
 rS
 rb
 rbrace
 rbracket
+rcursor
 rdonly
 rduppo
 readlock
@@ -1201,6 +1222,7 @@ waitpid
 walk's
 warmup
 wb
+wcursor
 wiredTiger
 wiredtiger
 workFactor
@@ -1222,6 +1244,10 @@ xxxx
 xxxxx
 xxxxxx
 zalloc
+zf
 zfree
 zlib
+zlib's
+zstd
+zstd's
 zu

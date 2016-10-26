@@ -115,6 +115,9 @@ def parse_wtstats_file(file, result):
     # Parse file
     for line in open(file, 'rU'):
         month, day, time, v, title = line.strip('\n').split(" ", 4)
+        # The colon in the URI confuses parsing, strip it out.
+        if "cache_walk" in title:
+            title = title.replace("file:", "", 1)
         result[title].append((month + " " + day + " " + time, v))
 
 

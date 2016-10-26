@@ -50,6 +50,8 @@ compressor(uint32_t compress_flag)
 		return ("zlib");
 	case COMPRESS_ZLIB_NO_RAW:
 		return ("zlib-noraw");
+	case COMPRESS_ZSTD:
+		return ("zstd");
 	default:
 		break;
 	}
@@ -210,13 +212,14 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 	/* Extensions. */
 	p += snprintf(p, REMAIN(p, end),
 	    ",extensions=["
-	    "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
+	    "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
 	    g.c_reverse ? REVERSE_PATH : "",
 	    access(LZ4_PATH, R_OK) == 0 ? LZ4_PATH : "",
 	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
 	    access(ROTN_PATH, R_OK) == 0 ? ROTN_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
 	    access(ZLIB_PATH, R_OK) == 0 ? ZLIB_PATH : "",
+	    access(ZSTD_PATH, R_OK) == 0 ? ZSTD_PATH : "",
 	    DATASOURCE("kvsbdb") ? KVS_BDB_PATH : "");
 
 	/*
@@ -546,6 +549,7 @@ wts_stats(void)
 	WT_DECL_RET;
 	WT_SESSION *session;
 	FILE *fp;
+	size_t len;
 	char *stat_name;
 	const char *pval, *desc;
 	uint64_t v;
@@ -582,8 +586,9 @@ wts_stats(void)
 
 	/* Data source statistics. */
 	fprintf(fp, "\n\n====== Data source statistics:\n");
-	stat_name = dmalloc(strlen("statistics:") + strlen(g.uri) + 1);
-	sprintf(stat_name, "statistics:%s", g.uri);
+	len = strlen("statistics:") + strlen(g.uri) + 1;
+	stat_name = dmalloc(len);
+	snprintf(stat_name, len, "statistics:%s", g.uri);
 	testutil_check(session->open_cursor(
 	    session, stat_name, NULL, NULL, &cursor));
 	free(stat_name);

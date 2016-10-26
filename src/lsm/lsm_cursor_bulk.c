@@ -28,9 +28,8 @@ __clsm_close_bulk(WT_CURSOR *cursor)
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
 
 	/* Close the bulk cursor to ensure the chunk is written to disk. */
-	bulk_cursor = clsm->cursors[0];
+	bulk_cursor = clsm->chunks[0]->cursor;
 	WT_RET(bulk_cursor->close(bulk_cursor));
-	clsm->cursors[0] = NULL;
 	clsm->nchunks = 0;
 
 	/* Set ondisk, and flush the metadata */
@@ -75,7 +74,7 @@ __clsm_insert_bulk(WT_CURSOR *cursor)
 	WT_ASSERT(session, lsm_tree->nchunks == 1 && clsm->nchunks == 1);
 	++chunk->count;
 	chunk->size += cursor->key.size + cursor->value.size;
-	bulk_cursor = *clsm->cursors;
+	bulk_cursor = clsm->chunks[0]->cursor;
 	bulk_cursor->set_key(bulk_cursor, &cursor->key);
 	bulk_cursor->set_value(bulk_cursor, &cursor->value);
 	WT_RET(bulk_cursor->insert(bulk_cursor));
@@ -124,11 +123,10 @@ __wt_clsm_open_bulk(WT_CURSOR_LSM *clsm, const char *cfg[])
 	 * for a bloom filter - it makes cleanup simpler. Cleaned up by
 	 * cursor close on error.
 	 */
-	WT_RET(__wt_calloc_one(session, &clsm->blooms));
-	clsm->bloom_alloc = 1;
-	WT_RET(__wt_calloc_one(session, &clsm->cursors));
-	clsm->cursor_alloc = 1;
-	clsm->nchunks = 1;
+	WT_RET(
+	    __wt_realloc_def(session, &clsm->chunks_alloc, 1, &clsm->chunks));
+	WT_RET(__wt_calloc_one(session, &clsm->chunks[0]));
+	clsm->chunks_count = clsm->nchunks = 1;
 
 	/*
 	 * Open a bulk cursor on the first chunk in the tree - take a read
@@ -139,7 +137,7 @@ __wt_clsm_open_bulk(WT_CURSOR_LSM *clsm, const char *cfg[])
 	 */
 	WT_RET(__wt_open_cursor(session,
 	    lsm_tree->chunk[0]->uri, &clsm->iface, cfg, &bulk_cursor));
-	clsm->cursors[0] = bulk_cursor;
+	clsm->chunks[0]->cursor = bulk_cursor;
 	/* LSM cursors are always raw */
 	F_SET(bulk_cursor, WT_CURSTD_RAW);
 

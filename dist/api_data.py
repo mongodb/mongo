@@ -136,8 +136,8 @@ file_config = format_meta + [
         configure a compressor for file blocks.  Permitted values are \c "none"
         or custom compression engine name created with
         WT_CONNECTION::add_compressor.  If WiredTiger has builtin support for
-        \c "snappy", \c "lz4" or \c "zlib" compression, these names are also
-        available.  See @ref compression for more information'''),
+        \c "lz4", \c "snappy", \c "zlib" or \c "zstd" compression, these names
+        are also available.  See @ref compression for more information'''),
     Config('cache_resident', 'false', r'''
         do not ever evict the object's pages from cache. Not compatible with
         LSM tables; see @ref tuning_cache_resident for more information''',
@@ -183,6 +183,12 @@ file_config = format_meta + [
         configure Huffman encoding for values.  Permitted values are
         \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
         See @ref huffman for more information'''),
+    Config('ignore_in_memory_cache_size', 'false', r'''
+        allow update and insert operations to proceed even if the cache is
+        already at capacity. Only valid in conjunction with in-memory
+        databases. Should be used with caution - this configuration allows
+        WiredTiger to consume memory over the configured cache limit''',
+        type='boolean'),
     Config('internal_key_truncate', 'true', r'''
         configure internal key truncation, discarding unnecessary
         trailing bytes on internal keys (ignored for custom
@@ -410,13 +416,13 @@ connection_runtime_config = [
     Config('eviction_dirty_target', '5', r'''
         perform eviction in worker threads when the cache contains at least
         this much dirty content, expressed as a percentage of the total cache
-        size.  Ignored if \c in_memory is \c true''',
+        size.''',
         min=1, max=99),
     Config('eviction_dirty_trigger', '20', r'''
         trigger application threads to perform eviction when the cache contains
         at least this much dirty content, expressed as a percentage of the
         total cache size. This setting only alters behavior if it is lower than
-        eviction_trigger. Ignored if \c in_memory is \c true''',
+        eviction_trigger''',
         min=1, max=99),
     Config('eviction_target', '80', r'''
         perform eviction in worker threads when the cache contains at least
@@ -496,7 +502,8 @@ connection_runtime_config = [
         is used to gather statistics, as well as each time statistics
         are logged using the \c statistics_log configuration.  See
         @ref statistics for more information''',
-        type='list', choices=['all', 'fast', 'none', 'clear']),
+        type='list',
+        choices=['all', 'cache_walk', 'fast', 'none', 'clear', 'tree_walk']),
     Config('verbose', '', r'''
         enable messages for various events. Only available if WiredTiger
         is configured with --enable-verbose. Options are given as a
@@ -563,8 +570,9 @@ wiredtiger_open_log_configuration = [
             configure a compressor for log records.  Permitted values are
             \c "none" or custom compression engine name created with
             WT_CONNECTION::add_compressor.  If WiredTiger has builtin support
-            for \c "snappy", \c "lz4" or \c "zlib" compression, these names
-            are also available. See @ref compression for more information'''),
+            for \c "lz4", \c "snappy", \c "zlib" or \c "zstd" compression,
+            these names are also available. See @ref compression for more
+            information'''),
         Config('file_max', '100MB', r'''
             the maximum size of log files''',
             min='100KB', max='2GB'),
@@ -970,7 +978,8 @@ methods = {
         gathering them, where appropriate (for example, a cache size statistic
         is not cleared, while the count of cursor insert operations will be
         cleared).  See @ref statistics for more information''',
-        type='list', choices=['all', 'fast', 'clear', 'size']),
+        type='list',
+        choices=['all', 'cache_walk', 'fast', 'clear', 'size', 'tree_walk']),
     Config('target', '', r'''
         if non-empty, backup the list of objects; valid only for a
         backup data source''',
