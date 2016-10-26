@@ -292,7 +292,7 @@ bool ShardRegistry::reload(OperationContext* txn) {
     currData.addConfigShard(_data.getConfigShard());
     _data.swap(currData);
 
-    // Remove RSMs that are not in the catalog any more.
+    // Remove ReplicaSeMonitors that are not in the catalog any more.
     std::set<ShardId> removedShardIds;
     currData.getAllShardIds(removedShardIds);
     _data.shardIdSetDifference(removedShardIds);
@@ -301,8 +301,11 @@ bool ShardRegistry::reload(OperationContext* txn) {
         auto shard = currData.findByShardId(shardId);
         invariant(shard);
 
-        auto name = shard->getConnString().getSetName();
-        ReplicaSetMonitor::remove(name);
+        // Only attempt to remove a ReplicaSetMonitor if the shard was a replica set.
+        if (shard->getConnString().type() == ConnectionString::SET ||
+            shard->getConnString().type() == ConnectionString::CUSTOM) {  // CUSTOM for dbtests
+            ReplicaSetMonitor::remove(shard->getConnString().getSetName());
+        }
     }
 
     nextReloadState = ReloadState::Idle;
