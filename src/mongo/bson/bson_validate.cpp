@@ -237,7 +237,9 @@ Status validateElementInfo(Buffer* buffer, ValidationState::State* nextState, BS
             status = buffer->readUTF8String(NULL);
             if (!status.isOK())
                 return status;
-            buffer->skip(OID::kOIDSize);
+            if (!buffer->skip(OID::kOIDSize)) {
+                return makeError("invalid bson length", idElem);
+            }
             return Status::OK();
 
         case RegEx:
