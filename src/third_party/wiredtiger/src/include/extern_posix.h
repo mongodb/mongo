@@ -27,5 +27,5 @@ extern void __wt_sleep(uint64_t seconds, uint64_t micro_seconds);
 extern int __wt_thread_create(WT_SESSION_IMPL *session, wt_thread_t *tidret, WT_THREAD_CALLBACK(*func)(void *), void *arg) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_thread_id(char *buf, size_t buflen);
-extern int __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern void __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp);
 extern void __wt_yield(void);

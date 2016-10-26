@@ -108,7 +108,7 @@ else
 	   ! expr "$f" : 'test/.*' > /dev/null &&
 	   ! expr "$f" : '.*/utilities/.*' > /dev/null; then
 		if ! expr "$f" : '.*/os_alloc.c' > /dev/null &&
-		     egrep '[[:space:]]free[(]|[[:space:]]strdup[(]|[[:space:]]strndup[(]|[[:space:]]malloc[(]|[[:space:]]calloc[(]|[[:space:]]realloc[(]' $f > $t; then
+		     egrep '[[:space:]]free[(]|[[:space:]]strdup[(]|[[:space:]]strndup[(]|[[:space:]]malloc[(]|[[:space:]]calloc[(]|[[:space:]]realloc[(]|[[:space:]]sprintf[(]' $f > $t; then
 			test -s $t && {
 				echo "$f: call to illegal function"
 				cat $t

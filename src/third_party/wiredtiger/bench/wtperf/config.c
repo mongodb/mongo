@@ -28,15 +28,19 @@
 
 #include "wtperf.h"
 
-/* All options changeable on command line using -o or -O are listed here. */
-static CONFIG_OPT config_opts[] = {
+static CONFIG_OPT config_opts_desc[] = {	/* Option descriptions */
 #define	OPT_DEFINE_DESC
 #include "wtperf_opt.i"
 #undef OPT_DEFINE_DESC
 };
 
-static int  config_opt(CONFIG *, WT_CONFIG_ITEM *, WT_CONFIG_ITEM *);
-static void config_opt_usage(void);
+static CONFIG_OPTS config_opts_default = {	/* Option defaults */
+#define	OPT_DEFINE_DEFAULT
+#include "wtperf_opt.i"
+#undef OPT_DEFINE_DEFAULT
+
+	{ NULL, NULL }				/* config_head */
+};
 
 /*
  * STRING_MATCH --
@@ -45,6 +49,72 @@ static void config_opt_usage(void);
 #undef	STRING_MATCH
 #define	STRING_MATCH(str, bytes, len)					\
 	(strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
+
+/*
+ * config_opt_init --
+ *	Initialize the global configuration options.
+ */
+void
+config_opt_init(CONFIG_OPTS **retp)
+{
+	CONFIG_OPT *desc;
+	CONFIG_OPTS *opts;
+	size_t i;
+	char **strp;
+	void *valueloc;
+
+	opts = dmalloc(sizeof(CONFIG_OPTS));
+	*opts = config_opts_default;
+
+	TAILQ_INIT(&opts->config_head);
+
+	/*
+	 * Option strings come-and-go as we configure them, so allocate copies
+	 * of the default strings now so that we can always free the string as
+	 * we allocate new versions.
+	 */
+	for (i = 0, desc = config_opts_desc;
+	    i < WT_ELEMENTS(config_opts_desc); i++, ++desc)
+		if (desc->type == CONFIG_STRING_TYPE ||
+		    desc->type == STRING_TYPE) {
+			valueloc = ((uint8_t *)opts + desc->offset);
+			strp = (char **)valueloc;
+			*strp = dstrdup(*strp);
+		}
+
+	*retp = opts;
+}
+
+/*
+ * config_opt_cleanup --
+ *	Clean up the global configuration options.
+ */
+void
+config_opt_cleanup(CONFIG_OPTS *opts)
+{
+	CONFIG_OPT *desc;
+	CONFIG_QUEUE_ENTRY *config_line;
+	size_t i;
+	char **strp;
+	void *valueloc;
+
+	for (i = 0, desc = config_opts_desc;
+	    i < WT_ELEMENTS(config_opts_desc); i++, ++desc)
+		if (desc->type == CONFIG_STRING_TYPE ||
+		    desc->type == STRING_TYPE) {
+			valueloc = ((uint8_t *)opts + desc->offset);
+			strp = (char **)valueloc;
+			free(*strp);
+		}
+
+	while ((config_line = TAILQ_FIRST(&opts->config_head)) != NULL) {
+		TAILQ_REMOVE(&opts->config_head, config_line, q);
+		free(config_line->string);
+		free(config_line);
+	}
+
+	free(opts);
+}
 
 /*
  * config_unescape --
@@ -94,168 +164,11 @@ config_unescape(char *orig)
 }
 
 /*
- * config_copy --
- *	CONFIG structure initialization, based on a source configuration.
- */
-void
-config_copy(CONFIG *dest, const CONFIG *src)
-{
-	CONFIG_QUEUE_ENTRY *conf_line, *tmp_line;
-	size_t i;
-	char *newstr, **pstr;
-
-	memcpy(dest, src, sizeof(CONFIG));
-
-	if (src->home != NULL)
-		dest->home = dstrdup(src->home);
-	if (src->monitor_dir != NULL)
-		dest->monitor_dir = dstrdup(src->monitor_dir);
-	if (src->partial_config != NULL)
-		dest->partial_config = dstrdup(src->partial_config);
-	if (src->reopen_config != NULL)
-		dest->reopen_config = dstrdup(src->reopen_config);
-	if (src->base_uri != NULL)
-		dest->base_uri = dstrdup(src->base_uri);
-
-	if (src->uris != NULL) {
-		dest->uris = dcalloc(src->table_count, sizeof(char *));
-		for (i = 0; i < src->table_count; i++)
-			dest->uris[i] = dstrdup(src->uris[i]);
-	}
-
-	if (src->async_config != NULL)
-		dest->async_config = dstrdup(src->async_config);
-
-	dest->ckptthreads = NULL;
-	dest->popthreads = NULL;
-	dest->workers = NULL;
-
-	if (src->workload != NULL) {
-		dest->workload = dcalloc(WORKLOAD_MAX, sizeof(WORKLOAD));
-		memcpy(dest->workload,
-		    src->workload, WORKLOAD_MAX * sizeof(WORKLOAD));
-	}
-
-	for (i = 0; i < sizeof(config_opts) / sizeof(config_opts[0]); i++)
-		if (config_opts[i].type == STRING_TYPE ||
-		    config_opts[i].type == CONFIG_STRING_TYPE) {
-			pstr = (char **)
-			    ((u_char *)dest + config_opts[i].offset);
-			if (*pstr != NULL) {
-				newstr = dstrdup(*pstr);
-				*pstr = newstr;
-			}
-		}
-
-	TAILQ_INIT(&dest->stone_head);
-	TAILQ_INIT(&dest->config_head);
-
-	/* Clone the config string information into the new cfg object */
-	TAILQ_FOREACH(conf_line, &src->config_head, c) {
-		tmp_line = dcalloc(sizeof(CONFIG_QUEUE_ENTRY), 1);
-		tmp_line->string = dstrdup(conf_line->string);
-		TAILQ_INSERT_TAIL(&dest->config_head, tmp_line, c);
-	}
-}
-
-/*
- * config_free --
- *	Free any storage allocated in the config struct.
- */
-void
-config_free(CONFIG *cfg)
-{
-	CONFIG_QUEUE_ENTRY *config_line;
-	size_t i;
-	char **pstr;
-
-	free(cfg->home);
-	free(cfg->monitor_dir);
-	free(cfg->partial_config);
-	free(cfg->reopen_config);
-
-	/* Free the various URIs */
-	free(cfg->base_uri);
-	free(cfg->log_table_uri);
-
-	if (cfg->uris != NULL) {
-		for (i = 0; i < cfg->table_count; i++)
-			free(cfg->uris[i]);
-		free(cfg->uris);
-	}
-
-	free(cfg->async_config);
-
-	free(cfg->ckptthreads);
-	free(cfg->popthreads);
-
-	free(cfg->workers);
-	free(cfg->workload);
-
-	cleanup_truncate_config(cfg);
-
-	while (!TAILQ_EMPTY(&cfg->config_head)) {
-		config_line = TAILQ_FIRST(&cfg->config_head);
-		TAILQ_REMOVE(&cfg->config_head, config_line, c);
-		free(config_line->string);
-		free(config_line);
-	}
-
-	for (i = 0; i < sizeof(config_opts) / sizeof(config_opts[0]); i++)
-		if (config_opts[i].type == STRING_TYPE ||
-		    config_opts[i].type == CONFIG_STRING_TYPE) {
-			pstr = (char **)
-			    ((u_char *)cfg + config_opts[i].offset);
-			free(*pstr);
-			*pstr = NULL;
-		}
-}
-
-/*
- * config_compress --
- *	Parse the compression configuration.
- */
-int
-config_compress(CONFIG *cfg)
-{
-	int ret;
-	const char *s;
-
-	ret = 0;
-	s = cfg->compression;
-	if (strcmp(s, "none") == 0) {
-		cfg->compress_ext = NULL;
-		cfg->compress_table = NULL;
-	} else if (strcmp(s, "lz4") == 0) {
-#ifndef HAVE_BUILTIN_EXTENSION_LZ4
-		cfg->compress_ext = LZ4_EXT;
-#endif
-		cfg->compress_table = LZ4_BLK;
-	} else if (strcmp(s, "snappy") == 0) {
-#ifndef HAVE_BUILTIN_EXTENSION_SNAPPY
-		cfg->compress_ext = SNAPPY_EXT;
-#endif
-		cfg->compress_table = SNAPPY_BLK;
-	} else if (strcmp(s, "zlib") == 0) {
-#ifndef HAVE_BUILTIN_EXTENSION_ZLIB
-		cfg->compress_ext = ZLIB_EXT;
-#endif
-		cfg->compress_table = ZLIB_BLK;
-	} else {
-		fprintf(stderr,
-	    "invalid compression configuration: %s\n", s);
-		ret = EINVAL;
-	}
-	return (ret);
-
-}
-
-/*
  * config_threads --
  *	Parse the thread configuration.
  */
 static int
-config_threads(CONFIG *cfg, const char *config, size_t len)
+config_threads(WTPERF *wtperf, const char *config, size_t len)
 {
 	WORKLOAD *workp;
 	WT_CONFIG_ITEM groupk, groupv, k, v;
@@ -263,19 +176,19 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 	int ret;
 
 	group = scan = NULL;
-	if (cfg->workload != NULL) {
+	if (wtperf->workload != NULL) {
 		/*
 		 * This call overrides an earlier call.  Free and
 		 * reset everything.
 		 */
-		free(cfg->workload);
-		cfg->workload = NULL;
-		cfg->workload_cnt = 0;
-		cfg->workers_cnt = 0;
+		free(wtperf->workload);
+		wtperf->workload = NULL;
+		wtperf->workload_cnt = 0;
+		wtperf->workers_cnt = 0;
 	}
 	/* Allocate the workload array. */
-	cfg->workload = dcalloc(WORKLOAD_MAX, sizeof(WORKLOAD));
-	cfg->workload_cnt = 0;
+	wtperf->workload = dcalloc(WORKLOAD_MAX, sizeof(WORKLOAD));
+	wtperf->workload_cnt = 0;
 
 	/*
 	 * The thread configuration may be in multiple groups, that is, we have
@@ -294,14 +207,14 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 			goto err;
 
 		/* Move to the next workload slot. */
-		if (cfg->workload_cnt == WORKLOAD_MAX) {
+		if (wtperf->workload_cnt == WORKLOAD_MAX) {
 			fprintf(stderr,
 			    "too many workloads configured, only %d workloads "
 			    "supported\n",
 			    WORKLOAD_MAX);
 			return (EINVAL);
 		}
-		workp = &cfg->workload[cfg->workload_cnt++];
+		workp = &wtperf->workload[wtperf->workload_cnt++];
 
 		while ((ret = scan->next(scan, &k, &v)) == 0) {
 			if (STRING_MATCH("count", k.str, k.len)) {
@@ -334,9 +247,9 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 				if ((workp->truncate = v.val) != 1)
 					goto err;
 				/* There can only be one Truncate thread. */
-				if (F_ISSET(cfg, CFG_TRUNCATE))
+				if (F_ISSET(wtperf, CFG_TRUNCATE))
 					goto err;
-				F_SET(cfg, CFG_TRUNCATE);
+				F_SET(wtperf, CFG_TRUNCATE);
 				continue;
 			}
 			if (STRING_MATCH("truncate_pct", k.str, k.len)) {
@@ -364,13 +277,13 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 						goto err;
 					/* Special random value */
 					workp->update_delta = INT64_MAX;
-					F_SET(cfg, CFG_GROW);
+					F_SET(wtperf, CFG_GROW);
 				} else {
 					workp->update_delta = v.val;
 					if (v.val > 0)
-						F_SET(cfg, CFG_GROW);
+						F_SET(wtperf, CFG_GROW);
 					if (v.val < 0)
-						F_SET(cfg, CFG_SHRINK);
+						F_SET(wtperf, CFG_SHRINK);
 				}
 				continue;
 			}
@@ -400,7 +313,7 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 		if (workp->truncate != 0 &&
 		    (workp->insert > 0 || workp->read > 0 || workp->update > 0))
 			goto err;
-		cfg->workers_cnt += (u_int)workp->threads;
+		wtperf->workers_cnt += (u_int)workp->threads;
 	}
 
 	ret = group->close(group);
@@ -428,32 +341,34 @@ err:	if (group != NULL)
  * value.
  */
 static int
-config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
+config_opt(WTPERF *wtperf, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 {
-	CONFIG_OPT *popt;
+	CONFIG_OPTS *opts;
+	CONFIG_OPT *desc;
 	char *begin, *newstr, **strp;
 	int ret;
-	size_t i, newlen, nopt;
+	size_t i, newlen;
 	void *valueloc;
 
-	popt = NULL;
-	nopt = sizeof(config_opts)/sizeof(config_opts[0]);
-	for (i = 0; i < nopt; i++)
-		if (strlen(config_opts[i].name) == k->len &&
-		    strncmp(config_opts[i].name, k->str, k->len) == 0) {
-			popt = &config_opts[i];
+	opts = wtperf->opts;
+
+	desc = NULL;
+	for (i = 0; i < WT_ELEMENTS(config_opts_desc); i++)
+		if (strlen(config_opts_desc[i].name) == k->len &&
+		    strncmp(config_opts_desc[i].name, k->str, k->len) == 0) {
+			desc = &config_opts_desc[i];
 			break;
 		}
-	if (popt == NULL) {
+	if (desc == NULL) {
 		fprintf(stderr, "wtperf: Error: "
 		    "unknown option \'%.*s\'\n", (int)k->len, k->str);
 		fprintf(stderr, "Options:\n");
-		for (i = 0; i < nopt; i++)
-			fprintf(stderr, "\t%s\n", config_opts[i].name);
+		for (i = 0; i < WT_ELEMENTS(config_opts_desc); i++)
+			fprintf(stderr, "\t%s\n", config_opts_desc[i].name);
 		return (EINVAL);
 	}
-	valueloc = ((u_char *)cfg + popt->offset);
-	switch (popt->type) {
+	valueloc = ((uint8_t *)opts + desc->offset);
+	switch (desc->type) {
 	case BOOL_TYPE:
 		if (v->type != WT_CONFIG_ITEM_BOOL) {
 			fprintf(stderr, "wtperf: Error: "
@@ -531,7 +446,7 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		 */
 		if (v->type == WT_CONFIG_ITEM_STRUCT &&
 		    STRING_MATCH("threads", k->str, k->len))
-			return (config_threads(cfg, v->str, v->len));
+			return (config_threads(wtperf, v->str, v->len));
 
 		if (v->type != WT_CONFIG_ITEM_STRING &&
 		    v->type != WT_CONFIG_ITEM_ID) {
@@ -559,7 +474,7 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
  * via lines ending in '\'.
  */
 int
-config_opt_file(CONFIG *cfg, const char *filename)
+config_opt_file(WTPERF *wtperf, const char *filename)
 {
 	FILE *fp;
 	size_t linelen, optionpos;
@@ -659,7 +574,7 @@ config_opt_file(CONFIG *cfg, const char *filename)
 		if (contline)
 			optionpos += linelen;
 		else {
-			if ((ret = config_opt_line(cfg, option)) != 0) {
+			if ((ret = config_opt_str(wtperf, option)) != 0) {
 				fprintf(stderr, "wtperf: %s: %d: parse error\n",
 				    filename, linenum);
 				break;
@@ -684,23 +599,26 @@ config_opt_file(CONFIG *cfg, const char *filename)
 }
 
 /*
- * config_opt_line --
+ * config_opt_str --
  *	Parse a single line of config options.  Continued lines have already
  * been joined.
  */
 int
-config_opt_line(CONFIG *cfg, const char *optstr)
+config_opt_str(WTPERF *wtperf, const char *optstr)
 {
+	CONFIG_OPTS *opts;
 	CONFIG_QUEUE_ENTRY *config_line;
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_PARSER *scan;
 	size_t len;
 	int ret, t_ret;
 
+	opts = wtperf->opts;
+
 	len = strlen(optstr);
 	if ((ret = wiredtiger_config_parser_open(
 	    NULL, optstr, len, &scan)) != 0) {
-		lprintf(cfg, ret, 0, "Error in config_scan_begin");
+		lprintf(wtperf, ret, 0, "Error in config_scan_begin");
 		return (ret);
 	}
 
@@ -712,7 +630,7 @@ config_opt_line(CONFIG *cfg, const char *optstr)
 	 */
 	config_line = dcalloc(sizeof(CONFIG_QUEUE_ENTRY), 1);
 	config_line->string = dstrdup(optstr);
-	TAILQ_INSERT_TAIL(&cfg->config_head, config_line, c);
+	TAILQ_INSERT_TAIL(&opts->config_head, config_line, q);
 
 	while (ret == 0) {
 		if ((ret = scan->next(scan, &k, &v)) != 0) {
@@ -721,10 +639,10 @@ config_opt_line(CONFIG *cfg, const char *optstr)
 				ret = 0;
 			break;
 		}
-		ret = config_opt(cfg, &k, &v);
+		ret = config_opt(wtperf, &k, &v);
 	}
 	if ((t_ret = scan->close(scan)) != 0) {
-		lprintf(cfg, ret, 0, "Error in config_scan_end");
+		lprintf(wtperf, ret, 0, "Error in config_scan_end");
 		if (ret == 0)
 			ret = t_ret;
 	}
@@ -733,19 +651,20 @@ config_opt_line(CONFIG *cfg, const char *optstr)
 }
 
 /*
- * config_opt_str --
- *	Set a single string config option.
+ * config_opt_name_value --
+ *	Set a name/value configuration pair.
  */
 int
-config_opt_str(CONFIG *cfg, const char *name, const char *value)
+config_opt_name_value(WTPERF *wtperf, const char *name, const char *value)
 {
+	size_t len;
 	int ret;
 	char *optstr;
-
 							/* name="value" */
-	optstr = dmalloc(strlen(name) + strlen(value) + 4);
-	sprintf(optstr, "%s=\"%s\"", name, value);
-	ret = config_opt_line(cfg, optstr);
+	len = strlen(name) + strlen(value) + 4;
+	optstr = dmalloc(len);
+	snprintf(optstr, len, "%s=\"%s\"", name, value);
+	ret = config_opt_str(wtperf, optstr);
 	free(optstr);
 	return (ret);
 }
@@ -755,60 +674,63 @@ config_opt_str(CONFIG *cfg, const char *name, const char *value)
  *	Configuration sanity checks.
  */
 int
-config_sanity(CONFIG *cfg)
+config_sanity(WTPERF *wtperf)
 {
+	CONFIG_OPTS *opts;
 	WORKLOAD *workp;
 	u_int i;
 
+	opts = wtperf->opts;
+
 	/* Various intervals should be less than the run-time. */
-	if (cfg->run_time > 0 &&
-	    ((cfg->checkpoint_threads != 0 &&
-	    cfg->checkpoint_interval > cfg->run_time) ||
-	    cfg->report_interval > cfg->run_time ||
-	    cfg->sample_interval > cfg->run_time)) {
+	if (opts->run_time > 0 &&
+	    ((opts->checkpoint_threads != 0 &&
+	    opts->checkpoint_interval > opts->run_time) ||
+	    opts->report_interval > opts->run_time ||
+	    opts->sample_interval > opts->run_time)) {
 		fprintf(stderr, "interval value longer than the run-time\n");
 		return (EINVAL);
 	}
 	/* The maximum is here to keep file name construction simple. */
-	if (cfg->table_count < 1 || cfg->table_count > 99999) {
+	if (opts->table_count < 1 || opts->table_count > 99999) {
 		fprintf(stderr,
 		    "invalid table count, less than 1 or greater than 99999\n");
 		return (EINVAL);
 	}
-	if (cfg->database_count < 1 || cfg->database_count > 99) {
+	if (opts->database_count < 1 || opts->database_count > 99) {
 		fprintf(stderr,
 		    "invalid database count, less than 1 or greater than 99\n");
 		return (EINVAL);
 	}
 
-	if (cfg->pareto > 100) {
+	if (opts->pareto > 100) {
 		fprintf(stderr,
 		    "Invalid pareto distribution - should be a percentage\n");
 		return (EINVAL);
 	}
 
-	if (cfg->value_sz_max < cfg->value_sz) {
-		if (F_ISSET(cfg, CFG_GROW)) {
+	if (opts->value_sz_max < opts->value_sz) {
+		if (F_ISSET(wtperf, CFG_GROW)) {
 			fprintf(stderr, "value_sz_max %" PRIu32
 			    " must be greater than or equal to value_sz %"
-			    PRIu32 "\n", cfg->value_sz_max, cfg->value_sz);
+			    PRIu32 "\n", opts->value_sz_max, opts->value_sz);
 			return (EINVAL);
 		} else
-			cfg->value_sz_max = cfg->value_sz;
+			opts->value_sz_max = opts->value_sz;
 	}
-	if (cfg->value_sz_min > cfg->value_sz) {
-		if (F_ISSET(cfg, CFG_SHRINK)) {
+	if (opts->value_sz_min > opts->value_sz) {
+		if (F_ISSET(wtperf, CFG_SHRINK)) {
 			fprintf(stderr, "value_sz_min %" PRIu32
 			    " must be less than or equal to value_sz %"
-			    PRIu32 "\n", cfg->value_sz_min, cfg->value_sz);
+			    PRIu32 "\n", opts->value_sz_min, opts->value_sz);
 			return (EINVAL);
 		} else
-			cfg->value_sz_min = cfg->value_sz;
+			opts->value_sz_min = opts->value_sz;
 	}
 
-	if (cfg->readonly && cfg->workload != NULL)
-		for (i = 0, workp = cfg->workload;
-		    i < cfg->workload_cnt; ++i, ++workp)
+	if (opts->readonly && wtperf->workload != NULL)
+		for (i = 0, workp = wtperf->workload;
+		    i < wtperf->workload_cnt; ++i, ++workp)
 			if (workp->insert != 0 || workp->update != 0 ||
 			    workp->truncate != 0) {
 				fprintf(stderr,
@@ -824,21 +746,21 @@ config_sanity(CONFIG *cfg)
  *	Consolidate repeated configuration settings so that it only appears
  *	once in the configuration output file.
  */
-void
-config_consolidate(CONFIG *cfg)
+static void
+config_consolidate(CONFIG_OPTS *opts)
 {
 	CONFIG_QUEUE_ENTRY *conf_line, *test_line, *tmp;
 	char *string_key;
 
 	/*
-	 * This loop iterates over the config queue and for entry checks if an
-	 * entry later in the queue has the same key. If a match is found then
-	 * the current queue entry is removed and we continue.
+	 * This loop iterates over the config queue and for each entry checks if
+	 * a later queue entry has the same key. If there's a match, the current
+	 * queue entry is removed and we continue.
 	 */
-	conf_line = TAILQ_FIRST(&cfg->config_head);
+	conf_line = TAILQ_FIRST(&opts->config_head);
 	while (conf_line != NULL) {
 		string_key = strchr(conf_line->string, '=');
-		tmp = test_line = TAILQ_NEXT(conf_line, c);
+		tmp = test_line = TAILQ_NEXT(conf_line, q);
 		while (test_line != NULL) {
 			/*
 			 * The + 1 here forces the '=' sign to be matched
@@ -849,89 +771,75 @@ config_consolidate(CONFIG *cfg)
 			if (strncmp(conf_line->string, test_line->string,
 			    (size_t)((string_key - conf_line->string) + 1))
 			    == 0) {
-				TAILQ_REMOVE(&cfg->config_head, conf_line, c);
+				TAILQ_REMOVE(&opts->config_head, conf_line, q);
 				free(conf_line->string);
 				free(conf_line);
 				break;
 			}
-			test_line = TAILQ_NEXT(test_line, c);
+			test_line = TAILQ_NEXT(test_line, q);
 		}
 		conf_line = tmp;
 	}
 }
 
 /*
- * config_to_file --
+ * config_opt_log --
  *	Write the final config used in this execution to a file.
  */
 void
-config_to_file(CONFIG *cfg)
+config_opt_log(CONFIG_OPTS *opts, const char *path)
 {
 	CONFIG_QUEUE_ENTRY *config_line;
 	FILE *fp;
-	size_t req_len;
-	char *path;
 
-	fp = NULL;
+	testutil_checkfmt(((fp = fopen(path, "w")) == NULL), "%s", path);
 
-	/* Backup the config */
-	req_len = strlen(cfg->home) + strlen("/CONFIG.wtperf") + 1;
-	path = dcalloc(req_len, 1);
-	snprintf(path, req_len, "%s/CONFIG.wtperf", cfg->home);
-	if ((fp = fopen(path, "w")) == NULL) {
-		lprintf(cfg, errno, 0, "%s", path);
-		goto err;
-	}
+	config_consolidate(opts);
 
-	/* Print the config dump */
-	fprintf(fp,"# Warning. This config includes "
+	fprintf(fp,"# Warning: This config includes "
 	    "unwritten, implicit configuration defaults.\n"
 	    "# Changes to those values may cause differences in behavior.\n");
-	config_consolidate(cfg);
-	config_line = TAILQ_FIRST(&cfg->config_head);
-	while (config_line != NULL) {
+	TAILQ_FOREACH(config_line, &opts->config_head, q)
 		fprintf(fp, "%s\n", config_line->string);
-		config_line = TAILQ_NEXT(config_line, c);
-	}
-
-err:	free(path);
-	if (fp != NULL)
-		(void)fclose(fp);
+	testutil_check(fclose(fp));
 }
 
 /*
- * config_print --
+ * config_opt_print --
  *	Print out the configuration in verbose mode.
  */
 void
-config_print(CONFIG *cfg)
+config_opt_print(WTPERF *wtperf)
 {
+	CONFIG_OPTS *opts;
 	WORKLOAD *workp;
 	u_int i;
 
+	opts = wtperf->opts;
+
 	printf("Workload configuration:\n");
-	printf("\t" "Home: %s\n", cfg->home);
-	printf("\t" "Table name: %s\n", cfg->table_name);
-	printf("\t" "Connection configuration: %s\n", cfg->conn_config);
-	if (cfg->sess_config != NULL)
-		printf("\t" "Session configuration: %s\n", cfg->sess_config);
+	printf("\t" "Home: %s\n", wtperf->home);
+	printf("\t" "Table name: %s\n", opts->table_name);
+	printf("\t" "Connection configuration: %s\n", opts->conn_config);
+	if (opts->sess_config != NULL)
+		printf("\t" "Session configuration: %s\n", opts->sess_config);
 
 	printf("\t%s table: %s\n",
-	    cfg->create ? "Creating new" : "Using existing",
-	    cfg->table_config);
+	    opts->create ? "Creating new" : "Using existing",
+	    opts->table_config);
 	printf("\t" "Key size: %" PRIu32 ", value size: %" PRIu32 "\n",
-	    cfg->key_sz, cfg->value_sz);
-	if (cfg->create)
+	    opts->key_sz, opts->value_sz);
+	if (opts->create)
 		printf("\t" "Populate threads: %" PRIu32 ", inserting %" PRIu32
 		    " rows\n",
-		    cfg->populate_threads, cfg->icount);
+		    opts->populate_threads, opts->icount);
 
 	printf("\t" "Workload seconds, operations: %" PRIu32 ", %" PRIu32 "\n",
-	    cfg->run_time, cfg->run_ops);
-	if (cfg->workload != NULL) {
+	    opts->run_time, opts->run_ops);
+	if (wtperf->workload != NULL) {
 		printf("\t" "Workload configuration(s):\n");
-		for (i = 0, workp = cfg->workload;
-		    i < cfg->workload_cnt; ++i, ++workp)
+		for (i = 0, workp = wtperf->workload;
+		    i < wtperf->workload_cnt; ++i, ++workp)
 			printf("\t\t%" PRId64 " threads (inserts=%" PRId64
 			    ", reads=%" PRId64 ", updates=%" PRId64
 			    ", truncates=% " PRId64 ")\n",
@@ -941,11 +849,11 @@ config_print(CONFIG *cfg)
 	}
 
 	printf("\t" "Checkpoint threads, interval: %" PRIu32 ", %" PRIu32 "\n",
-	    cfg->checkpoint_threads, cfg->checkpoint_interval);
-	printf("\t" "Reporting interval: %" PRIu32 "\n", cfg->report_interval);
-	printf("\t" "Sampling interval: %" PRIu32 "\n", cfg->sample_interval);
+	    opts->checkpoint_threads, opts->checkpoint_interval);
+	printf("\t" "Reporting interval: %" PRIu32 "\n", opts->report_interval);
+	printf("\t" "Sampling interval: %" PRIu32 "\n", opts->sample_interval);
 
-	printf("\t" "Verbosity: %" PRIu32 "\n", cfg->verbose);
+	printf("\t" "Verbosity: %" PRIu32 "\n", opts->verbose);
 }
 
 /*
@@ -975,10 +883,10 @@ pretty_print(const char *p, const char *indent)
  * config_opt_usage --
  *	Configuration usage error message.
  */
-static void
+void
 config_opt_usage(void)
 {
-	size_t i, nopt;
+	size_t i;
 	const char *defaultval, *typestr;
 
 	pretty_print(
@@ -988,11 +896,10 @@ config_opt_usage(void)
 	    "String values must be enclosed in \" quotes, boolean values must "
 	    "be either true or false.\n", NULL);
 
-	nopt = sizeof(config_opts)/sizeof(config_opts[0]);
-	for (i = 0; i < nopt; i++) {
-		defaultval = config_opts[i].defaultval;
+	for (i = 0; i < WT_ELEMENTS(config_opts_desc); i++) {
+		defaultval = config_opts_desc[i].defaultval;
 		typestr = "string";
-		switch (config_opts[i].type) {
+		switch (config_opts_desc[i].type) {
 		case BOOL_TYPE:
 			typestr = "boolean";
 			if (strcmp(defaultval, "0") == 0)
@@ -1011,28 +918,7 @@ config_opt_usage(void)
 			break;
 		}
 		printf("%s (%s, default=%s)\n",
-		    config_opts[i].name, typestr, defaultval);
-		pretty_print(config_opts[i].description, "\t");
+		    config_opts_desc[i].name, typestr, defaultval);
+		pretty_print(config_opts_desc[i].description, "\t");
 	}
-}
-
-/*
- * usage --
- *	wtperf usage print, no error.
- */
-void
-usage(void)
-{
-	printf("wtperf [-C config] "
-	    "[-H mount] [-h home] [-O file] [-o option] [-T config]\n");
-	printf("\t-C <string> additional connection configuration\n");
-	printf("\t            (added to option conn_config)\n");
-	printf("\t-H <mount> configure Helium volume mount point\n");
-	printf("\t-h <string> Wired Tiger home must exist, default WT_TEST\n");
-	printf("\t-O <file> file contains options as listed below\n");
-	printf("\t-o option=val[,option=val,...] set options listed below\n");
-	printf("\t-T <string> additional table configuration\n");
-	printf("\t            (added to option table_config)\n");
-	printf("\n");
-	config_opt_usage();
 }

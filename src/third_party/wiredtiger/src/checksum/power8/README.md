@@ -39,7 +39,7 @@ Quick start
 
 - Type make to create the constants (crc32_constants.h)
 
-- Import the code into your application (crc32.S crc32_wrapper.c
+- Import the code into your application (crc32.sx crc32_wrapper.c
   crc32_constants.h ppc-opcode.h) and call the CRC:
 
 ```

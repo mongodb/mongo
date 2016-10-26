@@ -37,3 +37,17 @@ typedef struct {
 	CONFIG_OPT_TYPE type;
 	size_t offset;
 } CONFIG_OPT;
+
+typedef struct __config_queue_entry {
+	char *string;
+	TAILQ_ENTRY(__config_queue_entry) q;
+} CONFIG_QUEUE_ENTRY;
+
+typedef struct {					/* Option structure */
+#define	OPT_DECLARE_STRUCT
+#include "wtperf_opt.i"
+#undef	OPT_DECLARE_STRUCT
+
+	/* Queue head to save a copy of the config to be output */
+	TAILQ_HEAD(__config_qh, __config_queue_entry) config_head;
+} CONFIG_OPTS;

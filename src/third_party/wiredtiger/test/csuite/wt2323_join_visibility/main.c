@@ -52,8 +52,6 @@
  * of inserts set low as a default.
  */
 
-void (*custom_die)(void) = NULL;
-
 #define	N_RECORDS	10000
 #define	N_INSERT	500000
 #define	N_INSERT_THREAD	2
@@ -96,6 +94,8 @@ main(int argc, char *argv[])
 
 	opts = &_opts;
 	sharedopts = &_sharedopts;
+	if (testutil_disable_long_tests())
+		return (0);
 	memset(opts, 0, sizeof(*opts));
 	memset(sharedopts, 0, sizeof(*sharedopts));
 
@@ -225,7 +225,8 @@ test_join(TEST_OPTS *opts, SHARED_OPTS *sharedopts, bool bloom,
 	testutil_check(session->close(session, NULL));
 }
 
-static void *thread_insert(void *arg)
+static void *
+thread_insert(void *arg)
 {
 	SHARED_OPTS *sharedopts;
 	TEST_OPTS *opts;
@@ -239,7 +240,7 @@ static void *thread_insert(void *arg)
 	threadargs = (THREAD_ARGS *)arg;
 	opts = threadargs->testopts;
 	sharedopts = threadargs->sharedopts;
-	testutil_check(__wt_random_init_seed(NULL, &rnd));
+	__wt_random_init_seed(NULL, &rnd);
 
 	testutil_check(opts->conn->open_session(
 	    opts->conn, NULL, NULL, &session));

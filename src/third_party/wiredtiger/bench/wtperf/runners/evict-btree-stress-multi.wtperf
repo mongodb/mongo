@@ -1,6 +1,7 @@
 conn_config="cache_size=1G,eviction=(threads_max=4),session_max=2000"
 table_config="type=file"
 table_count=100
+close_conn=false
 icount=100000000
 report_interval=5
 run_time=600

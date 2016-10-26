@@ -34,6 +34,7 @@ import com.wiredtiger.db.WiredTigerException;
 import com.wiredtiger.db.wiredtiger;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -69,7 +70,7 @@ class InsertThread extends Thread {
                 Session session = conn.open_session(null);
                 Cursor cursor = session.open_cursor("table:cclose", null,
                                                     "overwrite");
-                cursor.putKeyString("key"+threadId + "-" + i);
+                cursor.putKeyString("key" + threadId + "-" + i);
                 cursor.putValueString("value1");
                 ret = cursor.insert();
                 cursor.close();
@@ -127,36 +128,36 @@ public class ConcurrentCloseTest {
         setup();
         try {
             List<Thread> threads = new ArrayList<Thread>();
-            int i, ret;
+            int i;
 
-            ret = session.create("table:cclose", "key_format=S,value_format=S");
+            assertEquals(0, session.create("table:cclose",
+                                           "key_format=S,value_format=S"));
             Cursor cursor = session.open_cursor("table:cclose", null,
                                                 "overwrite");
             cursor.putKeyString("key1");
             cursor.putValueString("value1");
-            ret = cursor.insert();
+            assertEquals(0, cursor.insert());
             cursor.close();
-            ret = session.close(null);
+            assertEquals(0, session.close(null));
 
             for (i = 0; i < NUM_THREADS; i++) {
                 Thread insertThread = new InsertThread(conn, i);
-                Thread scanThread = new InsertThread(conn, i);
+                Thread scanThread = new ScanThread(conn);
                 insertThread.start();
                 scanThread.start();
                 threads.add(insertThread);
                 threads.add(scanThread);
             }
-
             for (Thread thread : threads)
                 try {
                     thread.join();
-                    ret = -1;
                 }
                 catch (InterruptedException ie) {
+                    fail();
                 }
 
-            ret = conn.close(null);
-            System.exit(ret);
+            assertEquals(0, conn.close(null));
+            System.exit(0);
         }
         catch (WiredTigerException wte) {
             System.err.println("Exception: " + wte);

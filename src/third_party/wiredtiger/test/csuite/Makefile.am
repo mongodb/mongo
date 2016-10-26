@@ -7,6 +7,9 @@ AM_LDFLAGS = -static
 test_wt1965_col_efficiency_SOURCES = wt1965_col_efficiency/main.c
 noinst_PROGRAMS = test_wt1965_col_efficiency
 
+test_wt2403_lsm_workload_SOURCES = wt2403_lsm_workload/main.c
+noinst_PROGRAMS += test_wt2403_lsm_workload
+
 test_wt2246_col_append_SOURCES = wt2246_col_append/main.c
 noinst_PROGRAMS += test_wt2246_col_append
 

@@ -355,7 +355,7 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool *didworkp)
 	txn_state = WT_SESSION_TXN_STATE(session);
 	busy = busy || txn_state->id != WT_TXN_NONE ||
 	    session->nhazard > 0 ||
-	    (txn_state->snap_min != WT_TXN_NONE &&
+	    (txn_state->pinned_id != WT_TXN_NONE &&
 	    txn_global->current != txn_global->oldest_id);
 
 	/*
