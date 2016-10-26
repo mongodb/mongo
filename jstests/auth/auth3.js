@@ -20,13 +20,13 @@
     assert.eq(x.code, errorCodeUnauthorized, tojson(x));
 
     x = admin.fsyncUnlock();
-    assert(x.errmsg != "not locked", tojson(x));
+    assert(x.errmsg != "fsyncUnlock called when not locked", tojson(x));
     assert.eq(x.code, errorCodeUnauthorized, tojson(x));
 
     conn.getDB("admin").auth("foo", "bar");
 
     assert("inprog" in admin.currentOp());
     assert("info" in admin.killOp(123));
-    assert.eq(admin.fsyncUnlock().errmsg, "not locked");
+    assert.eq(admin.fsyncUnlock().errmsg, "fsyncUnlock called when not locked");
 
 })();

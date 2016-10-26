@@ -703,6 +703,8 @@ void assembleResponse(OperationContext* txn,
         if (txn->lockState()->isReadLocked()) {
             LOG(1) << "note: not profiling because recursive read lock";
         } else if (lockedForWriting()) {
+            // TODO SERVER-26825: Fix race condition where fsyncLock is acquired post
+            // lockedForWriting() call but prior to profile collection lock acquisition.
             LOG(1) << "note: not profiling because doing fsync+lock";
         } else if (storageGlobalParams.readOnly) {
             LOG(1) << "note: not profiling because server is read-only";

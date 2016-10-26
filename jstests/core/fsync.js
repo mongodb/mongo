@@ -50,7 +50,7 @@
     // is blocked. There is really no way to do that currently, so just check that the write didn't
     // go through.
     var writeOpHandle = startParallelShell("db.getSisterDB('fsyncLockTestDB').coll.insert({x:1});");
-    sleep(1000);
+    sleep(3000);
 
     // Make sure reads can still run even though there is a pending write and also that the write
     // didn't get through.
@@ -88,4 +88,41 @@
     var fsyncPseudoCommandRes = db.getSiblingDB("admin").$cmd.sys.unlock.findOne();
     assert(fsyncPseudoCommandRes.ok, "fsyncUnlock pseudo-command failed");
     assert(db.currentOp().fsyncLock == null, "fsyncUnlock is not null in db.currentOp");
+
+    // Make sure that insert attempts made during multiple fsynLock requests will not execute until
+    // all locks have been released.
+    fsyncLockRes = db.fsyncLock();
+    assert.commandWorked(fsyncLockRes);
+    assert(fsyncLockRes.lockCount == 1, tojson(fsyncLockRes));
+    let currentOp = db.currentOp();
+    assert.commandWorked(currentOp);
+    assert(currentOp.fsyncLock, "Value in db.currentOp incorrect for fsyncLocked server");
+
+    let shellHandle1 =
+        startParallelShell("db.getSisterDB('fsyncLockTestDB').multipleLock.insert({x:1});");
+
+    fsyncLockRes = db.fsyncLock();
+    assert.commandWorked(fsyncLockRes);
+    assert(fsyncLockRes.lockCount == 2, tojson(fsyncLockRes));
+    currentOp = db.currentOp();
+    assert.commandWorked(currentOp);
+    assert(currentOp.fsyncLock, "Value in db.currentOp incorrect for fsyncLocked server");
+
+    let shellHandle2 =
+        startParallelShell("db.getSisterDB('fsyncLockTestDB').multipleLock.insert({x:1});");
+    sleep(3000);
+    assert.eq(0, fsyncLockDB.multipleLock.find({}).itcount());
+
+    fsyncUnlockRes = db.fsyncUnlock();
+    assert.commandWorked(fsyncUnlockRes);
+    assert(fsyncUnlockRes.lockCount == 1, tojson(fsyncLockRes));
+    sleep(3000);
+    assert.eq(0, fsyncLockDB.multipleLock.find({}).itcount());
+
+    fsyncUnlockRes = db.fsyncUnlock();
+    assert.commandWorked(fsyncUnlockRes);
+    assert(fsyncUnlockRes.lockCount == 0, tojson(fsyncLockRes));
+    shellHandle1();
+    shellHandle2();
+    assert.eq(2, fsyncLockDB.multipleLock.find({}).itcount());
 }());
