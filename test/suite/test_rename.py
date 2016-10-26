@@ -28,9 +28,8 @@
 
 import os, time
 import wiredtiger, wttest
-from helper import confirm_does_not_exist,\
-    complex_populate, complex_populate_check,\
-    simple_populate, simple_populate_check
+from helper import confirm_does_not_exist
+from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 
 # test_rename.py
@@ -46,10 +45,13 @@ class test_rename(wttest.WiredTigerTestCase):
 
     # Populate and object, and rename it a couple of times, confirming the
     # old name doesn't exist and the new name has the right contents.
-    def rename(self, populate, check, with_cursor):
+    def rename(self, dataset, with_cursor):
         uri1 = self.uri + self.name1
         uri2 = self.uri + self.name2
-        populate(self, uri1, 'key_format=S', 10)
+        # Only populate uri1, we keep ds2 for checking.
+        ds1 = dataset(self, uri1, 10)
+        ds2 = dataset(self, uri2, 10)
+        ds1.populate()
 
         # Open cursors should cause failure.
         if with_cursor:
@@ -60,24 +62,24 @@ class test_rename(wttest.WiredTigerTestCase):
 
         self.session.rename(uri1, uri2, None)
         confirm_does_not_exist(self, uri1)
-        check(self, uri2, 10)
+        ds2.check()
 
         self.session.rename(uri2, uri1, None)
         confirm_does_not_exist(self, uri2)
-        check(self, uri1, 10)
+        ds1.check()
 
         self.session.drop(uri1)
 
     # Test rename of an object.
     def test_rename(self):
         # Simple, one-file file or table object.
-        self.rename(simple_populate, simple_populate_check, False)
-        self.rename(simple_populate, simple_populate_check, True)
+        self.rename(SimpleDataSet, False)
+        self.rename(SimpleDataSet, True)
 
         # A complex, multi-file table object.
         if self.uri == "table:":
-            self.rename(complex_populate, complex_populate_check, False)
-            self.rename(complex_populate, complex_populate_check, True)
+            self.rename(ComplexDataSet, False)
+            self.rename(ComplexDataSet, True)
 
     def test_rename_dne(self):
         uri1 = self.uri + self.name1

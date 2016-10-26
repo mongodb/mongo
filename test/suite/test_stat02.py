@@ -28,22 +28,21 @@
 
 import itertools, wiredtiger, wttest
 from suite_subprocess import suite_subprocess
+from wtdataset import SimpleDataSet, SimpleLSMDataSet, ComplexDataSet, \
+    ComplexLSMDataSet
 from wtscenario import make_scenarios
 from wiredtiger import stat
-from helper import complex_populate, complex_populate_lsm, simple_populate
 
 # test_stat02.py
 #    Statistics cursor configurations.
 class test_stat_cursor_config(wttest.WiredTigerTestCase):
     pfx = 'test_stat_cursor_config'
     uri = [
-        ('file',  dict(uri='file:' + pfx, pop=simple_populate, cfg='')),
-        ('table', dict(uri='table:' + pfx, pop=simple_populate, cfg='')),
-        ('table-lsm',
-            dict(uri='table:' + pfx, pop=simple_populate, cfg=',type=lsm')),
-        ('complex', dict(uri='table:' + pfx, pop=complex_populate, cfg='')),
-        ('complex-lsm',
-            dict(uri='table:' + pfx, pop=complex_populate_lsm, cfg=''))
+        ('file',  dict(uri='file:' + pfx, dataset=SimpleDataSet)),
+        ('table', dict(uri='table:' + pfx, dataset=SimpleDataSet)),
+        ('table-lsm', dict(uri='table:' + pfx, dataset=SimpleLSMDataSet)),
+        ('complex', dict(uri='table:' + pfx, dataset=ComplexDataSet)),
+        ('complex-lsm', dict(uri='table:' + pfx, dataset=ComplexLSMDataSet))
     ]
     data_config = [
         ('none', dict(data_config='none', ok=[])),
@@ -66,7 +65,7 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
     # For each database/cursor configuration, confirm the right combinations
     # succeed or fail.
     def test_stat_cursor_config(self):
-        self.pop(self, self.uri, 'key_format=S' + self.cfg, 100)
+        self.dataset(self, self.uri, 100).populate()
         config = 'statistics=('
         if self.cursor_config != 'empty':
             config = config + self.cursor_config
@@ -85,7 +84,7 @@ class test_stat_cursor_conn_clear(wttest.WiredTigerTestCase):
 
     def test_stat_cursor_conn_clear(self):
         uri = 'table:' + self.pfx
-        complex_populate(self, uri, 'key_format=S', 100)
+        ComplexDataSet(self, uri, 100).populate()
 
         # cursor_insert should clear
         # cache_bytes_dirty should not clear
@@ -103,17 +102,17 @@ class test_stat_cursor_dsrc_clear(wttest.WiredTigerTestCase):
     pfx = 'test_stat_cursor_dsrc_clear'
 
     uri = [
-        ('dsrc_clear_1',  dict(uri='file:' + pfx, pop=simple_populate)),
-        ('dsrc_clear_2', dict(uri='table:' + pfx, pop=simple_populate)),
-        ('dsrc_clear_3', dict(uri='table:' + pfx, pop=complex_populate)),
-        ('dsrc_clear_4', dict(uri='table:' + pfx, pop=complex_populate_lsm))
+        ('dsrc_clear_1',  dict(uri='file:' + pfx, dataset=SimpleDataSet)),
+        ('dsrc_clear_2', dict(uri='table:' + pfx, dataset=SimpleDataSet)),
+        ('dsrc_clear_3', dict(uri='table:' + pfx, dataset=ComplexDataSet)),
+        ('dsrc_clear_4', dict(uri='table:' + pfx, dataset=ComplexLSMDataSet))
     ]
 
     scenarios = make_scenarios(uri)
     conn_config = 'statistics=(all)'
 
     def test_stat_cursor_dsrc_clear(self):
-        self.pop(self, self.uri, 'key_format=S', 100)
+        self.dataset(self, self.uri, 100).populate()
 
         # cursor_insert should clear
         #
@@ -132,17 +131,17 @@ class test_stat_cursor_fast(wttest.WiredTigerTestCase):
     pfx = 'test_stat_cursor_fast'
 
     uri = [
-        ('fast_1',  dict(uri='file:' + pfx, pop=simple_populate)),
-        ('fast_2', dict(uri='table:' + pfx, pop=simple_populate)),
-        ('fast_3', dict(uri='table:' + pfx, pop=complex_populate)),
-        ('fast_4', dict(uri='table:' + pfx, pop=complex_populate_lsm))
+        ('fast_1',  dict(uri='file:' + pfx, dataset=SimpleDataSet)),
+        ('fast_2', dict(uri='table:' + pfx, dataset=SimpleDataSet)),
+        ('fast_3', dict(uri='table:' + pfx, dataset=ComplexDataSet)),
+        ('fast_4', dict(uri='table:' + pfx, dataset=ComplexLSMDataSet))
     ]
 
     scenarios = make_scenarios(uri)
     conn_config = 'statistics=(all)'
 
     def test_stat_cursor_fast(self):
-        self.pop(self, self.uri, 'key_format=S', 100)
+        self.dataset(self, self.uri, 100).populate()
 
         # A "fast" cursor shouldn't see the underlying btree statistics.
         # Check "fast" first, otherwise we get a copy of the statistics
@@ -174,17 +173,17 @@ class test_stat_cursor_dsrc_error(wttest.WiredTigerTestCase):
     pfx = 'test_stat_cursor_dsrc_error'
 
     uri = [
-        ('dsrc_error_1',  dict(uri='file:' + pfx, pop=simple_populate)),
-        ('dsrc_error_2', dict(uri='table:' + pfx, pop=simple_populate)),
-        ('dsrc_error_3', dict(uri='table:' + pfx, pop=complex_populate)),
-        ('dsrc_error_4', dict(uri='table:' + pfx, pop=complex_populate_lsm))
+        ('dsrc_error_1',  dict(uri='file:' + pfx, dataset=SimpleDataSet)),
+        ('dsrc_error_2', dict(uri='table:' + pfx, dataset=SimpleDataSet)),
+        ('dsrc_error_3', dict(uri='table:' + pfx, dataset=ComplexDataSet)),
+        ('dsrc_error_4', dict(uri='table:' + pfx, dataset=ComplexLSMDataSet))
     ]
 
     scenarios = make_scenarios(uri)
     conn_config = 'statistics=(all)'
 
     def test_stat_cursor_dsrc_error(self):
-        self.pop(self, self.uri, 'key_format=S', 100)
+        self.dataset(self, self.uri, 100).populate()
         args = ['all', 'fast']
         for i in list(itertools.permutations(args, 2)):
             config = 'statistics=(' + i[0] + ',' + i[1] + ')'
@@ -200,7 +199,7 @@ class test_stat_cursor_dsrc_cache_walk(wttest.WiredTigerTestCase):
     conn_config = 'statistics=(none)'
 
     def test_stat_cursor_dsrc_cache_walk(self):
-        simple_populate(self, self.uri, 'key_format=S', 100)
+        SimpleDataSet(self, self.uri, 100).populate()
         # Ensure that it's an error to get cache_walk stats if none is set
         msg = '/doesn\'t match the database statistics/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,

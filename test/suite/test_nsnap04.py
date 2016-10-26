@@ -29,9 +29,9 @@
 # test_nsnap04.py
 #   Named snapshots: Create snapshot from running transaction
 
-from suite_subprocess import suite_subprocess
-from helper import simple_populate
 import wiredtiger, wttest
+from suite_subprocess import suite_subprocess
+from wtdataset import SimpleDataSet
 
 class test_nsnap04(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_nsnap04'
@@ -52,7 +52,7 @@ class test_nsnap04(wttest.WiredTigerTestCase, suite_subprocess):
     def test_named_snapshots(self):
         # Populate a table
         end = start = 0
-        simple_populate(self, self.uri, 'key_format=i', 0)
+        SimpleDataSet(self, self.uri, 0, key_format='i').populate()
 
         snapshots = []
         c = self.session.open_cursor(self.uri)

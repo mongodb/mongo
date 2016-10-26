@@ -30,7 +30,7 @@
 #       Regression tests.
 
 import wiredtiger, wttest
-from helper import key_populate, value_populate
+from wtdataset import SimpleDataSet, simple_key, simple_value
 from wtscenario import make_scenarios
 
 # Check that verify and salvage both raise exceptions if there is an open
@@ -47,7 +47,7 @@ class test_bug006(wttest.WiredTigerTestCase):
         self.session.create(uri, 'value_format=S,key_format=S')
         cursor = self.session.open_cursor(uri, None)
         for i in range(1, 1000):
-            cursor[key_populate(cursor, i)] = value_populate(cursor, i)
+            cursor[simple_key(cursor, i)] = simple_value(cursor, i)
 
         # Table operations should fail, the cursor is open.
         self.assertRaises(

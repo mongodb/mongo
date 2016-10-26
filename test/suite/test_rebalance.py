@@ -28,7 +28,7 @@
 
 import os, time
 import wiredtiger, wttest
-from helper import complex_populate, simple_populate
+from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 
 # test_rebalance.py
@@ -38,7 +38,7 @@ class test_rebalance(wttest.WiredTigerTestCase):
 
     # Use small pages so we generate some internal layout
     # Setup LSM so multiple chunks are present
-    config = 'key_format=S,allocation_size=512,internal_page_max=512' + \
+    config = 'allocation_size=512,internal_page_max=512' + \
              ',leaf_page_max=1k,lsm=(chunk_size=512k,merge_min=10)'
 
     scenarios = make_scenarios([
@@ -48,9 +48,10 @@ class test_rebalance(wttest.WiredTigerTestCase):
     ])
 
     # Populate an object, then rebalance it.
-    def rebalance(self, populate, with_cursor):
+    def rebalance(self, dataset, with_cursor):
         uri = self.uri + self.name
-        populate(self, uri, self.config, 10000)
+        ds = dataset(self, uri, 10000, config=self.config)
+        ds.populate()
 
         # Force to disk, we don't rebalance in-memory objects.
         self.reopen_conn()
@@ -68,13 +69,13 @@ class test_rebalance(wttest.WiredTigerTestCase):
     # Test rebalance of an object.
     def test_rebalance(self):
         # Simple file or table object.
-        self.rebalance(simple_populate, False)
-        self.rebalance(simple_populate, True)
+        self.rebalance(SimpleDataSet, False)
+        self.rebalance(SimpleDataSet, True)
 
         # A complex, multi-file table object.
         if self.uri == "table:":
-            self.rebalance(complex_populate, False)
-            self.rebalance(complex_populate, True)
+            self.rebalance(ComplexDataSet, False)
+            self.rebalance(ComplexDataSet, True)
 
 if __name__ == '__main__':
     wttest.run()
