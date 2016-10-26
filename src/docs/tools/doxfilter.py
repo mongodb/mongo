@@ -98,6 +98,9 @@ def process_lang(lang, lines):
     subpage_pat = re.compile(r'@subpage\s+(\w*)')
     subpage_rep = r'@subpage \1' + lang_suffix
     exref_pat = re.compile(r'@ex_ref{ex_([^.]*)[.]c}')
+    # Add some ability to have non-language references
+    x_ref_pat = re.compile(r'@x_ref\s+(\w*)')
+    x_ref_rep = r'@ref \1'
     if lang == 'c':
         exref_rep = r'@ex_ref{ex_\1' + lang_ext + '}'
     else:
@@ -118,6 +121,7 @@ def process_lang(lang, lines):
             line = re.sub(snip_pat, snip_rep, line)
         line = re.sub(mpage_pat, mpage_rep, line)
         line = re.sub(subpage_pat, subpage_rep, line)
+        line = re.sub(x_ref_pat, x_ref_rep, line)
         if '@m_if' in line:
             m = re.search(mif_pat, line)
             if not m:
