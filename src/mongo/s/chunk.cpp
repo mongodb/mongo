@@ -63,6 +63,18 @@ namespace {
 
 const uint64_t kTooManySplitPoints = 4;
 
+// Test whether we should split once data * splitTestFactor > chunkSize (approximately)
+const int splitTestFactor = 5;
+
+/**
+ * Generates a random value for _dataWritten so that a mongos restart wouldn't cause delay in
+ * splitting.
+ */
+int mkDataWritten() {
+    PseudoRandom r(static_cast<int64_t>(time(0)));
+    return r.nextInt32(grid.getBalancerConfiguration()->getMaxChunkSizeBytes() / splitTestFactor);
+}
+
 }  // namespace
 
 Chunk::Chunk(OperationContext* txn, ChunkManager* manager, const ChunkType& from)
@@ -97,12 +109,6 @@ Chunk::Chunk(ChunkManager* info,
       _lastmod(lastmod),
       _jumbo(false),
       _dataWritten(initialDataWritten) {}
-
-int Chunk::mkDataWritten() {
-    PseudoRandom r(static_cast<int64_t>(time(0)));
-    return r.nextInt32(grid.getBalancerConfiguration()->getMaxChunkSizeBytes() /
-                       ChunkManager::SplitHeuristics::splitTestFactor);
-}
 
 bool Chunk::containsKey(const BSONObj& shardKey) const {
     return getMin().woCompare(shardKey) <= 0 && shardKey.woCompare(getMax()) < 0;
@@ -190,14 +196,16 @@ std::vector<BSONObj> Chunk::_determineSplitPoints(OperationContext* txn, bool at
         uint64_t chunkSize = _manager->getCurrentDesiredChunkSize();
 
         // Note: One split point for every 1/2 chunk size.
-        const uint64_t estNumSplitPoints = _dataWritten / chunkSize * 2;
+        const uint64_t chunkBytesWritten = getBytesWritten();
+        const uint64_t estNumSplitPoints = chunkBytesWritten / chunkSize * 2;
 
         if (estNumSplitPoints >= kTooManySplitPoints) {
             // The current desired chunk size will split the chunk into lots of small chunk and at
             // the worst case this can result into thousands of chunks. So check and see if a bigger
             // value can be used.
-            chunkSize = std::min(
-                _dataWritten, Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes());
+            chunkSize =
+                std::min(chunkBytesWritten,
+                         Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes());
         }
 
         splitPoints =
@@ -300,17 +308,33 @@ StatusWith<boost::optional<ChunkRange>> Chunk::split(OperationContext* txn,
     return splitStatus.getValue();
 }
 
+uint64_t Chunk::getBytesWritten() const {
+    return _dataWritten;
+}
+
+void Chunk::addBytesWritten(uint64_t bytesWrittenIncrement) {
+    _dataWritten += bytesWrittenIncrement;
+}
+
+void Chunk::setBytesWritten(uint64_t newBytesWritten) {
+    _dataWritten = newBytesWritten;
+}
+
 bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
     LastError::Disabled d(&LastError::get(cc()));
 
+    addBytesWritten(dataWritten);
+
+    const uint64_t chunkBytesWritten = getBytesWritten();
+
     try {
-        _dataWritten += dataWritten;
         uint64_t splitThreshold = _manager->getCurrentDesiredChunkSize();
+
         if (_minIsInf() || _maxIsInf()) {
             splitThreshold = static_cast<uint64_t>((double)splitThreshold * 0.9);
         }
 
-        if (_dataWritten < splitThreshold / ChunkManager::SplitHeuristics::splitTestFactor) {
+        if (chunkBytesWritten < splitThreshold / splitTestFactor) {
             return false;
         }
 
@@ -334,15 +358,15 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
             return false;
         }
 
-        LOG(1) << "about to initiate autosplit: " << *this << " dataWritten: " << _dataWritten
+        LOG(1) << "about to initiate autosplit: " << *this << " dataWritten: " << chunkBytesWritten
                << " splitThreshold: " << splitThreshold;
 
         size_t splitCount = 0;
         auto splitStatus = split(txn, Chunk::autoSplitInternal, &splitCount);
         if (!splitStatus.isOK()) {
-            // Split would have issued a message if we got here. This means there wasn't enough
-            // data to split, so don't want to try again until considerable more data
-            _dataWritten = 0;
+            // Split would have issued a message if we got here. This means there wasn't enough data
+            // to split, so don't want to try again until we have considerably more data.
+            setBytesWritten(0);
             return false;
         }
 
@@ -351,7 +375,7 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
             // right away
         } else {
             // we're splitting, so should wait a bit
-            _dataWritten = 0;
+            setBytesWritten(0);
         }
 
         bool shouldBalance = balancerConfig->shouldBalanceForAutoSplit();
@@ -406,7 +430,7 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
     } catch (const DBException& e) {
         // TODO: Make this better - there are lots of reasons a split could fail
         // Random so that we don't sync up with other failed splits
-        _dataWritten = mkDataWritten();
+        setBytesWritten(mkDataWritten());
 
         // if the collection lock is taken (e.g. we're migrating), it is fine for the split to fail.
         warning() << "could not autosplit collection " << _manager->getns() << causedBy(e);

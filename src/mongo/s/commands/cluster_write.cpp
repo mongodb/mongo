@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/cluster_write.h"
+#include "mongo/s/commands/cluster_write.h"
 
 #include <string>
 #include <vector>

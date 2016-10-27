@@ -329,7 +329,6 @@ env.Install(
             'db/commands/core',
             'db/mongodandmongos',
             's/client/sharding_connection_hook',
-            's/cluster_ops_impl',
             's/commands/cluster_commands',
             's/commands/shared_cluster_commands',
             's/coreshard',

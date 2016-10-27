@@ -54,7 +54,7 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_write.h"
+#include "mongo/s/commands/cluster_write.h"
 #include "mongo/s/config.h"
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"

@@ -188,27 +188,6 @@ env.CppUnitTest(
     ]
 )
 
-#
-# Implementations of components to perform cluster operations in mongos
-#
-# This is the glue code implementing the interfaces required by cluster ops
-# in particular environments.
-#
-env.Library(
-    target='cluster_ops_impl',
-    source=[
-        'chunk_manager_targeter.cpp',
-        'cluster_write.cpp',
-    ],
-    LIBDEPS=[
-        'client/sharding_client',
-        'mongoscore',
-        'write_ops/cluster_write_op',
-        'write_ops/cluster_write_op_conversion',
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
 env.CppUnitTest(
     target='chunk_manager_targeter_test',
     source=[
@@ -296,6 +275,7 @@ env.Library(
 env.Library(
     target='mongoscore',
     source=[
+        'chunk_manager_targeter.cpp',
         'cluster_cursor_stats.cpp',
         'mongos_options.cpp',
         's_only.cpp',
@@ -305,8 +285,8 @@ env.Library(
         'version_mongos.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmongos',
         '$BUILD_DIR/mongo/client/parallel',
+        '$BUILD_DIR/mongo/db/auth/authmongos',
         '$BUILD_DIR/mongo/db/fts/ftsmongos',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/s/query/cluster_query',

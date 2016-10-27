@@ -103,7 +103,7 @@ Status ClusterAggregate::runAggregate(OperationContext* txn,
         return aggPassthrough(txn, namespaces, conf, cmdObj, result, options);
     }
 
-    ChunkManagerPtr chunkMgr = conf->getChunkManager(txn, namespaces.executionNss.ns());
+    auto chunkMgr = conf->getChunkManager(txn, namespaces.executionNss.ns());
 
     // If there was no collation specified, but there is a default collation for the collation,
     // use that.

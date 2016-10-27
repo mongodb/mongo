@@ -107,9 +107,12 @@ public:
     // split support
     //
 
-    long long getBytesWritten() const {
-        return _dataWritten;
-    }
+    /**
+     * Get/increment/set the estimation of how much data was written for this chunk.
+     */
+    uint64_t getBytesWritten() const;
+    void addBytesWritten(uint64_t bytesWrittenIncrement);
+    void setBytesWritten(uint64_t newBytesWritten);
 
     /**
      * if the amount of data written nears the max size of a shard
@@ -215,12 +218,6 @@ private:
      * @param splitPoints out parameter containing the chosen split points. Can be empty.
      */
     std::vector<BSONObj> _determineSplitPoints(OperationContext* txn, bool atMedian) const;
-
-    /**
-     * initializes _dataWritten with a random value so that a mongos restart
-     * wouldn't cause delay in splitting
-     */
-    static int mkDataWritten();
 };
 
 }  // namespace mongo

@@ -245,7 +245,7 @@ bool initShardVersionEmptyNS(OperationContext* txn, DBClientBase* conn_in) {
 bool checkShardVersion(OperationContext* txn,
                        DBClientBase* conn_in,
                        const string& ns,
-                       ChunkManagerPtr refManager,
+                       shared_ptr<ChunkManager> refManager,
                        bool authoritative,
                        int tryNumber) {
     // Empty namespaces are special - we require initialization but not versioning
@@ -444,7 +444,7 @@ bool VersionManager::forceRemoteCheckShardVersionCB(OperationContext* txn, const
         return false;
     }
 
-    ChunkManagerPtr manager = conf->getChunkManagerIfExists(txn, ns, true, true);
+    auto manager = conf->getChunkManagerIfExists(txn, ns, true, true);
     if (!manager) {
         return false;
     }

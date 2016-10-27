@@ -106,7 +106,7 @@ public:
                 Status(ErrorCodes::NamespaceNotSharded, "ns [" + nss.ns() + " is not sharded."));
         }
 
-        ChunkManagerPtr cm = config->getChunkManagerIfExists(txn, nss.ns());
+        auto cm = config->getChunkManagerIfExists(txn, nss.ns());
         if (!cm) {
             errmsg = "no chunk manager?";
             return false;
