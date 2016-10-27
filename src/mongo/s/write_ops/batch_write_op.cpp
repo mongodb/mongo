@@ -156,14 +156,19 @@ static int getWriteSizeBytes(const WriteOp& writeOp) {
         return item.getDocument().objsize();
     } else if (batchType == BatchedCommandRequest::BatchType_Update) {
         // Note: Be conservative here - it's okay if we send slightly too many batches
-        int estSize = item.getUpdate()->getQuery().objsize() +
-            item.getUpdate()->getUpdateExpr().objsize() + kEstUpdateOverheadBytes;
+        auto collationSize =
+            item.getUpdate()->isCollationSet() ? item.getUpdate()->getCollation().objsize() : 0;
+        auto estSize = item.getUpdate()->getQuery().objsize() +
+            item.getUpdate()->getUpdateExpr().objsize() + collationSize + kEstUpdateOverheadBytes;
         dassert(estSize >= item.getUpdate()->toBSON().objsize());
         return estSize;
     } else {
         dassert(batchType == BatchedCommandRequest::BatchType_Delete);
         // Note: Be conservative here - it's okay if we send slightly too many batches
-        int estSize = item.getDelete()->getQuery().objsize() + kEstDeleteOverheadBytes;
+        auto collationSize =
+            item.getDelete()->isCollationSet() ? item.getDelete()->getCollation().objsize() : 0;
+        auto estSize =
+            item.getDelete()->getQuery().objsize() + collationSize + kEstDeleteOverheadBytes;
         dassert(estSize >= item.getDelete()->toBSON().objsize());
         return estSize;
     }
