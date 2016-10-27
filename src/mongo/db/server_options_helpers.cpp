@@ -541,6 +541,18 @@ Status validateServerOptions(const moe::Environment& params) {
         if (authMechParameter != parameters.end() && authMechParameter->second.empty()) {
             haveAuthenticationMechanisms = false;
         }
+
+        // Make sure 'internalLookupStageBatchSize' can only be set if test commands are enabled.
+        auto lookupBatchSizeParameter = parameters.find("internalLookupStageBatchSize");
+        auto enableTestCommandsParameter = parameters.find("enableTestCommands");
+        if (lookupBatchSizeParameter != parameters.end()) {
+            if (enableTestCommandsParameter == parameters.end() ||
+                enableTestCommandsParameter->second != "1") {
+                return Status(
+                    ErrorCodes::BadValue,
+                    "internalLookupStageBatchSize can only be set if test commands are enabled.");
+            }
+        }
     }
     if ((params.count("security.authorization") &&
          params["security.authorization"].as<std::string>() == "enabled") ||

@@ -7,27 +7,30 @@
 (function() {
     'use strict';
 
-    // We use a batch size of 1 to ensure that the mongo shell issues a getMore when unwinding the
+    // We use a batch size of 2 to ensure that the mongo shell issues a getMore when unwinding the
     // results from the 'dest' collection for the same document in the 'source' collection under a
     // different OperationContext.
-    const batchSize = 1;
+    const batchSize = 2;
 
-    db.source.drop();
-    db.dest.drop();
+    const conn =
+        MongoRunner.runMongod({setParameter: "internalAggregationLookupBatchSize=" + batchSize});
+    assert.neq(null, conn, "mongod failed to start up");
+    const testDB = conn.getDB("test");
 
-    assert.writeOK(db.source.insert({local: 1}));
+    testDB.source.drop();
+    testDB.dest.drop();
 
-    // We insert documents in the 'dest' collection such that their combined size is greater than
-    // 16MB in order to ensure that the DBDirectClient used by the $lookup stage issues a getMore
-    // under a different OperationContext.
-    const numMatches = 3;
-    const largeStr = new Array(6 * 1024 * 1024 + 1).join('x');
+    assert.writeOK(testDB.source.insert({local: 1}));
 
+    // The cursor batching logic actually requests one more document than it needs to fill the
+    // first batch, so if we want to leave the $lookup stage paused with a cursor open we'll
+    // need two more matching documents than the batch size.
+    const numMatches = batchSize + 2;
     for (var i = 0; i < numMatches; ++i) {
-        assert.writeOK(db.dest.insert({foreign: 1, largeStr: largeStr}));
+        assert.writeOK(testDB.dest.insert({foreign: 1}));
     }
 
-    var res = db.runCommand({
+    var res = testDB.runCommand({
         aggregate: 'source',
         pipeline: [
             {
@@ -50,6 +53,8 @@
     });
     assert.commandWorked(res);
 
-    var cursor = new DBCommandCursor(db.getMongo(), res, batchSize);
+    var cursor = new DBCommandCursor(conn, res, batchSize);
     assert.eq(numMatches, cursor.itcount());
+
+    assert.eq(0, MongoRunner.stopMongod(conn), "expected mongod to shutdown cleanly");
 })();

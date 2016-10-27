@@ -31,16 +31,23 @@
 #include "document_source.h"
 
 #include "mongo/base/init.h"
+#include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
+
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(internalAggregationLookupBatchSize,
+                                      int,
+                                      LiteParsedQuery::kDefaultBatchSize);
 
 DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
                                            std::string as,
@@ -54,10 +61,54 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
       _foreignField(foreignField),
       _foreignFieldFieldName(std::move(foreignField)) {}
 
+DocumentSourceLookUp::~DocumentSourceLookUp() {
+    DESTRUCTOR_GUARD(
+        // A DBClientCursor will issue a killCursors command through its parent DBDirectClient when
+        // it goes out of scope. To issue a killCursors command, a DBDirectClient needs a valid
+        // OperationContext. So here we set the OperationContext on the DBDirectClient, then
+        // aggressively destroy the DBClientCursor.
+        // Note that we cannot rely on any sort of callback from above to provide a valid
+        // OperationContext, since we might be destroyed from the destructor of a CursorManager,
+        // which does not have an OperationContext. Thus, we unfortunately have to make a new one or
+        // use the one on our thread's Client.
+        if (_mongod && _cursor) {
+            auto& client = cc();
+            if (auto opCtx = client.getOperationContext()) {
+                pExpCtx->opCtx = opCtx;
+                _mongod->setOperationContext(opCtx);
+                _cursor.reset();
+            } else {
+                auto newOpCtx = client.makeOperationContext();
+                pExpCtx->opCtx = newOpCtx.get();
+                _mongod->setOperationContext(newOpCtx.get());
+                _cursor.reset();
+            }
+        });
+}
+
 REGISTER_DOCUMENT_SOURCE(lookup, DocumentSourceLookUp::createFromBson);
 
 const char* DocumentSourceLookUp::getSourceName() const {
     return "$lookup";
+}
+
+std::unique_ptr<DBClientCursor> DocumentSourceLookUp::doQuery(const Document& docToLookUp) const {
+    auto query = DocumentSourceLookUp::queryForInput(docToLookUp);
+
+    // Defaults for everything except batch size.
+    const int nToReturn = 0;
+    const int nToSkip = 0;
+    const BSONObj* fieldsToReturn = nullptr;
+    const int queryOptions = 0;
+
+    const int batchSize = internalAggregationLookupBatchSize;
+    return _mongod->directClient()->query(_fromNs.ns(),
+                                          std::move(query),
+                                          nToReturn,
+                                          nToSkip,
+                                          fieldsToReturn,
+                                          queryOptions,
+                                          batchSize);
 }
 
 boost::optional<Document> DocumentSourceLookUp::getNext() {
@@ -72,8 +123,7 @@ boost::optional<Document> DocumentSourceLookUp::getNext() {
     boost::optional<Document> input = pSource->getNext();
     if (!input)
         return {};
-    BSONObj query = queryForInput(*input);
-    std::unique_ptr<DBClientCursor> cursor = _mongod->directClient()->query(_fromNs.ns(), query);
+    auto cursor = doQuery(*input);
 
     std::vector<Value> results;
     int objsize = 0;
@@ -82,7 +132,8 @@ boost::optional<Document> DocumentSourceLookUp::getNext() {
         objsize += result.objsize();
         uassert(4568,
                 str::stream() << "Total size of documents in " << _fromNs.coll() << " matching "
-                              << query << " exceeds maximum document size",
+                              << DocumentSourceLookUp::queryForInput(*input)
+                              << " exceeds maximum document size",
                 objsize <= BSONObjMaxInternalSize);
         results.push_back(Value(result));
     }
@@ -136,8 +187,8 @@ boost::optional<Document> DocumentSourceLookUp::unwindResult() {
         if (!_input)
             return {};
 
-        _cursor = _mongod->directClient()->query(_fromNs.ns(), queryForInput(*_input));
         _cursorIndex = 0;
+        _cursor = doQuery(*_input);
 
         if (_unwindSrc->preserveNullAndEmptyArrays() && !_cursor->more()) {
             // There were no results for this cursor, but the $unwind was asked to preserve empty

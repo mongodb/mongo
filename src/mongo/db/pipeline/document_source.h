@@ -1295,10 +1295,16 @@ private:
                          std::string localField,
                          std::string foreignField,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    ~DocumentSourceLookUp() final;
 
     Value serialize(bool explain = false) const final {
         invariant(false);
     }
+
+    /**
+     * Builds the required query and executes it.
+     */
+    std::unique_ptr<DBClientCursor> doQuery(const Document& docToLookUp) const;
 
     boost::optional<Document> unwindResult();
     BSONObj queryForInput(const Document& input) const;
