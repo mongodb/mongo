@@ -87,7 +87,6 @@ public:
     void clearSyncSourceBlacklist() override {}
     HostAndPort chooseNewSyncSource(const Timestamp& ts) override {
         HostAndPort result = _syncSource;
-        _syncSource = HostAndPort();
         return result;
     }
     void blacklistSyncSource(const HostAndPort& host, Date_t until) override {

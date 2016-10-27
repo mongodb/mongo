@@ -726,6 +726,9 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
         _reporterPaused = true;
         _applierPaused = true;
 
+        LOG(2) << "Resetting sync source so a new one can be chosen for this initial sync attempt.";
+        _syncSource = HostAndPort();
+
         _resetState_inlock(txn, OpTimeWithHash());
 
         // For testing, we may want to fail if we receive a getmore.
@@ -736,17 +739,16 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
         }
 
         if (attemptErrorStatus.isOK()) {
-            if (_syncSource.empty()) {
-                for (int i = 0; i < numInitialSyncConnectAttempts; ++i) {
-                    attemptErrorStatus = _ensureGoodSyncSource_inlock();
-                    if (attemptErrorStatus.isOK()) {
-                        break;
-                    }
-                    LOG(1) << "Error getting sync source: '" << attemptErrorStatus.toString()
-                           << "', trying again in " << _opts.syncSourceRetryWait << ". Attempt "
-                           << i + 1 << " of " << numInitialSyncConnectAttempts.load();
-                    sleepmillis(durationCount<Milliseconds>(_opts.syncSourceRetryWait));
+            invariant(_syncSource.empty());
+            for (int i = 0; i < numInitialSyncConnectAttempts; ++i) {
+                attemptErrorStatus = _ensureGoodSyncSource_inlock();
+                if (attemptErrorStatus.isOK()) {
+                    break;
                 }
+                LOG(1) << "Error getting sync source: '" << attemptErrorStatus.toString()
+                       << "', trying again in " << _opts.syncSourceRetryWait << ". Attempt "
+                       << i + 1 << " of " << numInitialSyncConnectAttempts.load();
+                sleepmillis(durationCount<Milliseconds>(_opts.syncSourceRetryWait));
             }
 
             if (_syncSource.empty()) {
