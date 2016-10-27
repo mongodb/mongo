@@ -83,7 +83,7 @@ void ScopedMigrationRequestTest::checkMigrationsCollectionForDocument(
 ScopedMigrationRequest ScopedMigrationRequestTest::makeScopedMigrationRequest(
     const MigrateInfo& migrateInfo) {
     ScopedMigrationRequest scopedMigrationRequest =
-        assertGet(ScopedMigrationRequest::writeMigration(operationContext(), migrateInfo));
+        assertGet(ScopedMigrationRequest::writeMigration(operationContext(), migrateInfo, false));
 
     checkMigrationsCollectionForDocument(migrateInfo.getName(), 1);
 
@@ -111,8 +111,8 @@ TEST_F(ScopedMigrationRequestTest, CreateScopedMigrationRequest) {
     MigrateInfo migrateInfo = makeMigrateInfo();
 
     {
-        ScopedMigrationRequest scopedMigrationRequest =
-            assertGet(ScopedMigrationRequest::writeMigration(operationContext(), migrateInfo));
+        ScopedMigrationRequest scopedMigrationRequest = assertGet(
+            ScopedMigrationRequest::writeMigration(operationContext(), migrateInfo, false));
 
         checkMigrationsCollectionForDocument(migrateInfo.getName(), 1);
     }
@@ -132,8 +132,8 @@ TEST_F(ScopedMigrationRequestTest, CreateScopedMigrationRequestOnRecovery) {
 
     // Insert the document for the MigrationRequest and then prevent its removal in the destructor.
     {
-        ScopedMigrationRequest scopedMigrationRequest =
-            assertGet(ScopedMigrationRequest::writeMigration(operationContext(), migrateInfo));
+        ScopedMigrationRequest scopedMigrationRequest = assertGet(
+            ScopedMigrationRequest::writeMigration(operationContext(), migrateInfo, false));
 
         checkMigrationsCollectionForDocument(migrateInfo.getName(), 1);
 
@@ -149,7 +149,8 @@ TEST_F(ScopedMigrationRequestTest, CreateScopedMigrationRequestOnRecovery) {
         differentToShardMigrateInfo.to = kDifferentToShard;
 
         StatusWith<ScopedMigrationRequest> statusWithScopedMigrationRequest =
-            ScopedMigrationRequest::writeMigration(operationContext(), differentToShardMigrateInfo);
+            ScopedMigrationRequest::writeMigration(
+                operationContext(), differentToShardMigrateInfo, false);
 
         ASSERT_EQUALS(ErrorCodes::DuplicateKey, statusWithScopedMigrationRequest.getStatus());
 
@@ -173,15 +174,15 @@ TEST_F(ScopedMigrationRequestTest, CreateMultipleScopedMigrationRequestsForIdent
 
     {
         // Create a ScopedMigrationRequest, which will do the config.migrations write.
-        ScopedMigrationRequest scopedMigrationRequest =
-            assertGet(ScopedMigrationRequest::writeMigration(operationContext(), migrateInfo));
+        ScopedMigrationRequest scopedMigrationRequest = assertGet(
+            ScopedMigrationRequest::writeMigration(operationContext(), migrateInfo, false));
 
         checkMigrationsCollectionForDocument(migrateInfo.getName(), 1);
 
         {
             // Should be able to create another Scoped object if the request is identical.
-            ScopedMigrationRequest identicalScopedMigrationRequest =
-                assertGet(ScopedMigrationRequest::writeMigration(operationContext(), migrateInfo));
+            ScopedMigrationRequest identicalScopedMigrationRequest = assertGet(
+                ScopedMigrationRequest::writeMigration(operationContext(), migrateInfo, false));
 
             checkMigrationsCollectionForDocument(migrateInfo.getName(), 1);
         }
@@ -199,7 +200,7 @@ TEST_F(ScopedMigrationRequestTest, TryToRemoveScopedMigrationRequestBeforeDestru
 
     // Remove the migration document with tryToRemoveMigration().
     ScopedMigrationRequest scopedMigrationRequest =
-        assertGet(ScopedMigrationRequest::writeMigration(operationContext(), migrateInfo));
+        assertGet(ScopedMigrationRequest::writeMigration(operationContext(), migrateInfo, false));
 
     checkMigrationsCollectionForDocument(migrateInfo.getName(), 1);
 

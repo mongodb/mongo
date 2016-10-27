@@ -67,7 +67,8 @@ public:
      * The destructor will handle removing the document when it is no longer needed.
      */
     static StatusWith<ScopedMigrationRequest> writeMigration(OperationContext* txn,
-                                                             const MigrateInfo& migrate);
+                                                             const MigrateInfo& migrate,
+                                                             bool waitForDelete);
 
     /**
      * Creates a ScopedMigrationRequest object without inserting a document into config.migrations.

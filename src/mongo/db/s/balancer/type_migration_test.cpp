@@ -4,6 +4,7 @@
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
  *    as published by the Free Software Foundation.
+ *    GNU Affero General Public License for more details.
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -45,6 +46,7 @@ const BSONObj kMin = BSON("a" << 10);
 const BSONObj kMax = BSON("a" << 20);
 const ShardId kFromShard("shard0000");
 const ShardId kToShard("shard0001");
+const bool kWaitForDelete{true};
 
 TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
     const ChunkVersion version(1, 2, OID::gen());
@@ -61,7 +63,7 @@ TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
     ASSERT_OK(chunkType.validate());
 
     MigrateInfo migrateInfo(kToShard, chunkType);
-    MigrationType migrationType(migrateInfo);
+    MigrationType migrationType(migrateInfo, kWaitForDelete);
 
     BSONObjBuilder builder;
     builder.append(MigrationType::name(), kName);
@@ -71,6 +73,7 @@ TEST(MigrationTypeTest, ConvertFromMigrationInfo) {
     builder.append(MigrationType::fromShard(), kFromShard.toString());
     builder.append(MigrationType::toShard(), kToShard.toString());
     version.appendWithFieldForCommands(&builder, "chunkVersion");
+    builder.append(MigrationType::waitForDelete(), kWaitForDelete);
 
     BSONObj obj = builder.obj();
 
@@ -88,6 +91,7 @@ TEST(MigrationTypeTest, FromAndToBSON) {
     builder.append(MigrationType::fromShard(), kFromShard.toString());
     builder.append(MigrationType::toShard(), kToShard.toString());
     version.appendWithFieldForCommands(&builder, "chunkVersion");
+    builder.append(MigrationType::waitForDelete(), kWaitForDelete);
 
     BSONObj obj = builder.obj();
 

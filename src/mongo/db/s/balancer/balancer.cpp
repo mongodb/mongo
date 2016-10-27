@@ -344,10 +344,8 @@ void Balancer::_mainThread() {
 
     log() << "CSRS balancer thread is recovering";
 
-    _migrationManager.finishRecovery(txn.get(),
-                                     balancerConfig->getMaxChunkSizeBytes(),
-                                     balancerConfig->getSecondaryThrottle(),
-                                     balancerConfig->waitForDelete());
+    _migrationManager.finishRecovery(
+        txn.get(), balancerConfig->getMaxChunkSizeBytes(), balancerConfig->getSecondaryThrottle());
 
     log() << "CSRS balancer thread is recovered";
 

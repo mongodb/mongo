@@ -92,10 +92,10 @@ ScopedMigrationRequest& ScopedMigrationRequest::operator=(ScopedMigrationRequest
 }
 
 StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
-    OperationContext* txn, const MigrateInfo& migrateInfo) {
+    OperationContext* txn, const MigrateInfo& migrateInfo, bool waitForDelete) {
 
     // Try to write a unique migration document to config.migrations.
-    const MigrationType migrationType(migrateInfo);
+    const MigrationType migrationType(migrateInfo, waitForDelete);
 
     for (int retry = 0; retry < kDuplicateKeyErrorMaxRetries; ++retry) {
         Status result = grid.catalogClient(txn)->insertConfigDocument(

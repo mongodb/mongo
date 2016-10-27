@@ -162,7 +162,7 @@ void MigrationManagerTest::setUp() {
     ConfigServerTestFixture::setUp();
     _migrationManager = stdx::make_unique<MigrationManager>(getServiceContext());
     _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
-    _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle, false);
+    _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle);
 }
 
 void MigrationManagerTest::tearDown() {
@@ -797,7 +797,7 @@ TEST_F(MigrationManagerTest, InterruptMigration) {
 
     // Restore the migration manager back to the started state, which is expected by tearDown
     _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
-    _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle, false);
+    _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle);
 }
 
 TEST_F(MigrationManagerTest, RestartMigrationManager) {
@@ -821,7 +821,7 @@ TEST_F(MigrationManagerTest, RestartMigrationManager) {
     _migrationManager->interruptAndDisableMigrations();
     _migrationManager->drainActiveMigrations();
     _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
-    _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle, false);
+    _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle);
 
     auto future = launchAsync([&] {
         Client::initThreadIfNotAlready("Test");
@@ -882,7 +882,7 @@ TEST_F(MigrationManagerTest, MigrationRecovery) {
         shardTargeterMock(txn.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
         shardTargeterMock(txn.get(), kShardId2)->setFindHostReturnValue(kShardHost2);
 
-        _migrationManager->finishRecovery(txn.get(), 0, kDefaultSecondaryThrottle, false);
+        _migrationManager->finishRecovery(txn.get(), 0, kDefaultSecondaryThrottle);
     });
 
     // Expect two moveChunk commands.
@@ -943,7 +943,7 @@ TEST_F(MigrationManagerTest, FailMigrationRecovery) {
         DistLockManager::kSingleLockAttemptTimeout));
 
     _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
-    _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle, false);
+    _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle);
 
     // MigrationManagerTest::tearDown checks that the config.migrations collection is empty and all
     // distributed locks are unlocked.

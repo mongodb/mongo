@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
+#include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
@@ -120,8 +121,7 @@ public:
      */
     void finishRecovery(OperationContext* txn,
                         uint64_t maxChunkSizeBytes,
-                        const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                        bool waitForDelete);
+                        const MigrationSecondaryThrottleOptions& secondaryThrottle);
 
     /**
      * Non-blocking method that should never be called concurrently with finishRecovery. Puts the
@@ -286,7 +286,7 @@ private:
 
     // Carries migration information over from startRecovery to finishRecovery. Should only be set
     // in startRecovery and then accessed in finishRecovery.
-    stdx::unordered_map<NamespaceString, std::list<MigrateInfo>> _migrationRecoveryMap;
+    stdx::unordered_map<NamespaceString, std::list<MigrationType>> _migrationRecoveryMap;
 
     // Protects the class state below.
     stdx::mutex _mutex;

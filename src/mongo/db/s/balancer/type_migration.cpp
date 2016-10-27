@@ -48,16 +48,18 @@ const BSONField<BSONObj> MigrationType::min("min");
 const BSONField<BSONObj> MigrationType::max("max");
 const BSONField<std::string> MigrationType::fromShard("fromShard");
 const BSONField<std::string> MigrationType::toShard("toShard");
+const BSONField<bool> MigrationType::waitForDelete("waitForDelete");
 
 MigrationType::MigrationType() = default;
 
-MigrationType::MigrationType(MigrateInfo info)
+MigrationType::MigrationType(MigrateInfo info, bool waitForDelete)
     : _nss(NamespaceString(info.ns)),
       _min(info.minKey),
       _max(info.maxKey),
       _fromShard(info.from),
       _toShard(info.to),
-      _chunkVersion(info.version) {}
+      _chunkVersion(info.version),
+      _waitForDelete(waitForDelete) {}
 
 StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
     MigrationType migrationType;
@@ -104,6 +106,15 @@ StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
         migrationType._chunkVersion = chunkVersionStatus.getValue();
     }
 
+    {
+        bool waitForDeleteVal{false};
+        Status status = bsonExtractBooleanFieldWithDefault(
+            source, waitForDelete.name(), false, &waitForDeleteVal);
+        if (!status.isOK())
+            return status;
+        migrationType._waitForDelete = waitForDeleteVal;
+    }
+
     return migrationType;
 }
 
@@ -121,6 +132,7 @@ BSONObj MigrationType::toBSON() const {
 
     _chunkVersion.appendWithFieldForCommands(&builder, kChunkVersion);
 
+    builder.append(waitForDelete.name(), _waitForDelete);
     return builder.obj();
 }
 

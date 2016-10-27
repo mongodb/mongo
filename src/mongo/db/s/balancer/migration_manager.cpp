@@ -157,7 +157,7 @@ MigrationStatuses MigrationManager::executeMigrationsForAutoBalance(
             // Write a document to the config.migrations collection, in case this migration must be
             // recovered by the Balancer. Fail if the chunk is already moving.
             auto statusWithScopedMigrationRequest =
-                ScopedMigrationRequest::writeMigration(txn, migrateInfo);
+                ScopedMigrationRequest::writeMigration(txn, migrateInfo, waitForDelete);
             if (!statusWithScopedMigrationRequest.isOK()) {
                 migrationStatuses.emplace(migrateInfo.getName(),
                                           std::move(statusWithScopedMigrationRequest.getStatus()));
@@ -201,7 +201,7 @@ MigrationStatuses MigrationManager::executeMigrationsForAutoBalance(
         // Write a document to the config.migrations collection, in case this migration must be
         // recovered by the Balancer. Fail if the chunk is already moving.
         auto statusWithScopedMigrationRequest =
-            ScopedMigrationRequest::writeMigration(txn, migrateInfo);
+            ScopedMigrationRequest::writeMigration(txn, migrateInfo, waitForDelete);
         if (!statusWithScopedMigrationRequest.isOK()) {
             migrationStatuses.emplace(migrateInfo.getName(),
                                       std::move(statusWithScopedMigrationRequest.getStatus()));
@@ -239,7 +239,7 @@ Status MigrationManager::executeManualMigration(
     // Write a document to the config.migrations collection, in case this migration must be
     // recovered by the Balancer. Fail if the chunk is already moving.
     auto statusWithScopedMigrationRequest =
-        ScopedMigrationRequest::writeMigration(txn, migrateInfo);
+        ScopedMigrationRequest::writeMigration(txn, migrateInfo, waitForDelete);
     if (!statusWithScopedMigrationRequest.isOK()) {
         return statusWithScopedMigrationRequest.getStatus();
     }
@@ -321,28 +321,28 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* txn) {
                       << causedBy(redact(statusWithMigrationType.getStatus()));
             return;
         }
-        MigrateInfo migrateInfo = statusWithMigrationType.getValue().toMigrateInfo();
+        MigrationType migrateType = std::move(statusWithMigrationType.getValue());
 
-        auto it = _migrationRecoveryMap.find(NamespaceString(migrateInfo.ns));
+        auto it = _migrationRecoveryMap.find(NamespaceString(migrateType.getNss()));
         if (it == _migrationRecoveryMap.end()) {
-            std::list<MigrateInfo> list;
-            it = _migrationRecoveryMap.insert(std::make_pair(NamespaceString(migrateInfo.ns), list))
-                     .first;
+            std::list<MigrationType> list;
+            it = _migrationRecoveryMap.insert(std::make_pair(migrateType.getNss(), list)).first;
 
             // Reacquire the matching distributed lock for this namespace.
             const std::string whyMessage(stream() << "Migrating chunk(s) in collection "
-                                                  << redact(migrateInfo.ns));
+                                                  << migrateType.getNss().ns());
             auto statusWithDistLockHandle =
                 Grid::get(txn)
                     ->catalogClient(txn)
                     ->getDistLockManager()
-                    ->tryLockWithLocalWriteConcern(txn, migrateInfo.ns, whyMessage, _lockSessionID);
+                    ->tryLockWithLocalWriteConcern(
+                        txn, migrateType.getNss().ns(), whyMessage, _lockSessionID);
             if (!statusWithDistLockHandle.isOK() &&
                 statusWithDistLockHandle.getStatus() != ErrorCodes::LockBusy) {
                 // LockBusy is alright because that should mean a 3.2 shard has it for the active
                 // migration.
                 warning() << "Failed to acquire distributed lock for collection '"
-                          << redact(migrateInfo.ns)
+                          << migrateType.getNss().ns()
                           << "' during balancer recovery of an active migration. Abandoning"
                           << " balancer recovery."
                           << causedBy(redact(statusWithDistLockHandle.getStatus()));
@@ -350,7 +350,7 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* txn) {
             }
         }
 
-        it->second.push_back(std::move(migrateInfo));
+        it->second.push_back(std::move(migrateType));
     }
 
     scopedGuard.Dismiss();
@@ -358,8 +358,7 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* txn) {
 
 void MigrationManager::finishRecovery(OperationContext* txn,
                                       uint64_t maxChunkSizeBytes,
-                                      const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                                      bool waitForDelete) {
+                                      const MigrationSecondaryThrottleOptions& secondaryThrottle) {
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         if (_state == State::kStopping) {
@@ -407,7 +406,9 @@ void MigrationManager::finishRecovery(OperationContext* txn,
         int scheduledMigrations = 0;
 
         while (!migrateInfos.empty()) {
-            const auto migrationInfo = std::move(migrateInfos.front());
+            auto migrationType = std::move(migrateInfos.front());
+            const auto migrationInfo = migrationType.toMigrateInfo();
+            auto waitForDelete = migrationType.getWaitForDelete();
             migrateInfos.pop_front();
 
             auto chunk = cm->findIntersectingChunkWithSimpleCollation(txn, migrationInfo.minKey);
