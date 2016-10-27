@@ -506,6 +506,9 @@ functions:
               echo "Copy to host $hostn failed!"
               $sudo tail -n 100 $hostn_log
               exit_failure_code=$exit_code
+            else
+              # Cleanup any existing logs from previous runs.
+              ssh root@$hostn "rm -f /root/mongod.log /root/stdout.log /opt/mongod/mongod.log /opt/mongod/stdout.log"
             fi
           done
           exit $exit_failure_code
