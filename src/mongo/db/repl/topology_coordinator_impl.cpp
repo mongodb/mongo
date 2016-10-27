@@ -2331,6 +2331,7 @@ TopologyCoordinator::UpdateTermResult TopologyCoordinatorImpl::updateTerm(long l
     if (_iAmPrimary()) {
         return TopologyCoordinator::UpdateTermResult::kTriggerStepDown;
     }
+    LOG(1) << "Updating term from " << _term << " to " << term;
     _term = term;
     return TopologyCoordinator::UpdateTermResult::kUpdatedTerm;
 }
