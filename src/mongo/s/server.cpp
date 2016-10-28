@@ -141,10 +141,15 @@ void exitCleanly(ExitCode code) {
             txn = uniqueTxn.get();
         }
 
-        auto cursorManager = grid.getCursorManager();
-        cursorManager->shutdown();
-        grid.shardRegistry()->shutdown();
-        grid.catalogManager(txn)->shutDown(txn);
+        if (auto cursorManager = grid.getCursorManager()) {
+            cursorManager->shutdown();
+        }
+        if (auto shardRegistry = grid.shardRegistry()) {
+            shardRegistry->shutdown();
+        }
+        if (auto catalogManager = grid.catalogManager(txn)) {
+            catalogManager->shutDown(txn);
+        }
     }
 
     dbexit(code);
