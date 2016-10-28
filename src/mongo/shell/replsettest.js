@@ -1060,7 +1060,7 @@ var ReplSetTest = function(opts) {
                 assert.commandWorked(primaryDBHash);
 
                 try {
-                    var primaryCollInfos = primary.getDB(dbName).getCollectionInfos();
+                    var primaryCollInfo = primary.getDB(dbName).getCollectionInfos();
                 } catch (e) {
                     if (jsTest.options().skipValidationOnInvalidViewDefinitions) {
                         assert.commandFailedWithCode(e, ErrorCodes.InvalidViewDefinition);
@@ -1112,15 +1112,15 @@ var ReplSetTest = function(opts) {
 
                     // Check that collection information is consistent on the primary and
                     // secondaries.
-                    var secondaryCollInfos = secondary.getDB(dbName).getCollectionInfos();
-                    secondaryCollInfos.forEach(secondaryInfo => {
+                    var secondaryCollInfo = secondary.getDB(dbName).getCollectionInfos();
+                    secondaryCollInfo.forEach(secondaryInfo => {
                         // SERVER-26712 Temporarily avoid validating _id index version.
-                        if (secondaryInfo.hasOwnProperty('idIndex'))
-                            delete secondaryInfo.idIndex.v;
-                        primaryCollInfos.forEach(primaryInfo => {
+                        if (secondaryCollInfo.hasOwnProperty('idIndex'))
+                            delete secondaryCollInfo.idIndex.v;
+                        primaryCollInfo.forEach(primaryInfo => {
                             // SERVER-26712 Temporarily avoid validating _id index version.
-                            if (primaryInfo.hasOwnProperty('idIndex'))
-                                delete primaryInfo.idIndex.v;
+                            if (primaryCollInfo.hasOwnProperty('idIndex'))
+                                delete primaryCollInfo.idIndex.v;
                             if (secondaryInfo.name === primaryInfo.name) {
                                 if (!bsonBinaryEqual(secondaryInfo, primaryInfo)) {
                                     print(msgPrefix +
