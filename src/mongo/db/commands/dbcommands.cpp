@@ -1445,9 +1445,11 @@ void Command::execCommand(OperationContext* txn,
     } catch (const DBException& e) {
         // If we got a stale config, wait in case the operation is stuck in a critical section
         if (e.getCode() == ErrorCodes::SendStaleConfig) {
-            auto& sce = static_cast<const StaleConfigException&>(e);
+            auto sce = dynamic_cast<const StaleConfigException*>(&e);
+            invariant(sce);  // do not upcasts from DBException created by uassert variants.
+
             ShardingState::get(txn)->onStaleShardVersion(
-                txn, NamespaceString(sce.getns()), sce.getVersionReceived());
+                txn, NamespaceString(sce->getns()), sce->getVersionReceived());
         }
 
         BSONObjBuilder metadataBob;

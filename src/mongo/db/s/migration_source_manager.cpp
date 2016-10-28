@@ -127,18 +127,14 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkR
 
     const ChunkVersion collectionVersion = _collectionMetadata->getCollVersion();
 
-    if (expectedCollectionVersion.epoch() != collectionVersion.epoch()) {
-        throw SendStaleConfigException(
-            getNss().ns(),
+    uassert(ErrorCodes::StaleEpoch,
             str::stream() << "cannot move chunk " << _args.toString()
                           << " because collection may have been dropped. "
                           << "current epoch: "
                           << collectionVersion.epoch()
                           << ", cmd epoch: "
                           << expectedCollectionVersion.epoch(),
-            expectedCollectionVersion,
-            collectionVersion);
-    }
+            expectedCollectionVersion.epoch() == collectionVersion.epoch());
 
     // With nonzero shard version, we must have a coll version >= our shard version
     invariant(collectionVersion >= shardVersion);
