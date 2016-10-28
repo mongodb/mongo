@@ -167,8 +167,13 @@ sh.getBalancerHost = function(configDB) {
         print(
             "config.locks collection does not contain balancer lock. be sure you are connected to a mongos");
         return "";
+    } else if (x.process.match(/ConfigServer/)) {
+        print("getBalancerHost is deprecated starting version 3.4. The balancer is running on " +
+              "the config server primary host.");
+        return "";
+    } else {
+        return x.process.match(/[^:]+:[^:]+/)[0];
     }
-    return x.process.match(/[^:]+:[^:]+/)[0];
 };
 
 sh.stopBalancer = function(timeoutMs, interval) {
