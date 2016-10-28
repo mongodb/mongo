@@ -166,6 +166,12 @@ var timestampConstructors = {
         'Timestamp(true,true)',
         'Timestamp(true,0)',
         'Timestamp(0,true)',
+        'Timestamp(Math.pow(2,32),Math.pow(2,32))',
+        'Timestamp(0,Math.pow(2,32))',
+        'Timestamp(Math.pow(2,32),0)',
+        'Timestamp(-1,-1)',
+        'Timestamp(-1,0)',
+        'Timestamp(0,-1)'
     ]
 };
 

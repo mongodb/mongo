@@ -297,9 +297,6 @@ public:
     */
     bool trueValue() const;
 
-    /** True if number, string, bool, date, OID */
-    bool isSimpleType() const;
-
     /** True if element is of a numeric type. */
     bool isNumber() const;
 
@@ -703,22 +700,6 @@ inline bool BSONElement::isNumber() const {
         case NumberDouble:
         case NumberDecimal:
         case NumberInt:
-            return true;
-        default:
-            return false;
-    }
-}
-
-inline bool BSONElement::isSimpleType() const {
-    switch (type()) {
-        case NumberLong:
-        case NumberDouble:
-        case NumberInt:
-        case NumberDecimal:
-        case mongo::String:
-        case mongo::Bool:
-        case mongo::Date:
-        case jstOID:
             return true;
         default:
             return false;

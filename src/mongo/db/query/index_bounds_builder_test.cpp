@@ -301,7 +301,7 @@ TEST(IndexBoundsBuilderTest, TranslateGtTimestamp) {
                       fromjson("{'': Timestamp(2, 3), '': Timestamp(4294967295, 4294967295)}"),
                       false,
                       true)));
-    ASSERT_EQUALS(tightness, IndexBoundsBuilder::INEXACT_FETCH);
+    ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
 }
 
 TEST(IndexBoundsBuilderTest, TranslateGtNumber) {

@@ -57,11 +57,8 @@ namespace {
 // Tightness rules are shared for $lt, $lte, $gt, $gte.
 IndexBoundsBuilder::BoundsTightness getInequalityPredicateTightness(const BSONElement& dataElt,
                                                                     const IndexEntry& index) {
-    if (dataElt.isSimpleType() || dataElt.type() == BSONType::BinData) {
-        return IndexBoundsBuilder::EXACT;
-    }
-
-    return IndexBoundsBuilder::INEXACT_FETCH;
+    return Indexability::isExactBoundsGenerating(dataElt) ? IndexBoundsBuilder::EXACT
+                                                          : IndexBoundsBuilder::INEXACT_FETCH;
 }
 
 }  // namespace
