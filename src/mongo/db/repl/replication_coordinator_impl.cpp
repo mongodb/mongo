@@ -1843,11 +1843,15 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor(const NamespaceString& ns) {
 Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* txn,
                                                          const NamespaceString& ns,
                                                          bool slaveOk) {
-    if ((_memberState.startup2() || _memberState.rollback()) && ns.isOplog()) {
+    auto client = txn->getClient();
+    if (((_memberState.startup() && client->isFromUserConnection() &&
+          getReplicationMode() == modeReplSet) ||
+         _memberState.startup2() || _memberState.rollback()) &&
+        ns.isOplog()) {
         return {ErrorCodes::NotMasterOrSecondary,
                 "Oplog collection reads are not allowed while in the rollback or startup state."};
     }
-    if (txn->getClient()->isInDirectClient()) {
+    if (client->isInDirectClient()) {
         return Status::OK();
     }
     if (canAcceptWritesFor(ns)) {
