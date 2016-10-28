@@ -523,15 +523,19 @@ functions:
           set -o verbose
           start_time=$(date +%s)
           lein run --tarball "file:///root/mongo-binaries.tgz" ${jepsen_key_time_limit} ${jepsen_protocol_version} ${jepsen_read_concern} ${jepsen_read_with_find_and_modify} ${jepsen_storage_engine} ${jepsen_time_limit} ${jepsen_write_concern} 2>&1 | tee jepsen_${task_name}_${execution}.log
-          exit_code=$PIPESTATUS
           end_time=$(date +%s)
           elapsed_secs=$((end_time-start_time))
+          # Since we cannot use PIPESTATUS to get the exit code from the "lein run ..." pipe in dash shell,
+          # we will check the output for success, failure or setup error.
+          grep -q "Everything looks good" jepsen_${task_name}_${execution}.log
+          exit_code=$?
           if [ $exit_code -eq 0 ]; then
             status='"pass"'
             failures=0
           else
             grep -q "Analysis invalid" jepsen_${task_name}_${execution}.log
-            if [ $? -eq 0 ]; then
+            exit_code=$?
+            if [ $exit_code -eq 0 ]; then
               status='"fail"'
               failures=1
             else
