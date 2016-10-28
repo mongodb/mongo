@@ -213,7 +213,6 @@ std::string Fetcher::getDiagnosticString() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     str::stream output;
     output << "Fetcher";
-    output << " executor: " << _executor->getDiagnosticString();
     output << " source: " << _source.toString();
     output << " database: " << _dbname;
     output << " query: " << _cmdObj;
