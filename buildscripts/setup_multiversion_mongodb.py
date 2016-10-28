@@ -22,11 +22,12 @@ import zipfile
 # Only really tested/works on Linux.
 #
 
+
 def dump_stacks(signal, frame):
     print "======================================"
     print "DUMPING STACKS due to SIGUSR1 signal"
     print "======================================"
-    threads = threading.enumerate();
+    threads = threading.enumerate()
 
     print "Total Threads: " + str(len(threads))
 
@@ -90,23 +91,27 @@ def download_file(url, file_name):
     raise Exception("Failed to download %s with error %d" % (url, error_code))
 
 
-class MultiVersionDownloader :
+class MultiVersionDownloader:
 
-    def __init__(self, install_dir, link_dir, edition, platform_arch):
+    def __init__(self, install_dir, link_dir, edition, platform_arch, generic_arch='Linux/x86_64'):
         self.install_dir = install_dir
         self.link_dir = link_dir
-        self.edition = edition
-        match = re.compile("(.*)\/(.*)").match(platform_arch)
-        if match:
-            self.platform_arch = match.group(1).lower() + "_" + match.group(2).lower()
-        else:
-            self.platform_arch = platform_arch.lower()
+        self.edition = edition.lower()
+        self.platform_arch = platform_arch.lower().replace('/', '_')
+        self.generic_arch = generic_arch.lower().replace('/', '_')
         self._links = None
+        self._generic_links = None
+
+    @property
+    def generic_links(self):
+        if self._generic_links is None:
+            self._links, self._generic_links = self.download_links()
+        return self._generic_links
 
     @property
     def links(self):
         if self._links is None:
-            self._links = self.download_links()
+            self._links, self._generic_links = self.download_links()
         return self._links
 
     def download_links(self):
@@ -119,15 +124,20 @@ class MultiVersionDownloader :
             raise Exception("No versions field in JSON: \n" + str(full_json))
 
         links = {}
+        generic_links = {}
         for json_version in full_json['versions']:
             if 'version' in json_version and 'downloads' in json_version:
+                version = json_version['version']
                 for download in json_version['downloads']:
-                    if 'target' in download and 'edition' in download and \
-                        download['target'] == self.platform_arch and \
-                        download['edition'] == self.edition:
-                            links[json_version['version']] = download['archive']['url']
+                    if 'target' in download and 'edition' in download:
+                        if download['target'].lower() == self.platform_arch and \
+                                download['edition'].lower() == self.edition:
+                            links[version] = download['archive']['url']
+                        elif download['target'].lower() == self.generic_arch and \
+                                download['edition'].lower() == 'base':
+                            generic_links[version] = download['archive']['url']
 
-        return links
+        return links, generic_links
 
     def download_version(self, version):
 
@@ -157,8 +167,19 @@ class MultiVersionDownloader :
                 urls.append((link_version, link_url))
 
         if len(urls) == 0:
-            raise Exception("Cannot find a link for version %s, versions %s found." \
-                % (version, self.links))
+            print >> sys.stderr, ("Cannot find a link for version %s, versions %s found."
+                                  % (version, self.links))
+            for ver, generic_url in self.generic_links.iteritems():
+                parts = get_version_parts(ver)
+                if parts[:len(requested_version_parts)] == requested_version_parts:
+                    if "-" in version and ver != version:
+                        continue
+                    urls.append((ver, generic_url))
+            if len(urls) == 0:
+                raise Exception(
+                    "No fall-back generic link available or version %s." % version)
+            else:
+                print "Falling back to generic architecture."
 
         urls.sort(key=lambda (version, _): get_version_parts(version, for_sorting=True))
         full_version = urls[-1][0]
@@ -333,6 +354,5 @@ def main():
         downloader.download_version(version)
 
 
-
 if __name__ == '__main__':
-  main()
+    main()

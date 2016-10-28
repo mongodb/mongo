@@ -640,7 +640,7 @@ functions:
         # 3.2.1 is needed to check cross version compatibility as it is the final version
         # to use the old style replSetUpdatePosition command.
         # 3.2.1 is also needed to check for a correct implementation of SERVER-23299.
-        ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion "base" ${multiversion_platform_arch|"Linux/x86_64"} "2.6" "3.0" "3.2" "3.2.1"
+        ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${multiversion_edition|"base"} ${multiversion_platform_arch|"linux/x86_64"} "2.6" "3.0" "3.2" "3.2.1"
 
   "cleanup environment" :
     - command: shell.exec
@@ -3509,6 +3509,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-ubuntu1204
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1204 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    multiversion_platform_arch: "ubuntu1204"
+    multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
@@ -3626,6 +3628,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-ubuntu1404
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    multiversion_platform_arch: "ubuntu1404"
+    multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
@@ -3752,6 +3756,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    multiversion_platform_arch: "ubuntu1604"
+    multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
@@ -4286,6 +4292,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-amazon
     compile_flags: --ssl MONGO_DISTMOD=amazon -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    multiversion_platform_arch: "amzn64"
+    multiversion_edition: "enterprise"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
@@ -4514,7 +4522,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: win32
     push_arch: x86_64-2008plus
-    multiversion_platform_arch: "Windows/x86_64-2008plus"
+    multiversion_platform_arch: "windows/x86_64-2008plus"
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=2008plus VARIANT_DIR=win32
@@ -5317,6 +5325,8 @@ buildvariants:
     push_arch: x86_64-enterprise-rhel62
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    multiversion_platform_arch: "rhel62"
+    multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
@@ -5530,6 +5540,8 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
     compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    multiversion_platform_arch: "rhel62"
+    multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     # The gcov instrumentation saves the path the .gcno files were created in as the default path
     # for the .gcda files. In Evergreen the path will start with /data/mci/[Hashed ID]/src/... where
@@ -5790,6 +5802,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-rhel62
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    multiversion_platform_arch: "rhel62"
+    multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
@@ -5908,6 +5922,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-rhel70
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    multiversion_platform_arch: "rhel70"
+    multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
@@ -6666,6 +6682,8 @@ buildvariants:
     push_arch: x86_64-suse12
     compile_flags: --ssl MONGO_DISTMOD=suse12 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    multiversion_platform_arch: "suse12"
+    multiversion_edition: "targeted"
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -6925,6 +6943,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-suse11
     compile_flags: --ssl MONGO_DISTMOD=suse11 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    multiversion_platform_arch: "suse11"
+    multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
@@ -7247,6 +7267,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-debian71
     compile_flags: --ssl MONGO_DISTMOD=debian71 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    multiversion_platform_arch: "debian71"
+    multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
@@ -7367,6 +7389,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-debian81
     compile_flags: --ssl MONGO_DISTMOD=debian81 -j$(grep -c ^processor /proc/cpuinfo) --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    multiversion_platform_arch: "debian81"
+    multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
@@ -7898,6 +7922,8 @@ buildvariants:
     variant_path_suffix: /usr/lib/llvm-3.8/bin
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions" ASAN_OPTIONS=detect_leaks=1
     compile_flags: CC=/usr/bin/clang-3.8 CXX=/usr/bin/clang++-3.8 CPPDEFINES="_GLIBCXX_USE_CXX11_ABI=0" --dbg=on --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip VARIANT_DIR=build
+    multiversion_platform_arch: "ubuntu1604"
+    multiversion_edition: "targeted"
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under ASAN build.
     build_mongoreplay: true
   tasks:
@@ -8069,6 +8095,8 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     san_options: UBSAN_OPTIONS="print_stacktrace=1"
     compile_flags: CC=/usr/bin/clang-3.8 CXX=/usr/bin/clang++-3.8 --dbg=on --opt=on --allocator=system --sanitize=undefined --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip CXXFLAGS="-nostdlib -nostdinc++" LIBPATH=/opt/mongodbtoolchain/v2/lib/gcc/x86_64-mongodb-linux/5.4.0 CPPPATH="/opt/mongodbtoolchain/v2/include/c++/5.4.0/ /opt/mongodbtoolchain/v2/include/c++/5.4.0/x86_64-mongodb-linux" CPPDEFINES="_GLIBCXX_USE_CXX11_ABI=0" VARIANT_DIR=build
+    multiversion_platform_arch: "ubuntu1604"
+    multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     build_mongoreplay: true
   tasks:
@@ -8229,6 +8257,8 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
     compile_flags: --allocator=system --dbg=on --opt=on --ssl -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on --cxx-std=14
+    multiversion_platform_arch: "rhel62"
+    multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
     build_mongoreplay: true
