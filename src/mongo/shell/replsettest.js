@@ -1114,13 +1114,7 @@ var ReplSetTest = function(opts) {
                     // secondaries.
                     var secondaryCollInfo = secondary.getDB(dbName).getCollectionInfos();
                     secondaryCollInfo.forEach(secondaryInfo => {
-                        // SERVER-26712 Temporarily avoid validating _id index version.
-                        if (secondaryCollInfo.hasOwnProperty('idIndex'))
-                            delete secondaryCollInfo.idIndex.v;
                         primaryCollInfo.forEach(primaryInfo => {
-                            // SERVER-26712 Temporarily avoid validating _id index version.
-                            if (primaryCollInfo.hasOwnProperty('idIndex'))
-                                delete primaryCollInfo.idIndex.v;
                             if (secondaryInfo.name === primaryInfo.name) {
                                 if (!bsonBinaryEqual(secondaryInfo, primaryInfo)) {
                                     print(msgPrefix +
