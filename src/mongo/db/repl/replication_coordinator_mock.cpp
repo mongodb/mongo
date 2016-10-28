@@ -381,11 +381,6 @@ bool ReplicationCoordinatorMock::shouldChangeSyncSource(const HostAndPort& curre
     invariant(false);
 }
 
-SyncSourceResolverResponse ReplicationCoordinatorMock::selectSyncSource(
-    OperationContext* txn, const OpTime& lastOpTimeFetched) {
-    return SyncSourceResolverResponse();
-}
-
 OpTime ReplicationCoordinatorMock::getLastCommittedOpTime() const {
     return OpTime();
 }

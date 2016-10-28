@@ -270,9 +270,6 @@ public:
     virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
                                         const rpc::ReplSetMetadata& metadata) override;
 
-    virtual SyncSourceResolverResponse selectSyncSource(OperationContext* txn,
-                                                        const OpTime& lastOpTimeFetched) override;
-
     virtual OpTime getLastCommittedOpTime() const override;
 
     virtual Status processReplSetRequestVotes(OperationContext* txn,

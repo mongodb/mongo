@@ -82,9 +82,6 @@ public:
     bool shouldChangeSyncSource(const HostAndPort&, const rpc::ReplSetMetadata&) {
         return false;
     }
-    SyncSourceResolverResponse selectSyncSource(OperationContext*, const OpTime&) {
-        return SyncSourceResolverResponse();
-    }
 
     HostAndPort syncSource = HostAndPort("host1", 1234);
     Timestamp lastTimestampFetched;

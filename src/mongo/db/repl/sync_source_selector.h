@@ -83,13 +83,6 @@ public:
      */
     virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
                                         const rpc::ReplSetMetadata& metadata) = 0;
-
-    /**
-     * Returns a SyncSourceResolverResponse containing the syncSource or a new MinValid boundry as
-     * described in SyncSourceResolverResponse.
-     */
-    virtual SyncSourceResolverResponse selectSyncSource(OperationContext* txn,
-                                                        const OpTime& lastOpTimeFetched) = 0;
 };
 
 }  // namespace repl

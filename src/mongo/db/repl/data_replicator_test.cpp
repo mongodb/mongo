@@ -96,10 +96,6 @@ public:
                                 const rpc::ReplSetMetadata& metadata) override {
         return false;
     }
-    SyncSourceResolverResponse selectSyncSource(OperationContext* txn,
-                                                const OpTime& lastOpTimeFetched) override {
-        return SyncSourceResolverResponse();
-    }
 
     HostAndPort _syncSource;
     HostAndPort _blacklistedSource;
@@ -137,10 +133,6 @@ public:
     bool shouldChangeSyncSource(const HostAndPort& currentSource,
                                 const rpc::ReplSetMetadata& metadata) override {
         return _syncSourceSelector->shouldChangeSyncSource(currentSource, metadata);
-    }
-    SyncSourceResolverResponse selectSyncSource(OperationContext* txn,
-                                                const OpTime& lastOpTimeFetched) override {
-        return SyncSourceResolverResponse();
     }
 
     void scheduleNetworkResponse(std::string cmdName, const BSONObj& obj) {
@@ -1564,10 +1556,7 @@ public:
                                 const rpc::ReplSetMetadata& metadata) override {
         return false;
     }
-    SyncSourceResolverResponse selectSyncSource(OperationContext* txn,
-                                                const OpTime& lastOpTimeFetched) override {
-        return SyncSourceResolverResponse();
-    }
+
     mutable stdx::mutex _mutex;
     stdx::condition_variable _condition;
     int _nextSourceNum{0};
@@ -1693,10 +1682,7 @@ public:
                                 const rpc::ReplSetMetadata& metadata) override {
         return false;
     }
-    SyncSourceResolverResponse selectSyncSource(OperationContext* txn,
-                                                const OpTime& lastOpTimeFetched) override {
-        return SyncSourceResolverResponse();
-    }
+
     executor::TaskExecutor* _exec;
 };
 
