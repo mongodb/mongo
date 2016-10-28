@@ -3863,6 +3863,7 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1604-arm64-small
+  - ubuntu1604-arm64-large
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
@@ -3938,6 +3939,7 @@ buildvariants:
   display_name: SSL Ubuntu 16.04 arm64
   run_on:
   - ubuntu1604-arm64-small
+  - ubuntu1604-arm64-large
   batchtime: 1440 # 1 day
   expansions:
     gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
