@@ -814,6 +814,11 @@ ExitCode _initAndListen(int listenPort) {
 
 #ifndef _WIN32
     mongo::signalForkSuccess();
+#else
+    if (ntservice::shouldStartService()) {
+        ntservice::reportStatus(SERVICE_RUNNING);
+        log() << "Service running";
+    }
 #endif
 
     return waitForShutdown();
@@ -841,8 +846,6 @@ ExitCode initAndListen(int listenPort) {
 
 #if defined(_WIN32)
 ExitCode initService() {
-    ntservice::reportStatus(SERVICE_RUNNING);
-    log() << "Service running";
     return initAndListen(serverGlobalParams.port);
 }
 #endif
