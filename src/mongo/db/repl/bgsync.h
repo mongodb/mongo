@@ -37,6 +37,7 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
@@ -192,6 +193,10 @@ private:
     bool _stopped = true;
 
     HostAndPort _syncSourceHost;
+
+    // Current sync source resolver validating sync source candidates.
+    // Owned by us.
+    std::unique_ptr<SyncSourceResolver> _syncSourceResolver;
 
     // Current oplog fetcher tailing the oplog on the sync source.
     // Owned by us.

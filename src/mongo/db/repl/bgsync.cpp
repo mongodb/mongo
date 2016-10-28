@@ -49,7 +49,6 @@
 #include "mongo/db/repl/rs_rollback.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/memory.h"
@@ -153,6 +152,10 @@ void BackgroundSync::shutdown(OperationContext* txn) {
     // waiting for an operation to be past the slaveDelay point.
     clearBuffer(txn);
     _stopped = true;
+
+    if (_syncSourceResolver) {
+        _syncSourceResolver->shutdown();
+    }
 
     if (_oplogFetcher) {
         _oplogFetcher->shutdown();
@@ -280,14 +283,35 @@ void BackgroundSync::_produce(OperationContext* txn) {
     // find a target to sync from the last optime fetched
     OpTime lastOpTimeFetched;
     HostAndPort source;
+    SyncSourceResolverResponse syncSourceResp;
+    SyncSourceResolver* syncSourceResolver;
     {
         stdx::unique_lock<stdx::mutex> lock(_mutex);
         lastOpTimeFetched = _lastOpTimeFetched;
         _syncSourceHost = HostAndPort();
+        _syncSourceResolver = stdx::make_unique<SyncSourceResolver>(
+            _replicationCoordinatorExternalState->getTaskExecutor(),
+            _replCoord,
+            lastOpTimeFetched,
+            [&syncSourceResp](const SyncSourceResolverResponse& resp) { syncSourceResp = resp; });
+        syncSourceResolver = _syncSourceResolver.get();
     }
-
-    SyncSourceResolverResponse syncSourceResp =
-        _replCoord->selectSyncSource(txn, lastOpTimeFetched);
+    // This may deadlock if called inside the mutex because SyncSourceResolver::startup() calls
+    // ReplicationCoordinator::chooseNewSyncSource(). ReplicationCoordinatorImpl's mutex has to
+    // acquired before BackgroundSync's.
+    // It is safe to call startup() outside the mutex on this instance of SyncSourceResolver because
+    // we do not destroy this instance outside of this function.
+    auto status = _syncSourceResolver->startup();
+    if (ErrorCodes::CallbackCanceled == status || ErrorCodes::isShutdownError(status.code())) {
+        return;
+    }
+    fassertStatusOK(40349, status);
+    syncSourceResolver->join();
+    syncSourceResolver = nullptr;
+    {
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        _syncSourceResolver.reset();
+    }
 
     if (syncSourceResp.syncSourceStatus == ErrorCodes::OplogStartMissing) {
         // All (accessible) sync sources were too stale.

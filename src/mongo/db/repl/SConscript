@@ -13,6 +13,7 @@ env.Library(
         'rollback_source_impl',
         'rs_rollback',
         'storage_interface',
+        'sync_source_resolver',
         '$BUILD_DIR/mongo/client/connection_pool',
         '$BUILD_DIR/mongo/client/fetcher',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
