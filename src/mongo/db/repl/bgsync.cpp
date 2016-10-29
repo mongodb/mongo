@@ -289,7 +289,8 @@ void BackgroundSync::_produce(OperationContext* txn) {
         _syncSourceHost = HostAndPort();
     }
     OplogReader syncSourceReader;
-    syncSourceReader.connectToSyncSource(txn, lastOpTimeFetched, _replCoord);
+    OpTime minValid;
+    syncSourceReader.connectToSyncSource(txn, lastOpTimeFetched, minValid, _replCoord);
 
     // no server found
     if (syncSourceReader.getHost().empty()) {
