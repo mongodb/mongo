@@ -125,8 +125,36 @@ HostAndPort OplogReader::getHost() const {
     return _host;
 }
 
+Status OplogReader::_compareRequiredOpTimeWithQueryResponse(const OpTime& requiredOpTime) {
+    auto containsMinValid = more();
+    if (!containsMinValid) {
+        return Status(
+            ErrorCodes::NoMatchingDocument,
+            "remote oplog does not contain entry with optime matching our required optime");
+    }
+    auto doc = nextSafe();
+    const auto opTime = fassertStatusOK(40351, OpTime::parseFromOplogEntry(doc));
+    if (requiredOpTime != opTime) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "remote oplog contain entry with matching timestamp "
+                                    << opTime.getTimestamp().toString()
+                                    << " but optime "
+                                    << opTime.toString()
+                                    << " does not "
+                                       "match our required optime");
+    }
+    if (requiredOpTime.getTerm() != opTime.getTerm()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "remote oplog contain entry with term " << opTime.getTerm()
+                                    << " that does not "
+                                       "match the term in our required optime");
+    }
+    return Status::OK();
+}
+
 void OplogReader::connectToSyncSource(OperationContext* txn,
                                       const OpTime& lastOpTimeFetched,
+                                      const OpTime& requiredOpTime,
                                       ReplicationCoordinator* replCoord) {
     const Timestamp sentinelTimestamp(duration_cast<Seconds>(Date_t::now().toDurationSinceEpoch()),
                                       0);
@@ -192,6 +220,29 @@ void OplogReader::connectToSyncSource(OperationContext* txn,
             continue;
         }
 
+        // Check if sync source contains required optime.
+        if (!requiredOpTime.isNull()) {
+            // This query is structured so that it is executed on the sync source using the oplog
+            // start hack (oplogReplay=true and $gt/$gte predicate over "ts").
+            auto ts = requiredOpTime.getTimestamp();
+            tailingQuery(rsOplogName.c_str(), BSON("ts" << BSON("$gte" << ts << "$lte" << ts)));
+            auto status = _compareRequiredOpTimeWithQueryResponse(requiredOpTime);
+            if (!status.isOK()) {
+                const auto blacklistDuration = Seconds(60);
+                const auto until = Date_t::now() + blacklistDuration;
+                warning() << "We cannot use " << candidate.toString()
+                          << " as a sync source because it does not contain the necessary "
+                             "operations for us to reach a consistent state: "
+                          << status << " last fetched optime: " << lastOpTimeFetched
+                          << ". required optime: " << requiredOpTime
+                          << ". Blacklisting this sync source for " << blacklistDuration
+                          << " until: " << until;
+                resetConnection();
+                replCoord->blacklistSyncSource(candidate, until);
+                continue;
+            }
+            resetCursor();
+        }
 
         // TODO: If we were too stale (recovering with maintenance mode on), then turn it off, to
         //       allow becoming secondary/etc.
