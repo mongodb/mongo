@@ -126,7 +126,7 @@ TEST(BSONValidate, MuckingData1) {
 
         char* data = const_cast<char*>(mine.objdata());
 
-        data[i] = 200;
+        data[i] = 0xc8U;
 
         numToRun++;
         if (mine.valid(BSONVersion::kLatest)) {

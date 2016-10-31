@@ -1906,6 +1906,12 @@ def doConfigure(myenv):
         # see: http://stackoverflow.com/questions/21755206/how-to-get-around-gcc-void-b-4-may-be-used-uninitialized-in-this-funct
         AddToCXXFLAGSIfSupported(myenv, "-Wno-maybe-uninitialized")
 
+        # Disable warning about templates that can't be implicitly instantiated. It is an attempt to
+        # make a link error into an easier-to-debug compiler failure, but it triggers false
+        # positives if explicit instantiation is used in a TU that can see the full definition. This
+        # is a problem at least for the S2 headers.
+        AddToCXXFLAGSIfSupported(myenv, "-Wno-undefined-var-template")
+
         # Check if we can set "-Wnon-virtual-dtor" when "-Werror" is set. The only time we can't set it is on
         # clang 3.4, where a class with virtual function(s) and a non-virtual destructor throws a warning when
         # it shouldn't.
