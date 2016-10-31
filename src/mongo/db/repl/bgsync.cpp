@@ -290,6 +290,12 @@ void BackgroundSync::_produce(OperationContext* txn) {
     }
     OplogReader syncSourceReader;
     OpTime minValid;
+    if (_replCoord->getMemberState().recovering()) {
+        auto minValidSaved = getMinValid(txn);
+        if (minValidSaved > lastOpTimeFetched) {
+            minValid = minValidSaved;
+        }
+    }
     syncSourceReader.connectToSyncSource(txn, lastOpTimeFetched, minValid, _replCoord);
 
     // no server found

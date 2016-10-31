@@ -6,7 +6,7 @@
  * -- Set minvalid manually on primary (node0) way ahead (5 minutes)
  * -- Restart primary (node0)
  * -- Ensure restarted primary (node0) comes up in recovering
- * -- Ensure node0 replicates a batch, and keeps the old minvalid
+ * -- Ensure node0 blacklists new primary as a sync source and keeps the old minvalid
  * -- Success!
  *
  * This test requires persistence to test that a restarted primary will stay in the RECOVERING state
@@ -63,12 +63,23 @@
                                         {upsert: true, writeConcern: {w: 1}})));
 
     jsTest.log("restart primary");
+    clearRawMongoProgramOutput();
     replTest.restart(master);
     printjson(sLocal.adminCommand("isMaster"));
     replTest.waitForState(master, ReplSetTest.State.RECOVERING, 90000);
 
-    // Slave is now master... so do a write to get a minvalid entry on the secondary.
-    assert.writeOK(replTest.getPrimary().getDB("test").foo.save({}, {writeConcern: {w: 3}}));
+    // Slave is now master... Do a write to advance the optime on the primary so that it will be
+    // considered as a sync source -  this is more relevant to PV0 because we do not write a new
+    // entry to the oplog on becoming primary.
+    assert.writeOK(
+        replTest.getPrimary().getDB("test").foo.save({}, {writeConcern: {w: 2, wtimeout: 90000}}));
+
+    // Sync source selection will log this message if it does not detect min valid in the sync
+    // source candidate's oplog.
+    assert.soon(function() {
+        return rawMongoProgramOutput().match(
+            'it does not contain the necessary operations for us to reach a consistent state');
+    });
 
     assert.soon(function() {
         var mv;
