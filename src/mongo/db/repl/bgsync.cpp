@@ -286,6 +286,12 @@ void BackgroundSync::_produce(OperationContext* txn) {
     SyncSourceResolverResponse syncSourceResp;
     SyncSourceResolver* syncSourceResolver;
     OpTime minValid;
+    if (_replCoord->getMemberState().recovering()) {
+        auto minValidSaved = StorageInterface::get(txn)->getMinValid(txn);
+        if (minValidSaved > lastOpTimeFetched) {
+            minValid = minValidSaved;
+        }
+    }
     {
         stdx::unique_lock<stdx::mutex> lock(_mutex);
         lastOpTimeFetched = _lastOpTimeFetched;
