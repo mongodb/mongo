@@ -84,6 +84,10 @@ MONGO_FP_DECLARE(initialSyncHangBeforeFinish);
 // operation.
 MONGO_FP_DECLARE(initialSyncHangBeforeGettingMissingDocument);
 
+// Failpoint which causes initial sync to hang when it has cloned 'numDocsToClone' documents to
+// collection 'namespace'. This failpoint also applies to 3.2 initial sync.
+MONGO_FP_DECLARE(initialSyncHangDuringCollectionClone);
+
 // Failpoint which stops the applier.
 MONGO_FP_DECLARE(rsSyncApplyStop);
 

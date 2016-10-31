@@ -56,6 +56,7 @@
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
@@ -73,6 +74,8 @@ using std::list;
 using std::string;
 
 const auto kInitialSyncMaxConnectRetries = 10;
+
+MONGO_EXPORT_SERVER_PARAMETER(num3Dot2InitialSyncAttempts, int, 10);
 
 /**
  * Truncates the oplog (removes any documents) and resets internal variables that were
@@ -456,7 +459,6 @@ Status _initialSync(OperationContext* txn, BackgroundSync* bgsync) {
 }
 
 stdx::mutex _initialSyncMutex;
-const auto kMaxFailedAttempts = 10;
 const auto kInitialSyncRetrySleepDuration = Seconds{5};
 }  // namespace
 
@@ -538,7 +540,7 @@ void syncDoInitialSync(OperationContext* txn,
     });
 
     int failedAttempts = 0;
-    while (failedAttempts < kMaxFailedAttempts) {
+    while (failedAttempts < num3Dot2InitialSyncAttempts) {
         try {
             // leave loop when successful
             Status status = _initialSync(txn, bgsync.get());
@@ -559,13 +561,13 @@ void syncDoInitialSync(OperationContext* txn,
             return;
         }
 
-        error() << "initial sync attempt failed, " << (kMaxFailedAttempts - ++failedAttempts)
-                << " attempts remaining";
+        error() << "initial sync attempt failed, "
+                << (num3Dot2InitialSyncAttempts - ++failedAttempts) << " attempts remaining";
         sleepmillis(durationCount<Milliseconds>(kInitialSyncRetrySleepDuration));
     }
 
     // No need to print a stack
-    if (failedAttempts >= kMaxFailedAttempts) {
+    if (failedAttempts >= num3Dot2InitialSyncAttempts) {
         severe() << "The maximum number of retries have been exhausted for initial sync.";
         fassertFailedNoTrace(16233);
     }
