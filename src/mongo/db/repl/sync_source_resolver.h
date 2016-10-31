@@ -96,6 +96,7 @@ public:
     static const Seconds kFirstOplogEntryEmptyBlacklistDuration;
     static const Seconds kFirstOplogEntryNullTimestampBlacklistDuration;
     static const Minutes kTooStaleBlacklistDuration;
+    static const Seconds kNoRequiredOpTimeBlacklistDuration;
 
     /**
      * Callback function to report final status of resolving sync source.
@@ -105,6 +106,7 @@ public:
     SyncSourceResolver(executor::TaskExecutor* taskExecutor,
                        SyncSourceSelector* syncSourceSelector,
                        const OpTime& lastOpTimeFetched,
+                       const OpTime& requiredOpTime,
                        const OnCompletionFn& onCompletion);
     virtual ~SyncSourceResolver();
 
@@ -144,6 +146,12 @@ private:
                                                          OpTime earliestOpTimeSeen);
 
     /**
+     * Creates fetcher to check the remote oplog for '_requiredOpTime'.
+     */
+    std::unique_ptr<Fetcher> _makeRequiredOpTimeFetcher(HostAndPort candidate,
+                                                        OpTime earliestOpTimeSeen);
+
+    /**
      * Schedules fetcher to read oplog on sync source.
      * Saves fetcher in '_fetcher' on success.
      */
@@ -164,6 +172,18 @@ private:
                                          OpTime earliestOpTimeSeen);
 
     /**
+     * Checks query response for required optime.
+     */
+    Status _compareRequiredOpTimeWithQueryResponse(const Fetcher::QueryResponse& queryResponse);
+
+    /**
+     * Callback for checking if the remote oplog contains '_requiredOpTime'.
+     */
+    void _requiredOpTimeFetcherCallback(const StatusWith<Fetcher::QueryResponse>& queryResult,
+                                        HostAndPort candidate,
+                                        OpTime earliestOpTimeSeen);
+
+    /**
      * Obtains new sync source candidate and schedules remote command to fetcher first oplog entry.
      * May transition state to Complete.
      * Returns status that could be used as result for startup().
@@ -177,14 +197,34 @@ private:
     Status _finishCallback(StatusWith<HostAndPort> result);
     Status _finishCallback(const SyncSourceResolverResponse& response);
 
+    // Executor used to send remote commands to sync source candidates.
     executor::TaskExecutor* const _taskExecutor;
+
+    // Sync source selector used to obtain sync source candidates and for us to blacklist non-viable
+    // candidates.
     SyncSourceSelector* const _syncSourceSelector;
+
+    // A viable sync source must contain a starting oplog entry with a timestamp equal or earlier
+    // than the timestamp in '_lastOpTimeFetched'.
     const OpTime _lastOpTimeFetched;
+
+    // If '_requiredOpTime' is not null, a viable sync source must contain an oplog entry with an
+    // optime equal to this value.
+    const OpTime _requiredOpTime;
+
+    // This is invoked exactly once after startup. The caller gets the results of the sync source
+    // resolver via this callback in a SyncSourceResolverResponse struct when the resolver finishes.
     const OnCompletionFn _onCompletion;
 
     // Protects members of this sync source resolver.
     mutable stdx::mutex _mutex;
     mutable stdx::condition_variable _condition;
+
+    // State transitions:
+    // PreStart --> Running --> ShuttingDown --> Complete
+    // It is possible to skip intermediate states. For example,
+    // Calling shutdown() when the resolver has not started will transition from PreStart directly
+    // to Complete.
     enum class State { kPreStart, kRunning, kShuttingDown, kComplete };
     State _state = State::kPreStart;
 

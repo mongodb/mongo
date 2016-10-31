@@ -285,6 +285,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
     HostAndPort source;
     SyncSourceResolverResponse syncSourceResp;
     SyncSourceResolver* syncSourceResolver;
+    OpTime minValid;
     {
         stdx::unique_lock<stdx::mutex> lock(_mutex);
         lastOpTimeFetched = _lastOpTimeFetched;
@@ -293,6 +294,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
             _replicationCoordinatorExternalState->getTaskExecutor(),
             _replCoord,
             lastOpTimeFetched,
+            minValid,
             [&syncSourceResp](const SyncSourceResolverResponse& resp) { syncSourceResp = resp; });
         syncSourceResolver = _syncSourceResolver.get();
     }
