@@ -594,11 +594,10 @@ BSONObj DBClientReplicaSet::findOne(const string& ns,
                 return conn->findOne(ns, query, fieldsToReturn, queryOptions);
             } catch (const DBException& ex) {
                 const Status status = ex.toStatus();
-                _invalidateLastSlaveOkCache({status.code(),
-                                             str::stream() << "can't findone replica set node "
-                                                           << _lastSlaveOkHost.toString()
-                                                           << ": "
-                                                           << status.reason()});
+                lastNodeErrMsg = str::stream() << "can't findone replica set node "
+                                               << _lastSlaveOkHost.toString() << ": "
+                                               << status.reason();
+                _invalidateLastSlaveOkCache({status.code(), lastNodeErrMsg});
             }
         }
 
@@ -779,13 +778,13 @@ void DBClientReplicaSet::say(Message& toSend, bool isRetry, string* actualServer
                     _lazyState._lastOp = lastOp;
                     _lazyState._secondaryQueryOk = true;
                     _lazyState._lastClient = conn;
-                } catch (const DBException& e) {
-                    const Status status = e.toStatus();
-                    _invalidateLastSlaveOkCache({status.code(),
-                                                 str::stream() << "can't callLazy replica set node "
-                                                               << _lastSlaveOkHost.toString()
-                                                               << ": "
-                                                               << status.reason()});
+                } catch (const DBException& ex) {
+                    const Status status = ex.toStatus();
+                    lastNodeErrMsg = str::stream() << "can't callLazy replica set node "
+                                                   << _lastSlaveOkHost.toString() << ": "
+                                                   << status.reason();
+                    _invalidateLastSlaveOkCache({status.code(), lastNodeErrMsg});
+
                     continue;
                 }
 

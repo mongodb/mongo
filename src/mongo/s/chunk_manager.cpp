@@ -230,12 +230,9 @@ void ChunkManager::loadExistingRanges(OperationContext* txn, const ChunkManager*
 
                 log() << "ChunkManager load took " << t.millis() << " ms and found version "
                       << _version;
-            } else {
-                warning() << "ChunkManager load took " << t.millis()
-                          << " ms and found invalid chunk ranges at version " << _version;
-            }
 
-            return;
+                return;
+            }
         }
 
         warning() << "ChunkManager load failed after " << t.millis()
