@@ -185,13 +185,11 @@ void ChunkManager::loadExistingRanges(OperationContext* txn, const ChunkManager*
 
         Timer t;
 
+        log() << "ChunkManager loading chunks for " << _ns << " sequenceNumber: " << _sequenceNumber
+              << " based on: " << (oldManager ? oldManager->getVersion().toString() : "(empty)");
+
         bool success = _load(txn, chunkMap, shardIds, &shardVersions, oldManager);
         if (success) {
-            log() << "ChunkManager: time to load chunks for " << _ns << ": " << t.millis() << "ms"
-                  << " sequenceNumber: " << _sequenceNumber << " version: " << _version.toString()
-                  << " based on: "
-                  << (oldManager ? oldManager->getVersion().toString() : "(empty)");
-
             // TODO: Merge into diff code above, so we validate in one place
             if (isChunkMapValid(chunkMap)) {
                 _chunkMap.swap(chunkMap);
@@ -199,15 +197,15 @@ void ChunkManager::loadExistingRanges(OperationContext* txn, const ChunkManager*
                 _shardVersions.swap(shardVersions);
                 _chunkRanges.reloadAll(_chunkMap);
 
+                log() << "ChunkManager load took " << t.millis() << " ms and found version "
+                      << _version;
+
                 return;
             }
         }
 
-        if (_chunkMap.size() < 10) {
-            _printChunks();
-        }
-
-        warning() << "ChunkManager loaded an invalid config for " << _ns << ", trying again";
+        warning() << "ChunkManager load failed after " << t.millis()
+                  << " ms and will be retried up to " << tries << " more times";
 
         sleepmillis(10 * (3 - tries));
     }

@@ -644,7 +644,6 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
     shared_ptr<CollectionMetadata> remoteMetadata(std::make_shared<CollectionMetadata>());
 
     Timer refreshTimer;
-    long long refreshMillis;
 
     {
         Status status = mdLoader.makeCollectionMetadata(txn,
@@ -653,7 +652,6 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
                                                         getShardName(),
                                                         fullReload ? NULL : beforeMetadata.get(),
                                                         remoteMetadata.get());
-        refreshMillis = refreshTimer.millis();
 
         if (status.code() == ErrorCodes::NamespaceNotFound) {
             remoteMetadata.reset();
@@ -794,8 +792,8 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
             << "need to retry loading metadata for " << ns
             << ", collection may have been dropped or recreated during load"
             << " (loaded shard version : " << remoteShardVersion.toString()
-            << ", stored shard versions : " << localShardVersionMsg << ", took " << refreshMillis
-            << "ms)";
+            << ", stored shard versions : " << localShardVersionMsg << ", took "
+            << refreshTimer.millis() << " ms)";
 
         warning() << errMsg;
         return Status(ErrorCodes::RemoteChangeDetected, errMsg);
@@ -804,7 +802,7 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
     if (choice == VersionChoice::Local) {
         LOG(0) << "metadata of collection " << ns
                << " already up to date (shard version : " << afterShardVersion.toString()
-               << ", took " << refreshMillis << "ms)";
+               << ", took " << refreshTimer.millis() << " ms)";
         return Status::OK();
     }
 
@@ -813,20 +811,22 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
     switch (installType) {
         case InstallType_New:
             LOG(0) << "collection " << ns << " was previously unsharded"
-                   << ", new metadata loaded with shard version " << remoteShardVersion;
+                   << ", new metadata loaded with shard version " << remoteShardVersion << ", took "
+                   << refreshTimer.millis() << " ms";
             break;
         case InstallType_Update:
             LOG(0) << "updating metadata for " << ns << " from shard version "
-                   << localShardVersionMsg << " to shard version " << remoteShardVersion;
+                   << localShardVersionMsg << " to shard version " << remoteShardVersion
+                   << ", took " << refreshTimer.millis() << " ms";
             break;
         case InstallType_Replace:
             LOG(0) << "replacing metadata for " << ns << " at shard version "
                    << localShardVersionMsg << " with a new epoch (shard version "
-                   << remoteShardVersion << ")";
+                   << remoteShardVersion << "), took " << refreshTimer.millis() << " ms";
             break;
         case InstallType_Drop:
             LOG(0) << "dropping metadata for " << ns << " at shard version " << localShardVersionMsg
-                   << ", took " << refreshMillis << "ms";
+                   << ", took " << refreshTimer.millis() << " ms";
             break;
         default:
             verify(false);
@@ -835,7 +835,7 @@ Status ShardingState::_refreshMetadata(OperationContext* txn,
 
     if (installType != InstallType_Drop) {
         LOG(0) << "collection version was loaded at version " << remoteCollVersion << ", took "
-               << refreshMillis << "ms";
+               << refreshTimer.millis() << " ms";
     }
 
     return Status::OK();
