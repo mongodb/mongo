@@ -46,3 +46,16 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/unittest/unittest',
     ],
 )
+
+env.CppUnitTest(
+    target='resolved_view_test',
+    source=[
+        'resolved_view_test.cpp',
+    ],
+    LIBDEPS=[
+        'views',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/unittest/unittest',
+    ],
+)
