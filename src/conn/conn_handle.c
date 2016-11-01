@@ -48,7 +48,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_conn_config_init(session));
 
 	/* Statistics. */
-	__wt_stat_connection_init(conn);
+	WT_RET(__wt_stat_connection_init(session, conn));
 
 	/* Spinlocks. */
 	WT_RET(__wt_spin_init(session, &conn->api_lock, "api"));
@@ -161,6 +161,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_free(session, conn->home);
 	__wt_free(session, conn->error_prefix);
 	__wt_free(session, conn->sessions);
+	__wt_stat_connection_discard(session, conn);
 
 	__wt_free(NULL, conn);
 	return (ret);

@@ -138,15 +138,27 @@ __wt_stat_dsrc_init_single(WT_DSRC_STATS *stats)
 	memset(stats, 0, sizeof(*stats));
 }
 
-void
-__wt_stat_dsrc_init(WT_DATA_HANDLE *handle)
+int
+__wt_stat_dsrc_init(
+    WT_SESSION_IMPL *session, WT_DATA_HANDLE *handle)
 {
 	int i;
+
+	WT_RET(__wt_calloc(session, (size_t)WT_COUNTER_SLOTS,
+	    sizeof(*handle->stat_array), &handle->stat_array));
 
 	for (i = 0; i < WT_COUNTER_SLOTS; ++i) {
 		handle->stats[i] = &handle->stat_array[i];
 		__wt_stat_dsrc_init_single(handle->stats[i]);
 	}
+	return (0);
+}
+
+void
+__wt_stat_dsrc_discard(
+    WT_SESSION_IMPL *session, WT_DATA_HANDLE *handle)
+{
+	__wt_free(session, handle->stat_array);
 }
 
 void
@@ -860,15 +872,27 @@ __wt_stat_connection_init_single(WT_CONNECTION_STATS *stats)
 	memset(stats, 0, sizeof(*stats));
 }
 
-void
-__wt_stat_connection_init(WT_CONNECTION_IMPL *handle)
+int
+__wt_stat_connection_init(
+    WT_SESSION_IMPL *session, WT_CONNECTION_IMPL *handle)
 {
 	int i;
+
+	WT_RET(__wt_calloc(session, (size_t)WT_COUNTER_SLOTS,
+	    sizeof(*handle->stat_array), &handle->stat_array));
 
 	for (i = 0; i < WT_COUNTER_SLOTS; ++i) {
 		handle->stats[i] = &handle->stat_array[i];
 		__wt_stat_connection_init_single(handle->stats[i]);
 	}
+	return (0);
+}
+
+void
+__wt_stat_connection_discard(
+    WT_SESSION_IMPL *session, WT_CONNECTION_IMPL *handle)
+{
+	__wt_free(session, handle->stat_array);
 }
 
 void

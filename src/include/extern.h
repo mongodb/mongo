@@ -697,14 +697,16 @@ extern void *__wt_ext_scr_alloc( WT_EXTENSION_API *wt_api, WT_SESSION *wt_sessio
 extern void __wt_ext_scr_free(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, void *p);
 extern int __wt_stat_dsrc_desc(WT_CURSOR_STAT *cst, int slot, const char **p) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_stat_dsrc_init_single(WT_DSRC_STATS *stats);
-extern void __wt_stat_dsrc_init(WT_DATA_HANDLE *handle);
+extern int __wt_stat_dsrc_init( WT_SESSION_IMPL *session, WT_DATA_HANDLE *handle) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern void __wt_stat_dsrc_discard( WT_SESSION_IMPL *session, WT_DATA_HANDLE *handle);
 extern void __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats);
 extern void __wt_stat_dsrc_clear_all(WT_DSRC_STATS **stats);
 extern void __wt_stat_dsrc_aggregate_single( WT_DSRC_STATS *from, WT_DSRC_STATS *to);
 extern void __wt_stat_dsrc_aggregate( WT_DSRC_STATS **from, WT_DSRC_STATS *to);
 extern int __wt_stat_connection_desc(WT_CURSOR_STAT *cst, int slot, const char **p) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_stat_connection_init_single(WT_CONNECTION_STATS *stats);
-extern void __wt_stat_connection_init(WT_CONNECTION_IMPL *handle);
+extern int __wt_stat_connection_init( WT_SESSION_IMPL *session, WT_CONNECTION_IMPL *handle) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern void __wt_stat_connection_discard( WT_SESSION_IMPL *session, WT_CONNECTION_IMPL *handle);
 extern void __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats);
 extern void __wt_stat_connection_clear_all(WT_CONNECTION_STATS **stats);
 extern void __wt_stat_connection_aggregate( WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *to);
