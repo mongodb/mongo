@@ -227,6 +227,11 @@ public:
 
     DBClientBase* get(const std::string& host, double socketTimeout = 0);
     DBClientBase* get(const ConnectionString& host, double socketTimeout = 0);
+
+    /**
+     * Gets the number of connections available in the pool.
+     */
+    int getNumAvailableConns(const std::string& host, double socketTimeout = 0) const;
     int getNumBadConns(const std::string& host, double socketTimeout = 0) const;
 
     void release(const std::string& host, DBClientBase* c);

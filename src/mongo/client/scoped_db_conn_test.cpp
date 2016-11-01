@@ -272,40 +272,59 @@ protected:
      */
     void checkNewConns(void (*checkFunc)(uint64_t, uint64_t),
                        uint64_t arg2,
-                       size_t newConnsToCreate) {
+                       const int newConnsToCreate) {
         vector<ScopedDbConnection*> newConnList;
 
-        for (size_t x = 0; x < newConnsToCreate; x++) {
+        for (int x = 0; x < newConnsToCreate; x++) {
             ScopedDbConnection* newConn = new ScopedDbConnection(TARGET_HOST);
             checkFunc(newConn->get()->getSockCreationMicroSec(), arg2);
             newConnList.push_back(newConn);
         }
 
         std::set<long long> connIds;
+        int prevNumBadConns = globalConnPool.getNumBadConns(TARGET_HOST);
         for (vector<ScopedDbConnection*>::iterator iter = newConnList.begin();
              iter != newConnList.end();
              ++iter) {
 
             connIds.insert((*iter)->get()->getConnectionId());
 
+            // ScopedDbConnection::done() may not successfuly add the connection back to
+            // the pool if the connection has failed. If the connection is not addded back
+            // to the pool, we increment the number of bad connections in the pool by one
+            // (see PoolForHost::done()). We then use the number of bad connections to
+            // verify the number of connections successfully added back to the pool.
             (*iter)->done();
             delete *iter;
         }
+        int numBadConns = globalConnPool.getNumBadConns(TARGET_HOST) - prevNumBadConns;
+        const int numConnsInPool = globalConnPool.getNumAvailableConns(TARGET_HOST);
+        ASSERT_EQ(numConnsInPool, newConnsToCreate - numBadConns);
 
         newConnList.clear();
 
         // Check that connections created after the purge were put back to the pool.
-        int notReusedConns = 0;
-        int prevNumBadConns = globalConnPool.getNumBadConns(TARGET_HOST);
-        for (size_t x = 0; x < newConnsToCreate; x++) {
+        int numReusedConns = 0;
+        prevNumBadConns = globalConnPool.getNumBadConns(TARGET_HOST);
+        for (int x = 0; x < newConnsToCreate; x++) {
+            // ScopedDBConnection will attempt to reuse a connection from the pool if
+            // the pool is not empty. It may fail to reuse that connection if that
+            // connection has gone bad, in that case, it'll try to get another connection
+            // from the pool and increment the number of bad connections in the pool
+            // If the pool is empty however, it'll create a new connection.
+            // See PoolForHost::get() and DBConnectionPool::get().
             ScopedDbConnection* newConn = new ScopedDbConnection(TARGET_HOST);
-
-            if (connIds.count(newConn->get()->getConnectionId()) == 0) {
-                notReusedConns++;
-            }
-            ASSERT_EQ(notReusedConns, globalConnPool.getNumBadConns(TARGET_HOST) - prevNumBadConns);
             newConnList.push_back(newConn);
+            if (connIds.count(newConn->get()->getConnectionId())) {
+                numReusedConns++;
+            }
         }
+        numBadConns = globalConnPool.getNumBadConns(TARGET_HOST) - prevNumBadConns;
+        // Each bad connection is not a reused connection. Therefore the number of reused
+        // connections plus the number of bad ones should be equal to the number of connections
+        // that were in the pool.
+        ASSERT_EQ(numConnsInPool, numReusedConns + numBadConns);
+        ASSERT_EQ(globalConnPool.getNumAvailableConns(TARGET_HOST), 0);
 
         for (vector<ScopedDbConnection*>::iterator iter = newConnList.begin();
              iter != newConnList.end();

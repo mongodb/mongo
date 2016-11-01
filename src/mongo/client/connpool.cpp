@@ -76,13 +76,16 @@ void PoolForHost::done(DBConnectionPool* pool, DBClientBase* c) {
 
     // Remember that this host had a broken connection for later
     if (isFailed) {
-        _badConns++;
         reportBadConnectionAt(c->getSockCreationMicroSec());
     }
 
-    if (isFailed ||
-        // Another (later) connection was reported as broken to this host
-        (c->getSockCreationMicroSec() < _minValidCreationTimeMicroSec) ||
+    // Another (later) connection was reported as broken to this host
+    bool isBroken = c->getSockCreationMicroSec() < _minValidCreationTimeMicroSec;
+    if (isFailed || isBroken) {
+        _badConns++;
+    }
+
+    if (isFailed || isBroken ||
         // We have a pool size that we need to enforce
         (_maxPoolSize >= 0 && static_cast<int>(_pool.size()) >= _maxPoolSize)) {
         pool->onDestroy(c);
@@ -264,6 +267,12 @@ DBClientBase* DBConnectionPool::get(const string& host, double socketTimeout) {
                               11002,
                               str::stream() << _name << " error: " << errmsg);
     return _finishCreate(host, socketTimeout, c);
+}
+
+int DBConnectionPool::getNumAvailableConns(const string& host, double socketTimeout) const {
+    stdx::lock_guard<stdx::mutex> L(_mutex);
+    auto it = _pools.find(PoolKey(host, socketTimeout));
+    return (it == _pools.end()) ? 0 : it->second.numAvailable();
 }
 
 int DBConnectionPool::getNumBadConns(const string& host, double socketTimeout) const {
