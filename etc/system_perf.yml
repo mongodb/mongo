@@ -5,6 +5,32 @@ pre:
     - command: shell.track
 
 post:
+    - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+          source ./dsienv.sh
+          $DSI_PATH/bin/make_artifact.sh
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: work/reports.tgz
+        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/${task_name}-${build_id}.${ext|tgz}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: test-log
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: work/reports/graphs/timeseries-p1.html
+        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-p1-${task_name}-${build_id}.html
+        bucket: mciuploads
+        permissions: public-read
+        content_type: text/html
+        display_name: timeseries-p1.html
     - command: attach.results
       params:
         file_location: work/report.json
@@ -194,47 +220,8 @@ functions:
       params:
         working_dir: work
         script: |
-          set -e
-          set -o verbose
           source ./dsienv.sh
-          cd reports
-          # move additional file here
-          cp ../infrastructure_provisioning.out.yml .
-          if [ -f "../terraform.log" ]; then cp ../terraform.log .; fi
-          cp ../perf.json .
-          cd ..
-          mkdir -p ./reports/graphs
-          touch ./reports/graphs/timeseries-p1.html
-          $DSI_PATH/bin/retrieve-diag-data.sh
-          $DSI_PATH/bin/generate-timeseries-html.sh || true
-    - command: archive.targz_pack
-      params:
-        target: "reports.tgz"
-        source_dir: work
-        include:
-          - "reports/**"
-
-  "upload log file":
-    - command: s3.put
-      params:
-            aws_key: ${aws_key}
-            aws_secret: ${aws_secret}
-            local_file: reports.tgz
-            remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/${test}-${build_id}.${ext|tgz}
-            bucket: mciuploads
-            permissions: public-read
-            content_type: ${content_type|application/x-gzip}
-            display_name: ${test}-test-log
-    - command: s3.put
-      params:
-            aws_key: ${aws_key}
-            aws_secret: ${aws_secret}
-            local_file: work/reports/graphs/timeseries-p1.html
-            remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-p1-${test}-${build_id}.html
-            bucket: mciuploads
-            permissions: public-read
-            content_type: text/html
-            display_name: timeseries-p1.html
+          $DSI_PATH/bin/make_artifact.sh
 
   "analyze":
     - command: json.get_history
@@ -393,9 +380,6 @@ tasks:
         test: "ycsb"
         testList: "default"
     - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "ycsb"
     - func: "analyze"
       vars:
         script_flags: --ycsb-throughput-analysis reports
@@ -416,9 +400,6 @@ tasks:
         test: "ycsb"
         testList: "default"
     - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "ycsb"
     - func: "analyze"
       vars:
         script_flags: --ycsb-throughput-analysis reports
@@ -439,9 +420,6 @@ tasks:
         test: "benchRun"
         testList: "default"
     - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "core_workloads_WT"
     - func: "analyze"
 
 - name: core_workloads_MMAPv1
@@ -460,9 +438,6 @@ tasks:
         test: "benchRun"
         testList: "default"
     - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "core_workloads_MMAPv1"
     - func: "analyze"
 
 - name: industry_benchmarks_WT_oplog_comp
@@ -545,9 +520,6 @@ tasks:
         test: "initialSync"
         testList: "default"
     - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "initialsync_WT"
     - func: "analyze"
 
 - name: initialsync_MMAPv1
@@ -566,9 +538,6 @@ tasks:
         test: "initialSync"
         testList: "default"
     - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "initialsync_MMAPv1"
     - func: "analyze"
 
 - name: initialsync_WT_dr
@@ -588,9 +557,6 @@ tasks:
         test: "initialSync"
         testList: "default"
     - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "initialsync_WT"
     - func: "analyze"
 
 - name: initialsync_MMAPv1_dr
@@ -610,9 +576,6 @@ tasks:
         test: "initialSync"
         testList: "default"
     - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "initialsync_MMAPv1"
     - func: "analyze"
 
 

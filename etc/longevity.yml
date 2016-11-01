@@ -5,6 +5,33 @@ pre:
     - command: shell.track
 
 post:
+    - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+          set -v
+          source ./dsienv.sh
+          $DSI_PATH/bin/make_artifact.sh
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: work/reports.tgz
+        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/${task_name}-${build_id}.${ext|tgz}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: test-log
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: work/reports/graphs/timeseries-p1.html
+        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-p1-${task_name}-${build_id}.html
+        bucket: mciuploads
+        permissions: public-read
+        content_type: text/html
+        display_name: timeseries-p1.html
     - command: attach.results
       params:
         file_location: work/report.json
@@ -18,6 +45,8 @@ post:
           # call terraform destroy twice to avoid AWS timeout
           yes yes | ./terraform destroy
           yes yes | ./terraform destroy
+          # clean all file to be safe
+          rm -rf *
           echo "Cluster DESTROYED."
     - command: shell.exec
       params:
@@ -144,8 +173,6 @@ functions:
           # destroy the EC2 cluster
           yes yes | ./terraform destroy
           yes yes | ./terraform destroy
-          # clean all file to be safe
-          rm -rf *
           echo "Cluster DESTROYED."
           echo "All perf results"
           cd ..
@@ -156,48 +183,9 @@ functions:
       params:
         working_dir: work
         script: |
-          set -e
-          set -o verbose
+          set -v
           source ./dsienv.sh
-          # move additional file here
-          cd reports
-          cp ../infrastructure_provisioning.out.yml .
-          if [ -f "../terraform.log" ]; then cp ../terraform.log .; fi
-          cp ../perf.json .
-          cd ..
-          mkdir -p ./reports/graphs
-          touch ./reports/graphs/timeseries-p1.html
-          $DSI_PATH/bin/retrieve-diag-data.sh
-          $DSI_PATH/bin/generate-timeseries-html.sh || true
-
-    - command: archive.targz_pack
-      params:
-        target: "reports.tgz"
-        source_dir: "work"
-        include:
-          - "reports/**"
-
-  "upload log file":
-    - command: s3.put
-      params:
-            aws_key: ${aws_key}
-            aws_secret: ${aws_secret}
-            local_file: reports.tgz
-            remote_file: longevity/${build_variant}/${revision}/logs/${test}-${build_id}.${ext|tgz}
-            bucket: mciuploads
-            permissions: public-read
-            content_type: ${content_type|application/x-gzip}
-            display_name: ${test}-longevity-testlog
-    - command: s3.put
-      params:
-            aws_key: ${aws_key}
-            aws_secret: ${aws_secret}
-            local_file: work/reports/graphs/timeseries-p1.html
-            remote_file: dsi/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-p1-${test}-${build_id}.html
-            bucket: mciuploads
-            permissions: public-read
-            content_type: text/html
-            display_name: timeseries-p1.html
+          $DSI_PATH/bin/make_artifact.sh
 
   "analyze":
     - command: json.get_history
@@ -296,9 +284,6 @@ tasks:
         storageEngine: "wiredTiger"
         test: "ycsb"
     - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "ycsb"
     - func: "analyze"
       vars:
         script_flags: --ycsb-throughput-analysis reports
@@ -317,9 +302,6 @@ tasks:
         storageEngine: "mmapv1"
         test: "ycsb"
     - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "ycsb"
     - func: "analyze"
       vars:
         script_flags: --ycsb-throughput-analysis reports
@@ -358,6 +340,7 @@ buildvariants:
     numShard: 3
     storageEngine: wiredTiger
     use_scons_cache: true
+    project: &project longevity
   run_on:
     - "rhel70-perf-longevity"
   tasks:
@@ -377,6 +360,7 @@ buildvariants:
     numShard: 3
     storageEngine: mmapv1
     use_scons_cache: true
+    project: *project
   run_on:
     - "rhel70-perf-longevity"
   tasks:
