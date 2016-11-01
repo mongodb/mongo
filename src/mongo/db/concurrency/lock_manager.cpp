@@ -781,8 +781,8 @@ void LockManager::_onLockModeChanged(LockHead* lock, bool checkConflictQueue) {
 
         iter->notify->notify(lock->resourceId, LOCK_OK);
 
-        // Small optimization - nothing is compatible with MODE_X, so no point in looking
-        // further in the conflict queue.
+        // Small optimization - nothing is compatible with a newly granted MODE_X, so no point in
+        // looking further in the conflict queue. Conflicting MODE_X requests are skipped above.
         if (iter->mode == MODE_X) {
             break;
         }
