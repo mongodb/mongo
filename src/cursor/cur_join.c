@@ -38,8 +38,8 @@ __wt_curjoin_joined(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cursor->session;
-	__wt_errx(session, "cursor is being used in a join");
-	return (ENOTSUP);
+
+	WT_RET_MSG(session, ENOTSUP, "cursor is being used in a join");
 }
 
 /*
@@ -1304,11 +1304,15 @@ __wt_curjoin_open(WT_SESSION_IMPL *session,
 
 	WT_STATIC_ASSERT(offsetof(WT_CURSOR_JOIN, iface) == 0);
 
+	if (owner != NULL)
+		WT_RET_MSG(session, EINVAL,
+		    "unable to initialize a join cursor with existing owner");
+
 	if (!WT_PREFIX_SKIP(uri, "join:"))
-		return (EINVAL);
+		return (__wt_unexpected_object_type(session, uri, "join:"));
 	tablename = uri;
 	if (!WT_PREFIX_SKIP(tablename, "table:"))
-		return (EINVAL);
+		return (__wt_unexpected_object_type(session, uri, "table:"));
 
 	columns = strchr(tablename, '(');
 	if (columns == NULL)
@@ -1335,9 +1339,6 @@ __wt_curjoin_open(WT_SESSION_IMPL *session,
 		    session, tmp->data, tmp->size, &cursor->value_format));
 		WT_ERR(__wt_strdup(session, columns, &cjoin->projection));
 	}
-
-	if (owner != NULL)
-		WT_ERR(EINVAL);
 
 	WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
 

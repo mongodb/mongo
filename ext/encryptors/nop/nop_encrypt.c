@@ -38,12 +38,28 @@
 typedef struct {
 	WT_ENCRYPTOR encryptor;		/* Must come first */
 
-	WT_EXTENSION_API *wt_api;		/* Extension API */
+	WT_EXTENSION_API *wtext;	/* Extension API */
 
-	unsigned long nop_calls;		/* Count of calls */
+	unsigned long nop_calls;	/* Count of calls */
 
 } NOP_ENCRYPTOR;
 /*! [WT_ENCRYPTOR initialization structure] */
+
+/*
+ * nop_error --
+ *	Display an error from this module in a standard way.
+ */
+static int
+nop_error(
+    NOP_ENCRYPTOR *encryptor, WT_SESSION *session, int err, const char *msg)
+{
+	WT_EXTENSION_API *wtext;
+
+	wtext = encryptor->wtext;
+	(void)wtext->err_printf(wtext, session,
+	    "nop encryption: %s: %s", msg, wtext->strerror(wtext, NULL, err));
+	return (err);
+}
 
 /*! [WT_ENCRYPTOR encrypt] */
 /*
@@ -63,7 +79,8 @@ nop_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	++nop_encryptor->nop_calls;		/* Call count */
 
 	if (dst_len < src_len)
-		return (ENOMEM);
+		return (nop_error(nop_encryptor, session,
+		    ENOMEM, "encrypt buffer not big enough"));
 
 	memcpy(dst, src, src_len);
 	*result_lenp = src_len;
@@ -169,7 +186,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	nop_encryptor->encryptor.sizing = nop_sizing;
 	nop_encryptor->encryptor.terminate = nop_terminate;
 
-	nop_encryptor->wt_api = connection->get_extension_api(connection);
+	nop_encryptor->wtext = connection->get_extension_api(connection);
 
 						/* Load the encryptor */
 	return (connection->add_encryptor(

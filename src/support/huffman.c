@@ -823,7 +823,8 @@ __wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg,
 		 * where that's not true.
 		 */
 		if (from_len_bits < len)	/* corrupted */
-			WT_ERR(EINVAL);
+			WT_ERR_MSG(session, EINVAL,
+			    "huffman decompression detected input corruption");
 		from_len_bits -= len;
 
 		WT_ASSERT(session,

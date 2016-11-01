@@ -231,9 +231,12 @@ __txn_op_apply(
 	/* Reset the cursor so it doesn't block eviction. */
 	if (cursor != NULL)
 		WT_ERR(cursor->reset(cursor));
+	return (0);
 
-err:	if (ret != 0)
-		__wt_err(session, ret, "Operation failed during recovery");
+err:	__wt_err(session, ret,
+	    "operation apply failed during recovery: operation type %d "
+	    "at LSN %" PRIu32 "/%" PRIu32,
+	    optype, lsnp->l.file, lsnp->l.offset);
 	return (ret);
 }
 
@@ -263,12 +266,14 @@ __txn_log_recover(WT_SESSION_IMPL *session,
     WT_ITEM *logrec, WT_LSN *lsnp, WT_LSN *next_lsnp,
     void *cookie, int firstrecord)
 {
+	WT_DECL_RET;
 	WT_RECOVERY *r;
-	const uint8_t *end, *p;
-	uint64_t txnid;
+	uint64_t txnid_unused;
 	uint32_t rectype;
+	const uint8_t *end, *p;
 
 	WT_UNUSED(next_lsnp);
+
 	r = cookie;
 	p = WT_LOG_SKIP_HEADER(logrec->data);
 	end = (const uint8_t *)logrec->data + logrec->size;
@@ -285,8 +290,10 @@ __txn_log_recover(WT_SESSION_IMPL *session,
 		break;
 
 	case WT_LOGREC_COMMIT:
-		WT_RET(__wt_vunpack_uint(&p, WT_PTRDIFF(end, p), &txnid));
-		WT_UNUSED(txnid);
+		if ((ret = __wt_vunpack_uint(
+		    &p, WT_PTRDIFF(end, p), &txnid_unused)) != 0)
+			WT_RET_MSG(
+			    session, ret, "txn_log_recover: unpack failure");
 		WT_RET(__txn_commit_apply(r, lsnp, &p, end));
 		break;
 	}

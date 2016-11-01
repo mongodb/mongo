@@ -144,7 +144,7 @@ retry:
 	 */
 	if (op == NULL || op->state != WT_ASYNCOP_FREE) {
 		WT_STAT_CONN_INCR(session, async_full);
-		WT_RET(EBUSY);
+		return (EBUSY);
 	}
 	/*
 	 * Set the state of this op handle as READY for the user to use.
@@ -232,7 +232,7 @@ __async_start(WT_SESSION_IMPL *session)
 	uint32_t i, session_flags;
 
 	conn = S2C(session);
-	conn->async_cfg = 1;
+	conn->async_cfg = true;
 	/*
 	 * Async is on, allocate the WT_ASYNC structure and initialize the ops.
 	 */
@@ -339,16 +339,16 @@ __wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[])
 	 * 2. If async is off, and the user wants it on, start it.
 	 * 3. If not a toggle and async is off, we're done.
 	 */
-	if (conn->async_cfg > 0 && !run) {
+	if (conn->async_cfg && !run) {
 		/* Case 1 */
 		WT_TRET(__wt_async_flush(session));
 		ret = __wt_async_destroy(session);
-		conn->async_cfg = 0;
+		conn->async_cfg = false;
 		return (ret);
-	} else if (conn->async_cfg == 0 && run)
+	} else if (!conn->async_cfg && run)
 		/* Case 2 */
 		return (__async_start(session));
-	else if (conn->async_cfg == 0)
+	else if (!conn->async_cfg)
 		/* Case 3 */
 		return (0);
 
@@ -599,7 +599,8 @@ __wt_async_new_op(WT_SESSION_IMPL *session, const char *uri,
 
 	conn = S2C(session);
 	if (!conn->async_cfg)
-		return (ENOTSUP);
+		WT_RET_MSG(
+		    session, ENOTSUP, "Asynchronous operations not configured");
 
 	op = NULL;
 	WT_ERR(__async_new_op_alloc(session, uri, config, &op));

@@ -26,7 +26,7 @@ __drop_file(
 
 	filename = uri;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
-		return (EINVAL);
+		return (__wt_unexpected_object_type(session, uri, "file:"));
 
 	WT_RET(__wt_schema_backup_check(session, filename));
 	/* Close all btree handles associated with this file. */

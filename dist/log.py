@@ -270,11 +270,13 @@ __wt_logop_%(name)s_unpack(
     WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
     %(arg_decls)s)
 {
+\tWT_DECL_RET;
 \tconst char *fmt = WT_UNCHECKED_STRING(%(fmt)s);
 \tuint32_t optype, size;
 
-\tWT_RET(__wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), fmt,
-\t    &optype, &size%(arg_names)s));
+\tif ((ret = __wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), fmt,
+\t    &optype, &size%(arg_names)s)) != 0)
+\t\tWT_RET_MSG(session, ret, "logop_%(name)s: unpack failure");
 \tWT_ASSERT(session, optype == %(macro)s);
 
 \t*pp += size;
