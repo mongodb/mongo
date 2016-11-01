@@ -12,6 +12,7 @@ var $config = (function() {
 
     var data = {
         prefix: "create_index_background_unique_",
+        numDocsToLoad: 5000,
         iterationCount: 0,
         getCollectionNameForThread: function(threadId) {
             return this.prefix + threadId.toString();
@@ -70,14 +71,14 @@ var $config = (function() {
                 db.createCollection(collectionName, this.getCollectionOptions()));
             var bulk = db[collectionName].initializeUnorderedBulkOp();
 
-            // Preload 15K documents for each thread's collection. This ensures that index build and
-            // drop has meaningful work to do.
-            for (let i = 0; i < 15000; ++i) {
+            // Preload documents for each thread's collection. This ensures that the index build and
+            // drop have meaningful work to do.
+            for (let i = 0; i < this.numDocsToLoad; ++i) {
                 const uniqueValuePrefix = i.toString() + "_";
                 bulk.insert(this.buildvariableSizedDoc(uniqueValuePrefix));
             }
             assertAlways.writeOK(bulk.execute());
-            assertAlways.eq(15000, db[collectionName].find({}).itcount());
+            assertAlways.eq(this.numDocsToLoad, db[collectionName].find({}).itcount());
         }
     }
 
