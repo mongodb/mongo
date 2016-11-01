@@ -337,7 +337,7 @@ __wt_conn_btree_open(
 	 * are reopening the handle, then it may already have statistics memory,
 	 * check to avoid the leak.
 	 */
-	if (!F_ISSET(dhandle, WT_DHANDLE_OPEN))
+	if (dhandle->stat_array == NULL)
 		WT_ERR(__wt_stat_dsrc_init(session, dhandle));
 
 	WT_ERR(__wt_btree_open(session, cfg));
