@@ -2127,9 +2127,8 @@ std::string TopologyCoordinatorImpl::_getUnelectableReasonString(
         }
         hasWrittenToStream = true;
         ss << "member is not caught up enough to the most up-to-date member to call for priority "
-              "takeover.  Must be within "
-           << priorityTakeoverFreshnessWindowSeconds
-           << " seconds or 1000 ops within the same second.";
+              "takeover - must be within "
+           << priorityTakeoverFreshnessWindowSeconds << " seconds";
     }
     if (ur & NotInitialized) {
         if (hasWrittenToStream) {
