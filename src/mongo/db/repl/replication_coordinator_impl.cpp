@@ -1844,6 +1844,9 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* txn,
                                                          const NamespaceString& ns,
                                                          bool slaveOk) {
     auto client = txn->getClient();
+    // Oplog reads are not allowed during STARTUP state, but we make an exception for internal
+    // reads and master-slave replication. Internel reads are required for cleaning up unfinished
+    // apply batches. Master-slave never sets the state so we make an exception for it as well.
     if (((_memberState.startup() && client->isFromUserConnection() &&
           getReplicationMode() == modeReplSet) ||
          _memberState.startup2() || _memberState.rollback()) &&
