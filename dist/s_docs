@@ -183,7 +183,8 @@ EOF
 
 clean=0
 additional_languages=1
-filter="|sed '/PROJECT_NUMBER/s,=.*,=\"Version $WIREDTIGER_VERSION\",'"
+filter="|sed '/PROJECT_BRIEF/s,=.*,=\"$WIREDTIGER_VERSION\",'"
+filter="$filter| sed '/PROJECT_NUMBER/s,=.*,=\"Version $WIREDTIGER_VERSION\",'"
 while :
 	do case "$1" in
 	-a)	# Build from scratch
@@ -199,6 +200,13 @@ while :
 		shift;;
 	-t)	# Include the TODO list
 		filter="$filter| sed '/GENERATE_TODOLIST/s,=.*,=YES,'"
+		shift;;
+	-v)	# Override the version with <slug> <version string>
+		filter="$filter| sed '/HTML_HEADER/s,=.*,= style/header-web.html,'"
+		shift
+		filter="$filter| sed '/PROJECT_BRIEF/s,=.*,=\"$1\",'"
+		shift
+		filter="$filter| sed '/PROJECT_NUMBER/s,=.*,=\"$1\",'"
 		shift;;
 	*)
 		break;;
