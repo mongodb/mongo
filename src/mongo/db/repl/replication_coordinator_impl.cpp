@@ -1750,7 +1750,8 @@ bool ReplicationCoordinatorImpl::_tryToStepDown(const Date_t waitUntil,
     }
 
     const bool forceNow = now >= waitUntil ? force : false;
-    if (!_topCoord->stepDown(stepDownUntil, forceNow, getMyLastAppliedOpTime())) {
+    if (!_topCoord->stepDown(
+            stepDownUntil, forceNow, getMyLastAppliedOpTime(), getLastCommittedOpTime())) {
         if (now >= waitUntil) {
             uasserted(ErrorCodes::ExceededTimeLimit,
                       str::stream() << "No electable secondaries caught up as of "

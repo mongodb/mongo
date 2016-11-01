@@ -394,12 +394,24 @@ public:
     /**
      * Tries to transition the coordinator from the leader role to the follower role.
      *
-     * Fails if "force" is not set and no follower is known to be up.  It is illegal
-     * to call this method if the node is not leader.
+     * If force==true, step down this node and return true immediately. Else, a step down
+     * succeeds only if the following conditions are met:
      *
-     * Returns whether or not the step down succeeded.
+     *      C1. A majority set of nodes, M, in the replica set have optimes greater than or
+     *      equal to the last applied optime of the primary.
+     *
+     *      C2. If C1 holds, then there must exist at least one electable secondary node in the
+     *      majority set M.
+     *
+     * If C1 and C2 hold, a step down occurs and this method returns true. Else, the step down
+     * fails and this method returns false.
+     *
+     * NOTE: It is illegal to call this method if the node is not a primary.
      */
-    virtual bool stepDown(Date_t until, bool force, const OpTime& lastOpApplied) = 0;
+    virtual bool stepDown(Date_t until,
+                          bool force,
+                          const OpTime& lastOpApplied,
+                          const OpTime& lastOpCommitted) = 0;
 
     /**
      * Sometimes a request to step down comes in (like via a heartbeat), but we don't have the
