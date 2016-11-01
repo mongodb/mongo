@@ -1638,7 +1638,8 @@ void ReplicationCoordinatorImpl::_stepDownContinue(
         return;
     }
     bool forceNow = now >= waitUntil ? force : false;
-    if (_topCoord->stepDown(stepDownUntil, forceNow, getMyLastAppliedOpTime())) {
+    if (_topCoord->stepDown(
+            stepDownUntil, forceNow, getMyLastAppliedOpTime(), getLastCommittedOpTime())) {
         // Schedule work to (potentially) step back up once the stepdown period has ended.
         _replExecutor.scheduleWorkAt(stepDownUntil,
                                      stdx::bind(&ReplicationCoordinatorImpl::_handleTimePassing,
