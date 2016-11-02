@@ -23,8 +23,8 @@ function optimesAreEqual(replTest) {
         if (timestampCompare(prevStatus.latestOptime, status.latestOptime) != 0) {
             jsTest.log("optimesAreEqual returning false match, prevOptime: " +
                        prevStatus.latestOptime + " latestOptime: " + status.latestOptime);
-            replTest.dumpOplog(replTest.nodes[i], 20);
-            replTest.dumpOplog(replTest.nodes[i - 1], 20);
+            replTest.dumpOplog(replTest.nodes[i], {}, 20);
+            replTest.dumpOplog(replTest.nodes[i - 1], {}, 20);
             return false;
         }
         prevStatus = status;
