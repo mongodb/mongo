@@ -647,6 +647,7 @@ def make_rpm(distro, build_os, arch, spec, srcdir):
     sdir=setupdir(distro, build_os, arch, spec)
 
     specfile = srcdir + "rpm/mongodb%s.spec" % suffix
+    init_spec = specfile.replace(".spec", "-init.spec")
 
     # The Debian directory is here for the manpages so we we need to remove the service file
     # from it so that RPM packages don't end up with the Debian file.
@@ -662,13 +663,13 @@ def make_rpm(distro, build_os, arch, spec, srcdir):
         os.link(sdir+"rpm/init.d-mongod.suse", sdir+"rpm/init.d-mongod")
 
         os.unlink(specfile)
-        os.link(specfile.replace(".spec", "-init.spec"), specfile)
-    elif distro.name() == "rhel" and distro.repo_os_version(build_os) in ("5", "6"):
+        os.link(init_spec, specfile)
+    elif distro.name() == "redhat" and distro.repo_os_version(build_os) in ("5", "6"):
         os.unlink(specfile)
-        os.link(specfile.replace(".spec", "-init.spec"), specfile)
+        os.link(init_spec, specfile)
     elif distro.name() == "amazon":
         os.unlink(specfile)
-        os.link(specfile.replace(".spec", "-init.spec"), specfile)
+        os.link(init_spec, specfile)
 
     topdir=ensure_dir('%s/rpmbuild/%s/' % (os.getcwd(), build_os))
     for subdir in ["BUILD", "RPMS", "SOURCES", "SPECS", "SRPMS"]:
