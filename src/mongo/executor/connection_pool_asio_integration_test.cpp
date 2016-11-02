@@ -268,19 +268,20 @@ TEST(ConnectionPoolASIO, ConnRefreshSurvivesFailure) {
  * timers before they're invoked
  */
 TEST(ConnectionPoolASIO, ConnSetupSurvivesFailure) {
+    const int kNumThreads = 8;
+    const int kNumOps = 1000;
+
     auto fixture = unittest::getFixtureConnectionString();
 
     NetworkInterfaceASIO::Options options;
     options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
     options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
     options.connectionPoolOptions.refreshTimeout = Seconds(1);
+    options.connectionPoolOptions.maxConnections = kNumThreads;
     NetworkInterfaceASIO net{std::move(options)};
 
     net.startup();
     auto guard = MakeGuard([&] { net.shutdown(); });
-
-    const int kNumThreads = 8;
-    const int kNumOps = 1000;
 
     AtomicWord<size_t> unfinished(kNumThreads * kNumOps);
     AtomicWord<size_t> unstarted(kNumThreads * kNumOps);
