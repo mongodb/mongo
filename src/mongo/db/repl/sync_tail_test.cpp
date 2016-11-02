@@ -997,6 +997,9 @@ OplogEntry IdempotencyTest::dropIndex(const std::string& indexName) {
 
 std::string IdempotencyTest::validate() {
     auto collection = AutoGetCollectionForRead(_txn.get(), nss).getCollection();
+    if (!collection) {
+        return "CollectionNotFound";
+    }
     ValidateResults validateResults;
     BSONObjBuilder bob;
 
@@ -1177,6 +1180,44 @@ TEST_F(IdempotencyTest, IndexWithDifferentOptions) {
     ReplicationCoordinator::get(_txn.get())->setFollowerMode(MemberState::RS_PRIMARY);
     auto status = runOps(ops);
     ASSERT_EQ(status.code(), ErrorCodes::IndexOptionsConflict);
+}
+
+TEST_F(IdempotencyTest, CollModNamespaceNotFound) {
+    getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING);
+
+    ASSERT_OK(runOp(createCollection()));
+    ASSERT_OK(runOp(buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600))));
+
+    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}}");
+    auto collModCmd = BSON("collMod" << nss.coll() << "index" << indexChange);
+    auto collModOp = makeCommandOplogEntry(nextOpTime(), nss, collModCmd);
+    auto dropCollOp = makeCommandOplogEntry(nextOpTime(), nss, BSON("drop" << nss.coll()));
+
+    auto ops = {collModOp, dropCollOp};
+
+    ASSERT_OK(runOps(ops));
+    auto hash = validate();
+    ASSERT_OK(runOps(ops));
+    ASSERT_EQUALS(hash, validate());
+}
+
+TEST_F(IdempotencyTest, CollModIndexNotFound) {
+    getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING);
+
+    ASSERT_OK(runOp(createCollection()));
+    ASSERT_OK(runOp(buildIndex(BSON("createdAt" << 1), BSON("expireAfterSeconds" << 3600))));
+
+    auto indexChange = fromjson("{keyPattern: {createdAt:1}, expireAfterSeconds:4000}}");
+    auto collModCmd = BSON("collMod" << nss.coll() << "index" << indexChange);
+    auto collModOp = makeCommandOplogEntry(nextOpTime(), nss, collModCmd);
+    auto dropIndexOp = dropIndex("createdAt_index");
+
+    auto ops = {collModOp, dropIndexOp};
+
+    ASSERT_OK(runOps(ops));
+    auto hash = validate();
+    ASSERT_OK(runOps(ops));
+    ASSERT_EQUALS(hash, validate());
 }
 
 TEST_F(IdempotencyTest, ResyncOnRenameCollection) {

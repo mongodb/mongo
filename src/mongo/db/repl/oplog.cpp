@@ -593,10 +593,12 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
           return createCollection(txn, nss.db().toString(), cmd, idIndexSpecBuilder.done());
       },
       {ErrorCodes::NamespaceExists}}},
-    {"collMod", {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
-         BSONObjBuilder resultWeDontCareAbout;
-         return collMod(txn, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
-     }}},
+    {"collMod",
+     {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+          BSONObjBuilder resultWeDontCareAbout;
+          return collMod(txn, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
+      },
+      {ErrorCodes::IndexNotFound, ErrorCodes::NamespaceNotFound}}},
     {"dropDatabase",
      {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
           return dropDatabase(txn, NamespaceString(ns).db().toString());
