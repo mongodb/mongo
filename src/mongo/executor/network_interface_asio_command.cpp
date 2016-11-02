@@ -205,13 +205,10 @@ ResponseStatus NetworkInterfaceASIO::AsyncCommand::response(rpc::Protocol protoc
         case CommandType::kRPC: {
             return decodeRPC(&received, protocol, now - _start, _target, metadataHook);
         }
-        case CommandType::kDownConvertedFind: {
-            auto ns = DbMessage(_toSend).getns();
-            return upconvertLegacyQueryResponse(_toSend.header().getId(), ns, received);
-        }
+        case CommandType::kDownConvertedFind:
         case CommandType::kDownConvertedGetMore: {
             auto ns = DbMessage(_toSend).getns();
-            return upconvertLegacyGetMoreResponse(_toSend.header().getId(), ns, received);
+            return prepareOpReplyErrorResponse(_toSend.header().getId(), ns, &received);
         }
     }
     MONGO_UNREACHABLE;

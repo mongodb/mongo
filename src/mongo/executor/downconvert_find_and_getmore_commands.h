@@ -29,6 +29,9 @@
 #include <cstdint>
 #include <memory>
 
+#include "mongo/db/cursor_id.h"
+#include "mongo/util/time_support.h"
+
 namespace mongo {
 
 class Message;
@@ -52,13 +55,14 @@ struct RemoteCommandResponse;
 StatusWith<Message> downconvertFindCommandRequest(const RemoteCommandRequest& request);
 
 /**
- * Upconverts the OP_REPLY received in response to a legacy OP_QUERY to a semantically equivalent
- * find command response. The 'requestId' parameter is the messageId of the original OP_QUERY, and
- * the 'cursorNamespace' is the full namespace of the collection the query ran on.
+ * We may not be able to fit the entire batch from the OP_REPLY into a single response BSONObj, so
+ * we must defer the parsing to the original requester. This method creates a RemoteCommandResponse
+ * with a response that will signal callers to decode the raw message. The RemoteCommandResponse
+ * returned by this method takes ownership of 'message'.
  */
-StatusWith<RemoteCommandResponse> upconvertLegacyQueryResponse(std::uint32_t requestId,
-                                                               StringData cursorNamespace,
-                                                               const Message& response);
+StatusWith<RemoteCommandResponse> prepareOpReplyErrorResponse(std::uint32_t requestId,
+                                                              StringData cursorNamespace,
+                                                              Message* response);
 
 /**
  * Downconverts a getMore command request to the legacy OP_GET_MORE format. The returned message
@@ -67,15 +71,6 @@ StatusWith<RemoteCommandResponse> upconvertLegacyQueryResponse(std::uint32_t req
  * messageId in MessagingPort::say().
  */
 StatusWith<Message> downconvertGetMoreCommandRequest(const RemoteCommandRequest& request);
-
-/**
- * Upconverts the OP_REPLY received in response to a legacy OP_GET_MORE to a semantically equivalent
- * getMore command response. The 'requestId' parameter is the messageId of the original OP_GET_MORE,
- * and the 'curesorNamespace' is the full namespace of the collection the original query ran on.
- */
-StatusWith<RemoteCommandResponse> upconvertLegacyGetMoreResponse(std::uint32_t requestId,
-                                                                 StringData cursorNamespace,
-                                                                 const Message& response);
 
 }  // namespace mongo
 }  // namespace executor

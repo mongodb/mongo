@@ -34,8 +34,6 @@
 #include <string>
 #include <tuple>
 
-#include "mongo/base/data_range_cursor.h"
-#include "mongo/base/data_type_validated.h"
 #include "mongo/base/status_with.h"
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclientinterface.h"
@@ -47,7 +45,6 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
-#include "mongo/rpc/object_check.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/message.h"
 
@@ -56,75 +53,17 @@ namespace executor {
 
 namespace {
 
-StatusWith<std::tuple<CursorId, BSONArray>> getBatchFromReply(std::uint32_t requestId,
-                                                              const Message& response) {
-    auto header = response.header();
-    if (header.getNetworkOp() != mongo::opReply) {
-        return {ErrorCodes::ProtocolError,
-                str::stream() << "Expected to be decoding an OP_REPLY but got "
-                              << mongo::networkOpToString(header.getNetworkOp())};
-    }
-
-    if (header.getResponseTo() != requestId) {
-        return {ErrorCodes::ProtocolError,
-                str::stream() << "responseTo field of OP_REPLY header with value '"
-                              << header.getResponseTo() << "' does not match requestId '"
-                              << requestId << "'"};
-    }
-
-    if ((header.dataLen() < 0) ||
-        (static_cast<std::size_t>(header.dataLen()) > mongo::MaxMessageSizeBytes)) {
-        return {ErrorCodes::InvalidLength,
-                str::stream() << "Received message has invalid length field with value "
-                              << header.dataLen()};
-    }
-
-    QueryResult::View qr = response.header().view2ptr();
-
-    auto resultFlags = qr.getResultFlags();
-
-    if (resultFlags & ResultFlag_CursorNotFound) {
-        return {ErrorCodes::CursorNotFound,
-                str::stream() << "Cursor with id '" << qr.getCursorId() << "' not found"};
-    }
-
-    // Use CDRC directly instead of DocumentRange as DocumentRange has a throwing API.
-    ConstDataRangeCursor cdrc{qr.data(), qr.data() + header.dataLen()};
-
-    if (resultFlags & ResultFlag_ErrSet) {
-        if (qr.getNReturned() != 1) {
-            return {ErrorCodes::BadValue,
-                    str::stream() << "ResultFlag_ErrSet flag set on reply, but nReturned was '"
-                                  << qr.getNReturned() << "' - expected 1"};
-        }
-        // Convert error document to a Status.
-        // Will throw if first document is invalid BSON.
-        auto first = cdrc.readAndAdvance<Validated<BSONObj>>();
-        if (!first.isOK()) {
-            return first.getStatus();
-        }
-
-        // Convert error document to a status.
-        return getStatusFromCommandResult(first.getValue());
-    }
-
-    Validated<BSONObj> nextObj;
-    BSONArrayBuilder batch;
-    while (!cdrc.empty() && batch.arrSize() < qr.getNReturned()) {
-        auto readStatus = cdrc.readAndAdvance(&nextObj);
-        if (!readStatus.isOK()) {
-            return readStatus;
-        }
-        batch.append(nextObj.val);
-    }
-    if (qr.getNReturned() != batch.arrSize()) {
-        return {ErrorCodes::InvalidLength,
-                str::stream() << "Count of documents in OP_REPLY message (" << batch.arrSize()
-                              << ") did not match the value specified in the nReturned field ("
-                              << qr.getNReturned() << ")"};
-    }
-
-    return {std::make_tuple(qr.getCursorId(), batch.arr())};
+/**
+ * Returns a non-OK status if 'response' does not report it is a response to the request with id
+ * 'requestId'.
+ */
+Status checkMessageResponseTo(std::uint32_t requestId, const Message* response) {
+    return response->header().getResponseTo() == requestId
+        ? Status::OK()
+        : Status{ErrorCodes::ProtocolError,
+                 str::stream() << "responseTo field of OP_REPLY header with value "
+                               << response->header().getResponseTo() << " does not match requestId "
+                               << requestId};
 }
 
 }  // namespace
@@ -204,28 +143,21 @@ StatusWith<Message> downconvertFindCommandRequest(const RemoteCommandRequest& re
     return {std::move(message)};
 }
 
-StatusWith<RemoteCommandResponse> upconvertLegacyQueryResponse(std::uint32_t requestId,
-                                                               StringData cursorNamespace,
-                                                               const Message& response) {
-    auto swBatch = getBatchFromReply(requestId, response);
-    if (!swBatch.isOK()) {
-        return swBatch.getStatus();
+StatusWith<RemoteCommandResponse> prepareOpReplyErrorResponse(std::uint32_t requestId,
+                                                              StringData cursorNamespace,
+                                                              Message* response) {
+    auto status = checkMessageResponseTo(requestId, response);
+    if (!status.isOK()) {
+        return status;
     }
 
-    BSONArray batch;
-    CursorId cursorId;
-    std::tie(cursorId, batch) = std::move(swBatch.getValue());
-
     BSONObjBuilder result;
-    appendCursorResponseObject(cursorId, cursorNamespace, std::move(batch), &result);
-    // Using Command::appendCommandStatus would create a circular dep, so it's simpler to just do
-    // this.
-    result.append("ok", 1.0);
+    result.append("ok", 0.0);
+    result.append("code", ErrorCodes::ReceivedOpReplyMessage);
+    result.append("errmsg", "Received an OP_REPLY, unable to parse into a single BSONObj");
+    result.append("ns", cursorNamespace);
 
-    RemoteCommandResponse upconvertedResponse;
-    upconvertedResponse.data = result.obj();
-
-    return {std::move(upconvertedResponse)};
+    return {RemoteCommandResponse{std::move(*response), result.obj(), {}, {}}};
 }
 
 StatusWith<Message> downconvertGetMoreCommandRequest(const RemoteCommandRequest& request) {
@@ -246,29 +178,6 @@ StatusWith<Message> downconvertGetMoreCommandRequest(const RemoteCommandRequest&
     m.setData(dbGetMore, b.buf(), b.len());
 
     return {std::move(m)};
-}
-
-StatusWith<RemoteCommandResponse> upconvertLegacyGetMoreResponse(std::uint32_t requestId,
-                                                                 StringData cursorNamespace,
-                                                                 const Message& response) {
-    auto swBatch = getBatchFromReply(requestId, response);
-    if (!swBatch.isOK()) {
-        return swBatch.getStatus();
-    }
-
-    BSONArray batch;
-    CursorId cursorId;
-
-    std::tie(cursorId, batch) = std::move(swBatch.getValue());
-
-    BSONObjBuilder result;
-    appendGetMoreResponseObject(cursorId, cursorNamespace, std::move(batch), &result);
-    result.append("ok", 1.0);
-
-    RemoteCommandResponse resp;
-    resp.data = result.obj();
-
-    return {std::move(resp)};
 }
 
 }  // namespace mongo

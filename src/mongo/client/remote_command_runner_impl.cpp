@@ -83,7 +83,7 @@ Status getStatusFromCursorResult(DBClientCursor& cursor) {
 using RequestDownconverter = StatusWith<Message>(*)(const RemoteCommandRequest&);
 using ReplyUpconverter = StatusWith<RemoteCommandResponse>(*)(std::uint32_t requestId,
                                                               StringData cursorNamespace,
-                                                              const Message& response);
+                                                              Message* response);
 
 template <RequestDownconverter downconvertRequest, ReplyUpconverter upconvertReply>
 StatusWith<RemoteCommandResponse> runDownconvertedCommand(DBClientConnection* conn,
@@ -104,7 +104,7 @@ StatusWith<RemoteCommandResponse> runDownconvertedCommand(DBClientConnection* co
 
     auto messageId = requestMsg.header().getId();
 
-    return upconvertReply(messageId, DbMessage(requestMsg).getns(), responseMsg);
+    return upconvertReply(messageId, DbMessage(requestMsg).getns(), &responseMsg);
 }
 
 /**
@@ -114,7 +114,7 @@ StatusWith<RemoteCommandResponse> runDownconvertedCommand(DBClientConnection* co
 StatusWith<RemoteCommandResponse> runDownconvertedFindCommand(DBClientConnection* conn,
                                                               const RemoteCommandRequest& request) {
     return runDownconvertedCommand<executor::downconvertFindCommandRequest,
-                                   executor::upconvertLegacyQueryResponse>(conn, request);
+                                   executor::prepareOpReplyErrorResponse>(conn, request);
 }
 
 /**
@@ -124,7 +124,7 @@ StatusWith<RemoteCommandResponse> runDownconvertedFindCommand(DBClientConnection
 StatusWith<RemoteCommandResponse> runDownconvertedGetMoreCommand(
     DBClientConnection* conn, const RemoteCommandRequest& request) {
     return runDownconvertedCommand<executor::downconvertGetMoreCommandRequest,
-                                   executor::upconvertLegacyGetMoreResponse>(conn, request);
+                                   executor::prepareOpReplyErrorResponse>(conn, request);
 }
 
 }  // namespace

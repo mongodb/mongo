@@ -31,9 +31,12 @@
 
 #include "mongo/client/fetcher.h"
 
+#include "mongo/base/data_range_cursor.h"
+#include "mongo/base/data_type_validated.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/object_check.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -53,27 +56,19 @@ const char* kNamespaceFieldName = "ns";
 const char* kFirstBatchFieldName = "firstBatch";
 const char* kNextBatchFieldName = "nextBatch";
 
-/**
- * Parses cursor response in command result for cursor ID, namespace and documents.
- * 'batchFieldName' will be 'firstBatch' for the initial remote command invocation and
- * 'nextBatch' for getMore.
- */
-Status parseCursorResponse(const BSONObj& obj,
-                           const std::string& batchFieldName,
-                           Fetcher::QueryResponse* batchData) {
-    invariant(batchFieldName == kFirstBatchFieldName || batchFieldName == kNextBatchFieldName);
-    invariant(batchData);
-
-    BSONElement cursorElement = obj.getField(kCursorFieldName);
+Status parseCursorResponseFromResponseObj(const BSONObj& responseObj,
+                                          const std::string& batchFieldName,
+                                          Fetcher::QueryResponse* batchData) {
+    BSONElement cursorElement = responseObj.getField(kCursorFieldName);
     if (cursorElement.eoo()) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "cursor response must contain '" << kCursorFieldName
-                                    << "' field: " << obj);
+                                    << "' field: " << responseObj);
     }
     if (!cursorElement.isABSONObj()) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "'" << kCursorFieldName
-                                    << "' field must be an object: " << obj);
+                                    << "' field must be an object: " << responseObj);
     }
     BSONObj cursorObj = cursorElement.Obj();
 
@@ -81,13 +76,13 @@ Status parseCursorResponse(const BSONObj& obj,
     if (cursorIdElement.eoo()) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "cursor response must contain '" << kCursorFieldName << "."
-                                    << kCursorIdFieldName << "' field: " << obj);
+                                    << kCursorIdFieldName << "' field: " << responseObj);
     }
     if (cursorIdElement.type() != mongo::NumberLong) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "'" << kCursorFieldName << "." << kCursorIdFieldName
                                     << "' field must be a 'long' but was a '"
-                                    << typeName(cursorIdElement.type()) << "': " << obj);
+                                    << typeName(cursorIdElement.type()) << "': " << responseObj);
     }
     batchData->cursorId = cursorIdElement.numberLong();
 
@@ -96,18 +91,18 @@ Status parseCursorResponse(const BSONObj& obj,
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "cursor response must contain "
                                     << "'" << kCursorFieldName << "." << kNamespaceFieldName
-                                    << "' field: " << obj);
+                                    << "' field: " << responseObj);
     }
     if (namespaceElement.type() != mongo::String) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "'" << kCursorFieldName << "." << kNamespaceFieldName
-                                    << "' field must be a string: " << obj);
+                                    << "' field must be a string: " << responseObj);
     }
     NamespaceString tempNss(namespaceElement.valuestrsafe());
     if (!tempNss.isValid()) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "'" << kCursorFieldName << "." << kNamespaceFieldName
-                                    << "' contains an invalid namespace: " << obj);
+                                    << "' contains an invalid namespace: " << responseObj);
     }
     batchData->nss = tempNss;
 
@@ -115,12 +110,12 @@ Status parseCursorResponse(const BSONObj& obj,
     if (batchElement.eoo()) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "cursor response must contain '" << kCursorFieldName << "."
-                                    << batchFieldName << "' field: " << obj);
+                                    << batchFieldName << "' field: " << responseObj);
     }
     if (!batchElement.isABSONObj()) {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "'" << kCursorFieldName << "." << batchFieldName
-                                    << "' field must be an array: " << obj);
+                                    << "' field must be an array: " << responseObj);
     }
     BSONObj batchObj = batchElement.Obj();
     for (auto itemElement : batchObj) {
@@ -128,12 +123,136 @@ Status parseCursorResponse(const BSONObj& obj,
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "found non-object " << itemElement << " in "
                                         << "'" << kCursorFieldName << "." << batchFieldName
-                                        << "' field: " << obj);
+                                        << "' field: " << responseObj);
         }
         batchData->documents.push_back(itemElement.Obj().getOwned());
     }
 
     return Status::OK();
+}
+
+/**
+ * Extracts the CursorId and array of results from a Message representing an OP_REPLY. Returns a
+ * non-OK status if Message does not represent a well-formed OP_REPLY.
+ */
+StatusWith<std::tuple<CursorId, std::vector<BSONObj>>> getBatchFromReply(const Message* response) {
+    auto header = response->header();
+    if (header.getNetworkOp() != mongo::opReply) {
+        return {ErrorCodes::ProtocolError,
+                str::stream() << "Expected to be decoding an OP_REPLY but got "
+                              << mongo::networkOpToString(header.getNetworkOp())};
+    }
+
+    if ((header.dataLen() < 0) ||
+        (static_cast<std::size_t>(header.dataLen()) > mongo::MaxMessageSizeBytes)) {
+        return {ErrorCodes::InvalidLength,
+                str::stream() << "Received message has invalid length field with value "
+                              << header.dataLen()};
+    }
+
+    QueryResult::View qr = response->header().view2ptr();
+
+    auto resultFlags = qr.getResultFlags();
+
+    if (resultFlags & ResultFlag_CursorNotFound) {
+        return {ErrorCodes::CursorNotFound,
+                str::stream() << "Cursor with id '" << qr.getCursorId() << "' not found"};
+    }
+
+    // Use CDRC directly instead of DocumentRange as DocumentRange has a throwing API.
+    ConstDataRangeCursor cdrc{qr.data(), qr.data() + header.dataLen()};
+
+    if (resultFlags & ResultFlag_ErrSet) {
+        if (qr.getNReturned() != 1) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "ResultFlag_ErrSet flag set on reply, but nReturned was '"
+                                  << qr.getNReturned() << "' - expected 1"};
+        }
+        // Convert error document to a Status.
+        // Will throw if first document is invalid BSON.
+        auto first = cdrc.readAndAdvance<Validated<BSONObj>>();
+        if (!first.isOK()) {
+            return first.getStatus();
+        }
+
+        // Convert error document to a status.
+        return getStatusFromCommandResult(first.getValue());
+    }
+
+    const int32_t nReturned = qr.getNReturned();
+    std::vector<BSONObj> batch;
+    batch.reserve(qr.getNReturned());
+
+    int32_t nParsed = 0;
+    Validated<BSONObj> nextObj;
+    while (!cdrc.empty() && nParsed < nReturned) {
+        auto readStatus = cdrc.readAndAdvance(&nextObj);
+        if (!readStatus.isOK()) {
+            return readStatus;
+        }
+        ++nParsed;
+        batch.emplace_back(nextObj.val.getOwned());
+    }
+    if (nParsed != nReturned) {
+        return {ErrorCodes::InvalidLength,
+                str::stream() << "Count of documents in OP_REPLY message (" << nParsed
+                              << ") did not match the value specified in the nReturned field ("
+                              << nReturned << ")"};
+    }
+
+    return {std::make_tuple(qr.getCursorId(), std::move(batch))};
+}
+
+Status parseCursorResponseFromRawMessage(const Message* message,
+                                         Fetcher::QueryResponse* batchData) {
+    auto batchStatus = getBatchFromReply(message);
+    if (!batchStatus.isOK()) {
+        return batchStatus.getStatus();
+    }
+
+    std::tie(batchData->cursorId, batchData->documents) = batchStatus.getValue();
+    return Status::OK();
+}
+
+/**
+ * Parses cursor response in command result for cursor ID, namespace and documents.
+ * 'batchFieldName' will be 'firstBatch' for the initial remote command invocation and 'nextBatch'
+ * for getMore.
+ */
+Status parseCursorResponse(const RemoteCommandResponse& response,
+                           const std::string& batchFieldName,
+                           Fetcher::QueryResponse* batchData) {
+    invariant(batchFieldName == kFirstBatchFieldName || batchFieldName == kNextBatchFieldName);
+    invariant(batchData);
+
+    // If we are talking to a 3.0 mongod, then the response will have come back as an OP_QUERY, and
+    // we'll need to parse the raw message to populate 'batchData'. Otherwise, we ran a find or
+    // getMore command, and need to parse the BSON that is returned from those commands.
+    Status status = getStatusFromCommandResult(response.data);
+    if (status.isOK()) {
+        return parseCursorResponseFromResponseObj(response.data, batchFieldName, batchData);
+    } else if (status.code() == ErrorCodes::ReceivedOpReplyMessage) {
+        auto ns = response.data["ns"];
+        if (!ns) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "expected 'ns' field to be present in response: "
+                                  << response.data};
+        }
+        if (ns.type() != String) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "expected 'ns' field to be a string, was "
+                                  << typeName(ns.type()) << ": " << response.data};
+        }
+        auto nss = NamespaceString(ns.String());
+        if (!nss.isValid()) {
+            return {ErrorCodes::FailedToParse,
+                    str::stream() << "invalid 'ns' field in response: " << response.data};
+        }
+        batchData->nss = nss;
+        return parseCursorResponseFromRawMessage(response.message.get(), batchData);
+    } else {
+        return status;
+    }
 }
 
 }  // namespace
@@ -244,16 +363,8 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
         return;
     }
 
-    const BSONObj& queryResponseObj = rcbd.response.getValue().data;
-    Status status = getStatusFromCommandResult(queryResponseObj);
-    if (!status.isOK()) {
-        _work(StatusWith<Fetcher::QueryResponse>(status), nullptr, nullptr);
-        _finishCallback();
-        return;
-    }
-
     QueryResponse batchData;
-    status = parseCursorResponse(queryResponseObj, batchFieldName, &batchData);
+    auto status = parseCursorResponse(rcbd.response.getValue(), batchFieldName, &batchData);
     if (!status.isOK()) {
         _work(StatusWith<Fetcher::QueryResponse>(status), nullptr, nullptr);
         _finishCallback();
