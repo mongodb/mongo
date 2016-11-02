@@ -173,7 +173,7 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 void
 __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
-	wt_rwlock_t *l;
+	wt_rwlock_t *l, old;
 	uint16_t ticket;
 	int pause_cnt;
 
@@ -182,6 +182,15 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	WT_DIAGNOSTIC_YIELD;
 
 	l = &rwlock->rwlock;
+
+	/* Be optimistic when lock is available to readers. */
+	old = *l;
+	while (old.s.readers == old.s.next) {
+		if (__wt_try_readlock(session, rwlock) == 0)
+			return;
+		WT_PAUSE();
+		old = *l;
+	}
 
 	/*
 	 * Possibly wrap: if we have more than 64K lockers waiting, the ticket
@@ -192,17 +201,14 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	for (pause_cnt = 0; ticket != l->s.readers;) {
 		/*
 		 * We failed to get the lock; pause before retrying and if we've
-		 * paused enough, sleep so we don't burn CPU to no purpose. This
+		 * paused enough, yield so we don't burn CPU to no purpose. This
 		 * situation happens if there are more threads than cores in the
 		 * system and we're thrashing on shared resources.
-		 *
-		 * Don't sleep long when waiting on a read lock, hopefully we're
-		 * waiting on another read thread to increment the reader count.
 		 */
 		if (++pause_cnt < WT_THOUSAND)
 			WT_PAUSE();
 		else
-			__wt_sleep(0, 10);
+			__wt_yield();
 	}
 
 	/*
