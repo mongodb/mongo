@@ -97,10 +97,6 @@ TransportLayer::Stats TransportLayerManager::sessionStats() {
     return stats;
 }
 
-void TransportLayerManager::registerTags(const ConstSessionHandle& session) {
-    session->getTransportLayer()->registerTags(session);
-}
-
 void TransportLayerManager::end(const SessionHandle& session) {
     session->getTransportLayer()->end(session);
 }
@@ -124,10 +120,6 @@ Status TransportLayerManager::addAndStartTransportLayer(std::unique_ptr<Transpor
         _tls.emplace_back(std::move(tl));
     }
     return ptr->start();
-}
-
-void TransportLayerManager::_destroy(Session& session) {
-    MONGO_UNREACHABLE;
 }
 
 }  // namespace transport

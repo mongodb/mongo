@@ -32,35 +32,14 @@
 
 #include "mongo/base/status.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/transport/session.h"
-#include "mongo/transport/ticket.h"
-#include "mongo/transport/ticket_impl.h"
+#include "mongo/transport/mock_session.h"
+#include "mongo/transport/mock_ticket.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace transport {
-
-TransportLayerMock::TicketMock::TicketMock(const SessionHandle& session,
-                                           Message* message,
-                                           Date_t expiration)
-    : _session(session), _message(message), _expiration(expiration) {}
-
-TransportLayerMock::TicketMock::TicketMock(const SessionHandle& session, Date_t expiration)
-    : _session(session), _expiration(expiration) {}
-
-Session::Id TransportLayerMock::TicketMock::sessionId() const {
-    return _session->id();
-}
-
-Date_t TransportLayerMock::TicketMock::expiration() const {
-    return _expiration;
-}
-
-boost::optional<Message*> TransportLayerMock::TicketMock::msg() const {
-    return _message;
-}
 
 TransportLayerMock::TransportLayerMock() : _shutdown(false) {}
 
@@ -75,8 +54,7 @@ Ticket TransportLayerMock::sourceMessage(const SessionHandle& session,
         return Ticket(TransportLayer::TicketSessionClosedStatus);
     }
 
-    return Ticket(this,
-                  stdx::make_unique<TransportLayerMock::TicketMock>(session, message, expiration));
+    return Ticket(this, stdx::make_unique<transport::MockTicket>(session, message, expiration));
 }
 
 Ticket TransportLayerMock::sinkMessage(const SessionHandle& session,
@@ -90,7 +68,7 @@ Ticket TransportLayerMock::sinkMessage(const SessionHandle& session,
         return Ticket(TransportLayer::TicketSessionClosedStatus);
     }
 
-    return Ticket(this, stdx::make_unique<TransportLayerMock::TicketMock>(session, expiration));
+    return Ticket(this, stdx::make_unique<transport::MockTicket>(session, expiration));
 }
 
 Status TransportLayerMock::wait(Ticket&& ticket) {
@@ -124,10 +102,8 @@ TransportLayer::Stats TransportLayerMock::sessionStats() {
     return Stats();
 }
 
-void TransportLayerMock::registerTags(const ConstSessionHandle& session) {}
-
 SessionHandle TransportLayerMock::createSession() {
-    auto session = Session::create(HostAndPort(), HostAndPort(), this);
+    auto session = MockSession::create(this);
     Session::Id sessionId = session->id();
 
     _sessions[sessionId] = Connection{false, session, SSLPeerInfo()};
@@ -178,8 +154,6 @@ bool TransportLayerMock::inShutdown() const {
 TransportLayerMock::~TransportLayerMock() {
     shutdown();
 }
-
-void TransportLayerMock::_destroy(Session& session) {}
 
 }  // namespace transport
 }  // namespace mongo

@@ -26,48 +26,55 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
 #include "mongo/transport/session.h"
-
-#include "mongo/platform/atomic_word.h"
-#include "mongo/transport/transport_layer.h"
-#include "mongo/util/net/ssl_types.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace transport {
 
-namespace {
+class TransportLayer;
 
-AtomicUInt64 sessionIdCounter(0);
+class MockSession : public Session {
+    MONGO_DISALLOW_COPYING(MockSession);
 
-}  // namespace
+public:
+    static std::shared_ptr<MockSession> create(TransportLayer* tl) {
+        std::shared_ptr<MockSession> handle(new MockSession(tl));
+        return handle;
+    }
 
-Session::Session() : _id(sessionIdCounter.addAndFetch(1)), _tags(kEmptyTagMask) {}
+    static std::shared_ptr<MockSession> create(HostAndPort remote,
+                                               HostAndPort local,
+                                               TransportLayer* tl) {
+        std::shared_ptr<MockSession> handle(
+            new MockSession(std::move(remote), std::move(local), tl));
+        return handle;
+    }
 
-Ticket Session::sourceMessage(Message* message, Date_t expiration) {
-    return getTransportLayer()->sourceMessage(shared_from_this(), message, expiration);
-}
+    TransportLayer* getTransportLayer() const override {
+        return _tl;
+    }
 
-Ticket Session::sinkMessage(const Message& message, Date_t expiration) {
-    return getTransportLayer()->sinkMessage(shared_from_this(), message, expiration);
-}
+    const HostAndPort& remote() const override {
+        return _remote;
+    }
 
-SSLPeerInfo Session::getX509PeerInfo() const {
-    return getTransportLayer()->getX509PeerInfo(shared_from_this());
-}
+    const HostAndPort& local() const override {
+        return _local;
+    }
 
-void Session::replaceTags(TagMask tags) {
-    _tags = tags;
-}
+protected:
+    explicit MockSession(TransportLayer* tl) : _tl(tl), _remote(), _local() {}
+    explicit MockSession(HostAndPort remote, HostAndPort local, TransportLayer* tl)
+        : _tl(tl), _remote(std::move(remote)), _local(std::move(local)) {}
 
-Session::TagMask Session::getTags() const {
-    return _tags;
-}
+    TransportLayer* _tl;
 
-MessageCompressorManager& Session::getCompressorManager() {
-    return _messageCompressorManager;
-}
+    HostAndPort _remote;
+    HostAndPort _local;
+};
 
 }  // namespace transport
 }  // namespace mongo

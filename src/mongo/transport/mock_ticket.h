@@ -26,48 +26,53 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/transport/session.h"
-
-#include "mongo/platform/atomic_word.h"
-#include "mongo/transport/transport_layer.h"
-#include "mongo/util/net/ssl_types.h"
+#include "mongo/transport/ticket_impl.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
+
+class Message;
+
 namespace transport {
 
-namespace {
+/**
+ * A mock ticket class for our test suite.
+ */
+class MockTicket : public TicketImpl {
+    MONGO_DISALLOW_COPYING(MockTicket);
 
-AtomicUInt64 sessionIdCounter(0);
+public:
+    // Source constructor
+    MockTicket(const SessionHandle& session,
+               Message* message,
+               Date_t expiration = Ticket::kNoExpirationDate)
+        : _id(session->id()), _message(message), _expiration(expiration) {}
 
-}  // namespace
+    // Sink constructor
+    MockTicket(const SessionHandle& session, Date_t expiration = Ticket::kNoExpirationDate)
+        : _id(session->id()), _expiration(expiration) {}
 
-Session::Session() : _id(sessionIdCounter.addAndFetch(1)), _tags(kEmptyTagMask) {}
+    SessionId sessionId() const override {
+        return _id;
+    }
 
-Ticket Session::sourceMessage(Message* message, Date_t expiration) {
-    return getTransportLayer()->sourceMessage(shared_from_this(), message, expiration);
-}
+    Date_t expiration() const override {
+        return _expiration;
+    }
 
-Ticket Session::sinkMessage(const Message& message, Date_t expiration) {
-    return getTransportLayer()->sinkMessage(shared_from_this(), message, expiration);
-}
+    boost::optional<Message*> message() const {
+        return _message;
+    }
 
-SSLPeerInfo Session::getX509PeerInfo() const {
-    return getTransportLayer()->getX509PeerInfo(shared_from_this());
-}
-
-void Session::replaceTags(TagMask tags) {
-    _tags = tags;
-}
-
-Session::TagMask Session::getTags() const {
-    return _tags;
-}
-
-MessageCompressorManager& Session::getCompressorManager() {
-    return _messageCompressorManager;
-}
+private:
+    Session::Id _id;
+    boost::optional<Message*> _message;
+    Date_t _expiration;
+};
 
 }  // namespace transport
 }  // namespace mongo

@@ -148,15 +148,6 @@ public:
     virtual void asyncWait(Ticket&& ticket, TicketCallback callback) = 0;
 
     /**
-     * Tag this Session within the TransportLayer with the tags currently assigned to the
-     * Session. If endAllSessions() is called with a matching
-     * Session::TagMask, this Session will not be ended.
-     *
-     * Before calling this method, use Session::replaceTags() to set the desired TagMask.
-     */
-    virtual void registerTags(const ConstSessionHandle& session) = 0;
-
-    /**
      * Return the stored X509 peer information for this session. If the session does not
      * exist in this TransportLayer, returns a default constructed object.
      */
@@ -221,13 +212,6 @@ protected:
     TransportLayer* getTicketTransportLayer(const Ticket& ticket) {
         return ticket._tl;
     }
-
-private:
-    /**
-     * Destroys any information linked to this Session in the TransportLayer.
-     * This should only be called from within Session's destructor.
-     */
-    virtual void _destroy(Session& session) = 0;
 };
 
 }  // namespace transport

@@ -65,7 +65,6 @@ public:
     void asyncWait(Ticket&& ticket, TicketCallback callback) override;
 
     SSLPeerInfo getX509PeerInfo(const ConstSessionHandle& session) const override;
-    void registerTags(const ConstSessionHandle& session) override;
 
     Stats sessionStats() override;
 
@@ -78,8 +77,6 @@ public:
     Status addAndStartTransportLayer(std::unique_ptr<TransportLayer> tl);
 
 private:
-    void _destroy(Session& session) override;
-
     template <typename Callable>
     void _foreach(Callable&& cb);
 

@@ -48,31 +48,6 @@ class TransportLayerMock : public TransportLayer {
     MONGO_DISALLOW_COPYING(TransportLayerMock);
 
 public:
-    class TicketMock : public TicketImpl {
-    public:
-        // Source constructor
-        TicketMock(const SessionHandle& session,
-                   Message* message,
-                   Date_t expiration = Ticket::kNoExpirationDate);
-
-        // Sink constructor
-        TicketMock(const SessionHandle& session, Date_t expiration = Ticket::kNoExpirationDate);
-
-        TicketMock(TicketMock&&) = default;
-        TicketMock& operator=(TicketMock&&) = default;
-
-        SessionId sessionId() const override;
-
-        Date_t expiration() const override;
-
-        boost::optional<Message*> msg() const;
-
-    private:
-        const SessionHandle& _session;
-        boost::optional<Message*> _message;
-        Date_t _expiration;
-    };
-
     TransportLayerMock();
     ~TransportLayerMock();
 
@@ -88,7 +63,6 @@ public:
 
     SSLPeerInfo getX509PeerInfo(const ConstSessionHandle& session) const override;
     void setX509PeerInfo(const SessionHandle& session, SSLPeerInfo peerInfo);
-    void registerTags(const ConstSessionHandle& session) override;
 
     Stats sessionStats() override;
 
@@ -103,8 +77,6 @@ public:
     bool inShutdown() const;
 
 private:
-    void _destroy(Session& session) override;
-
     struct Connection {
         bool ended;
         SessionHandle session;

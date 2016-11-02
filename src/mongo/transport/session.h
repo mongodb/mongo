@@ -76,12 +76,7 @@ public:
     /**
      * Destroys a session, calling end() for this session in its TransportLayer.
      */
-    ~Session();
-
-    /**
-     * A factory for sessions.
-     */
-    static SessionHandle create(HostAndPort remote, HostAndPort local, TransportLayer* tl);
+    virtual ~Session() = default;
 
     /**
      * Return the id for this session.
@@ -91,43 +86,16 @@ public:
     }
 
     /**
-     * Return the remote host for this session.
+     * The TransportLayer for this Session.
      */
-    const HostAndPort& remote() const {
-        return _remote;
-    }
-
-    /**
-     * Return the local host information for this session.
-     */
-    const HostAndPort& local() const {
-        return _local;
-    }
-
-    /**
-     * Return the X509 peer information for this connection (SSL only).
-     */
-    SSLPeerInfo getX509PeerInfo() const;
-
-    /**
-     * Set this session's tags. This Session will register
-     * its new tags with its TransportLayer.
-     */
-    void replaceTags(TagMask tags);
-
-    /**
-     * Get this session's tags.
-     */
-    TagMask getTags() const {
-        return _tags;
-    }
+    virtual TransportLayer* getTransportLayer() const = 0;
 
     /**
      * Source (receive) a new Message for this Session.
      *
      * This method will forward to sourceMessage on this Session's transport layer.
      */
-    Ticket sourceMessage(Message* message, Date_t expiration = Ticket::kNoExpirationDate);
+    virtual Ticket sourceMessage(Message* message, Date_t expiration = Ticket::kNoExpirationDate);
 
     /**
      * Sink (send) a new Message for this Session. This method should be used
@@ -135,34 +103,50 @@ public:
      *
      * This method will forward to sinkMessage on this Session's transport layer.
      */
-    Ticket sinkMessage(const Message& message, Date_t expiration = Ticket::kNoExpirationDate);
+    virtual Ticket sinkMessage(const Message& message,
+                               Date_t expiration = Ticket::kNoExpirationDate);
 
     /**
-     * The TransportLayer for this Session.
+     * Return the X509 peer information for this connection (SSL only).
      */
-    TransportLayer* getTransportLayer() const {
-        return _tl;
-    }
+    virtual SSLPeerInfo getX509PeerInfo() const;
 
-    MessageCompressorManager& getCompressorManager() {
-        return _messageCompressorManager;
-    }
+    /**
+     * Return the remote host for this session.
+     */
+    virtual const HostAndPort& remote() const = 0;
 
-private:
+    /**
+     * Return the local host information for this session.
+     */
+    virtual const HostAndPort& local() const = 0;
+
+    /**
+     * Set this session's tags. This Session will register
+     * its new tags with its TransportLayer.
+     */
+    virtual void replaceTags(TagMask tags);
+
+    /**
+     * Get this session's tags.
+     */
+    virtual TagMask getTags() const;
+
+    /**
+     * Get the compressor manager for this session.
+     */
+    virtual MessageCompressorManager& getCompressorManager();
+
+protected:
     /**
      * Construct a new session.
      */
-    Session(HostAndPort remote, HostAndPort local, TransportLayer* tl);
+    Session();
 
-    Id _id;
-
-    HostAndPort _remote;
-    HostAndPort _local;
+private:
+    const Id _id;
 
     TagMask _tags;
-
-    TransportLayer* _tl;
-
     MessageCompressorManager _messageCompressorManager;
 };
 

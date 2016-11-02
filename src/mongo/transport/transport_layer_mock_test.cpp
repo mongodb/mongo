@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/stdx/memory.h"
+#include "mongo/transport/mock_ticket.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_mock.h"
@@ -170,7 +171,7 @@ TEST_F(TransportLayerMockTest, SourceMessageTLShutdown) {
 // wait() returns an OK status
 TEST_F(TransportLayerMockTest, Wait) {
     SessionHandle session = tl()->createSession();
-    Ticket ticket = Ticket(tl(), stdx::make_unique<TransportLayerMock::TicketMock>(session));
+    Ticket ticket = Ticket(tl(), stdx::make_unique<transport::MockTicket>(session));
 
     Status status = tl()->wait(std::move(ticket));
     ASSERT_OK(status);
@@ -180,7 +181,7 @@ TEST_F(TransportLayerMockTest, Wait) {
 TEST_F(TransportLayerMockTest, WaitExpiredTicket) {
     SessionHandle session = tl()->createSession();
     Ticket expiredTicket =
-        Ticket(tl(), stdx::make_unique<TransportLayerMock::TicketMock>(session, Date_t::now()));
+        Ticket(tl(), stdx::make_unique<transport::MockTicket>(session, Date_t::now()));
 
     Status status = tl()->wait(std::move(expiredTicket));
     ASSERT_EQUALS(status.code(), ErrorCodes::ExceededTimeLimit);
@@ -198,7 +199,7 @@ TEST_F(TransportLayerMockTest, WaitInvalidTicket) {
 // wait() returns a SessionClosed error status if the Ticket's Session is closed
 TEST_F(TransportLayerMockTest, WaitSessionClosed) {
     SessionHandle session = tl()->createSession();
-    Ticket ticket = Ticket(tl(), stdx::make_unique<TransportLayerMock::TicketMock>(session));
+    Ticket ticket = Ticket(tl(), stdx::make_unique<transport::MockTicket>(session));
 
     tl()->end(session);
 
@@ -211,7 +212,7 @@ TEST_F(TransportLayerMockTest, WaitSessionClosed) {
 TEST_F(TransportLayerMockTest, WaitSessionUnknown) {
     std::unique_ptr<TransportLayerMock> anotherTL = stdx::make_unique<TransportLayerMock>();
     SessionHandle session = anotherTL->createSession();
-    Ticket ticket = Ticket(tl(), stdx::make_unique<TransportLayerMock::TicketMock>(session));
+    Ticket ticket = Ticket(tl(), stdx::make_unique<transport::MockTicket>(session));
 
     Status status = tl()->wait(std::move(ticket));
     ASSERT_EQUALS(status.code(), ErrorCodes::TransportSessionUnknown);
@@ -220,7 +221,7 @@ TEST_F(TransportLayerMockTest, WaitSessionUnknown) {
 // wait() returns a ShutdownInProgress status if the TransportLayer is in shutdown
 TEST_F(TransportLayerMockTest, WaitTLShutdown) {
     SessionHandle session = tl()->createSession();
-    Ticket ticket = Ticket(tl(), stdx::make_unique<TransportLayerMock::TicketMock>(session));
+    Ticket ticket = Ticket(tl(), stdx::make_unique<transport::MockTicket>(session));
 
     tl()->shutdown();
 
@@ -242,7 +243,7 @@ void assertEnded(TransportLayer* tl,
                  std::vector<SessionHandle> sessions,
                  ErrorCodes::Error code = ErrorCodes::TransportSessionClosed) {
     for (auto session : sessions) {
-        Ticket ticket = Ticket(tl, stdx::make_unique<TransportLayerMock::TicketMock>(session));
+        Ticket ticket = Ticket(tl, stdx::make_unique<transport::MockTicket>(session));
         Status status = tl->wait(std::move(ticket));
         ASSERT_EQUALS(status.code(), code);
     }
