@@ -2764,7 +2764,7 @@ int linenoiseHistorySetMaxLen(int len) {
 int linenoiseHistorySave(const char* filename) {
     FILE* fp;
 #if _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE || defined(__APPLE__)
-    int fd = open(filename, O_CREAT, S_IRUSR | S_IWUSR);
+    int fd = open(filename, O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR);
     if (fd == -1) {
         // report errno somehow?
         return -1;
