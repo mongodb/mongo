@@ -84,7 +84,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* txn,
             const IndexDescriptor* idx =
                 coll->getIndexCatalog()->findIndexByKeyPattern(txn, keyPattern);
             if (idx == NULL) {
-                return Status(ErrorCodes::InvalidOptions,
+                return Status(ErrorCodes::IndexNotFound,
                               str::stream() << "cannot find index " << keyPattern << " for ns "
                                             << nss.ns());
             }
