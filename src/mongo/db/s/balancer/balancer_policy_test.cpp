@@ -527,6 +527,18 @@ TEST(BalancerPolicy, BalancerFixesIncorrectTagsInOtherwiseBalancedClusterParalle
     ASSERT_BSONOBJ_EQ(cluster.second[kShardId3][0].getMax(), migrations[1].maxKey);
 }
 
+TEST(BalancerPolicy, BalancerHandlesNoShardsWithTag) {
+    auto cluster = generateCluster(
+        {{ShardStatistics(kShardId0, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 2},
+         {ShardStatistics(kShardId1, kNoMaxSize, 5, false, emptyTagSet, emptyShardVersion), 2}});
+
+    DistributionStatus distribution(kNamespace, cluster.second);
+    ASSERT_OK(
+        distribution.addRangeToZone(ZoneRange(kMinBSONKey, BSON("x" << 7), "NonExistentZone")));
+
+    ASSERT(BalancerPolicy::balance(cluster.first, distribution, false).empty());
+}
+
 TEST(DistributionStatus, AddTagRangeOverlap) {
     DistributionStatus d(kNamespace, ShardToChunksMap{});
 

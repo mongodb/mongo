@@ -233,7 +233,7 @@ Status BalancerPolicy::isShardSuitableReceiver(const ClusterStatistics::ShardSta
 
     if (!chunkTag.empty() && !stat.shardTags.count(chunkTag)) {
         return {ErrorCodes::IllegalOperation,
-                str::stream() << stat.shardId << " doesn't have right tag"};
+                str::stream() << stat.shardId << " is not in the correct zone " << chunkTag};
     }
 
     return Status::OK();
@@ -369,7 +369,7 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
                     continue;
 
                 if (chunk.getJumbo()) {
-                    warning() << "chunk " << redact(chunk.toString()) << " violates tag "
+                    warning() << "Chunk " << redact(chunk.toString()) << " violates zone "
                               << redact(tag) << ", but it is jumbo and cannot be moved";
                     continue;
                 }
@@ -378,7 +378,7 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
                     _getLeastLoadedReceiverShard(shardStats, distribution, tag, usedShards);
                 if (!to.isValid()) {
                     if (migrations.empty()) {
-                        warning() << "chunk " << redact(chunk.toString()) << " violates tag "
+                        warning() << "Chunk " << redact(chunk.toString()) << " violates zone "
                                   << redact(tag) << ", but no appropriate recipient found";
                     }
                     continue;
@@ -411,6 +411,18 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
             if (tag.empty() || stat.shardTags.count(tag)) {
                 totalNumberOfShardsWithTag++;
             }
+        }
+
+        // Skip zones which have no shards assigned to them. This situation is not harmful, but
+        // should not be possible so warn the operator to correct it.
+        if (totalNumberOfShardsWithTag == 0) {
+            if (!tag.empty()) {
+                warning() << "Zone " << redact(tag) << " in collection " << distribution.nss()
+                          << " has no assigned shards and chunks which fall into it cannot be "
+                             "balanced. This should be corrected by either assigning shards to the "
+                             "zone or by deleting it.";
+            }
+            continue;
         }
 
         // Calculate the ceiling of the optimal number of chunks per shard
@@ -466,7 +478,7 @@ bool BalancerPolicy::_singleZoneBalance(const ShardStatisticsVector& shardStats,
     const ShardId to = _getLeastLoadedReceiverShard(shardStats, distribution, tag, *usedShards);
     if (!to.isValid()) {
         if (migrations->empty()) {
-            log() << "No available shards to take chunks for tag [" << tag << "]";
+            log() << "No available shards to take chunks for zone [" << tag << "]";
         }
         return false;
     }
