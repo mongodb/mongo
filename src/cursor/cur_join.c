@@ -673,6 +673,8 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 		extract_cursor.entry = entry;
 		WT_ERR(idx->extractor->extract(idx->extractor,
 		    &session->iface, key, &v, &extract_cursor.iface));
+		__wt_buf_free(session, &extract_cursor.iface.key);
+		__wt_buf_free(session, &extract_cursor.iface.value);
 		if (!extract_cursor.ismember)
 			WT_ERR(WT_NOTFOUND);
 	} else
