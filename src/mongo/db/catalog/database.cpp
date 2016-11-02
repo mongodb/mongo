@@ -392,16 +392,7 @@ Status Database::dropCollection(OperationContext* txn, StringData fullns) {
                 if (_profile != 0)
                     return Status(ErrorCodes::IllegalOperation,
                                   "turn off profiling before dropping system.profile collection");
-            } else if (nss.isSystemDotViews()) {
-                if (serverGlobalParams.featureCompatibility.version.load() !=
-                        ServerGlobalParams::FeatureCompatibility::Version::k32 &&
-                    serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.load()) {
-                    return Status(ErrorCodes::IllegalOperation,
-                                  "The featureCompatibilityVersion must be 3.2 to drop the "
-                                  "system.views collection. See "
-                                  "http://dochub.mongodb.org/core/3.4-feature-compatibility.");
-                }
-            } else {
+            } else if (!nss.isSystemDotViews()) {
                 return Status(ErrorCodes::IllegalOperation, "can't drop system ns");
             }
         }

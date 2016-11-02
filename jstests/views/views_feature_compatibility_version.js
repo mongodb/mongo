@@ -29,11 +29,6 @@
     // 3.4.
     assert.writeOK(viewsDB.system.views.remove({_id: "views_feature_compatibility_version.view2"}));
 
-    // We cannot drop the system.views collection when the featureCompatibilityVersion is 3.4.
-    assert.throws(function() {
-        viewsDB.system.views.drop();
-    });
-
     // Ensure the featureCompatibilityVersion is 3.2.
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "3.2"}));
     res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});

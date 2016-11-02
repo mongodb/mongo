@@ -361,7 +361,7 @@ void syncFixUp(OperationContext* txn,
 
             verify(!doc._id.eoo());
 
-            {
+            try {
                 // TODO : slow.  lots of round trips.
                 numFetched++;
                 BSONObj good = rollbackSource.findOne(NamespaceString(doc.ns), doc._id.wrap());
@@ -370,6 +370,15 @@ void syncFixUp(OperationContext* txn,
 
                 // note good might be eoo, indicating we should delete it
                 goodVersions[doc.ns][doc] = good;
+            } catch (const DBException& ex) {
+                Status status = ex.toStatus();
+                // If the collection turned into a view, we might get an error trying to
+                // refetch documents, but these errors should be ignored, as we'll be creating
+                // the view during oplog replay.
+                if (status.code() == ErrorCodes::CommandNotSupportedOnView)
+                    continue;
+
+                throw ex;
             }
         }
         newMinValid = rollbackSource.getLastOperation();

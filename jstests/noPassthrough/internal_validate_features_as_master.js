@@ -159,15 +159,5 @@
 
     assert.commandFailed(testDB.runCommand({collMod: "view", pipeline: []}));
 
-    // Check for dropping system.views is enforced.
-    assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
-    res = conn.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.4");
-
-    assert.throws(function() {
-        testDB.system.views.drop();
-    });
-
     MongoRunner.stopMongod(conn);
 }());
