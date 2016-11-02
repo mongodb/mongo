@@ -466,8 +466,9 @@ Status NetworkInterfaceASIO::setAlarm(Date_t when, const stdx::function<void()>&
     std::shared_ptr<asio::system_timer> alarm;
 
     try {
+        auto timeLeft = when - now();
         // "alarm" must stay alive until it expires, hence the shared_ptr.
-        alarm = std::make_shared<asio::system_timer>(_io_service, when.toSystemTimePoint());
+        alarm = std::make_shared<asio::system_timer>(_io_service, timeLeft.toSystemDuration());
     } catch (...) {
         return exceptionToStatus();
     }
