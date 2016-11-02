@@ -186,10 +186,12 @@ intrusive_ptr<DocumentStorage> DocumentStorage::clone() const {
 
     // Make a copy of the buffer.
     // It is very important that the positions of each field are the same after cloning.
-    const size_t bufferBytes = (_bufferEnd + hashTabBytes()) - _buffer;
+    const size_t bufferBytes = allocatedBytes();
     out->_buffer = new char[bufferBytes];
     out->_bufferEnd = out->_buffer + (_bufferEnd - _buffer);
-    memcpy(out->_buffer, _buffer, bufferBytes);
+    if (bufferBytes > 0) {
+        memcpy(out->_buffer, _buffer, bufferBytes);
+    }
 
     // Copy remaining fields
     out->_usedBytes = _usedBytes;

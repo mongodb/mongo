@@ -104,6 +104,14 @@ TEST(DocumentConstruction, FromInitializerList) {
     ASSERT_EQUALS("q", getNthField(document, 1).second.getString());
 }
 
+TEST(DocumentConstruction, FromEmptyDocumentClone) {
+    Document document;
+    ASSERT_EQUALS(0U, document.size());
+    // Prior to SERVER-26462, cloning an empty document would cause a segmentation fault.
+    Document documentClone = document.clone();
+    ASSERT_DOCUMENT_EQ(document, documentClone);
+}
+
 /** Add Document fields. */
 class AddField {
 public:
