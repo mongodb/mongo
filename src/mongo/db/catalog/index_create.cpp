@@ -47,6 +47,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/fail_point_service.h"
@@ -62,6 +63,30 @@ using std::string;
 using std::endl;
 
 MONGO_FP_DECLARE(crashAfterStartingIndexBuild);
+
+std::atomic<std::int32_t> maxIndexBuildMemoryUsageMegabytes(500);  // NOLINT
+
+class ExportedMaxIndexBuildMemoryUsageParameter
+    : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {
+public:
+    ExportedMaxIndexBuildMemoryUsageParameter()
+        : ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime>(
+              ServerParameterSet::getGlobal(),
+              "maxIndexBuildMemoryUsageMegabytes",
+              &maxIndexBuildMemoryUsageMegabytes) {}
+
+    virtual Status validate(const std::int32_t& potentialNewValue) {
+        if (potentialNewValue < 100) {
+            return Status(
+                ErrorCodes::BadValue,
+                "maxIndexBuildMemoryUsageMegabytes must be greater than or equal to 100 MB");
+        }
+
+        return Status::OK();
+    }
+
+} exportedMaxIndexBuildMemoryUsageParameter;
+
 
 /**
  * On rollback sets MultiIndexBlock::_needToCleanup to true.
@@ -169,6 +194,14 @@ Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
         _buildInBackground = (_buildInBackground && info["background"].trueValue());
     }
 
+    std::vector<BSONObj> indexInfoObjs;
+    indexInfoObjs.reserve(indexSpecs.size());
+    std::size_t eachIndexBuildMaxMemoryUsageBytes = 0;
+    if (!indexSpecs.empty()) {
+        eachIndexBuildMaxMemoryUsageBytes =
+            std::size_t(maxIndexBuildMemoryUsageMegabytes) * 1024 * 1024 / indexSpecs.size();
+    }
+
     for (size_t i = 0; i < indexSpecs.size(); i++) {
         BSONObj info = indexSpecs[i];
         StatusWith<BSONObj> statusWithInfo =
@@ -192,7 +225,7 @@ Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
         if (!_buildInBackground) {
             // Bulk build process requires foreground building as it assumes nothing is changing
             // under it.
-            index.bulk = index.real->initiateBulk();
+            index.bulk = index.real->initiateBulk(eachIndexBuildMaxMemoryUsageBytes);
         }
 
         const IndexDescriptor* descriptor = index.block->getEntry()->descriptor();
@@ -203,7 +236,8 @@ Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
 
         log() << "build index on: " << ns << " properties: " << descriptor->toString();
         if (index.bulk)
-            log() << "\t building index using bulk method";
+            log() << "\t building index using bulk method; build may temporarily use up to "
+                  << eachIndexBuildMaxMemoryUsageBytes / 1024 / 1024 << " megabytes of RAM";
 
         index.filterExpression = index.block->getEntry()->getFilterExpression();
 

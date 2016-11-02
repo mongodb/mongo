@@ -339,17 +339,19 @@ Status IndexAccessMethod::update(OperationContext* txn,
     return Status::OK();
 }
 
-std::unique_ptr<IndexAccessMethod::BulkBuilder> IndexAccessMethod::initiateBulk() {
-    return std::unique_ptr<BulkBuilder>(new BulkBuilder(this, _descriptor));
+std::unique_ptr<IndexAccessMethod::BulkBuilder> IndexAccessMethod::initiateBulk(
+    size_t maxMemoryUsageBytes) {
+    return std::unique_ptr<BulkBuilder>(new BulkBuilder(this, _descriptor, maxMemoryUsageBytes));
 }
 
 IndexAccessMethod::BulkBuilder::BulkBuilder(const IndexAccessMethod* index,
-                                            const IndexDescriptor* descriptor)
+                                            const IndexDescriptor* descriptor,
+                                            size_t maxMemoryUsageBytes)
     : _sorter(Sorter::make(
           SortOptions()
               .TempDir(storageGlobalParams.dbpath + "/_tmp")
               .ExtSortAllowed()
-              .MaxMemoryUsageBytes(100 * 1024 * 1024),
+              .MaxMemoryUsageBytes(maxMemoryUsageBytes),
           BtreeExternalSortComparison(descriptor->keyPattern(), descriptor->version()))),
       _real(index) {}
 

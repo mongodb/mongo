@@ -202,7 +202,9 @@ public:
 
         using Sorter = mongo::Sorter<BSONObj, RecordId>;
 
-        BulkBuilder(const IndexAccessMethod* index, const IndexDescriptor* descriptor);
+        BulkBuilder(const IndexAccessMethod* index,
+                    const IndexDescriptor* descriptor,
+                    size_t maxMemoryUsageBytes);
 
         std::unique_ptr<Sorter> _sorter;
         const IndexAccessMethod* _real;
@@ -216,8 +218,11 @@ public:
      * This can return NULL, meaning bulk mode is not available.
      *
      * It is only legal to initiate bulk when the index is new and empty.
+     *
+     * maxMemoryUsageBytes: amount of memory consumed before the external sorter starts spilling to
+     *                      disk
      */
-    std::unique_ptr<BulkBuilder> initiateBulk();
+    std::unique_ptr<BulkBuilder> initiateBulk(size_t maxMemoryUsageBytes);
 
     /**
      * Call this when you are ready to finish your bulk work.
