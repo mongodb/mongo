@@ -90,7 +90,7 @@ main(int argc, char *argv[])
 	WT_CURSOR *cursor1, *cursor2, *jcursor;
 	WT_ITEM k, v;
 	WT_SESSION *session;
-	int ret;
+	int i, ret;
 	int32_t key, val[2];
 
 	opts = &_opts;
@@ -125,7 +125,7 @@ main(int argc, char *argv[])
 	key = 10;
 	val[0] = 20;
 	val[1] = 30;
-	for (int i = 0; i < 100000; ++i) {
+	for (i = 0; i < 100000; ++i) {
 		key += i;
 		val[0] += i; val[1] += i;
 		cursor1->set_key(cursor1, &k);
