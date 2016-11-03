@@ -1453,14 +1453,14 @@ __evict_walk_file(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue,
 		if (modified && !F_ISSET(cache, WT_CACHE_EVICT_DIRTY))
 			continue;
 
-		/* If eviction gets aggressive, anything else is fair game. */
-		if (__wt_cache_aggressive(session))
-			goto fast;
-
 		/* Limit internal pages to 50% of the total. */
 		if (WT_PAGE_IS_INTERNAL(page) &&
 		    internal_pages >= (int)(evict - start) / 2)
 			continue;
+
+		/* If eviction gets aggressive, anything else is fair game. */
+		if (__wt_cache_aggressive(session))
+			goto fast;
 
 		/*
 		 * If the oldest transaction hasn't changed since the last time
