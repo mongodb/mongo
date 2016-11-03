@@ -142,7 +142,7 @@ Database* DatabaseHolder::openDb(OperationContext* txn, StringData ns, bool* jus
 }
 
 void DatabaseHolder::close(OperationContext* txn, StringData ns) {
-    // TODO: This should be fine if only a DB X-lock
+    // Global lock is required.
     invariant(txn->lockState()->isW());
 
     const StringData dbName = _todb(ns);

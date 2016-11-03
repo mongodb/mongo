@@ -16,7 +16,7 @@ var myColl = mydb.a;
 var doc = {_id: 1, a: "hello world"};
 myColl.insert(doc);
 myColl.ensureIndex({a: 1});
-mydb.repairDatabase();
+assert.commandWorked(mydb.repairDatabase());
 var foundDoc = myColl.findOne();
 
 assert.neq(null, foundDoc);
@@ -28,12 +28,12 @@ assert.docEq(doc, myColl.findOne({_id: 1}));
 // 3
 var myColl2 = mydb.b;
 myColl.remove({});
-mydb.repairDatabase();
+assert.commandWorked(mydb.repairDatabase());
 
 // 4
 var myColl2 = mydb.b;
 myColl.insert(doc);
 myColl2.insert(doc);
-mydb.repairDatabase();
+assert.commandWorked(mydb.repairDatabase());
 assert.docEq(doc, myColl.findOne({a: doc.a}));
 assert.docEq(doc, myColl2.findOne({a: doc.a}));

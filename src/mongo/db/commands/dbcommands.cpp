@@ -261,9 +261,13 @@ public:
             return false;
         }
 
-        // TODO: SERVER-4328 Don't lock globally
+        // Closing a database requires a global lock.
         ScopedTransaction transaction(txn, MODE_X);
         Lock::GlobalWrite lk(txn->lockState());
+        if (!dbHolder().get(txn, dbname)) {
+            errmsg = str::stream() << "Database does not exist. Database: `" << dbname << "`";
+            return false;
+        }
 
         // TODO (Kal): OldClientContext legacy, needs to be removed
         {
