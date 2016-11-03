@@ -311,14 +311,14 @@ env.Default(env.Install('#/', mongod))
 # tools
 rewrittenTools = [ "mongodump", "mongorestore", "mongoexport", "mongoimport", "mongostat", "mongotop", "bsondump", "mongofiles", "mongooplog" ]
 
-# mongobridge and mongoperf
+# mongoperf
 env.Install(
     '#/',
     [
         env.Program("mongoperf",
                     [
                         "client/examples/mongoperf.cpp",
-                    ],
+                    ] + env.WindowsResourceFile("client/examples/mongoperf.rc"),
                     LIBDEPS=[
                         "db/serveronly",
                     ]),
@@ -334,7 +334,7 @@ env.Install(
             's/mongos_options_init.cpp',
             's/server.cpp',
             's/service_entry_point_mongos.cpp',
-        ],
+        ] + env.WindowsResourceFile("s/server.rc"),
         LIBDEPS=[
             'db/conn_pool_options',
             'db/commands/core',
@@ -405,7 +405,7 @@ if not has_option('noshell') and usemozjs:
 
     mongo_shell = shellEnv.Program(
         "mongo",
-        "shell/dbshell.cpp",
+        ["shell/dbshell.cpp"] + env.WindowsResourceFile("shell/shell.rc"),
         LIBDEPS=["$BUILD_DIR/third_party/shim_pcrecpp",
                  "shell_core",
                  "db/server_options_core",

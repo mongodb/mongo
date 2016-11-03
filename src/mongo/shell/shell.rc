@@ -1,0 +1,54 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include <winres.h>
+
+#include "mongo/util/resource_constants.h"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+#define IDI_ICON2 102
+
+IDI_ICON2               ICON                    "mongo/db/mongo.ico"
+/////////////////////////////////////////////////////////////////////////////
+
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+
+// Fields are documented here:
+// https://msdn.microsoft.com/en-us/library/windows/desktop/ms646987(v=vs.85).aspx
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION MONGO_VERSION_MAJOR,MONGO_VERSION_MINOR,MONGO_VERSION_PATCH,0
+ PRODUCTVERSION MONGO_VERSION_MAJOR,MONGO_VERSION_MINOR,MONGO_VERSION_PATCH,0
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x40004L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "MongoDB, Inc"
+            VALUE "FileDescription", "MongoDB Shell"
+            VALUE "FileVersion", MONGO_FILE_VERSION_STR
+            VALUE "InternalName", "mongo.exe"
+            VALUE "OriginalFilename", "mongo.exe"
+            VALUE "ProductName", MONGO_PRODUCT_NAME_STR
+            VALUE "ProductVersion", MONGO_PRODUCT_VERSION_STR
+            VALUE "Comment", MONGO_VERSION_COMMENT_STR
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
