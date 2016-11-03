@@ -227,6 +227,18 @@ generatedVersionFile = env.Substfile(
     ])
 env.Alias('generated-sources', generatedVersionFile)
 
+if env.TargetOSIs('windows'):
+    generatedResourceConstantFile = env.Substfile(
+        'util/resource_constants.h.in',
+        SUBST_DICT=[
+            ('@mongo_version@', env['MONGO_VERSION']),
+            ('@mongo_version_major@', version_parts[0]),
+            ('@mongo_version_minor@', version_parts[1]),
+            ('@mongo_version_patch@', version_parts[2]),
+            ('@mongo_git_hash@', env['MONGO_GIT_HASH']),
+        ])
+    env.Alias('generated-sources', generatedResourceConstantFile)
+
 config_header_substs = (
     ('@mongo_config_byte_order@', 'MONGO_CONFIG_BYTE_ORDER'),
     ('@mongo_config_debug_build@', 'MONGO_CONFIG_DEBUG_BUILD'),
@@ -291,10 +303,9 @@ mongod = env.Program(
         "db/db.cpp",
         "db/mongod_options_init.cpp",
         "db/service_entry_point_mongod.cpp",
-    ],
+    ] + env.WindowsResourceFile("db/db.rc"),
     LIBDEPS=mongodLibDeps,
 )
-
 env.Default(env.Install('#/', mongod))
 
 # tools

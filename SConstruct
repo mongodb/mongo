@@ -2875,6 +2875,15 @@ def checkErrorCodes():
 
 checkErrorCodes()
 
+# Resource Files are Windows specific
+def env_windows_resource_file(env, path):
+    if env.TargetOSIs('windows'):
+        return [ env.RES(path) ]
+    else:
+        return []
+
+env.AddMethod(env_windows_resource_file, 'WindowsResourceFile')
+
 # --- lint ----
 
 def doLint( env , target , source ):
