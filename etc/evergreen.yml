@@ -711,6 +711,59 @@ functions:
           kill_process "$process"
         done
 
+  "set up kitchen credentials":
+    command: shell.exec
+    params:
+      silent: true
+      script: |
+        set -o errexit
+
+        mkdir -p ~/.ssh ~/.aws
+        echo -n "${kitchen_private_key}" > ~/.ssh/kitchen.pem
+        chmod 0600 ~/.ssh/kitchen.pem
+
+        cat <<EOF > ~/.aws/config
+        [default]
+        region = us-east-1
+        EOF
+
+        cat <<EOF > ~/.aws/credentials
+        [default]
+        aws_access_key_id = ${kitchen_aws_key}
+        aws_secret_access_key = ${kitchen_aws_secret}
+        EOF
+
+  "run kitchen":
+    command: shell.exec
+    type: test
+    params:
+      working_dir: src/buildscripts/package_test
+      script: |
+        set -o errexit
+
+        export KITCHEN_ARTIFACTS_URL="https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}.tgz"
+        export KITCHEN_SECURITY_GROUP="${kitchen_security_group}"
+        export KITCHEN_SSH_KEY_ID="${kitchen_ssh_key_id}"
+        export KITCHEN_SUBNET="${kitchen_subnet}"
+
+        kitchen_variant=${packager_distro}
+
+        # `kitchen test` will test all variants if $kitchen_variant is empty, so exit early if $kitchen_variant is empty
+        if [ -z "$kitchen_variant" ]; then
+          echo "could not find a variant name, exiting"
+          exit 1
+        fi
+
+        # run `kitchen destroy` after we run `kitchen verify`, and exit with the `kitchen verify` exit status
+        finish () {
+          ret=$?
+          kitchen destroy "$kitchen_variant"
+          exit $ret
+        }
+        trap finish EXIT
+
+        kitchen verify "$kitchen_variant"
+
 pre:
   - command: shell.track
   - func: "kill processes"
@@ -2602,6 +2655,14 @@ tasks:
       resmoke_args: --suites=views_rs --storageEngine=wiredTiger
       run_multiple_jobs: true
 
+- name: package
+  depends_on:
+  - name: compile
+  commands:
+    - func: "fetch artifacts"
+    - func: "set up kitchen credentials"
+    - func: "run kitchen"
+
 - name: push
   patchable: false
   depends_on:
@@ -3614,6 +3675,9 @@ buildvariants:
   - name: views_WT
   - name: views_rs
   - name: views_rs_WT
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 - name: ubuntu1404
@@ -3742,6 +3806,9 @@ buildvariants:
   - name: views_WT
   - name: views_rs
   - name: views_rs_WT
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 - name: ubuntu1604
@@ -3861,6 +3928,9 @@ buildvariants:
   - name: views_WT
   - name: views_rs
   - name: views_rs_WT
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 - name: enterprise-ubuntu1604-arm64
@@ -4278,6 +4348,9 @@ buildvariants:
   - name: views_WT
   - name: views_rs
   - name: views_rs_WT
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 - name: amazon
@@ -4400,6 +4473,9 @@ buildvariants:
   - name: views_WT
   - name: views_rs
   - name: views_rs_WT
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 ###########################################
@@ -5525,6 +5601,9 @@ buildvariants:
   - name: views_WT
   - name: views_rs
   - name: views_rs_WT
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 - name: enterprise-rhel-62-64-bit-coverage
@@ -5786,6 +5865,9 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: unittests
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 
@@ -5907,6 +5989,9 @@ buildvariants:
   - name: views_WT
   - name: views_rs
   - name: views_rs_WT
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 - name: rhel70
@@ -6043,6 +6128,9 @@ buildvariants:
   - name: views_WT
   - name: views_rs
   - name: views_rs_WT
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 - name: enterprise-rhel-71-ppc64le
@@ -6376,6 +6464,9 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: unittests
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 
@@ -6440,6 +6531,9 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: unittests
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 
@@ -6495,6 +6589,9 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: unittests
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 
@@ -6571,6 +6668,9 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: unittests
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 
@@ -6784,6 +6884,9 @@ buildvariants:
   - name: views_WT
   - name: views_rs
   - name: views_rs_WT
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 
@@ -6838,6 +6941,9 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: unittests
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 - name: enterprise-suse11-s390x
@@ -7045,6 +7151,9 @@ buildvariants:
   - name: views_WT
   - name: views_rs
   - name: views_rs_WT
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 
@@ -7196,6 +7305,9 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: unittests
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 
@@ -7251,6 +7363,9 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: unittests
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 
@@ -7373,6 +7488,9 @@ buildvariants:
   - name: views_WT
   - name: views_rs
   - name: views_rs_WT
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 
@@ -7495,6 +7613,9 @@ buildvariants:
   - name: views_WT
   - name: views_rs
   - name: views_rs_WT
+  - name: package
+    distros:
+    - ubuntu1604-packer
   - name: push
 
 
