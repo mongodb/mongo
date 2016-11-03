@@ -45,12 +45,13 @@
             -1);
 
     // 5. Verify only "repairDB" exists.
-    var dbNames = db.getMongo().getDBNames() assert.contains(
+    var dbNames = db.getMongo().getDBNames();
+    assert.contains(
         "repair_database_input_validation_REPAIRDB", dbNames, "Should contain REPAIRDB");
     assert.eq(false, dbNames.some(function(x) {
-        x == "repair_database_input_validation_repairdb"
+        x == "repair_database_input_validation_repairdb";
     }));
     assert.eq(false, dbNames.some(function(x) {
-        x == "repair_database_input_validation_nonExistentDb"
+        x == "repair_database_input_validation_nonExistentDb";
     }));
 })();
