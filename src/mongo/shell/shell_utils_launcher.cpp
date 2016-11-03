@@ -134,9 +134,7 @@ void safeClose(int fd) {
     }
 }
 
-#ifdef _WIN32
 stdx::mutex _createProcessMtx;
-#endif
 }  // namespace
 
 ProgramOutputMultiplexer programOutputLogger;
@@ -374,37 +372,58 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env) {
 
 void ProgramRunner::start() {
     int pipeEnds[2];
-    int status = pipe(pipeEnds);
-    if (status != 0) {
-        const auto ewd = errnoWithDescription();
-        error() << "failed to create pipe: " << ewd;
-        fassertFailed(16701);
-    }
+
+    {
+        // NOTE(JCAREY):
+        //
+        // We take this lock from before our call to pipe until after we close the write side (in
+        // the parent) to avoid leaking fds from threads racing around fork().  I.e.
+        //
+        // Thread A: calls pipe()
+        // Thread B: calls fork()
+        // A: sets cloexec on read and write sides
+        // B: has a forked child with open fds
+        // A: spawns a child thread to read it's child process's stdout
+        // A: A's child process exits
+        // A: wait's on A's reader thread in de-register
+        // A: deadlocks forever (because the child reader thread stays in read() because of the open
+        //    fd in B)
+        //
+        // Holding the lock for the duration of those events prevents the leaks and thus the
+        // associated deadlocks.
+        stdx::lock_guard<stdx::mutex> lk(_createProcessMtx);
+        int status = pipe(pipeEnds);
+        if (status != 0) {
+            const auto ewd = errnoWithDescription();
+            error() << "failed to create pipe: " << ewd;
+            fassertFailed(16701);
+        }
 #ifndef _WIN32
-    // The calls to fcntl to set CLOEXEC ensure that processes started by the process we are about
-    // to fork do *not* inherit the file descriptors for the pipe. If grandchild processes could
-    // inherit the FD for the pipe, than the pipe wouldn't close on child process exit. On windows,
-    // instead the handle inherit flag is turned off after the call to CreateProcess.
-    status = fcntl(pipeEnds[0], F_SETFD, FD_CLOEXEC);
-    if (status != 0) {
-        const auto ewd = errnoWithDescription();
-        error() << "failed to set FD_CLOEXEC on pipe end 0: " << ewd;
-        fassertFailed(40308);
-    }
-    status = fcntl(pipeEnds[1], F_SETFD, FD_CLOEXEC);
-    if (status != 0) {
-        const auto ewd = errnoWithDescription();
-        error() << "failed to set FD_CLOEXEC on pipe end 1: " << ewd;
-        fassertFailed(40317);
-    }
+        // The calls to fcntl to set CLOEXEC ensure that processes started by the process we are
+        // about to fork do *not* inherit the file descriptors for the pipe. If grandchild processes
+        // could inherit the FD for the pipe, than the pipe wouldn't close on child process exit. On
+        // windows, instead the handle inherit flag is turned off after the call to CreateProcess.
+        status = fcntl(pipeEnds[0], F_SETFD, FD_CLOEXEC);
+        if (status != 0) {
+            const auto ewd = errnoWithDescription();
+            error() << "failed to set FD_CLOEXEC on pipe end 0: " << ewd;
+            fassertFailed(40308);
+        }
+        status = fcntl(pipeEnds[1], F_SETFD, FD_CLOEXEC);
+        if (status != 0) {
+            const auto ewd = errnoWithDescription();
+            error() << "failed to set FD_CLOEXEC on pipe end 1: " << ewd;
+            fassertFailed(40317);
+        }
 #endif
 
-    fflush(0);
+        fflush(0);
 
-    launchProcess(pipeEnds[1]);  // sets _pid
+        launchProcess(pipeEnds[1]);  // sets _pid
 
-    // Close the write end of the pipe.
-    safeClose(pipeEnds[1]);
+        // Close the write end of the pipe.
+        safeClose(pipeEnds[1]);
+    }
 
     if (_port >= 0) {
         registry.registerProgram(_pid, _port);
@@ -551,47 +570,44 @@ void ProgramRunner::launchProcess(int child_stdout) {
     }
     std::memset(lpEnvironment.get() + environmentOffset, 0, sizeof(wchar_t));
 
-    {
-        stdx::lock_guard<stdx::mutex> lk(_createProcessMtx);
-        HANDLE h = reinterpret_cast<HANDLE>(_get_osfhandle(child_stdout));
-        invariant(h != INVALID_HANDLE_VALUE);
-        invariant(SetHandleInformation(h, HANDLE_FLAG_INHERIT, 1));
+    HANDLE h = reinterpret_cast<HANDLE>(_get_osfhandle(child_stdout));
+    invariant(h != INVALID_HANDLE_VALUE);
+    invariant(SetHandleInformation(h, HANDLE_FLAG_INHERIT, 1));
 
-        STARTUPINFO si;
-        ZeroMemory(&si, sizeof(si));
-        si.cb = sizeof(si);
-        si.hStdError = h;
-        si.hStdOutput = h;
-        si.dwFlags |= STARTF_USESTDHANDLES;
+    STARTUPINFO si;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    si.hStdError = h;
+    si.hStdOutput = h;
+    si.dwFlags |= STARTF_USESTDHANDLES;
 
-        PROCESS_INFORMATION pi;
-        ZeroMemory(&pi, sizeof(pi));
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&pi, sizeof(pi));
 
-        DWORD dwCreationFlags = 0;
-        dwCreationFlags |= CREATE_UNICODE_ENVIRONMENT;
+    DWORD dwCreationFlags = 0;
+    dwCreationFlags |= CREATE_UNICODE_ENVIRONMENT;
 
-        bool success = CreateProcessW(nullptr,
-                                      const_cast<LPWSTR>(args.c_str()),
-                                      nullptr,
-                                      nullptr,
-                                      true,
-                                      dwCreationFlags,
-                                      lpEnvironment.get(),
-                                      nullptr,
-                                      &si,
-                                      &pi) != 0;
-        if (!success) {
-            const auto ewd = errnoWithDescription();
-            ss << "couldn't start process " << _argv[0] << "; " << ewd;
-            uasserted(14042, ss.str());
-        }
-
-        CloseHandle(pi.hThread);
-        invariant(SetHandleInformation(h, HANDLE_FLAG_INHERIT, 0));
-
-        _pid = ProcessId::fromNative(pi.dwProcessId);
-        registry.insertHandleForPid(_pid, pi.hProcess);
+    bool success = CreateProcessW(nullptr,
+                                  const_cast<LPWSTR>(args.c_str()),
+                                  nullptr,
+                                  nullptr,
+                                  true,
+                                  dwCreationFlags,
+                                  lpEnvironment.get(),
+                                  nullptr,
+                                  &si,
+                                  &pi) != 0;
+    if (!success) {
+        const auto ewd = errnoWithDescription();
+        ss << "couldn't start process " << _argv[0] << "; " << ewd;
+        uasserted(14042, ss.str());
     }
+
+    CloseHandle(pi.hThread);
+    invariant(SetHandleInformation(h, HANDLE_FLAG_INHERIT, 0));
+
+    _pid = ProcessId::fromNative(pi.dwProcessId);
+    registry.insertHandleForPid(_pid, pi.hProcess);
 #else
 
     std::string execErrMsg = str::stream() << "Unable to start program " << _argv[0];
