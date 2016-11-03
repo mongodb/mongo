@@ -19,4 +19,5 @@
     var config = rst.getReplSetConfig();
     var response = oldNode.getDB("admin").runCommand({replSetInitiate: config});
     assert.eq(response.ok, 1);
+    rst.awaitReplication();
 })();
