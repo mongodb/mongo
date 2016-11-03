@@ -967,7 +967,14 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                 argArray.push(...['--setParameter', "enableTestCommands=1"]);
                 if (!programVersion || (parseInt(programVersion.split(".")[0]) >= 3 &&
                                         parseInt(programVersion.split(".")[1]) >= 3)) {
-                    argArray.push(...['--setParameter', "logComponentVerbosity={tracking:1}"]);
+                    if (argArray
+                            .filter((val) => {
+                                return typeof val === "string" &&
+                                    val.indexOf("logComponentVerbosity") === 0;
+                            })
+                            .length === 0) {
+                        argArray.push(...['--setParameter', "logComponentVerbosity={tracking:1}"]);
+                    }
                 }
             }
             if (jsTest.options().authMechanism && jsTest.options().authMechanism != "SCRAM-SHA-1") {
