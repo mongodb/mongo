@@ -57,7 +57,8 @@ class AutoGetActiveCloner {
     MONGO_DISALLOW_COPYING(AutoGetActiveCloner);
 
 public:
-    AutoGetActiveCloner(OperationContext* txn, const MigrationSessionId& migrationSessionId) {
+    AutoGetActiveCloner(OperationContext* txn, const MigrationSessionId& migrationSessionId)
+        : _scopedXact(txn, MODE_IS) {
         ShardingState* const gss = ShardingState::get(txn);
 
         const auto nss = gss->getActiveDonateChunkNss();
@@ -65,6 +66,10 @@ public:
 
         // Once the collection is locked, the migration status cannot change
         _autoColl.emplace(txn, *nss, MODE_IS);
+
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "Collection " << nss->ns() << " does not exist",
+                _autoColl->getCollection());
 
         auto css = CollectionShardingState::get(txn, *nss);
         uassert(ErrorCodes::IllegalOperation,
@@ -78,7 +83,7 @@ public:
 
         // Ensure the session ids are correct
         uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "requested migration session id " << migrationSessionId.toString()
+                str::stream() << "Requested migration session id " << migrationSessionId.toString()
                               << " does not match active session id "
                               << _chunkCloner->getSessionId().toString(),
                 migrationSessionId.matches(_chunkCloner->getSessionId()));
@@ -100,6 +105,9 @@ public:
     }
 
 private:
+    // Scoped transaction to reset the WT snapshot
+    ScopedTransaction _scopedXact;
+
     // Scoped database + collection lock
     boost::optional<AutoGetCollection> _autoColl;
 
