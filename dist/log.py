@@ -98,34 +98,6 @@ def printf_line(f, optype, i, ishex):
     return ifbegin + body + ifend
 
 #####################################################################
-# Update log.h with #defines for types
-#####################################################################
-log_defines = (
-    ''.join('/*! %s */\n#define\t%s\t%d\n' % (r.desc, r.macro_name(), i)
-        for i, r in enumerate(log_data.rectypes)) +
-    ''.join('/*! %s */\n#define\t%s\t%d\n' % (r.desc, r.macro_name(), i)
-        for i, r in enumerate(log_data.optypes,start=1))
-)
-
-tfile = open(tmp_file, 'w')
-skip = 0
-for line in open('../src/include/wiredtiger.in', 'r'):
-    if skip:
-        if 'Log record declarations: END' in line:
-            tfile.write('/*\n' + line)
-            skip = 0
-    else:
-        tfile.write(line)
-    if 'Log record declarations: BEGIN' in line:
-        skip = 1
-        tfile.write(' */\n')
-        tfile.write('/*! invalid operation */\n')
-        tfile.write('#define\tWT_LOGOP_INVALID\t0\n')
-        tfile.write(log_defines)
-tfile.close()
-compare_srcfile(tmp_file, '../src/include/wiredtiger.in')
-
-#####################################################################
 # Create log_auto.c with handlers for each record / operation type.
 #####################################################################
 f='../src/log/log_auto.c'
