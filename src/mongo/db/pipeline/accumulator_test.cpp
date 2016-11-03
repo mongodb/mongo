@@ -283,7 +283,16 @@ TEST(Accumulators, Sum) {
          // Two doubles.
          {{Value(2.5), Value(5.5)}, Value(8.0)},
          // An int, a long, and a double.
-         {{Value(5), Value(99), Value(0.2)}, Value(104.2)},
+         {{Value(5), Value(99LL), Value(0.2)}, Value(104.2)},
+         // Two decimals.
+         {{Value(Decimal128("-10.100")), Value(Decimal128("20.200"))}, Value(Decimal128("10.100"))},
+         // Two longs and a decimal.
+         {{Value(10LL), Value(10LL), Value(Decimal128("10.000"))}, Value(Decimal128("30.000"))},
+         // A double and a decimal.
+         {{Value(2.5), Value(Decimal128("2.5"))}, Value(Decimal128("5.0"))},
+         // An int, long, double and decimal.
+         {{Value(10), Value(10LL), Value(10.5), Value(Decimal128("9.6"))},
+          Value(Decimal128("40.1"))},
 
          // A negative value is summed.
          {{Value(5), Value(-8.5)}, Value(-3.5)},
