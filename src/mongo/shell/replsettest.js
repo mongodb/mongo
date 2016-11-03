@@ -302,17 +302,6 @@ var ReplSetTest = function(opts) {
     }
 
     /*
-     * Checks if given optime object conforms to Protocol Version 1 optime format.
-     *
-     * PV1 Format:
-     * {ts:Timestamp, t:NumberLong}
-     *
-     */
-    function _isOptimeV1(optime) {
-        return (optime.hasOwnProperty("ts") && optime.hasOwnProperty("t"));
-    }
-
-    /*
      * Compares Timestamp objects. Returns true if ts1 is 'earlier' than ts2, else false.
      */
     function _isEarlierTimestamp(ts1, ts2) {
@@ -320,34 +309,6 @@ var ReplSetTest = function(opts) {
             return ts1.getInc() < ts2.getInc();
         }
         return ts1.getTime() < ts2.getTime();
-    }
-
-    /*
-     * Compares optimes. Returns true if ot1 is 'earlier' than ot2, else false.
-     *
-     * Note: Since Protocol Version 1 was introduced for replication, 'optimes'
-     * can come in two different formats. This function checks for this and changes
-     * any timestamps of PV0 format to PV1 format, by adding a default term number of -1,
-     * to make comparison logic generic for both formats.
-     *
-     * Optime Formats:
-     * PV0: Timestamp
-     * PV1: {ts:Timestamp, t:NumberLong}
-     */
-    function _isEarlierOpTime(ot1, ot2) {
-        // Make sure both optimes have a timestamp and a term.
-        var ot1 = _isOptimeV1(ot1) ? ot1 : {ts: ot1, t: NumberLong(-1)};
-        var ot2 = _isOptimeV1(ot2) ? ot2 : {ts: ot2, t: NumberLong(-1)};
-
-        // If both optimes have a term that's not -1 and one has a lower term, return that optime.
-        if (!friendlyEqual(ot1.t, NumberLong(-1)) && !friendlyEqual(ot2.t, NumberLong(-1))) {
-            if (!friendlyEqual(ot1.t, ot2.t)) {
-                return ot1.t < ot2.t;
-            }
-        }
-
-        // Otherwise, choose the optime with the lower timestamp.
-        return _isEarlierTimestamp(ot1.ts, ot2.ts);
     }
 
     /**
@@ -724,7 +685,7 @@ var ReplSetTest = function(opts) {
                 if (friendlyEqual(rcmOpTime, {ts: Timestamp(0, 0), t: NumberLong(0)})) {
                     return false;
                 }
-                if (_isEarlierOpTime(rcmOpTime, masterOpTime)) {
+                if (rs.compareOpTimes(rcmOpTime, masterOpTime) < 0) {
                     return false;
                 }
             }
@@ -824,7 +785,7 @@ var ReplSetTest = function(opts) {
                         slaveOpTime = _getLastOpTime(slave);
                     }
 
-                    if (_isEarlierOpTime(masterLatestOpTime, slaveOpTime)) {
+                    if (rs.compareOpTimes(masterLatestOpTime, slaveOpTime) < 0) {
                         masterLatestOpTime = _getLastOpTime(master);
                         print("ReplSetTest awaitReplication: optime for " + slaveName +
                               " is newer, resetting latest primary optime to " +

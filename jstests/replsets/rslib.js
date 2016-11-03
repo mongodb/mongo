@@ -10,6 +10,7 @@ var waitUntilAllNodesCaughtUp;
 var updateConfigIfNotDurable;
 var reInitiateWithoutThrowingOnAbortedMember;
 var awaitRSClientHosts;
+var getLastOpTime;
 
 (function() {
     "use strict";
@@ -355,5 +356,16 @@ var awaitRSClientHosts;
 
             return false;
         }, 'timed out waiting for replica set client to recognize hosts', timeout);
+    };
+
+    /**
+     * Returns the last opTime of the connection based from replSetGetStatus. Can only
+     * be used on replica set nodes.
+     */
+    getLastOpTime = function(conn) {
+        var replSetStatus =
+            assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1}));
+        var connStatus = replSetStatus.members.filter(m => m.self)[0];
+        return connStatus.optime;
     };
 }());
