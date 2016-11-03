@@ -4201,6 +4201,11 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*! @} */
 
 /*!
+ * @addtogroup wt
+ * @{
+ */
+
+/*!
  * @name Log record and operation types
  * @anchor log_types
  * @{
@@ -4210,8 +4215,6 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  * never change because they're written into the log.  Append
  * any new records or operations to the appropriate set.
  */
-/*! invalid operation */
-#define	WT_LOGOP_INVALID	0
 /*! checkpoint */
 #define	WT_LOGREC_CHECKPOINT	0
 /*! transaction commit */
@@ -4220,6 +4223,8 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_LOGREC_FILE_SYNC	2
 /*! message */
 #define	WT_LOGREC_MESSAGE	3
+/*! invalid operation */
+#define	WT_LOGOP_INVALID	0
 /*! column put */
 #define	WT_LOGOP_COL_PUT	1
 /*! column remove */
@@ -4237,10 +4242,6 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*******************************************
  * Statistic reference.
  *******************************************/
-/*!
- * @addtogroup wt
- * @{
- */
 /*
  * DO NOT EDIT: automatically built by dist/api_stat.py.
  * Statistics section: BEGIN
@@ -5104,6 +5105,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  * Statistics section: END
  * DO NOT EDIT: automatically built by dist/api_stat.py.
  */
+/*! @} */
 
 #undef __F
 
