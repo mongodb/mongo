@@ -308,7 +308,6 @@ __split_ref_deepen_move(WT_SESSION_IMPL *session,
 		addr->size = (uint8_t)unpack.size;
 		addr->type =
 		    unpack.raw == WT_CELL_ADDR_INT ? WT_ADDR_INT : WT_ADDR_LEAF;
-		ref->addr = addr;
 		if (!__wt_atomic_cas_ptr(&ref->addr, ref_addr, addr)) {
 			__wt_free(session, addr->addr);
 			__wt_free(session, addr);

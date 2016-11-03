@@ -860,6 +860,7 @@ nowrite
 np
 nr
 nset
+nsnap
 nthread
 nul
 nuls
@@ -1060,6 +1061,7 @@ tdrop
 tdump
 tdumpfile
 tempty
+testutil
 th
 thazard
 tid

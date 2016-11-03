@@ -117,8 +117,9 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 		sources = NULL;
 	}
 
-	WT_ERR(__wt_config_gets(session, cfg, "statistics_log.path", &cval));
-	WT_ERR(__wt_nfilename(session, cval.str, cval.len, &conn->stat_path));
+	__wt_free(session, conn->stat_path);
+	WT_ERR(__wt_filename(
+	    session, "WiredTigerStat.%d.%H", &conn->stat_path));
 
 	WT_ERR(__wt_config_gets(
 	    session, cfg, "statistics_log.timestamp", &cval));
