@@ -151,7 +151,6 @@ public:
     }
 
 private:
-    void _init(const std::string& ns, StringData coll);
     void _ensureMajorityCommittedSnapshotIsValid(const NamespaceString& nss);
 
     const Timer _timer;

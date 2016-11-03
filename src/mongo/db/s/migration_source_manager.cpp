@@ -305,7 +305,8 @@ bool MigrationSourceManager::transferMods(OperationContext* txn,
     long long size = 0;
 
     {
-        AutoGetCollectionForRead ctx(txn, _getNS());
+        ScopedTransaction scopedXact(txn, MODE_IS);
+        AutoGetCollection autoColl(txn, _getNS(), MODE_IS);
 
         stdx::lock_guard<stdx::mutex> sl(_mutex);
 
@@ -324,9 +325,13 @@ bool MigrationSourceManager::transferMods(OperationContext* txn,
             return false;
         }
 
-        // TODO: fix SERVER-16540 race
-        _xfer(txn, _nss.ns(), ctx.getDb(), &_deleted, b, "deleted", size, false);
-        _xfer(txn, _nss.ns(), ctx.getDb(), &_reload, b, "reload", size, true);
+        if (!autoColl.getCollection()) {
+            errmsg = str::stream() << "collection " << _nss.toString() << " does not exist";
+            return false;
+        }
+
+        _xfer(txn, _nss.ns(), autoColl.getDb(), &_deleted, b, "deleted", size, false);
+        _xfer(txn, _nss.ns(), autoColl.getDb(), &_reload, b, "reload", size, true);
     }
 
     b.append("size", size);
@@ -338,6 +343,7 @@ bool MigrationSourceManager::storeCurrentLocs(OperationContext* txn,
                                               long long maxChunkSize,
                                               string& errmsg,
                                               BSONObjBuilder& result) {
+    ScopedTransaction scopedXact(txn, MODE_IS);
     AutoGetCollection autoColl(txn, _getNS(), MODE_IS);
 
     Collection* collection = autoColl.getCollection();
@@ -460,7 +466,6 @@ bool MigrationSourceManager::storeCurrentLocs(OperationContext* txn,
 
     log() << "moveChunk number of documents: " << cloneLocsRemaining() << migrateLog;
 
-    txn->recoveryUnit()->abandonSnapshot();
     return true;
 }
 
@@ -473,6 +478,7 @@ bool MigrationSourceManager::clone(OperationContext* txn,
     int allocSize = 0;
 
     {
+        ScopedTransaction scopedXact(txn, MODE_IS);
         AutoGetCollection autoColl(txn, _getNS(), MODE_IS);
 
         stdx::lock_guard<stdx::mutex> sl(_mutex);
@@ -504,6 +510,7 @@ bool MigrationSourceManager::clone(OperationContext* txn,
     bool isBufferFilled = false;
     BSONArrayBuilder clonedDocsArrayBuilder(allocSize);
     while (!isBufferFilled) {
+        ScopedTransaction scopedXact(txn, MODE_IS);
         AutoGetCollection autoColl(txn, _getNS(), MODE_IS);
 
         stdx::lock_guard<stdx::mutex> sl(_mutex);
@@ -521,7 +528,6 @@ bool MigrationSourceManager::clone(OperationContext* txn,
             return false;
         }
 
-        // TODO: fix SERVER-16540 race
         Collection* collection = autoColl.getCollection();
         if (!collection) {
             errmsg = str::stream() << "collection " << _nss.toString() << " does not exist";
