@@ -1,0 +1,81 @@
+---
+driver:
+  name: ec2
+  region: us-east-1
+  subnet_id: <%= ENV['KITCHEN_SUBNET'] %>
+  security_group_ids:
+    - <%= ENV['KITCHEN_SECURITY_GROUP'] %>
+  aws_ssh_key_id: <%= ENV['KITCHEN_SSH_KEY_ID'] %>
+  interface: dns
+  associate_public_ip: true
+
+verifier:
+  name: inspec
+  sudo: true
+
+provisioner:
+  name: chef_solo
+  require_chef_omnibus: 12.6.0
+
+platforms:
+  - name: amazon
+    driver:
+      image_id: ami-c481fad3
+    transport:
+      username: ec2-user
+  - name: debian71
+    driver:
+      image_id: ami-4b124a22
+    transport:
+      username: admin
+  - name: debian81
+    driver:
+      image_id: ami-896d85e2
+    transport:
+      username: admin
+  - name: rhel62
+    driver:
+      # Use rhel 6.3 because chef-solo fails on rhel 6.2
+      image_id: ami-a35a33ca
+    transport:
+      username: root
+  - name: rhel70
+    driver:
+      image_id: ami-60a1e808
+    transport:
+      username: root
+  - name: suse11
+    driver:
+      image_id: ami-7f2e6015
+    transport:
+      username: ec2-user
+  - name: suse12
+    driver:
+      image_id: ami-aeb532c6
+    transport:
+      username: ec2-user
+  - name: ubuntu1204
+    driver:
+      image_id: ami-3fec7956
+    transport:
+      username: ubuntu
+  - name: ubuntu1404
+    driver:
+      image_id: ami-1d8c9574
+    transport:
+      username: ubuntu
+  - name: ubuntu1604
+    driver:
+      image_id: ami-64140d0e
+    transport:
+      username: ubuntu
+
+transport:
+  ssh_key: ~/.ssh/kitchen.pem
+
+suites:
+  - name: service
+    run_list:
+      - recipe[package_test::install_mongodb]
+    attributes:
+      artifacts_url: <%= ENV['KITCHEN_ARTIFACTS_URL'] %>
