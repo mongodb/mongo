@@ -63,6 +63,7 @@
 #include "mongo/db/repl/rollback_source.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 /* Scenarios
@@ -116,6 +117,10 @@ using std::string;
 using std::pair;
 
 namespace repl {
+
+// Failpoint which causes rollback to hang before finishing.
+MONGO_FP_DECLARE(rollbackHangBeforeFinish);
+
 namespace {
 
 class RSFatalException : public std::exception {
@@ -894,6 +899,15 @@ Status _syncRollback(OperationContext* txn,
         throw;
     }
     replCoord->incrementRollbackID();
+
+    if (MONGO_FAIL_POINT(rollbackHangBeforeFinish)) {
+        // This log output is used in js tests so please leave it.
+        log() << "rollback - rollbackHangBeforeFinish fail point "
+                 "enabled. Blocking until fail point is disabled.";
+        while (MONGO_FAIL_POINT(rollbackHangBeforeFinish)) {
+            mongo::sleepsecs(1);
+        }
+    }
 
     // Success; leave "ROLLBACK" state intact until applier thread has reloaded the new minValid.
     // Otherwise, the applier could transition the node to SECONDARY with an out-of-date minValid.
