@@ -52,14 +52,14 @@ revint_compare(WT_COLLATOR *collator,
     WT_SESSION *session, const WT_ITEM *k1, const WT_ITEM *k2, int *cmp)
 {
 	const REVINT_COLLATOR *revint_collator;
-	WT_EXTENSION_API *wtapi;
+	WT_EXTENSION_API *wt_api;
 	WT_PACK_STREAM *pstream;
 	int64_t i1, i2, p1, p2;
 	int ret;
 
 	i1 = i2 = p1 = p2 = 0;
 	revint_collator = (const REVINT_COLLATOR *)collator;
-	wtapi = revint_collator->wt_api;
+	wt_api = revint_collator->wt_api;
 
 	/*
 	 * All indices using this collator have an integer key, and the
@@ -79,25 +79,25 @@ revint_compare(WT_COLLATOR *collator,
 	 * To keep this code simple, we do not reverse the ordering
 	 * when comparing primary keys.
 	 */
-	if ((ret = wtapi->unpack_start(
-	    wtapi, session, "ii", k1->data, k1->size, &pstream)) != 0 ||
-	    (ret = wtapi->unpack_int(wtapi, pstream, &i1)) != 0)
+	if ((ret = wt_api->unpack_start(
+	    wt_api, session, "ii", k1->data, k1->size, &pstream)) != 0 ||
+	    (ret = wt_api->unpack_int(wt_api, pstream, &i1)) != 0)
 		return (ret);
-	if ((ret = wtapi->unpack_int(wtapi, pstream, &p1)) != 0)
+	if ((ret = wt_api->unpack_int(wt_api, pstream, &p1)) != 0)
 		/* A missing primary key is OK and sorts first. */
 		p1 = INT64_MIN;
-	if ((ret = wtapi->pack_close(wtapi, pstream, NULL)) != 0)
+	if ((ret = wt_api->pack_close(wt_api, pstream, NULL)) != 0)
 		return (ret);
 
 	/* Unpack the second pair of numbers. */
-	if ((ret = wtapi->unpack_start(
-	    wtapi, session, "ii", k2->data, k2->size, &pstream)) != 0 ||
-	    (ret = wtapi->unpack_int(wtapi, pstream, &i2)) != 0)
+	if ((ret = wt_api->unpack_start(
+	    wt_api, session, "ii", k2->data, k2->size, &pstream)) != 0 ||
+	    (ret = wt_api->unpack_int(wt_api, pstream, &i2)) != 0)
 		return (ret);
-	if ((ret = wtapi->unpack_int(wtapi, pstream, &p2)) != 0)
+	if ((ret = wt_api->unpack_int(wt_api, pstream, &p2)) != 0)
 		/* A missing primary key is OK and sorts first. */
 		p2 = INT64_MIN;
-	if ((ret = wtapi->pack_close(wtapi, pstream, NULL)) != 0)
+	if ((ret = wt_api->pack_close(wt_api, pstream, NULL)) != 0)
 		return (ret);
 
 	/* sorting is reversed */

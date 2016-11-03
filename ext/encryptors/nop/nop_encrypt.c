@@ -38,7 +38,7 @@
 typedef struct {
 	WT_ENCRYPTOR encryptor;		/* Must come first */
 
-	WT_EXTENSION_API *wtext;	/* Extension API */
+	WT_EXTENSION_API *wt_api;	/* Extension API */
 
 	unsigned long nop_calls;	/* Count of calls */
 
@@ -53,11 +53,11 @@ static int
 nop_error(
     NOP_ENCRYPTOR *encryptor, WT_SESSION *session, int err, const char *msg)
 {
-	WT_EXTENSION_API *wtext;
+	WT_EXTENSION_API *wt_api;
 
-	wtext = encryptor->wtext;
-	(void)wtext->err_printf(wtext, session,
-	    "nop encryption: %s: %s", msg, wtext->strerror(wtext, NULL, err));
+	wt_api = encryptor->wt_api;
+	(void)wt_api->err_printf(wt_api, session,
+	    "nop encryption: %s: %s", msg, wt_api->strerror(wt_api, NULL, err));
 	return (err);
 }
 
@@ -186,7 +186,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	nop_encryptor->encryptor.sizing = nop_sizing;
 	nop_encryptor->encryptor.terminate = nop_terminate;
 
-	nop_encryptor->wtext = connection->get_extension_api(connection);
+	nop_encryptor->wt_api = connection->get_extension_api(connection);
 
 						/* Load the encryptor */
 	return (connection->add_encryptor(

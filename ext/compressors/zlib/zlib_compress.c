@@ -485,7 +485,7 @@ zlib_init_config(
 {
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_PARSER *config_parser;
-	WT_EXTENSION_API *wtext;
+	WT_EXTENSION_API *wt_api;
 	int ret, zlib_level;
 
 	/* If configured as a built-in, there's no configuration argument. */
@@ -496,18 +496,19 @@ zlib_init_config(
 	 * Zlib compression engine allows applications to specify a compression
 	 * level; review the configuration.
 	 */
-	wtext = connection->get_extension_api(connection);
-	if ((ret = wtext->config_get(wtext, NULL, config, "config", &v)) != 0) {
-		(void)wtext->err_printf(wtext, NULL,
+	wt_api = connection->get_extension_api(connection);
+	if ((ret =
+	    wt_api->config_get(wt_api, NULL, config, "config", &v)) != 0) {
+		(void)wt_api->err_printf(wt_api, NULL,
 		    "WT_EXTENSION_API.config_get: zlib configure: %s",
-		    wtext->strerror(wtext, NULL, ret));
+		    wt_api->strerror(wt_api, NULL, ret));
 		return (ret);
 	}
-	if ((ret = wtext->config_parser_open(
-	    wtext, NULL, v.str, v.len, &config_parser)) != 0) {
-		(void)wtext->err_printf(wtext, NULL,
+	if ((ret = wt_api->config_parser_open(
+	    wt_api, NULL, v.str, v.len, &config_parser)) != 0) {
+		(void)wt_api->err_printf(wt_api, NULL,
 		    "WT_EXTENSION_API.config_parser_open: zlib configure: %s",
-		    wtext->strerror(wtext, NULL, ret));
+		    wt_api->strerror(wt_api, NULL, ret));
 		return (ret);
 	}
 	while ((ret = config_parser->next(config_parser, &k, &v)) == 0)
@@ -518,7 +519,7 @@ zlib_init_config(
 			 */
 			zlib_level = (int)v.val;
 			if (zlib_level < 0 || zlib_level > 9) {
-				(void)wtext->err_printf(wtext, NULL,
+				(void)wt_api->err_printf(wt_api, NULL,
 				    "WT_CONFIG_PARSER.next: zlib configure: "
 				    "unsupported compression level %d",
 				    zlib_level);
@@ -528,15 +529,15 @@ zlib_init_config(
 			continue;
 		}
 	if (ret != WT_NOTFOUND) {
-		(void)wtext->err_printf(wtext, NULL,
+		(void)wt_api->err_printf(wt_api, NULL,
 		    "WT_CONFIG_PARSER.next: zlib configure: %s",
-		    wtext->strerror(wtext, NULL, ret));
+		    wt_api->strerror(wt_api, NULL, ret));
 		return (ret);
 	}
 	if ((ret = config_parser->close(config_parser)) != 0) {
-		(void)wtext->err_printf(wtext, NULL,
+		(void)wt_api->err_printf(wt_api, NULL,
 		    "WT_CONFIG_PARSER.close: zlib configure: %s",
-		    wtext->strerror(wtext, NULL, ret));
+		    wt_api->strerror(wt_api, NULL, ret));
 		return (ret);
 	}
 	return (0);

@@ -78,7 +78,7 @@ csv_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
     const WT_ITEM *key, const WT_ITEM *value, WT_CURSOR *result_cursor)
 {
 	const CSV_EXTRACTOR *csv_extractor;
-	WT_EXTENSION_API *wtapi;
+	WT_EXTENSION_API *wt_api;
 	size_t len;
 	int i, ret, val;
 	char *copy, *p, *pend, *valstr;
@@ -86,10 +86,10 @@ csv_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 	(void)key;				/* Unused parameters */
 
 	csv_extractor = (const CSV_EXTRACTOR *)extractor;
-	wtapi = csv_extractor->wt_api;
+	wt_api = csv_extractor->wt_api;
 
 	/* Unpack the value. */
-	if ((ret = wtapi->struct_unpack(wtapi,
+	if ((ret = wt_api->struct_unpack(wt_api,
 	    session, value->data, value->size, "S", &valstr)) != 0)
 		return (ret);
 
