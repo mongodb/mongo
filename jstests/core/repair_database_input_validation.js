@@ -9,7 +9,7 @@
  * 5.) Using "listDatabases" verify only "repairDB" exists.
  */
 
-(function () {
+(function() {
     "use strict";
 
     // 1. Drop databases.
@@ -30,16 +30,27 @@
     // 3. Repair "repairdb", verify error.
     var res1 = casing2db.repairDatabase();
     assert.eq(0, res1["ok"]);
-    assert.eq(true, res1["errmsg"].indexOf("Database does not exist. Database: `repair_database_input_validation_repairdb`") > -1);
+    assert.eq(
+        true,
+        res1["errmsg"].indexOf(
+            "Database does not exist. Database: `repair_database_input_validation_repairdb`") > -1);
 
     // 4. Repair "nonExistentDb", verify error.
     var res2 = nonExistentDb.repairDatabase();
     assert.eq(0, res2["ok"]);
-    assert.eq(true, res2["errmsg"].indexOf("Database does not exist. Database: `repair_database_input_validation_nonExistentDb`") > -1);
+    assert.eq(
+        true,
+        res2["errmsg"].indexOf(
+            "Database does not exist. Database: `repair_database_input_validation_nonExistentDb`") >
+            -1);
 
     // 5. Verify only "repairDB" exists.
-    var dbNames = db.getMongo().getDBNames()
-    assert.contains("repair_database_input_validation_REPAIRDB", dbNames, "Should contain REPAIRDB");
-    assert.eq(false, dbNames.some(function(x) { x == "repair_database_input_validation_repairdb" }));
-    assert.eq(false, dbNames.some(function(x) { x == "repair_database_input_validation_nonExistentDb" }));
+    var dbNames = db.getMongo().getDBNames() assert.contains(
+        "repair_database_input_validation_REPAIRDB", dbNames, "Should contain REPAIRDB");
+    assert.eq(false, dbNames.some(function(x) {
+        x == "repair_database_input_validation_repairdb"
+    }));
+    assert.eq(false, dbNames.some(function(x) {
+        x == "repair_database_input_validation_nonExistentDb"
+    }));
 })();
