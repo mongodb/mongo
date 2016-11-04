@@ -167,13 +167,39 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 }
 
 /*
+ * __wt_readlock_spin --
+ *	Spin to get a read lock: only yield the CPU if the lock is held
+ *	exclusive.
+ */
+void
+__wt_readlock_spin(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+{
+	wt_rwlock_t *l;
+
+	l = &rwlock->rwlock;
+
+	/*
+	 * Try to get the lock in a single operation if it is available to
+	 * readers.  This avoids the situation where multiple readers arrive
+	 * concurrently and have to line up in order to enter the lock.  For
+	 * read-heavy workloads it can make a significant difference.
+	 */
+	while (__wt_try_readlock(session, rwlock) != 0) {
+		if (l->s.writers_active > 0)
+			__wt_yield();
+		else
+			WT_PAUSE();
+	}
+}
+
+/*
  * __wt_readlock --
  *	Get a shared lock.
  */
 void
 __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
-	wt_rwlock_t *l, old;
+	wt_rwlock_t *l;
 	uint16_t ticket;
 	int pause_cnt;
 
@@ -182,15 +208,6 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	WT_DIAGNOSTIC_YIELD;
 
 	l = &rwlock->rwlock;
-
-	/* Be optimistic when lock is available to readers. */
-	old = *l;
-	while (old.s.readers == old.s.next) {
-		if (__wt_try_readlock(session, rwlock) == 0)
-			return;
-		WT_PAUSE();
-		old = *l;
-	}
 
 	/*
 	 * Possibly wrap: if we have more than 64K lockers waiting, the ticket
@@ -270,6 +287,7 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 
 	/* The replacement lock value is a result of allocating a new ticket. */
 	++new.s.next;
+	++new.s.writers_active;
 	return (__wt_atomic_cas64(&l->u, old.u, new.u) ? 0 : EBUSY);
 }
 
@@ -294,6 +312,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	 * lock.
 	 */
 	ticket = __wt_atomic_fetch_add16(&l->s.next, 1);
+	(void)__wt_atomic_add16(&l->s.writers_active, 1);
 	for (pause_cnt = 0; ticket != l->s.writers;) {
 		/*
 		 * We failed to get the lock; pause before retrying and if we've
@@ -325,13 +344,14 @@ __wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 
 	WT_UNUSED(session);
 
+	l = &rwlock->rwlock;
+	(void)__wt_atomic_sub16(&l->s.writers_active, 1);
+
 	/*
 	 * Ensure that all updates made while the lock was held are visible to
 	 * the next thread to acquire the lock.
 	 */
 	WT_WRITE_BARRIER();
-
-	l = &rwlock->rwlock;
 
 	new = *l;
 

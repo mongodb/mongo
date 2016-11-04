@@ -667,6 +667,7 @@ extern int __wt_huffman_encode(WT_SESSION_IMPL *session, void *huffman_arg, cons
 extern int __wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg, const uint8_t *from_arg, size_t from_len, WT_ITEM *to_buf) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_rwlock_alloc( WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp, const char *name) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern void __wt_readlock_spin(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern void __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern void __wt_readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern int __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
