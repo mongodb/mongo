@@ -84,5 +84,6 @@ env.Library(
         '$BUILD_DIR/mongo/rpc/client_metadata',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/mongoscore',
+        '$BUILD_DIR/mongo/transport/transport_layer_common',
     ]
 )

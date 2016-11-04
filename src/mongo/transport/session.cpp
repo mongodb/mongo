@@ -56,44 +56,26 @@ Session::~Session() {
     }
 }
 
-Session::Session(Session&& other)
-    : _id(other._id),
-      _remote(std::move(other._remote)),
-      _local(std::move(other._local)),
-      _tl(other._tl) {
-    // We do not want to call tl->destroy() on moved-from Sessions.
-    other._tl = nullptr;
-}
-
-Session& Session::operator=(Session&& other) {
-    if (&other == this) {
-        return *this;
-    }
-
-    _id = other._id;
-    _remote = std::move(other._remote);
-    _local = std::move(other._local);
-    _tl = other._tl;
-    other._tl = nullptr;
-
-    return *this;
+SessionHandle Session::create(HostAndPort remote, HostAndPort local, TransportLayer* tl) {
+    std::shared_ptr<Session> handle(new Session(std::move(remote), std::move(local), tl));
+    return handle;
 }
 
 void Session::replaceTags(TagMask tags) {
     _tags = tags;
-    _tl->registerTags(*this);
+    _tl->registerTags(shared_from_this());
 }
 
 Ticket Session::sourceMessage(Message* message, Date_t expiration) {
-    return _tl->sourceMessage(*this, message, expiration);
+    return _tl->sourceMessage(shared_from_this(), message, expiration);
 }
 
 Ticket Session::sinkMessage(const Message& message, Date_t expiration) {
-    return _tl->sinkMessage(*this, message, expiration);
+    return _tl->sinkMessage(shared_from_this(), message, expiration);
 }
 
 SSLPeerInfo Session::getX509PeerInfo() const {
-    return _tl->getX509PeerInfo(*this);
+    return _tl->getX509PeerInfo(shared_from_this());
 }
 
 }  // namespace transport

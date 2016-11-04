@@ -90,7 +90,7 @@ void setPingCommand(Message* m) {
 }
 
 // Some default method implementations
-const auto kDefaultEnd = [](const Session& session) { return; };
+const auto kDefaultEnd = [](const SessionHandle& session) { return; };
 const auto kDefaultDestroyHook = [](Session& session) { return; };
 const auto kDefaultAsyncWait = [](Ticket, TicketCallback cb) { cb(Status::OK()); };
 const auto kNoopFunction = [] { return; };
@@ -100,13 +100,13 @@ const auto kEndConnectionStatus = Status(ErrorCodes::HostUnreachable, "connectio
 
 }  // namespace
 
-ServiceEntryPointTestSuite::MockTicket::MockTicket(const Session& session,
+ServiceEntryPointTestSuite::MockTicket::MockTicket(const SessionHandle& session,
                                                    Message* message,
                                                    Date_t expiration)
-    : _message(message), _sessionId(session.id()), _expiration(expiration) {}
+    : _message(message), _sessionId(session->id()), _expiration(expiration) {}
 
-ServiceEntryPointTestSuite::MockTicket::MockTicket(const Session& session, Date_t expiration)
-    : _sessionId(session.id()), _expiration(expiration) {}
+ServiceEntryPointTestSuite::MockTicket::MockTicket(const SessionHandle& session, Date_t expiration)
+    : _sessionId(session->id()), _expiration(expiration) {}
 
 Session::Id ServiceEntryPointTestSuite::MockTicket::sessionId() const {
     return _sessionId;
@@ -129,13 +129,13 @@ ServiceEntryPointTestSuite::MockTLHarness::MockTLHarness()
       _asyncWait(kDefaultAsyncWait),
       _end(kDefaultEnd) {}
 
-Ticket ServiceEntryPointTestSuite::MockTLHarness::sourceMessage(Session& session,
+Ticket ServiceEntryPointTestSuite::MockTLHarness::sourceMessage(const SessionHandle& session,
                                                                 Message* message,
                                                                 Date_t expiration) {
     return _sourceMessage(session, message, expiration);
 }
 
-Ticket ServiceEntryPointTestSuite::MockTLHarness::sinkMessage(Session& session,
+Ticket ServiceEntryPointTestSuite::MockTLHarness::sinkMessage(const SessionHandle& session,
                                                               const Message& message,
                                                               Date_t expiration) {
     return _sinkMessage(session, message, expiration);
@@ -151,17 +151,17 @@ void ServiceEntryPointTestSuite::MockTLHarness::asyncWait(Ticket&& ticket,
 }
 
 SSLPeerInfo ServiceEntryPointTestSuite::MockTLHarness::getX509PeerInfo(
-    const Session& session) const {
+    const ConstSessionHandle& session) const {
     return SSLPeerInfo("mock", stdx::unordered_set<RoleName>{});
 }
 
-void ServiceEntryPointTestSuite::MockTLHarness::registerTags(const Session& session) {}
+void ServiceEntryPointTestSuite::MockTLHarness::registerTags(const ConstSessionHandle& session) {}
 
 TransportLayer::Stats ServiceEntryPointTestSuite::MockTLHarness::sessionStats() {
     return Stats();
 }
 
-void ServiceEntryPointTestSuite::MockTLHarness::end(Session& session) {
+void ServiceEntryPointTestSuite::MockTLHarness::end(const SessionHandle& session) {
     return _end(session);
 }
 
@@ -194,17 +194,19 @@ Status ServiceEntryPointTestSuite::MockTLHarness::_waitOnceThenError(transport::
     return _defaultWait(std::move(ticket));
 }
 
-Ticket ServiceEntryPointTestSuite::MockTLHarness::_defaultSource(Session& s, Message* m, Date_t d) {
+Ticket ServiceEntryPointTestSuite::MockTLHarness::_defaultSource(const SessionHandle& s,
+                                                                 Message* m,
+                                                                 Date_t d) {
     return Ticket(this, stdx::make_unique<ServiceEntryPointTestSuite::MockTicket>(s, m, d));
 }
 
-Ticket ServiceEntryPointTestSuite::MockTLHarness::_defaultSink(Session& s,
+Ticket ServiceEntryPointTestSuite::MockTLHarness::_defaultSink(const SessionHandle& s,
                                                                const Message&,
                                                                Date_t d) {
     return Ticket(this, stdx::make_unique<ServiceEntryPointTestSuite::MockTicket>(s, d));
 }
 
-Ticket ServiceEntryPointTestSuite::MockTLHarness::_sinkThenErrorOnWait(Session& s,
+Ticket ServiceEntryPointTestSuite::MockTLHarness::_sinkThenErrorOnWait(const SessionHandle& s,
                                                                        const Message& m,
                                                                        Date_t d) {
     _wait = stdx::bind(&ServiceEntryPointTestSuite::MockTLHarness::_waitOnceThenError, this, _1);
@@ -251,10 +253,10 @@ void ServiceEntryPointTestSuite::noLifeCycleTest() {
     _tl->_wait = stdx::bind(&ServiceEntryPointTestSuite::MockTLHarness::_waitError, _tl.get(), _1);
 
     // Step 3: SEP destroys the session, which calls end()
-    _tl->_destroy_hook = [&testComplete](const Session&) { testComplete.set_value(); };
+    _tl->_destroy_hook = [&testComplete](Session&) { testComplete.set_value(); };
 
     // Kick off the SEP
-    Session s(HostAndPort(), HostAndPort(), _tl.get());
+    auto s = Session::create(HostAndPort(), HostAndPort(), _tl.get());
     _sep->startSession(std::move(s));
 
     testFuture.wait();
@@ -270,7 +272,7 @@ void ServiceEntryPointTestSuite::halfLifeCycleTest() {
     // Step 1: SEP gets a ticket to source a Message
     // Step 2: SEP calls wait() on the ticket and receives a Message
     // Step 3: SEP gets a ticket to sink a Message
-    _tl->_sinkMessage = [this](Session& session, const Message& m, Date_t expiration) {
+    _tl->_sinkMessage = [this](const SessionHandle& session, const Message& m, Date_t expiration) {
 
         // Step 4: SEP calls wait() on the ticket and receives an error
         _tl->_wait =
@@ -280,10 +282,10 @@ void ServiceEntryPointTestSuite::halfLifeCycleTest() {
     };
 
     // Step 5: SEP destroys the session, which calls end()
-    _tl->_destroy_hook = [&testComplete](const Session&) { testComplete.set_value(); };
+    _tl->_destroy_hook = [&testComplete](Session&) { testComplete.set_value(); };
 
     // Kick off the SEP
-    Session s(HostAndPort(), HostAndPort(), _tl.get());
+    auto s = Session::create(HostAndPort(), HostAndPort(), _tl.get());
     _sep->startSession(std::move(s));
 
     testFuture.wait();
@@ -306,20 +308,20 @@ void ServiceEntryPointTestSuite::fullLifeCycleTest() {
     // Step 5: SEP gets a ticket to source a Message
     // Step 6: SEP calls wait() on the ticket and receives and error
     // Step 7: SEP destroys the session, which calls end()
-    _tl->_destroy_hook = [&testComplete](const Session& session) { testComplete.set_value(); };
+    _tl->_destroy_hook = [&testComplete](Session& session) { testComplete.set_value(); };
 
     // Kick off the SEP
-    Session s(HostAndPort(), HostAndPort(), _tl.get());
+    auto s = Session::create(HostAndPort(), HostAndPort(), _tl.get());
     _sep->startSession(std::move(s));
 
     testFuture.wait();
 }
 
 void ServiceEntryPointTestSuite::interruptingSessionTest() {
-    Session sA(HostAndPort(), HostAndPort(), _tl.get());
-    Session sB(HostAndPort(), HostAndPort(), _tl.get());
-    auto idA = sA.id();
-    auto idB = sB.id();
+    auto sA = Session::create(HostAndPort(), HostAndPort(), _tl.get());
+    auto sB = Session::create(HostAndPort(), HostAndPort(), _tl.get());
+    auto idA = sA->id();
+    auto idB = sB->id();
     int waitCountB = 0;
 
     stdx::promise<void> startB;
@@ -366,7 +368,7 @@ void ServiceEntryPointTestSuite::interruptingSessionTest() {
     // Step 7: SEP calls sourceMessage() for B, gets tB3
     // Step 8: SEP calls wait() for tB3, gets an error
     // Step 9: SEP calls end(B)
-    _tl->_destroy_hook = [this, idA, idB, &resumeA, &testComplete](const Session& session) {
+    _tl->_destroy_hook = [this, idA, idB, &resumeA, &testComplete](Session& session) {
         // When end(B) is called, time to resume session A
         if (session.id() == idB) {
             // Resume session A
@@ -450,18 +452,18 @@ void ServiceEntryPointTestSuite::burstStressTest(int numSessions,
     };
 
     // When we end the last session, end the test.
-    _tl->_destroy_hook = [&allSessionsComplete, numSessions, &ended](const Session& session) {
+    _tl->_destroy_hook = [&allSessionsComplete, numSessions, &ended](Session& session) {
         if (ended.fetchAndAdd(1) == (numSessions - 1)) {
             allSessionsComplete.set_value();
         }
     };
 
     for (int i = 0; i < numSessions; i++) {
-        Session s(HostAndPort(), HostAndPort(), _tl.get());
+        auto s = Session::create(HostAndPort(), HostAndPort(), _tl.get());
         {
             // This operation may cause a re-hash.
             stdx::lock_guard<stdx::mutex> lock(cyclesLock);
-            completedCycles.emplace(s.id(), 0);
+            completedCycles.emplace(s->id(), 0);
         }
         _sep->startSession(std::move(s));
     }

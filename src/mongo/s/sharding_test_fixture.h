@@ -32,6 +32,7 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/executor/network_test_env.h"
+#include "mongo/transport/session.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/message_port_mock.h"
 
@@ -97,7 +98,7 @@ protected:
 
     executor::TaskExecutor* executor() const;
 
-    transport::Session* getTransportSession() const;
+    const transport::SessionHandle& getTransportSession() const;
 
     DistLockManagerMock* distLock() const;
 
@@ -208,7 +209,7 @@ private:
     ServiceContext::UniqueClient _client;
     ServiceContext::UniqueOperationContext _opCtx;
     transport::TransportLayerMock* _transportLayer;
-    std::unique_ptr<transport::Session> _transportSession;
+    transport::SessionHandle _transportSession;
 
     RemoteCommandTargeterFactoryMock* _targeterFactory;
     RemoteCommandTargeterMock* _configTargeter;

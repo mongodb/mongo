@@ -87,14 +87,14 @@ public:
         }
     }
 
-    void startSession(transport::Session&& session) override {
+    void startSession(transport::SessionHandle session) override {
         _threads.emplace_back(&DummyServiceEntryPoint::run, this, std::move(session));
     }
 
 private:
-    void run(transport::Session&& session) {
+    void run(transport::SessionHandle session) {
         Message inMessage;
-        if (!session.sourceMessage(&inMessage).wait().isOK()) {
+        if (!session->sourceMessage(&inMessage).wait().isOK()) {
             return;
         }
 
@@ -117,7 +117,7 @@ private:
 
         response.header().setResponseToMsgId(inMessage.header().getId());
 
-        if (!session.sinkMessage(response).wait().isOK()) {
+        if (!session->sinkMessage(response).wait().isOK()) {
             return;
         }
     }

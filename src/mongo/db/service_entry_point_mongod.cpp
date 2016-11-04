@@ -92,16 +92,19 @@ using transport::TransportLayer;
 
 ServiceEntryPointMongod::ServiceEntryPointMongod(TransportLayer* tl) : _tl(tl) {}
 
-void ServiceEntryPointMongod::startSession(Session&& session) {
-    launchWrappedServiceEntryWorkerThread(std::move(session), [this](Session* session) {
-        _nWorkers.fetchAndAdd(1);
-        auto guard = MakeGuard([&] { _nWorkers.fetchAndSubtract(1); });
+void ServiceEntryPointMongod::startSession(transport::SessionHandle session) {
+    // Pass ownership of the transport::SessionHandle into our worker thread. When this
+    // thread exits, the session will end.
+    launchWrappedServiceEntryWorkerThread(
+        std::move(session), [this](const transport::SessionHandle& session) {
+            _nWorkers.fetchAndAdd(1);
+            auto guard = MakeGuard([&] { _nWorkers.fetchAndSubtract(1); });
 
-        _sessionLoop(session);
-    });
+            _sessionLoop(session);
+        });
 }
 
-void ServiceEntryPointMongod::_sessionLoop(Session* session) {
+void ServiceEntryPointMongod::_sessionLoop(const transport::SessionHandle& session) {
     Message inMessage;
     bool inExhaust = false;
     int64_t counter = 0;

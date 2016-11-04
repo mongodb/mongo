@@ -67,7 +67,7 @@ private:
         // We want to keep request vote connection open when relinquishing primary.
         // Tag it here.
         transport::Session::TagMask originalTag = 0;
-        transport::Session* session = txn->getClient()->session();
+        auto session = txn->getClient()->session();
         if (session) {
             originalTag = session->getTags();
             session->replaceTags(originalTag | transport::Session::kKeepOpen);

@@ -54,22 +54,22 @@ class TransportLayerManager final : public TransportLayer {
 public:
     TransportLayerManager();
 
-    Ticket sourceMessage(Session& session,
+    Ticket sourceMessage(const SessionHandle& session,
                          Message* message,
                          Date_t expiration = Ticket::kNoExpirationDate) override;
-    Ticket sinkMessage(Session& session,
+    Ticket sinkMessage(const SessionHandle& session,
                        const Message& message,
                        Date_t expiration = Ticket::kNoExpirationDate) override;
 
     Status wait(Ticket&& ticket) override;
     void asyncWait(Ticket&& ticket, TicketCallback callback) override;
 
-    SSLPeerInfo getX509PeerInfo(const Session& session) const override;
-    void registerTags(const Session& session) override;
+    SSLPeerInfo getX509PeerInfo(const ConstSessionHandle& session) const override;
+    void registerTags(const ConstSessionHandle& session) override;
 
     Stats sessionStats() override;
 
-    void end(Session& session) override;
+    void end(const SessionHandle& session) override;
     void endAllSessions(Session::TagMask tags) override;
 
     Status start() override;

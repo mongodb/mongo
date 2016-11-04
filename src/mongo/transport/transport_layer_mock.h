@@ -51,12 +51,12 @@ public:
     class TicketMock : public TicketImpl {
     public:
         // Source constructor
-        TicketMock(const Session* session,
+        TicketMock(const SessionHandle& session,
                    Message* message,
                    Date_t expiration = Ticket::kNoExpirationDate);
 
         // Sink constructor
-        TicketMock(const Session* session, Date_t expiration = Ticket::kNoExpirationDate);
+        TicketMock(const SessionHandle& session, Date_t expiration = Ticket::kNoExpirationDate);
 
         TicketMock(TicketMock&&) = default;
         TicketMock& operator=(TicketMock&&) = default;
@@ -68,7 +68,7 @@ public:
         boost::optional<Message*> msg() const;
 
     private:
-        const Session* _session;
+        const SessionHandle& _session;
         boost::optional<Message*> _message;
         Date_t _expiration;
     };
@@ -76,26 +76,26 @@ public:
     TransportLayerMock();
     ~TransportLayerMock();
 
-    Ticket sourceMessage(Session& session,
+    Ticket sourceMessage(const SessionHandle& session,
                          Message* message,
                          Date_t expiration = Ticket::kNoExpirationDate) override;
-    Ticket sinkMessage(Session& session,
+    Ticket sinkMessage(const SessionHandle& session,
                        const Message& message,
                        Date_t expiration = Ticket::kNoExpirationDate) override;
 
     Status wait(Ticket&& ticket) override;
     void asyncWait(Ticket&& ticket, TicketCallback callback) override;
 
-    SSLPeerInfo getX509PeerInfo(const Session& session) const override;
-    void setX509PeerInfo(const Session& session, SSLPeerInfo peerInfo);
-    void registerTags(const Session& session) override;
+    SSLPeerInfo getX509PeerInfo(const ConstSessionHandle& session) const override;
+    void setX509PeerInfo(const SessionHandle& session, SSLPeerInfo peerInfo);
+    void registerTags(const ConstSessionHandle& session) override;
 
     Stats sessionStats() override;
 
-    Session* createSession();
-    Session* get(Session::Id id);
+    SessionHandle createSession();
+    SessionHandle get(Session::Id id);
     bool owns(Session::Id id);
-    void end(Session& session) override;
+    void end(const SessionHandle& session) override;
     void endAllSessions(Session::TagMask tags) override;
 
     Status start() override;
@@ -107,7 +107,7 @@ private:
 
     struct Connection {
         bool ended;
-        std::unique_ptr<Session> session;
+        SessionHandle session;
         SSLPeerInfo peerInfo;
     };
     stdx::unordered_map<Session::Id, Connection> _sessions;

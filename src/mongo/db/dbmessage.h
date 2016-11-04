@@ -35,16 +35,13 @@
 #include "mongo/client/constants.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/server_options.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
 
 class OperationContext;
-
-namespace transport {
-class Session;
-}  // namespace transport
 
 /* db response format
 
@@ -363,7 +360,7 @@ public:
     /**
      * Finishes the reply and sends the message out to 'destination'.
      */
-    void send(transport::Session* session,
+    void send(const transport::SessionHandle& session,
               int queryResultFlags,
               const Message& requestMsg,
               int nReturned,
@@ -373,14 +370,14 @@ public:
     /**
      * Similar to send() but used for replying to a command.
      */
-    void sendCommandReply(transport::Session* session, const Message& requestMsg);
+    void sendCommandReply(const transport::SessionHandle& session, const Message& requestMsg);
 
 private:
     BufBuilder _buffer;
 };
 
 void replyToQuery(int queryResultFlags,
-                  transport::Session* session,
+                  const transport::SessionHandle& session,
                   Message& requestMsg,
                   const void* data,
                   int size,
@@ -390,7 +387,7 @@ void replyToQuery(int queryResultFlags,
 
 /* object reply helper. */
 void replyToQuery(int queryResultFlags,
-                  transport::Session* session,
+                  const transport::SessionHandle& session,
                   Message& requestMsg,
                   const BSONObj& responseObj);
 

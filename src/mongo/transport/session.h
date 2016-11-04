@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/session_id.h"
@@ -43,12 +45,16 @@ struct SSLPeerInfo;
 namespace transport {
 
 class TransportLayer;
+class Session;
+
+using SessionHandle = std::shared_ptr<Session>;
+using ConstSessionHandle = std::shared_ptr<const Session>;
 
 /**
  * This type contains data needed to associate Messages with connections
  * (on the transport side) and Messages with Client objects (on the database side).
  */
-class Session {
+class Session : public std::enable_shared_from_this<Session> {
     MONGO_DISALLOW_COPYING(Session);
 
 public:
@@ -68,20 +74,14 @@ public:
     static constexpr TagMask kKeepOpen = 1;
 
     /**
-     * Construct a new session.
-     */
-    Session(HostAndPort remote, HostAndPort local, TransportLayer* tl);
-
-    /**
      * Destroys a session, calling end() for this session in its TransportLayer.
      */
     ~Session();
 
     /**
-     * Move constructor and assignment operator.
+     * A factory for sessions.
      */
-    Session(Session&& other);
-    Session& operator=(Session&& other);
+    static SessionHandle create(HostAndPort remote, HostAndPort local, TransportLayer* tl);
 
     /**
      * Return the id for this session.
@@ -149,6 +149,11 @@ public:
     }
 
 private:
+    /**
+     * Construct a new session.
+     */
+    Session(HostAndPort remote, HostAndPort local, TransportLayer* tl);
+
     Id _id;
 
     HostAndPort _remote;

@@ -44,14 +44,16 @@ namespace transport {
 
 TransportLayerManager::TransportLayerManager() = default;
 
-Ticket TransportLayerManager::sourceMessage(Session& session, Message* message, Date_t expiration) {
-    return session.getTransportLayer()->sourceMessage(session, message, expiration);
+Ticket TransportLayerManager::sourceMessage(const SessionHandle& session,
+                                            Message* message,
+                                            Date_t expiration) {
+    return session->getTransportLayer()->sourceMessage(session, message, expiration);
 }
 
-Ticket TransportLayerManager::sinkMessage(Session& session,
+Ticket TransportLayerManager::sinkMessage(const SessionHandle& session,
                                           const Message& message,
                                           Date_t expiration) {
-    return session.getTransportLayer()->sinkMessage(session, message, expiration);
+    return session->getTransportLayer()->sinkMessage(session, message, expiration);
 }
 
 Status TransportLayerManager::wait(Ticket&& ticket) {
@@ -62,8 +64,8 @@ void TransportLayerManager::asyncWait(Ticket&& ticket, TicketCallback callback) 
     return getTicketTransportLayer(ticket)->asyncWait(std::move(ticket), std::move(callback));
 }
 
-SSLPeerInfo TransportLayerManager::getX509PeerInfo(const Session& session) const {
-    return session.getX509PeerInfo();
+SSLPeerInfo TransportLayerManager::getX509PeerInfo(const ConstSessionHandle& session) const {
+    return session->getX509PeerInfo();
 }
 
 template <typename Callable>
@@ -95,12 +97,12 @@ TransportLayer::Stats TransportLayerManager::sessionStats() {
     return stats;
 }
 
-void TransportLayerManager::registerTags(const Session& session) {
-    session.getTransportLayer()->registerTags(session);
+void TransportLayerManager::registerTags(const ConstSessionHandle& session) {
+    session->getTransportLayer()->registerTags(session);
 }
 
-void TransportLayerManager::end(Session& session) {
-    session.getTransportLayer()->end(session);
+void TransportLayerManager::end(const SessionHandle& session) {
+    session->getTransportLayer()->end(session);
 }
 
 void TransportLayerManager::endAllSessions(Session::TagMask tags) {

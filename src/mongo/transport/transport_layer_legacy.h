@@ -66,23 +66,23 @@ public:
     Status setup();
     Status start() override;
 
-    Ticket sourceMessage(Session& session,
+    Ticket sourceMessage(const SessionHandle& session,
                          Message* message,
                          Date_t expiration = Ticket::kNoExpirationDate) override;
 
-    Ticket sinkMessage(Session& session,
+    Ticket sinkMessage(const SessionHandle& session,
                        const Message& message,
                        Date_t expiration = Ticket::kNoExpirationDate) override;
 
     Status wait(Ticket&& ticket) override;
     void asyncWait(Ticket&& ticket, TicketCallback callback) override;
 
-    void registerTags(const Session& session) override;
-    SSLPeerInfo getX509PeerInfo(const Session& session) const override;
+    void registerTags(const ConstSessionHandle& session) override;
+    SSLPeerInfo getX509PeerInfo(const ConstSessionHandle& session) const override;
 
     Stats sessionStats() override;
 
-    void end(Session& session) override;
+    void end(const SessionHandle& session) override;
     void endAllSessions(transport::Session::TagMask tags) override;
 
     void shutdown() override;
@@ -105,7 +105,7 @@ private:
         MONGO_DISALLOW_COPYING(LegacyTicket);
 
     public:
-        LegacyTicket(const Session& session, Date_t expiration, WorkHandle work);
+        LegacyTicket(const SessionHandle& session, Date_t expiration, WorkHandle work);
 
         SessionId sessionId() const override;
         Date_t expiration() const override;

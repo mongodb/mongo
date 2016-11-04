@@ -53,14 +53,14 @@ public:
 
     virtual ~ServiceEntryPointMongod() = default;
 
-    void startSession(transport::Session&& session) override;
+    void startSession(transport::SessionHandle session) override;
 
     std::size_t getNumberOfActiveWorkerThreads() const {
         return _nWorkers.load();
     }
 
 private:
-    void _sessionLoop(transport::Session* session);
+    void _sessionLoop(const transport::SessionHandle& session);
 
     transport::TransportLayer* _tl;
     AtomicWord<std::size_t> _nWorkers;

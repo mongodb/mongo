@@ -64,10 +64,10 @@ TransportLayerLegacy::TransportLayerLegacy(const TransportLayerLegacy::Options& 
       _running(false),
       _options(opts) {}
 
-TransportLayerLegacy::LegacyTicket::LegacyTicket(const Session& session,
+TransportLayerLegacy::LegacyTicket::LegacyTicket(const SessionHandle& session,
                                                  Date_t expiration,
                                                  WorkHandle work)
-    : _sessionId(session.id()), _expiration(expiration), _fill(std::move(work)) {}
+    : _sessionId(session->id()), _expiration(expiration), _fill(std::move(work)) {}
 
 Session::Id TransportLayerLegacy::LegacyTicket::sessionId() const {
     return _sessionId;
@@ -98,8 +98,10 @@ Status TransportLayerLegacy::start() {
 
 TransportLayerLegacy::~TransportLayerLegacy() = default;
 
-Ticket TransportLayerLegacy::sourceMessage(Session& session, Message* message, Date_t expiration) {
-    auto& compressorMgr = session.getCompressorManager();
+Ticket TransportLayerLegacy::sourceMessage(const SessionHandle& session,
+                                           Message* message,
+                                           Date_t expiration) {
+    auto& compressorMgr = session->getCompressorManager();
     auto sourceCb = [message, &compressorMgr](AbstractMessagingPort* amp) -> Status {
         if (!amp->recv(*message)) {
             return {ErrorCodes::HostUnreachable, "Recv failed"};
@@ -119,10 +121,10 @@ Ticket TransportLayerLegacy::sourceMessage(Session& session, Message* message, D
     return Ticket(this, stdx::make_unique<LegacyTicket>(session, expiration, std::move(sourceCb)));
 }
 
-SSLPeerInfo TransportLayerLegacy::getX509PeerInfo(const Session& session) const {
+SSLPeerInfo TransportLayerLegacy::getX509PeerInfo(const ConstSessionHandle& session) const {
     {
         stdx::lock_guard<stdx::mutex> lk(_connectionsMutex);
-        auto conn = _connections.find(session.id());
+        auto conn = _connections.find(session->id());
         if (conn == _connections.end()) {
             // Return empty string if the session is not found
             return SSLPeerInfo();
@@ -145,10 +147,10 @@ TransportLayer::Stats TransportLayerLegacy::sessionStats() {
     return stats;
 }
 
-Ticket TransportLayerLegacy::sinkMessage(Session& session,
+Ticket TransportLayerLegacy::sinkMessage(const SessionHandle& session,
                                          const Message& message,
                                          Date_t expiration) {
-    auto& compressorMgr = session.getCompressorManager();
+    auto& compressorMgr = session->getCompressorManager();
     auto sinkCb = [&message, &compressorMgr](AbstractMessagingPort* amp) -> Status {
         try {
             networkCounter.hitLogical(0, message.size());
@@ -179,19 +181,19 @@ void TransportLayerLegacy::asyncWait(Ticket&& ticket, TicketCallback callback) {
     MONGO_UNREACHABLE;
 }
 
-void TransportLayerLegacy::end(Session& session) {
+void TransportLayerLegacy::end(const SessionHandle& session) {
     stdx::lock_guard<stdx::mutex> lk(_connectionsMutex);
-    auto conn = _connections.find(session.id());
+    auto conn = _connections.find(session->id());
     if (conn != _connections.end()) {
         _endSession_inlock(conn);
     }
 }
 
-void TransportLayerLegacy::registerTags(const Session& session) {
+void TransportLayerLegacy::registerTags(const ConstSessionHandle& session) {
     stdx::lock_guard<stdx::mutex> lk(_connectionsMutex);
-    auto conn = _connections.find(session.id());
+    auto conn = _connections.find(session->id());
     if (conn != _connections.end()) {
-        conn->second.tags = session.getTags();
+        conn->second.tags = session->getTags();
     }
 }
 
@@ -311,15 +313,16 @@ void TransportLayerLegacy::_handleNewConnection(std::unique_ptr<AbstractMessagin
         return;
     }
 
-    Session session(amp->remote(), HostAndPort(amp->localAddr().toString(true)), this);
+    auto session =
+        Session::create(amp->remote(), HostAndPort(amp->localAddr().toString(true)), this);
 
     amp->setLogLevel(logger::LogSeverity::Debug(1));
 
     {
         stdx::lock_guard<stdx::mutex> lk(_connectionsMutex);
         _connections.emplace(std::piecewise_construct,
-                             std::forward_as_tuple(session.id()),
-                             std::forward_as_tuple(std::move(amp), false, session.getTags()));
+                             std::forward_as_tuple(session->id()),
+                             std::forward_as_tuple(std::move(amp), false, session->getTags()));
     }
 
     invariant(_sep);

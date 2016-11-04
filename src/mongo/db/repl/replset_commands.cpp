@@ -740,7 +740,7 @@ public:
         /* we want to keep heartbeat connections open when relinquishing primary.
            tag them here. */
         transport::Session::TagMask originalTag = 0;
-        transport::Session* session = txn->getClient()->session();
+        auto session = txn->getClient()->session();
         if (session) {
             originalTag = session->getTags();
             session->replaceTags(originalTag | transport::Session::kKeepOpen);

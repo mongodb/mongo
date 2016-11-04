@@ -123,7 +123,7 @@ void Request::process(OperationContext* txn, int attempt) {
            << " op: " << op << " attempt: " << attempt;
 }
 
-transport::Session* Request::session() const {
+const transport::SessionHandle& Request::session() const {
     return _clientInfo->session();
 }
 

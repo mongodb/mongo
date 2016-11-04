@@ -37,6 +37,7 @@
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/tick_source.h"
@@ -50,7 +51,6 @@ class OpObserver;
 class ServiceEntryPoint;
 
 namespace transport {
-class Session;
 class TransportLayer;
 class TransportLayerManager;
 }  // namespace transport
@@ -216,7 +216,7 @@ public:
      *
      * If supplied, "session" is the transport::Session used for communicating with the client.
      */
-    UniqueClient makeClient(std::string desc, transport::Session* session = nullptr);
+    UniqueClient makeClient(std::string desc, transport::SessionHandle session = nullptr);
 
     /**
      * Creates a new OperationContext on "client".
