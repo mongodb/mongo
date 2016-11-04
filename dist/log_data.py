@@ -18,6 +18,11 @@ class LogRecordType:
     def prname(self):
         return '__logrec_print_' + self.name
 
+#
+# If you add a new record type you must also add its record type value in
+# src/include/wiredtiger.in.  The values cannot be generated because they must
+# never change after they're written in a log file.
+#
 rectypes = [
     # A database-wide checkpoint.
     LogRecordType('checkpoint', 'checkpoint', [
@@ -46,6 +51,11 @@ class LogOperationType:
     def macro_name(self):
         return 'WT_LOGOP_%s' % self.name.upper()
 
+#
+# If you add a new operation type you must also add its type value in
+# src/include/wiredtiger.in.  The values cannot be generated because they must
+# never change after they're written in a log file.
+#
 optypes = [
     LogOperationType('col_put', 'column put',
         [('uint32', 'fileid'), ('recno', 'recno'), ('item', 'value')]),

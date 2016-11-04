@@ -38,7 +38,9 @@ __curindex_set_value(WT_CURSOR *cursor, ...)
 	WT_SESSION_IMPL *session;
 
 	JOINABLE_CURSOR_API_CALL(cursor, session, set_value, NULL);
-	ret = ENOTSUP;
+	WT_ERR_MSG(session, ENOTSUP,
+	    "WT_CURSOR.set_value not supported for index cursors");
+
 err:	cursor->saved_err = ret;
 	F_CLR(cursor, WT_CURSTD_VALUE_SET);
 	API_END(session, ret);

@@ -269,7 +269,8 @@ struct __wt_connection_impl {
 	WT_TXN_GLOBAL txn_global;	/* Global transaction state */
 
 	WT_RWLOCK *hot_backup_lock;	/* Hot backup serialization */
-	bool hot_backup;
+	bool hot_backup;		/* Hot backup in progress */
+	char **hot_backup_list;		/* Hot backup file list */
 
 	WT_SESSION_IMPL *ckpt_session;	/* Checkpoint thread session */
 	wt_thread_t	 ckpt_tid;	/* Checkpoint thread */
@@ -289,10 +290,10 @@ struct __wt_connection_impl {
 
 					/* Connection statistics */
 	WT_CONNECTION_STATS *stats[WT_COUNTER_SLOTS];
-	WT_CONNECTION_STATS  stat_array[WT_COUNTER_SLOTS];
+	WT_CONNECTION_STATS *stat_array;
 
 	WT_ASYNC	*async;		/* Async structure */
-	int		 async_cfg;	/* Global async configuration */
+	bool		 async_cfg;	/* Global async configuration */
 	uint32_t	 async_size;	/* Async op array size */
 	uint32_t	 async_workers;	/* Number of async workers */
 

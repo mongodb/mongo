@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wtscenario, wttest
-from helper import simple_populate
+from wtdataset import SimpleDataSet
 
 # test_lsm03.py
 #    Check to make sure that LSM schema operations don't get EBUSY when
@@ -37,13 +37,14 @@ class test_lsm03(wttest.WiredTigerTestCase):
 
     # Use small pages so we generate some internal layout
     # Setup LSM so multiple chunks are present
-    config = 'key_format=S,allocation_size=512,internal_page_max=512' + \
+    config = 'allocation_size=512,internal_page_max=512' + \
              ',leaf_page_max=1k,lsm=(chunk_size=512k,merge_min=10)'
 
     # Populate an object then drop it.
     def test_lsm_drop_active(self):
         uri = 'lsm:' + self.name
-        simple_populate(self, uri, self.config, 10000)
+        ds = SimpleDataSet(self, uri, 10000, config=self.config)
+        ds.populate()
 
         # Force to disk
         self.reopen_conn()
@@ -55,6 +56,7 @@ class test_lsm03(wttest.WiredTigerTestCase):
         cursor.close()
 
         # Add enough records that a merge should be running
-        simple_populate(self, uri, self.config, 50000)
+        ds = SimpleDataSet(self, uri, 50000, config=self.config)
+        ds.populate()
         # The drop should succeed even when LSM work units are active
         self.session.drop(uri)

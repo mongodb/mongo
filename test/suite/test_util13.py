@@ -28,11 +28,9 @@
 
 import os, re, string
 from suite_subprocess import suite_subprocess
-import itertools, wiredtiger, wttest
+from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
+import wiredtiger, wttest
 
-from helper import complex_populate_cgconfig, complex_populate_cgconfig_lsm
-from helper import simple_populate
-from helper import complex_populate_check, simple_populate_check
 from wtscenario import make_scenarios
 
 # test_util13.py
@@ -52,25 +50,23 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
     # Select table configuration settings that are not the default.
     #
     types = [
-        ('file-simple', dict(uri='file:' + pfx, pop=simple_populate,
-            populate_check=simple_populate_check,
-            table_config='prefix_compression_min=3', cfg='')),
-        ('lsm-simple', dict(uri='lsm:' + pfx, pop=simple_populate,
-            populate_check=simple_populate_check,
-            table_config='lsm=(bloom_bit_count=29)',
-            cfg='bloom_bit_count=29')),
-        ('table-simple', dict(uri='table:' + pfx, pop=simple_populate,
-            populate_check=simple_populate_check,
-            table_config='split_pct=50', cfg='')),
+        ('file-simple', dict(uri='file:' + pfx, dataset=SimpleDataSet,
+            table_config='prefix_compression_min=3', cfg='',
+            cg_config='')),
+        ('lsm-simple', dict(uri='lsm:' + pfx, dataset=SimpleDataSet,
+            table_config='lsm=(bloom_bit_count=29)', cfg='bloom_bit_count=29',
+            cg_config='')),
+        ('table-simple', dict(uri='table:' + pfx, dataset=SimpleDataSet,
+            table_config='split_pct=50', cfg='',
+            cg_config='')),
         ('table-complex',
-            dict(uri='table:' + pfx, pop=complex_populate_cgconfig,
-            populate_check=complex_populate_check,
-            table_config='allocation_size=512B', cfg='')),
+            dict(uri='table:' + pfx, dataset=ComplexDataSet,
+            table_config='allocation_size=512B', cfg='',
+            cg_config='allocation_size=512B')),
         ('table-complex-lsm',
-            dict(uri='table:' + pfx, pop=complex_populate_cgconfig_lsm,
-            populate_check=complex_populate_check,
-            table_config='lsm=(merge_max=5)',
-            cfg='merge_max=5')),
+            dict(uri='table:' + pfx, dataset=ComplexLSMDataSet,
+            table_config='lsm=(merge_max=5)', cfg='merge_max=5',
+            cg_config='lsm=(merge_max=5)'))
     ]
 
     scenarios = make_scenarios(types)
@@ -83,7 +79,7 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
         #print "compare_config Expected config "
         #print expected_cfg
         cfg_orig = actual_cfg
-        if self.pop != simple_populate:
+        if self.dataset != SimpleDataSet:
             #
             # If we have a complex config, strip out the colgroups and
             # columns from the config.  Doing so allows us to keep the
@@ -127,7 +123,7 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
                 break
         return True
 
-    def load_recheck(self, expect_subset, dump_out):
+    def load_recheck(self, ds, expect_subset, dump_out):
         newdump = "newdump.out"
         os.mkdir(self.dir)
         self.runWt(['-h', self.dir, 'load', '-f', dump_out])
@@ -135,7 +131,7 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
         conn = self.wiredtiger_open(self.dir)
         session = conn.open_session()
         cursor = session.open_cursor(self.uri, None, None)
-        self.populate_check
+        ds.check()
         conn.close()
         dumpargs = ["-h"]
         dumpargs.append(self.dir)
@@ -150,8 +146,9 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
         # The number of btree_entries reported is influenced by the
         # number of column groups and indices.  Each insert will have
         # a multiplied effect.
-        self.pop(self, self.uri,
-            'key_format=S,value_format=S,' + self.table_config, self.nentries)
+        ds = self.dataset(self, self.uri, self.nentries,
+                          config=self.table_config, cgconfig=self.cg_config)
+        ds.populate()
 
         ver = wiredtiger.wiredtiger_version()
         verstring = str(ver[1]) + '.' + str(ver[2]) + '.' + str(ver[3])
@@ -166,7 +163,7 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
             expectout.write('Header\n')
             expectout.write(self.uri + '\n')
             # Check the config on the colgroup itself for complex tables.
-            if self.pop != simple_populate:
+            if self.dataset != SimpleDataSet:
                 expectout.write('key_format=S\n')
                 expectout.write('colgroup:' + self.pfx + ':cgroup1\n')
             if self.cfg == '':
@@ -182,7 +179,7 @@ class test_util13(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(dumpargs, outfilename=outfile)
 
         self.assertTrue(self.compare_files(expectfile, outfile))
-        self.assertTrue(self.load_recheck(expectfile, outfile))
+        self.assertTrue(self.load_recheck(ds, expectfile, outfile))
 
 if __name__ == '__main__':
     wttest.run()

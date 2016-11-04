@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wtscenario, wttest
-from helper import simple_populate
+from wtdataset import SimpleDataSet
 
 # test_lsm01.py
 #    Test LSM tree configuration options.
@@ -77,7 +77,7 @@ class test_lsm01(wttest.WiredTigerTestCase):
         args += ')' # Close the LSM configuration option group
         self.verbose(3,
             'Test LSM with config: ' + args + ' count: ' + str(self.nrecs))
-        simple_populate(self, self.uri, args, self.nrecs)
+        SimpleDataSet(self, self.uri, self.nrecs).populate()
 
         # TODO: Adding an explicit drop here can cause deadlocks, if a merge
         # is still happening. See issue #349.

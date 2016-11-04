@@ -27,8 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper import complex_populate, simple_populate
-from helper import key_populate, value_populate
+from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 # test_cursor_random02.py
@@ -56,12 +55,14 @@ class test_cursor_random02(wttest.WiredTigerTestCase):
     def test_cursor_random_reasonable_distribution(self):
         uri = self.type
         num_entries = self.records
-        config = 'key_format=S'
         if uri == 'table:random':
-            config = 'leaf_page_max=100MB,' + config
+            config = 'leaf_page_max=100MB'
+        else:
+            config = ''
 
         # Set the leaf-page-max value, otherwise the page might split.
-        simple_populate(self, uri, config, num_entries)
+        ds = SimpleDataSet(self, uri, num_entries, config=config)
+        ds.populate()
         # Setup an array to track which keys are seen
         visitedKeys = [0] * (num_entries + 1)
         # Setup a counter to see when we find a sequential key

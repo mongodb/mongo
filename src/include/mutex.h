@@ -43,7 +43,7 @@ typedef union {				/* Read/write lock */
 		uint16_t writers;	/* Now serving for writers */
 		uint16_t readers;	/* Now serving for readers */
 		uint16_t next;		/* Next available ticket number */
-		uint16_t __notused;	/* Padding */
+		uint16_t writers_active;/* Count of active writers */
 	} s;
 } wt_rwlock_t;
 

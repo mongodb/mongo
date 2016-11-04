@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper import simple_populate, key_populate, value_populate
+from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 # test_cursor_pin.py
@@ -36,7 +36,7 @@ from wtscenario import make_scenarios
 class test_cursor_pin(wttest.WiredTigerTestCase):
     uri = 'file:cursor_pin'
     nentries = 10000
-    config = 'allocation_size=512,leaf_page_max=512,value_format=S,key_format='
+    config = 'allocation_size=512,leaf_page_max=512'
     scenarios = make_scenarios([
         ('recno', dict(keyfmt='r')),
         ('string', dict(keyfmt='S')),
@@ -45,72 +45,75 @@ class test_cursor_pin(wttest.WiredTigerTestCase):
     # Create a multi-page file, confirm that a simple search to the local
     # page works, followed by a search to a different page.
     def test_smoke(self):
-        simple_populate(self,
-            self.uri, self.config + self.keyfmt, self.nentries)
+        ds = SimpleDataSet(self, self.uri, self.nentries,
+            config=self.config, key_format=self.keyfmt)
+        ds.populate()
         self.reopen_conn()
         c = self.session.open_cursor(self.uri, None)
-        c.set_key(key_populate(c, 100))
+        c.set_key(ds.key(100))
         self.assertEqual(c.search(), 0)
-        self.assertEqual(c.get_value(), value_populate(c, 100))
-        c.set_key(key_populate(c, 101))
+        self.assertEqual(c.get_value(), ds.value(100))
+        c.set_key(ds.key(101))
         self.assertEqual(c.search(), 0)
-        self.assertEqual(c.get_value(), value_populate(c, 101))
-        c.set_key(key_populate(c, 9999))
+        self.assertEqual(c.get_value(), ds.value(101))
+        c.set_key(ds.key(9999))
         self.assertEqual(c.search(), 0)
-        self.assertEqual(c.get_value(), value_populate(c, 9999))
+        self.assertEqual(c.get_value(), ds.value(9999))
 
     # Forward check.
-    def forward(self, c, max, notfound):
+    def forward(self, c, ds, max, notfound):
         for i in range(1, max + 1):
-            c.set_key(key_populate(c, i))
+            c.set_key(ds.key(i))
             if i in notfound:
                 self.assertEqual(c.search(), wiredtiger.WT_NOTFOUND)
             else:
                 self.assertEqual(c.search(), 0)
-                self.assertEqual(c.get_value(), value_populate(c, i))
+                self.assertEqual(c.get_value(), ds.value(i))
 
     # Backward check.
-    def backward(self, c, max, notfound):
+    def backward(self, c, ds, max, notfound):
         for i in range(max, 0, -1):
-            c.set_key(key_populate(c, i))
+            c.set_key(ds.key(i))
             if i in notfound:
                 self.assertEqual(c.search(), wiredtiger.WT_NOTFOUND)
             else:
                 self.assertEqual(c.search(), 0)
-                self.assertEqual(c.get_value(), value_populate(c, i))
+                self.assertEqual(c.get_value(), ds.value(i))
 
     # Create a multi-page file, search backward, forward to check page
     # boundaries.
     def test_basic(self):
-        simple_populate(self,
-            self.uri, self.config + self.keyfmt, self.nentries)
+        ds = SimpleDataSet(self, self.uri, self.nentries,
+            config=self.config, key_format=self.keyfmt)
+        ds.populate()
         self.reopen_conn()
         c = self.session.open_cursor(self.uri, None)
-        self.forward(c, self.nentries, [])
-        self.backward(c, self.nentries, [])
+        self.forward(c, ds, self.nentries, [])
+        self.backward(c, ds, self.nentries, [])
 
     # Create a multi-page file with a big chunk of missing space in the
     # middle (to exercise column-store searches).
     def test_missing(self):
-        simple_populate(self,
-            self.uri, self.config + self.keyfmt, self.nentries)
+        ds = SimpleDataSet(self, self.uri, self.nentries,
+            config=self.config, key_format=self.keyfmt)
+        ds.populate()
         c = self.session.open_cursor(self.uri, None)
         for i in range(self.nentries + 3000, self.nentries + 5001):
-            c[key_populate(c, i)] = value_populate(c, i)
+            c[ds.key(i)] = ds.value(i)
         self.reopen_conn()
         c = self.session.open_cursor(self.uri, None)
-        self.forward(c, self.nentries + 5000,
+        self.forward(c, ds, self.nentries + 5000,
             list(range(self.nentries + 1, self.nentries + 3000)))
-        self.backward(c, self.nentries + 5000,
+        self.backward(c, ds, self.nentries + 5000,
             list(range(self.nentries + 1, self.nentries + 3000)))
 
         # Insert into the empty space so we test searching inserted items.
         for i in range(self.nentries + 1000, self.nentries + 2001):
-            c[key_populate(c, i)] = value_populate(c, i)
-        self.forward(c, self.nentries + 5000,
+            c[ds.key(i)] = ds.value(i)
+        self.forward(c, ds, self.nentries + 5000,
             list(range(self.nentries + 1, self.nentries + 1000) +\
                  range(self.nentries + 2001, self.nentries + 3000)))
-        self.backward(c, self.nentries + 5000,
+        self.backward(c, ds, self.nentries + 5000,
             list(range(self.nentries + 1, self.nentries + 1000) +\
                  range(self.nentries + 2001, self.nentries + 3000)))
 

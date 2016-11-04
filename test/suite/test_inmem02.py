@@ -28,9 +28,7 @@
 
 import wiredtiger, wttest
 from time import sleep
-from helper import simple_populate, simple_populate_check
-from helper import key_populate, value_populate
-from wtscenario import make_scenarios
+from wtdataset import SimpleDataSet
 
 # test_inmem02.py
 #    Test in-memory with ignore-cache-size setting.
@@ -38,7 +36,7 @@ class test_inmem02(wttest.WiredTigerTestCase):
     uri = 'table:inmem02'
     conn_config = \
         'cache_size=3MB,file_manager=(close_idle_time=0),in_memory=true'
-    table_config = 'key_format=S,value_format=S,memory_page_max=32k,leaf_page_max=4k'
+    table_config = 'memory_page_max=32k,leaf_page_max=4k'
 
     # Add more data than fits into the configured cache and verify it fails.
     def test_insert_over_allowed(self):
@@ -50,9 +48,9 @@ class test_inmem02(wttest.WiredTigerTestCase):
 
         # Populate a table with enough data to fill the cache.
         msg = '/WT_CACHE_FULL.*/'
+        ds = SimpleDataSet(self, self.uri, 10000000, config=self.table_config)
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
-            lambda:simple_populate(
-            self, self.uri, self.table_config, 10000000), msg)
+            lambda:ds.populate(), msg)
 
         # Add some content to the new table
         cursor = self.session.open_cursor(self.uri + '_over', None)

@@ -562,7 +562,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/*
 	 * Do a pass over the configuration arguments and figure out what kind
-	 * kind of checkpoint this is.
+	 * of checkpoint this is.
 	 */
 	WT_RET(__checkpoint_apply_all(session, cfg, NULL, &full));
 

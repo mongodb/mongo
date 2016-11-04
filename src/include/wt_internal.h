@@ -126,8 +126,6 @@ struct __wt_connection_stats;
     typedef struct __wt_connection_stats WT_CONNECTION_STATS;
 struct __wt_cursor_backup;
     typedef struct __wt_cursor_backup WT_CURSOR_BACKUP;
-struct __wt_cursor_backup_entry;
-    typedef struct __wt_cursor_backup_entry WT_CURSOR_BACKUP_ENTRY;
 struct __wt_cursor_btree;
     typedef struct __wt_cursor_btree WT_CURSOR_BTREE;
 struct __wt_cursor_bulk;
