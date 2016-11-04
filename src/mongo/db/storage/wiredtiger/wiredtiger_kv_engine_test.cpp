@@ -29,6 +29,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"

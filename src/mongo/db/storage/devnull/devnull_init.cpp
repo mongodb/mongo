@@ -29,6 +29,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/base/init.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"

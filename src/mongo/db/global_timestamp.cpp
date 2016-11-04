@@ -28,6 +28,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/global_timestamp.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
