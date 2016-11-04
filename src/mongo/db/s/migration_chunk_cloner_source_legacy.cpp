@@ -254,10 +254,11 @@ Status MigrationChunkClonerSourceLegacy::awaitUntilCriticalSectionIsAppropriate(
     while ((Date_t::now() - startTime) < maxTimeToWait) {
         // Exponential sleep backoff, up to 1024ms. Don't sleep much on the first few iterations,
         // since we want empty chunk migrations to be fast.
-        sleepmillis(1 << std::min(iteration, 10));
+        sleepmillis(1LL << std::min(iteration, 10));
         iteration++;
 
-        auto responseStatus = _callRecipient(BSON(kRecvChunkStatus << _args.getNss().ns()));
+        auto responseStatus = _callRecipient(
+            createRequestWithSessionId(kRecvChunkStatus, _args.getNss(), _sessionId));
         if (!responseStatus.isOK()) {
             return {responseStatus.getStatus().code(),
                     str::stream()
