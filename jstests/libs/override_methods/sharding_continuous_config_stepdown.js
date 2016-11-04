@@ -132,11 +132,7 @@ function retryOnNetworkError(func) {
             if (!options) {
                 options = {};
             }
-            options.setParameter = {
-                logComponentVerbosity:
-                    "{ verbosity: 0, command: {verbosity: 1}, network: {verbosity: 1, \
-asio: {verbosity: 2}}, tracking: {verbosity: 1} }"
-            };
+            options.verbose = 2;
             return _originalStartSetFn.call(this, options);
         };
 
@@ -203,11 +199,7 @@ asio: {verbosity: 2}}, tracking: {verbosity: 1} }"
         if (!arguments[0].other) {
             arguments[0].other = {};
         }
-        arguments[0].setParameter = {
-            logComponentVerbosity:
-                "{ verbosity: 0, command: {verbosity: 1}, network: {verbosity: 1, \
-asio: {verbosity: 2}}, tracking: {verbosity: 1} }"
-        };
+        arguments[0].verbose = 2;
 
         // Set electionTimeoutMillis to 5 seconds, from 10, so that chunk migrations don't
         // time out because of the CSRS primary being down so often for so long.
