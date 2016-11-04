@@ -1425,9 +1425,11 @@ __wt_page_swap_func(
 	 * page not having been released, and that's not the case.
 	 */
 	if (LF_ISSET(WT_READ_NOTFOUND_OK) && ret == WT_NOTFOUND)
-		return (EINVAL);
+		WT_RET_MSG(session,
+		    EINVAL, "page-release WT_NOTFOUND error mapped to EINVAL");
 	if (LF_ISSET(WT_READ_RESTART_OK) && ret == WT_RESTART)
-		return (EINVAL);
+		WT_RET_MSG(session,
+		    EINVAL, "page-release WT_RESTART error mapped to EINVAL");
 
 	return (ret);
 }

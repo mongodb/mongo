@@ -29,10 +29,11 @@
 import Queue
 import threading, time, wiredtiger, wttest
 import glob, os, shutil
+from helper import compare_files
 from suite_subprocess import suite_subprocess
+from wtdataset import SimpleDataSet, simple_key
 from wtscenario import make_scenarios
 from wtthread import op_thread
-from helper import compare_files, key_populate
 
 # test_backup04.py
 #    Utilities: wt backup
@@ -67,14 +68,14 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
         self.pr('populate: ' + uri + ' with ' + str(rows) + ' rows')
         cursor = self.session.open_cursor(uri, None)
         for i in range(1, rows + 1):
-            cursor[key_populate(cursor, i)] = str(i) + ':' + 'a' * dsize
+            cursor[simple_key(cursor, i)] = str(i) + ':' + 'a' * dsize
         cursor.close()
 
     def update(self, uri, dsize, upd, rows):
         self.pr('update: ' + uri + ' with ' + str(rows) + ' rows')
         cursor = self.session.open_cursor(uri, None)
         for i in range(1, rows + 1):
-            cursor[key_populate(cursor, i)] = str(i) + ':' + upd * dsize
+            cursor[simple_key(cursor, i)] = str(i) + ':' + upd * dsize
         cursor.close()
 
     # Compare the original and backed-up files using the wt dump command.

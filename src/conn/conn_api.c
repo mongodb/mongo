@@ -1451,7 +1451,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_FH *fh;
 	size_t len;
 	wt_off_t size;
-	bool bytelock, exist, is_create;
+	bool bytelock, exist, is_create, match;
 	char buf[256];
 
 	conn = S2C(session);
@@ -1477,13 +1477,14 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	 * won't open a database in multiple threads, but we don't want to have
 	 * it fail the first time, but succeed the second.
 	 */
+	match = false;
 	TAILQ_FOREACH(t, &__wt_process.connqh, q)
 		if (t->home != NULL &&
 		    t != conn && strcmp(t->home, conn->home) == 0) {
-			ret = EBUSY;
+			match = true;
 			break;
 		}
-	if (ret != 0)
+	if (match)
 		WT_ERR_MSG(session, EBUSY,
 		    "WiredTiger database is already being managed by another "
 		    "thread in this process");

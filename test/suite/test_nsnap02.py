@@ -30,7 +30,7 @@
 #   Named snapshots: Combinations of dropping snapshots
 
 from suite_subprocess import suite_subprocess
-from helper import simple_populate
+from wtdataset import SimpleDataSet
 import wiredtiger, wttest
 
 class test_nsnap02(wttest.WiredTigerTestCase, suite_subprocess):
@@ -63,7 +63,7 @@ class test_nsnap02(wttest.WiredTigerTestCase, suite_subprocess):
     def create_snapshots(self):
         # Populate a table
         end = start = 0
-        simple_populate(self, self.uri, 'key_format=i', 0)
+        SimpleDataSet(self, self.uri, 0, key_format='i').populate()
 
         # Create a set of snapshots
         # Each snapshot has a bunch of new data

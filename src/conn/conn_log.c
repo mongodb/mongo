@@ -87,14 +87,16 @@ __logmgr_config(
 	if (reconfig &&
 	    ((enabled && !FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED)) ||
 	    (!enabled && FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED))))
-		return (EINVAL);
+		WT_RET_MSG(session, EINVAL,
+		    "log manager reconfigure: enabled mismatch with existing "
+		    "setting");
 
 	/* Logging is incompatible with in-memory */
 	if (enabled) {
 		WT_RET(__wt_config_gets(session, cfg, "in_memory", &cval));
 		if (cval.val != 0)
 			WT_RET_MSG(session, EINVAL,
-			    "In memory configuration incompatible with "
+			    "In-memory configuration incompatible with "
 			    "log=(enabled=true)");
 	}
 
@@ -137,8 +139,7 @@ __logmgr_config(
 	if (!reconfig) {
 		WT_RET(__wt_config_gets(session, cfg, "log.file_max", &cval));
 		conn->log_file_max = (wt_off_t)cval.val;
-		WT_STAT_CONN_SET(session,
-		    log_max_filesize, conn->log_file_max);
+		WT_STAT_CONN_SET(session, log_max_filesize, conn->log_file_max);
 	}
 
 	/*

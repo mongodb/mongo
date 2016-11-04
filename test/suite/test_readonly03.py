@@ -31,9 +31,9 @@
 #   all return ENOTSUP.
 #
 
-from helper import simple_populate
-from suite_subprocess import suite_subprocess
 import os, sys, wiredtiger, wttest
+from suite_subprocess import suite_subprocess
+from wtdataset import SimpleDataSet
 
 class test_readonly03(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:test_readonly03'
@@ -61,7 +61,8 @@ class test_readonly03(wttest.WiredTigerTestCase, suite_subprocess):
         create_params = 'key_format=i,value_format=i'
         entries = 10
         # Create a database and a table.
-        simple_populate(self, self.uri, create_params, entries)
+        SimpleDataSet(self, self.uri, entries, key_format='i',
+            value_format='i').populate()
 
         #
         # Now close and reopen.  Note that the connection function

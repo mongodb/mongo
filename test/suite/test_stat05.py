@@ -30,8 +30,7 @@ import itertools, wiredtiger, wttest
 from suite_subprocess import suite_subprocess
 from wtscenario import make_scenarios
 from wiredtiger import stat
-from helper import complex_populate, complex_populate_lsm, simple_populate
-from helper import complex_value_populate, key_populate, value_populate
+from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
 
 # test_stat05.py
 #    Statistics cursor using size only
@@ -40,17 +39,17 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
     conn_config = 'statistics=(fast)'
 
     uri = [
-        ('file',  dict(uri='file:' + pfx, pop=simple_populate, cfg='')),
-        ('table', dict(uri='table:' + pfx, pop=simple_populate, cfg='')),
-        ('inmem', dict(uri='table:' + pfx, pop=simple_populate, cfg='',
+        ('file',  dict(uri='file:' + pfx, dataset=SimpleDataSet, cfg='')),
+        ('table', dict(uri='table:' + pfx, dataset=SimpleDataSet, cfg='')),
+        ('inmem', dict(uri='table:' + pfx, dataset=SimpleDataSet, cfg='',
             conn_config = 'in_memory,statistics=(fast)')),
-        ('table-lsm', dict(uri='table:' + pfx, pop=simple_populate,
-            cfg=',type=lsm,lsm=(chunk_size=1MB,merge_min=2)',
+        ('table-lsm', dict(uri='table:' + pfx, dataset=SimpleDataSet,
+            cfg='lsm=(chunk_size=1MB,merge_min=2)',
             conn_config = 'statistics=(fast),eviction_dirty_target=99,eviction_dirty_trigger=99')),
-        ('complex', dict(uri='table:' + pfx, pop=complex_populate, cfg='')),
+        ('complex', dict(uri='table:' + pfx, dataset=ComplexDataSet, cfg='')),
         ('complex-lsm',
-            dict(uri='table:' + pfx, pop=complex_populate_lsm,
-            cfg=',lsm=(chunk_size=1MB,merge_min=2)',
+            dict(uri='table:' + pfx, dataset=ComplexLSMDataSet,
+            cfg='lsm=(chunk_size=1MB,merge_min=2)',
             conn_config = 'statistics=(fast),eviction_dirty_target=99,eviction_dirty_trigger=99')),
     ]
 
@@ -68,17 +67,14 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
     # the cursor open succeeds. Insert enough data that LSM tables to need to
     # switch and merge.
     def test_stat_cursor_size(self):
-        self.pop(self, self.uri, 'key_format=S' + self.cfg, 100)
+        ds = self.dataset(self, self.uri, 100, config=self.cfg)
+        ds.populate()
         self.openAndWalkStatCursor()
         cursor = self.session.open_cursor(self.uri, None)
         for i in range(100, 40000 + 1):
             if i % 100 == 0:
                 self.openAndWalkStatCursor()
-            if self.pop == simple_populate:
-                cursor[key_populate(cursor, i)] = value_populate(cursor, i)
-            else:
-                cursor[key_populate(cursor, i)] = \
-                        tuple(complex_value_populate(cursor, i))
+            cursor[ds.key(i)] = ds.value(i)
         cursor.close()
         self.openAndWalkStatCursor()
 

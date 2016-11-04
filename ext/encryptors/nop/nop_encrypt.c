@@ -38,12 +38,28 @@
 typedef struct {
 	WT_ENCRYPTOR encryptor;		/* Must come first */
 
-	WT_EXTENSION_API *wt_api;		/* Extension API */
+	WT_EXTENSION_API *wt_api;	/* Extension API */
 
-	unsigned long nop_calls;		/* Count of calls */
+	unsigned long nop_calls;	/* Count of calls */
 
 } NOP_ENCRYPTOR;
 /*! [WT_ENCRYPTOR initialization structure] */
+
+/*
+ * nop_error --
+ *	Display an error from this module in a standard way.
+ */
+static int
+nop_error(
+    NOP_ENCRYPTOR *encryptor, WT_SESSION *session, int err, const char *msg)
+{
+	WT_EXTENSION_API *wt_api;
+
+	wt_api = encryptor->wt_api;
+	(void)wt_api->err_printf(wt_api, session,
+	    "nop encryption: %s: %s", msg, wt_api->strerror(wt_api, NULL, err));
+	return (err);
+}
 
 /*! [WT_ENCRYPTOR encrypt] */
 /*
@@ -63,7 +79,8 @@ nop_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	++nop_encryptor->nop_calls;		/* Call count */
 
 	if (dst_len < src_len)
-		return (ENOMEM);
+		return (nop_error(nop_encryptor, session,
+		    ENOMEM, "encrypt buffer not big enough"));
 
 	memcpy(dst, src, src_len);
 	*result_lenp = src_len;

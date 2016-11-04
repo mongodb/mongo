@@ -842,6 +842,7 @@ localtime
 logf
 logmgr
 lognum
+logop
 logread
 logrec
 logsize
