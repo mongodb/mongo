@@ -202,13 +202,15 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target='sharding_state_test',
+    target='shard_test',
     source=[
         'active_migrations_registry_test.cpp',
         'metadata_manager_test.cpp',
+        'migration_chunk_cloner_source_legacy_test.cpp',
         'sharding_state_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_mock',
         '$BUILD_DIR/mongo/s/sharding_mongod_test_fixture',
     ],
 )

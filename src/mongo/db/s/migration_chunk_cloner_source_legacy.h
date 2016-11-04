@@ -125,6 +125,9 @@ private:
     friend class DeleteNotificationStage;
     friend class LogOpForShardingHandler;
 
+    // Represents the states in which the cloner can be
+    enum State { kNew, kCloning, kDone };
+
     /**
      * Idempotent method, which cleans up any previously initialized state. It is safe to be called
      * at any time, but no methods should be called after it.
@@ -183,24 +186,24 @@ private:
     // Protects the entries below
     stdx::mutex _mutex;
 
-    // Inidicates whether commit or cancel have already been called and ensures that we do not
-    // double commit or double cancel
-    bool _cloneCompleted{false};
+    // The current state of the cloner
+    State _state{kNew};
 
     // List of record ids that needs to be transferred (initial clone)
     std::set<RecordId> _cloneLocs;
 
     // The estimated average object size during the clone phase. Used for buffer size
-    // pre-allocation.
+    // pre-allocation (initial clone).
     uint64_t _averageObjectSizeForCloneLocs{0};
 
-    // List of _id of documents that were modified that must be re-cloned.
+    // List of _id of documents that were modified that must be re-cloned (xfer mods)
     std::list<BSONObj> _reload;
 
-    // List of _id of documents that were deleted during clone that should be deleted later.
+    // List of _id of documents that were deleted during clone that should be deleted later (xfer
+    // mods)
     std::list<BSONObj> _deleted;
 
-    // Total bytes in _reload + _deleted
+    // Total bytes in _reload + _deleted (xfer mods)
     uint64_t _memoryUsed{0};
 };
 
