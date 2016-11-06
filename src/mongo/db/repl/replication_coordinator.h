@@ -275,12 +275,10 @@ public:
                                          bool slaveOk) = 0;
 
     /**
-     * Returns true if this node should ignore index constraints for idempotency reasons.
-     *
-     * The namespace "ns" is passed in because the "local" database is usually writable
-     * and we need to enforce the constraints for it.
+     * Returns true if this node should ignore unique index constraints on new documents.
+     * Currently this is needed for nodes in STARTUP2, RECOVERING, and ROLLBACK states.
      */
-    virtual bool shouldRelaxIndexConstraints(const NamespaceString& ns) = 0;
+    virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx) = 0;
 
     /**
      * Updates our internal tracking of the last OpTime applied for the given slave

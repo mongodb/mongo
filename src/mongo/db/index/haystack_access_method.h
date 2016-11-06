@@ -75,7 +75,7 @@ private:
      * This function ignores the 'multikeyPaths' pointer because geoHaystack indexes don't support
      * tracking path-level multikey information.
      */
-    void doGetKeys(const BSONObj& obj, BSONObjSet* keys, MultikeyPaths* multikeyPaths) const final;
+    void getKeys(const BSONObj& obj, BSONObjSet* keys, MultikeyPaths* multikeyPaths) const final;
 
     std::string _geoField;
     std::vector<std::string> _otherFields;

@@ -152,7 +152,7 @@ public:
                                          const NamespaceString& ns,
                                          bool slaveOk);
 
-    virtual bool shouldRelaxIndexConstraints(const NamespaceString& ns);
+    virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 
     virtual Status setLastOptimeForSlave(const OID& rid, const Timestamp& ts);
 

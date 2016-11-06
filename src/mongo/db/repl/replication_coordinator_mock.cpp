@@ -120,13 +120,8 @@ bool ReplicationCoordinatorMock::isMasterForReportingPurposes() {
 }
 
 bool ReplicationCoordinatorMock::canAcceptWritesForDatabase(StringData dbName) {
-    // Return true if we allow writes explicitly even when not in primary state, as in sharding
-    // unit tests, so that the op observers can fire but the tests don't have to set all the states
-    // as if it's in primary.
-    if (_alwaysAllowWrites) {
-        return true;
-    }
-    return dbName == "local" || _memberState.primary();
+    // TODO
+    return true;
 }
 
 bool ReplicationCoordinatorMock::canAcceptWritesFor(const NamespaceString& ns) {
@@ -141,8 +136,9 @@ Status ReplicationCoordinatorMock::checkCanServeReadsFor(OperationContext* txn,
     return Status::OK();
 }
 
-bool ReplicationCoordinatorMock::shouldRelaxIndexConstraints(const NamespaceString& ns) {
-    return !canAcceptWritesFor(ns);
+bool ReplicationCoordinatorMock::shouldIgnoreUniqueIndex(const IndexDescriptor* idx) {
+    // TODO
+    return false;
 }
 
 Status ReplicationCoordinatorMock::setLastOptimeForSlave(const OID& rid, const Timestamp& ts) {
@@ -464,10 +460,6 @@ void ReplicationCoordinatorMock::setIndexPrefetchConfig(
 
 Status ReplicationCoordinatorMock::stepUpIfEligible() {
     return Status::OK();
-}
-
-void ReplicationCoordinatorMock::alwaysAllowWrites(bool allowWrites) {
-    _alwaysAllowWrites = allowWrites;
 }
 
 }  // namespace repl

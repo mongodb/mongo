@@ -753,19 +753,17 @@ Status applyOperation_inlock(OperationContext* txn,
                 indexSpec = bob.obj();
             }
 
-            bool relaxIndexConstraints =
-                ReplicationCoordinator::get(txn)->shouldRelaxIndexConstraints(indexNss);
             if (indexSpec["background"].trueValue()) {
                 Lock::TempRelease release(txn->lockState());
                 if (txn->lockState()->isLocked()) {
                     // If TempRelease fails, background index build will deadlock.
                     LOG(3) << "apply op: building background index " << indexSpec
                            << " in the foreground because temp release failed";
-                    IndexBuilder builder(indexSpec, relaxIndexConstraints);
+                    IndexBuilder builder(indexSpec);
                     Status status = builder.buildInForeground(txn, db);
                     uassertStatusOK(status);
                 } else {
-                    IndexBuilder* builder = new IndexBuilder(indexSpec, relaxIndexConstraints);
+                    IndexBuilder* builder = new IndexBuilder(indexSpec);
                     // This spawns a new thread and returns immediately.
                     builder->go();
                     // Wait for thread to start and register itself
@@ -773,7 +771,7 @@ Status applyOperation_inlock(OperationContext* txn,
                 }
                 txn->recoveryUnit()->abandonSnapshot();
             } else {
-                IndexBuilder builder(indexSpec, relaxIndexConstraints);
+                IndexBuilder builder(indexSpec);
                 Status status = builder.buildInForeground(txn, db);
                 uassertStatusOK(status);
             }

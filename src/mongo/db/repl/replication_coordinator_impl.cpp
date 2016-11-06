@@ -1877,8 +1877,33 @@ bool ReplicationCoordinatorImpl::isInPrimaryOrSecondaryState() const {
     return _canServeNonLocalReads.loadRelaxed();
 }
 
-bool ReplicationCoordinatorImpl::shouldRelaxIndexConstraints(const NamespaceString& ns) {
-    return !canAcceptWritesFor(ns);
+bool ReplicationCoordinatorImpl::shouldIgnoreUniqueIndex(const IndexDescriptor* idx) {
+    if (!idx->unique()) {
+        return false;
+    }
+    // Never ignore _id index
+    if (idx->isIdIndex()) {
+        return false;
+    }
+    if (nsToDatabaseSubstring(idx->parentNS()) == kLocalDB) {
+        // always enforce on local
+        return false;
+    }
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    if (getReplicationMode() != modeReplSet) {
+        return false;
+    }
+    // see SERVER-6671
+    MemberState ms = _getMemberState_inlock();
+    switch (ms.s) {
+        case MemberState::RS_SECONDARY:
+        case MemberState::RS_RECOVERING:
+        case MemberState::RS_ROLLBACK:
+        case MemberState::RS_STARTUP2:
+            return true;
+        default:
+            return false;
+    }
 }
 
 OID ReplicationCoordinatorImpl::getElectionId() {
