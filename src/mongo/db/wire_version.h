@@ -66,6 +66,10 @@ enum WireVersion {
 
     // Supports all write commands take a write concern.
     COMMANDS_ACCEPT_WRITE_CONCERN = 5,
+
+    // Set this to the highest value in this enum - it will be the default maxWireVersion for
+    // the WireSpec values.
+    LATEST_WIRE_VERSION = COMMANDS_ACCEPT_WRITE_CONCERN,
 };
 
 /**
@@ -106,14 +110,14 @@ struct WireSpec {
 
     // incoming.maxWireVersion - Latest version that the server accepts on incoming requests. This
     // should always be at the latest entry in WireVersion.
-    WireVersionInfo incoming;
+    WireVersionInfo incoming = {RELEASE_2_4_AND_BEFORE, LATEST_WIRE_VERSION};
 
     // outgoing.minWireVersion - Minimum version allowed on remote nodes when the server sends
     // requests. We should bump this whenever we don't want to connect to clients that are too old.
 
     // outgoing.maxWireVersion - Latest version allowed on remote nodes when the server sends
     // requests.
-    WireVersionInfo outgoing;
+    WireVersionInfo outgoing = {RELEASE_2_4_AND_BEFORE, LATEST_WIRE_VERSION};
 
     // Set to true if the client is internal to the cluster---this is a mongod or mongos connecting
     // to another mongod.

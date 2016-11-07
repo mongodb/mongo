@@ -220,9 +220,6 @@ static Status initializeSharding(OperationContext* txn) {
 
 static void _initWireSpec() {
     WireSpec& spec = WireSpec::instance();
-    // accept from any version
-    spec.incoming.minWireVersion = RELEASE_2_4_AND_BEFORE;
-    spec.incoming.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
     // connect to version supporting Write Concern only
     spec.outgoing.minWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
     spec.outgoing.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
