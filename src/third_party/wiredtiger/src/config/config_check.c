@@ -128,8 +128,7 @@ config_check(WT_SESSION_IMPL *session,
 			badtype = false;
 		} else
 			WT_RET_MSG(session, EINVAL,
-			    "unknown configuration type: '%s'",
-			    checks[i].type);
+			    "unknown configuration type: '%s'", checks[i].type);
 
 		if (badtype)
 			WT_RET_MSG(session, EINVAL,

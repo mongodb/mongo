@@ -344,7 +344,8 @@ __block_off_remove(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		__block_size_srch(el->sz, ext->size, sstack);
 		szp = *sstack[0];
 		if (szp == NULL || szp->size != ext->size)
-			return (EINVAL);
+			WT_PANIC_RET(session, EINVAL,
+			    "extent not found in by-size list during remove");
 		__block_off_srch(szp->off, off, astack, true);
 		ext = *astack[0];
 		if (ext == NULL || ext->off != off)

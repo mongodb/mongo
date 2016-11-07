@@ -30,7 +30,7 @@
 #       session level operations on tables
 
 import wiredtiger, wttest
-from helper import key_populate, simple_populate, value_populate
+from wtdataset import SimpleDataSet
 
 # A standalone test case that exercises address-deleted cells.
 class test_truncate_address_deleted(wttest.WiredTigerTestCase):
@@ -39,15 +39,15 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
     # Use a small page size and lots of keys because we want to create lots
     # of individual pages in the file.
     nentries = 10000
-    config = 'allocation_size=512,' +\
-        'leaf_page_max=512,value_format=S,key_format=S'
+    config = 'allocation_size=512,leaf_page_max=512'
 
     # address_deleted routine:
     #   Create an object that has a bunch of address-deleted cells on disk.
     #   Recover the object, and turn the address-deleted cells into free pages.
     def address_deleted(self):
         # Create the object, force it to disk, and verify the object.
-        simple_populate(self, self.uri, self.config, self.nentries)
+        ds = SimpleDataSet(self, self.uri, self.nentries, config=self.config)
+        ds.populate()
         self.reopen_conn()
         self.session.verify(self.uri)
 
@@ -59,9 +59,9 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
         # Truncate a big range of rows; the leaf pages aren't in memory, so
         # leaf page references will be deleted without being read.
         start = self.session.open_cursor(self.uri, None)
-        start.set_key(key_populate(start, 10))
+        start.set_key(ds.key(10))
         end = self.session.open_cursor(self.uri, None)
-        end.set_key(key_populate(end, self.nentries - 10))
+        end.set_key(ds.key(self.nentries - 10))
         self.session.truncate(None, start, end, None)
         self.assertEqual(start.close(), 0)
         self.assertEqual(end.close(), 0)
@@ -78,7 +78,7 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
         # we get a good look at all the internal pages and the address-deleted
         # cells.
         cursor = self.session.open_cursor(self.uri, None)
-        cursor.set_key(key_populate(cursor, 5))
+        cursor.set_key(ds.key(5))
         cursor.set_value("changed value")
         self.assertEqual(cursor.update(), 0)
         cursor.reset()
@@ -88,12 +88,13 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
 
         # Checkpoint, freeing the pages.
         self.session.checkpoint()
+        return ds
 
     # Test object creation, recovery, and conversion of address-deleted cells
     # into free pages.
     def test_truncate_address_deleted_free(self):
         # Create the object on disk.
-        self.address_deleted()
+        ds = self.address_deleted()
 
         # That's all just verify that worked.
         self.session.verify(self.uri)
@@ -103,7 +104,7 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
     # empty pages by a reader after the underlying leaf pages are removed.
     def test_truncate_address_deleted_empty_page(self):
         # Create the object on disk.
-        self.address_deleted()
+        ds = self.address_deleted()
 
         # Open a cursor and update pages in the middle of the range, forcing
         # creation of empty pages (once the underlying leaf page is freed, we
@@ -111,11 +112,11 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
         # the value as well as write the page and get it back.
         cursor = self.session.open_cursor(self.uri, None)
         for i in range(3000, 7000, 137):
-            k = key_populate(cursor, i)
+            k = ds.key(i)
             v = 'changed value: ' + str(i)
             cursor[k] = v
         for i in range(3000, 7000, 137):
-            k = key_populate(cursor, i)
+            k = ds.key(i)
             v = 'changed value: ' + str(i)
             cursor.set_key(k)
             self.assertEqual(cursor.search(), 0)
@@ -128,7 +129,7 @@ class test_truncate_address_deleted(wttest.WiredTigerTestCase):
 
         cursor = self.session.open_cursor(self.uri, None)
         for i in range(3000, 7000, 137):
-            k = key_populate(cursor, i)
+            k = ds.key(i)
             v = 'changed value: ' + str(i)
             cursor.set_key(k)
             self.assertEqual(cursor.search(), 0)

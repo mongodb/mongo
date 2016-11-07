@@ -32,15 +32,13 @@
 
 import os, time
 import wiredtiger, wttest
-from helper import complex_populate, key_populate, simple_populate
+from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 
 # Test session.open_cursor with cursor duplication.
 class test_duplicate_cursor(wttest.WiredTigerTestCase):
     name = 'test_dupc'
     nentries = 1000
-
-    config = 'key_format='
 
     scenarios = make_scenarios([
         ('file-r', dict(uri='file:', fmt='r')),
@@ -51,7 +49,7 @@ class test_duplicate_cursor(wttest.WiredTigerTestCase):
 
     # Iterate through an object, duplicate the cursor and checking that it
     # matches the original and is set to the same record.
-    def iterate(self, uri):
+    def iterate(self, uri, ds):
         cursor = self.session.open_cursor(uri, None, None)
         next = 0
         while True:
@@ -59,10 +57,10 @@ class test_duplicate_cursor(wttest.WiredTigerTestCase):
             if nextret != 0:
                 break
             next += 1
-            self.assertEqual(cursor.get_key(), key_populate(cursor, next))
+            self.assertEqual(cursor.get_key(), ds.key(next))
             dupc = self.session.open_cursor(None, cursor, None)
             self.assertEqual(cursor.compare(dupc), 0)
-            self.assertEqual(dupc.get_key(), key_populate(dupc, next))
+            self.assertEqual(dupc.get_key(), ds.key(next))
             cursor.close()
             cursor = dupc
         self.assertEqual(next, self.nentries)
@@ -73,14 +71,16 @@ class test_duplicate_cursor(wttest.WiredTigerTestCase):
         uri = self.uri + self.name
 
         # A simple, one-file file or table object.
-        simple_populate(self, uri, self.config + self.fmt, self.nentries)
-        self.iterate(uri)
+        ds = SimpleDataSet(self, uri, self.nentries, key_format=self.fmt)
+        ds.populate()
+        self.iterate(uri, ds)
         self.session.drop(uri, None)
 
         # A complex, multi-file table object.
         if self.uri == "table:":
-            complex_populate(self, uri, self.config + self.fmt, self.nentries)
-            self.iterate(uri)
+            ds = ComplexDataSet(self, uri, self.nentries, key_format=self.fmt)
+            ds.populate()
+            self.iterate(uri, ds)
             self.session.drop(uri, None)
 
 if __name__ == '__main__':

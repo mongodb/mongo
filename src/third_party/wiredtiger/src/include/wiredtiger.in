@@ -1284,6 +1284,9 @@ struct __wt_session {
 	 * @configstart{WT_SESSION.join, see dist/api_data.py}
 	 * @config{bloom_bit_count, the number of bits used per item for the
 	 * bloom filter., an integer between 2 and 1000; default \c 16.}
+	 * @config{bloom_false_positives, return all values that pass the bloom
+	 * filter\, without eliminating any false positives., a boolean flag;
+	 * default \c false.}
 	 * @config{bloom_hash_count, the number of hash values per item for the
 	 * bloom filter., an integer between 2 and 100; default \c 8.}
 	 * @config{compare, modifies the set of items to be returned so that the
@@ -4197,13 +4200,48 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 
 /*! @} */
 
-/*******************************************
- * Statistic reference.
- *******************************************/
 /*!
  * @addtogroup wt
  * @{
  */
+
+/*!
+ * @name Log record and operation types
+ * @anchor log_types
+ * @{
+ */
+/*
+ * NOTE:  The values of these record types and operations must
+ * never change because they're written into the log.  Append
+ * any new records or operations to the appropriate set.
+ */
+/*! checkpoint */
+#define	WT_LOGREC_CHECKPOINT	0
+/*! transaction commit */
+#define	WT_LOGREC_COMMIT	1
+/*! file sync */
+#define	WT_LOGREC_FILE_SYNC	2
+/*! message */
+#define	WT_LOGREC_MESSAGE	3
+/*! invalid operation */
+#define	WT_LOGOP_INVALID	0
+/*! column put */
+#define	WT_LOGOP_COL_PUT	1
+/*! column remove */
+#define	WT_LOGOP_COL_REMOVE	2
+/*! column truncate */
+#define	WT_LOGOP_COL_TRUNCATE	3
+/*! row put */
+#define	WT_LOGOP_ROW_PUT	4
+/*! row remove */
+#define	WT_LOGOP_ROW_REMOVE	5
+/*! row truncate */
+#define	WT_LOGOP_ROW_TRUNCATE	6
+/*! @} */
+
+/*******************************************
+ * Statistic reference.
+ *******************************************/
 /*
  * DO NOT EDIT: automatically built by dist/api_stat.py.
  * Statistics section: BEGIN
@@ -5067,42 +5105,6 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  * Statistics section: END
  * DO NOT EDIT: automatically built by dist/api_stat.py.
  */
-/*!
- * @name Log record and operation types
- * @anchor log_types
- * @{
- */
-/*
- * DO NOT EDIT: automatically built by dist/log.py.
- * Log record declarations: BEGIN
- */
-/*! invalid operation */
-#define	WT_LOGOP_INVALID	0
-/*! checkpoint */
-#define	WT_LOGREC_CHECKPOINT	0
-/*! transaction commit */
-#define	WT_LOGREC_COMMIT	1
-/*! file sync */
-#define	WT_LOGREC_FILE_SYNC	2
-/*! message */
-#define	WT_LOGREC_MESSAGE	3
-/*! column put */
-#define	WT_LOGOP_COL_PUT	1
-/*! column remove */
-#define	WT_LOGOP_COL_REMOVE	2
-/*! column truncate */
-#define	WT_LOGOP_COL_TRUNCATE	3
-/*! row put */
-#define	WT_LOGOP_ROW_PUT	4
-/*! row remove */
-#define	WT_LOGOP_ROW_REMOVE	5
-/*! row truncate */
-#define	WT_LOGOP_ROW_TRUNCATE	6
-/*
- * Log record declarations: END
- * DO NOT EDIT: automatically built by dist/log.py.
- */
-/*! @} */
 /*! @} */
 
 #undef __F

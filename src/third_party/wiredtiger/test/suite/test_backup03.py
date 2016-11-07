@@ -27,11 +27,11 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import glob, os, shutil, string
-from suite_subprocess import suite_subprocess
-from wtscenario import make_scenarios
 import wiredtiger, wttest
-from helper import compare_files,\
-    complex_populate, complex_populate_lsm, simple_populate
+from helper import compare_files
+from suite_subprocess import suite_subprocess
+from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
+from wtscenario import make_scenarios
 
 # test_backup03.py
 #    Utilities: wt backup
@@ -50,10 +50,10 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
     # to the backup to confirm the backup is correct.
     pfx = 'test_backup'
     objs = [                            # Objects
-        ('table:' + pfx + '.1',  simple_populate, 0),
-        (  'lsm:' + pfx + '.2',  simple_populate, 1),
-        ('table:' + pfx + '.3', complex_populate, 2),
-        ('table:' + pfx + '.4', complex_populate_lsm, 3),
+        ('table:' + pfx + '.1', SimpleDataSet, 0),
+        (  'lsm:' + pfx + '.2', SimpleDataSet, 1),
+        ('table:' + pfx + '.3', ComplexDataSet, 2),
+        ('table:' + pfx + '.4', ComplexLSMDataSet, 3),
     ]
     list = [
         ( 'backup_1', dict(big=0,list=[0])),       # Target objects individually
@@ -85,7 +85,7 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
                 rows = 200000           # Big object
             else:
                 rows = 1000             # Small object
-            i[1](self, i[0], 'key_format=S', rows)
+            i[1](self, i[0], rows).populate()
         # Backup needs a checkpoint
         self.session.checkpoint(None)
 

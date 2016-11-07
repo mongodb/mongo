@@ -299,6 +299,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_drop[] = {
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_join[] = {
 	{ "bloom_bit_count", "int", NULL, "min=2,max=1000", NULL, 0 },
+	{ "bloom_false_positives", "boolean", NULL, NULL, NULL, 0 },
 	{ "bloom_hash_count", "int", NULL, "min=2,max=100", NULL, 0 },
 	{ "compare", "string",
 	    NULL, "choices=[\"eq\",\"ge\",\"gt\",\"le\",\"lt\"]",
@@ -1090,9 +1091,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_WT_SESSION_drop, 4
 	},
 	{ "WT_SESSION.join",
-	  "bloom_bit_count=16,bloom_hash_count=8,compare=\"eq\",count=,"
-	  "operation=\"and\",strategy=",
-	  confchk_WT_SESSION_join, 6
+	  "bloom_bit_count=16,bloom_false_positives=false,"
+	  "bloom_hash_count=8,compare=\"eq\",count=,operation=\"and\","
+	  "strategy=",
+	  confchk_WT_SESSION_join, 7
 	},
 	{ "WT_SESSION.log_flush",
 	  "sync=on",

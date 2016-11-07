@@ -31,7 +31,7 @@
 #
 
 import wiredtiger, wttest
-from helper import key_populate, value_populate
+from wtdataset import SimpleDataSet, simple_key, simple_value
 from wtscenario import make_scenarios
 
 # Smoke test bulk-load.
@@ -61,7 +61,7 @@ class test_bulk_load(wttest.WiredTigerTestCase):
             'key_format=' + self.keyfmt + ',value_format=' + self.valfmt)
         cursor = self.session.open_cursor(uri, None, "bulk")
         for i in range(1, 1000):
-            cursor[key_populate(cursor, i)] = value_populate(cursor, i)
+            cursor[simple_key(cursor, i)] = simple_value(cursor, i)
 
     # Test a bulk-load triggers variable-length column-store RLE correctly.
     def test_bulk_load_var_rle(self):
@@ -76,7 +76,7 @@ class test_bulk_load(wttest.WiredTigerTestCase):
             'key_format=' + self.keyfmt + ',value_format=' + self.valfmt)
         cursor = self.session.open_cursor(uri, None, "bulk")
         for i in range(1, 1000):
-            cursor[key_populate(cursor, i)] = value_populate(cursor, i/7)
+            cursor[simple_key(cursor, i)] = simple_value(cursor, i/7)
 
     # Test a bulk-load variable-length column-store append ignores any key.
     def test_bulk_load_var_append(self):
@@ -88,13 +88,13 @@ class test_bulk_load(wttest.WiredTigerTestCase):
             'key_format=' + self.keyfmt + ',value_format=' + self.valfmt)
         cursor = self.session.open_cursor(uri, None, "bulk,append")
         for i in range(1, 1000):
-            cursor[key_populate(cursor, 37)] = value_populate(cursor, i)
+            cursor[simple_key(cursor, 37)] = simple_value(cursor, i)
         cursor.close()
         cursor = self.session.open_cursor(uri, None, None)
         for i in range(1, 1000):
-            cursor.set_key(key_populate(cursor, i))
+            cursor.set_key(simple_key(cursor, i))
             cursor.search()
-            self.assertEqual(cursor.get_value(), value_populate(cursor, i))
+            self.assertEqual(cursor.get_value(), simple_value(cursor, i))
 
     # Test that column-store bulk-load handles skipped records correctly.
     def test_bulk_load_col_delete(self):
@@ -107,21 +107,21 @@ class test_bulk_load(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(uri, None, "bulk")
         for i in range(1, 1000):
             if i % 7 == 0:
-                cursor[key_populate(cursor, i)] = value_populate(cursor, i)
+                cursor[simple_key(cursor, i)] = simple_value(cursor, i)
 
         # Ensure we create all the missing records.
         i = i + 1
-        cursor[key_populate(cursor, i)] = value_populate(cursor, i)
+        cursor[simple_key(cursor, i)] = simple_value(cursor, i)
 
         cursor.close()
         cursor = self.session.open_cursor(uri, None, None)
 
         # Verify all the records are there, in their proper state.
         for i in range(1, 1000):
-            cursor.set_key(key_populate(cursor, i))
+            cursor.set_key(simple_key(cursor, i))
             if i % 7 == 0:
                 cursor.search()
-                self.assertEqual(cursor.get_value(), value_populate(cursor, i))
+                self.assertEqual(cursor.get_value(), simple_value(cursor, i))
             elif cursor.value_format == '8t':
                 cursor.search()
                 self.assertEqual(cursor.get_value(), 0)
@@ -139,17 +139,17 @@ class test_bulk_load(wttest.WiredTigerTestCase):
             'key_format=' + self.keyfmt + ',value_format=' + self.valfmt)
         cursor = self.session.open_cursor(uri, None, "bulk")
         for i in range(1, 10):
-            cursor[key_populate(cursor, i)] = value_populate(cursor, i)
+            cursor[simple_key(cursor, i)] = simple_value(cursor, i)
 
         # A big record -- if it's not efficient, we'll just hang.
         big = 18446744073709551606
-        cursor[key_populate(cursor, big)] = value_populate(cursor, big)
+        cursor[simple_key(cursor, big)] = simple_value(cursor, big)
 
         cursor.close()
         cursor = self.session.open_cursor(uri, None, None)
-        cursor.set_key(key_populate(cursor, big))
+        cursor.set_key(simple_key(cursor, big))
         cursor.search()
-        self.assertEqual(cursor.get_value(), value_populate(cursor, big))
+        self.assertEqual(cursor.get_value(), simple_value(cursor, big))
 
     # Test that bulk-load out-of-order fails.
     def test_bulk_load_order_check(self):
@@ -157,16 +157,16 @@ class test_bulk_load(wttest.WiredTigerTestCase):
         self.session.create(uri,
             'key_format=' + self.keyfmt + ',value_format=' + self.valfmt)
         cursor = self.session.open_cursor(uri, None, "bulk")
-        cursor[key_populate(cursor, 10)] = value_populate(cursor, 10)
+        cursor[simple_key(cursor, 10)] = simple_value(cursor, 10)
 
         for i in [1, 9, 10]:
-            cursor.set_key(key_populate(cursor, 1))
-            cursor.set_value(value_populate(cursor, 1))
+            cursor.set_key(simple_key(cursor, 1))
+            cursor.set_value(simple_value(cursor, 1))
             msg = '/than previously inserted key/'
             self.assertRaisesWithMessage(
                 wiredtiger.WiredTigerError, lambda: cursor.insert(), msg)
 
-        cursor[key_populate(cursor, 11)] = value_populate(cursor, 11)
+        cursor[simple_key(cursor, 11)] = simple_value(cursor, 11)
 
     # Test that row-store bulk-load out-of-order can succeed.
     def test_bulk_load_row_order_nocheck(self):
@@ -181,8 +181,8 @@ class test_bulk_load(wttest.WiredTigerTestCase):
         self.session.create(uri,
             'key_format=' + self.keyfmt + ',value_format=' + self.valfmt)
         cursor = self.session.open_cursor(uri, None, "bulk,skip_sort_check")
-        cursor[key_populate(cursor, 10)] = value_populate(cursor, 10)
-        cursor[key_populate(cursor, 1)] = value_populate(cursor, 1)
+        cursor[simple_key(cursor, 10)] = simple_value(cursor, 10)
+        cursor[simple_key(cursor, 1)] = simple_value(cursor, 1)
 
         if not wiredtiger.diagnostic_build():
             self.skipTest('requires a diagnostic build')
@@ -197,7 +197,7 @@ class test_bulk_load(wttest.WiredTigerTestCase):
         uri = self.type + self.name
         self.session.create(uri, 'key_format=S,value_format=S')
         cursor = self.session.open_cursor(uri, None)
-        cursor[key_populate(cursor, 1)] = value_populate(cursor, 1)
+        cursor[simple_key(cursor, 1)] = simple_value(cursor, 1)
         # Close the insert cursor, else we'll get EBUSY.
         cursor.close()
         msg = '/bulk-load is only supported on newly created objects/'
@@ -209,7 +209,7 @@ class test_bulk_load(wttest.WiredTigerTestCase):
         uri = self.type + self.name
         self.session.create(uri, 'key_format=S,value_format=S')
         cursor = self.session.open_cursor(uri, None)
-        cursor[key_populate(cursor, 1)] = value_populate(cursor, 1)
+        cursor[simple_key(cursor, 1)] = simple_value(cursor, 1)
         # Don't close the insert cursor, we want EBUSY.
         self.assertRaises(wiredtiger.WiredTigerError,
             lambda: self.session.open_cursor(uri, None, "bulk"))

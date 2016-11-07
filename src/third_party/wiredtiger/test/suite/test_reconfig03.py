@@ -28,7 +28,7 @@
 
 import fnmatch, os, time
 import wiredtiger, wttest
-from helper import simple_populate
+from wtdataset import SimpleDataSet
 
 # test_reconfig03.py
 #    Test the connection reconfiguration operations used in the MongoDB
@@ -41,16 +41,16 @@ class test_reconfig03(wttest.WiredTigerTestCase):
     # can run after we've made modifications.
     def test_reconfig03_mdb(self):
         entries = 10000
-        simple_populate(self, self.uri, 'key_format=S', entries)
+        SimpleDataSet(self, self.uri, entries).populate()
         time.sleep(1)
         self.conn.reconfigure("eviction_target=81")
-        simple_populate(self, self.uri, 'key_format=S', entries * 2)
+        SimpleDataSet(self, self.uri, entries * 2).populate()
         time.sleep(1)
         self.conn.reconfigure("cache_size=81M")
-        simple_populate(self, self.uri, 'key_format=S', entries * 3)
+        SimpleDataSet(self, self.uri, entries * 3).populate()
         time.sleep(1)
         self.conn.reconfigure("eviction_dirty_target=82")
-        simple_populate(self, self.uri, 'key_format=S', entries * 4)
+        SimpleDataSet(self, self.uri, entries * 4).populate()
         time.sleep(1)
         self.conn.reconfigure("shared_cache=(chunk=11MB, name=bar, reserve=12MB, size=1G)")
 

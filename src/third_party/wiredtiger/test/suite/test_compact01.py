@@ -27,8 +27,8 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper import complex_populate, simple_populate, key_populate
 from suite_subprocess import suite_subprocess
+from wtdataset import SimpleDataSet, ComplexDataSet
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
@@ -39,14 +39,14 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
 
     # Use a small page size because we want to create lots of pages.
     config = 'allocation_size=512,' +\
-        'leaf_page_max=512,value_format=S,key_format=S'
+        'leaf_page_max=512,key_format=S'
     nentries = 50000
 
     # The table is a complex object, give it roughly 5 pages per underlying
     # file.
     types = [
-        ('file', dict(type='file:', pop=simple_populate, maxpages=5)),
-        ('table', dict(type='table:', pop=complex_populate, maxpages=50))
+        ('file', dict(type='file:', dataset=SimpleDataSet, maxpages=5)),
+        ('table', dict(type='table:', dataset=ComplexDataSet, maxpages=50))
         ]
     compact = [
         ('method', dict(utility=0,reopen=0)),
@@ -64,7 +64,8 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
     def test_compact(self):
         # Populate an object
         uri = self.type + self.name
-        self.pop(self, uri, self.config, self.nentries - 1)
+        ds = self.dataset(self, uri, self.nentries - 1, config=self.config)
+        ds.populate()
 
         # Reopen the connection to force the object to disk.
         self.reopen_conn()
@@ -76,9 +77,9 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Remove most of the object.
         c1 = self.session.open_cursor(uri, None)
-        c1.set_key(key_populate(c1, 5))
+        c1.set_key(ds.key(5))
         c2 = self.session.open_cursor(uri, None)
-        c2.set_key(key_populate(c2, self.nentries - 5))
+        c2.set_key(ds.key(self.nentries - 5))
         self.session.truncate(None, c1, c2, None)
         c1.close()
         c2.close()

@@ -32,6 +32,7 @@ func_ok()
 	    -e '/int __bm_stat$/d' \
 	    -e '/int __checkpoint_presync$/d' \
 	    -e '/int __compact_uri_analyze$/d' \
+	    -e '/int __config_parser_close$/d' \
 	    -e '/int __curlog_reset$/d' \
 	    -e '/int __handle_close_default$/d' \
 	    -e '/int __handle_progress_default$/d' \
@@ -63,6 +64,7 @@ func_ok()
 	    -e '/int __wt_stat_join_desc$/d' \
 	    -e '/int __wt_win_directory_list_free$/d' \
 	    -e '/int bdb_compare_reverse$/d' \
+	    -e '/int csv_error$/d' \
 	    -e '/int csv_terminate$/d' \
 	    -e '/int demo_file_close$/d' \
 	    -e '/int demo_file_lock$/d' \
@@ -81,6 +83,7 @@ func_ok()
 	    -e '/int main$/d' \
 	    -e '/int nop_decompress$/d' \
 	    -e '/int nop_decrypt$/d' \
+	    -e '/int nop_error$/d' \
 	    -e '/int nop_pre_size$/d' \
 	    -e '/int nop_sizing$/d' \
 	    -e '/int nop_terminate$/d' \
@@ -90,14 +93,14 @@ func_ok()
 	    -e '/int rotn_error$/d' \
 	    -e '/int rotn_sizing$/d' \
 	    -e '/int rotn_terminate$/d' \
+	    -e '/int snappy_pre_size$/d' \
+	    -e '/int snappy_terminate$/d' \
 	    -e '/int uri2name$/d' \
 	    -e '/int usage$/d' \
 	    -e '/int util_err$/d' \
 	    -e '/int wiredtiger_extension_init$/d' \
 	    -e '/int wiredtiger_extension_terminate$/d' \
 	    -e '/int wiredtiger_pack_close$/d' \
-	    -e '/int snappy_pre_size$/d' \
-	    -e '/int snappy_terminate$/d' \
 	    -e '/int zlib_error$/d' \
 	    -e '/int zlib_terminate$/d' \
 	    -e '/int zstd_error$/d' \

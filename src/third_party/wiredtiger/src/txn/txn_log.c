@@ -262,20 +262,20 @@ err:	__wt_logrec_free(session, &logrec);
  *	Read a log record for a checkpoint operation.
  */
 int
-__wt_txn_checkpoint_logread(
-    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
-    WT_LSN *ckpt_lsn)
+__wt_txn_checkpoint_logread(WT_SESSION_IMPL *session,
+    const uint8_t **pp, const uint8_t *end, WT_LSN *ckpt_lsn)
 {
-	WT_ITEM ckpt_snapshot;
+	WT_DECL_RET;
+	WT_ITEM ckpt_snapshot_unused;
 	uint32_t ckpt_file, ckpt_offset;
-	u_int ckpt_nsnapshot;
+	u_int ckpt_nsnapshot_unused;
 	const char *fmt = WT_UNCHECKED_STRING(IIIU);
 
-	WT_RET(__wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), fmt,
+	if ((ret = __wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), fmt,
 	    &ckpt_file, &ckpt_offset,
-	    &ckpt_nsnapshot, &ckpt_snapshot));
-	WT_UNUSED(ckpt_nsnapshot);
-	WT_UNUSED(ckpt_snapshot);
+	    &ckpt_nsnapshot_unused, &ckpt_snapshot_unused)) != 0)
+		WT_RET_MSG(session,
+		    ret, "txn_checkpoint_logread: unpack failure");
 	WT_SET_LSN(ckpt_lsn, ckpt_file, ckpt_offset);
 	*pp = end;
 	return (0);

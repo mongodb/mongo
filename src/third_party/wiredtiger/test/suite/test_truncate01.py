@@ -31,9 +31,8 @@
 #
 
 import wiredtiger, wttest
-from helper import confirm_empty,\
-    key_populate, value_populate, simple_populate,\
-    complex_populate, complex_value_populate
+from helper import confirm_empty
+from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 
 # Test truncation arguments.
@@ -49,7 +48,7 @@ class test_truncate_arguments(wttest.WiredTigerTestCase):
     # either cursor specified, expect errors.
     def test_truncate_bad_args(self):
         uri = self.type + self.name
-        simple_populate(self, uri, 'key_format=S', 100)
+        SimpleDataSet(self, uri, 100).populate()
         msg = '/either a URI or start/stop cursors/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.truncate(None, None, None, None), msg)
@@ -64,11 +63,12 @@ class test_truncate_arguments(wttest.WiredTigerTestCase):
         uri = self.type + self.name
         msg = '/requires key be set/'
 
-        simple_populate(self, uri, 'key_format=S', 100)
+        ds = SimpleDataSet(self, uri, 100)
+        ds.populate()
 
         c1 = self.session.open_cursor(uri, None)
         c2 = self.session.open_cursor(uri, None)
-        c2.set_key(key_populate(c2, 10))
+        c2.set_key(ds.key(10))
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.truncate(None, c1, c2, None), msg)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
@@ -89,13 +89,13 @@ class test_truncate_uri(wttest.WiredTigerTestCase):
         uri = self.type + self.name
 
         # A simple, one-file file or table object.
-        simple_populate(self, uri, 'key_format=S', 100)
+        SimpleDataSet(self, uri, 100).populate()
         self.session.truncate(uri, None, None, None)
         confirm_empty(self, uri)
         self.session.drop(uri, None)
 
         if self.type == "table:":
-            complex_populate(self, uri, 'key_format=S', 100)
+            ComplexDataSet(self, uri, 100).populate()
             self.session.truncate(uri, None, None, None)
             confirm_empty(self, uri)
             self.session.drop(uri, None)
@@ -118,16 +118,17 @@ class test_truncate_cursor_order(wttest.WiredTigerTestCase):
     # Test an illegal order, then confirm that equal cursors works.
     def test_truncate_cursor_order(self):
         uri = self.type + self.name
-        simple_populate(self, uri, 'key_format=' + self.keyfmt, 100)
+        ds = SimpleDataSet(self, uri, 100, key_format=self.keyfmt)
+        ds.populate()
         c1 = self.session.open_cursor(uri, None)
         c2 = self.session.open_cursor(uri, None)
 
-        c1.set_key(key_populate(c1, 20))
-        c2.set_key(key_populate(c2, 10))
+        c1.set_key(ds.key(20))
+        c2.set_key(ds.key(10))
         msg = '/the start cursor position is after the stop cursor position/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.truncate(None, c1, c2, None), msg)
-        c2.set_key(key_populate(c2, 20))
+        c2.set_key(ds.key(20))
         self.session.truncate(None, c1, c2, None)
 
 # Test truncation of cursors past the end of the object.
@@ -150,22 +151,24 @@ class test_truncate_cursor_end(wttest.WiredTigerTestCase):
         uri = self.type + self.name
 
         # A simple, one-file file or table object.
-        simple_populate(self, uri, 'key_format=' + self.keyfmt, 100)
+        ds = SimpleDataSet(self, uri, 100, key_format=self.keyfmt)
+        ds.populate()
         c1 = self.session.open_cursor(uri, None)
-        c1.set_key(key_populate(c1, 1000))
+        c1.set_key(ds.key(1000))
         c2 = self.session.open_cursor(uri, None)
-        c2.set_key(key_populate(c2, 2000))
+        c2.set_key(ds.key(2000))
         self.session.truncate(None, c1, c2, None)
         self.assertEquals(c1.close(), 0)
         self.assertEquals(c2.close(), 0)
         self.session.drop(uri)
 
         if self.type == "table:":
-            complex_populate(self, uri, 'key_format=' + self.keyfmt, 100)
+            ds = ComplexDataSet(self, uri, 100, key_format=self.keyfmt)
+            ds.populate()
             c1 = self.session.open_cursor(uri, None)
-            c1.set_key(key_populate(c1, 1000))
+            c1.set_key(ds.key(1000))
             c2 = self.session.open_cursor(uri, None)
-            c2.set_key(key_populate(c2, 2000))
+            c2.set_key(ds.key(2000))
             self.session.truncate(None, c1, c2, None)
             self.assertEquals(c1.close(), 0)
             self.assertEquals(c2.close(), 0)
@@ -179,13 +182,12 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
     # The underlying table routines don't easily support 8t value types, limit
     # those tests to file objects.
     types = [
-        ('file', dict(type='file:',\
-            config='allocation_size=512,leaf_page_max=512,key_format=')),
-        ('file8t', dict(type='file:',\
-            config='allocation_size=512,\
-            leaf_page_max=512,value_format=8t,key_format=')),
-        ('table', dict(type='table:',\
-            config='allocation_size=512,leaf_page_max=512,key_format=')),
+        ('file', dict(type='file:', valuefmt='S',
+            config='allocation_size=512,leaf_page_max=512')),
+        ('file8t', dict(type='file:', valuefmt='8t',
+            config='allocation_size=512,leaf_page_max=512')),
+        ('table', dict(type='table:', valuefmt='S',
+            config='allocation_size=512,leaf_page_max=512')),
     ]
     keyfmt = [
         ('integer', dict(keyfmt='i')),
@@ -204,18 +206,18 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(types, keyfmt, size, reopen)
 
     # Set a cursor key.
-    def cursorKey(self, uri, key):
+    def cursorKey(self, ds, uri, key):
         if key == -1:
             return None
         cursor = self.session.open_cursor(uri, None)
-        cursor.set_key(key_populate(cursor, key))
+        cursor.set_key(ds.key(key))
         return cursor
 
     # Truncate a range using cursors, and check the results.
-    def truncateRangeAndCheck(self, uri, begin, end, expected):
+    def truncateRangeAndCheck(self, ds, uri, begin, end, expected):
         self.pr('truncateRangeAndCheck: ' + str(begin) + ',' + str(end))
-        cur1 = self.cursorKey(uri, begin)
-        cur2 = self.cursorKey(uri, end)
+        cur1 = self.cursorKey(ds, uri, begin)
+        cur2 = self.cursorKey(ds, uri, end)
         self.session.truncate(None, cur1, cur2, None)
         if not cur1:
             begin = 1
@@ -234,7 +236,7 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
         # Check the expected values against the object.
         cursor = self.session.open_cursor(uri, None)
         for i in range(begin, end + 1):
-            expected[key_populate(cursor, i)] = [0]
+            expected[ds.key(i)] = [0]
         for k, v in expected.iteritems():
             cursor.set_key(k)
             if v == [0] and \
@@ -306,6 +308,10 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
             (self.skip, self.skip)              # middle to same middle
             ]
 
+        # Using this data set to compare only, it doesn't create or populate.
+        ds = SimpleDataSet(self, uri, 0, key_format=self.keyfmt,
+            value_format=self.valuefmt, config=self.config)
+
         # Build the layout we're going to test
         total = self.nentries
         for begin_skipped,begin_insert,end_skipped,end_insert in layout:
@@ -332,15 +338,16 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
 
                 # Create the object.
                 self.session.create(
-                    uri, 'value_format=S,' + self.config + self.keyfmt)
+                    uri, self.config + ',key_format=' + self.keyfmt +
+                    ',value_format=' + self.valuefmt)
 
                 # Insert the records that aren't skipped or inserted.
                 start = begin_skipped + begin_insert
                 stop = self.nentries - (end_skipped + end_insert)
                 cursor = self.session.open_cursor(uri, None)
                 for i in range(start + 1, stop + 1):
-                    k = key_populate(cursor, i)
-                    v = value_populate(cursor, i)
+                    k = ds.key(i)
+                    v = ds.value(i)
                     cursor[k] = v
                     expected[k] = [v]
                 cursor.close()
@@ -355,33 +362,33 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
                 start = 0
                 for i in range(0, begin_skipped):
                     start += 1
-                    k = key_populate(cursor, start)
+                    k = ds.key(start)
                     expected[k] = [0]
 
                 # Optionally insert leading records.
                 for i in range(0, begin_insert):
                     start += 1
-                    k = key_populate(cursor, start)
-                    v = value_populate(cursor, start)
+                    k = ds.key(start)
+                    v = ds.value(start)
                     cursor[k] = v
                     expected[k] = [v]
 
                 # Optionally insert trailing skipped records.
                 for i in range(0, end_skipped):
                     stop += 1
-                    k = key_populate(cursor, stop)
+                    k = ds.key(stop)
                     expected[k] = [0]
 
                 # Optionally insert trailing records.
                 for i in range(0, end_insert):
                     stop += 1
-                    k = key_populate(cursor, stop)
-                    v = value_populate(cursor, stop)
+                    k = ds.key(stop)
+                    v = ds.value(stop)
                     cursor[k] = v
                     expected[k] = [v]
                 cursor.close()
 
-                self.truncateRangeAndCheck(uri, begin, end, expected)
+                self.truncateRangeAndCheck(ds, uri, begin, end, expected)
                 self.session.drop(uri, None)
 
     # Test truncation of complex tables using cursors.  We can't do the kind of
@@ -423,16 +430,16 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
             '''
 
             # Create the object.
-            complex_populate(
-                self, uri, self.config + self.keyfmt, self.nentries)
+            ds = ComplexDataSet(self, uri, self.nentries,
+                config=self.config, key_format=self.keyfmt)
+            ds.populate()
 
             # Build a dictionary of what the object should look like for
             # later comparison
             cursor = self.session.open_cursor(uri, None)
             expected = {}
             for i in range(1, self.nentries + 1):
-                expected[key_populate(cursor, i)] = \
-                    complex_value_populate(cursor, i)
+                expected[ds.key(i)] = ds.comparable_value(i)
             cursor.close()
 
             # Optionally close and re-open the object to get a disk image
@@ -440,7 +447,7 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
             if self.reopen:
                 self.reopen_conn()
 
-            self.truncateRangeAndCheck(uri, begin, end, expected)
+            self.truncateRangeAndCheck(ds, uri, begin, end, expected)
             self.session.drop(uri, None)
 
 if __name__ == '__main__':

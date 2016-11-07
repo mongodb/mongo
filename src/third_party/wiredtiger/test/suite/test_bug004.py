@@ -30,7 +30,7 @@
 #       Regression tests.
 
 import wiredtiger, wttest
-from helper import key_populate, value_populate
+from wtdataset import SimpleDataSet, simple_key, simple_value
 
 # Check to make sure we see the right versions of overflow keys and values
 # when they are deleted in reconciliation without having been instantiated
@@ -50,8 +50,8 @@ class test_bug004(wttest.WiredTigerTestCase):
         self.session.create(self.uri, self.config)
         c1 = self.session.open_cursor(self.uri, None)
         for i in range(1, self.nentries):
-            c1[key_populate(c1, i) + 'abcdef' * 100] = \
-                value_populate(c1, i) + 'abcdef' * 100
+            c1[simple_key(c1, i) + 'abcdef' * 100] = \
+                simple_value(c1, i) + 'abcdef' * 100
         c1.close()
 
         # Verify the object, force it to disk, and verify the on-disk version.
@@ -69,9 +69,9 @@ class test_bug004(wttest.WiredTigerTestCase):
         # currently do -- that's unlikely to change, but is a problem for the
         # test going forward.)
         c1 = self.session.open_cursor(self.uri, None)
-        c1.set_key(key_populate(c1, self.nentries - 5) + 'abcdef' * 100)
+        c1.set_key(simple_key(c1, self.nentries - 5) + 'abcdef' * 100)
         c2 = self.session.open_cursor(self.uri, None)
-        c2.set_key(key_populate(c2, self.nentries + 5) + 'abcdef' * 100)
+        c2.set_key(simple_key(c2, self.nentries + 5) + 'abcdef' * 100)
         self.session.truncate(None, c1, c2, None)
         c1.close()
         c2.close()
@@ -81,14 +81,14 @@ class test_bug004(wttest.WiredTigerTestCase):
 
         # Use the snapshot cursor to retrieve the old key/value pairs
         c1 = tmp_session.open_cursor(self.uri, None)
-        c1.set_key(key_populate(c1, 1) + 'abcdef' * 100)
+        c1.set_key(simple_key(c1, 1) + 'abcdef' * 100)
         c1.search()
         for i in range(2, self.nentries):
             c1.next()
             self.assertEquals(
-                c1.get_key(), key_populate(c1, i) + 'abcdef' * 100)
+                c1.get_key(), simple_key(c1, i) + 'abcdef' * 100)
             self.assertEquals(
-                c1.get_value(), value_populate(c1, i) + 'abcdef' * 100)
+                c1.get_value(), simple_value(c1, i) + 'abcdef' * 100)
 
 if __name__ == '__main__':
     wttest.run()

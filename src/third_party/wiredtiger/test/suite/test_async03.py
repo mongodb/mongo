@@ -54,12 +54,11 @@ class test_async03(wttest.WiredTigerTestCase):
         tablearg = 'table:' + self.table_name1
         self.session.create(tablearg, 'key_format=S,value_format=S')
 
-        # Populate table with async inserts, callback checks
-        # to ensure key/value is correct.
         callback = Callback()
 
-        self.assertRaises(wiredtiger.WiredTigerError,
-            lambda: self.conn.async_new_op(tablearg, None, callback))
+        msg = '/Asynchronous operations not configured/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.conn.async_new_op(tablearg, None, callback), msg)
 
         self.conn.async_flush()
 

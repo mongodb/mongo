@@ -28,7 +28,6 @@
 
 import Queue
 import threading, time, wiredtiger, wttest
-from helper import key_populate, simple_populate
 from wtthread import backup_thread, checkpoint_thread, op_thread
 from wtscenario import make_scenarios
 

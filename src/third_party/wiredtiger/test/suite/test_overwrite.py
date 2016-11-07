@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper import key_populate, simple_populate
+from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 # test_overwrite.py
@@ -35,22 +35,23 @@ from wtscenario import make_scenarios
 class test_overwrite(wttest.WiredTigerTestCase):
     name = 'overwrite'
     scenarios = make_scenarios([
-        ('file-r', dict(type='file:',keyfmt='r')),
-        ('file-S', dict(type='file:',keyfmt='S')),
-        ('lsm-S', dict(type='lsm:',keyfmt='S')),
-        ('table-r', dict(type='table:',keyfmt='r')),
-        ('table-S', dict(type='table:',keyfmt='S')),
+        ('file-r', dict(type='file:', keyfmt='r', dataset=SimpleDataSet)),
+        ('file-S', dict(type='file:', keyfmt='S', dataset=SimpleDataSet)),
+        ('lsm-S', dict(type='lsm:', keyfmt='S', dataset=SimpleDataSet)),
+        ('table-r', dict(type='table:', keyfmt='r', dataset=SimpleDataSet)),
+        ('table-S', dict(type='table:', keyfmt='S', dataset=SimpleDataSet)),
     ])
 
     # Confirm a cursor configured with/without overwrite correctly handles
     # non-existent records during insert, remove and update operations.
     def test_overwrite_insert(self):
         uri = self.type + self.name
-        simple_populate(self, uri, 'key_format=' + self.keyfmt, 100)
+        ds = self.dataset(self, uri, 100, key_format=self.keyfmt)
+        ds.populate()
 
         # Insert of an existing record with overwrite off fails.
         cursor = self.session.open_cursor(uri, None, "overwrite=false")
-        cursor.set_key(key_populate(cursor, 5))
+        cursor.set_key(ds.key(5))
         cursor.set_value('XXXXXXXXXX')
         self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.insert())
 
@@ -60,78 +61,80 @@ class test_overwrite(wttest.WiredTigerTestCase):
         # failure modes are for non-existent records, and you cannot duplicate
         # cursor pointing to non-existent records.
         cursor = self.session.open_cursor(uri, None, "overwrite=false")
-        cursor.set_key(key_populate(cursor, 5))
+        cursor.set_key(ds.key(5))
         dupc = self.session.open_cursor(None, cursor, "overwrite=true")
         dupc.set_value('XXXXXXXXXX')
         self.assertEquals(dupc.insert(), 0)
 
         # Insert of an existing record with overwrite on succeeds.
         cursor = self.session.open_cursor(uri, None)
-        cursor.set_key(key_populate(cursor, 6))
+        cursor.set_key(ds.key(6))
         cursor.set_value('XXXXXXXXXX')
         self.assertEquals(cursor.insert(), 0)
 
         # Insert of a non-existent record with overwrite off succeeds.
         cursor = self.session.open_cursor(uri, None, "overwrite=false")
-        cursor.set_key(key_populate(cursor, 200))
+        cursor.set_key(ds.key(200))
         cursor.set_value('XXXXXXXXXX')
         self.assertEquals(cursor.insert(), 0)
 
         # Insert of a non-existent record with overwrite on succeeds.
         cursor = self.session.open_cursor(uri, None)
-        cursor.set_key(key_populate(cursor, 201))
+        cursor.set_key(ds.key(201))
         cursor.set_value('XXXXXXXXXX')
         self.assertEquals(cursor.insert(), 0)
 
     def test_overwrite_remove(self):
         uri = self.type + self.name
-        simple_populate(self, uri, 'key_format=' + self.keyfmt, 100)
+        ds = self.dataset(self, uri, 100, key_format=self.keyfmt)
+        ds.populate()
 
         # Remove of an existing record with overwrite off succeeds.
         cursor = self.session.open_cursor(uri, None, "overwrite=false")
-        cursor.set_key(key_populate(cursor, 5))
+        cursor.set_key(ds.key(5))
         self.assertEquals(cursor.remove(), 0)
 
         # Remove of an existing record with overwrite on succeeds.
         cursor = self.session.open_cursor(uri, None)
-        cursor.set_key(key_populate(cursor, 6))
+        cursor.set_key(ds.key(6))
         self.assertEquals(cursor.remove(), 0)
 
         # Remove of a non-existent record with overwrite off fails.
         cursor = self.session.open_cursor(uri, None, "overwrite=false")
-        cursor.set_key(key_populate(cursor, 200))
+        cursor.set_key(ds.key(200))
         self.assertEquals(cursor.remove(), wiredtiger.WT_NOTFOUND)
 
         # Remove of a non-existent record with overwrite on succeeds.
         cursor = self.session.open_cursor(uri, None)
-        cursor.set_key(key_populate(cursor, 201))
+        cursor.set_key(ds.key(201))
         self.assertEquals(cursor.remove(), 0)
 
     def test_overwrite_update(self):
         uri = self.type + self.name
-        simple_populate(self, uri, 'key_format=' + self.keyfmt, 100)
+        ds = self.dataset(self, uri, 100, key_format=self.keyfmt)
+        ds.populate()
 
         # Update of an existing record with overwrite off succeeds.
         cursor = self.session.open_cursor(uri, None, "overwrite=false")
-        cursor.set_key(key_populate(cursor, 5))
+        cursor.set_key(ds.key(5))
         cursor.set_value('XXXXXXXXXX')
         self.assertEquals(cursor.update(), 0)
 
         # Update of an existing record with overwrite on succeeds.
         cursor = self.session.open_cursor(uri, None)
-        cursor.set_key(key_populate(cursor, 6))
+        cursor.set_key(ds.key(6))
         cursor.set_value('XXXXXXXXXX')
         self.assertEquals(cursor.update(), 0)
 
         # Update of a non-existent record with overwrite off fails.
         cursor = self.session.open_cursor(uri, None, "overwrite=false")
-        cursor.set_key(key_populate(cursor, 200))
+        cursor.set_key(ds.key(200))
         cursor.set_value('XXXXXXXXXX')
         self.assertEquals(cursor.update(), wiredtiger.WT_NOTFOUND)
 
         # Update of a non-existent record with overwrite on succeeds.
         cursor = self.session.open_cursor(uri, None)
-        cursor.set_key(key_populate(cursor, 201))
+        cursor.set_key(ds.key(201))
         cursor.set_value('XXXXXXXXXX')
         self.assertEquals(cursor.update(), 0)
 

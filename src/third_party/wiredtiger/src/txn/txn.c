@@ -112,7 +112,6 @@ int
 __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s, *txn_state;
@@ -126,14 +125,8 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	txn_state = WT_SESSION_TXN_STATE(session);
 	n = 0;
 
-	/*
-	 * Spin waiting for the lock: the sleeps in our blocking readlock
-	 * implementation are too slow for scanning the transaction table.
-	 */
-	while ((ret =
-	    __wt_try_readlock(session, txn_global->scan_rwlock)) == EBUSY)
-		WT_PAUSE();
-	WT_RET(ret);
+	/* We're going to scan the table: wait for the lock. */
+	__wt_readlock_spin(session, txn_global->scan_rwlock);
 
 	current_id = pinned_id = txn_global->current;
 	prev_oldest_id = txn_global->oldest_id;
@@ -292,7 +285,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 
 	/* First do a read-only scan. */
 	if (wait)
-		__wt_readlock(session, txn_global->scan_rwlock);
+		__wt_readlock_spin(session, txn_global->scan_rwlock);
 	else if ((ret =
 	    __wt_try_readlock(session, txn_global->scan_rwlock)) != 0)
 		return (ret == EBUSY ? 0 : ret);

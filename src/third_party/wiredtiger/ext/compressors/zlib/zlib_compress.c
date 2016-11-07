@@ -371,8 +371,7 @@ retry:		/* If we reached our maximum reserve, quit. */
 		ret = 0;
 	}
 
-err:	if (zs != NULL &&
-	    (tret = deflateEnd(zs)) != Z_OK && tret != Z_DATA_ERROR)
+err:	if ((tret = deflateEnd(zs)) != Z_OK && tret != Z_DATA_ERROR)
 		ret = zlib_error(compressor, session, "deflateEnd", tret);
 	if (last_zs != NULL &&
 	    (tret = deflateEnd(last_zs)) != Z_OK && tret != Z_DATA_ERROR)
@@ -393,19 +392,27 @@ err:	if (zs != NULL &&
 #if 0
 	/* Decompress the result and confirm it matches the original source. */
 	if (ret == 0 && last_slot > 0) {
+		WT_EXTENSION_API *wt_api;
 		void *decomp;
 		size_t result_len;
 
+		wt_api = ((ZLIB_COMPRESSOR *)compressor)->wt_api;
+
 		if ((decomp = zalloc(
-		    &opaque, 1, (uint32_t)best_zs->total_in + 100)) == NULL)
+		    &opaque, 1, (uint32_t)best_zs->total_in + 100)) == NULL) {
+			(void)wt_api->err_printf(wt_api, session,
+			    "zlib_compress_raw: zalloc failure");
 			return (ENOMEM);
+		}
 		if ((ret = zlib_decompress(
 		    compressor, session, dst, (size_t)best_zs->total_out,
 		    decomp, (size_t)best_zs->total_in + 100, &result_len)) == 0)
-			 if (memcmp(src, decomp, result_len) != 0)
-				ret = zlib_error(compressor, session,
-				    "deflate compare with original source",
-				    Z_DATA_ERROR);
+			if (memcmp(src, decomp, result_len) != 0) {
+				(void)wt_api->err_printf(wt_api, session,
+				    "zlib_compress_raw: "
+				    "deflate compare with original source");
+				return (WT_ERROR);
+			}
 		zfree(&opaque, decomp);
 	}
 #endif
@@ -478,7 +485,7 @@ zlib_init_config(
 {
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_PARSER *config_parser;
-	WT_EXTENSION_API *wtext;
+	WT_EXTENSION_API *wt_api;
 	int ret, zlib_level;
 
 	/* If configured as a built-in, there's no configuration argument. */
@@ -489,18 +496,19 @@ zlib_init_config(
 	 * Zlib compression engine allows applications to specify a compression
 	 * level; review the configuration.
 	 */
-	wtext = connection->get_extension_api(connection);
-	if ((ret = wtext->config_get(wtext, NULL, config, "config", &v)) != 0) {
-		(void)wtext->err_printf(wtext, NULL,
+	wt_api = connection->get_extension_api(connection);
+	if ((ret =
+	    wt_api->config_get(wt_api, NULL, config, "config", &v)) != 0) {
+		(void)wt_api->err_printf(wt_api, NULL,
 		    "WT_EXTENSION_API.config_get: zlib configure: %s",
-		    wtext->strerror(wtext, NULL, ret));
+		    wt_api->strerror(wt_api, NULL, ret));
 		return (ret);
 	}
-	if ((ret = wtext->config_parser_open(
-	    wtext, NULL, v.str, v.len, &config_parser)) != 0) {
-		(void)wtext->err_printf(wtext, NULL,
+	if ((ret = wt_api->config_parser_open(
+	    wt_api, NULL, v.str, v.len, &config_parser)) != 0) {
+		(void)wt_api->err_printf(wt_api, NULL,
 		    "WT_EXTENSION_API.config_parser_open: zlib configure: %s",
-		    wtext->strerror(wtext, NULL, ret));
+		    wt_api->strerror(wt_api, NULL, ret));
 		return (ret);
 	}
 	while ((ret = config_parser->next(config_parser, &k, &v)) == 0)
@@ -511,7 +519,7 @@ zlib_init_config(
 			 */
 			zlib_level = (int)v.val;
 			if (zlib_level < 0 || zlib_level > 9) {
-				(void)wtext->err_printf(wtext, NULL,
+				(void)wt_api->err_printf(wt_api, NULL,
 				    "WT_CONFIG_PARSER.next: zlib configure: "
 				    "unsupported compression level %d",
 				    zlib_level);
@@ -521,15 +529,15 @@ zlib_init_config(
 			continue;
 		}
 	if (ret != WT_NOTFOUND) {
-		(void)wtext->err_printf(wtext, NULL,
+		(void)wt_api->err_printf(wt_api, NULL,
 		    "WT_CONFIG_PARSER.next: zlib configure: %s",
-		    wtext->strerror(wtext, NULL, ret));
+		    wt_api->strerror(wt_api, NULL, ret));
 		return (ret);
 	}
 	if ((ret = config_parser->close(config_parser)) != 0) {
-		(void)wtext->err_printf(wtext, NULL,
+		(void)wt_api->err_printf(wt_api, NULL,
 		    "WT_CONFIG_PARSER.close: zlib configure: %s",
-		    wtext->strerror(wtext, NULL, ret));
+		    wt_api->strerror(wt_api, NULL, ret));
 		return (ret);
 	}
 	return (0);

@@ -37,21 +37,20 @@ __cursor_size_chk(WT_SESSION_IMPL *session, WT_ITEM *kv)
 	if (kv->size <= WT_GIGABYTE)
 		return (0);
 
-	/*
-	 * There are two checks: what we are willing to store in the tree, and
-	 * what the block manager can actually write.
-	 */
+	/* Check what we are willing to store in the tree. */
 	if (kv->size > WT_BTREE_MAX_OBJECT_SIZE)
-		ret = EINVAL;
-	else {
-		size = kv->size;
-		ret = bm->write_size(bm, session, &size);
-	}
-	if (ret != 0)
-		WT_RET_MSG(session, ret,
+		WT_RET_MSG(session, EINVAL,
 		    "item size of %" WT_SIZET_FMT " exceeds the maximum "
-		    "supported size",
+		    "supported WiredTiger size of %d",
+		    kv->size, WT_BTREE_MAX_OBJECT_SIZE);
+
+	/* Check what the block manager can actually write. */
+	size = kv->size;
+	if ((ret = bm->write_size(bm, session, &size)) != 0)
+		WT_RET_MSG(session, ret,
+		    "item size of %" WT_SIZET_FMT " refused by block manager",
 		    kv->size);
+
 	return (0);
 }
 
@@ -858,7 +857,8 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	 * value from a column-store, if there were any reason to do so.
 	 */
 	if (btree->type != BTREE_ROW)
-		WT_RET(ENOTSUP);
+		WT_RET_MSG(session, ENOTSUP,
+		    "WT_CURSOR.next_random only supported by row-store tables");
 
 	WT_STAT_CONN_INCR(session, cursor_next);
 	WT_STAT_DATA_INCR(session, cursor_next);

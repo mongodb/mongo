@@ -562,3 +562,16 @@ __wt_bad_object_type(WT_SESSION_IMPL *session, const char *uri)
 
 	WT_RET_MSG(session, ENOTSUP, "unknown object type: %s", uri);
 }
+
+/*
+ * __wt_unexpected_object_type --
+ *	Print a standard error message when given an unexpected object type.
+ */
+int
+__wt_unexpected_object_type(
+    WT_SESSION_IMPL *session, const char *uri, const char *expect)
+    WT_GCC_FUNC_ATTRIBUTE((cold))
+{
+	WT_RET_MSG(session,
+	    EINVAL, "uri %s doesn't match expected \"%s\"", uri, expect);
+}

@@ -29,9 +29,8 @@
 #define	WT_LAS_URI		"file:WiredTigerLAS.wt"	/* Lookaside table URI*/
 
 /*
- * Pre computed hash for the metadata file. Used to optimize comparisons
- * against the metafile URI. The validity is checked on connection open
- * when diagnostic is enabled.
+ * Optimize comparisons against the metafile URI, flag handles that reference
+ * the metadata file.
  */
 #define	WT_IS_METADATA(session, dh)					\
 	F_ISSET((dh), WT_DHANDLE_IS_METADATA)

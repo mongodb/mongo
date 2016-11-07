@@ -103,27 +103,30 @@ void
 __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 {
 	WT_DECL_RET;
-	bool locked;
-
-	locked = false;
 
 	__wt_verbose(session, WT_VERB_MUTEX, "signal %s", cond->name);
 
-	/* Fast path if already signalled. */
-	if (cond->waiters == -1)
+	/*
+	 * Our callers are often setting flags to cause a thread to exit. Add
+	 * a barrier to ensure the flags are seen by the threads.
+	 */
+	WT_WRITE_BARRIER();
+
+	/*
+	 * Fast path if we are in (or can enter), a state where the next waiter
+	 * will return immediately as already signaled.
+	 */
+	if (cond->waiters == -1 ||
+	    (cond->waiters == 0 && __wt_atomic_casi32(&cond->waiters, 0, -1)))
 		return;
 
-	if (cond->waiters > 0 || !__wt_atomic_casi32(&cond->waiters, 0, -1)) {
-		WT_ERR(pthread_mutex_lock(&cond->mtx));
-		locked = true;
-		WT_ERR(pthread_cond_broadcast(&cond->cond));
-	}
-
-err:	if (locked)
-		WT_TRET(pthread_mutex_unlock(&cond->mtx));
+	WT_ERR(pthread_mutex_lock(&cond->mtx));
+	ret = pthread_cond_broadcast(&cond->cond);
+	WT_TRET(pthread_mutex_unlock(&cond->mtx));
 	if (ret == 0)
 		return;
 
+err:
 	WT_PANIC_MSG(session, ret, "pthread_cond_broadcast: %s", cond->name);
 }
 

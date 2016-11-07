@@ -30,10 +30,7 @@ import itertools, wiredtiger, wttest
 from suite_subprocess import suite_subprocess
 from wiredtiger import stat
 
-from helper import complex_populate, complex_populate_lsm, simple_populate
-from helper import key_populate, complex_value_populate, value_populate
-from helper import complex_populate_colgroup_count, complex_populate_index_count
-from helper import complex_populate_colgroup_name, complex_populate_index_name
+from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
 from wtscenario import make_scenarios
 
 # test_stat03.py
@@ -41,14 +38,11 @@ from wtscenario import make_scenarios
 class test_stat_cursor_reset(wttest.WiredTigerTestCase):
     pfx = 'test_stat_cursor_reset'
     uri = [
-        ('file-simple',
-            dict(uri='file:' + pfx, pop=simple_populate)),
-        ('table-simple',
-            dict(uri='table:' + pfx, pop=simple_populate)),
-        ('table-complex',
-            dict(uri='table:' + pfx, pop=complex_populate)),
-        ('table-complex-lsm',
-            dict(uri='table:' + pfx, pop=complex_populate_lsm)),
+        ('file-simple', dict(uri='file:' + pfx, dataset=SimpleDataSet)),
+        ('table-simple', dict(uri='table:' + pfx, dataset=SimpleDataSet)),
+        ('table-complex', dict(uri='table:' + pfx, dataset=ComplexDataSet)),
+        ('table-complex-lsm', dict(uri='table:' + pfx,
+            dataset=ComplexLSMDataSet))
     ]
 
     scenarios = make_scenarios(uri)
@@ -59,25 +53,23 @@ class test_stat_cursor_reset(wttest.WiredTigerTestCase):
             'statistics:' + uri, None, 'statistics=(all)')
 
     def test_stat_cursor_reset(self):
+        n = 100
+        ds = self.dataset(self, self.uri, n)
+        ds.populate()
+
         # The number of btree_entries reported is influenced by the
         # number of column groups and indices.  Each insert will have
         # a multiplied effect.
-        if self.pop == simple_populate:
+        if self.dataset == SimpleDataSet:
             multiplier = 1   # no declared colgroup is like one big colgroup
         else:
-            multiplier = complex_populate_colgroup_count() + \
-                         complex_populate_index_count()
-        n = 100
-        self.pop(self, self.uri, 'key_format=S', n)
+            multiplier = ds.colgroup_count() +  ds.index_count()
         statc = self.stat_cursor(self.uri)
         self.assertEqual(statc[stat.dsrc.btree_entries][2], n * multiplier)
 
         c = self.session.open_cursor(self.uri)
-        c.set_key(key_populate(c, 200))
-        if self.pop == simple_populate:
-            c.set_value(value_populate(c, 200))
-        else:
-            c.set_value(tuple(complex_value_populate(c, 200)))
+        c.set_key(ds.key(200))
+        c.set_value(ds.value(200))
         c.insert()
 
         # Test that cursor reset re-loads the values.
@@ -88,14 +80,12 @@ class test_stat_cursor_reset(wttest.WiredTigerTestCase):
 
         # For applications with indices and/or column groups, verify
         # that there is a way to count the base number of entries.
-        if self.pop != simple_populate:
+        if self.dataset != SimpleDataSet:
             statc.close()
-            statc = self.stat_cursor(
-                complex_populate_index_name(self, self.uri, 0))
+            statc = self.stat_cursor(ds.index_name(0))
             self.assertEqual(statc[stat.dsrc.btree_entries][2], n)
             statc.close()
-            statc = self.stat_cursor(
-                complex_populate_colgroup_name(self, self.uri, 0))
+            statc = self.stat_cursor(ds.colgroup_name(0))
             self.assertEqual(statc[stat.dsrc.btree_entries][2], n)
         statc.close()
 

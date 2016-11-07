@@ -547,8 +547,11 @@ __rec_write_status(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	btree = S2BT(session);
 	mod = page->modify;
 
-	/* Check for a lookaside table and checkpoint collision. */
-	if (__rec_las_checkpoint_test(session, r))
+	/*
+	 * If we have used the lookaside table, check for a lookaside table and
+	 * checkpoint collision.
+	 */
+	if (r->cache_write_lookaside && __rec_las_checkpoint_test(session, r))
 		return (EBUSY);
 
 	/*

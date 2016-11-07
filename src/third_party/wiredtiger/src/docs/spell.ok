@@ -346,6 +346,7 @@ nolock
 nolocking
 nommap
 nop
+noraw
 nosql
 nosync
 notgranted

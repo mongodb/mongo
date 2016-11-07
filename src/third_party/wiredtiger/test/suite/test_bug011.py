@@ -26,8 +26,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import helper, random, wiredtiger, wttest
-from helper import simple_populate
+import random, wiredtiger, wttest
+from wtdataset import SimpleDataSet
 
 # test_bug011.py
 #    Eviction working on more files than there are hazard pointers.
@@ -46,11 +46,13 @@ class test_bug011(wttest.WiredTigerTestCase):
 
     def test_eviction(self):
         cursors = []
+        datasets = []
         for i in range(0, self.ntables):
             this_uri = 'table:%s-%03d' % (self.table_name, i)
-            simple_populate(self, this_uri,
-                'key_format=S,allocation_size=1KB,leaf_page_max=1KB',
-                self.nrows)
+            ds = SimpleDataSet(self, this_uri, self.nrows,
+                               config='allocation_size=1KB,leaf_page_max=1KB')
+            ds.populate()
+            datasets.append(ds)
 
         # Switch over to on-disk trees with multiple leaf pages
         self.reopen_conn()
@@ -63,8 +65,7 @@ class test_bug011(wttest.WiredTigerTestCase):
         # Make use of the cache.
         for i in range(0, self.nops):
             for i in range(0, self.ntables):
-                cursors[i].set_key(helper.key_populate(cursors[i],
-                    random.randint(0, self.nrows - 1)))
+                cursors[i].set_key(ds.key(random.randint(0, self.nrows - 1)))
                 cursors[i].search()
                 cursors[i].reset()
 

@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper import simple_populate, key_populate, value_populate
+from wtdataset import SimpleDataSet, simple_key, simple_value
 from wtscenario import make_scenarios
 
 # test_colgap.py
@@ -61,14 +61,16 @@ class test_column_store_gap(wttest.WiredTigerTestCase):
     # namespace. If this runs in less-than-glacial time, it's working.
     def test_column_store_gap(self):
         uri = 'table:gap'
-        simple_populate(self, uri, 'key_format=r,value_format=S', 0)
+        # Initially just create tables.
+        ds = SimpleDataSet(self, uri, 0, key_format='r')
+        ds.populate()
         cursor = self.session.open_cursor(uri, None, None)
         self.nentries = 0
 
         # Create a column-store table with large gaps in the name-space.
         v = [ 1000, 2000000000000, 30000000000000 ]
         for i in v:
-            cursor[key_populate(cursor, i)] = value_populate(cursor, i)
+            cursor[ds.key(i)] = ds.value(i)
             self.nentries += 1
 
         # In-memory cursor forward, backward.
@@ -84,7 +86,9 @@ class test_column_store_gap(wttest.WiredTigerTestCase):
 
     def test_column_store_gap_traverse(self):
         uri = 'table:gap'
-        simple_populate(self, uri, 'key_format=r,value_format=S', 0)
+        # Initially just create tables.
+        ds = SimpleDataSet(self, uri, 0, key_format='r')
+        ds.populate()
         cursor = self.session.open_cursor(uri, None, None)
         self.nentries = 0
 
@@ -92,7 +96,7 @@ class test_column_store_gap(wttest.WiredTigerTestCase):
         # important, we just want some gaps.
         v = [ 1000, 1001, 2000, 2001]
         for i in v:
-            cursor[key_populate(cursor, i)] = value_populate(cursor, i)
+            cursor[ds.key(i)] = ds.value(i)
             self.nentries += 1
 
         # In-memory cursor forward, backward.
@@ -111,7 +115,7 @@ class test_column_store_gap(wttest.WiredTigerTestCase):
         # so the traversal walks to them.
         v2 = [ 1500, 1501 ]
         for i in v2:
-            cursor[key_populate(cursor, i)] = value_populate(cursor, i)
+            cursor[ds.key(i)] = ds.value(i)
             self.nentries += 1
 
         # Tell the validation what to expect.
@@ -168,7 +172,7 @@ class test_colmax(wttest.WiredTigerTestCase):
         # Optionaly make the big record the only record in the table.
         if not self.single:
             for i in range(1, 723):
-                cursor[key_populate(cursor, i)] = value_populate(cursor, i)
+                cursor[simple_key(cursor, i)] = simple_value(cursor, i)
 
         # Confirm searching past the end of the table works.
         if not self.bulk:
@@ -176,7 +180,7 @@ class test_colmax(wttest.WiredTigerTestCase):
             self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
 
         # Insert the big record.
-        cursor[key_populate(cursor, recno)] = value_populate(cursor, recno)
+        cursor[simple_key(cursor, recno)] = simple_value(cursor, recno)
 
         # Optionally flush to disk; re-open the cursor as necessary.
         if self.bulk or self.reopen:
@@ -189,18 +193,18 @@ class test_colmax(wttest.WiredTigerTestCase):
         # Search for the large record.
         cursor.set_key(recno)
         self.assertEqual(cursor.search(), 0)
-        self.assertEqual(cursor.get_value(), value_populate(cursor, recno))
+        self.assertEqual(cursor.get_value(), simple_value(cursor, recno))
 
         # Update it.
-        cursor[key_populate(cursor, recno)] = value_populate(cursor, 37)
+        cursor[simple_key(cursor, recno)] = simple_value(cursor, 37)
         cursor.set_key(recno)
         self.assertEqual(cursor.search(), 0)
-        self.assertEqual(cursor.get_value(), value_populate(cursor, 37))
+        self.assertEqual(cursor.get_value(), simple_value(cursor, 37))
 
         # Remove it.
         cursor.set_key(recno)
         self.assertEqual(cursor.remove(), 0)
-        cursor.set_key(key_populate(cursor, recno))
+        cursor.set_key(simple_key(cursor, recno))
         self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
 
 if __name__ == '__main__':

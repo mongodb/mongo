@@ -30,7 +30,7 @@
 #       Regression tests.
 
 import wiredtiger, wttest
-from helper import key_populate, value_populate
+from wtdataset import SimpleDataSet, simple_key, simple_value
 
 # Check that verify works when the file has additional data after the last
 # checkpoint.
@@ -43,7 +43,7 @@ class test_bug005(wttest.WiredTigerTestCase):
         self.session.create(self.uri, 'value_format=S,key_format=S')
         cursor = self.session.open_cursor(self.uri, None)
         for i in range(1, 1000):
-            cursor[key_populate(cursor, i)] = value_populate(cursor, i)
+            cursor[simple_key(cursor, i)] = simple_value(cursor, i)
         cursor.close()
 
         # Verify the object, force it to disk, and verify the on-disk version.

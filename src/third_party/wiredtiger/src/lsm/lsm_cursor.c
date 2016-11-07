@@ -1678,7 +1678,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	lsm_tree = NULL;
 
 	if (!WT_PREFIX_MATCH(uri, "lsm:"))
-		return (EINVAL);
+		return (__wt_unexpected_object_type(session, uri, "lsm:"));
 
 	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
 		WT_RET_MSG(session, EINVAL,
