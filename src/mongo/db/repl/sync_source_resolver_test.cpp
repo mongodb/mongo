@@ -202,21 +202,24 @@ TEST_F(SyncSourceResolverTest, InvalidConstruction) {
         "last fetched optime cannot be null");
 
     // If provided, required optime must be more recent than last fetched optime.
-    ASSERT_THROWS_CODE_AND_WHAT(
-        SyncSourceResolver(&getExecutor(),
-                           &selector,
-                           lastOpTimeFetched,
-                           OpTime(Timestamp(Seconds(50), 1U), 1LL),
-                           onCompletion),
-        UserException,
-        ErrorCodes::BadValue,
-        "required optime (if provided) must be more recent than last fetched optime");
+    ASSERT_THROWS_CODE_AND_WHAT(SyncSourceResolver(&getExecutor(),
+                                                   &selector,
+                                                   lastOpTimeFetched,
+                                                   OpTime(Timestamp(Seconds(50), 1U), 1LL),
+                                                   onCompletion),
+                                UserException,
+                                ErrorCodes::BadValue,
+                                "required optime (if provided) must be more recent than last "
+                                "fetched optime. requiredOpTime: { ts: Timestamp 50000|1, t: 1 }, "
+                                "lastOpTimeFetched: { ts: Timestamp 100000|1, t: 1 }");
     ASSERT_THROWS_CODE_AND_WHAT(
         SyncSourceResolver(
             &getExecutor(), &selector, lastOpTimeFetched, lastOpTimeFetched, onCompletion),
         UserException,
         ErrorCodes::BadValue,
-        "required optime (if provided) must be more recent than last fetched optime");
+        "required optime (if provided) must be more recent than last fetched optime. "
+        "requiredOpTime: { ts: Timestamp 100000|1, t: 1 }, lastOpTimeFetched: { ts: Timestamp "
+        "100000|1, t: 1 }");
 
     // Null callback function.
     ASSERT_THROWS_CODE_AND_WHAT(SyncSourceResolver(&getExecutor(),

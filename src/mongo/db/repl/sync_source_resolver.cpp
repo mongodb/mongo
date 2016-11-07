@@ -69,7 +69,11 @@ SyncSourceResolver::SyncSourceResolver(executor::TaskExecutor* taskExecutor,
     uassert(
         ErrorCodes::BadValue, "last fetched optime cannot be null", !lastOpTimeFetched.isNull());
     uassert(ErrorCodes::BadValue,
-            "required optime (if provided) must be more recent than last fetched optime",
+            str::stream() << "required optime (if provided) must be more recent than last "
+                             "fetched optime. requiredOpTime: "
+                          << requiredOpTime.toString()
+                          << ", lastOpTimeFetched: "
+                          << lastOpTimeFetched.toString(),
             requiredOpTime.isNull() || requiredOpTime > lastOpTimeFetched);
     uassert(ErrorCodes::BadValue, "callback function cannot be null", onCompletion);
 }
