@@ -157,8 +157,7 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
 		    g.c_lsm_worker_threads);
 
 	if (DATASOURCE("lsm") || g.c_cache < 20) {
-		p += snprintf(p, REMAIN(p, end),
-		    ",eviction_dirty_target=80,eviction_dirty_trigger=95");
+		p += snprintf(p, REMAIN(p, end), ",eviction_dirty_trigger=95");
 	}
 
 	/* Eviction worker configuration. */
