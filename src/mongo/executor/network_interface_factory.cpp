@@ -36,6 +36,7 @@
 #include "mongo/executor/async_stream_factory.h"
 #include "mongo/executor/async_stream_interface.h"
 #include "mongo/executor/async_timer_asio.h"
+#include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_asio.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
@@ -52,12 +53,14 @@ std::unique_ptr<NetworkInterface> makeNetworkInterface(std::string instanceName)
 std::unique_ptr<NetworkInterface> makeNetworkInterface(
     std::string instanceName,
     std::unique_ptr<NetworkConnectionHook> hook,
-    std::unique_ptr<rpc::EgressMetadataHook> metadataHook) {
+    std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
+    ConnectionPool::Options connPoolOptions) {
     NetworkInterfaceASIO::Options options{};
     options.instanceName = std::move(instanceName);
     options.networkConnectionHook = std::move(hook);
     options.metadataHook = std::move(metadataHook);
     options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
+    options.connectionPoolOptions = connPoolOptions;
 
 #ifdef MONGO_CONFIG_SSL
     if (SSLManagerInterface* manager = getSSLManager()) {

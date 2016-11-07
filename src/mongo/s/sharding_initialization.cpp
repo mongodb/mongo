@@ -38,7 +38,9 @@
 #include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
+#include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/task_executor.h"
@@ -65,6 +67,22 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+using executor::ConnectionPool;
+
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolHostTimeout,
+                                      int,
+                                      ConnectionPool::kDefaultHostTimeout.count());
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolMaxSize, int, -1);
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolMinSize,
+                                      int,
+                                      static_cast<int>(ConnectionPool::kDefaultMinConns));
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolRefreshRequirement,
+                                      int,
+                                      ConnectionPool::kDefaultRefreshRequirement.count());
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolRefreshTimeout,
+                                      int,
+                                      ConnectionPool::kDefaultRefreshTimeout.count());
 
 namespace {
 
@@ -97,13 +115,16 @@ std::unique_ptr<ShardingCatalogClient> makeCatalogClient(ServiceContext* service
 
 std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(
     std::unique_ptr<NetworkInterface> fixedNet,
-    rpc::ShardingEgressMetadataHookBuilder metadataHookBuilder) {
+    rpc::ShardingEgressMetadataHookBuilder metadataHookBuilder,
+    ConnectionPool::Options connPoolOptions) {
     std::vector<std::unique_ptr<executor::TaskExecutor>> executors;
+
     for (size_t i = 0; i < TaskExecutorPool::getSuggestedPoolSize(); ++i) {
         auto net = executor::makeNetworkInterface(
             "NetworkInterfaceASIO-TaskExecutorPool-" + std::to_string(i),
             stdx::make_unique<ShardingNetworkConnectionHook>(),
-            metadataHookBuilder());
+            metadataHookBuilder(),
+            connPoolOptions);
         auto netPtr = net.get();
         auto exec = stdx::make_unique<ThreadPoolTaskExecutor>(
             stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
@@ -145,12 +166,25 @@ Status initializeGlobalShardingState(OperationContext* txn,
         return {ErrorCodes::BadValue, "Unrecognized connection string."};
     }
 
+    // We don't set the ConnectionPool's static const variables to be the default value in
+    // MONGO_EXPORT_STARTUP_SERVER_PARAMETER because it's not guaranteed to be initialized.
+    // The following code is a workaround.
+    ConnectionPool::Options connPoolOptions;
+    connPoolOptions.hostTimeout = Milliseconds(ShardingTaskExecutorPoolHostTimeout);
+    connPoolOptions.maxConnections = (ShardingTaskExecutorPoolMaxSize != -1)
+        ? ShardingTaskExecutorPoolMaxSize
+        : ConnectionPool::kDefaultMaxConns;
+    connPoolOptions.minConnections = ShardingTaskExecutorPoolMinSize;
+    connPoolOptions.refreshRequirement = Milliseconds(ShardingTaskExecutorPoolRefreshRequirement);
+    connPoolOptions.refreshTimeout = Milliseconds(ShardingTaskExecutorPoolRefreshTimeout);
+
     auto network =
         executor::makeNetworkInterface("NetworkInterfaceASIO-ShardRegistry",
                                        stdx::make_unique<ShardingNetworkConnectionHook>(),
-                                       hookBuilder());
+                                       hookBuilder(),
+                                       connPoolOptions);
     auto networkPtr = network.get();
-    auto executorPool = makeTaskExecutorPool(std::move(network), hookBuilder);
+    auto executorPool = makeTaskExecutorPool(std::move(network), hookBuilder, connPoolOptions);
     executorPool->startup();
 
     auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS));
