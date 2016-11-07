@@ -50,15 +50,20 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/progress_meter.h"
+#include "mongo/util/quick_exit.h"
 
 namespace mongo {
 
 using boost::scoped_ptr;
 using std::string;
 using std::endl;
+
+MONGO_FP_DECLARE(crashAfterStartingIndexBuild);
 
 /**
  * On rollback sets MultiIndexBlock::_needToCleanup to true.
@@ -140,82 +145,96 @@ void MultiIndexBlock::removeExistingIndexes(std::vector<BSONObj>* specs) const {
 }
 
 Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
-    WriteUnitOfWork wunit(_txn);
+    {
+        WriteUnitOfWork wunit(_txn);
 
-    invariant(_indexes.empty());
-    _txn->recoveryUnit()->registerChange(new CleanupIndexesVectorOnRollback(this));
+        invariant(_indexes.empty());
+        _txn->recoveryUnit()->registerChange(new CleanupIndexesVectorOnRollback(this));
 
-    const string& ns = _collection->ns().ns();
+        const string& ns = _collection->ns().ns();
 
-    Status status = _collection->getIndexCatalog()->checkUnfinished();
-    if (!status.isOK())
-        return status;
+        Status status = _collection->getIndexCatalog()->checkUnfinished();
+        if (!status.isOK())
+            return status;
 
-    for (size_t i = 0; i < indexSpecs.size(); i++) {
-        BSONObj info = indexSpecs[i];
+        for (size_t i = 0; i < indexSpecs.size(); i++) {
+            BSONObj info = indexSpecs[i];
 
-        string pluginName = IndexNames::findPluginName(info["key"].Obj());
-        if (pluginName.size()) {
-            Status s = _collection->getIndexCatalog()->_upgradeDatabaseMinorVersionIfNeeded(
-                _txn, pluginName);
-            if (!s.isOK())
-                return s;
+            string pluginName = IndexNames::findPluginName(info["key"].Obj());
+            if (pluginName.size()) {
+                Status s = _collection->getIndexCatalog()->_upgradeDatabaseMinorVersionIfNeeded(
+                    _txn, pluginName);
+                if (!s.isOK())
+                    return s;
+            }
+
+            // Any foreground indexes make all indexes be built in the foreground.
+            _buildInBackground = (_buildInBackground && info["background"].trueValue());
         }
 
-        // Any foreground indexes make all indexes be built in the foreground.
-        _buildInBackground = (_buildInBackground && info["background"].trueValue());
-    }
+        for (size_t i = 0; i < indexSpecs.size(); i++) {
+            BSONObj info = indexSpecs[i];
+            StatusWith<BSONObj> statusWithInfo =
+                _collection->getIndexCatalog()->prepareSpecForCreate(_txn, info);
+            Status status = statusWithInfo.getStatus();
+            if (!status.isOK())
+                return status;
+            info = statusWithInfo.getValue();
 
-    for (size_t i = 0; i < indexSpecs.size(); i++) {
-        BSONObj info = indexSpecs[i];
-        StatusWith<BSONObj> statusWithInfo =
-            _collection->getIndexCatalog()->prepareSpecForCreate(_txn, info);
-        Status status = statusWithInfo.getStatus();
-        if (!status.isOK())
-            return status;
-        info = statusWithInfo.getValue();
+            IndexToBuild index;
+            index.block =
+                boost::make_shared<IndexCatalog::IndexBuildBlock>(_txn, _collection, info);
+            status = index.block->init();
+            if (!status.isOK())
+                return status;
 
-        IndexToBuild index;
-        index.block = boost::make_shared<IndexCatalog::IndexBuildBlock>(_txn, _collection, info);
-        status = index.block->init();
-        if (!status.isOK())
-            return status;
+            index.real = index.block->getEntry()->accessMethod();
+            status = index.real->initializeAsEmpty(_txn);
+            if (!status.isOK())
+                return status;
 
-        index.real = index.block->getEntry()->accessMethod();
-        status = index.real->initializeAsEmpty(_txn);
-        if (!status.isOK())
-            return status;
+            if (!_buildInBackground) {
+                // Bulk build process requires foreground building as it assumes nothing is changing
+                // under it.
+                index.bulk.reset(index.real->initiateBulk(_txn));
+            }
 
-        if (!_buildInBackground) {
-            // Bulk build process requires foreground building as it assumes nothing is changing
-            // under it.
-            index.bulk.reset(index.real->initiateBulk(_txn));
+            const IndexDescriptor* descriptor = index.block->getEntry()->descriptor();
+
+            index.options.logIfError = false;  // logging happens elsewhere if needed.
+            index.options.dupsAllowed = !descriptor->unique() || _ignoreUnique ||
+                repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(descriptor);
+
+            log() << "build index on: " << ns << " properties: " << descriptor->toString();
+            if (index.bulk)
+                log() << "\t building index using bulk method";
+
+            // TODO SERVER-14888 Suppress this in cases we don't want to audit.
+            audit::logCreateIndex(_txn->getClient(), &info, descriptor->indexName(), ns);
+
+            _indexes.push_back(index);
         }
 
-        const IndexDescriptor* descriptor = index.block->getEntry()->descriptor();
+        // this is so that operations examining the list of indexes know there are more keys to look
+        // at when doing things like in place updates, etc...
+        _collection->infoCache()->addedIndex(_txn);
 
-        index.options.logIfError = false;  // logging happens elsewhere if needed.
-        index.options.dupsAllowed = !descriptor->unique() || _ignoreUnique ||
-            repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(descriptor);
+        if (_buildInBackground)
+            _backgroundOperation.reset(new BackgroundOperation(ns));
 
-        log() << "build index on: " << ns << " properties: " << descriptor->toString();
-        if (index.bulk)
-            log() << "\t building index using bulk method";
-
-        // TODO SERVER-14888 Suppress this in cases we don't want to audit.
-        audit::logCreateIndex(_txn->getClient(), &info, descriptor->indexName(), ns);
-
-        _indexes.push_back(index);
+        wunit.commit();
     }
 
-    // this is so that operations examining the list of indexes know there are more keys to look
-    // at when doing things like in place updates, etc...
-    _collection->infoCache()->addedIndex(_txn);
+    if (MONGO_FAIL_POINT(crashAfterStartingIndexBuild)) {
+        log() << "Index build interrupted due to 'crashAfterStartingIndexBuild' failpoint. Exiting "
+                 "after waiting for changes to become durable.";
+        Locker::LockSnapshot lockInfo;
+        _txn->lockState()->saveLockStateAndUnlock(&lockInfo);
+        if (_txn->recoveryUnit()->awaitCommit()) {
+            quickExit(EXIT_TEST);
+        }
+    }
 
-    if (_buildInBackground)
-        _backgroundOperation.reset(new BackgroundOperation(ns));
-
-    wunit.commit();
     return Status::OK();
 }
 
