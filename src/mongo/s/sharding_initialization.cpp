@@ -39,7 +39,9 @@
 #include "mongo/client/syncclusterconnection.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
+#include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/task_executor.h"
@@ -47,7 +49,6 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
-#include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/s/catalog/forwarding_catalog_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/sharding_network_connection_hook.h"
@@ -60,6 +61,22 @@
 #include "mongo/util/net/sock.h"
 
 namespace mongo {
+
+using executor::ConnectionPool;
+
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolHostTimeout,
+                                      int,
+                                      ConnectionPool::kDefaultHostTimeout.count());
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolMaxSize, int, -1);
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolMinSize,
+                                      int,
+                                      static_cast<int>(ConnectionPool::kDefaultMinConns));
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolRefreshRequirement,
+                                      int,
+                                      ConnectionPool::kDefaultRefreshRequirement.count());
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolRefreshTimeout,
+                                      int,
+                                      ConnectionPool::kDefaultRefreshTimeout.count());
 
 namespace {
 
@@ -124,13 +141,16 @@ std::unique_ptr<ThreadPoolTaskExecutor> makeTaskExecutor(std::unique_ptr<Network
         stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
 }
 
-std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(std::unique_ptr<NetworkInterface> fixedNet) {
+std::unique_ptr<TaskExecutorPool> makeTaskExecutorPool(std::unique_ptr<NetworkInterface> fixedNet,
+                                                       ConnectionPool::Options connPoolOptions) {
     std::vector<std::unique_ptr<executor::TaskExecutor>> executors;
+
     for (size_t i = 0; i < TaskExecutorPool::getSuggestedPoolSize(); ++i) {
         auto net = executor::makeNetworkInterface(
             "NetworkInterfaceASIO-TaskExecutorPool-" + std::to_string(i),
             stdx::make_unique<ShardingNetworkConnectionHook>(),
-            stdx::make_unique<ShardingEgressMetadataHook>());
+            stdx::make_unique<ShardingEgressMetadataHook>(),
+            connPoolOptions);
         auto netPtr = net.get();
         auto exec = stdx::make_unique<ThreadPoolTaskExecutor>(
             stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));
@@ -157,14 +177,28 @@ Status initializeGlobalShardingState(OperationContext* txn,
         [](const HostAndPort& target, const executor::RemoteCommandResponse& isMasterReply) {
             return ShardingNetworkConnectionHook::validateHostImpl(target, isMasterReply, true);
         });
+
+    // We don't set the ConnectionPool's static const variables to be the default value in
+    // MONGO_EXPORT_STARTUP_SERVER_PARAMETER because it's not guaranteed to be initialized.
+    // The following code is a workaround.
+    ConnectionPool::Options connPoolOptions;
+    connPoolOptions.hostTimeout = Milliseconds(ShardingTaskExecutorPoolHostTimeout);
+    connPoolOptions.maxConnections = (ShardingTaskExecutorPoolMaxSize != -1)
+        ? ShardingTaskExecutorPoolMaxSize
+        : ConnectionPool::kDefaultMaxConns;
+    connPoolOptions.minConnections = ShardingTaskExecutorPoolMinSize;
+    connPoolOptions.refreshRequirement = Milliseconds(ShardingTaskExecutorPoolRefreshRequirement);
+    connPoolOptions.refreshTimeout = Milliseconds(ShardingTaskExecutorPoolRefreshTimeout);
+
     auto network =
         executor::makeNetworkInterface("NetworkInterfaceASIO-ShardRegistry",
                                        stdx::make_unique<ShardingNetworkConnectionHook>(),
-                                       stdx::make_unique<ShardingEgressMetadataHook>());
+                                       stdx::make_unique<ShardingEgressMetadataHook>(),
+                                       connPoolOptions);
     auto networkPtr = network.get();
     auto shardRegistry(
         stdx::make_unique<ShardRegistry>(stdx::make_unique<RemoteCommandTargeterFactoryImpl>(),
-                                         makeTaskExecutorPool(std::move(network)),
+                                         makeTaskExecutorPool(std::move(network), connPoolOptions),
                                          networkPtr,
                                          makeTaskExecutor(executor::makeNetworkInterface(
                                              "NetworkInterfaceASIO-ShardRegistry-TaskExecutor")),
