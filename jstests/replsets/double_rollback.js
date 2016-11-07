@@ -38,7 +38,7 @@
                 {replSetTest: 1, waitForMemberState: state, timeoutMillis: timeout}));
             return true;
         });
-    };
+    }
 
     function stepUp(rst, node) {
         var primary = rst.getPrimary();
