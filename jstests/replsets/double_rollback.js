@@ -36,7 +36,7 @@
                 {replSetTest: 1, waitForMemberState: state, timeoutMillis: rst.kDefaultTimeoutMs}));
             return true;
         });
-    };
+    }
 
     function stepUp(rst, node) {
         var primary = rst.getPrimary();
