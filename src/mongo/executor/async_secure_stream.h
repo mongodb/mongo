@@ -46,7 +46,7 @@ public:
 
     ~AsyncSecureStream();
 
-    void connect(const asio::ip::tcp::resolver::iterator endpoints,
+    void connect(asio::ip::tcp::resolver::iterator endpoints,
                  ConnectHandler&& connectHandler) override;
 
     void write(asio::const_buffer buffer, StreamHandler&& streamHandler) override;
