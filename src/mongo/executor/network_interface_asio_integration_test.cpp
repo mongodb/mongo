@@ -62,7 +62,13 @@ public:
     void startNet(NetworkInterfaceASIO::Options options = NetworkInterfaceASIO::Options()) {
         options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
         options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
+#ifdef _WIN32
+        // Connections won't queue on widnows, so attempting to open too many connections
+        // concurrently will result in refused connections and test failure.
+        options.connectionPoolOptions.maxConnections = 16u;
+#else
         options.connectionPoolOptions.maxConnections = 256u;
+#endif
         _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
         _net->startup();
     }
