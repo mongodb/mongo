@@ -27,8 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest, exceptions
-from helper import complex_populate, simple_populate, key_populate
-from helper import complex_populate_index_name
+from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
 from wtscenario import make_scenarios
 
 # Test cursor comparisons.
@@ -36,9 +35,9 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
     name = 'test_compare'
 
     types = [
-        ('file', dict(type='file:', config='')),
-        ('lsm', dict(type='table:', config=',type=lsm')),
-        ('table', dict(type='table:', config=''))
+        ('file', dict(type='file:', dataset=SimpleDataSet)),
+        ('lsm', dict(type='table:', dataset=ComplexLSMDataSet)),
+        ('table', dict(type='table:', dataset=ComplexDataSet))
     ]
     keyfmt = [
         ('integer', dict(keyfmt='i')),
@@ -52,28 +51,20 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
         uriX = self.type + 'compareX'
 
         # Build the object.
+        ds = self.dataset(self, uri, 100, key_format=self.keyfmt)
+        dsX = self.dataset(self, uriX, 100, key_format=self.keyfmt)
+        ds.populate()
+        dsX.populate()
         if self.type == 'file:':
-            simple_populate(
-                self, uri, 'key_format=' + self.keyfmt + self.config, 100)
-            simple_populate(
-                self, uriX, 'key_format=' + self.keyfmt + self.config, 100)
             ix0_0 = None
             ix0_1 = None
             ix1_0 = None
             ixX_0 = None
         else:
-            complex_populate(
-                self, uri, 'key_format=' + self.keyfmt + self.config, 100)
-            complex_populate(
-                self, uriX, 'key_format=' + self.keyfmt + self.config, 100)
-            ix0_0 = self.session.open_cursor(
-                complex_populate_index_name(self, uri, 0), None)
-            ix0_1 = self.session.open_cursor(
-                complex_populate_index_name(self, uri, 0), None)
-            ix1_0 = self.session.open_cursor(
-                complex_populate_index_name(self, uri, 1), None)
-            ixX_0 = self.session.open_cursor(
-                complex_populate_index_name(self, uriX, 0), None)
+            ix0_0 = self.session.open_cursor(ds.index_name(0), None)
+            ix0_1 = self.session.open_cursor(ds.index_name(0), None)
+            ix1_0 = self.session.open_cursor(ds.index_name(1), None)
+            ixX_0 = self.session.open_cursor(dsX.index_name(0), None)
             ix0_0.next()
             ix0_1.next()
             ix1_0.next()
@@ -90,17 +81,17 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
             wiredtiger.WiredTigerError, lambda: c2.compare(c1), msg)
 
         # Test cursors before they're positioned.
-        c1.set_key(key_populate(c1, 10))
-        c2.set_key(key_populate(c2, 20))
+        c1.set_key(ds.key(10))
+        c2.set_key(ds.key(20))
         self.assertGreater(c2.compare(c1), 0)
         self.assertLess(c1.compare(c2), 0)
-        c2.set_key(key_populate(c2, 10))
+        c2.set_key(ds.key(10))
         self.assertEqual(c1.compare(c2), 0)
         self.assertEqual(c2.compare(c1), 0)
 
         # Confirm failure for different objects.
         cX = self.session.open_cursor(uriX, None)
-        cX.set_key(key_populate(cX, 10))
+        cX.set_key(dsX.key(10))
         msg = '/must reference the same object/'
         self.assertRaisesWithMessage(
             wiredtiger.WiredTigerError, lambda: cX.compare(c1), msg)
@@ -125,20 +116,20 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
                 wiredtiger.WiredTigerError, lambda: ix0_0.compare(ix1_0), msg)
 
         # Test cursors after they're positioned (shouldn't matter for compare).
-        c1.set_key(key_populate(c1, 10))
+        c1.set_key(ds.key(10))
         self.assertEqual(c1.search(), 0)
-        c2.set_key(key_populate(c2, 20))
+        c2.set_key(ds.key(20))
         self.assertEqual(c2.search(), 0)
         self.assertGreater(c2.compare(c1), 0)
         self.assertLess(c1.compare(c2), 0)
-        c2.set_key(key_populate(c2, 10))
+        c2.set_key(ds.key(10))
         self.assertEqual(c2.search(), 0)
         self.assertEqual(c1.compare(c2), 0)
         self.assertEqual(c2.compare(c1), 0)
 
         # Confirm failure for different objects.
         cX = self.session.open_cursor(uriX, None)
-        cX.set_key(key_populate(cX, 10))
+        cX.set_key(dsX.key(10))
         self.assertEqual(cX.search(), 0)
         msg = '/must reference the same object/'
         self.assertRaisesWithMessage(
@@ -149,28 +140,20 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
         uriX = self.type + 'compareX'
 
         # Build the object.
+        ds = self.dataset(self, uri, 100, key_format=self.keyfmt)
+        dsX = self.dataset(self, uriX, 100, key_format=self.keyfmt)
+        ds.populate()
+        dsX.populate()
         if self.type == 'file:':
-            simple_populate(
-                self, uri, 'key_format=' + self.keyfmt + self.config, 100)
-            simple_populate(
-                self, uriX, 'key_format=' + self.keyfmt + self.config, 100)
             ix0_0 = None
             ix0_1 = None
             ix1_0 = None
             ixX_0 = None
         else:
-            complex_populate(
-                self, uri, 'key_format=' + self.keyfmt + self.config, 100)
-            complex_populate(
-                self, uriX, 'key_format=' + self.keyfmt + self.config, 100)
-            ix0_0 = self.session.open_cursor(
-                complex_populate_index_name(self, uri, 0), None)
-            ix0_1 = self.session.open_cursor(
-                complex_populate_index_name(self, uri, 0), None)
-            ix1_0 = self.session.open_cursor(
-                complex_populate_index_name(self, uri, 1), None)
-            ixX_0 = self.session.open_cursor(
-                complex_populate_index_name(self, uriX, 0), None)
+            ix0_0 = self.session.open_cursor(ds.index_name(0), None)
+            ix0_1 = self.session.open_cursor(ds.index_name(0), None)
+            ix1_0 = self.session.open_cursor(ds.index_name(1), None)
+            ixX_0 = self.session.open_cursor(dsX.index_name(0), None)
             ix0_0.next()
             ix0_1.next()
             ix1_0.next()
@@ -187,17 +170,17 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
             wiredtiger.WiredTigerError, lambda: c2.equals(c1), msg)
 
         # Test cursors before they're positioned.
-        c1.set_key(key_populate(c1, 10))
-        c2.set_key(key_populate(c2, 20))
+        c1.set_key(ds.key(10))
+        c2.set_key(ds.key(20))
         self.assertFalse(c1.equals(c2))
         self.assertFalse(c2.equals(c1))
-        c2.set_key(key_populate(c2, 10))
+        c2.set_key(ds.key(10))
         self.assertTrue(c1.equals(c2))
         self.assertTrue(c2.equals(c1))
 
         # Confirm failure for different objects.
         cX = self.session.open_cursor(uriX, None)
-        cX.set_key(key_populate(cX, 10))
+        cX.set_key(dsX.key(10))
         msg = '/must reference the same object/'
         self.assertRaisesWithMessage(
             wiredtiger.WiredTigerError, lambda: cX.equals(c1), msg)
@@ -222,20 +205,20 @@ class test_cursor_comparison(wttest.WiredTigerTestCase):
 
         # Test cursors after they're positioned (internally, it's a different
         # search path if keys are positioned in the tree).
-        c1.set_key(key_populate(c1, 10))
+        c1.set_key(ds.key(10))
         self.assertEqual(c1.search(), 0)
-        c2.set_key(key_populate(c2, 20))
+        c2.set_key(ds.key(20))
         self.assertEqual(c2.search(), 0)
         self.assertFalse(c1.equals(c2))
         self.assertFalse(c2.equals(c1))
-        c2.set_key(key_populate(c2, 10))
+        c2.set_key(ds.key(10))
         self.assertEqual(c2.search(), 0)
         self.assertTrue(c1.equals(c2))
         self.assertTrue(c2.equals(c1))
 
         # Confirm failure for different objects.
         cX = self.session.open_cursor(uriX, None)
-        cX.set_key(key_populate(cX, 10))
+        cX.set_key(dsX.key(10))
         self.assertEqual(cX.search(), 0)
         msg = '/must reference the same object/'
         self.assertRaisesWithMessage(

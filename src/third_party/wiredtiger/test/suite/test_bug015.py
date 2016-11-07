@@ -27,7 +27,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper import copy_wiredtiger_home, key_populate, simple_populate
 
 # test_bug015.py
 #    JIRA WT-2162: index drop in a certain order triggers NULL pointer deref

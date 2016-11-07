@@ -31,7 +31,7 @@
 
 import fnmatch, os, time
 from suite_subprocess import suite_subprocess
-from helper import simple_populate
+from wtdataset import SimpleDataSet
 import wttest
 
 class test_txn11(wttest.WiredTigerTestCase, suite_subprocess):
@@ -64,7 +64,7 @@ class test_txn11(wttest.WiredTigerTestCase, suite_subprocess):
 
     def test_ops(self):
         # Populate a table
-        simple_populate(self, self.source_uri, 'key_format=S', self.nrows)
+        SimpleDataSet(self, self.source_uri, self.nrows).populate()
 
         # Run forced checkpoints
         self.run_checkpoints()

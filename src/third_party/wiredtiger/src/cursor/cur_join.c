@@ -38,8 +38,8 @@ __wt_curjoin_joined(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cursor->session;
-	__wt_errx(session, "cursor is being used in a join");
-	return (ENOTSUP);
+
+	WT_RET_MSG(session, ENOTSUP, "cursor is being used in a join");
 }
 
 /*
@@ -613,8 +613,8 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 	if (entry->bloom != NULL) {
 		/*
 		 * If the item is not in the Bloom filter, we return
-		 * immediately, otherwise, we still need to check the long
-		 * way, since it may be a false positive.
+		 * immediately, otherwise, we still may need to check the
+		 * long way, since it may be a false positive.
 		 *
 		 * If we don't own the Bloom filter, we must be sharing one
 		 * in a previous entry. So the shared filter has already
@@ -623,6 +623,8 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 		 */
 		if (F_ISSET(entry, WT_CURJOIN_ENTRY_OWN_BLOOM))
 			WT_ERR(__wt_bloom_inmem_get(entry->bloom, key));
+		if (F_ISSET(entry, WT_CURJOIN_ENTRY_FALSE_POSITIVES))
+			return (0);
 		bloom_found = true;
 	}
 	if (entry->subjoin != NULL) {
@@ -671,6 +673,8 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 		extract_cursor.entry = entry;
 		WT_ERR(idx->extractor->extract(idx->extractor,
 		    &session->iface, key, &v, &extract_cursor.iface));
+		__wt_buf_free(session, &extract_cursor.iface.key);
+		__wt_buf_free(session, &extract_cursor.iface.value);
 		if (!extract_cursor.ismember)
 			WT_ERR(WT_NOTFOUND);
 	} else
@@ -1302,11 +1306,15 @@ __wt_curjoin_open(WT_SESSION_IMPL *session,
 
 	WT_STATIC_ASSERT(offsetof(WT_CURSOR_JOIN, iface) == 0);
 
+	if (owner != NULL)
+		WT_RET_MSG(session, EINVAL,
+		    "unable to initialize a join cursor with existing owner");
+
 	if (!WT_PREFIX_SKIP(uri, "join:"))
-		return (EINVAL);
+		return (__wt_unexpected_object_type(session, uri, "join:"));
 	tablename = uri;
 	if (!WT_PREFIX_SKIP(tablename, "table:"))
-		return (EINVAL);
+		return (__wt_unexpected_object_type(session, uri, "table:"));
 
 	columns = strchr(tablename, '(');
 	if (columns == NULL)
@@ -1333,9 +1341,6 @@ __wt_curjoin_open(WT_SESSION_IMPL *session,
 		    session, tmp->data, tmp->size, &cursor->value_format));
 		WT_ERR(__wt_strdup(session, columns, &cjoin->projection));
 	}
-
-	if (owner != NULL)
-		WT_ERR(EINVAL);
 
 	WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
 
@@ -1441,6 +1446,11 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		    F_MASK(entry, WT_CURJOIN_ENTRY_BLOOM))
 			WT_RET_MSG(session, EINVAL,
 			    "join has incompatible strategy "
+			    "values for the same index");
+		if (LF_MASK(WT_CURJOIN_ENTRY_FALSE_POSITIVES) !=
+		    F_MASK(entry, WT_CURJOIN_ENTRY_FALSE_POSITIVES))
+			WT_RET_MSG(session, EINVAL,
+			    "join has incompatible bloom_false_positives "
 			    "values for the same index");
 
 		/*

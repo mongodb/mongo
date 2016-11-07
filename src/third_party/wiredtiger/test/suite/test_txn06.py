@@ -30,7 +30,7 @@
 #   Transactions: test long-running snapshots
 
 from suite_subprocess import suite_subprocess
-from helper import simple_populate
+from wtdataset import SimpleDataSet
 import wiredtiger, wttest
 
 class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
@@ -47,7 +47,7 @@ class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
 
     def test_long_running(self):
         # Populate a table
-        simple_populate(self, self.source_uri, 'key_format=S', self.nrows)
+        SimpleDataSet(self, self.source_uri, self.nrows).populate()
 
         # Now scan the table and copy the rows into a new table
         c_src = self.session.create(self.uri, "key_format=S")

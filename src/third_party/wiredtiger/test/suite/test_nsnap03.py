@@ -30,7 +30,7 @@
 #   Named snapshots: Access and create from multiple sessions
 
 from suite_subprocess import suite_subprocess
-from helper import simple_populate
+from wtdataset import SimpleDataSet
 import wiredtiger, wttest
 
 class test_nsnap03(wttest.WiredTigerTestCase, suite_subprocess):
@@ -55,7 +55,7 @@ class test_nsnap03(wttest.WiredTigerTestCase, suite_subprocess):
     def test_named_snapshots(self):
         # Populate a table
         end = start = 0
-        simple_populate(self, self.uri, 'key_format=i', 0)
+        SimpleDataSet(self, self.uri, 0, key_format='i').populate()
 
         # Now run a workload:
         # every iteration:

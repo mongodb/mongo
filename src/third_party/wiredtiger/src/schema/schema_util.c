@@ -9,6 +9,45 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_schema_backup_check --
+ *	Check if a backup cursor is open and give an error if the schema
+ * operation will conflict.  This is called after the schema operations
+ * have taken the schema lock so no hot backup cursor can be created until
+ * this is done.
+ */
+int
+__wt_schema_backup_check(WT_SESSION_IMPL *session, const char *name)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	int i;
+	char **backup_list;
+
+	conn = S2C(session);
+	if (!conn->hot_backup)
+		return (0);
+	__wt_readlock(session, conn->hot_backup_lock);
+	/*
+	 * There is a window at the end of a backup where the list has been
+	 * cleared from the connection but the flag is still set.  It is safe
+	 * to drop at that point.
+	 */
+	if (!conn->hot_backup ||
+	    (backup_list = conn->hot_backup_list) == NULL) {
+		__wt_readunlock(session, conn->hot_backup_lock);
+		return (0);
+	}
+	for (i = 0; backup_list[i] != NULL; ++i) {
+		if (strcmp(backup_list[i], name) == 0) {
+			ret = EBUSY;
+			break;
+		}
+	}
+	__wt_readunlock(session, conn->hot_backup_lock);
+	return (ret);
+}
+
+/*
  * __wt_schema_get_source --
  *	Find a matching data source or report an error.
  */

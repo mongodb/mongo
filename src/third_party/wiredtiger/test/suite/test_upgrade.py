@@ -28,7 +28,7 @@
 
 import os, time
 import wiredtiger, wttest
-from helper import complex_populate, simple_populate
+from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 
 # test_upgrade.py
@@ -42,9 +42,9 @@ class test_upgrade(wttest.WiredTigerTestCase):
     ])
 
     # Populate an object, then upgrade it.
-    def upgrade(self, populate, with_cursor):
+    def upgrade(self, dataset, with_cursor):
         uri = self.uri + self.name
-        populate(self, uri, 'key_format=S', 10)
+        dataset(self, uri, 10).populate()
 
         # Open cursors should cause failure.
         if with_cursor:
@@ -59,13 +59,13 @@ class test_upgrade(wttest.WiredTigerTestCase):
     # Test upgrade of an object.
     def test_upgrade(self):
         # Simple file or table object.
-        self.upgrade(simple_populate, False)
-        self.upgrade(simple_populate, True)
+        self.upgrade(SimpleDataSet, False)
+        self.upgrade(SimpleDataSet, True)
 
         # A complex, multi-file table object.
         if self.uri == "table:":
-            self.upgrade(complex_populate, False)
-            self.upgrade(complex_populate, True)
+            self.upgrade(ComplexDataSet, False)
+            self.upgrade(ComplexDataSet, True)
 
 if __name__ == '__main__':
     wttest.run()

@@ -225,21 +225,24 @@ __wt_stats_clear(void *stats_arg, int slot)
  * necessary until everything is converted to using data-source handles.
  */
 #define	WT_STAT_DATA_DECRV(session, fld, value) do {			\
-	if ((session)->dhandle != NULL)					\
+	if ((session)->dhandle != NULL &&				\
+	    (session)->dhandle->stat_array != NULL)			\
 		WT_STAT_DECRV(						\
 		    session, (session)->dhandle->stats, fld, value);	\
 } while (0)
 #define	WT_STAT_DATA_DECR(session, fld)					\
 	WT_STAT_DATA_DECRV(session, fld, 1)
 #define	WT_STAT_DATA_INCRV(session, fld, value) do {			\
-	if ((session)->dhandle != NULL)					\
+	if ((session)->dhandle != NULL &&				\
+	    (session)->dhandle->stat_array != NULL)			\
 		WT_STAT_INCRV(						\
 		    session, (session)->dhandle->stats, fld, value);	\
 } while (0)
 #define	WT_STAT_DATA_INCR(session, fld)					\
 	WT_STAT_DATA_INCRV(session, fld, 1)
 #define	WT_STAT_DATA_SET(session, fld, value) do {			\
-	if ((session)->dhandle != NULL)					\
+	if ((session)->dhandle != NULL &&				\
+	    (session)->dhandle->stat_array != NULL)			\
 		WT_STAT_SET(						\
 		    session, (session)->dhandle->stats, fld, value);	\
 } while (0)

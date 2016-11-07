@@ -920,8 +920,7 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 		    "table for join cursor does not match table for "
 		    "ref_cursor");
 	if (F_ISSET(ref_cursor, WT_CURSTD_JOINED))
-		WT_ERR_MSG(session, EINVAL,
-		    "cursor already used in a join");
+		WT_ERR_MSG(session, EINVAL, "cursor already used in a join");
 
 	/* "ge" is the default */
 	range = WT_CURJOIN_END_GT | WT_CURJOIN_END_EQ;
@@ -937,7 +936,9 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 		else if (WT_STRING_MATCH("eq", cval.str, cval.len))
 			range = WT_CURJOIN_END_EQ;
 		else if (!WT_STRING_MATCH("ge", cval.str, cval.len))
-			WT_ERR(EINVAL);
+			WT_ERR_MSG(session, EINVAL,
+			    "compare=%.*s not supported",
+			    (int)cval.len, cval.str);
 	}
 	WT_ERR(__wt_config_gets(session, cfg, "count", &cval));
 	if (cval.len != 0)
@@ -948,12 +949,13 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 		if (WT_STRING_MATCH("bloom", cval.str, cval.len))
 			LF_SET(WT_CURJOIN_ENTRY_BLOOM);
 		else if (!WT_STRING_MATCH("default", cval.str, cval.len))
-			WT_ERR(EINVAL);
+			WT_ERR_MSG(session, EINVAL,
+			    "strategy=%.*s not supported",
+			    (int)cval.len, cval.str);
 	}
 	WT_ERR(__wt_config_gets(session, cfg, "bloom_bit_count", &cval));
 	if ((uint64_t)cval.val > UINT32_MAX)
-		WT_ERR_MSG(session, EINVAL,
-		    "bloom_bit_count: value too large");
+		WT_ERR_MSG(session, EINVAL, "bloom_bit_count: value too large");
 	bloom_bit_count = (uint32_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "bloom_hash_count", &cval));
 	if ((uint64_t)cval.val > UINT32_MAX)
@@ -963,6 +965,10 @@ __session_join(WT_SESSION *wt_session, WT_CURSOR *join_cursor,
 	if (LF_ISSET(WT_CURJOIN_ENTRY_BLOOM) && count == 0)
 		WT_ERR_MSG(session, EINVAL,
 		    "count must be nonzero when strategy=bloom");
+	WT_ERR(__wt_config_gets_def(
+	    session, cfg, "bloom_false_positives", 0, &cval));
+	if (cval.val != 0)
+		LF_SET(WT_CURJOIN_ENTRY_FALSE_POSITIVES);
 
 	WT_ERR(__wt_config_gets(session, cfg, "operation", &cval));
 	if (cval.len != 0 && WT_STRING_MATCH("or", cval.str, cval.len))
@@ -1007,7 +1013,9 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 	SESSION_API_CALL(session, salvage, config, cfg);
 
 	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
-		WT_ERR(ENOTSUP);
+		WT_ERR_MSG(session, ENOTSUP,
+		    "WT_SESSION.salvage not supported for in-memory "
+		    "configurations");
 
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
 	WT_WITH_CHECKPOINT_LOCK(session, ret,
@@ -1311,7 +1319,9 @@ __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
 	SESSION_API_CALL(session, verify, config, cfg);
 
 	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
-		WT_ERR(ENOTSUP);
+		WT_ERR_MSG(session, ENOTSUP,
+		    "WT_SESSION.verify not supported for in-memory "
+		    "configurations");
 
 	/* Block out checkpoints to avoid spurious EBUSY errors. */
 	WT_WITH_CHECKPOINT_LOCK(session, ret,
@@ -1556,7 +1566,9 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	SESSION_API_CALL(session, checkpoint, config, cfg);
 
 	if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
-		WT_ERR(ENOTSUP);
+		WT_ERR_MSG(session, ENOTSUP,
+		    "WT_SESSION.checkpoint not supported for in-memory "
+		    "configurations");
 
 	/*
 	 * Checkpoints require a snapshot to write a transactionally consistent

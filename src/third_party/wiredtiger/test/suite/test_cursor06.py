@@ -27,8 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper import key_populate, value_populate, simple_populate
-from helper import complex_value_populate, complex_populate
+from wtdataset import SimpleDataSet, ComplexDataSet, ComplexLSMDataSet
 from wtscenario import make_scenarios
 
 # test_cursor06.py
@@ -36,33 +35,26 @@ from wtscenario import make_scenarios
 class test_cursor06(wttest.WiredTigerTestCase):
     name = 'reconfigure'
     scenarios = make_scenarios([
-        ('file-r', dict(type='file:', config='key_format=r', complex=0)),
-        ('file-S', dict(type='file:', config='key_format=S', complex=0)),
-        ('lsm-S', dict(type='lsm:', config='key_format=S', complex=0)),
-        ('table-r',
-            dict(type='table:', config='key_format=r', complex=0)),
-        ('table-S',
-            dict(type='table:', config='key_format=S', complex=0)),
-        ('table-r-complex',
-            dict(type='table:', config='key_format=r', complex=1)),
-        ('table-S-complex',
-            dict(type='table:', config='key_format=S', complex=1)),
-        ('table-S-complex-lsm',
-            dict(type='table:', config='key_format=S,type=lsm', complex=1)),
+        ('file-r', dict(type='file:', keyfmt='r', dataset=SimpleDataSet)),
+        ('file-S', dict(type='file:', keyfmt='S', dataset=SimpleDataSet)),
+        ('lsm-S', dict(type='lsm:', keyfmt='S', dataset=SimpleDataSet)),
+        ('table-r', dict(type='table:', keyfmt='r', dataset=SimpleDataSet)),
+        ('table-S', dict(type='table:', keyfmt='S', dataset=SimpleDataSet)),
+        ('table-r-complex', dict(type='table:', keyfmt='r',
+            dataset=ComplexDataSet)),
+        ('table-S-complex', dict(type='table:', keyfmt='S',
+            dataset=ComplexDataSet)),
+        ('table-S-complex-lsm', dict(type='table:', keyfmt='S',
+            dataset=ComplexLSMDataSet)),
     ])
 
     def populate(self, uri):
-        if self.complex:
-            complex_populate(self, uri, self.config, 100)
-        else:
-            simple_populate(self, uri, self.config, 100)
+        self.ds = self.dataset(self, uri, 100, key_format=self.keyfmt)
+        self.ds.populate()
 
     def set_kv(self, cursor):
-        cursor.set_key(key_populate(cursor, 10))
-        if self.complex:
-            cursor.set_value(tuple(complex_value_populate(cursor, 10)))
-        else:
-            cursor.set_value(value_populate(cursor, 10))
+        cursor.set_key(self.ds.key(10))
+        cursor.set_value(self.ds.value(10))
 
     def test_reconfigure_overwrite(self):
         uri = self.type + self.name
