@@ -76,9 +76,10 @@ bool EmptyWiredTigerCustomizationHooks::restartRequired() {
     return false;
 }
 
-std::string EmptyWiredTigerCustomizationHooks::getTableCreateConfig(StringData tableName) {
+std::string EmptyWiredTigerCustomizationHooks::getOpenConfig(StringData tableName) {
     return "";
 }
+
 
 std::unique_ptr<DataProtector> EmptyWiredTigerCustomizationHooks::getDataProtector() {
     return std::unique_ptr<DataProtector>();
