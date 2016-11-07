@@ -33,7 +33,7 @@
     function waitForState(node, state) {
         assert.soonNoExcept(function() {
             assert.commandWorked(node.adminCommand(
-                {replSetTest: 1, waitForMemberState: state, timeoutMillis: rst.kDefaultTimeoutMs}));
+                {replSetTest: 1, waitForMemberState: state, timeoutMillis: rst.kDefaultTimeoutMS}));
             return true;
         });
     }

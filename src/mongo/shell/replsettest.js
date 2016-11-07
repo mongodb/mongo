@@ -85,7 +85,7 @@ var ReplSetTest = function(opts) {
     var _unbridgedPorts;
     var _unbridgedNodes;
 
-    this.kDefaultTimeoutMs = 10 * 60 * 1000;
+    this.kDefaultTimeoutMS = 10 * 60 * 1000;
     var oplogName = 'oplog.rs';
 
     // Publicly exposed variables
