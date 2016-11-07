@@ -10,14 +10,17 @@ if sanitizer_list:
 
 env.Library(
     target='storage_wiredtiger_customization_hooks',
-    source= ['wiredtiger_customization_hooks.cpp'],
+    source= [
+        'wiredtiger_customization_hooks.cpp',
+        'wiredtiger_extensions.cpp',
+    ],
     LIBDEPS= ['$BUILD_DIR/mongo/base',
               '$BUILD_DIR/mongo/db/service_context'],
     PROGDEPS_DEPENDENTS=[
         '$BUILD_DIR/mongo/mongod',
         '$BUILD_DIR/mongo/mongos',
     ],
-    )
+)
 
 if wiredtiger:
     wtEnv = env.Clone()
