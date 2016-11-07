@@ -70,17 +70,17 @@ namespace mongo {
 
 using executor::ConnectionPool;
 
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolHostTimeout,
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolHostTimeoutMS,
                                       int,
                                       ConnectionPool::kDefaultHostTimeout.count());
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolMaxSize, int, -1);
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolMinSize,
                                       int,
                                       static_cast<int>(ConnectionPool::kDefaultMinConns));
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolRefreshRequirement,
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolRefreshRequirementMS,
                                       int,
                                       ConnectionPool::kDefaultRefreshRequirement.count());
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolRefreshTimeout,
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(ShardingTaskExecutorPoolRefreshTimeoutMS,
                                       int,
                                       ConnectionPool::kDefaultRefreshTimeout.count());
 
@@ -170,13 +170,13 @@ Status initializeGlobalShardingState(OperationContext* txn,
     // MONGO_EXPORT_STARTUP_SERVER_PARAMETER because it's not guaranteed to be initialized.
     // The following code is a workaround.
     ConnectionPool::Options connPoolOptions;
-    connPoolOptions.hostTimeout = Milliseconds(ShardingTaskExecutorPoolHostTimeout);
+    connPoolOptions.hostTimeout = Milliseconds(ShardingTaskExecutorPoolHostTimeoutMS);
     connPoolOptions.maxConnections = (ShardingTaskExecutorPoolMaxSize != -1)
         ? ShardingTaskExecutorPoolMaxSize
         : ConnectionPool::kDefaultMaxConns;
     connPoolOptions.minConnections = ShardingTaskExecutorPoolMinSize;
-    connPoolOptions.refreshRequirement = Milliseconds(ShardingTaskExecutorPoolRefreshRequirement);
-    connPoolOptions.refreshTimeout = Milliseconds(ShardingTaskExecutorPoolRefreshTimeout);
+    connPoolOptions.refreshRequirement = Milliseconds(ShardingTaskExecutorPoolRefreshRequirementMS);
+    connPoolOptions.refreshTimeout = Milliseconds(ShardingTaskExecutorPoolRefreshTimeoutMS);
 
     auto network =
         executor::makeNetworkInterface("NetworkInterfaceASIO-ShardRegistry",
