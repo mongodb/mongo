@@ -40,8 +40,13 @@ function retryOnNetworkError(func) {
     var originalReplSetTest = ReplSetTest;
     var originalShardingTest = ShardingTest;
 
+    const verbositySetting =
+        "{ verbosity: 0, command: {verbosity: 1}, network: {verbosity: 1, asio: {verbosity: 2}}, \
+tracking: {verbosity: 1} }";
+
     /**
-     * Overrides the ReplSetTest constructor to start the continuous config server stepdown thread.
+     * Overrides the ReplSetTest constructor to start the continuous config server stepdown
+     * thread.
      */
     ReplSetTest = function ReplSetTestWithContinuousPrimaryStepdown() {
         // Construct the original object
@@ -71,11 +76,11 @@ function retryOnNetworkError(func) {
             print('*** Continuous stepdown thread running with seed node ' + seedNode);
 
             try {
-                // The config primary may unexpectedly step down during startup if under heavy load
-                // and too slowly processing heartbeats. When it steps down, it closes all of its
-                // connections. This can happen during the call to new ReplSetTest, so in order to
-                // account for this and make the tests stable, retry discovery of the replica set's
-                // configuration once (SERVER-22794).
+                // The config primary may unexpectedly step down during startup if under heavy
+                // load and too slowly processing heartbeats. When it steps down, it closes all of
+                // its connections. This can happen during the call to new ReplSetTest, so in order
+                // to account for this and make the tests stable, retry discovery of the replica
+                // set's configuration once (SERVER-22794).
                 var replSet = retryOnNetworkError(function() {
                     return new ReplSetTest(seedNode);
                 });
@@ -96,8 +101,7 @@ function retryOnNetworkError(func) {
                     });
 
                     // Wait for primary to get elected and allow the test to make some progress
-                    // before
-                    // attempting another stepdown.
+                    // before attempting another stepdown.
                     if (stopCounter.getCount() > 0)
                         primary = replSet.getPrimary();
 
@@ -113,7 +117,8 @@ function retryOnNetworkError(func) {
             }
         }
 
-        // Preserve the original stopSet method, because we are overriding it to stop the continuous
+        // Preserve the original stopSet method, because we are overriding it to stop the
+        // continuous
         // stepdown thread.
         var _originalStartSetFn = this.startSet;
         var _originalStopSetFn = this.stopSet;
@@ -132,7 +137,11 @@ function retryOnNetworkError(func) {
             if (!options) {
                 options = {};
             }
-            options.verbose = 2;
+            if ('setParameter' in options) {
+                options.setParameter.logComponentVerbosity = verbositySetting;
+            } else {
+                options.setParameter = {logComponentVerbosity: verbositySetting};
+            }
             return _originalStartSetFn.call(this, options);
         };
 
@@ -169,7 +178,8 @@ function retryOnNetworkError(func) {
         };
 
         /**
-         * Blocking method, which tells the thread running continuousPrimaryStepdownFn to stop and
+         * Blocking method, which tells the thread running continuousPrimaryStepdownFn to stop
+         * and
          * waits
          * for it to terminate.
          */
@@ -199,7 +209,16 @@ function retryOnNetworkError(func) {
         if (!arguments[0].other) {
             arguments[0].other = {};
         }
-        arguments[0].verbose = 2;
+        if ('configOptions' in arguments[0].other &&
+            'setParameter' in arguments[0].other.configOptions) {
+            arguments[0].other.configOptions.setParameter.logComponentVerbosity = verbositySetting;
+        }
+
+        if ('setParameter' in arguments[0].other) {
+            arguments[0].other.setParameter.logComponentVerbosity = verbositySetting;
+        } else {
+            arguments[0].other.setParameter = {logComponentVerbosity: verbositySetting};
+        }
 
         // Set electionTimeoutMillis to 5 seconds, from 10, so that chunk migrations don't
         // time out because of the CSRS primary being down so often for so long.

@@ -21,7 +21,8 @@
             rs: true,
             rsOptions: {nodes: 1},
             configOptions: {
-                setParameter: "failpoint.dontUpsertShardIdentityOnNewShards={'mode':'alwaysOn'}"
+                setParameter:
+                    {"failpoint.dontUpsertShardIdentityOnNewShards": "{'mode':'alwaysOn'}"}
             }
         }
     });
