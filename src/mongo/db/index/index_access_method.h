@@ -257,7 +257,15 @@ public:
                       std::set<RecordId>* dups);
 
     /**
+     * Specifies whether getKeys should relax the index constraints or not.
+     */
+    enum class GetKeysMode { kRelaxConstraints, kEnforceConstraints };
+
+    /**
      * Fills 'keys' with the keys that should be generated for 'obj' on this index.
+     * Based on 'mode', it will honor or ignore index constraints, e.g. duplicated key, key too
+     * long, and geo index parsing errors. The ignoring of constraints is for replication due to
+     * idempotency reasons. In those cases, the generated 'keys' will be empty.
      *
      * If the 'multikeyPaths' pointer is non-null, then it must point to an empty vector. If this
      * index type supports tracking path-level multikey information, then this function resizes
@@ -265,9 +273,10 @@ public:
      * element with the prefixes of the indexed field that would cause this index to be multikey as
      * a result of inserting 'keys'.
      */
-    virtual void getKeys(const BSONObj& obj,
-                         BSONObjSet* keys,
-                         MultikeyPaths* multikeyPaths) const = 0;
+    void getKeys(const BSONObj& obj,
+                 GetKeysMode mode,
+                 BSONObjSet* keys,
+                 MultikeyPaths* multikeyPaths) const;
 
     /**
      * Splits the sets 'left' and 'right' into two vectors, the first containing the elements that
@@ -281,7 +290,22 @@ public:
         const BSONObjSet& left, const BSONObjSet& right);
 
 protected:
-    // Determines whether it's OK to ignore ErrorCodes::KeyTooLong for this OperationContext
+    /**
+     * Fills 'keys' with the keys that should be generated for 'obj' on this index.
+     *
+     * If the 'multikeyPaths' pointer is non-null, then it must point to an empty vector. If this
+     * index type supports tracking path-level multikey information, then this function resizes
+     * 'multikeyPaths' to have the same number of elements as the index key pattern and fills each
+     * element with the prefixes of the indexed field that would cause this index to be multikey as
+     * a result of inserting 'keys'.
+     */
+    virtual void doGetKeys(const BSONObj& obj,
+                           BSONObjSet* keys,
+                           MultikeyPaths* multikeyPaths) const = 0;
+
+    /**
+     * Determines whether it's OK to ignore ErrorCodes::KeyTooLong for this OperationContext
+     */
     bool ignoreKeyTooLong(OperationContext* txn);
 
     IndexCatalogEntry* _btreeState;  // owned by IndexCatalogEntry
@@ -329,13 +353,15 @@ private:
  * Flags we can set for inserts and deletes (and updates, which are kind of both).
  */
 struct InsertDeleteOptions {
-    InsertDeleteOptions() : logIfError(false), dupsAllowed(false) {}
-
     // If there's an error, log() it.
-    bool logIfError;
+    bool logIfError = false;
 
     // Are duplicate keys allowed in the index?
-    bool dupsAllowed;
+    bool dupsAllowed = false;
+
+    // Should we relax the index constraints?
+    IndexAccessMethod::GetKeysMode getKeysMode =
+        IndexAccessMethod::GetKeysMode::kEnforceConstraints;
 };
 
 }  // namespace mongo

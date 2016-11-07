@@ -219,7 +219,7 @@ void FeatureCompatibilityVersion::set(OperationContext* txn, StringData version)
                     repl::ReplicationCoordinator::get(txn->getServiceContext())
                         ->canAcceptWritesFor(nss));
 
-            IndexBuilder builder(k32IncompatibleIndexSpec);
+            IndexBuilder builder(k32IncompatibleIndexSpec, false);
             auto status = builder.buildInForeground(txn, autoDB.getDb());
             uassertStatusOK(status);
 
@@ -303,7 +303,7 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* txn,
             ScopedTransaction transaction(txn, MODE_IX);
             AutoGetOrCreateDb autoDB(txn, nss.db(), MODE_X);
 
-            IndexBuilder builder(k32IncompatibleIndexSpec);
+            IndexBuilder builder(k32IncompatibleIndexSpec, false);
             auto status = builder.buildInForeground(txn, autoDB.getDb());
             uassertStatusOK(status);
         }

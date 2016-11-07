@@ -32,6 +32,10 @@
 #include <vector>
 
 #include "mongo/bson/json.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -216,11 +220,26 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
         });
         operationContext()->setReplicatedWrites(false);
         replicationCoordinator()->setFollowerMode(repl::MemberState::RS_ROLLBACK);
-        ASSERT_OK(
-            catalogClient()->removeConfigDocuments(operationContext(),
-                                                   VersionType::ConfigNS,
-                                                   BSONObj(),
-                                                   ShardingCatalogClient::kMajorityWriteConcern));
+        auto txn = operationContext();
+        auto nss = NamespaceString(VersionType::ConfigNS);
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            ScopedTransaction transaction(txn, MODE_IX);
+            AutoGetCollection autoColl(txn, nss, MODE_IX);
+            auto coll = autoColl.getCollection();
+            ASSERT_TRUE(coll);
+            auto cursor = coll->getCursor(txn);
+            std::vector<RecordId> recordIds;
+            while (auto recordId = cursor->next()) {
+                recordIds.push_back(recordId->id);
+            }
+            mongo::WriteUnitOfWork wuow(txn);
+            for (auto recordId : recordIds) {
+                coll->deleteDocument(txn, recordId, nullptr);
+            }
+            wuow.commit();
+            ASSERT_EQUALS(0UL, coll->numRecords(txn));
+        }
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "removeConfigDocuments", nss.ns());
     }
 
     // Verify the document was actually removed.

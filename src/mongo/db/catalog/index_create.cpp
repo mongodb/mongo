@@ -245,9 +245,11 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(const std::vector<BSONObj
 
         const IndexDescriptor* descriptor = index.block->getEntry()->descriptor();
 
-        index.options.logIfError = false;  // logging happens elsewhere if needed.
-        index.options.dupsAllowed = !descriptor->unique() || _ignoreUnique ||
-            repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(descriptor);
+        IndexCatalog::prepareInsertDeleteOptions(_txn, descriptor, &index.options);
+        index.options.dupsAllowed = index.options.dupsAllowed || _ignoreUnique;
+        if (_ignoreUnique) {
+            index.options.getKeysMode = IndexAccessMethod::GetKeysMode::kRelaxConstraints;
+        }
 
         log() << "build index on: " << ns << " properties: " << descriptor->toString();
         if (index.bulk)

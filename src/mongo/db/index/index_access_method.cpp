@@ -113,10 +113,11 @@ IndexAccessMethod::IndexAccessMethod(IndexCatalogEntry* btreeState, SortedDataIn
 }
 
 bool IndexAccessMethod::ignoreKeyTooLong(OperationContext* txn) {
-    // Ignore this error if we're on a secondary or if the user requested it
-    const auto canAcceptWritesForNs = repl::ReplicationCoordinator::get(txn)->canAcceptWritesFor(
-        NamespaceString(_btreeState->ns()));
-    return !canAcceptWritesForNs || !failIndexKeyTooLong;
+    // Ignore this error if we cannot write to the collection or if the user requested it
+    const auto shouldRelaxConstraints =
+        repl::ReplicationCoordinator::get(txn)->shouldRelaxIndexConstraints(
+            NamespaceString(_btreeState->ns()));
+    return shouldRelaxConstraints || !failIndexKeyTooLong;
 }
 
 // Find the keys for obj, put them in the tree pointing to loc
@@ -130,7 +131,7 @@ Status IndexAccessMethod::insert(OperationContext* txn,
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths multikeyPaths;
     // Delegate to the subclass.
-    getKeys(obj, &keys, &multikeyPaths);
+    getKeys(obj, options.getKeysMode, &keys, &multikeyPaths);
 
     Status ret = Status::OK();
     for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
@@ -210,7 +211,7 @@ Status IndexAccessMethod::remove(OperationContext* txn,
     // multikey when removing a document since the index metadata isn't updated when keys are
     // deleted.
     MultikeyPaths* multikeyPaths = nullptr;
-    getKeys(obj, &keys, multikeyPaths);
+    getKeys(obj, options.getKeysMode, &keys, multikeyPaths);
 
     for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
         removeOneKey(txn, *i, loc, options.dupsAllowed);
@@ -229,7 +230,7 @@ Status IndexAccessMethod::touch(OperationContext* txn, const BSONObj& obj) {
     // There's no need to compute the prefixes of the indexed fields that cause the index to be
     // multikey when paging a document's index entries into memory.
     MultikeyPaths* multikeyPaths = nullptr;
-    getKeys(obj, &keys, multikeyPaths);
+    getKeys(obj, GetKeysMode::kEnforceConstraints, &keys, multikeyPaths);
 
     std::unique_ptr<SortedDataInterface::Cursor> cursor(_newInterface->newCursor(txn));
     for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
@@ -251,7 +252,7 @@ RecordId IndexAccessMethod::findSingle(OperationContext* txn, const BSONObj& req
         // For performance, call get keys only if there is a non-simple collation.
         BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
         MultikeyPaths* multikeyPaths = nullptr;
-        getKeys(requestedKey, &keys, multikeyPaths);
+        getKeys(requestedKey, GetKeysMode::kEnforceConstraints, &keys, multikeyPaths);
         invariant(keys.size() == 1);
         actualKey = *keys.begin();
     } else {
@@ -340,11 +341,11 @@ Status IndexAccessMethod::validateUpdate(OperationContext* txn,
         // index to be multikey when the old version of the document was written since the index
         // metadata isn't updated when keys are deleted.
         MultikeyPaths* multikeyPaths = nullptr;
-        getKeys(from, &ticket->oldKeys, multikeyPaths);
+        getKeys(from, options.getKeysMode, &ticket->oldKeys, multikeyPaths);
     }
 
     if (!indexFilter || indexFilter->matchesBSON(to)) {
-        getKeys(to, &ticket->newKeys, &ticket->newMultikeyPaths);
+        getKeys(to, options.getKeysMode, &ticket->newKeys, &ticket->newMultikeyPaths);
     }
 
     ticket->loc = record;
@@ -425,7 +426,8 @@ Status IndexAccessMethod::BulkBuilder::insert(OperationContext* txn,
                                               int64_t* numInserted) {
     BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths multikeyPaths;
-    _real->getKeys(obj, &keys, &multikeyPaths);
+
+    _real->getKeys(obj, options.getKeysMode, &keys, &multikeyPaths);
 
     _everGeneratedMultipleKeys = _everGeneratedMultipleKeys || (keys.size() > 1);
 
@@ -536,6 +538,52 @@ Status IndexAccessMethod::commitBulk(OperationContext* txn,
 
     builder->commit(mayInterrupt);
     return Status::OK();
+}
+
+void IndexAccessMethod::getKeys(const BSONObj& obj,
+                                GetKeysMode mode,
+                                BSONObjSet* keys,
+                                MultikeyPaths* multikeyPaths) const {
+    static stdx::unordered_set<int> whiteList{// Btree
+                                              ErrorCodes::KeyTooLong,
+                                              ErrorCodes::CannotIndexParallelArrays,
+                                              // FTS
+                                              16732,
+                                              16733,
+                                              16675,
+                                              // Hash
+                                              16766,
+                                              // Haystack
+                                              16775,
+                                              16776,
+                                              // 2dsphere geo
+                                              16755,
+                                              16756,
+                                              // 2d geo
+                                              16804,
+                                              13067,
+                                              13068,
+                                              13026,
+                                              13027};
+    try {
+        doGetKeys(obj, keys, multikeyPaths);
+    } catch (const UserException& ex) {
+        if (mode == GetKeysMode::kEnforceConstraints) {
+            throw;
+        }
+
+        // Suppress indexing errors when mode is kRelaxConstraints.
+        keys->clear();
+        if (multikeyPaths) {
+            multikeyPaths->clear();
+        }
+        // Only suppress the errors in the whitelist.
+        if (whiteList.find(ex.getCode()) == whiteList.end()) {
+            throw;
+        }
+        LOG(1) << "Ignoring indexing error for idempotency reasons: " << redact(ex)
+               << " when getting index keys of " << redact(obj);
+    }
 }
 
 }  // namespace mongo

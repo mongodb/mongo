@@ -122,6 +122,7 @@ int dbtestsMain(int argc, char** argv, char** envp) {
     repl::ReplSettings replSettings;
     replSettings.setOplogSizeBytes(10 * 1024 * 1024);
     repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
+    repl::getGlobalReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY);
     getGlobalAuthorizationManager()->setAuthEnabled(false);
     ScriptEngine::setup();
     StartupTest::runTests();

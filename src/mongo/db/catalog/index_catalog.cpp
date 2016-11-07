@@ -1249,23 +1249,12 @@ const IndexDescriptor* IndexCatalog::refreshEntry(OperationContext* txn,
 
 // ---------------------------
 
-namespace {
-bool isDupsAllowed(IndexDescriptor* desc) {
-    bool isUnique = desc->unique() || KeyPattern::isIdKeyPattern(desc->keyPattern());
-    if (!isUnique)
-        return true;
-
-    return repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(desc);
-}
-}
-
 Status IndexCatalog::_indexFilteredRecords(OperationContext* txn,
                                            IndexCatalogEntry* index,
                                            const std::vector<BsonRecord>& bsonRecords,
                                            int64_t* keysInsertedOut) {
     InsertDeleteOptions options;
-    options.logIfError = false;
-    options.dupsAllowed = isDupsAllowed(index->descriptor());
+    prepareInsertDeleteOptions(txn, index->descriptor(), &options);
 
     for (auto bsonRecord : bsonRecords) {
         int64_t inserted;
@@ -1306,8 +1295,8 @@ Status IndexCatalog::_unindexRecord(OperationContext* txn,
                                     bool logIfError,
                                     int64_t* keysDeletedOut) {
     InsertDeleteOptions options;
+    prepareInsertDeleteOptions(txn, index->descriptor(), &options);
     options.logIfError = logIfError;
-    options.dupsAllowed = isDupsAllowed(index->descriptor());
 
     // For unindex operations, dupsAllowed=false really means that it is safe to delete anything
     // that matches the key, without checking the RecordID, since dups are impossible. We need
@@ -1374,6 +1363,25 @@ BSONObj IndexCatalog::fixIndexKey(const BSONObj& key) {
         return _idObj;
     }
     return key;
+}
+
+void IndexCatalog::prepareInsertDeleteOptions(OperationContext* txn,
+                                              const IndexDescriptor* desc,
+                                              InsertDeleteOptions* options) {
+    auto replCoord = repl::ReplicationCoordinator::get(txn);
+    if (replCoord->shouldRelaxIndexConstraints(NamespaceString(desc->parentNS()))) {
+        options->getKeysMode = IndexAccessMethod::GetKeysMode::kRelaxConstraints;
+    } else {
+        options->getKeysMode = IndexAccessMethod::GetKeysMode::kEnforceConstraints;
+    }
+
+    // Don't allow dups for Id key. Allow dups for non-unique keys or when constraints relaxed.
+    if (KeyPattern::isIdKeyPattern(desc->keyPattern())) {
+        options->dupsAllowed = false;
+    } else {
+        options->dupsAllowed = !desc->unique() ||
+            options->getKeysMode == IndexAccessMethod::GetKeysMode::kRelaxConstraints;
+    }
 }
 
 StatusWith<BSONObj> IndexCatalog::_fixIndexSpec(OperationContext* txn,
