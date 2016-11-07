@@ -25,7 +25,7 @@ load("jstests/replsets/rslib.js");
 
     // Initial replication
     master.getDB("barDB").bar.save({a: 1});
-    replTest.awaitReplication(5 * 60 * 1000);
+    replTest.awaitReplication();
 
     // These writes should be replicated immediately
     var docNum = 5000;

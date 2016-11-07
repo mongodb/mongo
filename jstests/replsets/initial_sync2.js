@@ -96,7 +96,7 @@ var doTest = function() {
     replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
 
     jsTest.log("12. Everyone happy eventually");
-    replTest.awaitReplication(2 * 60 * 1000);
+    replTest.awaitReplication();
 
     replTest.stopSet();
 };

@@ -220,7 +220,7 @@ function runTest(s) {
     // Stop the balancer to prevent new writes from happening and make sure
     // that replication can keep up even on slow machines.
     s.stopBalancer();
-    s._rs[0].test.awaitReplication(300 * 1000);
+    s._rs[0].test.awaitReplication();
     assert.eq(51200, primary.getDB("test")[outcol].count(), "Wrong count");
     for (var i = 0; i < secondaries.length; ++i) {
         assert.eq(51200, secondaries[i].getDB("test")[outcol].count(), "Wrong count");

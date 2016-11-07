@@ -43,10 +43,10 @@ load('jstests/libs/write_concern_util.js');
     replTest.startSet();
     replTest.initiate(config);
 
-    // We increase the awaitReplication timeout because without a sync source the heartbeat
-    // interval will be half of the election timeout, 30 seconds. It thus will take almost
-    // 30 seconds for the secondaries to set the primary as their sync source and begin replicating.
-    replTest.awaitReplication(90 * 1000);
+    // Without a sync source the heartbeat interval will be half of the election timeout, 30
+    // seconds. It thus will take almost 30 seconds for the secondaries to set the primary as
+    // their sync source and begin replicating.
+    replTest.awaitReplication();
     var primary = replTest.getPrimary();
     var secondaries = replTest.getSecondaries();
 

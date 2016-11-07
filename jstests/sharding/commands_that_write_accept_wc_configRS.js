@@ -263,7 +263,7 @@ load('jstests/multiVersion/libs/auth_helpers.js');
         setupFunc();
         // Stop replication at all config server secondaries and all shard secondaries.
         stopReplicationOnSecondariesOfAllShards(st);
-        st.configRS.awaitReplication(30000);
+        st.configRS.awaitReplication();
         stopReplicationOnSecondaries(st.configRS);
 
         // Command should fail after two config servers are not replicating.

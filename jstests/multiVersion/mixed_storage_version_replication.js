@@ -716,14 +716,14 @@ function doMultiThreadedWork(primary, numThreads) {
         highestPriority++;
         printjson(config);
         reconfig(replTest, config);
-        replTest.awaitReplication(60000);  // 2 times the election period.
+        replTest.awaitReplication();
         assert.soon(primaryChanged(replTest.nodes, replTest, primaryIndex),
                     "waiting for higher priority primary to be elected",
                     100000);
         print("New primary elected, doing a bunch of work");
         primary = replTest.getPrimary();
         doMultiThreadedWork(primary, 10);
-        replTest.awaitReplication(50000);
+        replTest.awaitReplication();
         print("Work done, checking to see all nodes match");
         assertSameData(primary, replTest.nodes);
     }

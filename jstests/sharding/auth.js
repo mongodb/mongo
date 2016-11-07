@@ -243,10 +243,10 @@
     d2.waitForState(d2.getSecondaries(), ReplSetTest.State.SECONDARY, 5 * 60 * 1000);
 
     authutil.asCluster(d1.nodes, "jstests/libs/key1", function() {
-        d1.awaitReplication(120000);
+        d1.awaitReplication();
     });
     authutil.asCluster(d2.nodes, "jstests/libs/key1", function() {
-        d2.awaitReplication(120000);
+        d2.awaitReplication();
     });
 
     // add admin on shard itself, hack to prevent localhost auth bypass

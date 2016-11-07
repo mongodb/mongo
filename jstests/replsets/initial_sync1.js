@@ -100,7 +100,7 @@ for (var i = 0; i < 100; i++) {
 assert.writeOK(bulk.execute());
 
 print("11. Everyone happy eventually");
-replTest.awaitReplication(300000);
+replTest.awaitReplication();
 
 MongoRunner.stopMongod(slave2);
 replTest.stopSet();

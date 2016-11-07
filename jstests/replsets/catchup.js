@@ -96,14 +96,14 @@ load("jstests/replsets/rslib.js");
 
     jsTest.log("Case 1: The primary is up-to-date after freshness scan.");
     // Should complete transition to primary immediately.
-    rst.awaitReplication(30000, ReplSetTest.OpTimeType.LAST_DURABLE);
+    rst.awaitReplication(ReplSetTest.kDefaultTimeoutMS, ReplSetTest.OpTimeType.LAST_DURABLE);
     var newPrimary = stepUp(rst.getSecondary());
     rst.awaitNodesAgreeOnPrimary();
     // Should win an election and finish the transition very quickly.
     assert.eq(newPrimary, rst.getPrimary());
 
     jsTest.log("Case 2: The primary needs to catch up, succeeds in time.");
-    rst.awaitReplication(30000, ReplSetTest.OpTimeType.LAST_DURABLE);
+    rst.awaitReplication(ReplSetTest.kDefaultTimeoutMS, ReplSetTest.OpTimeType.LAST_DURABLE);
     // Write documents that cannot be replicated to secondaries in time.
     var originalSecondaries = rst.getSecondaries();
     originalSecondaries.forEach(enableFailPoint);
@@ -124,7 +124,7 @@ load("jstests/replsets/rslib.js");
     checkOpInOplog(newPrimary, latestOp, 1);
 
     jsTest.log("Case 3: The primary needs to catch up, fails due to timeout.");
-    rst.awaitReplication(30000, ReplSetTest.OpTimeType.LAST_DURABLE);
+    rst.awaitReplication(ReplSetTest.kDefaultTimeoutMS, ReplSetTest.OpTimeType.LAST_DURABLE);
     // Write documents that cannot be replicated to secondaries in time.
     originalSecondaries = rst.getSecondaries();
     originalSecondaries.forEach(enableFailPoint);
@@ -152,7 +152,7 @@ load("jstests/replsets/rslib.js");
     disableFailPoint(originalSecondaries[1]);
 
     jsTest.log("Case 4: The primary needs to catch up, but has to change sync source to catch up.");
-    rst.awaitReplication(30000, ReplSetTest.OpTimeType.LAST_DURABLE);
+    rst.awaitReplication(ReplSetTest.kDefaultTimeoutMS, ReplSetTest.OpTimeType.LAST_DURABLE);
     // Write documents that cannot be replicated to secondaries in time.
     rst.getSecondaries().forEach(enableFailPoint);
     doWrites(rst.getPrimary());
