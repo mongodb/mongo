@@ -37,6 +37,11 @@ var master = replTest.getPrimary();
 var masterId = replTest.getNodeId(master);
 var slave = slaves[0];
 var slaveId = replTest.getNodeId(slave);
+
+// Wait for primary to detect that the arbiter is up so that it won't step down when we later take
+// the secondary offline.
+replTest.waitForState(replTest.nodes[2], ReplSetTest.State.ARBITER);
+
 var mdb = master.getDB("foo");
 
 mdb.foo.save({a: 1000});
