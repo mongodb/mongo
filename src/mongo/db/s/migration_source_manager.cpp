@@ -232,8 +232,11 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* txn) {
     }
 
     {
-        ScopedTransaction scopedXact(txn, MODE_IS);
-        AutoGetCollection autoColl(txn, getNss(), MODE_IS);
+        // The critical section must be entered with collection X lock in order to ensure there are
+        // no writes which could have entered and passed the version check just before we entered
+        // the crticial section, but managed to complete after we left it.
+        ScopedTransaction scopedXact(txn, MODE_IX);
+        AutoGetCollection autoColl(txn, getNss(), MODE_IX, MODE_X);
 
         auto css = CollectionShardingState::get(txn, getNss().ns());
         auto metadata = css->getMetadata();

@@ -265,20 +265,22 @@ Status MigrationChunkClonerSourceLegacy::awaitUntilCriticalSectionIsAppropriate(
                         << responseStatus.getStatus().toString()};
         }
 
-        BSONObj res = std::move(responseStatus.getValue());
+        const BSONObj& res = responseStatus.getValue();
 
-        log() << "moveChunk data transfer progress: " << res << " my mem used: " << _memoryUsed;
+        stdx::lock_guard<stdx::mutex> sl(_mutex);
+
+        const std::size_t cloneLocsRemaining = _cloneLocs.size();
+
+        log() << "moveChunk data transfer progress: " << redact(res) << " mem used: " << _memoryUsed
+              << " documents remaining to clone: " << cloneLocsRemaining;
 
         if (res["state"].String() == "steady") {
-            // Ensure all cloned docs have actually been transferred
-            const std::size_t locsRemaining = _cloneLocs.size();
-            if (locsRemaining != 0) {
-                return {
-                    ErrorCodes::OperationIncomplete,
-                    str::stream()
-                        << "cannot enter critical section before all data is cloned, "
-                        << locsRemaining
-                        << " locs were not transferred but to-shard thinks they are all cloned"};
+            if (cloneLocsRemaining != 0) {
+                return {ErrorCodes::OperationIncomplete,
+                        str::stream() << "Unable to enter critical section because the recipient "
+                                         "shard thinks all data is cloned while there are still "
+                                      << cloneLocsRemaining
+                                      << " documents remaining"};
             }
 
             scopedGuard.Dismiss();
