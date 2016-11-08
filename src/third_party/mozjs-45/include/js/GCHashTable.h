@@ -112,7 +112,6 @@ class GCHashMapOperations
     bool empty() const                         { return map().empty(); }
     uint32_t count() const                     { return map().count(); }
     size_t capacity() const                    { return map().capacity(); }
-    uint32_t generation() const                { return map().generation(); }
     bool has(const Lookup& l) const            { return map().lookup(l).found(); }
 };
 
@@ -253,7 +252,6 @@ class GCHashSetOperations
     bool empty() const                         { return set().empty(); }
     uint32_t count() const                     { return set().count(); }
     size_t capacity() const                    { return set().capacity(); }
-    uint32_t generation() const                { return set().generation(); }
     bool has(const Lookup& l) const            { return set().lookup(l).found(); }
 };
 

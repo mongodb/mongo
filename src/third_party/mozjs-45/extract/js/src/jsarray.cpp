@@ -2123,18 +2123,25 @@ js::ArrayShiftMoveElements(JSObject* obj)
 
 template <JSValueType Type>
 DenseElementResult
-ArrayShiftDenseKernel(JSContext* cx, JSObject* obj, Value* rval)
+ArrayShiftDenseKernel(JSContext* cx, HandleObject obj, MutableHandleValue rval)
 {
     if (ObjectMayHaveExtraIndexedProperties(obj))
+        return DenseElementResult::Incomplete;
+
+    RootedObjectGroup group(cx, obj->getGroup(cx));
+    if (MOZ_UNLIKELY(!group))
+        return DenseElementResult::Failure;
+
+    if (MOZ_UNLIKELY(group->hasAllFlags(OBJECT_FLAG_ITERATED)))
         return DenseElementResult::Incomplete;
 
     size_t initlen = GetBoxedOrUnboxedInitializedLength<Type>(obj);
     if (initlen == 0)
         return DenseElementResult::Incomplete;
 
-    *rval = GetBoxedOrUnboxedDenseElement<Type>(obj, 0);
-    if (rval->isMagic(JS_ELEMENTS_HOLE))
-        rval->setUndefined();
+    rval.set(GetBoxedOrUnboxedDenseElement<Type>(obj, 0));
+    if (rval.isMagic(JS_ELEMENTS_HOLE))
+        rval.setUndefined();
 
     DenseElementResult result = MoveBoxedOrUnboxedDenseElements<Type>(cx, obj, 0, 1, initlen - 1);
     MOZ_ASSERT(result != DenseElementResult::Incomplete);
@@ -2146,7 +2153,7 @@ ArrayShiftDenseKernel(JSContext* cx, JSObject* obj, Value* rval)
 }
 
 DefineBoxedOrUnboxedFunctor3(ArrayShiftDenseKernel,
-                             JSContext*, JSObject*, Value*);
+                             JSContext*, HandleObject, MutableHandleValue);
 
 /* ES5 15.4.4.9 */
 bool
@@ -2178,19 +2185,13 @@ js::array_shift(JSContext* cx, unsigned argc, Value* vp)
     uint32_t newlen = len - 1;
 
     /* Fast paths. */
-    ArrayShiftDenseKernelFunctor functor(cx, obj, args.rval().address());
+    ArrayShiftDenseKernelFunctor functor(cx, obj, args.rval());
     DenseElementResult result = CallBoxedOrUnboxedSpecialization(functor, obj);
     if (result != DenseElementResult::Incomplete) {
         if (result == DenseElementResult::Failure)
             return false;
 
-        if (!SetLengthProperty(cx, obj, newlen))
-            return false;
-
-        RootedId id(cx);
-        if (!IndexToId(cx, newlen, &id))
-            return false;
-        return SuppressDeletedProperty(cx, obj, id);
+        return SetLengthProperty(cx, obj, newlen);
     }
 
     /* Steps 5, 10. */
@@ -2508,7 +2509,7 @@ js::array_splice_impl(JSContext* cx, unsigned argc, Value* vp, bool returnValueI
             Rooted<ArrayObject*> arr(cx, &obj->as<ArrayObject>());
             if (arr->lengthIsWritable()) {
                 DenseElementResult result =
-                    arr->ensureDenseElements(cx, arr->length(), itemCount - actualDeleteCount);
+                    arr->ensureDenseElements(cx, len, itemCount - actualDeleteCount);
                 if (result == DenseElementResult::Failure)
                     return false;
             }

@@ -156,6 +156,10 @@ struct SavedFrame::Lookup {
         MOZ_ASSERT(source);
         MOZ_ASSERT_IF(framePtr.isSome(), pc);
         MOZ_ASSERT_IF(framePtr.isSome(), activation);
+
+#ifdef JS_MORE_DETERMINISTIC
+        column = 0;
+#endif
     }
 
     explicit Lookup(SavedFrame& savedFrame)
@@ -422,6 +426,9 @@ SavedFrame::initLine(uint32_t line)
 void
 SavedFrame::initColumn(uint32_t column)
 {
+#ifdef JS_MORE_DETERMINISTIC
+    column = 0;
+#endif
     initReservedSlot(JSSLOT_COLUMN, PrivateUint32Value(column));
 }
 

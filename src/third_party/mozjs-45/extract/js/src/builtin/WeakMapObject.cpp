@@ -154,8 +154,7 @@ SetWeakMapEntryInternal(JSContext* cx, Handle<WeakMapObject*> mapObj,
 {
     ObjectValueMap* map = mapObj->getMap();
     if (!map) {
-        AutoInitGCManagedObject<ObjectValueMap> newMap(
-            cx->make_unique<ObjectValueMap>(cx, mapObj.get()));
+        auto newMap = cx->make_unique<ObjectValueMap>(cx, mapObj.get());
         if (!newMap)
             return false;
         if (!newMap->init()) {

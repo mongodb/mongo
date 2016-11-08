@@ -77,10 +77,10 @@ CurrentThreadIsGCSweeping()
 }
 
 bool
-CurrentThreadIsHandlingInitFailure()
+CurrentThreadCanSkipPostBarrier(bool inNursery)
 {
-    JSRuntime* rt = TlsPerThreadData.get()->runtimeIfOnOwnerThread();
-    return rt && rt->handlingInitFailure;
+    bool onMainThread = TlsPerThreadData.get()->runtimeIfOnOwnerThread() != nullptr;
+    return !onMainThread && !inNursery;
 }
 
 #endif // DEBUG

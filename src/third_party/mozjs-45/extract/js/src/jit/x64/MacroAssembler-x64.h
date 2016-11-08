@@ -767,6 +767,26 @@ class MacroAssemblerX64 : public MacroAssemblerX86Shared
     void load64(const Address& address, Register64 dest) {
         movq(Operand(address), dest.reg);
     }
+
+    void branch64(Condition cond, const Address& lhs, Imm64 val, Label* label) {
+        MOZ_ASSERT(cond == Assembler::NotEqual,
+                   "other condition codes not supported");
+
+        branchPtr(cond, lhs, ImmWord(val.value), label);
+    }
+
+    void branch64(Condition cond, const Address& lhs, const Address& rhs, Register scratch,
+                  Label* label)
+    {
+        MOZ_ASSERT(cond == Assembler::NotEqual,
+                   "other condition codes not supported");
+        MOZ_ASSERT(lhs.base != scratch);
+        MOZ_ASSERT(rhs.base != scratch);
+
+        loadPtr(rhs, scratch);
+        branchPtr(cond, lhs, scratch, label);
+    }
+
     template <typename T>
     void storePtr(ImmWord imm, T address) {
         if ((intptr_t)imm.value <= INT32_MAX && (intptr_t)imm.value >= INT32_MIN) {

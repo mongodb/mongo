@@ -814,8 +814,8 @@ frontend::CompileLazyFunction(JSContext* cx, Handle<LazyScript*> lazy, const cha
 
     script->bindings = pn->pn_funbox->bindings;
 
-    if (lazy->usesArgumentsApplyAndThis())
-        script->setUsesArgumentsApplyAndThis();
+    if (lazy->isLikelyConstructorWrapper())
+        script->setLikelyConstructorWrapper();
     if (lazy->hasBeenCloned())
         script->setHasBeenCloned();
 

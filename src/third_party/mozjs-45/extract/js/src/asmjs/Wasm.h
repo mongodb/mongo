@@ -34,7 +34,9 @@ using mozilla::Move;
 // The ValType enum represents the WebAssembly "value type", which are used to
 // specify the type of locals and parameters.
 
-enum class ValType : uint8_t
+// FIXME: uint8_t would make more sense for the underlying storage class, but
+// causes miscompilations in GCC (fixed in 4.8.5 and 4.9.3).
+enum class ValType
 {
     I32,
     I64,

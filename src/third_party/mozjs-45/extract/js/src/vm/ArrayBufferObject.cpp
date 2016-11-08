@@ -512,6 +512,8 @@ ArrayBufferObject::neuterView(JSContext* cx, ArrayBufferViewObject* view,
 ArrayBufferObject::neuter(JSContext* cx, Handle<ArrayBufferObject*> buffer,
                           BufferContents newContents)
 {
+    assertSameCompartment(cx, buffer);
+
     if (buffer->isAsmJS() && !OnDetachAsmJSArrayBuffer(cx, buffer))
         return false;
 
@@ -932,6 +934,7 @@ ArrayBufferObject::stealContents(JSContext* cx, Handle<ArrayBufferObject*> buffe
                                  bool hasStealableContents)
 {
     MOZ_ASSERT_IF(hasStealableContents, buffer->hasStealableContents());
+    assertSameCompartment(cx, buffer);
 
     BufferContents oldContents(buffer->dataPointer(), buffer->bufferKind());
     BufferContents newContents = AllocateArrayBufferContents(cx, buffer->byteLength());

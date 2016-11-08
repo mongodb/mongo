@@ -1102,9 +1102,6 @@ struct JSRuntime : public JS::shadow::Runtime,
     /* Had an out-of-memory error which did not populate an exception. */
     bool                hadOutOfMemory;
 
-    /* We are currently deleting an object due to an initialization failure. */
-    mozilla::DebugOnly<bool> handlingInitFailure;
-
     /* A context has been created on this runtime. */
     bool                haveCreatedContext;
 
@@ -1863,75 +1860,43 @@ class MOZ_RAII AutoEnterIonCompilation
 };
 
 /*
- * AutoInitGCManagedObject is a wrapper for use when initializing a object whose
- * lifetime is managed by the GC.  It ensures that the object is destroyed if
- * initialization fails but also allows us to assert the invariant that such
- * objects are only destroyed in this way or by the GC.
+ * Provides a delete policy that can be used for objects which have their
+ * lifetime managed by the GC and can only safely be destroyed while the nursery
+ * is empty.
  *
- * It has a limited interface but is a drop-in replacement for UniquePtr<T> is
- * this situation.  For example:
- *
- *   AutoInitGCManagedObject<MyClass> ptr(cx->make_unique<MyClass>());
- *   if (!ptr) {
- *     ReportOutOfMemory(cx);
- *     return nullptr;
- *   }
- *
- *   if (!ptr->init(cx))
- *     return nullptr;    // Object destroyed here if init() failed.
- *
- *   object->setPrivate(ptr.release());
- *   // Initialization successful, ptr is now owned through another object.
+ * This is necessary when initializing such an object may fail after the initial
+ * allocation.  The partially-initialized object must be destroyed, but it may
+ * not be safe to do so at the current time.  This policy puts the object on a
+ * queue to be destroyed at a safe time.
  */
 template <typename T>
-class MOZ_STACK_CLASS AutoInitGCManagedObject
+struct GCManagedDeletePolicy
 {
-    typedef mozilla::UniquePtr<T, JS::DeletePolicy<T>> UniquePtrT;
-
-    UniquePtrT ptr_;
-
-  public:
-    explicit AutoInitGCManagedObject(UniquePtrT&& ptr)
-      : ptr_(mozilla::Move(ptr))
-    {}
-
-    ~AutoInitGCManagedObject() {
-#ifdef DEBUG
-        if (ptr_) {
-            JSRuntime* rt = TlsPerThreadData.get()->runtimeFromMainThread();
-            MOZ_ASSERT(!rt->handlingInitFailure);
-            rt->handlingInitFailure = true;
-            ptr_.reset(nullptr);
-            rt->handlingInitFailure = false;
+    void operator()(const T* ptr) {
+        if (ptr) {
+            JSRuntime* rt = TlsPerThreadData.get()->runtimeIfOnOwnerThread();
+            if (rt)
+                rt->gc.callAfterMinorGC(deletePtr, const_cast<T*>(ptr));
+            else
+                js_delete(const_cast<T*>(ptr));
         }
-#endif
     }
 
-    T& operator*() const {
-        return *get();
+  private:
+    static void deletePtr(void* data) {
+        js_delete(reinterpret_cast<T*>(data));
     }
-
-    T* operator->() const {
-        return get();
-    }
-
-    explicit operator bool() const {
-        return get() != nullptr;
-    }
-
-    T* get() const {
-        return ptr_.get();
-    }
-
-    T* release() {
-        return ptr_.release();
-    }
-
-    AutoInitGCManagedObject(const AutoInitGCManagedObject<T>& other) = delete;
-    AutoInitGCManagedObject& operator=(const AutoInitGCManagedObject<T>& other) = delete;
 };
 
 } /* namespace js */
+
+namespace JS {
+
+template <typename T>
+struct DeletePolicy<js::HeapPtr<T>> : public js::GCManagedDeletePolicy<js::HeapPtr<T>>
+{};
+
+} /* namespace JS */
 
 #ifdef _MSC_VER
 #pragma warning(pop)

@@ -226,8 +226,8 @@ class Bindings : public JS::Traceable
     uint16_t numArgs_;
     uint16_t numBlockScoped_;
     uint16_t numBodyLevelLexicals_;
-    uint16_t aliasedBodyLevelLexicalBegin_;
     uint16_t numUnaliasedBodyLevelLexicals_;
+    uint32_t aliasedBodyLevelLexicalBegin_;
     uint32_t numVars_;
     uint32_t numUnaliasedVars_;
 
@@ -252,6 +252,7 @@ class Bindings : public JS::Traceable
     }
 
   public:
+    static const uint32_t BLOCK_SCOPED_LIMIT = UINT16_LIMIT;
 
     Binding* bindingArray() const {
         return reinterpret_cast<Binding*>(bindingArrayAndFlag_ & ~TEMPORARY_STORAGE_BIT);
@@ -354,6 +355,10 @@ class Bindings : public JS::Traceable
     void trace(JSTracer* trc);
 };
 
+// If this fails, add/remove padding within Bindings.
+static_assert(sizeof(Bindings) % js::gc::CellSize == 0,
+              "Size of Bindings must be an integral multiple of js::gc::CellSize");
+
 template <class Outer>
 class BindingsOperations
 {
@@ -436,7 +441,7 @@ class MutableBindingsOperations : public BindingsOperations<Outer>
     void setNumUnaliasedBodyLevelLexicals(uint16_t num) {
         bindings().numUnaliasedBodyLevelLexicals_ = num;
     }
-    void setAliasedBodyLevelLexicalBegin(uint16_t offset) {
+    void setAliasedBodyLevelLexicalBegin(uint32_t offset) {
         bindings().aliasedBodyLevelLexicalBegin_ = offset;
     }
     uint8_t* switchToScriptStorage(Binding* permanentStorage) {
@@ -1125,7 +1130,7 @@ class JSScript : public js::gc::TenuredCell
     bool isCachedEval_:1;
 
     // 'this', 'arguments' and f.apply() are used. This is likely to be a wrapper.
-    bool usesArgumentsApplyAndThis_:1;
+    bool isLikelyConstructorWrapper_:1;
 
     // IonMonkey compilation hints.
     bool failedBoundsCheck_:1; /* script has had hoisted bounds checks fail */
@@ -1387,10 +1392,10 @@ class JSScript : public js::gc::TenuredCell
 
     void setActiveEval() { isActiveEval_ = true; }
 
-    bool usesArgumentsApplyAndThis() const {
-        return usesArgumentsApplyAndThis_;
+    bool isLikelyConstructorWrapper() const {
+        return isLikelyConstructorWrapper_;
     }
-    void setUsesArgumentsApplyAndThis() { usesArgumentsApplyAndThis_ = true; }
+    void setLikelyConstructorWrapper() { isLikelyConstructorWrapper_ = true; }
 
     bool isGeneratorExp() const { return isGeneratorExp_; }
 
@@ -2143,7 +2148,7 @@ class LazyScript : public gc::TenuredCell
         uint32_t bindingsAccessedDynamically : 1;
         uint32_t hasDebuggerStatement : 1;
         uint32_t hasDirectEval : 1;
-        uint32_t usesArgumentsApplyAndThis : 1;
+        uint32_t isLikelyConstructorWrapper : 1;
         uint32_t hasBeenCloned : 1;
         uint32_t treatAsRunOnce : 1;
         uint32_t isDerivedClassConstructor : 1;
@@ -2297,11 +2302,11 @@ class LazyScript : public gc::TenuredCell
         p_.hasDirectEval = true;
     }
 
-    bool usesArgumentsApplyAndThis() const {
-        return p_.usesArgumentsApplyAndThis;
+    bool isLikelyConstructorWrapper() const {
+        return p_.isLikelyConstructorWrapper;
     }
-    void setUsesArgumentsApplyAndThis() {
-        p_.usesArgumentsApplyAndThis = true;
+    void setLikelyConstructorWrapper() {
+        p_.isLikelyConstructorWrapper = true;
     }
 
     bool hasBeenCloned() const {

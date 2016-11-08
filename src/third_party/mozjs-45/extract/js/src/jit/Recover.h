@@ -291,6 +291,7 @@ class RMul final : public RInstruction
 {
   private:
     bool isFloatOperation_;
+    uint8_t mode_;
 
   public:
     RINSTRUCTION_HEADER_(Mul)

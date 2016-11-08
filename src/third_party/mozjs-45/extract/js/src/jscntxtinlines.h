@@ -21,7 +21,6 @@
 
 namespace js {
 
-#ifdef JS_CRASH_DIAGNOSTICS
 class CompartmentChecker
 {
     JSCompartment* compartment;
@@ -143,7 +142,6 @@ class CompartmentChecker
         check(desc.value());
     }
 };
-#endif /* JS_CRASH_DIAGNOSTICS */
 
 /*
  * Don't perform these checks when called from a finalizer. The checking
@@ -153,6 +151,13 @@ class CompartmentChecker
     if (cx->isJSContext() && cx->asJSContext()->runtime()->isHeapBusy())      \
         return;                                                               \
     CompartmentChecker c(cx)
+
+template <class T1> inline void
+releaseAssertSameCompartment(ExclusiveContext* cx, const T1& t1)
+{
+    START_ASSERT_SAME_COMPARTMENT();
+    c.check(t1);
+}
 
 template <class T1> inline void
 assertSameCompartment(ExclusiveContext* cx, const T1& t1)

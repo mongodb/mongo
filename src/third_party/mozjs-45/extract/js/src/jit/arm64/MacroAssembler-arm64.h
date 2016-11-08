@@ -1683,6 +1683,25 @@ class MacroAssemblerCompat : public vixl::MacroAssembler
         branchPtr(cond, scratch, ptr, label);
     }
 
+    void branch64(Condition cond, const Address& lhs, Imm64 val, Label* label) {
+        MOZ_ASSERT(cond == Assembler::NotEqual,
+                   "other condition codes not supported");
+
+        branchPtr(cond, lhs, ImmWord(val.value), label);
+    }
+
+    void branch64(Condition cond, const Address& lhs, const Address& rhs, Register scratch,
+                  Label* label)
+    {
+        MOZ_ASSERT(cond == Assembler::NotEqual,
+                   "other condition codes not supported");
+        MOZ_ASSERT(lhs.base != scratch);
+        MOZ_ASSERT(rhs.base != scratch);
+
+        loadPtr(rhs, scratch);
+        branchPtr(cond, lhs, scratch, label);
+    }
+
     void branchTestPtr(Condition cond, Register lhs, Register rhs, Label* label) {
         Tst(ARMRegister(lhs, 64), Operand(ARMRegister(rhs, 64)));
         B(label, cond);

@@ -386,7 +386,10 @@ class RegExpObject : public NativeObject
         setSlot(LAST_INDEX_SLOT, NumberValue(d));
     }
 
-    void zeroLastIndex() {
+    void zeroLastIndex(ExclusiveContext* cx) {
+        MOZ_ASSERT(lookupPure(cx->names().lastIndex)->writable(),
+                   "can't infallibly zero a non-writable lastIndex on a "
+                   "RegExp that's been exposed to script");
         setSlot(LAST_INDEX_SLOT, Int32Value(0));
     }
 
@@ -443,12 +446,11 @@ class RegExpObject : public NativeObject
 
     static void trace(JSTracer* trc, JSObject* obj);
 
-    static bool initFromAtom(ExclusiveContext* cx, Handle<RegExpObject*> regexp, HandleAtom source,
-                             RegExpFlag flags);
+    void initIgnoringLastIndex(HandleAtom source, RegExpFlag flags);
+
+    void initAndZeroLastIndex(HandleAtom source, RegExpFlag flags, ExclusiveContext* cx);
 
   private:
-    bool init(ExclusiveContext* cx, HandleAtom source, RegExpFlag flags);
-
     /*
      * Precondition: the syntax for |source| has already been validated.
      * Side effect: sets the private field.

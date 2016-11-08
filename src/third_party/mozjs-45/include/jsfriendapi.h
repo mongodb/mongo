@@ -1209,7 +1209,7 @@ NukeCrossCompartmentWrappers(JSContext* cx,
  * * If DoesntShadowUnique is returned then the slot at listBaseExpandoSlot
  *   should contain a private pointer to a ExpandoAndGeneration, which contains
  *   a JS::Value that should either be undefined or point to an expando object,
- *   and a uint32 value. If that value changes then the IC for getting a
+ *   and a uint64 value. If that value changes then the IC for getting a
  *   property will be invalidated.
  * * If Shadows is returned, that means the property is an own property of the
  *   proxy but doesn't live on the expando object.
@@ -1238,7 +1238,7 @@ struct ExpandoAndGeneration {
   }
 
   JS::Heap<JS::Value> expando;
-  uint32_t generation;
+  uint64_t generation;
 };
 
 typedef enum DOMProxyShadowsResult {

@@ -861,8 +861,8 @@ JitCode::finalize(FreeOp* fop)
     // Don't do this if the Ion code is protected, as the signal handler will
     // deadlock trying to reacquire the interrupt lock.
     {
-        AutoWritableJitCode awjc(this);
-        memset(code_, JS_SWEPT_CODE_PATTERN, bufferSize_);
+        AutoWritableJitCode awjc(fop->runtime(), code_ - headerSize_, headerSize_ + bufferSize_);
+        memset(code_ - headerSize_, JS_SWEPT_CODE_PATTERN, headerSize_ + bufferSize_);
         code_ = nullptr;
     }
 

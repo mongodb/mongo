@@ -2226,7 +2226,7 @@ class MOZ_STACK_CLASS StringRegExpGuard
         if (obj_->is<RegExpObject>()) {
             RegExpObject* nobj = &obj_->as<RegExpObject>();
             if (nobj->lookup(cx, cx->names().lastIndex)->writable()) {
-                nobj->zeroLastIndex();
+                nobj->zeroLastIndex(cx);
                 return true;
             }
         }

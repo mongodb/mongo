@@ -1167,6 +1167,25 @@ class MacroAssemblerMIPS64Compat : public MacroAssemblerMIPS64
     void loadPtr(AbsoluteAddress address, Register dest);
     void loadPtr(wasm::SymbolicAddress address, Register dest);
 
+    void branch64(Condition cond, const Address& lhs, Imm64 val, Label* label) {
+        MOZ_ASSERT(cond == Assembler::NotEqual,
+                   "other condition codes not supported");
+
+        branchPtr(cond, lhs, ImmWord(val.value), label);
+    }
+
+    void branch64(Condition cond, const Address& lhs, const Address& rhs, Register scratch,
+                  Label* label)
+    {
+        MOZ_ASSERT(cond == Assembler::NotEqual,
+                   "other condition codes not supported");
+        MOZ_ASSERT(lhs.base != scratch);
+        MOZ_ASSERT(rhs.base != scratch);
+
+        loadPtr(rhs, scratch);
+        branchPtr(cond, lhs, scratch, label);
+    }
+
     void loadPrivate(const Address& address, Register dest);
 
     void loadInt32x1(const Address& addr, FloatRegister dest) { MOZ_CRASH("NYI"); }

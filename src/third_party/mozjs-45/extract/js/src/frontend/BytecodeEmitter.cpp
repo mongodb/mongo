@@ -6271,8 +6271,8 @@ BytecodeEmitter::emitFunction(ParseNode* pn, bool needsProto)
             if (!bce2.emitFunctionScript(pn->pn_body))
                 return false;
 
-            if (funbox->usesArguments && funbox->usesApply && funbox->usesThis)
-                script->setUsesArgumentsApplyAndThis();
+            if (funbox->isLikelyConstructorWrapper())
+                script->setLikelyConstructorWrapper();
         }
         if (outersc->isFunctionBox())
             outersc->asFunctionBox()->function()->nonLazyScript()->setHasInnerFunctions(true);

@@ -462,6 +462,7 @@ ValueNumberer::fixupOSROnlyLoop(MBasicBlock* block, MBasicBlock* backedge)
     block->setLoopHeader(backedge);
 
     JitSpew(JitSpew_GVN, "        Created fake block%u", fake->id());
+    hasOSRFixups_ = true;
     return true;
 }
 
@@ -1076,6 +1077,52 @@ ValueNumberer::visitGraph()
     return true;
 }
 
+// OSR fixups serve the purpose of representing the non-OSR entry into a loop
+// when the only real entry is an OSR entry into the middle. However, if the
+// entry into the middle is subsequently folded away, the loop may actually
+// have become unreachable. Mark-and-sweep all blocks to remove all such code.
+bool ValueNumberer::cleanupOSRFixups()
+{
+    // Mark.
+    Vector<MBasicBlock*, 0, JitAllocPolicy> worklist(graph_.alloc());
+    unsigned numMarked = 2;
+    graph_.entryBlock()->mark();
+    graph_.osrBlock()->mark();
+    if (!worklist.append(graph_.entryBlock()) || !worklist.append(graph_.osrBlock()))
+        return false;
+    while (!worklist.empty()) {
+        MBasicBlock* block = worklist.popCopy();
+        for (size_t i = 0, e = block->numSuccessors(); i != e; ++i) {
+            MBasicBlock* succ = block->getSuccessor(i);
+            if (!succ->isMarked()) {
+                ++numMarked;
+                succ->mark();
+                if (!worklist.append(succ))
+                    return false;
+            }
+        }
+        // The one special thing we do during this mark pass is to mark
+        // loop predecessors of reachable blocks as reachable. These blocks are
+        // the OSR fixups blocks which need to remain if the loop remains,
+        // though they can be removed if the loop is removed.
+        if (block->isLoopHeader()) {
+            MBasicBlock* pred = block->loopPredecessor();
+            if (!pred->isMarked() && pred->numPredecessors() == 0) {
+                MOZ_ASSERT(pred->numSuccessors() == 1,
+                           "OSR fixup block should have exactly one successor");
+                MOZ_ASSERT(pred != graph_.entryBlock(),
+                           "OSR fixup block shouldn't be the entry block");
+                MOZ_ASSERT(pred != graph_.osrBlock(),
+                           "OSR fixup block shouldn't be the OSR entry block");
+                pred->mark();
+            }
+        }
+    }
+
+    // And sweep.
+    return RemoveUnmarkedBlocks(mir_, graph_, numMarked);
+}
+
 ValueNumberer::ValueNumberer(MIRGenerator* mir, MIRGraph& graph)
   : mir_(mir), graph_(graph),
     values_(graph.alloc()),
@@ -1086,7 +1133,8 @@ ValueNumberer::ValueNumberer(MIRGenerator* mir, MIRGraph& graph)
     rerun_(false),
     blocksRemoved_(false),
     updateAliasAnalysis_(false),
-    dependenciesBroken_(false)
+    dependenciesBroken_(false),
+    hasOSRFixups_(false)
 {}
 
 bool
@@ -1161,6 +1209,11 @@ ValueNumberer::run(UpdateAliasAnalysisFlag updateAliasAnalysis)
 
         JitSpew(JitSpew_GVN, "Re-running GVN on graph (run %d, now with %llu blocks)",
                 runs, uint64_t(graph_.numBlocks()));
+    }
+
+    if (MOZ_UNLIKELY(hasOSRFixups_)) {
+        cleanupOSRFixups();
+        hasOSRFixups_ = false;
     }
 
     return true;
