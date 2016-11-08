@@ -1024,7 +1024,6 @@ env.Library(
         'oplog_buffer_blocking_queue',
         'oplog_fetcher',
         'optime',
-        'reporter',
         'rollback_checker',
         'storage_interface',
         '$BUILD_DIR/mongo/client/fetcher',

@@ -203,9 +203,6 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
                     targetIndex,
                     hbResp.hasDurableOpTime() ? hbResp.getDurableOpTime() : OpTime(),
                     hbResp.getAppliedOpTime());
-                // TODO: Enable with Data Replicator
-                // lk.unlock();
-                //_dr.slavesHaveProgressed();
             }
         }
     }

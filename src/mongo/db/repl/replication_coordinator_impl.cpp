@@ -278,21 +278,10 @@ ReplicationCoordinator::Mode getReplicationModeFromSettings(const ReplSettings& 
 DataReplicatorOptions createDataReplicatorOptions(
     ReplicationCoordinator* replCoord, ReplicationCoordinatorExternalState* externalState) {
     DataReplicatorOptions options;
-    options.rollbackFn = [](OperationContext*, const OpTime&, const HostAndPort&) -> Status {
-        return Status::OK();
-    };
-    options.prepareReplSetUpdatePositionCommandFn =
-        [replCoord](ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle)
-        -> StatusWith<BSONObj> {
-            return replCoord->prepareReplSetUpdatePositionCommand(commandStyle);
-        };
     options.getMyLastOptime = [replCoord]() { return replCoord->getMyLastAppliedOpTime(); };
     options.setMyLastOptime = [replCoord, externalState](const OpTime& opTime) {
         replCoord->setMyLastAppliedOpTime(opTime);
         externalState->setGlobalTimestamp(opTime.getTimestamp());
-    };
-    options.setFollowerMode = [replCoord](const MemberState& newState) {
-        return replCoord->setFollowerMode(newState);
     };
     options.getSlaveDelay = [replCoord]() { return replCoord->getSlaveDelaySecs(); };
     options.syncSourceSelector = replCoord;
@@ -2604,7 +2593,6 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             break;
         case kActionFollowerModeStateChange:
             // In follower mode, or sub-mode so ensure replication is active
-            // TODO: _dr->resume();
             _externalState->signalApplierToChooseNewSyncSource();
             break;
         case kActionCloseAllConnections:
@@ -2854,8 +2842,6 @@ Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(
     if (somethingChanged && !_getMemberState_inlock().primary()) {
         lock.unlock();
         // Must do this outside _mutex
-        // TODO: enable _dr, remove _externalState when DataReplicator is used excl.
-        //_dr->slavesHaveProgressed();
         _externalState->forwardSlaveProgress();
     }
     return status;
@@ -2879,8 +2865,6 @@ Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(const UpdatePosi
     if (somethingChanged && !_getMemberState_inlock().primary()) {
         lock.unlock();
         // Must do this outside _mutex
-        // TODO: enable _dr, remove _externalState when DataReplicator is used excl.
-        //_dr->slavesHaveProgressed();
         _externalState->forwardSlaveProgress();
     }
     return status;
