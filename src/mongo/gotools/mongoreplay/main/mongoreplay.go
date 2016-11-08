@@ -15,11 +15,23 @@ const (
 )
 
 func main() {
+	versionOpts := mongoreplay.VersionOptions{}
+	versionFlagParser := flags.NewParser(&versionOpts, flags.Default)
+	versionFlagParser.Options = flags.IgnoreUnknown
+	_, err := versionFlagParser.Parse()
+	if err != nil {
+		os.Exit(ExitError)
+	}
+
+	if versionOpts.PrintVersion() {
+		os.Exit(ExitOk)
+	}
+
 	opts := mongoreplay.Options{}
 
 	var parser = flags.NewParser(&opts, flags.Default)
 
-	_, err := parser.AddCommand("play", "Play captured traffic against a mongodb instance", "",
+	_, err = parser.AddCommand("play", "Play captured traffic against a mongodb instance", "",
 		&mongoreplay.PlayCommand{GlobalOpts: &opts})
 	if err != nil {
 		panic(err)
@@ -37,13 +49,6 @@ func main() {
 		panic(err)
 	}
 
-	parser.Options = flags.IgnoreUnknown
-	parser.Parse()
-	if opts.PrintVersion() {
-		os.Exit(ExitOk)
-	}
-
-	parser.Options = flags.Default
 	_, err = parser.Parse()
 
 	if err != nil {

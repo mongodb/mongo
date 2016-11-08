@@ -190,7 +190,7 @@ post:
   - command: shell.cleanup
 
 tasks:
-- name: build
+- name: replay-dist
   commands:
   - func: "fetch source"
   - func: "build tool"
@@ -201,9 +201,9 @@ tasks:
       tool: mongotape
   - func: "build tool"
 
-- name: sanity_check
+- name: replay-sanity_check
   depends_on:
-  - name: build
+  - name: replay-dist
   commands:
   - func: "fetch source"
   - func: "fetch tool"
@@ -221,9 +221,9 @@ tasks:
         echo "Running sanity check"
         ./sanity_check.sh -p ${mongod_port}
 
-- name: go_test
+- name: replay-go_test
   depends_on:
-  - name: build
+  - name: replay-dist
   commands:
   - func: "fetch source"
   - func: "fetch tool"
@@ -243,9 +243,9 @@ tasks:
     vars:
         filename: playtest
 
-- name: sharded_test
+- name: replay-sharded_test
   depends_on:
-  - name: build
+  - name: replay-dist
   commands:
   - func: "fetch source"
   - func: "fetch tool"
@@ -267,9 +267,9 @@ tasks:
         environment_vars: DB_PORT=20010
         additional_args: --run "LiveDB"
 
-- name: auth_test
+- name: replay-auth_test
   depends_on:
-  - name: build
+  - name: replay-dist
   commands:
   - func: "fetch source"
   - func: "fetch tool"
@@ -295,9 +295,9 @@ tasks:
         filename: authtest
         additional_args: --run "(LiveDB)|(Authed)"
 
-- name: repl_test
+- name: replay-repl_test
   depends_on:
-  - name: build
+  - name: replay-dist
   commands:
   - func: "fetch source"
   - func: "fetch tool"
@@ -318,9 +318,9 @@ tasks:
         filename: repltest
         additional_args: --run "LiveDB"
 
-- name: replay_test
+- name: replay-replay_test
   depends_on:
-  - name: build
+  - name: replay-dist
   commands:
   - func: "fetch source"
   - func: "fetch tool"
@@ -358,10 +358,10 @@ buildvariants:
   run_on:
   - ubuntu1404-test
   tasks:
-  - name: build
-  - name: sanity_check
-  - name: go_test
-  - name: auth_test
-  - name: sharded_test
-  - name: repl_test
-  - name: replay_test
+  - name: replay-dist
+  - name: replay-sanity_check
+  - name: replay-go_test
+  - name: replay-auth_test
+  - name: replay-sharded_test
+  - name: replay-repl_test
+  - name: replay-replay_test

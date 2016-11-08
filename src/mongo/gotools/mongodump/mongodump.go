@@ -16,6 +16,7 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
+	"bufio"
 	"compress/gzip"
 	"fmt"
 	"io"
@@ -426,6 +427,29 @@ func (dump *MongoDump) Dump() (err error) {
 	return err
 }
 
+type resettableOutputBuffer interface {
+	io.Writer
+	Close() error
+	Reset(io.Writer)
+}
+
+type closableBufioWriter struct {
+	*bufio.Writer
+}
+
+func (w closableBufioWriter) Close() error {
+	return w.Flush()
+}
+
+func (dump *MongoDump) getResettableOutputBuffer() resettableOutputBuffer {
+	if dump.OutputOptions.Archive != "" {
+		return nil
+	} else if dump.OutputOptions.Gzip {
+		return gzip.NewWriter(nil)
+	}
+	return &closableBufioWriter{bufio.NewWriter(nil)}
+}
+
 // DumpIntents iterates through the previously-created intents and
 // dumps all of the found collections.
 func (dump *MongoDump) DumpIntents() error {
@@ -447,6 +471,7 @@ func (dump *MongoDump) DumpIntents() error {
 	// start a goroutine for each job thread
 	for i := 0; i < jobs; i++ {
 		go func(id int) {
+			buffer := dump.getResettableOutputBuffer()
 			log.Logvf(log.DebugHigh, "starting dump routine with id=%v", id)
 			for {
 				intent := dump.manager.Pop()
@@ -456,7 +481,7 @@ func (dump *MongoDump) DumpIntents() error {
 					return
 				}
 				if intent.BSONFile != nil {
-					err := dump.DumpIntent(intent)
+					err := dump.DumpIntent(intent, buffer)
 					if err != nil {
 						resultChan <- err
 						return
@@ -478,7 +503,7 @@ func (dump *MongoDump) DumpIntents() error {
 }
 
 // DumpIntent dumps the specified database's collection.
-func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
+func (dump *MongoDump) DumpIntent(intent *intents.Intent, buffer resettableOutputBuffer) error {
 	session, err := dump.sessionProvider.GetSession()
 	if err != nil {
 		return err
@@ -488,12 +513,6 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 	// more results as soon as results are returned. This effectively
 	// duplicates the behavior of an exhaust cursor.
 	session.SetPrefetch(1.0)
-
-	err = intent.BSONFile.Open()
-	if err != nil {
-		return err
-	}
-	defer intent.BSONFile.Close()
 
 	var findQuery *mgo.Query
 	switch {
@@ -513,7 +532,7 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 
 	if dump.OutputOptions.Out == "-" {
 		log.Logvf(log.Always, "writing %v to stdout", intent.Namespace())
-		dumpCount, err = dump.dumpQueryToWriter(findQuery, intent)
+		dumpCount, err = dump.dumpQueryToIntent(findQuery, intent, buffer)
 		if err == nil {
 			// on success, print the document count
 			log.Logvf(log.Always, "dumped %v %v", dumpCount, docPlural(dumpCount))
@@ -532,7 +551,7 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 
 	if !dump.OutputOptions.Repair {
 		log.Logvf(log.Always, "writing %v to %v", intent.Namespace(), intent.Location)
-		if dumpCount, err = dump.dumpQueryToWriter(findQuery, intent); err != nil {
+		if dumpCount, err = dump.dumpQueryToIntent(findQuery, intent, buffer); err != nil {
 			return err
 		}
 	} else {
@@ -540,7 +559,7 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 		log.Logvf(log.Always, "writing repair of %v to %v", intent.Namespace(), intent.Location)
 		repairIter := session.DB(intent.DB).C(intent.C).Repair()
 		repairCounter := progress.NewCounter(1) // this counter is ignored
-		if err := dump.dumpIterToWriter(repairIter, intent.BSONFile, repairCounter); err != nil {
+		if err := dump.dumpIterToWriter(repairIter, buffer, repairCounter); err != nil {
 			return fmt.Errorf("repair error: %v", err)
 		}
 		_, repairCount := repairCounter.Progress()
@@ -552,17 +571,29 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
 	return nil
 }
 
-// dumpQueryToWriter takes an mgo Query, its intent, and a writer, performs the query,
+// dumpQueryToIntent takes an mgo Query, its intent, and a writer, performs the query,
 // and writes the raw bson results to the writer. Returns a final count of documents
 // dumped, and any errors that occured.
-func (dump *MongoDump) dumpQueryToWriter(
-	query *mgo.Query, intent *intents.Intent) (int64, error) {
+func (dump *MongoDump) dumpQueryToIntent(
+	query *mgo.Query, intent *intents.Intent, buffer resettableOutputBuffer) (dumpCount int64, err error) {
+
+	// restore of views from archives require an empty collection as the trigger to create the view
+	// so, we open here before the early return if IsView so that we write an empty collection to the archive
+	err = intent.BSONFile.Open()
+	if err != nil {
+		return 0, err
+	}
+	defer func() {
+		closeErr := intent.BSONFile.Close()
+		if err == nil && closeErr != nil {
+			err = fmt.Errorf("error writing data for collection `%v` to disk: %v", intent.Namespace(), closeErr)
+		}
+	}()
 	// don't dump any data for views being dumped as views
 	if intent.IsView() && !dump.OutputOptions.ViewsAsCollections {
 		return 0, nil
 	}
 	var total int
-	var err error
 	if len(dump.query) == 0 {
 		total, err = query.Count()
 		if err != nil {
@@ -579,10 +610,25 @@ func (dump *MongoDump) dumpQueryToWriter(
 		defer dump.ProgressManager.Detach(intent.Namespace())
 	}
 
-	err = dump.dumpIterToWriter(query.Iter(), intent.BSONFile, dumpProgressor)
-	_, dumpCount := dumpProgressor.Progress()
+	var f io.Writer
+	f = intent.BSONFile
+	if buffer != nil {
+		buffer.Reset(f)
+		f = buffer
+		defer func() {
+			closeErr := buffer.Close()
+			if err == nil && closeErr != nil {
+				err = fmt.Errorf("error writing data for collection `%v` to disk: %v", intent.Namespace(), closeErr)
+			}
+		}()
+	}
 
-	return dumpCount, err
+	err = dump.dumpIterToWriter(query.Iter(), f, dumpProgressor)
+	dumpCount, _ = dumpProgressor.Progress()
+	if err != nil {
+		err = fmt.Errorf("error writing data for collection `%v` to disk: %v", intent.Namespace(), err)
+	}
+	return
 }
 
 // dumpIterToWriter takes an mgo iterator, a writer, and a pointer to
@@ -641,6 +687,7 @@ func (dump *MongoDump) dumpIterToWriter(
 // database. Only works with an authentication schema version >= 3.
 func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 	session, err := dump.sessionProvider.GetSession()
+	buffer := dump.getResettableOutputBuffer()
 	if err != nil {
 		return err
 	}
@@ -648,37 +695,19 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 
 	dbQuery := bson.M{"db": db}
 	usersQuery := session.DB("admin").C("system.users").Find(dbQuery)
-	intent := dump.manager.Users()
-	err = intent.BSONFile.Open()
-	if err != nil {
-		return fmt.Errorf("error opening output stream for dumping Users: %v", err)
-	}
-	defer intent.BSONFile.Close()
-	_, err = dump.dumpQueryToWriter(usersQuery, intent)
+	_, err = dump.dumpQueryToIntent(usersQuery, dump.manager.Users(), buffer)
 	if err != nil {
 		return fmt.Errorf("error dumping db users: %v", err)
 	}
 
 	rolesQuery := session.DB("admin").C("system.roles").Find(dbQuery)
-	intent = dump.manager.Roles()
-	err = intent.BSONFile.Open()
-	if err != nil {
-		return fmt.Errorf("error opening output stream for dumping Roles: %v", err)
-	}
-	defer intent.BSONFile.Close()
-	_, err = dump.dumpQueryToWriter(rolesQuery, intent)
+	_, err = dump.dumpQueryToIntent(rolesQuery, dump.manager.Roles(), buffer)
 	if err != nil {
 		return fmt.Errorf("error dumping db roles: %v", err)
 	}
 
 	versionQuery := session.DB("admin").C("system.version").Find(nil)
-	intent = dump.manager.AuthVersion()
-	err = intent.BSONFile.Open()
-	if err != nil {
-		return fmt.Errorf("error opening output stream for dumping AuthVersion: %v", err)
-	}
-	defer intent.BSONFile.Close()
-	_, err = dump.dumpQueryToWriter(versionQuery, intent)
+	_, err = dump.dumpQueryToIntent(versionQuery, dump.manager.AuthVersion(), buffer)
 	if err != nil {
 		return fmt.Errorf("error dumping db auth version: %v", err)
 	}
@@ -690,20 +719,21 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 // TODO: This and DumpUsersAndRolesForDB should be merged, correctly
 func (dump *MongoDump) DumpUsersAndRoles() error {
 	var err error
+	buffer := dump.getResettableOutputBuffer()
 	if dump.manager.Users() != nil {
-		err = dump.DumpIntent(dump.manager.Users())
+		err = dump.DumpIntent(dump.manager.Users(), buffer)
 		if err != nil {
 			return err
 		}
 	}
 	if dump.manager.Roles() != nil {
-		err = dump.DumpIntent(dump.manager.Roles())
+		err = dump.DumpIntent(dump.manager.Roles(), buffer)
 		if err != nil {
 			return err
 		}
 	}
 	if dump.manager.AuthVersion() != nil {
-		err = dump.DumpIntent(dump.manager.AuthVersion())
+		err = dump.DumpIntent(dump.manager.AuthVersion(), buffer)
 		if err != nil {
 			return err
 		}
@@ -714,8 +744,9 @@ func (dump *MongoDump) DumpUsersAndRoles() error {
 
 // DumpSystemIndexes dumps all of the system.indexes
 func (dump *MongoDump) DumpSystemIndexes() error {
+	buffer := dump.getResettableOutputBuffer()
 	for _, dbName := range dump.manager.SystemIndexDBs() {
-		err := dump.DumpIntent(dump.manager.SystemIndexes(dbName))
+		err := dump.DumpIntent(dump.manager.SystemIndexes(dbName), buffer)
 		if err != nil {
 			return err
 		}
@@ -727,9 +758,10 @@ func (dump *MongoDump) DumpSystemIndexes() error {
 // that has metadata
 func (dump *MongoDump) DumpMetadata() error {
 	allIntents := dump.manager.Intents()
+	buffer := dump.getResettableOutputBuffer()
 	for _, intent := range allIntents {
 		if intent.MetadataFile != nil {
-			err := dump.dumpMetadata(intent)
+			err := dump.dumpMetadata(intent, buffer)
 			if err != nil {
 				return err
 			}
@@ -746,23 +778,6 @@ type nopCloseWriter struct {
 // Close does nothing on nopCloseWriters
 func (*nopCloseWriter) Close() error {
 	return nil
-}
-
-// wrappedWriteCloser implements io.WriteCloser. It wraps up two WriteClosers. The Write method
-// of the io.WriteCloser is implemented by the embedded io.WriteCloser
-type wrappedWriteCloser struct {
-	io.WriteCloser
-	inner io.WriteCloser
-}
-
-// Close is part of the io.WriteCloser interface. Close closes both the embedded io.WriteCloser as
-// well as the inner io.WriteCloser
-func (wwc *wrappedWriteCloser) Close() error {
-	err := wwc.WriteCloser.Close()
-	if err != nil {
-		return err
-	}
-	return wwc.inner.Close()
 }
 
 func (dump *MongoDump) getArchiveOut() (out io.WriteCloser, err error) {
@@ -788,10 +803,7 @@ func (dump *MongoDump) getArchiveOut() (out io.WriteCloser, err error) {
 		}
 	}
 	if dump.OutputOptions.Gzip {
-		return &wrappedWriteCloser{
-			WriteCloser: gzip.NewWriter(out),
-			inner:       out,
-		}, nil
+		return &util.WrappedWriteCloser{gzip.NewWriter(out), out}, nil
 	}
 	return out, nil
 }

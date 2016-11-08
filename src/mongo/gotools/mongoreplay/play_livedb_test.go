@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	defaultTestPort      = 20000
+	defaultTestPort      = "20000"
 	nonAuthTestServerURL = "mongodb://localhost"
 	authTestServerURL    = "mongodb://authorizedUser:authorizedPwd@localhost"
 	testDB               = "mongoreplay"
@@ -43,24 +43,31 @@ type recordedOpGenerator struct {
 }
 
 func setConnectionURL() error {
+	testPort := os.Getenv("DB_PORT")
+	if testPort == "" {
+		testPort = defaultTestPort
+	}
 	var url string
 	if os.Getenv("AUTH") == "1" {
 		url = authTestServerURL
 	} else {
 		url = nonAuthTestServerURL
 	}
-	dialURL := fmt.Sprintf("%s:%v", url, defaultTestPort)
+	dialURL := fmt.Sprintf("%s:%v", url, testPort)
 	if os.Getenv("AUTH") == "1" {
 		dialURL += "/admin"
 	}
-	session, err := mgo.Dial(dialURL)
+	session, err := mgo.DialWithTimeout(dialURL, 30*time.Second)
 	if err != nil {
-		return err
+		return fmt.Errorf("%v:%v", dialURL, err)
 	}
 
-	port, err := getTestDBPort(session)
+	port, err := getPrimaryPort(session)
 	if err != nil {
-		return err
+		return fmt.Errorf("%v:%v", dialURL, err)
+	}
+	if port == "" {
+		port = testPort
 	}
 	urlNonAuth = fmt.Sprintf("%s:%s", nonAuthTestServerURL, port)
 	urlAuth = fmt.Sprintf("%s:%v/admin", authTestServerURL, port)
@@ -71,10 +78,7 @@ func setConnectionURL() error {
 	return nil
 }
 
-func getTestDBPort(session *mgo.Session) (string, error) {
-	if port := os.Getenv("DB_PORT"); port != "" {
-		return port, nil
-	}
+func getPrimaryPort(session *mgo.Session) (string, error) {
 
 	result := struct {
 		Members []struct {
@@ -83,13 +87,22 @@ func getTestDBPort(session *mgo.Session) (string, error) {
 		} `bson:"members"`
 	}{}
 
-	err := session.DB("admin").Run("replSetGetStatus", &result)
-	if err != nil && err.Error() != "not running with --replSet" {
-		return "", err
+	res := &struct {
+		Msg string
+	}{}
+	session.Run("ismaster", res)
+	isMongosTestServer = (res.Msg == "isdbgrid")
+	if isMongosTestServer {
+		return "", nil
 	}
 
-	if err != nil && err.Error() == "not running with --replSet" {
-		return fmt.Sprintf("%d", defaultTestPort), nil
+	err := session.DB("admin").Run("replSetGetStatus", &result)
+
+	if err != nil {
+		if err.Error() == "not running with --replSet" {
+			return "", nil
+		}
+		return "", err
 	}
 
 	for _, member := range result.Members {
@@ -98,7 +111,7 @@ func getTestDBPort(session *mgo.Session) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("unable to determine database port")
+	return "", fmt.Errorf("replset status has no primary")
 }
 
 func TestMain(m *testing.M) {
@@ -111,17 +124,6 @@ func TestMain(m *testing.M) {
 	} else {
 		authTestServerMode = false
 	}
-
-	session, err := mgo.Dial(currentTestURL)
-	if err != nil {
-		panic(err)
-	}
-	res := &struct {
-		Msg string
-	}{}
-	session.Run("ismaster", res)
-	isMongosTestServer = (res.Msg == "isdbgrid")
-	session.Close()
 
 	os.Exit(m.Run())
 }
@@ -192,7 +194,7 @@ func TestOpInsertLiveDB(t *testing.T) {
 	t.Log("Completed mongoreplay playback of generated traffic")
 
 	// prepare a query for the database
-	session, err := mgo.Dial(currentTestURL)
+	session, err := mgo.DialWithTimeout(currentTestURL, 30*time.Second)
 	if err != nil {
 		t.Errorf("Error connecting to test server: %v", err)
 	}
@@ -308,7 +310,7 @@ func TestUpdateOpLiveDB(t *testing.T) {
 	t.Log("Completed mongoreplay playback of generated traffic")
 
 	// prepare a query for the database
-	session, err := mgo.Dial(currentTestURL)
+	session, err := mgo.DialWithTimeout(currentTestURL, 30*time.Second)
 	if err != nil {
 		t.Errorf("Error connecting to test server: %v", err)
 	}
@@ -787,7 +789,7 @@ func TestCommandOpInsertLiveDB(t *testing.T) {
 	t.Log("Completed mongoreplay playback of generated traffic")
 
 	// prepare a query for the database
-	session, err := mgo.Dial(currentTestURL)
+	session, err := mgo.DialWithTimeout(currentTestURL, 30*time.Second)
 	if err != nil {
 		t.Errorf("Error connecting to test server: %v", err)
 	}
@@ -1005,7 +1007,7 @@ func TestCommandOpGetMoreLiveDB(t *testing.T) {
 }
 
 func teardownDB() error {
-	session, err := mgo.Dial(currentTestURL)
+	session, err := mgo.DialWithTimeout(currentTestURL, 30*time.Second)
 	if err != nil {
 		return err
 	}

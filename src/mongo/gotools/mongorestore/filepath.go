@@ -152,7 +152,7 @@ func (f *realMetadataFile) Open() (err error) {
 		if err != nil {
 			return fmt.Errorf("error reading compressed metadata %v: %v", f.path, err)
 		}
-		f.ReadCloser = &wrappedReadCloser{gzFile, file}
+		f.ReadCloser = &util.WrappedReadCloser{gzFile, file}
 	} else {
 		f.ReadCloser = file
 	}

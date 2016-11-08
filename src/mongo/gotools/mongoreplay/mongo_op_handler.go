@@ -15,6 +15,7 @@ import (
 type OpStreamSettings struct {
 	PcapFile         string `short:"f" description:"path to the pcap file to be read"`
 	PacketBufSize    int    `short:"b" description:"Size of heap used to merge separate streams together"`
+	CaptureBufSize   int    `long:"capSize" description:"Size in KiB of the PCAP capture buffer"`
 	Expression       string `short:"e" long:"expr" description:"BPF filter expression to apply to packets"`
 	NetworkInterface string `short:"i" description:"network interface to listen on"`
 }

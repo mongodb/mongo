@@ -2,6 +2,7 @@ package util
 
 import (
 	"bufio"
+	"io"
 	"os"
 	"path/filepath"
 )
@@ -31,4 +32,32 @@ func GetFieldsFromFile(path string) ([]string, error) {
 // replaced by multiple separators
 func ToUniversalPath(path string) string {
 	return filepath.FromSlash(path)
+}
+
+type WrappedReadCloser struct {
+	io.ReadCloser
+	Inner io.ReadCloser
+}
+
+func (wrc *WrappedReadCloser) Close() error {
+	outerErr := wrc.ReadCloser.Close()
+	innerErr := wrc.Inner.Close()
+	if outerErr != nil {
+		return outerErr
+	}
+	return innerErr
+}
+
+type WrappedWriteCloser struct {
+	io.WriteCloser
+	Inner io.WriteCloser
+}
+
+func (wwc *WrappedWriteCloser) Close() error {
+	outerErr := wwc.WriteCloser.Close()
+	innerErr := wwc.Inner.Close()
+	if outerErr != nil {
+		return outerErr
+	}
+	return innerErr
 }

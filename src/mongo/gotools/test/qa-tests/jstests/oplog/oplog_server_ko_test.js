@@ -12,7 +12,7 @@
   db = toolTest.db.getSiblingDB('foo'); // eslint-disable-line no-native-reassign
   db.dropDatabase();
 
-  var port = 26999;
+  var port = allocatePort();
   startMongod('--auth', '--port', port,
       '--dbpath', MongoRunner.dataPath + 'oplogServerKOTest2');
 

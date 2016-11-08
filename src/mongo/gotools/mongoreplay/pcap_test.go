@@ -128,7 +128,7 @@ func TestMultiChannelGetMoreLiveDB(t *testing.T) {
 
 func pcapTestHelper(t *testing.T, pcapFname string, preprocess bool, verifier verifyFunc) {
 
-	pcapFile := "testPcap/" + pcapFname
+	pcapFile := "mongoreplay/testPcap/" + pcapFname
 	if _, err := os.Stat(pcapFile); err != nil {
 		t.Skipf("pcap file %v not present, skipping test", pcapFile)
 	}

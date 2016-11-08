@@ -18,7 +18,7 @@
   ];
 
   if (toolTest.useSSL) {
-    var port = 26999;
+    var port = allocatePort();
 
     // this mongod is actually started with SSL flags because of `useSSL`
     startMongod('--auth', '--port', port,

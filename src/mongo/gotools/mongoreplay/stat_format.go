@@ -158,7 +158,7 @@ func (stat *OpStat) getRequestID() string {
 }
 func (stat *OpStat) getTime(layout string) string {
 	if layout == "" {
-		layout = "2/15 15:04:05.000"
+		layout = time.RFC822Z
 	}
 	t := stat.Seen
 	if stat.PlayedAt != nil {

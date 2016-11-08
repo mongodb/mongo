@@ -73,16 +73,10 @@ func (dump *MongoDump) DumpOplogAfterTimestamp(ts bson.MongoTimestamp) error {
 		return err
 	}
 	defer session.Close()
-	intent := dump.manager.Oplog()
-	err = intent.BSONFile.Open()
-	if err != nil {
-		return fmt.Errorf("error opening output stream for dumping oplog: %v", err)
-	}
-	defer intent.BSONFile.Close()
 	session.SetPrefetch(1.0) // mimic exhaust cursor
 	queryObj := bson.M{"ts": bson.M{"$gt": ts}}
 	oplogQuery := session.DB("local").C(dump.oplogCollection).Find(queryObj).LogReplay()
-	oplogCount, err := dump.dumpQueryToWriter(oplogQuery, dump.manager.Oplog())
+	oplogCount, err := dump.dumpQueryToIntent(oplogQuery, dump.manager.Oplog(), dump.getResettableOutputBuffer())
 	if err == nil {
 		log.Logvf(log.Always, "\tdumped %v oplog %v",
 			oplogCount, util.Pluralize(int(oplogCount), "entry", "entries"))

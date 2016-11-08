@@ -524,6 +524,7 @@ func TestShortenLegacyReply(t *testing.T) {
 	// add the two docs as the docs from the reply
 	result.RawOp.Body = append(result.RawOp.Body, asByte1...)
 	result.RawOp.Body = append(result.RawOp.Body, asByte2...)
+	result.Header.MessageLength = int32(len(result.RawOp.Body))
 
 	// reply should be functional and parseable
 	parsed, err := result.RawOp.Parse()

@@ -486,19 +486,6 @@ func (restore *MongoRestore) Restore() error {
 	return nil
 }
 
-type wrappedReadCloser struct {
-	io.ReadCloser
-	inner io.ReadCloser
-}
-
-func (wrc *wrappedReadCloser) Close() error {
-	err := wrc.ReadCloser.Close()
-	if err != nil {
-		return err
-	}
-	return wrc.inner.Close()
-}
-
 func (restore *MongoRestore) getArchiveReader() (rc io.ReadCloser, err error) {
 	if restore.InputOptions.Archive == "-" {
 		rc = ioutil.NopCloser(restore.stdin)
@@ -528,7 +515,7 @@ func (restore *MongoRestore) getArchiveReader() (rc io.ReadCloser, err error) {
 		if err != nil {
 			return nil, err
 		}
-		return &wrappedReadCloser{gzrc, rc}, nil
+		return &util.WrappedReadCloser{gzrc, rc}, nil
 	}
 	return rc, nil
 }
