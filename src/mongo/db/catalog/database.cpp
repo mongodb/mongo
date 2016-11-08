@@ -654,7 +654,7 @@ void Database::dropDatabase(OperationContext* txn, Database* db) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         getGlobalServiceContext()->getGlobalStorageEngine()->dropDatabase(txn, name);
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "dropDatabase", db->name());
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "dropDatabase", name);
 }
 
 Status userCreateNS(OperationContext* txn,
