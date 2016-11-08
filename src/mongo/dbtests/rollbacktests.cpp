@@ -139,7 +139,7 @@ void dropIndex(OperationContext* txn, const NamespaceString& nss, const string& 
 }
 }  // namespace
 
-template <bool rollback, bool defaultIndexes>
+template <bool rollback, bool defaultIndexes, bool capped>
 class CreateCollection {
 public:
     void run() {
@@ -154,7 +154,8 @@ public:
         {
             WriteUnitOfWork uow(&txn);
             ASSERT(!collectionExists(&ctx, ns));
-            ASSERT_OK(userCreateNS(&txn, ctx.db(), ns, BSONObj(), defaultIndexes));
+            auto options = capped ? BSON("capped" << true << "size" << 1000) : BSONObj();
+            ASSERT_OK(userCreateNS(&txn, ctx.db(), ns, options, defaultIndexes));
             ASSERT(collectionExists(&ctx, ns));
             if (!rollback) {
                 uow.commit();
@@ -168,7 +169,7 @@ public:
     }
 };
 
-template <bool rollback, bool defaultIndexes>
+template <bool rollback, bool defaultIndexes, bool capped>
 class DropCollection {
 public:
     void run() {
@@ -183,7 +184,8 @@ public:
         {
             WriteUnitOfWork uow(&txn);
             ASSERT(!collectionExists(&ctx, ns));
-            ASSERT_OK(userCreateNS(&txn, ctx.db(), ns, BSONObj(), defaultIndexes));
+            auto options = capped ? BSON("capped" << true << "size" << 1000) : BSONObj();
+            ASSERT_OK(userCreateNS(&txn, ctx.db(), ns, options, defaultIndexes));
             uow.commit();
         }
         ASSERT(collectionExists(&ctx, ns));
@@ -710,9 +712,20 @@ public:
     template <template <bool, bool> class T>
     void addAll() {
         add<T<false, false>>();
-        add<T<true, false>>();
         add<T<false, true>>();
+        add<T<true, false>>();
         add<T<true, true>>();
+    }
+    template <template <bool, bool, bool> class T>
+    void addAll() {
+        add<T<false, false, false>>();
+        add<T<false, false, true>>();
+        add<T<false, true, false>>();
+        add<T<false, true, true>>();
+        add<T<true, false, false>>();
+        add<T<true, false, true>>();
+        add<T<true, true, false>>();
+        add<T<true, true, true>>();
     }
 
     void setupTests() {
