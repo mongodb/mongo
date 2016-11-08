@@ -177,7 +177,7 @@ public:
     }
 
     void finishProcessingNetworkResponse() {
-        getNet()->runUntil(getNet()->now() + Milliseconds(5));
+        getNet()->runReadyNetworkOperations();
         if (getNet()->hasReadyRequests()) {
             log() << "The network has unexpected requests to process, next req:";
             NetworkInterfaceMock::NetworkOperation req = *getNet()->getNextReadyRequest();
@@ -347,19 +347,8 @@ protected:
     }
 
     void tearDown() override {
-        {
-            if (_dr && _dr->getState() != DataReplicatorState::Uninitialized) {
-                auto txn = getGlobalServiceContext()->makeOperationContext(&cc());
-                _dr->scheduleShutdown(txn.get());
-
-                NetworkGuard guard(getNet());
-                getNet()->runUntil(getNet()->now() + Milliseconds(5));
-            }
-        }
-
-        log() << "Resetting DataReplicator during test tearDown.";
-        _dr.reset();
         tearDownExecutorThread();
+        _dr.reset();
         _dbWorkThreadPool->join();
         _dbWorkThreadPool.reset();
         _storageInterface.reset();
@@ -441,7 +430,7 @@ public:
         while (!isDone()) {
             NetworkGuard guard(net);
             //            if (net->hasReadyRequests()) {
-            net->runUntil(net->now() + Milliseconds(5));
+            net->runReadyNetworkOperations();
             //            }
         }
         _thread->join();
@@ -468,11 +457,6 @@ public:
 
     BSONObj getInitialSyncProgress() {
         return _dr->getInitialSyncProgress();
-    }
-
-    DataReplicator* getDR() {
-        LockGuard lk(_mutex);
-        return _dr;
     }
 
 private:
@@ -552,17 +536,7 @@ protected:
         int processedRequests(0);
         const int expectedResponses(_responses.size());
 
-        log() << "playing responses.";
         Date_t lastLog{Date_t::now()};
-        auto logPeriodicallyWithDiagnostics = [&lastLog, &net](std::string msg) {
-            if ((Date_t::now() - lastLog) > Seconds(1)) {
-                if (msg.size())
-                    log() << msg;
-                lastLog = Date_t();
-                log() << "network diagnostics:" << net->getDiagnosticString();
-                net->logQueues();
-            }
-        };
         while (true) {
             if (_isbr && _isbr->isDone()) {
                 log() << "There are " << (expectedResponses - processedRequests)
@@ -573,10 +547,7 @@ protected:
             NetworkGuard guard(net);
 
             if (!net->hasReadyRequests()) {
-                logPeriodicallyWithDiagnostics(
-                    "no network requests, so processing ready network responses.");
-
-                net->runUntil(net->now() + Milliseconds(5));
+                net->runReadyNetworkOperations();
                 continue;
             }
 
@@ -609,10 +580,13 @@ protected:
                 log() << "     req: " << noi->getRequest().dbname << "."
                       << noi->getRequest().cmdObj;
                 log() << "     resp:" << respBSON;
-                logPeriodicallyWithDiagnostics("");
 
-
-                net->runUntil(net->now() + Milliseconds(5));
+                if ((Date_t::now() - lastLog) > Seconds(1)) {
+                    lastLog = Date_t::now();
+                    log() << "processing oplog getmore, net:" << net->getDiagnosticString();
+                    net->logQueues();
+                }
+                net->runReadyNetworkOperations();
                 continue;
             } else if (isOplogKillCursor(noi)) {
                 auto respBSON = BSON("ok" << 1.0);
@@ -621,7 +595,7 @@ protected:
                     noi,
                     net->now(),
                     ResponseStatus(RemoteCommandResponse(respBSON, BSONObj(), Milliseconds(10))));
-                net->runUntil(net->now() + Milliseconds(5));
+                net->runReadyNetworkOperations();
                 continue;
             }
 
@@ -644,8 +618,13 @@ protected:
                 noi,
                 net->now(),
                 ResponseStatus(RemoteCommandResponse(response, BSONObj(), Milliseconds(10))));
-            logPeriodicallyWithDiagnostics("");
-            net->runUntil(net->now() + Milliseconds(5));
+
+            if ((Date_t::now() - lastLog) > Seconds(1)) {
+                lastLog = Date_t();
+                log() << net->getDiagnosticString();
+                net->logQueues();
+            }
+            net->runReadyNetworkOperations();
 
             guard.dismiss();
             if (++processedRequests >= expectedResponses) {
@@ -688,11 +667,6 @@ void InitialSyncTest::tearDown() {
 }
 
 TEST_F(InitialSyncTest, Complete) {
-    // TODO: Re-enable (SERVER-25662)
-    if (1) {
-        log() << "skipping test";
-        return;
-    }
     /**
      * Initial Sync will issue these query/commands
      *   - replSetGetRBID
@@ -1096,7 +1070,7 @@ TEST_F(InitialSyncTest, DataReplicatorPassesThroughOplogFetcherFailure) {
         }
         log() << "Sending error response to getMore";
         net->scheduleErrorResponse(noi, {ErrorCodes::OperationFailed, "dead cursor"});
-        net->runUntil(net->now() + Milliseconds(5));
+        net->runReadyNetworkOperations();
     }
 
     verifySync(getNet(), ErrorCodes::OperationFailed);
@@ -1626,7 +1600,7 @@ protected:
         auto noi = net->getNextReadyRequest();
         ASSERT_EQUALS("find", std::string(noi->getRequest().cmdObj.firstElementFieldName()));
         scheduleNetworkResponse(noi, oplogFetcherResponse);
-        net->runUntil(net->now() + Milliseconds(5));
+        net->runReadyNetworkOperations();
 
         // Replicator state should be ROLLBACK before rollback function returns.
         ASSERT_EQUALS(toString(DataReplicatorState::Rollback), toString(stateDuringRollback));
@@ -1687,11 +1661,9 @@ TEST_F(SteadyStateTest, RequestShutdownAfterStart) {
         // Simulating an invalid remote oplog query response. This will invalidate the existing
         // sync source but that's fine because we're not testing oplog processing.
         scheduleNetworkResponse("find", BSON("ok" << 0));
-        net->runUntil(net->now() + Milliseconds(5));
+        net->runReadyNetworkOperations();
         ASSERT_OK(dr.scheduleShutdown(txn.get()));
-        net->runUntil(net->now() + Milliseconds(5));
     }
-
     // runs work item scheduled in 'scheduleShutdown()).
     dr.waitForShutdown();
     ASSERT_EQUALS(toString(DataReplicatorState::Uninitialized), toString(dr.getState()));
@@ -1741,7 +1713,7 @@ TEST_F(SteadyStateTest, ChooseNewSyncSourceAfterFailedNetworkRequest) {
     // Simulating an invalid remote oplog query response to cause the data replicator to
     // blacklist the existing sync source and request a new one.
     scheduleNetworkResponse("find", BSON("ok" << 0));
-    net->runUntil(net->now() + Milliseconds(5));
+    net->runReadyNetworkOperations();
 
     // Wait for data replicator to request a new sync source.
     {
@@ -1757,13 +1729,6 @@ TEST_F(SteadyStateTest, ChooseNewSyncSourceAfterFailedNetworkRequest) {
 }
 
 TEST_F(SteadyStateTest, RemoteOplogEmptyRollbackSucceeded) {
-    // TODO: Re-enable (SERVER-25662)
-    if (1) {
-        log() << "skipping test";
-        return;
-    }
-
-
     _setUpOplogFetcherFailed();
     auto oplogFetcherResponse =
         fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch: []}}");
@@ -1778,13 +1743,6 @@ TEST_F(SteadyStateTest, RemoteOplogEmptyRollbackSucceeded) {
 }
 
 TEST_F(SteadyStateTest, RemoteOplogEmptyRollbackFailed) {
-    // TODO: Re-enable (SERVER-25662)
-    if (1) {
-        log() << "skipping test";
-        return;
-    }
-
-
     _setUpOplogFetcherFailed();
     auto oplogFetcherResponse =
         fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch: []}}");
@@ -1799,13 +1757,6 @@ TEST_F(SteadyStateTest, RemoteOplogEmptyRollbackFailed) {
 }
 
 TEST_F(SteadyStateTest, RemoteOplogFirstOperationMissingTimestampRollbackFailed) {
-    // TODO: Re-enable (SERVER-25662)
-    if (1) {
-        log() << "skipping test";
-        return;
-    }
-
-
     _setUpOplogFetcherFailed();
     auto oplogFetcherResponse =
         fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch: [{}]}}");
@@ -1820,13 +1771,6 @@ TEST_F(SteadyStateTest, RemoteOplogFirstOperationMissingTimestampRollbackFailed)
 }
 
 TEST_F(SteadyStateTest, RemoteOplogFirstOperationTimestampDoesNotMatchRollbackFailed) {
-    // TODO: Re-enable (SERVER-25662)
-    if (1) {
-        log() << "skipping test";
-        return;
-    }
-
-
     _setUpOplogFetcherFailed();
     auto oplogFetcherResponse = fromjson(
         "{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch:[{ts:Timestamp(1,1)}]}}");
@@ -1841,13 +1785,6 @@ TEST_F(SteadyStateTest, RemoteOplogFirstOperationTimestampDoesNotMatchRollbackFa
 }
 
 TEST_F(SteadyStateTest, RollbackTwoSyncSourcesBothFailed) {
-    // TODO: Re-enable (SERVER-25662)
-    if (1) {
-        log() << "skipping test";
-        return;
-    }
-
-
     _setUpOplogFetcherFailed();
     auto oplogFetcherResponse =
         fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch: []}}");
@@ -1872,13 +1809,6 @@ TEST_F(SteadyStateTest, RollbackTwoSyncSourcesBothFailed) {
 }
 
 TEST_F(SteadyStateTest, RollbackTwoSyncSourcesSecondRollbackSucceeds) {
-    // TODO: Re-enable (SERVER-25662)
-    if (1) {
-        log() << "skipping test";
-        return;
-    }
-
-
     _setUpOplogFetcherFailed();
     auto oplogFetcherResponse =
         fromjson("{ok:1, cursor:{id:NumberLong(0), ns:'local.oplog.rs', firstBatch: []}}");
@@ -1970,7 +1900,7 @@ TEST_F(SteadyStateTest, RollbackTwoSyncSourcesSecondRollbackSucceeds) {
 //    ASSERT_EQUALS(0U, dr.getOplogBufferCount());
 //
 //    // Data replication will process the fetcher response but will not schedule the applier.
-//    net->runUntil(net->now() + Milliseconds(5))
+//    net->runReadyNetworkOperations();
 //    ASSERT_EQUALS(operationToApply["ts"].timestamp(), dr.getLastTimestampFetched());
 //
 //    // Schedule a bogus work item to ensure that the operation applier function
@@ -2068,7 +1998,7 @@ TEST_F(SteadyStateTest, RollbackTwoSyncSourcesSecondRollbackSucceeds) {
 //        ASSERT_EQUALS(0U, dr.getOplogBufferCount());
 //
 //        // Oplog buffer should be empty because contents are transferred to applier.
-//        net->runUntil(net->now() + Milliseconds(5))
+//        net->runReadyNetworkOperations();
 //        ASSERT_EQUALS(0U, dr.getOplogBufferCount());
 //
 //        // Wait for applier function.
