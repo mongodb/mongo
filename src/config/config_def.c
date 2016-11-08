@@ -24,6 +24,7 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_load_extension[] = {
 };
 
 static const WT_CONFIG_CHECK confchk_WT_CONNECTION_open_session[] = {
+	{ "ignore_cache_size", "boolean", NULL, NULL, NULL, 0 },
 	{ "isolation", "string",
 	    NULL, "choices=[\"read-uncommitted\",\"read-committed\","
 	    "\"snapshot\"]",
@@ -344,6 +345,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_open_cursor[] = {
 };
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_reconfigure[] = {
+	{ "ignore_cache_size", "boolean", NULL, NULL, NULL, 0 },
 	{ "isolation", "string",
 	    NULL, "choices=[\"read-uncommitted\",\"read-committed\","
 	    "\"snapshot\"]",
@@ -1017,8 +1019,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_WT_CONNECTION_load_extension, 4
 	},
 	{ "WT_CONNECTION.open_session",
-	  "isolation=read-committed",
-	  confchk_WT_CONNECTION_open_session, 1
+	  "ignore_cache_size=false,isolation=read-committed",
+	  confchk_WT_CONNECTION_open_session, 2
 	},
 	{ "WT_CONNECTION.reconfigure",
 	  "async=(enabled=false,ops_max=1024,threads=2),cache_overhead=8,"
@@ -1116,8 +1118,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  NULL, 0
 	},
 	{ "WT_SESSION.reconfigure",
-	  "isolation=read-committed",
-	  confchk_WT_SESSION_reconfigure, 1
+	  "ignore_cache_size=false,isolation=read-committed",
+	  confchk_WT_SESSION_reconfigure, 2
 	},
 	{ "WT_SESSION.rename",
 	  "",
