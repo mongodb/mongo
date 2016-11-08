@@ -561,12 +561,10 @@ Collection* Database::createCollection(OperationContext* txn,
     _checkCanCreateCollection(nss, options);
     audit::logCreateCollection(&cc(), ns);
 
-    txn->recoveryUnit()->registerChange(new AddCollectionChange(txn, this, ns));
-
     Status status = _dbEntry->createCollection(txn, ns, options, true /*allocateDefaultSpace*/);
     massertNoTraceStatusOK(status);
 
-
+    txn->recoveryUnit()->registerChange(new AddCollectionChange(txn, this, ns));
     Collection* collection = _getOrCreateCollectionInstance(txn, ns);
     invariant(collection);
     _collections[ns] = collection;
