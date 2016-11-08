@@ -255,7 +255,10 @@ void BackgroundSync::_runProducer() {
 void BackgroundSync::_produce(OperationContext* txn) {
 
     while (MONGO_FAIL_POINT(pauseRsBgSyncProducer)) {
-        sleepmillis(0);
+        if (inShutdown()) {
+            return;
+        }
+        sleepmillis(10);
     }
 
     // this oplog reader does not do a handshake because we don't want the server it's syncing
