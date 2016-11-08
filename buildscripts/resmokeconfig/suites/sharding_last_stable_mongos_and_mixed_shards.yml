@@ -84,6 +84,8 @@ selector:
     - jstests/sharding/merge_chunks_test.js
     # TODO Change in error reporting, enable when 3.4 becomes last-stable. See SERVER-26440.
     - jstests/sharding/explain_cmd_invalid_namespace.js
+    # $graphLookup is not supported in versions <= 3.2
+    - jstests/sharding/read_committed_lookup.js
 
 executor:
   js_test:
