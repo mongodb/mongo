@@ -770,7 +770,7 @@ var ReplSetTest = function(opts) {
             masterConfigVersion = this.getReplSetConfigFromNode().version;
             masterName = master.toString().substr(14);  // strip "connection to "
             return true;
-        }, "ReplSetTest awaitReplication: couldnt get repl set config.", num_attempts);
+        }, "ReplSetTest awaitReplication: couldnt get repl set config.", num_attempts, 1000);
 
         print("ReplSetTest awaitReplication: starting: optime for primary, " + masterName +
               ", is " + tojson(masterLatestOpTime));

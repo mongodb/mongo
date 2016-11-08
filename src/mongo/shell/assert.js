@@ -216,11 +216,14 @@ assert.soonNoExcept = function(func, msg, timeout) {
 };
 
 /*
- * Calls the given function 'func' repeatedly until either func() returns true
- * or the number of attempted function calls is equal to 'num_attempts'.
- * Throws an exception with message 'msg' after all attempts are used up.
+ * Calls the given function 'func' repeatedly at time intervals specified by
+ * 'intervalMS' (milliseconds) until either func() returns true or the number of
+ * attempted function calls is equal to 'num_attempts'. Throws an exception with
+ * message 'msg' after all attempts are used up. If no 'intervalMS' argument is passed,
+ * it defaults to 0.
  */
-assert.retry = function(func, msg, num_attempts) {
+assert.retry = function(func, msg, num_attempts, intervalMS) {
+    var intervalMS = intervalMS || 0;
     var attempts_made = 0;
     while (attempts_made < num_attempts) {
         if (func()) {
@@ -228,6 +231,7 @@ assert.retry = function(func, msg, num_attempts) {
         } else {
             attempts_made += 1;
             print("assert.retry failed on attempt " + attempts_made + " of " + num_attempts);
+            sleep(intervalMS);
         }
     }
     // Used up all attempts
@@ -235,13 +239,15 @@ assert.retry = function(func, msg, num_attempts) {
 };
 
 /*
- * Calls the given function 'func' repeatedly until either func() returns true without
- * throwing an exception or the number of attempted function calls is equal to 'num_attempts'.
- * Throws an exception with message 'msg' after all attempts are used up.
+ * Calls the given function 'func' repeatedly at time intervals specified by
+ * 'intervalMS' (milliseconds) until either func() returns true without throwing
+ * an exception or the number of attempted function calls is equal to 'num_attempts'.
+ * Throws an exception with message 'msg' after all attempts are used up. If no 'intervalMS'
+ * argument is passed, it defaults to 0.
  */
-assert.retryNoExcept = function(func, msg, num_attempts) {
+assert.retryNoExcept = function(func, msg, num_attempts, intervalMS) {
     var safeFunc = _convertExceptionToReturnStatus(func, "assert.retryNoExcept caught exception");
-    assert.retry(safeFunc, msg, num_attempts);
+    assert.retry(safeFunc, msg, num_attempts, intervalMS);
 };
 
 assert.time = function(f, msg, timeout /*ms*/) {
