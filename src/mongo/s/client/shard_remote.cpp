@@ -196,7 +196,7 @@ Shard::HostWithResponse ShardRemote::_runCommand(OperationContext* txn,
     const RemoteCommandRequest request(
         host.getValue(),
         dbName,
-        appendMaxTimeToCmdObj(maxTimeMSOverride, cmdObj),
+        appendMaxTimeToCmdObj(requestTimeout, cmdObj),
         _appendMetadataForCommand(txn, readPrefWithMinOpTime),
         txn,
         requestTimeout < Milliseconds::max() ? requestTimeout : RemoteCommandRequest::kNoTimeout);
