@@ -76,8 +76,14 @@ MONGO_FP_DECLARE(migrationCommitNetworkError);
 MONGO_FP_DECLARE(failMigrationCommit);
 MONGO_FP_DECLARE(hangBeforeLeavingCriticalSection);
 
-MigrationSourceManager::MigrationSourceManager(OperationContext* txn, MoveChunkRequest request)
-    : _args(std::move(request)), _startTime() {
+MigrationSourceManager::MigrationSourceManager(OperationContext* txn,
+                                               MoveChunkRequest request,
+                                               ConnectionString donorConnStr,
+                                               HostAndPort recipientHost)
+    : _args(std::move(request)),
+      _donorConnStr(std::move(donorConnStr)),
+      _recipientHost(std::move(recipientHost)),
+      _startTime() {
     invariant(!txn->lockState()->isLocked());
 
     // Disallow moving a chunk to ourselves
@@ -182,7 +188,7 @@ Status MigrationSourceManager::startClone(OperationContext* txn) {
                                        ShardingCatalogClient::kMajorityWriteConcern);
 
     _cloneDriver = stdx::make_unique<MigrationChunkClonerSourceLegacy>(
-        _args, _collectionMetadata->getKeyPattern());
+        _args, _collectionMetadata->getKeyPattern(), _donorConnStr, _recipientHost);
 
     {
         // Register for notifications from the replication subsystem

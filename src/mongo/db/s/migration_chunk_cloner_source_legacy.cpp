@@ -34,7 +34,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
@@ -168,11 +167,15 @@ private:
 };
 
 MigrationChunkClonerSourceLegacy::MigrationChunkClonerSourceLegacy(MoveChunkRequest request,
-                                                                   const BSONObj& shardKeyPattern)
+                                                                   const BSONObj& shardKeyPattern,
+                                                                   ConnectionString donorConnStr,
+                                                                   HostAndPort recipientHost)
     : _args(std::move(request)),
       _shardKeyPattern(shardKeyPattern),
       _sessionId(MigrationSessionId::generate(_args.getFromShardId().toString(),
-                                              _args.getToShardId().toString())) {}
+                                              _args.getToShardId().toString())),
+      _donorConnStr(std::move(donorConnStr)),
+      _recipientHost(std::move(recipientHost)) {}
 
 MigrationChunkClonerSourceLegacy::~MigrationChunkClonerSourceLegacy() {
     invariant(!_deleteNotifyExec);
@@ -188,32 +191,6 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* txn) {
     // already running migration.
     auto scopedGuard = MakeGuard([&] { _cleanup(txn); });
 
-    // Resolve the donor and recipient shards and their connection string
-
-    {
-        auto donorShardStatus = grid.shardRegistry()->getShard(txn, _args.getFromShardId());
-        if (!donorShardStatus.isOK()) {
-            return donorShardStatus.getStatus();
-        }
-        _donorCS = donorShardStatus.getValue()->getConnString();
-    }
-
-    {
-        auto recipientShardStatus = grid.shardRegistry()->getShard(txn, _args.getToShardId());
-        if (!recipientShardStatus.isOK()) {
-            return recipientShardStatus.getStatus();
-        }
-        auto recipientShard = recipientShardStatus.getValue();
-
-        auto shardHostStatus = recipientShard->getTargeter()->findHostNoWait(
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly});
-        if (!shardHostStatus.isOK()) {
-            return shardHostStatus.getStatus();
-        }
-
-        _recipientHost = std::move(shardHostStatus.getValue());
-    }
-
     // Prepare the currently available documents
     Status status = _storeCurrentLocs(txn);
     if (!status.isOK()) {
@@ -226,7 +203,7 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* txn) {
                                             _args.getNss(),
                                             _sessionId,
                                             _args.getConfigServerCS(),
-                                            _donorCS,
+                                            _donorConnStr,
                                             _args.getFromShardId(),
                                             _args.getToShardId(),
                                             _args.getMinKey(),
@@ -234,9 +211,9 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* txn) {
                                             _shardKeyPattern.toBSON(),
                                             _args.getSecondaryThrottle());
 
-    auto responseStatus = _callRecipient(cmdBuilder.obj());
-    if (!responseStatus.isOK()) {
-        return responseStatus.getStatus();
+    auto startChunkCloneResponseStatus = _callRecipient(cmdBuilder.obj());
+    if (!startChunkCloneResponseStatus.isOK()) {
+        return startChunkCloneResponseStatus.getStatus();
     }
 
     scopedGuard.Dismiss();
@@ -299,9 +276,10 @@ Status MigrationChunkClonerSourceLegacy::awaitUntilCriticalSectionIsAppropriate(
                                   << migrationSessionIdStatus.getStatus().toString()};
         }
 
-        if (res["ns"].str() != _args.getNss().ns() || res["from"].str() != _donorCS.toString() ||
-            !res["min"].isABSONObj() || res["min"].Obj().woCompare(_args.getMinKey()) != 0 ||
-            !res["max"].isABSONObj() || res["max"].Obj().woCompare(_args.getMaxKey()) != 0 ||
+        if (res["ns"].str() != _args.getNss().ns() ||
+            res["from"].str() != _donorConnStr.toString() || !res["min"].isABSONObj() ||
+            res["min"].Obj().woCompare(_args.getMinKey()) != 0 || !res["max"].isABSONObj() ||
+            res["max"].Obj().woCompare(_args.getMaxKey()) != 0 ||
             !_sessionId.matches(migrationSessionIdStatus.getValue())) {
             // This can happen when the destination aborted the migration and received another
             // recvChunk before this thread sees the transition to the abort state. This is

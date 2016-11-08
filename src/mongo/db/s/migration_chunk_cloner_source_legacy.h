@@ -55,7 +55,10 @@ class MigrationChunkClonerSourceLegacy final : public MigrationChunkClonerSource
     MONGO_DISALLOW_COPYING(MigrationChunkClonerSourceLegacy);
 
 public:
-    MigrationChunkClonerSourceLegacy(MoveChunkRequest request, const BSONObj& shardKeyPattern);
+    MigrationChunkClonerSourceLegacy(MoveChunkRequest request,
+                                     const BSONObj& shardKeyPattern,
+                                     ConnectionString donorConnStr,
+                                     HostAndPort recipientHost);
     ~MigrationChunkClonerSourceLegacy();
 
     Status startClone(OperationContext* txn) override;
@@ -168,10 +171,10 @@ private:
     const MigrationSessionId _sessionId;
 
     // The resolved connection string of the donor shard
-    ConnectionString _donorCS;
+    const ConnectionString _donorConnStr;
 
     // The resolved primary of the recipient shard
-    HostAndPort _recipientHost;
+    const HostAndPort _recipientHost;
 
     // Registered deletion notifications plan executor, which will listen for document deletions
     // during the cloning stage

@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -200,6 +201,20 @@ private:
             uassertStatusOK(ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(
                 txn, moveChunkRequest.getSecondaryThrottle()));
 
+        // Resolve the donor and recipient shards and their connection string
+        auto const shardRegistry = Grid::get(txn)->shardRegistry();
+
+        const auto donorConnStr =
+            uassertStatusOK(shardRegistry->getShard(txn, moveChunkRequest.getFromShardId()))
+                ->getConnString();
+        const auto recipientHost = uassertStatusOK([&] {
+            auto recipientShard =
+                uassertStatusOK(shardRegistry->getShard(txn, moveChunkRequest.getToShardId()));
+
+            return recipientShard->getTargeter()->findHostNoWait(
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly});
+        }());
+
         string unusedErrMsg;
         MoveTimingHelper moveTimingHelper(txn,
                                           "from",
@@ -223,7 +238,8 @@ private:
                 scopedCollectionDistLock = acquireCollectionDistLock(txn, moveChunkRequest);
             }
 
-            MigrationSourceManager migrationSourceManager(txn, moveChunkRequest);
+            MigrationSourceManager migrationSourceManager(
+                txn, moveChunkRequest, donorConnStr, recipientHost);
 
             shardKeyPattern = migrationSourceManager.getKeyPattern().getOwned();
 

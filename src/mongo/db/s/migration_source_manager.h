@@ -83,7 +83,10 @@ public:
      *  - SendStaleConfigException if the expected collection version does not match what we find it
      *      to be after acquiring the distributed lock.
      */
-    MigrationSourceManager(OperationContext* txn, MoveChunkRequest request);
+    MigrationSourceManager(OperationContext* txn,
+                           MoveChunkRequest request,
+                           ConnectionString donorConnStr,
+                           HostAndPort recipientHost);
     ~MigrationSourceManager();
 
     /**
@@ -201,6 +204,12 @@ private:
 
     // The parameters to the moveChunk command
     const MoveChunkRequest _args;
+
+    // The resolved connection string of the donor shard
+    const ConnectionString _donorConnStr;
+
+    // The resolved primary of the recipient shard
+    const HostAndPort _recipientHost;
 
     // Gets initialized at creation time and will time the entire move chunk operation
     const Timer _startTime;

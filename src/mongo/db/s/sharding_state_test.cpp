@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/dbdirectclient.h"
@@ -46,6 +45,8 @@
 namespace mongo {
 
 using executor::RemoteCommandRequest;
+
+namespace {
 
 class ShardingStateTest : public ShardingMongodTestFixture {
 public:
@@ -558,4 +559,6 @@ TEST_F(ShardingStateTest,
     ASSERT_OK(swShardingInitialized);
     ASSERT_FALSE(swShardingInitialized.getValue());
 }
+
+}  // namespace
 }  // namespace mongo
