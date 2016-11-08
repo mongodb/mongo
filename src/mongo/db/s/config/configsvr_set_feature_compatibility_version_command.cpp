@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/grid.h"
 
@@ -86,49 +87,14 @@ public:
              int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
+        const auto version = uassertStatusOK(
+            FeatureCompatibilityVersionCommandParser::extractVersionFromCommand(getName(), cmdObj));
+
         uassert(ErrorCodes::IllegalOperation,
-                "_configsvrSetFeatureCompatibilityVersion can only be run on config servers. See "
-                "http://dochub.mongodb.org/core/3.4-feature-compatibility.",
+                str::stream() << getName()
+                              << " can only be run on config servers. See "
+                                 "http://dochub.mongodb.org/core/3.4-feature-compatibility.",
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
-
-        // Validate command.
-        std::string version;
-        for (auto&& elem : cmdObj) {
-            if (elem.fieldNameStringData() == "_configsvrSetFeatureCompatibilityVersion") {
-                uassert(ErrorCodes::TypeMismatch,
-                        str::stream()
-                            << "_configsvrSetFeatureCompatibilityVersion must be of type "
-                               "String, but was of type "
-                            << typeName(elem.type())
-                            << " in: "
-                            << cmdObj
-                            << ". See http://dochub.mongodb.org/core/3.4-feature-compatibility.",
-                        elem.type() == BSONType::String);
-                version = elem.String();
-            } else {
-                uasserted(ErrorCodes::FailedToParse,
-                          str::stream()
-                              << "unrecognized field '"
-                              << elem.fieldName()
-                              << "' in: "
-                              << cmdObj
-                              << ". See http://dochub.mongodb.org/core/3.4-feature-compatibility.");
-            }
-        }
-
-        uassert(ErrorCodes::BadValue,
-                str::stream()
-                    << "invalid value for _configsvrSetFeatureCompatibilityVersion, expected '"
-                    << FeatureCompatibilityVersion::kVersion34
-                    << "' or '"
-                    << FeatureCompatibilityVersion::kVersion32
-                    << "', found "
-                    << version
-                    << " in: "
-                    << cmdObj
-                    << ". See http://dochub.mongodb.org/core/3.4-feature-compatibility.",
-                version == FeatureCompatibilityVersion::kVersion34 ||
-                    version == FeatureCompatibilityVersion::kVersion32);
 
         // Forward to all shards.
         uassertStatusOK(
@@ -136,8 +102,10 @@ public:
 
         // On success, set featureCompatibilityVersion on self.
         FeatureCompatibilityVersion::set(txn, version);
+
         return true;
     }
+
 } configsvrSetFeatureCompatibilityVersionCmd;
 
 }  // namespace

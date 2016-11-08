@@ -17,8 +17,7 @@
     var res;
 
     // Helper function to configure "maxTimeAlwaysTimeOut" fail point on shards, which forces mongod
-    // to
-    // throw if it receives an operation with a max time.  See fail point declaration for complete
+    // to throw if it receives an operation with a max time. See fail point declaration for complete
     // description.
     var configureMaxTimeAlwaysTimeOut = function(mode) {
         assert.commandWorked(shards[0].getDB("admin").runCommand(
@@ -28,8 +27,7 @@
     };
 
     // Helper function to configure "maxTimeAlwaysTimeOut" fail point on shards, which prohibits
-    // mongod
-    // from enforcing time limits.  See fail point declaration for complete description.
+    // mongod from enforcing time limits. See fail point declaration for complete description.
     var configureMaxTimeNeverTimeOut = function(mode) {
         assert.commandWorked(shards[0].getDB("admin").runCommand(
             {configureFailPoint: "maxTimeNeverTimeOut", mode: mode}));
@@ -220,8 +218,6 @@
         maxTimeMS: 1000 * 60 * 60 * 24
     }),
                          "expected moveChunk to not hit time limit in mongod");
-
-    // TODO Test additional commmands.
 
     st.stop();
 

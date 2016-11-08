@@ -30,6 +30,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -88,56 +89,22 @@ public:
              int options,
              std::string& errmsg,
              BSONObjBuilder& result) {
-
-        // Validate command.
-        std::string version;
-        for (auto&& elem : cmdObj) {
-            if (elem.fieldNameStringData() == "setFeatureCompatibilityVersion") {
-                uassert(
-                    ErrorCodes::TypeMismatch,
-                    str::stream()
-                        << "setFeatureCompatibilityVersion must be of type String, but was of type "
-                        << typeName(elem.type())
-                        << " in: "
-                        << cmdObj
-                        << ". See http://dochub.mongodb.org/core/3.4-feature-compatibility.",
-                    elem.type() == BSONType::String);
-                version = elem.String();
-            } else if (elem.fieldNameStringData() == "maxTimeMS") {
-                continue;
-            } else {
-                uasserted(ErrorCodes::FailedToParse,
-                          str::stream()
-                              << "unrecognized field '"
-                              << elem.fieldName()
-                              << "' in: "
-                              << cmdObj
-                              << ". See http://dochub.mongodb.org/core/3.4-feature-compatibility.");
-            }
-        }
-
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "invalid value for setFeatureCompatibilityVersion, expected '3.4' "
-                                 "or '3.2', found "
-                              << version
-                              << " in: "
-                              << cmdObj
-                              << ". See http://dochub.mongodb.org/core/3.4-feature-compatibility.",
-                version == "3.4" || version == "3.2");
+        const auto version = uassertStatusOK(
+            FeatureCompatibilityVersionCommandParser::extractVersionFromCommand(getName(), cmdObj));
 
         // Forward to config shard, which will forward to all shards.
         auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
-        auto response = configShard->runCommandWithFixedRetryAttempts(
+        auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
             txn,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             dbname,
             BSON("_configsvrSetFeatureCompatibilityVersion" << version),
-            Shard::RetryPolicy::kIdempotent);
-        uassertStatusOK(response);
-        uassertStatusOK(response.getValue().commandStatus);
+            Shard::RetryPolicy::kIdempotent));
+        uassertStatusOK(response.commandStatus);
 
         return true;
     }
+
 } clusterSetFeatureCompatibilityVersionCmd;
 
 }  // namespace

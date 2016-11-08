@@ -34,6 +34,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
@@ -58,8 +59,6 @@ constexpr StringData FeatureCompatibilityVersion::kCollection;
 constexpr StringData FeatureCompatibilityVersion::kCommandName;
 constexpr StringData FeatureCompatibilityVersion::kParameterName;
 constexpr StringData FeatureCompatibilityVersion::kVersionField;
-constexpr StringData FeatureCompatibilityVersion::kVersion34;
-constexpr StringData FeatureCompatibilityVersion::kVersion32;
 
 namespace {
 const BSONObj k32IncompatibleIndexSpec =
@@ -104,9 +103,9 @@ StringData getFeatureCompatibilityVersionString(
     ServerGlobalParams::FeatureCompatibility::Version version) {
     switch (version) {
         case ServerGlobalParams::FeatureCompatibility::Version::k34:
-            return FeatureCompatibilityVersion::kVersion34;
+            return FeatureCompatibilityVersionCommandParser::kVersion34;
         case ServerGlobalParams::FeatureCompatibility::Version::k32:
-            return FeatureCompatibilityVersion::kVersion32;
+            return FeatureCompatibilityVersionCommandParser::kVersion32;
         default:
             MONGO_UNREACHABLE;
     }
@@ -139,9 +138,9 @@ StatusWith<ServerGlobalParams::FeatureCompatibility::Version> FeatureCompatibili
                         << featureCompatibilityVersionDoc
                         << ". See http://dochub.mongodb.org/core/3.4-feature-compatibility.");
             }
-            if (elem.String() == FeatureCompatibilityVersion::kVersion34) {
+            if (elem.String() == FeatureCompatibilityVersionCommandParser::kVersion34) {
                 version = ServerGlobalParams::FeatureCompatibility::Version::k34;
-            } else if (elem.String() == FeatureCompatibilityVersion::kVersion32) {
+            } else if (elem.String() == FeatureCompatibilityVersionCommandParser::kVersion32) {
                 version = ServerGlobalParams::FeatureCompatibility::Version::k32;
             } else {
                 return Status(
@@ -152,9 +151,9 @@ StatusWith<ServerGlobalParams::FeatureCompatibility::Version> FeatureCompatibili
                         << ", found "
                         << elem.String()
                         << ", expected '"
-                        << FeatureCompatibilityVersion::kVersion34
+                        << FeatureCompatibilityVersionCommandParser::kVersion34
                         << "' or '"
-                        << FeatureCompatibilityVersion::kVersion32
+                        << FeatureCompatibilityVersionCommandParser::kVersion32
                         << "'. Contents of "
                         << FeatureCompatibilityVersion::kParameterName
                         << " document in "
@@ -197,13 +196,13 @@ void FeatureCompatibilityVersion::set(OperationContext* txn, StringData version)
     uassert(40284,
             "featureCompatibilityVersion must be '3.4' or '3.2'. See "
             "http://dochub.mongodb.org/core/3.4-feature-compatibility.",
-            version == FeatureCompatibilityVersion::kVersion34 ||
-                version == FeatureCompatibilityVersion::kVersion32);
+            version == FeatureCompatibilityVersionCommandParser::kVersion34 ||
+                version == FeatureCompatibilityVersionCommandParser::kVersion32);
 
     DBDirectClient client(txn);
     NamespaceString nss(FeatureCompatibilityVersion::kCollection);
 
-    if (version == FeatureCompatibilityVersion::kVersion34) {
+    if (version == FeatureCompatibilityVersionCommandParser::kVersion34) {
         // We build a v=2 index on the "admin.system.version" collection as part of setting the
         // featureCompatibilityVersion to 3.4. This is a new index version that isn't supported by
         // versions of MongoDB earlier than 3.4 that will cause 3.2 secondaries to crash when it is
@@ -248,7 +247,7 @@ void FeatureCompatibilityVersion::set(OperationContext* txn, StringData version)
         // We then update the value of the featureCompatibilityVersion server parameter.
         serverGlobalParams.featureCompatibility.version.store(
             ServerGlobalParams::FeatureCompatibility::Version::k34);
-    } else if (version == FeatureCompatibilityVersion::kVersion32) {
+    } else if (version == FeatureCompatibilityVersionCommandParser::kVersion32) {
         // We update the featureCompatibilityVersion document stored in the "admin.system.version"
         // collection. We do this before dropping the v=2 index in order to maintain the invariant
         // that if the featureCompatibilityVersion is 3.4, then 'k32IncompatibleIndexSpec' index
@@ -321,7 +320,7 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* txn,
             nss,
             BSON("_id" << FeatureCompatibilityVersion::kParameterName
                        << FeatureCompatibilityVersion::kVersionField
-                       << FeatureCompatibilityVersion::kVersion34)));
+                       << FeatureCompatibilityVersionCommandParser::kVersion34)));
 
         // We then update the value of the featureCompatibilityVersion server parameter.
         serverGlobalParams.featureCompatibility.version.store(
@@ -347,7 +346,8 @@ void FeatureCompatibilityVersion::onDelete(const BSONObj& doc) {
         idElement.String() != FeatureCompatibilityVersion::kParameterName) {
         return;
     }
-    log() << "setting featureCompatibilityVersion to " << FeatureCompatibilityVersion::kVersion32;
+    log() << "setting featureCompatibilityVersion to "
+          << FeatureCompatibilityVersionCommandParser::kVersion32;
     serverGlobalParams.featureCompatibility.version.store(
         ServerGlobalParams::FeatureCompatibility::Version::k32);
 }

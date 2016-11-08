@@ -31,6 +31,7 @@ env.Library(
         "connection_status.cpp",
         "copydb_common.cpp",
         "fail_point_cmd.cpp",
+        "feature_compatibility_version_command_parser.cpp",
         "find_and_modify_common.cpp",
         "hashcmd.cpp",
         "isself.cpp",

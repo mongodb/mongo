@@ -52,8 +52,6 @@ public:
     static constexpr StringData kCommandName = "setFeatureCompatibilityVersion"_sd;
     static constexpr StringData kParameterName = "featureCompatibilityVersion"_sd;
     static constexpr StringData kVersionField = "version"_sd;
-    static constexpr StringData kVersion34 = "3.4"_sd;
-    static constexpr StringData kVersion32 = "3.2"_sd;
 
     /**
      * Parses the featureCompatibilityVersion document from admin.system.version, and returns the

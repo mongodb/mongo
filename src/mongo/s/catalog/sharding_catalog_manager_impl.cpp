@@ -45,6 +45,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
@@ -844,7 +845,7 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
                                    targeter.get(),
                                    "admin",
                                    BSON(FeatureCompatibilityVersion::kCommandName
-                                        << FeatureCompatibilityVersion::kVersion34));
+                                        << FeatureCompatibilityVersionCommandParser::kVersion34));
         if (!versionResponse.isOK()) {
             return versionResponse.getStatus();
         }

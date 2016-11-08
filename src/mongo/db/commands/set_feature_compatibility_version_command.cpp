@@ -31,6 +31,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 
 namespace mongo {
 
@@ -86,51 +87,14 @@ public:
              int options,
              std::string& errmsg,
              BSONObjBuilder& result) {
+        const auto version = uassertStatusOK(
+            FeatureCompatibilityVersionCommandParser::extractVersionFromCommand(getName(), cmdObj));
 
-        // Validate command.
-        std::string version;
-        for (auto&& elem : cmdObj) {
-            if (elem.fieldNameStringData() == FeatureCompatibilityVersion::kCommandName) {
-                uassert(ErrorCodes::TypeMismatch,
-                        str::stream()
-                            << FeatureCompatibilityVersion::kCommandName
-                            << " must be of type String, but was of type "
-                            << typeName(elem.type())
-                            << " in: "
-                            << cmdObj
-                            << ". See http://dochub.mongodb.org/core/3.4-feature-compatibility.",
-                        elem.type() == BSONType::String);
-                version = elem.String();
-            } else {
-                uasserted(ErrorCodes::FailedToParse,
-                          str::stream()
-                              << "unrecognized field '"
-                              << elem.fieldName()
-                              << "' in: "
-                              << cmdObj
-                              << ". See http://dochub.mongodb.org/core/3.4-feature-compatibility.");
-            }
-        }
-
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "invalid value for " << FeatureCompatibilityVersion::kCommandName
-                              << ", expected '"
-                              << FeatureCompatibilityVersion::kVersion34
-                              << "' or '"
-                              << FeatureCompatibilityVersion::kVersion32
-                              << "', found "
-                              << version
-                              << " in: "
-                              << cmdObj
-                              << ". See http://dochub.mongodb.org/core/3.4-feature-compatibility.",
-                version == FeatureCompatibilityVersion::kVersion34 ||
-                    version == FeatureCompatibilityVersion::kVersion32);
-
-        // Set featureCompatibilityVersion.
         FeatureCompatibilityVersion::set(txn, version);
 
         return true;
     }
+
 } setFeatureCompatibilityVersionCommand;
 
 }  // namespace
