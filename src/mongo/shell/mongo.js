@@ -294,7 +294,6 @@ Mongo.prototype.writeMode = function() {
     if (this.hasWriteCommands()) {
         // good with whatever is already set
     } else if (this._writeMode == "commands") {
-        print("Cannot use commands write mode, degrading to compatibility mode");
         this._writeMode = "compatibility";
     }
 
@@ -344,7 +343,6 @@ Mongo.prototype.readMode = function() {
             if (hasReadCommands) {
                 this._readMode = "commands";
             } else {
-                print("Cannot use 'commands' readMode, degrading to 'legacy' mode");
                 this._readMode = "legacy";
             }
         } catch (e) {
