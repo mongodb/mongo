@@ -1351,6 +1351,8 @@ void DataReplicator::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
 
 void DataReplicator::_onOplogFetchFinish(const Status& status, const OpTimeWithHash& lastFetched) {
     _fetcherPaused = true;
+    log() << "Finished fetching oplog during initial sync: " << redact(status)
+          << ". Last fetched optime and hash: " << lastFetched;
     if (status.code() == ErrorCodes::CallbackCanceled) {
         return;
     } else if (status.isOK()) {
