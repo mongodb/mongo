@@ -183,28 +183,7 @@ private:
      */
     class AsyncCommand {
     public:
-        /**
-         * Describes the variant of AsyncCommand this object represents.
-         */
-        enum class CommandType {
-            /**
-             * An ordinary command of an unspecified Protocol.
-             */
-            kRPC,
-
-            /**
-             * A 'find' command that has been downconverted to an OP_QUERY.
-             */
-            kDownConvertedFind,
-
-            /**
-             * A 'getMore' command that has been downconverted to an OP_GET_MORE.
-             */
-            kDownConvertedGetMore,
-        };
-
         AsyncCommand(AsyncConnection* conn,
-                     CommandType type,
                      Message&& command,
                      Date_t now,
                      const HostAndPort& target);
@@ -222,8 +201,6 @@ private:
 
     private:
         NetworkInterfaceASIO::AsyncConnection* const _conn;
-
-        const CommandType _type;
 
         Message _toSend;
         Message _toRecv;
@@ -305,9 +282,7 @@ private:
 
         // This form of beginCommand takes a raw message. It is needed if the caller
         // has to form the command manually (e.g. to use a specific requestBuilder).
-        Status beginCommand(Message&& newCommand,
-                            AsyncCommand::CommandType,
-                            const HostAndPort& target);
+        Status beginCommand(Message&& newCommand, const HostAndPort& target);
 
         AsyncCommand* command();
 

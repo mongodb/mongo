@@ -142,6 +142,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/base/system_error',
+        '$BUILD_DIR/mongo/client/client_query',
         '$BUILD_DIR/mongo/db/auth/authcommon',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/wire_version',
@@ -151,7 +152,6 @@ env.Library(
         'async_stream',
         'async_timer_asio',
         'connection_pool',
-        'downconvert_find_and_getmore_commands',
         'network_interface',
         'task_executor_interface',
     ])
@@ -314,24 +314,6 @@ env.CppUnitTest(
         'thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/unittest/concurrency',
     ]
-)
-
-env.Library(
-    target='downconvert_find_and_getmore_commands',
-    source=[
-        'downconvert_find_and_getmore_commands.cpp',
-    ],
-    LIBDEPS=[
-        'remote_command',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/client/client_query',
-        '$BUILD_DIR/mongo/db/query/command_request_response',
-        '$BUILD_DIR/mongo/db/query/command_request_response',
-        '$BUILD_DIR/mongo/db/query/query_request',
-        '$BUILD_DIR/mongo/rpc/protocol',
-        '$BUILD_DIR/mongo/rpc/metadata',
-        '$BUILD_DIR/mongo/util/net/network',
-    ],
 )
 
 env.Library(

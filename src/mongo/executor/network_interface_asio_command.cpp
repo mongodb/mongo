@@ -40,7 +40,6 @@
 #include "mongo/executor/async_stream_interface.h"
 #include "mongo/executor/async_stream_interface.h"
 #include "mongo/executor/connection_pool_asio.h"
-#include "mongo/executor/downconvert_find_and_getmore_commands.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/rpc/protocol.h"
@@ -177,11 +176,10 @@ ResponseStatus decodeRPC(Message* received,
 }  // namespace
 
 NetworkInterfaceASIO::AsyncCommand::AsyncCommand(AsyncConnection* conn,
-                                                 CommandType type,
                                                  Message&& command,
                                                  Date_t now,
                                                  const HostAndPort& target)
-    : _conn(conn), _type(type), _toSend(std::move(command)), _start(now), _target(target) {
+    : _conn(conn), _toSend(std::move(command)), _start(now), _target(target) {
     _toSend.header().setResponseToMsgId(0);
 }
 
@@ -214,23 +212,10 @@ ResponseStatus NetworkInterfaceASIO::AsyncCommand::response(AsyncOp* op,
         received = std::move(swm.getValue());
     }
 
-    switch (_type) {
-        case CommandType::kRPC: {
-            auto rs = decodeRPC(&received, protocol, now - _start, _target, metadataHook);
-            if (rs.isOK())
-                op->setResponseMetadata(rs.metadata);
-            return rs;
-        }
-        case CommandType::kDownConvertedFind: {
-            auto ns = DbMessage(_toSend).getns();
-            return upconvertLegacyQueryResponse(_toSend.header().getId(), ns, received);
-        }
-        case CommandType::kDownConvertedGetMore: {
-            auto ns = DbMessage(_toSend).getns();
-            return upconvertLegacyGetMoreResponse(_toSend.header().getId(), ns, received);
-        }
-    }
-    MONGO_UNREACHABLE;
+    auto rs = decodeRPC(&received, protocol, now - _start, _target, metadataHook);
+    if (rs.isOK())
+        op->setResponseMetadata(rs.metadata);
+    return rs;
 }
 
 void NetworkInterfaceASIO::_startCommand(AsyncOp* op) {

@@ -37,7 +37,6 @@
 #include "mongo/db/query/query_request.h"
 #include "mongo/executor/async_stream_interface.h"
 #include "mongo/executor/connection_pool_asio.h"
-#include "mongo/executor/downconvert_find_and_getmore_commands.h"
 #include "mongo/executor/network_interface_asio.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
@@ -164,7 +163,6 @@ void NetworkInterfaceASIO::AsyncOp::setConnection(AsyncConnection&& conn) {
 }
 
 Status NetworkInterfaceASIO::AsyncOp::beginCommand(Message&& newCommand,
-                                                   AsyncCommand::CommandType type,
                                                    const HostAndPort& target) {
     // NOTE: We operate based on the assumption that AsyncOp's
     // AsyncConnection does not change over its lifetime.
@@ -176,44 +174,16 @@ Status NetworkInterfaceASIO::AsyncOp::beginCommand(Message&& newCommand,
         return swm.getStatus();
 
     // Construct a new AsyncCommand object for each command.
-    _command.emplace(_connection.get_ptr(), type, std::move(swm.getValue()), _owner->now(), target);
+    _command.emplace(_connection.get_ptr(), std::move(swm.getValue()), _owner->now(), target);
     return Status::OK();
 }
 
 Status NetworkInterfaceASIO::AsyncOp::beginCommand(const RemoteCommandRequest& request) {
-    // Check if we need to downconvert find or getMore commands.
-    StringData commandName = request.cmdObj.firstElement().fieldNameStringData();
-    const auto isFindCmd = commandName == QueryRequest::kFindCommandName;
-    const auto isGetMoreCmd = commandName == GetMoreRequest::kGetMoreCommandName;
-    const auto isFindOrGetMoreCmd = isFindCmd || isGetMoreCmd;
-
-    // If we aren't sending a find or getMore, or the server supports OP_COMMAND we don't have
-    // to worry about downconversion.
-    if (!isFindOrGetMoreCmd || connection().serverProtocols() == rpc::supports::kAll) {
-        auto newCommand = messageFromRequest(request, operationProtocol());
-        if (!newCommand.isOK()) {
-            return newCommand.getStatus();
-        }
-        return beginCommand(
-            std::move(newCommand.getValue()), AsyncCommand::CommandType::kRPC, request.target);
-    } else if (isFindCmd) {
-        auto downconvertedFind = downconvertFindCommandRequest(request);
-        if (!downconvertedFind.isOK()) {
-            return downconvertedFind.getStatus();
-        }
-        return beginCommand(std::move(downconvertedFind.getValue()),
-                            AsyncCommand::CommandType::kDownConvertedFind,
-                            request.target);
-    } else {
-        MONGO_ASYNC_OP_INVARIANT(isGetMoreCmd, "Expected a GetMore command");
-        auto downconvertedGetMore = downconvertGetMoreCommandRequest(request);
-        if (!downconvertedGetMore.isOK()) {
-            return downconvertedGetMore.getStatus();
-        }
-        return beginCommand(std::move(downconvertedGetMore.getValue()),
-                            AsyncCommand::CommandType::kDownConvertedGetMore,
-                            request.target);
+    auto newCommand = messageFromRequest(request, operationProtocol());
+    if (!newCommand.isOK()) {
+        return newCommand.getStatus();
     }
+    return beginCommand(std::move(newCommand.getValue()), request.target);
 }
 
 NetworkInterfaceASIO::AsyncCommand* NetworkInterfaceASIO::AsyncOp::command() {

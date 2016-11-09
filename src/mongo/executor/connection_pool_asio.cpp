@@ -272,9 +272,7 @@ void ASIOConnection::refresh(Milliseconds timeout, RefreshCallback cb) {
         setTimeout(timeout, [this] { _impl->connection().stream().cancel(); });
 
         // Our pings are isMaster's
-        auto beginStatus = op->beginCommand(makeIsMasterRequest(this),
-                                            NetworkInterfaceASIO::AsyncCommand::CommandType::kRPC,
-                                            _hostAndPort);
+        auto beginStatus = op->beginCommand(makeIsMasterRequest(this), _hostAndPort);
         if (!beginStatus.isOK()) {
             auto cb = std::move(_refreshCallback);
             cb(this, beginStatus);
