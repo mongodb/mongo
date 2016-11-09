@@ -233,6 +233,11 @@ void ReplicaSetMonitor::_refresh(const CallbackArgs& cbArgs) {
     {
         // reschedule itself
         invariant(_executor);
+        if (_isRemovedFromManager.load()) {  // already removed so no need to refresh
+            LOG(1) << "Stopping refresh for replica set " << getName() << " because its removed";
+            return;
+        }
+
         stdx::lock_guard<stdx::mutex> lk(_mutex);
         std::weak_ptr<ReplicaSetMonitor> that(shared_from_this());
         auto status = _executor->scheduleWorkAt(_executor->now() + kRefreshPeriod,
@@ -260,6 +265,11 @@ void ReplicaSetMonitor::_refresh(const CallbackArgs& cbArgs) {
 
 StatusWith<HostAndPort> ReplicaSetMonitor::getHostOrRefresh(const ReadPreferenceSetting& criteria,
                                                             Milliseconds maxWait) {
+    if (_isRemovedFromManager.load()) {
+        return Status(ErrorCodes::ReplicaSetMonitorRemoved,
+                      str::stream() << "ReplicaSetMonitor for set " << getName() << " is removed");
+    }
+
     {
         // Fast path, for the failure-free case
         stdx::lock_guard<stdx::mutex> lk(_state->mutex);
@@ -451,6 +461,10 @@ bool ReplicaSetMonitor::isKnownToHaveGoodPrimary() const {
     }
 
     return false;
+}
+
+void ReplicaSetMonitor::markAsRemoved() {
+    _isRemovedFromManager.store(true);
 }
 
 Refresher::Refresher(const SetStatePtr& setState)

@@ -36,6 +36,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -164,6 +165,11 @@ public:
     bool isKnownToHaveGoodPrimary() const;
 
     /**
+     * Marks the instance as removed to exit refresh sooner.
+     */
+    void markAsRemoved();
+
+    /**
      * Creates a new ReplicaSetMonitor, if it doesn't already exist.
      */
     static std::shared_ptr<ReplicaSetMonitor> createIfNeeded(const std::string& name,
@@ -262,6 +268,7 @@ private:
 
     const SetStatePtr _state;
     executor::TaskExecutor* _executor;
+    AtomicBool _isRemovedFromManager{false};
 };
 
 

@@ -124,6 +124,9 @@ void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     ReplicaSetMonitorsMap::const_iterator it = _monitors.find(setName);
     if (it != _monitors.end()) {
+        if (auto monitor = it->second.lock()) {
+            monitor->markAsRemoved();
+        }
         _monitors.erase(it);
         log() << "Removed ReplicaSetMonitor for replica set " << setName;
     }
