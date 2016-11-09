@@ -753,6 +753,8 @@ Status MigrationManager::_processRemoteCommandResponse(
     ScopedMigrationRequest* scopedMigrationRequest) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     Status commandStatus(ErrorCodes::InternalError, "Uninitialized value.");
+
+    // Check for local errors sending the remote command caused by stepdown.
     if (isErrorDueToConfigStepdown(remoteCommandResponse.status,
                                    _state != State::kEnabled && _state != State::kRecovering)) {
         scopedMigrationRequest->keepDocumentOnDestruct();
@@ -760,15 +762,18 @@ Status MigrationManager::_processRemoteCommandResponse(
                 stream() << "Migration interrupted because the balancer is stopping."
                          << " Command status: "
                          << remoteCommandResponse.status.toString()};
-    } else if (!remoteCommandResponse.isOK()) {
+    }
+
+    if (!remoteCommandResponse.isOK()) {
         commandStatus = remoteCommandResponse.status;
     } else {
         commandStatus = extractMigrationStatusFromCommandResponse(remoteCommandResponse.data);
-        if (!Shard::shouldErrorBePropagated(commandStatus.code())) {
-            commandStatus = {ErrorCodes::OperationFailed,
-                             stream() << "moveChunk command failed on source shard."
-                                      << causedBy(commandStatus)};
-        }
+    }
+
+    if (!Shard::shouldErrorBePropagated(commandStatus.code())) {
+        commandStatus = {ErrorCodes::OperationFailed,
+                         stream() << "moveChunk command failed on source shard."
+                                  << causedBy(commandStatus)};
     }
 
     // Any failure to remove the migration document should be because the config server is
