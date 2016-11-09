@@ -781,9 +781,6 @@ var ShardingTest = function(params) {
 
             // If the mongos is being restarted with a newer version, make sure we remove any
             // options that no longer exist in the newer version.
-            // Note: If a jstest specifies the mongos binVersion as an array, calling
-            // MongoRunner.areBinVersionsTheSame() will advance the binVersion iterator over that
-            // array (SERVER-26261).
             if (MongoRunner.areBinVersionsTheSame('latest', opts.binVersion)) {
                 delete opts.noAutoSplit;
             }
@@ -1240,6 +1237,40 @@ var ShardingTest = function(params) {
     // Wait for master to be elected before starting mongos
     var csrsPrimary = this.configRS.getPrimary();
 
+    // If 'otherParams.mongosOptions.binVersion' is an array value, then we'll end up constructing a
+    // version iterator. We initialize the options for the mongos processes before checking whether
+    // we need to run {setFeatureCompatibilityVersion: "3.2"} on the CSRS primary so we know
+    // definitively what binVersions will be used for the mongos processes.
+    const mongosOptions = [];
+    for (var i = 0; i < numMongos; ++i) {
+        let options = {
+            useHostname: otherParams.useHostname,
+            pathOpts: Object.merge(pathOpts, {mongos: i}),
+            verbose: mongosVerboseLevel,
+            keyFile: keyFile,
+        };
+
+        if (otherParams.mongosOptions && otherParams.mongosOptions.binVersion) {
+            otherParams.mongosOptions.binVersion =
+                MongoRunner.versionIterator(otherParams.mongosOptions.binVersion);
+        }
+
+        options = Object.merge(options, otherParams.mongosOptions);
+        options = Object.merge(options, otherParams["s" + i]);
+
+        options.port = options.port || allocatePort();
+
+        // TODO(esha): remove after v3.4 ships.
+        // Legacy mongoses use a command line option to disable autosplit instead of reading the
+        // config.settings collection.
+        if (options.binVersion && MongoRunner.areBinVersionsTheSame('3.2', options.binVersion) &&
+            !otherParams.enableAutoSplit) {
+            options.noAutoSplit = "";
+        }
+
+        mongosOptions.push(options);
+    }
+
     /**
      * Helper method to check whether we should set featureCompatibilityVersion to 3.2 on the CSRS.
      * We do this if we have a 3.2 shard or a 3.2 mongos and a 3.4 CSRS because older versions of
@@ -1285,7 +1316,14 @@ var ShardingTest = function(params) {
     const configRS = this.configRS;
     if (shouldSetFeatureCompatibilityVersion32()) {
         function setFeatureCompatibilityVersion() {
-            assert.commandWorked(csrsPrimary.adminCommand({setFeatureCompatibilityVersion: '3.2'}));
+            const res = csrsPrimary.adminCommand({setFeatureCompatibilityVersion: '3.2'});
+            if (res.ok === 0) {
+                // The "setFeatureCompatibilityVersion" command is unrecognized by versions of
+                // MongoDB earlier than 3.4.
+                assert.commandFailedWithCode(res, ErrorCodes.CommandNotFound);
+                return;
+            }
+            assert.commandWorked(res);
 
             // We wait for setting the featureCompatibilityVersion to "3.2" to propagate to all
             // nodes in the CSRS to ensure that older versions of mongos can successfully connect.
@@ -1335,34 +1373,8 @@ var ShardingTest = function(params) {
 
     // Start the MongoS servers
     for (var i = 0; i < numMongos; i++) {
-        options = {
-            useHostname: otherParams.useHostname,
-            pathOpts: Object.merge(pathOpts, {mongos: i}),
-            configdb: this._configDB,
-            verbose: mongosVerboseLevel,
-            keyFile: keyFile,
-        };
-
-        if (otherParams.mongosOptions && otherParams.mongosOptions.binVersion) {
-            otherParams.mongosOptions.binVersion =
-                MongoRunner.versionIterator(otherParams.mongosOptions.binVersion);
-        }
-
-        options = Object.merge(options, otherParams.mongosOptions);
-        options = Object.merge(options, otherParams["s" + i]);
-
-        options.port = options.port || allocatePort();
-
-        // TODO(esha): remove after v3.4 ships.
-        // Legacy mongoses use a command line option to disable autosplit instead of reading the
-        // config.settings collection.
-        // Note: If a jstest specifies the mongos binVersion as an array, calling
-        // MongoRunner.areBinVersionsTheSame() will advance the binVersion iterator over that array
-        // (SERVER-26261).
-        if (options.binVersion && MongoRunner.areBinVersionsTheSame('3.2', options.binVersion) &&
-            !otherParams.enableAutoSplit) {
-            options.noAutoSplit = "";
-        }
+        const options = mongosOptions[i];
+        options.configdb = this._configDB;
 
         if (otherParams.useBridge) {
             var bridgeOptions =

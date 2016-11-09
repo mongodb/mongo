@@ -118,10 +118,8 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     ];
 
     MongoRunner.getBinVersionFor = function(version) {
-
-        // If this is a version iterator, iterate the version via toString()
         if (version instanceof MongoRunner.versionIterator.iterator) {
-            version = version.toString();
+            version = version.current();
         }
 
         if (version == null)
@@ -227,11 +225,11 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     MongoRunner.toRealFile = MongoRunner.toRealDir;
 
     /**
-     * Returns an iterator object which yields successive versions on toString(), starting from a
-     * random initial position, from an array of versions.
+     * Returns an iterator object which yields successive versions on calls to advance(), starting
+     * from a random initial position, from an array of versions.
      *
      * If passed a single version string or an already-existing version iterator, just returns the
-     * object itself, since it will yield correctly on toString()
+     * object itself, since it will yield correctly on calls to advance().
      *
      * @param {Array.<String>}|{String}|{versionIterator}
      */
@@ -253,12 +251,21 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     };
 
     MongoRunner.versionIterator.iterator = function(i, arr) {
+        if (!Array.isArray(arr)) {
+            throw new Error("Expected an array for the second argument, but got: " + tojson(arr));
+        }
 
-        this.toString = function() {
-            i = i % arr.length;
-            print("Returning next version : " + i + " (" + arr[i] + ") from " + tojson(arr) +
-                  "...");
-            return arr[i++];
+        this.current = function current() {
+            return arr[i];
+        };
+
+        // We define the toString() method as an alias for current() so that concatenating a version
+        // iterator with a string returns the next version in the list without introducing any
+        // side-effects.
+        this.toString = this.current;
+
+        this.advance = function advance() {
+            i = (i + 1) % arr.length;
         };
 
         this.isVersionIterator = true;
@@ -428,6 +435,13 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
 
         // Normalize and get the binary version to use
         if (opts.hasOwnProperty('binVersion')) {
+            if (opts.binVersion instanceof MongoRunner.versionIterator.iterator) {
+                // Advance the version iterator so that subsequent calls to
+                // MongoRunner.mongoOptions() use the next version in the list.
+                const iterator = opts.binVersion;
+                opts.binVersion = iterator.current();
+                iterator.advance();
+            }
             opts.binVersion = MongoRunner.getBinVersionFor(opts.binVersion);
         }
 
@@ -874,7 +888,15 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     MongoRunner.runMongoTool = function(binaryName, opts, ...positionalArgs) {
 
         var opts = opts || {};
+
         // Normalize and get the binary version to use
+        if (opts.binVersion instanceof MongoRunner.versionIterator.iterator) {
+            // Advance the version iterator so that subsequent calls to MongoRunner.runMongoTool()
+            // use the next version in the list.
+            const iterator = opts.binVersion;
+            opts.binVersion = iterator.current();
+            iterator.advance();
+        }
         opts.binVersion = MongoRunner.getBinVersionFor(opts.binVersion);
 
         // Recent versions of the mongo tools support a --dialTimeout flag to set for how
