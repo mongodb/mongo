@@ -697,6 +697,7 @@ serveronlyLibdeps = [
     "query/query",
     "range_deleter",
     "repl/bgsync",
+    "repl/initial_sync_common",
     "repl/oplog_buffer_collection",
     "repl/oplog_buffer_blocking_queue",
     "repl/oplog_buffer_proxy",

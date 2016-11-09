@@ -37,12 +37,14 @@
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/initial_sync_common.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -489,6 +491,18 @@ void CollectionCloner::_insertDocumentsCallback(const executor::TaskExecutor::Ca
     if (!status.isOK()) {
         _finishCallback(status);
         return;
+    }
+
+    MONGO_FAIL_POINT_BLOCK(initialSyncHangDuringCollectionClone, options) {
+        const BSONObj& data = options.getData();
+        if (data["namespace"].String() == _destNss.ns() &&
+            static_cast<int>(_stats.documentsCopied) >= data["numDocsToClone"].numberInt()) {
+            log() << "initial sync - initialSyncHangDuringCollectionClone fail point "
+                     "enabled. Blocking until fail point is disabled.";
+            while (MONGO_FAIL_POINT(initialSyncHangDuringCollectionClone)) {
+                mongo::sleepsecs(1);
+            }
+        }
     }
 
     if (!lastBatch) {

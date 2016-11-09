@@ -792,11 +792,22 @@ env.Library(
 )
 
 env.Library(
+    target='initial_sync_common',
+    source=[
+        'initial_sync_common.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/fail_point',
+    ],
+)
+
+env.Library(
     target='collection_cloner',
     source=[
         'collection_cloner.cpp',
     ],
     LIBDEPS=[
+        'initial_sync_common',
         'task_runner',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/fetcher',

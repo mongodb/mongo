@@ -57,6 +57,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/repl/initial_sync_common.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
@@ -64,11 +65,13 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
+using repl::initialSyncHangDuringCollectionClone;
 using std::endl;
 using std::list;
 using std::set;
@@ -269,12 +272,26 @@ struct Cloner::Fun {
                             << redact(status) << " obj:" << redact(doc);
                     uassertStatusOK(status);
                 }
-                wunit.commit();
+                if (status.isOK()) {
+                    wunit.commit();
+                }
             }
             MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "cloner insert", to_collection.ns());
             RARELY if (time(0) - saveLast > 60) {
                 log() << numSeen << " objects cloned so far from collection " << from_collection;
                 saveLast = time(0);
+            }
+
+            MONGO_FAIL_POINT_BLOCK(initialSyncHangDuringCollectionClone, options) {
+                const BSONObj& data = options.getData();
+                if (data["namespace"].String() == to_collection.ns() &&
+                    numSeen >= data["numDocsToClone"].numberInt()) {
+                    log() << "initial sync - initialSyncHangDuringCollectionClone fail point "
+                             "enabled. Blocking until fail point is disabled.";
+                    while (MONGO_FAIL_POINT(initialSyncHangDuringCollectionClone)) {
+                        mongo::sleepsecs(1);
+                    }
+                }
             }
         }
     }
