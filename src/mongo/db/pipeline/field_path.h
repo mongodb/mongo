@@ -32,11 +32,10 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-
-class StringData;
 
 /**
  * Utility class which represents a field path with nested paths separated by dots.
@@ -53,6 +52,17 @@ public:
      * empty.
      */
     static std::string getFullyQualifiedPath(StringData prefix, StringData suffix);
+
+    /**
+     * Returns the substring of 'path' until the first '.', or the entire string if there is no '.'.
+     */
+    static StringData extractFirstFieldFromDottedPath(StringData path) {
+        const auto firstDot = path.find('.');
+        if (firstDot == std::string::npos) {
+            return path;
+        }
+        return path.substr(0, firstDot);
+    }
 
     /**
      * Throws a UserException if the string is empty or if any of the field names fail validation.

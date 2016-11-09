@@ -111,12 +111,10 @@ Pipeline::SourceContainer::iterator DocumentSourceMatch::doOptimizeAt(
 BSONObj DocumentSourceMatch::getObjectForMatch(const Document& input,
                                                const std::set<std::string>& fields) {
     BSONObjBuilder matchObject;
-
     for (auto&& field : fields) {
         // getNestedField does not handle dotted paths correctly, so instead of retrieving the
         // entire path, we just extract the first element of the path.
-        FieldPath path(field);
-        auto prefix = path.getFieldName(0);
+        const auto prefix = FieldPath::extractFirstFieldFromDottedPath(field);
         if (!matchObject.hasField(prefix)) {
             // Avoid adding the same prefix twice.
             input.getField(prefix).addToBsonObj(&matchObject, prefix);
