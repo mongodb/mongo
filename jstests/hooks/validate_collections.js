@@ -40,22 +40,38 @@ function validateCollections(db, obj) {
     // original value.
     var originalFeatureCompatibilityVersion;
     if (jsTest.options().forceValidationWithFeatureCompatibilityVersion) {
-        originalFeatureCompatibilityVersion = getFeatureCompatibilityVersion(adminDB);
+        try {
+            originalFeatureCompatibilityVersion = getFeatureCompatibilityVersion(adminDB);
+        } catch (e) {
+            if (jsTest.options().skipValidationOnInvalidViewDefinitions &&
+                e.code === ErrorCodes.InvalidViewDefinition) {
+                print("Reading the featureCompatibilityVersion from the admin.system.version" +
+                      " collection failed due to an invalid view definition on the admin database");
+                // The view catalog would only have been resolved if the namespace doesn't exist as
+                // a collection. The absence of the admin.system.version collection is equivalent to
+                // having featureCompatibilityVersion=3.2.
+                originalFeatureCompatibilityVersion = "3.2";
+            } else {
+                throw e;
+            }
+        }
+
         setFeatureCompatibilityVersion(
             adminDB, jsTest.options().forceValidationWithFeatureCompatibilityVersion);
     }
 
     // Don't run validate on view namespaces.
-    let listCollectionsRes = db.runCommand({listCollections: 1, filter: {"type": "collection"}});
-    if (jsTest.options().skipValidationOnInvalidViewDefinitions && listCollectionsRes.ok === 0) {
-        assert.commandFailedWithCode(listCollectionsRes, ErrorCodes.InvalidViewDefinition);
-        print('Skipping validate hook because of invalid views in system.views');
-        return true;
+    let filter = {type: "collection"};
+    if (jsTest.options().skipValidationOnInvalidViewDefinitions) {
+        // If skipValidationOnInvalidViewDefinitions=true, then we avoid resolving the view catalog
+        // on the admin database.
+        //
+        // TODO SERVER-25493: Remove the $exists clause once performing an initial sync from
+        // versions of MongoDB <= 3.2 is no longer supported.
+        filter = {$or: [filter, {type: {$exists: false}}]};
     }
-    assert.commandWorked(listCollectionsRes);
 
-    let collInfo = new DBCommandCursor(db.getMongo(), listCollectionsRes).toArray();
-
+    let collInfo = db.getCollectionInfos(filter);
     for (var collDocument of collInfo) {
         var coll = db.getCollection(collDocument["name"]);
         var res = coll.validate(full);
