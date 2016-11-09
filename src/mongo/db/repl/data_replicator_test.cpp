@@ -637,6 +637,14 @@ void InitialSyncTest::tearDown() {
     DataReplicatorTest::tearDown();
 }
 
+TEST_F(InitialSyncTest, ShutdownImmediatelyAfterStartup) {
+    startSync(1);
+    auto txn = makeOpCtx();
+    ASSERT_OK(getDR().shutdown(txn.get()));
+    getExecutor().shutdown();
+    verifySync(getNet(), ErrorCodes::ShutdownInProgress);
+}
+
 TEST_F(InitialSyncTest, Complete) {
     /**
      * Initial Sync will issue these query/commands
