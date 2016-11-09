@@ -545,8 +545,8 @@ TEST_F(AddShardTest, UnreachableHost) {
         Client::initThreadIfNotAlready();
         auto status = catalogManager()->addShard(
             operationContext(), &expectedShardName, ConnectionString(shardTarget), 100);
-        ASSERT_EQUALS(ErrorCodes::HostUnreachable, status);
-        ASSERT_EQUALS("host unreachable", status.getStatus().reason());
+        ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
+        ASSERT_STRING_CONTAINS(status.getStatus().reason(), "host unreachable");
     });
 
     Status hostUnreachableStatus = Status(ErrorCodes::HostUnreachable, "host unreachable");

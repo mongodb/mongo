@@ -354,13 +354,36 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManagerImpl::_runCommandForAdd
         if (swResponse.status.compareCode(ErrorCodes::ExceededTimeLimit)) {
             LOG(0) << "Operation for addShard timed out with status " << swResponse.status;
         }
+        if (!Shard::shouldErrorBePropagated(swResponse.status.code())) {
+            swResponse.status = {ErrorCodes::OperationFailed,
+                                 stream() << "failed to run command " << cmdObj
+                                          << " when attempting to add shard "
+                                          << targeter->connectionString().toString()
+                                          << causedBy(swResponse.status)};
+        }
         return swResponse.status;
     }
 
     BSONObj responseObj = swResponse.data.getOwned();
     BSONObj responseMetadata = swResponse.metadata.getOwned();
+
     Status commandStatus = getStatusFromCommandResult(responseObj);
+    if (!Shard::shouldErrorBePropagated(commandStatus.code())) {
+        commandStatus = {ErrorCodes::OperationFailed,
+                         stream() << "failed to run command " << cmdObj
+                                  << " when attempting to add shard "
+                                  << targeter->connectionString().toString()
+                                  << causedBy(commandStatus)};
+    }
+
     Status writeConcernStatus = getWriteConcernStatusFromCommandResult(responseObj);
+    if (!Shard::shouldErrorBePropagated(writeConcernStatus.code())) {
+        writeConcernStatus = {ErrorCodes::OperationFailed,
+                              stream() << "failed to satisfy writeConcern for command " << cmdObj
+                                       << " when attempting to add shard "
+                                       << targeter->connectionString().toString()
+                                       << causedBy(writeConcernStatus)};
+    }
 
     return Shard::CommandResponse(std::move(responseObj),
                                   std::move(responseMetadata),
