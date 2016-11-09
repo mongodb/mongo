@@ -244,12 +244,12 @@ TEST_F(ReplaceRootBasics, ErrorsIfNewRootFieldPathDoesNotExist) {
 
     auto mock = DocumentSourceMock::create(Document());
     replaceRoot->setSource(mock.get());
-    ASSERT_THROWS_CODE(replaceRoot->getNext(), UserException, 40232);
+    ASSERT_THROWS_CODE(replaceRoot->getNext(), UserException, 40228);
     assertExhausted(replaceRoot);
 
     mock = DocumentSourceMock::create(Document{{"e", Document{{"b", Document{{"c", 3}}}}}});
     replaceRoot->setSource(mock.get());
-    ASSERT_THROWS_CODE(replaceRoot->getNext(), UserException, 40232);
+    ASSERT_THROWS_CODE(replaceRoot->getNext(), UserException, 40228);
     assertExhausted(replaceRoot);
 }
 

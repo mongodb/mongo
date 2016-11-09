@@ -56,25 +56,16 @@ public:
         _variables->setRoot(input);
         Value newRoot = _newRoot->evaluate(_variables.get());
 
-        // The newRoot expression must evaluate to a valid Value.
-        uassert(
-            40232,
-            str::stream() << " 'newRoot' argument "
-                          << " to $replaceRoot stage must be able to be evaluated by the document "
-                          << input.toString()
-                          << ", try ensuring that your field path(s) exist by prepending a "
-                          << "$match: {<path>: $exists} aggregation stage.",
-            !newRoot.missing());
-
         // The newRoot expression, if it exists, must evaluate to an object.
-        uassert(
-            40228,
-            str::stream()
-                << " 'newRoot' argument to $replaceRoot stage must evaluate to an object, but got "
-                << typeName(newRoot.getType())
-                << " try ensuring that it evaluates to an object by prepending a "
-                << "$match: {<path>: {$type: 'object'}} aggregation stage.",
-            newRoot.getType() == Object);
+        uassert(40228,
+                str::stream()
+                    << "'newRoot' expression must evaluate to an object, but resulting value was: "
+                    << newRoot.toString()
+                    << ". Type of resulting value: '"
+                    << typeName(newRoot.getType())
+                    << "'. Input document: "
+                    << input.toString(),
+                newRoot.getType() == Object);
 
         // Turn the value into a document.
         return newRoot.getDocument();
