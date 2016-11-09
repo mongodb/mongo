@@ -45,15 +45,6 @@ public:
     }
 };
 
-/** FieldPath constructed from empty vector. */
-class EmptyVector {
-public:
-    void run() {
-        vector<string> vec;
-        ASSERT_THROWS(FieldPath path(vec), MsgAssertionException);
-    }
-};
-
 /** FieldPath constructed from a simple string (without dots). */
 class Simple {
 public:
@@ -63,18 +54,6 @@ public:
         ASSERT_EQUALS("foo", path.getFieldName(0));
         ASSERT_EQUALS("foo", path.fullPath());
         ASSERT_EQUALS("$foo", path.fullPathWithPrefix());
-    }
-};
-
-/** FieldPath constructed from a single element vector. */
-class SimpleVector {
-public:
-    void run() {
-        vector<string> vec(1, "foo");
-        FieldPath path(vec);
-        ASSERT_EQUALS(1U, path.getPathLength());
-        ASSERT_EQUALS("foo", path.getFieldName(0));
-        ASSERT_EQUALS("foo", path.fullPath());
     }
 };
 
@@ -104,28 +83,6 @@ public:
         ASSERT_EQUALS("bar", path.getFieldName(1));
         ASSERT_EQUALS("foo.bar", path.fullPath());
         ASSERT_EQUALS("$foo.bar", path.fullPathWithPrefix());
-    }
-};
-
-/** FieldPath constructed from a single element vector containing a dot. */
-class VectorWithDot {
-public:
-    void run() {
-        vector<string> vec(1, "fo.o");
-        ASSERT_THROWS(FieldPath path(vec), UserException);
-    }
-};
-
-/** FieldPath constructed from a two element vector. */
-class TwoFieldVector {
-public:
-    void run() {
-        vector<string> vec;
-        vec.push_back("foo");
-        vec.push_back("bar");
-        FieldPath path(vec);
-        ASSERT_EQUALS(2U, path.getPathLength());
-        ASSERT_EQUALS("foo.bar", path.fullPath());
     }
 };
 
@@ -174,6 +131,14 @@ public:
     }
 };
 
+/** FieldPath constructed with only dots. */
+class OnlyDots {
+public:
+    void run() {
+        ASSERT_THROWS(FieldPath path("..."), UserException);
+    }
+};
+
 /** FieldPath constructed from a string with one letter between two dots. */
 class LetterBetweenDots {
 public:
@@ -189,17 +154,6 @@ class NullCharacter {
 public:
     void run() {
         ASSERT_THROWS(FieldPath path(string("foo.b\0r", 7)), UserException);
-    }
-};
-
-/** FieldPath constructed with a vector containing a null character. */
-class VectorNullCharacter {
-public:
-    void run() {
-        vector<string> vec;
-        vec.push_back("foo");
-        vec.push_back(string("b\0r", 3));
-        ASSERT_THROWS(FieldPath path(vec), UserException);
     }
 };
 
@@ -228,22 +182,18 @@ public:
     All() : Suite("field_path") {}
     void setupTests() {
         add<Empty>();
-        add<EmptyVector>();
         add<Simple>();
-        add<SimpleVector>();
         add<DollarSign>();
         add<DollarSignPrefix>();
         add<Dotted>();
-        add<VectorWithDot>();
-        add<TwoFieldVector>();
         add<DollarSignPrefixSecondField>();
         add<TwoDotted>();
         add<TerminalDot>();
         add<PrefixDot>();
         add<AdjacentDots>();
+        add<OnlyDots>();
         add<LetterBetweenDots>();
         add<NullCharacter>();
-        add<VectorNullCharacter>();
         add<Tail>();
         add<TailThreeFields>();
     }

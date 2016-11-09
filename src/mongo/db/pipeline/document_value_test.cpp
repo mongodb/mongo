@@ -206,14 +206,14 @@ public:
         ASSERT_VALUE_EQ(md.peek()["x"]["y"]["z"], Value("nested"));
 
         // Set a nested field using setNestedField
-        FieldPath xxyyzz = string("xx.yy.zz");
+        FieldPath xxyyzz("xx.yy.zz");
         md.setNestedField(xxyyzz, Value("nested"));
         ASSERT_VALUE_EQ(md.peek().getNestedField(xxyyzz), Value("nested"));
 
         // Set a nested fields through an existing empty document
         md["xxx"] = Value(Document());
         md["xxx"]["yyy"] = Value(Document());
-        FieldPath xxxyyyzzz = string("xxx.yyy.zzz");
+        FieldPath xxxyyyzzz("xxx.yyy.zzz");
         md.setNestedField(xxxyyyzzz, Value("nested"));
         ASSERT_VALUE_EQ(md.peek().getNestedField(xxxyyyzzz), Value("nested"));
 

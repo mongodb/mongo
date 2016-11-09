@@ -335,7 +335,7 @@ static Value getNestedFieldHelper(const Document& doc,
                                   const FieldPath& fieldNames,
                                   vector<Position>* positions,
                                   size_t level) {
-    const string& fieldName = fieldNames.getFieldName(level);
+    const auto fieldName = fieldNames.getFieldName(level);
     const Position pos = doc.positionOf(fieldName);
 
     if (!pos.found())

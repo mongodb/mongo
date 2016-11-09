@@ -66,7 +66,7 @@ void ParsedAddFields::parse(const BSONObj& spec, const VariablesParseState& vari
                 auto remainingPath = FieldPath(elem.fieldName());
                 auto child = _root.get();
                 while (remainingPath.getPathLength() > 1) {
-                    child = child->addOrGetChild(remainingPath.getFieldName(0));
+                    child = child->addOrGetChild(remainingPath.getFieldName(0).toString());
                     remainingPath = remainingPath.tail();
                 }
                 // It is illegal to construct an empty FieldPath, so the above loop ends one
@@ -103,7 +103,7 @@ bool ParsedAddFields::parseObjectAsExpression(StringData pathToObject,
         // This is an expression like {$add: [...]}. We have already verified that it has only one
         // field.
         invariant(objSpec.nFields() == 1);
-        _root->addComputedField(pathToObject.toString(),
+        _root->addComputedField(pathToObject,
                                 Expression::parseExpression(objSpec, variablesParseState));
         return true;
     }

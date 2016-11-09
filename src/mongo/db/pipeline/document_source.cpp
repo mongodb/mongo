@@ -110,8 +110,7 @@ std::set<std::string> extractModifiedDependencies(const std::set<std::string>& d
     // should not be included in the modified dependencies.
     for (auto&& dependency : dependencies) {
         bool preserved = false;
-        auto depAsPath = FieldPath(dependency);
-        auto firstField = depAsPath.getFieldName(0);
+        auto firstField = FieldPath::extractFirstFieldFromDottedPath(dependency).toString();
         // If even a prefix is preserved, the path is preserved, so search for any prefixes of
         // 'dependency' as well. 'preservedPaths' is an *ordered* set, so we only have to search the
         // range ['firstField', 'dependency'] to find any prefixes of 'dependency'.

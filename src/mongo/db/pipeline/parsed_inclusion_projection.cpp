@@ -206,7 +206,7 @@ void InclusionNode::addComputedField(const FieldPath& path, boost::intrusive_ptr
         _orderToProcessAdditionsAndChildren.push_back(fieldName);
         return;
     }
-    addOrGetChild(path.getFieldName(0))->addComputedField(path.tail(), expr);
+    addOrGetChild(path.getFieldName(0).toString())->addComputedField(path.tail(), expr);
 }
 
 void InclusionNode::addIncludedField(const FieldPath& path) {
@@ -214,7 +214,7 @@ void InclusionNode::addIncludedField(const FieldPath& path) {
         _inclusions.insert(path.fullPath());
         return;
     }
-    addOrGetChild(path.getFieldName(0))->addIncludedField(path.tail());
+    addOrGetChild(path.getFieldName(0).toString())->addIncludedField(path.tail());
 }
 
 InclusionNode* InclusionNode::addOrGetChild(std::string field) {
@@ -299,7 +299,7 @@ void ParsedInclusionProjection::parse(const BSONObj& spec,
                 auto remainingPath = FieldPath(elem.fieldName());
                 auto child = _root.get();
                 while (remainingPath.getPathLength() > 1) {
-                    child = child->addOrGetChild(remainingPath.getFieldName(0));
+                    child = child->addOrGetChild(remainingPath.getFieldName(0).toString());
                     remainingPath = remainingPath.tail();
                 }
                 // It is illegal to construct an empty FieldPath, so the above loop ends one
@@ -350,7 +350,7 @@ bool ParsedInclusionProjection::parseObjectAsExpression(
         // This is an expression like {$add: [...]}. We have already verified that it has only one
         // field.
         invariant(objSpec.nFields() == 1);
-        _root->addComputedField(pathToObject.toString(),
+        _root->addComputedField(pathToObject,
                                 Expression::parseExpression(objSpec, variablesParseState));
         return true;
     }
