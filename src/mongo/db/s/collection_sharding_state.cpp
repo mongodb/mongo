@@ -84,6 +84,9 @@ private:
 /**
  * Used by the config server for backwards compatibility with 3.2 mongos to upsert a shardIdentity
  * document (and thereby perform shard aware initialization) on a newly added shard.
+ *
+ * Warning: Only a config server primary should perform this upsert. Callers should ensure that
+ * they are primary before registering this RecoveryUnit.
  */
 class LegacyAddShardLogOpHandler final : public RecoveryUnit::Change {
 public:
@@ -91,12 +94,8 @@ public:
         : _txn(txn), _shardType(std::move(shardType)) {}
 
     void commit() override {
-        // Only the primary should complete the addShard process by upserting the shardIdentity on
-        // the new shard.
-        if (repl::getGlobalReplicationCoordinator()->getMemberState().primary()) {
-            uassertStatusOK(
-                Grid::get(_txn)->catalogManager()->upsertShardIdentityOnShard(_txn, _shardType));
-        }
+        uassertStatusOK(
+            Grid::get(_txn)->catalogManager()->upsertShardIdentityOnShard(_txn, _shardType));
     }
 
     void rollback() override {}
@@ -117,11 +116,7 @@ public:
         : _txn(txn), _shardId(std::move(shardId)) {}
 
     void commit() override {
-        // Only the primary needs to check for and cancel a pending addShard task, since addShard
-        // tasks are only run by the primary.
-        if (repl::getGlobalReplicationCoordinator()->getMemberState().primary()) {
-            Grid::get(_txn)->catalogManager()->cancelAddShardTaskIfNeeded(_shardId);
-        }
+        Grid::get(_txn)->catalogManager()->cancelAddShardTaskIfNeeded(_shardId);
     }
 
     void rollback() override {}
@@ -253,7 +248,11 @@ void CollectionShardingState::onInsertOp(OperationContext* txn, const BSONObj& i
     // mongos performs the insert into config.shards without a "state" field.)
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
         _nss == ShardType::ConfigNS) {
-        if (insertedDoc[ShardType::state.name()].eoo()) {
+        // Only the primary should complete the addShard process by upserting the shardIdentity on
+        // the new shard. This guards against inserts on non-primaries due to oplog application in
+        // steady state, rollback, or recovering.
+        if (repl::getGlobalReplicationCoordinator()->getMemberState().primary() &&
+            insertedDoc[ShardType::state.name()].eoo()) {
             const auto shardType = uassertStatusOK(ShardType::fromBSON(insertedDoc));
             txn->recoveryUnit()->registerChange(
                 new LegacyAddShardLogOpHandler(txn, std::move(shardType)));
@@ -307,6 +306,9 @@ void CollectionShardingState::onDeleteOp(OperationContext* txn,
             BSONElement idElement = deleteState.idDoc["_id"];
             invariant(!idElement.eoo());
             auto shardIdStr = idElement.valuestrsafe();
+            // Though the asynchronous addShard task should only be started on a primary, we
+            // should cancel a pending addShard task (if one exists for this shardId) even while
+            // non-primary, since it guarantees we cleanup any pending tasks on stepdown.
             txn->recoveryUnit()->registerChange(
                 new RemoveShardLogOpHandler(txn, ShardId(std::move(shardIdStr))));
         } else if (_nss == VersionType::ConfigNS) {
