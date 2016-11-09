@@ -234,34 +234,6 @@ Database::Database(OperationContext* txn, StringData name, DatabaseCatalogEntry*
     }
 }
 
-/*static*/
-string Database::duplicateUncasedName(const string& name, set<string>* duplicates) {
-    if (duplicates) {
-        duplicates->clear();
-    }
-
-    set<string> allShortNames;
-    dbHolder().getAllShortNames(allShortNames);
-
-    for (const auto& dbname : allShortNames) {
-        if (strcasecmp(dbname.c_str(), name.c_str()))
-            continue;
-
-        if (strcmp(dbname.c_str(), name.c_str()) == 0)
-            continue;
-
-        if (duplicates) {
-            duplicates->insert(dbname);
-        } else {
-            return dbname;
-        }
-    }
-    if (duplicates) {
-        return duplicates->empty() ? "" : *duplicates->begin();
-    }
-    return "";
-}
-
 void Database::clearTmpCollections(OperationContext* txn) {
     invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
 

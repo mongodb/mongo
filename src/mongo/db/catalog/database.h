@@ -194,15 +194,6 @@ public:
      */
     static void dropDatabase(OperationContext* txn, Database* db);
 
-    /**
-     * @return name of an existing database with same text name but different
-     * casing, if one exists.  Otherwise the empty std::string is returned.  If
-     * 'duplicates' is specified, it is filled with all duplicate names.
-     // TODO move???
-     */
-    static std::string duplicateUncasedName(const std::string& name,
-                                            std::set<std::string>* duplicates = 0);
-
     static Status validateDBName(StringData dbname);
 
     const std::string& getSystemIndexesName() const {
