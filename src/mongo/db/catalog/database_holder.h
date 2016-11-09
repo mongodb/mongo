@@ -29,6 +29,7 @@
 #pragma once
 
 #include <set>
+#include <string>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
@@ -77,20 +78,14 @@ public:
     bool closeAll(OperationContext* txn, BSONObjBuilder& result, bool force);
 
     /**
-     * Retrieves the names of all currently opened databases. Does not require locking, but it
-     * is not guaranteed that the returned set of names will be still valid unless a global
-     * lock is held, which would prevent database from disappearing or being created.
+     * Returns the set of existing database names that differ only in casing.
      */
-    void getAllShortNames(std::set<std::string>& all) const {
-        stdx::lock_guard<SimpleMutex> lk(_m);
-        for (DBs::const_iterator j = _dbs.begin(); j != _dbs.end(); ++j) {
-            all.insert(j->first);
-        }
-    }
+    std::set<std::string> getNamesWithConflictingCasing(StringData name);
 
 private:
-    typedef StringMap<Database*> DBs;
+    std::set<std::string> _getNamesWithConflictingCasing_inlock(StringData name);
 
+    typedef StringMap<Database*> DBs;
     mutable SimpleMutex _m;
     DBs _dbs;
 };
