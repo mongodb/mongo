@@ -78,7 +78,7 @@ functions:
           chmod +x mongo
           git clone https://github.com/mongodb/mongo-perf perf
           cd perf
-          git checkout r20160929
+          git checkout r20161010
     - command: shell.exec
       params:
         background: true
@@ -156,7 +156,7 @@ functions:
         script: |
           set -o errexit
           source ./venv/bin/activate
-          REFTAGS="3.2.10-Baseline 3.3.10-Baseline 3.0.12-Baseline" # These are project specific
+          REFTAGS="3.2.10-Baseline 3.0.14-Baseline" # These are project specific
           # Project Opts are  project specific, but don't match expansion from elsewhere.
           # We could change dsi/analysis/master to dsi/analysis/perf in DSI to get dsi/analysis/${project}/perf_override.json
           # Note project_id performance doesn't match string perf used elsewhere for ${project}
