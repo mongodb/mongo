@@ -289,14 +289,15 @@ void BackgroundSync::_produce(OperationContext* txn) {
     SyncSourceResolverResponse syncSourceResp;
     SyncSourceResolver* syncSourceResolver;
     OpTime minValid;
+    OpTime minValidSaved;
     if (_replCoord->getMemberState().recovering()) {
-        auto minValidSaved = StorageInterface::get(txn)->getMinValid(txn);
-        if (minValidSaved > lastOpTimeFetched) {
-            minValid = minValidSaved;
-        }
+        minValidSaved = StorageInterface::get(txn)->getMinValid(txn);
     }
     {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        if (minValidSaved > _lastOpTimeFetched) {
+            minValid = minValidSaved;
+        }
         lastOpTimeFetched = _lastOpTimeFetched;
         _syncSourceHost = HostAndPort();
         _syncSourceResolver = stdx::make_unique<SyncSourceResolver>(
@@ -320,7 +321,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
     syncSourceResolver->join();
     syncSourceResolver = nullptr;
     {
-        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
         _syncSourceResolver.reset();
     }
 
