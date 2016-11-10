@@ -256,7 +256,9 @@ TEST(BSONValidateFast, ErrorWithId) {
     const BSONObj x = ob.done();
     const Status status = validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest);
     ASSERT_NOT_OK(status);
-    ASSERT_EQUALS(status.reason(), "not null terminated string in object with _id: 1");
+    ASSERT_EQUALS(
+        status.reason(),
+        "not null terminated string in element with field name 'not_id' in object with _id: 1");
 }
 
 TEST(BSONValidateFast, ErrorBeforeId) {
@@ -267,7 +269,9 @@ TEST(BSONValidateFast, ErrorBeforeId) {
     const BSONObj x = ob.done();
     const Status status = validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest);
     ASSERT_NOT_OK(status);
-    ASSERT_EQUALS(status.reason(), "not null terminated string in object with unknown _id");
+    ASSERT_EQUALS(status.reason(),
+                  "not null terminated string in element with field name 'not_id' in object with "
+                  "unknown _id");
 }
 
 TEST(BSONValidateFast, ErrorNoId) {
@@ -277,7 +281,9 @@ TEST(BSONValidateFast, ErrorNoId) {
     const BSONObj x = ob.done();
     const Status status = validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest);
     ASSERT_NOT_OK(status);
-    ASSERT_EQUALS(status.reason(), "not null terminated string in object with unknown _id");
+    ASSERT_EQUALS(status.reason(),
+                  "not null terminated string in element with field name 'not_id' in object with "
+                  "unknown _id");
 }
 
 TEST(BSONValidateFast, ErrorIsInId) {
@@ -287,7 +293,9 @@ TEST(BSONValidateFast, ErrorIsInId) {
     const BSONObj x = ob.done();
     const Status status = validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest);
     ASSERT_NOT_OK(status);
-    ASSERT_EQUALS(status.reason(), "not null terminated string in object with unknown _id");
+    ASSERT_EQUALS(
+        status.reason(),
+        "not null terminated string in element with field name '_id' in object with unknown _id");
 }
 
 TEST(BSONValidateFast, NonTopLevelId) {
@@ -300,7 +308,9 @@ TEST(BSONValidateFast, NonTopLevelId) {
     const BSONObj x = ob.done();
     const Status status = validateBSON(x.objdata(), x.objsize(), BSONVersion::kLatest);
     ASSERT_NOT_OK(status);
-    ASSERT_EQUALS(status.reason(), "not null terminated string in object with unknown _id");
+    ASSERT_EQUALS(status.reason(),
+                  "not null terminated string in element with field name 'not_id2' in object with "
+                  "unknown _id");
 }
 
 TEST(BSONValidateFast, StringHasSomething) {
