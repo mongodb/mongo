@@ -123,13 +123,26 @@ function runOneTest(conn, t) {
             failures.push(t.testname + ": " + msg);
         }
 
+        var specialResource = function(resource) {
+            if (!resource)
+                return true;
+
+            // Tests which use {db: "local", collection: "oplog.rs"} will not work with
+            // {db: "", collection: "oplog.rs"}. oplog.rs is special, and does not match with
+            // forDatabaseName or anyNormalResource ResourcePatterns. The same is true of
+            // oplog.$main, but oplog.$main is also an illegal collection name on any database
+            // other than local. The other collections checked for here in the local database have
+            // the same property as oplog.rs.
+            return !resource.db || !resource.collection ||
+                resource.collection.startsWith("system.") || resource.db == "local";
+        };
+
         // Test for proper authorization with the test case's privileges where non-system
         // collections are modified to be the empty string.
         msg = testProperAuthorization(conn, t, testcase, testcase.privileges.map(function(priv) {
             // Make a copy of the privilege so as not to modify the original array.
             var modifiedPrivilege = Object.extend({}, priv, true);
-            if (modifiedPrivilege.resource.collection &&
-                !modifiedPrivilege.resource.collection.startsWith('system.')) {
+            if (modifiedPrivilege.resource.collection && !specialResource(priv.resource)) {
                 modifiedPrivilege.resource.collection = "";
             }
             return modifiedPrivilege;
@@ -143,7 +156,7 @@ function runOneTest(conn, t) {
         msg = testProperAuthorization(conn, t, testcase, testcase.privileges.map(function(priv) {
             // Make a copy of the privilege so as not to modify the original array.
             var modifiedPrivilege = Object.extend({}, priv, true);
-            if (modifiedPrivilege.resource.db) {
+            if (!specialResource(priv.resource)) {
                 modifiedPrivilege.resource.db = "";
             }
             return modifiedPrivilege;
