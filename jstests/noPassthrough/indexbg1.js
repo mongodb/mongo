@@ -14,13 +14,15 @@ var resetParallel = function() {
     parallel().drop();
 };
 
+// Return the PID to call `waitpid` on for clean shutdown.
 var doParallel = function(work) {
     resetParallel();
     print("doParallel: " + work);
-    startMongoProgramNoConnect("mongo",
-                               "--eval",
-                               work + "; db." + baseName + "_parallelStatus.save( {done:1} );",
-                               db.getMongo().host);
+    return startMongoProgramNoConnect(
+        "mongo",
+        "--eval",
+        work + "; db." + baseName + "_parallelStatus.save( {done:1} );",
+        db.getMongo().host);
 };
 
 var doneParallel = function() {
@@ -34,6 +36,7 @@ var waitParallel = function() {
 };
 
 var size = 400 * 1000;
+var bgIndexBuildPid;
 while (1) {  // if indexing finishes before we can run checks, try indexing w/ more data
     print("size: " + size);
 
@@ -48,7 +51,7 @@ while (1) {  // if indexing finishes before we can run checks, try indexing w/ m
     assert.writeOK(bulk.execute());
     assert.eq(size, t.count());
 
-    doParallel(fullName + ".ensureIndex( {i:1}, {background:true} )");
+    bgIndexBuildPid = doParallel(fullName + ".ensureIndex( {i:1}, {background:true} )");
     try {
         // wait for indexing to start
         print("wait for indexing to start");
@@ -98,12 +101,17 @@ while (1) {  // if indexing finishes before we can run checks, try indexing w/ m
         break;
     }
     print("indexing finished too soon, retrying...");
+    // Although the index build finished, ensure the shell has exited.
+    waitProgram(bgIndexBuildPid);
     size *= 2;
     assert(size < 200000000, "unable to run checks in parallel with index creation");
 }
 
 print("our tests done, waiting for parallel to finish");
 waitParallel();
+// Ensure the shell has exited cleanly. Otherwise the test harness may send a SIGTERM which can lead
+// to a false test failure.
+waitProgram(bgIndexBuildPid);
 print("finished");
 
 assert.eq(1, t.count({i: -10}));

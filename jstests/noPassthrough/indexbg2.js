@@ -14,12 +14,14 @@ var resetParallel = function() {
     parallel().drop();
 };
 
+// Return the PID to call `waitpid` on for clean shutdown.
 var doParallel = function(work) {
     resetParallel();
-    startMongoProgramNoConnect("mongo",
-                               "--eval",
-                               work + "; db." + baseName + "_parallelStatus.save( {done:1} );",
-                               db.getMongo().host);
+    return startMongoProgramNoConnect(
+        "mongo",
+        "--eval",
+        work + "; db." + baseName + "_parallelStatus.save( {done:1} );",
+        db.getMongo().host);
 };
 
 var doneParallel = function() {
@@ -35,6 +37,7 @@ var waitParallel = function() {
 var doTest = function() {
     "use strict";
     var size = 10000;
+    var bgIndexBuildPid;
     while (1) {  // if indexing finishes before we can run checks, try indexing w/ more data
         print("size: " + size);
         var fullName = "db." + baseName;
@@ -46,7 +49,8 @@ var doTest = function() {
         }
         assert.eq(size, t.count());
 
-        doParallel(fullName + ".ensureIndex( {i:1}, {background:true, unique:true} )");
+        bgIndexBuildPid =
+            doParallel(fullName + ".ensureIndex( {i:1}, {background:true, unique:true} )");
         try {
             // wait for indexing to start
             assert.soon(function() {
@@ -59,13 +63,19 @@ var doTest = function() {
             // wait for parallel status to update to reflect indexing status
             sleep(1000);
             if (!doneParallel()) {
+                waitProgram(bgIndexBuildPid);
                 throw e;
             }
         }
         if (!doneParallel()) {
+            // Ensure the shell has exited cleanly. Otherwise the test harness may send a SIGTERM
+            // which can lead to a false test failure.
+            waitProgram(bgIndexBuildPid);
             break;
         }
         print("indexing finished too soon, retrying...");
+        // Although the index build finished, ensure the shell has exited.
+        waitProgram(bgIndexBuildPid);
         size *= 2;
         assert(size < 5000000, "unable to run checks in parallel with index creation");
     }
