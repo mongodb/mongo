@@ -50,6 +50,7 @@
 
 namespace mongo {
 
+using repl::UnreplicatedWritesBlock;
 using std::endl;
 using std::string;
 using std::stringstream;
@@ -92,7 +93,7 @@ public:
         Database* db = ctx.db();
 
         WriteUnitOfWork wunit(txn);
-        txn->setReplicatedWrites(false);
+        UnreplicatedWritesBlock unreplicatedWritesBlock(txn);
         Collection* collection = db->getCollection(ns);
         if (!collection) {
             collection = db->createCollection(txn, ns);

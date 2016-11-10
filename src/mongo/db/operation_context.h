@@ -253,6 +253,7 @@ public:
 
     /**
      * Set whether or not operations should generate oplog entries.
+     * TODO SERVER-26965: Make this private.
      */
     void setReplicatedWrites(bool writesAreReplicated = true) {
         _writesAreReplicated = writesAreReplicated;
@@ -500,5 +501,29 @@ public:
 private:
     OperationContext* _txn;
 };
+
+namespace repl {
+/**
+ * RAII-style class to turn off replicated writes. Writes do not create oplog entries while the
+ * object is in scope.
+ */
+class UnreplicatedWritesBlock {
+    MONGO_DISALLOW_COPYING(UnreplicatedWritesBlock);
+
+public:
+    UnreplicatedWritesBlock(OperationContext* txn)
+        : _txn(txn), _shouldReplicateWrites(txn->writesAreReplicated()) {
+        txn->setReplicatedWrites(false);
+    }
+
+    ~UnreplicatedWritesBlock() {
+        _txn->setReplicatedWrites(_shouldReplicateWrites);
+    }
+
+private:
+    OperationContext* _txn;
+    const bool _shouldReplicateWrites;
+};
+}  // namespace repl
 
 }  // namespace mongo

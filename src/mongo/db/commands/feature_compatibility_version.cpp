@@ -51,6 +51,8 @@
 
 namespace mongo {
 
+using repl::UnreplicatedWritesBlock;
+
 constexpr StringData FeatureCompatibilityVersion::k32IncompatibleIndexName;
 constexpr StringData FeatureCompatibilityVersion::kCollection;
 constexpr StringData FeatureCompatibilityVersion::kCommandName;
@@ -290,7 +292,7 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* txn,
             }
         }
 
-        txn->setReplicatedWrites(false);
+        UnreplicatedWritesBlock unreplicatedWritesBlock(txn);
         NamespaceString nss(FeatureCompatibilityVersion::kCollection);
 
         // We build a v=2 index on the "admin.system.version" collection as part of setting the
