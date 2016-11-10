@@ -167,7 +167,7 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
 
     ss << "block_compressor=" << wiredTigerGlobalOptions.indexBlockCompressor << ",";
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
-              ->getOpenConfig(desc.parentNS());
+              ->getTableCreateConfig(desc.parentNS());
     ss << sysIndexConfig << ",";
     ss << collIndexConfig << ",";
 

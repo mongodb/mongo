@@ -722,7 +722,7 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
 
     ss << "block_compressor=" << wiredTigerGlobalOptions.collectionBlockCompressor << ",";
 
-    ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())->getOpenConfig(ns);
+    ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())->getTableCreateConfig(ns);
 
     ss << extraStrings << ",";
 

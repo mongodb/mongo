@@ -69,10 +69,10 @@ public:
     virtual bool restartRequired() = 0;
 
     /**
-     *  Gets the WiredTiger encryption configuration string for the
-     *  provided table name
+     *  Gets an additional configuration string for the provided table name on a
+     *  `WT_SESSION::create` call.
      */
-    virtual std::string getOpenConfig(StringData tableName) = 0;
+    virtual std::string getTableCreateConfig(StringData tableName) = 0;
 
     /**
      * Returns the maximum size addition when doing transforming temp data.
@@ -113,7 +113,7 @@ public:
 
     bool restartRequired() override;
 
-    std::string getOpenConfig(StringData tableName) override;
+    std::string getTableCreateConfig(StringData tableName) override;
 
     std::unique_ptr<DataProtector> getDataProtector() override;
 
