@@ -93,8 +93,13 @@ bool ParsedResource::isValid(std::string* errMsg) const {
     }
     if (isCollectionSet() &&
         (!NamespaceString::validCollectionName(getCollection()) && !getCollection().empty())) {
-        *errMsg = stream() << getCollection() << " is not a valid collection name";
-        return false;
+        // local.oplog.$main is a real collection that the server will create. But, collection
+        // names with a '$' character are illegal. We must make an exception for this collection
+        // here so we can grant users access to it.
+        if (!(getDb() == "local" && getCollection() == "oplog.$main")) {
+            *errMsg = stream() << getCollection() << " is not a valid collection name";
+            return false;
+        }
     }
     return true;
 }

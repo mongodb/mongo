@@ -467,7 +467,12 @@ static int buildResourceSearchList(const ResourcePattern& target,
     resourceSearchList[size++] = ResourcePattern::forAnyResource();
     if (target.isExactNamespacePattern()) {
         if (!target.ns().isSystem()) {
-            resourceSearchList[size++] = ResourcePattern::forAnyNormalResource();
+            // Some databases should not be matchable with ResourcePattern::forAnyNormalResource.
+            // 'local' and 'config' are used to store special system collections, which user level
+            // administrators should not be able to manipulate.
+            if (target.ns().db() != "local" && target.ns().db() != "config") {
+                resourceSearchList[size++] = ResourcePattern::forAnyNormalResource();
+            }
             resourceSearchList[size++] = ResourcePattern::forDatabaseName(target.ns().db());
         }
         resourceSearchList[size++] = ResourcePattern::forCollectionName(target.ns().coll());
