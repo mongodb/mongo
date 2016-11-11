@@ -563,7 +563,7 @@ void ReplicationCoordinatorImpl::_stopDataReplication(OperationContext* txn) {
     if (drCopy && drCopy->getState() == DataReplicatorState::InitialSync) {
         LOG(1)
             << "ReplicationCoordinatorImpl::_stopDataReplication calling DataReplicator::shutdown.";
-        const auto status = drCopy->shutdown(txn);
+        const auto status = drCopy->shutdown();
         if (!status.isOK()) {
             warning() << "DataReplicator shutdown failed: " << status;
         }
@@ -730,7 +730,7 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* txn) {
     // joining the replication executor is blocking so it must be run outside of the mutex
     if (drCopy) {
         LOG(1) << "ReplicationCoordinatorImpl::shutdown calling DataReplicator::shutdown.";
-        const auto status = drCopy->shutdown(txn);
+        const auto status = drCopy->shutdown();
         if (!status.isOK()) {
             warning() << "DataReplicator shutdown failed: " << status;
         }

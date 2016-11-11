@@ -190,12 +190,12 @@ public:
     virtual ~DataReplicator();
 
     // Shuts down replication if "start" has been called, and blocks until shutdown has completed.
-    Status shutdown(OperationContext* txn);
+    Status shutdown();
 
     /**
      * Cancels outstanding work and begins shutting down.
      */
-    Status scheduleShutdown(OperationContext* txn);
+    Status scheduleShutdown();
 
     /**
      * Waits for data replicator to finish shutting down.
@@ -249,8 +249,9 @@ private:
     void _setState(const DataReplicatorState& newState);
     void _setState_inlock(const DataReplicatorState& newState);
 
-    // Returns OK when there is a good syncSource at _syncSource.
-    Status _ensureGoodSyncSource_inlock();
+    // Obtains a valid sync source from the sync source selector.
+    // Returns error if a sync source cannot be found.
+    StatusWith<HostAndPort> _chooseSyncSource_inlock();
 
     /**
      * Pushes documents from oplog fetcher to blocking queue for
@@ -262,7 +263,6 @@ private:
     void _onOplogFetchFinish(const Status& status, const OpTimeWithHash& lastFetched);
     void _doNextActions();
     void _doNextActions_inlock();
-    void _doNextActions_Steady_inlock();
 
     BSONObj _getInitialSyncProgress_inlock() const;
 
@@ -281,16 +281,11 @@ private:
     void _scheduleLastOplogEntryFetcher_inlock(Fetcher::CallbackFn callback);
 
     Status _scheduleDoNextActions();
-    Status _scheduleApplyBatch();
     Status _scheduleApplyBatch_inlock();
-    Status _scheduleApplyBatch_inlock(const Operations& ops);
-    Status _scheduleFetch_inlock();
 
     void _cancelAllHandles_inlock();
     void _waitOnAndResetAll_inlock(UniqueLock* lk);
     bool _anyActiveHandles_inlock() const;
-
-    Status _shutdown(OperationContext* txn);
 
     // Counts how many documents have been refetched from the source in the current batch.
     AtomicUInt32 _fetchCount;
@@ -310,10 +305,9 @@ private:
     const DataReplicatorOptions _opts;                                          // (R)
     std::unique_ptr<DataReplicatorExternalState> _dataReplicatorExternalState;  // (R)
     executor::TaskExecutor* _exec;                                              // (R)
-    DataReplicatorState _state;                                                 // (MX)
+    DataReplicatorState _dataReplicatorState;                                   // (MX)
     std::unique_ptr<InitialSyncState> _initialSyncState;                        // (M)
     StorageInterface* _storage;                                                 // (M)
-    bool _fetcherPaused = false;                                                // (X)
     std::unique_ptr<OplogFetcher> _oplogFetcher;                                // (S)
     std::unique_ptr<Fetcher> _lastOplogEntryFetcher;                            // (S)
     bool _applierPaused = false;                                                // (X)

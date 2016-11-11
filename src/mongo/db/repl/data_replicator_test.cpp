@@ -640,7 +640,7 @@ void InitialSyncTest::tearDown() {
 TEST_F(InitialSyncTest, ShutdownImmediatelyAfterStartup) {
     startSync(1);
     auto txn = makeOpCtx();
-    ASSERT_OK(getDR().shutdown(txn.get()));
+    ASSERT_OK(getDR().shutdown());
     getExecutor().shutdown();
     verifySync(getNet(), ErrorCodes::ShutdownInProgress);
 }
