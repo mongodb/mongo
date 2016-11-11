@@ -303,6 +303,10 @@ public:
              int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << getName() << " can only be run on config servers",
+                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+
         const NamespaceString nss = NamespaceString(parseNs(dbName, cmdObj));
 
         CommitChunkMigrationRequest commitChunkMigrationRequest =

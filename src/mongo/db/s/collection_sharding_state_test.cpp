@@ -47,7 +47,7 @@
 namespace mongo {
 namespace {
 
-class CollShardingStateTest : public mongo::unittest::Test {
+class CollectionShardingStateTest : public mongo::unittest::Test {
 public:
     void setUp() override {
         _service.setFastClockSource(stdx::make_unique<ClockSourceMock>());
@@ -92,7 +92,7 @@ private:
     int _initCallCount = 0;
 };
 
-TEST_F(CollShardingStateTest, GlobalInitGetsCalledAfterWriteCommits) {
+TEST_F(CollectionShardingStateTest, GlobalInitGetsCalledAfterWriteCommits) {
     CollectionShardingState collShardingState(&_service,
                                               NamespaceString::kConfigCollectionNamespace);
 
@@ -112,7 +112,7 @@ TEST_F(CollShardingStateTest, GlobalInitGetsCalledAfterWriteCommits) {
     ASSERT_EQ(1, getInitCallCount());
 }
 
-TEST_F(CollShardingStateTest, GlobalInitDoesntGetCalledIfWriteAborts) {
+TEST_F(CollectionShardingStateTest, GlobalInitDoesntGetCalledIfWriteAborts) {
     CollectionShardingState collShardingState(getServiceContext(),
                                               NamespaceString::kConfigCollectionNamespace);
 
@@ -132,7 +132,7 @@ TEST_F(CollShardingStateTest, GlobalInitDoesntGetCalledIfWriteAborts) {
     ASSERT_EQ(0, getInitCallCount());
 }
 
-TEST_F(CollShardingStateTest, GlobalInitDoesntGetsCalledIfNSIsNotForShardIdentity) {
+TEST_F(CollectionShardingStateTest, GlobalInitDoesntGetCalledIfNSIsNotForShardIdentity) {
     CollectionShardingState collShardingState(getServiceContext(), NamespaceString("admin.user"));
 
     ShardIdentityType shardIdentity;
@@ -151,7 +151,7 @@ TEST_F(CollShardingStateTest, GlobalInitDoesntGetsCalledIfNSIsNotForShardIdentit
     ASSERT_EQ(0, getInitCallCount());
 }
 
-TEST_F(CollShardingStateTest, OnInsertOpThrowWithIncompleteShardIdentityDocument) {
+TEST_F(CollectionShardingStateTest, OnInsertOpThrowWithIncompleteShardIdentityDocument) {
     CollectionShardingState collShardingState(getServiceContext(),
                                               NamespaceString::kConfigCollectionNamespace);
 
@@ -161,7 +161,7 @@ TEST_F(CollShardingStateTest, OnInsertOpThrowWithIncompleteShardIdentityDocument
     ASSERT_THROWS(collShardingState.onInsertOp(txn(), shardIdentity.toBSON()), AssertionException);
 }
 
-TEST_F(CollShardingStateTest, GlobalInitDoesntGetsCalledIfShardIdentityDocWasNotInserted) {
+TEST_F(CollectionShardingStateTest, GlobalInitDoesntGetCalledIfShardIdentityDocWasNotInserted) {
     CollectionShardingState collShardingState(getServiceContext(),
                                               NamespaceString::kConfigCollectionNamespace);
 
