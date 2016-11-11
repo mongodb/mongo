@@ -197,6 +197,7 @@ error_code("ViewPipelineMaxSizeExceeded", 195)
 error_code("InvalidIndexSpecificationOption", 197)
 error_code("OBSOLETE_ReceivedOpReplyMessage", 198)
 error_code("ReplicaSetMonitorRemoved", 199)
+error_code("ChunkRangeCleanupPending", 200)
 
 # Non-sequential error codes (for compatibility only)
 error_code("SocketException", 9001)

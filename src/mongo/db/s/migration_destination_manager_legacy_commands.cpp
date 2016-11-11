@@ -93,19 +93,6 @@ public:
              BSONObjBuilder& result) {
         ShardingState* const shardingState = ShardingState::get(txn);
 
-        // Pending deletes (for migrations) are serialized by the distributed collection lock,
-        // we are sure we registered a delete for a range *before* we can migrate-in a
-        // subrange.
-        const size_t numDeletes = getDeleter()->getTotalDeletes();
-        if (numDeletes > 0) {
-            errmsg = str::stream() << "can't accept new chunks because "
-                                   << " there are still " << numDeletes
-                                   << " deletes from previous migration";
-
-            warning() << errmsg;
-            return false;
-        }
-
         const ShardId toShard(cmdObj["toShardName"].String());
         const ShardId fromShard(cmdObj["fromShardName"].String());
 
@@ -163,8 +150,22 @@ public:
         const MigrationSessionId migrationSessionId(
             uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));
 
+        // Ensure this shard is not currently receiving or donating any chunks.
         auto scopedRegisterReceiveChunk(
             uassertStatusOK(shardingState->registerReceiveChunk(nss, chunkRange, fromShard)));
+
+        // Even if this shard is not currently donating any chunks, it may still have pending
+        // deletes from a previous migration, particularly if there are still open cursors on the
+        // range pending deletion.
+        const size_t numDeletes = getDeleter()->getTotalDeletes();
+        if (numDeletes > 0) {
+            errmsg = str::stream() << "can't accept new chunks because "
+                                   << " there are still " << numDeletes
+                                   << " deletes from previous migration";
+
+            warning() << errmsg;
+            return appendCommandStatus(result, {ErrorCodes::ChunkRangeCleanupPending, errmsg});
+        }
 
         uassertStatusOK(shardingState->migrationDestinationManager()->start(
             nss,
