@@ -80,8 +80,11 @@ class test_compact02(wttest.WiredTigerTestCase):
 
     # Return the size of the file
     def getSize(self):
+        # To allow this to work on systems without ftruncate,
+        # get the portion of the file allocated, via 'statistics=(all)',
+        # not the physical file size, via 'statistics=(size)'.
         cstat = self.session.open_cursor(
-            'statistics:' + self.uri, None, 'statistics=(size)')
+            'statistics:' + self.uri, None, 'statistics=(all)')
         sz = cstat[stat.dsrc.block_size][2]
         cstat.close()
         return sz
@@ -96,7 +99,7 @@ class test_compact02(wttest.WiredTigerTestCase):
         self.home = '.'
         conn_params = 'create,' + \
             cacheSize + ',error_prefix="%s: ",' % self.shortid() + \
-            'statistics=(fast),eviction_dirty_target=99,eviction_dirty_trigger=99'
+            'statistics=(all),eviction_dirty_target=99,eviction_dirty_trigger=99'
         try:
             self.conn = wiredtiger.wiredtiger_open(self.home, conn_params)
         except wiredtiger.WiredTigerError as e:
