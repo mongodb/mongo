@@ -261,6 +261,7 @@ private:
                            const OplogFetcher::DocumentsInfo& info);
     void _onOplogFetchFinish(const Status& status, const OpTimeWithHash& lastFetched);
     void _doNextActions();
+    void _doNextActions_inlock();
     void _doNextActions_Steady_inlock();
 
     BSONObj _getInitialSyncProgress_inlock() const;
@@ -322,10 +323,22 @@ private:
     OpTimeWithHash _lastFetched;                                                // (MX)
     OpTimeWithHash _lastApplied;                                                // (MX)
     std::unique_ptr<OplogBuffer> _oplogBuffer;                                  // (M)
-    bool _inShutdown = false;                                                   // (M)
-    Event _onShutdown;                                                          // (M)
-    CollectionCloner::ScheduleDbWorkFn _scheduleDbWorkFn;                       // (M)
-    Stats _stats;                                                               // (M)
+
+    // Set to true when shutdown is requested. This flag should be checked by
+    // the data replicator during initial sync so that it can interrupt the
+    // the current operation and gracefully transition to completion with
+    // a shutdown status.
+    bool _inShutdown = false;  // (M)
+    // Set to true when the _onShutdown event is signaled for the first time.
+    // Ensures that we do not signal the shutdown event more than once (which
+    // is disallowed by the task executor.
+    bool _onShutdownSignaled = false;  // (M)
+    // Created when shutdown is requested. Signaled at most once when the data
+    // replicator is determining its next steps between task executor callbacks.
+    Event _onShutdown;  // (M)
+
+    CollectionCloner::ScheduleDbWorkFn _scheduleDbWorkFn;  // (M)
+    Stats _stats;                                          // (M)
 };
 
 }  // namespace repl

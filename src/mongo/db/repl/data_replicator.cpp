@@ -782,9 +782,9 @@ void DataReplicator::_scheduleLastOplogEntryFetcher_inlock(Fetcher::CallbackFn c
 
 void DataReplicator::_onApplierReadyStart(const QueryResponseStatus& fetchResult) {
     // Data clone done, move onto apply.
+    LockGuard lk(_mutex);
     auto&& optimeWithHashStatus = parseOpTimeWithHash(fetchResult);
     if (optimeWithHashStatus.isOK()) {
-        LockGuard lk(_mutex);
         auto&& optimeWithHash = optimeWithHashStatus.getValue();
         _initialSyncState->stopTimestamp = optimeWithHash.opTime.getTimestamp();
 
@@ -805,7 +805,8 @@ void DataReplicator::_onApplierReadyStart(const QueryResponseStatus& fetchResult
     } else {
         _initialSyncState->status = optimeWithHashStatus.getStatus();
     }
-    _doNextActions();
+
+    _doNextActions_inlock();
 }
 
 bool DataReplicator::_anyActiveHandles_inlock() const {
@@ -871,17 +872,21 @@ void DataReplicator::_waitOnAndResetAll_inlock(UniqueLock* lk) {
 }
 
 void DataReplicator::_doNextActions() {
+    LockGuard lk(_mutex);
+    _doNextActions_inlock();
+}
+
+void DataReplicator::_doNextActions_inlock() {
     // Can be in one of 2 main states/modes (DataReplicatorState):
     // 1.) Initial Sync
     // 2.) Uninitialized
 
     // Check for shutdown flag, signal event
-    LockGuard lk(_mutex);
     if (_onShutdown.isValid()) {
-        if (!_anyActiveHandles_inlock()) {
-            LOG(1) << "Signaling shutdown event for DataReplicator.";
+        if (!_onShutdownSignaled) {
             _exec->signalEvent(_onShutdown);
             _setState_inlock(DataReplicatorState::Uninitialized);
+            _onShutdownSignaled = true;
         }
         return;
     }
@@ -896,9 +901,11 @@ void DataReplicator::_doNextActions() {
         return;
     }
 
-    if (_initialSyncState->dbsCloner->isActive() ||
-        !_initialSyncState->dbsCloner->getStatus().isOK()) {
-        return;
+    if (_initialSyncState->dbsCloner) {
+        if (_initialSyncState->dbsCloner->isActive() ||
+            !_initialSyncState->dbsCloner->getStatus().isOK()) {
+            return;
+        }
     }
 
     // The DatabasesCloner has completed so make sure we apply far enough to be consistent.
@@ -1292,14 +1299,6 @@ void DataReplicator::waitForShutdown() {
         onShutdown = _onShutdown;
     }
     _exec->waitForEvent(onShutdown);
-    {
-        UniqueLock lk(_mutex);
-        _waitOnAndResetAll_inlock(&lk);
-        _oplogBuffer.reset();
-        invariant(!_lastOplogEntryFetcher || !_lastOplogEntryFetcher->isActive());
-        invariant(!_oplogFetcher || !_oplogFetcher->isActive());
-        invariant(!_applier || !_applier->isActive());
-    }
 }
 
 Status DataReplicator::_shutdown(OperationContext* txn) {
