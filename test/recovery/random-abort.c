@@ -34,7 +34,7 @@
 static char home[512];			/* Program working dir */
 static const char *progname;		/* Program name */
 static const char * const uri = "table:main";
-bool inmem;
+static bool inmem;
 
 #define	MAX_TH	12
 #define	MIN_TH	5

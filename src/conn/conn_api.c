@@ -239,8 +239,6 @@ __conn_add_compressor(WT_CONNECTION *wt_conn,
 	WT_NAMED_COMPRESSOR *ncomp;
 	WT_SESSION_IMPL *session;
 
-	WT_UNUSED(name);
-	WT_UNUSED(compressor);
 	ncomp = NULL;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;

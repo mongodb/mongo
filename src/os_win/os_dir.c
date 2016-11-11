@@ -30,8 +30,6 @@ __wt_win_directory_list(WT_FILE_SYSTEM *file_system,
 	uint32_t count;
 	char *dir_copy, **entries;
 
-	WT_UNUSED(file_system);
-
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	*dirlistp = NULL;
