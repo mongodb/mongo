@@ -1501,7 +1501,7 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
                                                     ShardingCatalogClient::kMajorityWriteConcern));
     assertShardExists(existingShard);
 
-    // Adding the same host with a different shard name should fail.
+    // Adding the same standalone host with a different shard name should fail.
     std::string differentName = "anotherShardName";
     auto future1 = launchAsync([&] {
         Client::initThreadIfNotAlready();
@@ -1511,15 +1511,12 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
                                                  ConnectionString(shardTarget),
                                                  existingShard.getMaxSizeMB()));
     });
-    expectIsMaster(shardTarget,
-                   BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
-                             << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN));
     future1.timed_get(kFutureTimeout);
 
     // Ensure that the shard document was unchanged.
     assertShardExists(existingShard);
 
-    // Adding the same host with a different maxSize should fail.
+    // Adding the same standalone host with a different maxSize should fail.
     auto future2 = launchAsync([&] {
         Client::initThreadIfNotAlready();
         ASSERT_EQUALS(ErrorCodes::IllegalOperation,
@@ -1528,12 +1525,12 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
                                                  ConnectionString(shardTarget),
                                                  existingShard.getMaxSizeMB() + 100));
     });
-    expectIsMaster(shardTarget,
-                   BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
-                             << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN));
     future2.timed_get(kFutureTimeout);
 
-    // Adding the same host but as part of a replica set should fail.
+    // Adding the same standalone host but as part of a replica set should fail.
+    // Ensures that even if the user changed the standalone shard to a single-node replica set, you
+    // can't change the sharded cluster's notion of the shard from standalone to replica set just
+    // by calling addShard.
     auto future3 = launchAsync([&] {
         Client::initThreadIfNotAlready();
         ASSERT_EQUALS(
@@ -1543,24 +1540,12 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
                                        ConnectionString::forReplicaSet("mySet", {shardTarget}),
                                        existingShard.getMaxSizeMB()));
     });
-    // Make it get past the host validation check (even though if this *really* was a standalone
-    // it wouldn't report it was a replica set here and thus would fail the validation check) to
-    // ensure that even if the user changed the standalone shard to a single-node replica set, you
-    // can't change the sharded cluster's notion of the shard from standalone to replica set just
-    // by calling addShard.
-    expectIsMaster(shardTarget,
-                   BSON("ok" << 1 << "ismaster" << true << "setName"
-                             << "mySet"
-                             << "hosts"
-                             << BSON_ARRAY(shardTarget.toString())
-                             << "maxWireVersion"
-                             << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN));
     future3.timed_get(kFutureTimeout);
 
     // Ensure that the shard document was unchanged.
     assertShardExists(existingShard);
 
-    // Adding the same host with the same options should succeed.
+    // Adding the same standalone host with the same options should succeed.
     auto future4 = launchAsync([&] {
         Client::initThreadIfNotAlready();
         auto shardName = assertGet(catalogManager()->addShard(operationContext(),
@@ -1569,28 +1554,21 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
                                                               existingShard.getMaxSizeMB()));
         ASSERT_EQUALS(existingShardName, shardName);
     });
-    expectIsMaster(shardTarget,
-                   BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
-                             << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN));
     future4.timed_get(kFutureTimeout);
 
     // Ensure that the shard document was unchanged.
     assertShardExists(existingShard);
 
-    // Adding the same host with the same options (without explicitly specifying the shard name)
-    // should succeed.
+    // Adding the same standalone host with the same options (without explicitly specifying the
+    // shard name) should succeed.
     auto future5 = launchAsync([&] {
         Client::initThreadIfNotAlready();
-        auto shardName =
-            assertGet(catalogManager()->addShard(operationContext(),
-                                                 nullptr,  // should auto-pick same name
-                                                 ConnectionString(shardTarget),
-                                                 existingShard.getMaxSizeMB()));
+        auto shardName = assertGet(catalogManager()->addShard(operationContext(),
+                                                              nullptr,
+                                                              ConnectionString(shardTarget),
+                                                              existingShard.getMaxSizeMB()));
         ASSERT_EQUALS(existingShardName, shardName);
     });
-    expectIsMaster(shardTarget,
-                   BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
-                             << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN));
     future5.timed_get(kFutureTimeout);
 
     // Ensure that the shard document was unchanged.
@@ -1623,14 +1601,6 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
                                                     ShardingCatalogClient::kMajorityWriteConcern));
     assertShardExists(existingShard);
 
-    BSONObj isMasterResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
-                                         << "mySet"
-                                         << "hosts"
-                                         << BSON_ARRAY("host1:12345"
-                                                       << "host2:12345")
-                                         << "maxWireVersion"
-                                         << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
-
     // Adding the same connection string with a different shard name should fail.
     std::string differentName = "anotherShardName";
     auto future1 = launchAsync([&] {
@@ -1640,7 +1610,6 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
             catalogManager()->addShard(
                 operationContext(), &differentName, connString, existingShard.getMaxSizeMB()));
     });
-    expectIsMaster(shardTarget, isMasterResponse);
     future1.timed_get(kFutureTimeout);
 
     // Ensure that the shard document was unchanged.
@@ -1654,23 +1623,16 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
             catalogManager()->addShard(
                 operationContext(), nullptr, connString, existingShard.getMaxSizeMB() + 100));
     });
-    expectIsMaster(shardTarget, isMasterResponse);
     future2.timed_get(kFutureTimeout);
 
     // Ensure that the shard document was unchanged.
     assertShardExists(existingShard);
 
     // Adding a connecting string with a host of an existing shard but using a different connection
-    // string type should fail
-    {
-        // Make sure we can target the request to the standalone server.
-        std::unique_ptr<RemoteCommandTargeterMock> standaloneTargeter(
-            stdx::make_unique<RemoteCommandTargeterMock>());
-        standaloneTargeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
-        standaloneTargeter->setFindHostReturnValue(shardTarget);
-        targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget),
-                                               std::move(standaloneTargeter));
-    }
+    // string type should fail.
+    // Ensures that even if the user changed the replica set shard to a standalone, you can't change
+    // the sharded cluster's notion of the shard from replica set to standalone just by calling
+    // addShard.
     auto future3 = launchAsync([&] {
         Client::initThreadIfNotAlready();
         ASSERT_EQUALS(ErrorCodes::IllegalOperation,
@@ -1679,33 +1641,15 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
                                                  ConnectionString(shardTarget),
                                                  existingShard.getMaxSizeMB()));
     });
-    // Make it get past the host validation check (even though if this *really* was a replica set
-    // it would report it was a replica set here and thus would fail the validation check) to
-    // ensure that even if the user changed the replica set shard to a standalone, you
-    // can't change the sharded cluster's notion of the shard from replica set to standalone just
-    // by calling addShard.
-    expectIsMaster(shardTarget,
-                   BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
-                             << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN));
     future3.timed_get(kFutureTimeout);
 
     // Ensure that the shard document was unchanged.
     assertShardExists(existingShard);
 
     // Adding a connecting string with the same hosts but a different replica set name should fail.
+    // Ensures that even if you manually change the shard's replica set name somehow, you can't
+    // change the replica set name the sharded cluster knows for it just by calling addShard again.
     std::string differentSetName = "differentSet";
-    {
-        // Add a targeter with the new replica set name so the validation check can be targeted and
-        // run properly.
-        std::unique_ptr<RemoteCommandTargeterMock> differentRSNameTargeter(
-            stdx::make_unique<RemoteCommandTargeterMock>());
-        ConnectionString differentRSConnString =
-            ConnectionString::forReplicaSet(differentSetName, connString.getServers());
-        differentRSNameTargeter->setConnectionStringReturnValue(differentRSConnString);
-        differentRSNameTargeter->setFindHostReturnValue(shardTarget);
-        targeterFactory()->addTargeterToReturn(differentRSConnString,
-                                               std::move(differentRSNameTargeter));
-    }
     auto future4 = launchAsync([&] {
         Client::initThreadIfNotAlready();
         ASSERT_EQUALS(ErrorCodes::IllegalOperation,
@@ -1715,18 +1659,6 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
                                                      differentSetName, connString.getServers()),
                                                  existingShard.getMaxSizeMB()));
     });
-    BSONObj differentRSIsMasterResponse =
-        BSON("ok" << 1 << "ismaster" << true << "setName" << differentSetName << "hosts"
-                  << BSON_ARRAY("host1:12345"
-                                << "host2:12345")
-                  << "maxWireVersion"
-                  << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
-    // Make it get past the validation check (even though if you really tried to add a replica set
-    // with the wrong name it would report the other name in the ismaster response here and thus
-    // would fail the validation check) to ensure that even if you manually change the shard's
-    // replica set name somehow, you can't change the replica set name the sharded cluster knows
-    // for it just by calling addShard again.
-    expectIsMaster(shardTarget, differentRSIsMasterResponse);
     future4.timed_get(kFutureTimeout);
 
     // Ensure that the shard document was unchanged.
@@ -1739,7 +1671,6 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
             operationContext(), &existingShardName, connString, existingShard.getMaxSizeMB()));
         ASSERT_EQUALS(existingShardName, shardName);
     });
-    expectIsMaster(shardTarget, isMasterResponse);
     future5.timed_get(kFutureTimeout);
 
     // Adding the same host with the same options (without explicitly specifying the shard name)
@@ -1750,7 +1681,6 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
             operationContext(), nullptr, connString, existingShard.getMaxSizeMB()));
         ASSERT_EQUALS(existingShardName, shardName);
     });
-    expectIsMaster(shardTarget, isMasterResponse);
     future6.timed_get(kFutureTimeout);
 
     // Ensure that the shard document was unchanged.
@@ -1774,7 +1704,6 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
             operationContext(), nullptr, otherHostConnString, existingShard.getMaxSizeMB()));
         ASSERT_EQUALS(existingShardName, shardName);
     });
-    expectIsMaster(otherHost, isMasterResponse);
     future7.timed_get(kFutureTimeout);
 
     // Ensure that the shard document was unchanged.
