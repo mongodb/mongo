@@ -1236,7 +1236,7 @@ void ExpressionObject::addDependencies(DepsTracker* deps) const {
 Value ExpressionObject::evaluateInternal(Variables* vars) const {
     MutableDocument outputDoc;
     for (auto&& pair : _expressions) {
-        outputDoc.setNestedField(FieldPath(pair.first), pair.second->evaluateInternal(vars));
+        outputDoc.addField(pair.first, pair.second->evaluateInternal(vars));
     }
     return outputDoc.freezeToValue();
 }
@@ -1244,7 +1244,7 @@ Value ExpressionObject::evaluateInternal(Variables* vars) const {
 Value ExpressionObject::serialize(bool explain) const {
     MutableDocument outputDoc;
     for (auto&& pair : _expressions) {
-        outputDoc.setNestedField(FieldPath(pair.first), pair.second->serialize(explain));
+        outputDoc.addField(pair.first, pair.second->serialize(explain));
     }
     return outputDoc.freezeToValue();
 }
