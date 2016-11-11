@@ -806,6 +806,13 @@ void DataReplicator::_onApplierReadyStart(const QueryResponseStatus& fetchResult
         _initialSyncState->status = optimeWithHashStatus.getStatus();
     }
 
+    // Ensure that the DatabasesCloner has reached an inactive state because this callback is
+    // scheduled by the DatabasesCloner callback. This will avoid a race in _doNextActions() where
+    // we mistakenly think the cloner is still active.
+    if (_initialSyncState->dbsCloner) {
+        _initialSyncState->dbsCloner->join();
+    }
+
     _doNextActions_inlock();
 }
 
