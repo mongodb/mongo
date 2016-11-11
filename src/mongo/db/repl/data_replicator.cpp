@@ -683,6 +683,7 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
             const auto retStatus = (_initialSyncState && !_initialSyncState->status.isOK())
                 ? _initialSyncState->status
                 : shutdownStatus;
+            error() << "Initial sync attempt terminated due to shutdown: " << shutdownStatus;
             return retStatus;
         }
 
@@ -801,11 +802,10 @@ void DataReplicator::_onApplierReadyStart(const QueryResponseStatus& fetchResult
                 _lastApplied = optimeWithHash;
             }
         }
-        _doNextActions_InitialSync_inlock();
     } else {
         _initialSyncState->status = optimeWithHashStatus.getStatus();
-        _doNextActions();
     }
+    _doNextActions();
 }
 
 bool DataReplicator::_anyActiveHandles_inlock() const {
@@ -871,9 +871,9 @@ void DataReplicator::_waitOnAndResetAll_inlock(UniqueLock* lk) {
 }
 
 void DataReplicator::_doNextActions() {
-    // Can be in one of 3 main states/modes (DataReplicatorState):
+    // Can be in one of 2 main states/modes (DataReplicatorState):
     // 1.) Initial Sync
-    // 3.) Steady (Replication)
+    // 2.) Uninitialized
 
     // Check for shutdown flag, signal event
     LockGuard lk(_mutex);
@@ -886,17 +886,10 @@ void DataReplicator::_doNextActions() {
         return;
     }
 
-    // Do work for the current state
-    switch (_state) {
-        case DataReplicatorState::InitialSync:
-            _doNextActions_InitialSync_inlock();
-            break;
-        case DataReplicatorState::Uninitialized:
-            return;
+    if (DataReplicatorState::Uninitialized == _state) {
+        return;
     }
-}
 
-void DataReplicator::_doNextActions_InitialSync_inlock() {
     invariant(_initialSyncState);
 
     if (!_initialSyncState->status.isOK()) {
@@ -1278,9 +1271,11 @@ Status DataReplicator::scheduleShutdown(OperationContext* txn) {
         invariant(!_onShutdown.isValid());
         _inShutdown = true;
         _onShutdown = eventStatus.getValue();
-        if (_initialSyncState) {
+        if (DataReplicatorState::InitialSync == _state && _initialSyncState &&
+            _initialSyncState->status.isOK()) {
             _initialSyncState->status = {ErrorCodes::ShutdownInProgress,
                                          "Shutdown issued for the operation."};
+            _exec->signalEvent(_initialSyncState->finishEvent);
         }
         _cancelAllHandles_inlock();
     }

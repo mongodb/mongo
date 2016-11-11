@@ -261,7 +261,6 @@ private:
                            const OplogFetcher::DocumentsInfo& info);
     void _onOplogFetchFinish(const Status& status, const OpTimeWithHash& lastFetched);
     void _doNextActions();
-    void _doNextActions_InitialSync_inlock();
     void _doNextActions_Steady_inlock();
 
     BSONObj _getInitialSyncProgress_inlock() const;
