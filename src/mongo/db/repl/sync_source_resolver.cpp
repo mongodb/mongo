@@ -94,10 +94,17 @@ bool SyncSourceResolver::_isActive_inlock() const {
 Status SyncSourceResolver::startup() {
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
-        if (State::kPreStart != _state) {
-            return Status(ErrorCodes::IllegalOperation, "sync source resolver already started");
+        switch (_state) {
+            case State::kPreStart:
+                _state = State::kRunning;
+                break;
+            case State::kRunning:
+                return Status(ErrorCodes::IllegalOperation, "sync source resolver already started");
+            case State::kShuttingDown:
+                return Status(ErrorCodes::ShutdownInProgress, "sync source resolver shutting down");
+            case State::kComplete:
+                return Status(ErrorCodes::ShutdownInProgress, "sync source resolver completed");
         }
-        _state = State::kRunning;
     }
 
     return _chooseAndProbeNextSyncSource(OpTime());

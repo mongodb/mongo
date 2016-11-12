@@ -240,6 +240,15 @@ TEST_F(SyncSourceResolverTest, StartupReturnsIllegalOperationIfAlreadyActive) {
     ASSERT_TRUE(_resolver->isActive());
 }
 
+TEST_F(SyncSourceResolverTest, StartupReturnsShutdownInProgressIfResolverIsShuttingDown) {
+    _selector->syncSource = HostAndPort("node1", 12345);
+    ASSERT_OK(_resolver->startup());
+    ASSERT_TRUE(executor::NetworkInterfaceMock::InNetworkGuard(getNet())->hasReadyRequests());
+    _resolver->shutdown();
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, _resolver->startup());
+    ASSERT_TRUE(_resolver->isActive());
+}
+
 TEST_F(SyncSourceResolverTest, StartupReturnsShutdownInProgressIfExecutorIsShutdown) {
     ASSERT_FALSE(_resolver->isActive());
     getExecutor().shutdown();
@@ -258,7 +267,7 @@ TEST_F(SyncSourceResolverTest,
     ASSERT_EQUALS(lastOpTimeFetched.getTimestamp(), _selector->lastTimestampFetched);
 
     // Cannot restart a completed resolver.
-    ASSERT_EQUALS(ErrorCodes::IllegalOperation, _resolver->startup());
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, _resolver->startup());
 }
 
 TEST_F(
