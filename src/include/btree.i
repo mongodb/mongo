@@ -1562,27 +1562,36 @@ __wt_btree_lsm_switch_primary(WT_SESSION_IMPL *session, bool on)
 	cache = S2C(session)->cache;
 	root = btree->root.page;
 
-       if (on) {
-	       F_SET(btree, WT_BTREE_LSM_PRIMARY);
-	       F_SET(btree, WT_BTREE_NO_EVICTION);
-       } else {
+	if (on && !F_ISSET(btree, WT_BTREE_LSM_PRIMARY))
+		F_SET(btree, WT_BTREE_LSM_PRIMARY | WT_BTREE_NO_EVICTION);
+	if (!on && F_ISSET(btree, WT_BTREE_LSM_PRIMARY)) {
 		pindex = WT_INTL_INDEX_GET_SAFE(root);
+		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
+		    pindex->entries != 1)
+			return;
 		first = pindex->index[0];
 
-	/*
-	 * We're reaching down into the page without a hazard pointer, but
-	 * that's OK because we know that no-eviction is set and so the page
-	 * cannot disappear.
-	 */
+		/*
+		 * We're reaching down into the page without a hazard pointer,
+		 * but that's OK because we know that no-eviction is set so the
+		 * page can't disappear.
+		 */
 		child = first->page;
-		if (!__wt_page_is_modified(child))
+		if (first->state != WT_REF_MEM ||
+		    child->type != WT_PAGE_ROW_LEAF ||
+		    !__wt_page_is_modified(child))
 			return;
+
+		/*
+		 * While this tree was the primary, its dirty bytes were not
+		 * included in the cache accounting.  Fix that now before we
+		 * open it up for eviction.
+		 */
 		size = child->modify->bytes_dirty;
 		(void)__wt_atomic_add64(&btree->bytes_dirty_leaf, size);
 		(void)__wt_atomic_add64(&cache->bytes_dirty_leaf, size);
 
-		F_CLR(btree, WT_BTREE_LSM_PRIMARY);
-		F_CLR(btree, WT_BTREE_NO_EVICTION);
+		F_CLR(btree, WT_BTREE_LSM_PRIMARY | WT_BTREE_NO_EVICTION);
 	}
 }
 
