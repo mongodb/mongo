@@ -657,6 +657,11 @@ wiredtiger_open_common =\
         should be used (4KB on Linux systems when direct I/O is configured,
         zero elsewhere)''',
         min='-1', max='1MB'),
+    Config('builtin_extension_config', '', r'''
+        A structure where the keys are the names of builtin extensions and the
+        values are passed to WT_CONNECTION::load_extension as the \c config
+        parameter (for example,
+        <code>builtin_extension_config={zlib={compression_level=3}}</code>)'''),
     Config('checkpoint_sync', 'true', r'''
         flush files to stable storage when closing or writing
         checkpoints''',

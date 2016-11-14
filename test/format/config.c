@@ -301,7 +301,7 @@ config_compression(const char *conf_name)
 		break;
 #endif
 #ifdef HAVE_BUILTIN_EXTENSION_ZSTD
-	case 15: case 16 case 17:		/* 15% zstd */
+	case 15: case 16: case 17:		/* 15% zstd */
 		cstr = "zstd";
 		break;
 #endif
