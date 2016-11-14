@@ -133,6 +133,17 @@ IndexCatalogEntry* IndexCatalog::_setupInMemoryStructures(OperationContext* txn,
 
     Status status = _isSpecOk(descriptor->infoObj());
     if (!status.isOK() && status != ErrorCodes::IndexAlreadyExists) {
+        if (_collection->ns().ns() == "admin.system.version") {
+            auto indexNameElem = descriptor->infoObj()["name"];
+
+            if (indexNameElem.type() == BSONType::String &&
+                indexNameElem.valueStringData() == StringData("incompatible_with_version_32")) {
+                severe()
+                    << "Cannot start mongod when the featureCompatibilityVersion is higher than "
+                       "3.2. See http://dochub.mongodb.org/core/3.4-feature-compatibility.";
+                fassertFailedNoTrace(40352);
+            }
+        }
         severe() << "Found an invalid index " << descriptor->infoObj() << " on the "
                  << _collection->ns().ns() << " collection: " << status.reason();
         fassertFailedNoTrace(28782);
