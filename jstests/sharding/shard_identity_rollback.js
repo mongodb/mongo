@@ -17,12 +17,11 @@
     var secondaries = replTest.getSecondaries();
     var configConnStr = st.configRS.getURL();
 
-    var shardIdentityDoc = {
-        _id: 'shardIdentity',
-        configsvrConnectionString: configConnStr,
-        shardName: 'newShard',
-        clusterId: ObjectId()
-    };
+    // Wait for the secondaries to have the latest oplog entries before stopping the fetcher to
+    // avoid the situation where one of the secondaries will not have an overlapping oplog with
+    // the other nodes once the primary is killed.
+    replTest.awaitSecondaryNodes();
+    replTest.awaitReplication();
 
     nodes.forEach(function(node) {
         // Pause bgsync so it doesn't keep trying to sync from other nodes.
@@ -34,6 +33,14 @@
     });
 
     jsTest.log("inserting shardIdentity document to primary that shouldn't replicate");
+
+    var shardIdentityDoc = {
+        _id: 'shardIdentity',
+        configsvrConnectionString: configConnStr,
+        shardName: 'newShard',
+        clusterId: ObjectId()
+    };
+
     assert.writeOK(priConn.getDB('admin').system.version.update(
         {_id: 'shardIdentity'}, shardIdentityDoc, {upsert: true}));
 
