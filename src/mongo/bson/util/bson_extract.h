@@ -86,6 +86,18 @@ Status bsonExtractBooleanField(const BSONObj& object, StringData fieldName, bool
 Status bsonExtractIntegerField(const BSONObj& object, StringData fieldName, long long* out);
 
 /**
+ * Finds an element named "fieldName" in "object" that represents a double-precision floating point
+ * value.
+ *
+ * Returns Status::OK() and sets *out to the element's double floating point value representation on
+ * success. Returns ErrorCodes::NoSuchKey if there are no matches for "fieldName". Returns
+ * ErrorCodes::TypeMismatch if the value of the matching element is not of a numeric type. Returns
+ * ErrorCodes::BadValue if the value does not have an exact floating point number representation.
+ * For return values other than Status::OK(), the resulting value of "*out" is undefined.
+ */
+Status bsonExtractDoubleField(const BSONObj& object, StringData fieldName, double* out);
+
+/**
  * Finds a string-typed element named "fieldName" in "object" and stores its value in "out".
  *
  * Returns Status::OK() and sets *out to the found element's std::string value on success.  Returns

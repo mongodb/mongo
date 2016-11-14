@@ -46,13 +46,16 @@ namespace {
 
 const char kModeFieldName[] = "mode";
 const char kTagsFieldName[] = "tags";
-const char kMaxStalenessMSFieldName[] = "maxStalenessMS";
+const char kMaxStalenessSecondsFieldName[] = "maxStalenessSeconds";
 
 const char kPrimaryOnly[] = "primary";
 const char kPrimaryPreferred[] = "primaryPreferred";
 const char kSecondaryOnly[] = "secondary";
 const char kSecondaryPreferred[] = "secondaryPreferred";
 const char kNearest[] = "nearest";
+
+// Avoid overflow errors when converting from seconds to milliseconds
+const auto kMaximalMaxStalenessSecondsValue(durationCount<Seconds>(Milliseconds::max()));
 
 StringData readPreferenceName(ReadPreference pref) {
     switch (pref) {
@@ -182,39 +185,56 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromBSON(const BSONObj&
         return tagExtractStatus;
     }
 
-    long long maxStalenessMSValue;
-    auto maxStalenessMSExtractStatus = bsonExtractIntegerFieldWithDefault(
-        readPrefObj, kMaxStalenessMSFieldName, 0, &maxStalenessMSValue);
+    double maxStalenessSecondsValue;
 
-    if (!maxStalenessMSExtractStatus.isOK()) {
-        return maxStalenessMSExtractStatus;
+    Status maxStalenessSecondsExtractStatus = bsonExtractDoubleField(
+        readPrefObj, kMaxStalenessSecondsFieldName, &maxStalenessSecondsValue);
+
+    if (maxStalenessSecondsExtractStatus == ErrorCodes::NoSuchKey) {
+        return ReadPreferenceSetting(mode, tags);
+    } else if (!maxStalenessSecondsExtractStatus.isOK()) {
+        return maxStalenessSecondsExtractStatus;
     }
 
-    if (maxStalenessMSValue && maxStalenessMSValue < 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << kMaxStalenessMSFieldName
-                                    << " must be a non negative integer");
+    if (maxStalenessSecondsValue < 0.0) {
+        return {ErrorCodes::BadValue,
+                str::stream() << kMaxStalenessSecondsFieldName << " value can not be negative"};
     }
 
-    if (maxStalenessMSValue && maxStalenessMSValue >= Milliseconds::max().count()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << kMaxStalenessMSFieldName << " value can not exceed "
-                                    << Milliseconds::max().count());
+    if (maxStalenessSecondsValue > kMaximalMaxStalenessSecondsValue) {
+        return {ErrorCodes::MaxStalenessOutOfRange,
+                str::stream() << kMaxStalenessSecondsFieldName << " value can not exceed "
+                              << kMaximalMaxStalenessSecondsValue};
     }
 
-    if (maxStalenessMSValue && maxStalenessMSValue < kMinimalMaxStalenessValue.count()) {
-        return Status(ErrorCodes::MaxStalenessOutOfRange,
-                      str::stream() << kMaxStalenessMSFieldName << " value can not be less than "
-                                    << kMinimalMaxStalenessValue.count());
+    if (maxStalenessSecondsValue == 0.0) {
+        return ReadPreferenceSetting(mode, tags);
     }
 
-    if ((mode == ReadPreference::PrimaryOnly) && maxStalenessMSValue) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << kMaxStalenessMSFieldName
-                                    << " can not be set for the primary mode");
+    // Use a lambda to do the double seconds to integer milliseconds conversion in order to
+    // encapsulate the usage of helper variables
+    const Milliseconds requestedMaxStalenessMS = [maxStalenessSecondsValue] {
+        double integerPart;
+        const double fractionalPart = std::modf(maxStalenessSecondsValue, &integerPart);
+
+        return Seconds(static_cast<long long>(integerPart)) +
+            Milliseconds(static_cast<long long>(fractionalPart *
+                                                durationCount<Milliseconds>(Seconds(1))));
+    }();
+
+    if (requestedMaxStalenessMS < kMinimalMaxStalenessValue) {
+        return {ErrorCodes::MaxStalenessOutOfRange,
+                str::stream() << kMaxStalenessSecondsFieldName << " value can not be less than "
+                              << kMinimalMaxStalenessValue};
     }
 
-    return ReadPreferenceSetting(mode, tags, Milliseconds(maxStalenessMSValue));
+    if (mode == ReadPreference::PrimaryOnly) {
+        return {ErrorCodes::BadValue,
+                str::stream() << kMaxStalenessSecondsFieldName
+                              << " can not be set for the primary mode"};
+    }
+
+    return ReadPreferenceSetting(mode, tags, requestedMaxStalenessMS);
 }
 
 BSONObj ReadPreferenceSetting::toBSON() const {
@@ -224,7 +244,9 @@ BSONObj ReadPreferenceSetting::toBSON() const {
         bob.append(kTagsFieldName, tags.getTagBSON());
     }
     if (maxStalenessMS.count() > 0) {
-        bob.append(kMaxStalenessMSFieldName, maxStalenessMS.count());
+        bob.append(kMaxStalenessSecondsFieldName,
+                   static_cast<double>(maxStalenessMS.count()) /
+                       durationCount<Milliseconds>(Seconds(1)));
     }
     return bob.obj();
 }
