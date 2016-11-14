@@ -267,7 +267,7 @@ __cursor_func_init(WT_CURSOR_BTREE *cbt, bool reenter)
 	 * to read.
 	 */
 	if (!F_ISSET(cbt, WT_CBT_NO_TXN))
-		WT_RET(__wt_txn_cursor_op(session));
+		__wt_txn_cursor_op(session);
 	return (0);
 }
 

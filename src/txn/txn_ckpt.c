@@ -242,8 +242,6 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 	const char *name;
 
-	WT_UNUSED(cfg);
-
 	/* Should not be called with anything other than a file object. */
 	WT_ASSERT(session, session->dhandle->checkpoint == NULL);
 	WT_ASSERT(session, WT_PREFIX_MATCH(session->dhandle->name, "file:"));

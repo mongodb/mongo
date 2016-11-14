@@ -24,8 +24,6 @@ __wt_bm_preload(
 	uint32_t checksum, size;
 	bool mapped;
 
-	WT_UNUSED(addr_size);
-
 	block = bm->block;
 
 	WT_STAT_CONN_INCR(session, block_preload);

@@ -108,7 +108,7 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
  * __wt_txn_get_snapshot --
  *	Allocate a snapshot.
  */
-int
+void
 __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -180,7 +180,6 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 
 done:	__wt_readunlock(session, txn_global->scan_rwlock);
 	__txn_sort_snapshot(session, n, current_id);
-	return (0);
 }
 
 /*

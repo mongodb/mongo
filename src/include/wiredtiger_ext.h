@@ -204,18 +204,12 @@ struct __wt_extension_api {
 	    WT_COLLATOR *collator, WT_ITEM *first, WT_ITEM *second, int *cmp);
 
 	/*!
-	 * @copydoc wiredtiger_config_parser_open
-	 */
-	int (*config_parser_open)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
-	    const char *config, size_t len, WT_CONFIG_PARSER **config_parserp);
-
-	/*!
-	 * Return the value of a configuration string.
+	 * Return the value of a configuration key.
 	 *
 	 * @param wt_api the extension handle
 	 * @param session the session handle (or NULL if none available)
-	 * @param key configuration key string
 	 * @param config the configuration information passed to an application
+	 * @param key configuration key string
 	 * @param value the returned value
 	 * @errors
 	 *
@@ -223,6 +217,34 @@ struct __wt_extension_api {
 	 */
 	int (*config_get)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
 	    WT_CONFIG_ARG *config, const char *key, WT_CONFIG_ITEM *value);
+
+	/*!
+	 * Return the value of a configuration key from a string.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param config the configuration string
+	 * @param key configuration key string
+	 * @param value the returned value
+	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION config_get
+	 */
+	int (*config_get_string)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
+	    const char *config, const char *key, WT_CONFIG_ITEM *value);
+
+	/*!
+	 * @copydoc wiredtiger_config_parser_open
+	 */
+	int (*config_parser_open)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
+	    const char *config, size_t len, WT_CONFIG_PARSER **config_parserp);
+
+	/*!
+	 * @copydoc wiredtiger_config_parser_open
+	 */
+	int (*config_parser_open_arg)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session, WT_CONFIG_ARG *config,
+	    WT_CONFIG_PARSER **config_parserp);
 
 	/*!
 	 * Insert a row into the metadata if it does not already exist.

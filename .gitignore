@@ -16,11 +16,12 @@
 *.obj
 *.pdb
 *.pyc
+.dirstamp
 .sconf_temp
 .sconsign.dblite
-.dirstamp
 /Makefile.am
 /aclocal.m4
+/autom4te.cache/
 /build_posix/aclocal/libtool.m4
 /build_posix/aclocal/ltoptions.m4
 /build_posix/aclocal/ltsugar.m4
@@ -32,7 +33,7 @@
 /config.status
 /configure
 /configure.ac
-/libtool/
+/libtool
 /stamp-h1
 /wiredtiger.h
 /wiredtiger.pc
@@ -63,9 +64,9 @@ WT_TEST/
 
 # Python
 /lang/python/_wiredtiger.so
+/lang/python/wiredtiger.py
 /lang/python/wiredtiger/__init__.py
 /lang/python/wiredtiger/_wiredtiger.pyd
-/lang/python/wiredtiger.py
 /lang/python/wiredtiger_wrap.c
 _wiredtiger.pyd
 
@@ -106,6 +107,7 @@ _wiredtiger.pyd
 **/test/csuite/test_wt2719_reconfig
 **/test/csuite/test_wt2834_join_bloom_fix
 **/test/csuite/test_wt2853_perf
+**/test/csuite/test_wt2999_join_extractor
 **/test/cursor_order/cursor_order
 **/test/fops/t
 **/test/format/s_dumpcmp

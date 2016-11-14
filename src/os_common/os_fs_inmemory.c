@@ -515,8 +515,6 @@ __im_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session)
 	WT_FILE_SYSTEM_INMEM *im_fs;
 	WT_SESSION_IMPL *session;
 
-	WT_UNUSED(file_system);
-
 	session = (WT_SESSION_IMPL *)wt_session;
 	im_fs = (WT_FILE_SYSTEM_INMEM *)file_system;
 

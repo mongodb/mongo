@@ -215,7 +215,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, bool reset, bool update)
 				goto open;
 
 			if (txn->isolation == WT_ISO_SNAPSHOT)
-				WT_RET(__wt_txn_cursor_op(session));
+				__wt_txn_cursor_op(session);
 
 			/*
 			 * Figure out how many updates are required for
@@ -700,7 +700,7 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		if (btree->bulk_load_ok) {
 			btree->bulk_load_ok = false;
 			WT_WITH_BTREE(session, btree,
-			    __wt_btree_evictable(session, false));
+			    __wt_btree_lsm_switch_primary(session, true));
 		}
 	}
 

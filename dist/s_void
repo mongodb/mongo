@@ -134,8 +134,12 @@ for f in `find bench ext src test -name '*.[ci]'`; do
 	    -e 's/^ *//' |
 	func_ok > $t
 	test -s $t && {
-		echo "========== $f"
-		cat $t
+		echo "=============================================="
+		echo "$f:"
+		cat $t | sed 's/^/	/'
+		echo "Function could return void instead of int."
+		echo "Add false positives to the list in dist/s_void."
+		echo "=============================================="
 	}
 done
 
