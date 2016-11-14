@@ -83,7 +83,7 @@ bool rotateLogs(bool renameFiles) {
         manager->rotateAll(renameFiles, "." + terseCurrentTime(false)));
     for (RotatableFileManager::FileNameStatusPairVector::iterator it = result.begin();
          it != result.end();
-         it++) {
+         ++it) {
         warning() << "Rotating log file " << it->first << " failed: " << it->second.toString();
     }
     return result.empty();

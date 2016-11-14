@@ -157,7 +157,7 @@ void MemoryMappedFile::close() {
     {
         stdx::lock_guard<stdx::mutex> lk(mapViewMutex);
 
-        for (vector<void*>::iterator i = views.begin(); i != views.end(); i++) {
+        for (vector<void*>::iterator i = views.begin(); i != views.end(); ++i) {
             UnmapViewOfFile(*i);
         }
     }

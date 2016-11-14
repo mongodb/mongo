@@ -285,7 +285,7 @@ void CappedRecordStoreV1::_compact(OperationContext* txn) {
     invariant(j != drecs.end());
     DiskLoc a = *j;
     while (1) {
-        j++;
+        ++j;
         if (j == drecs.end()) {
             DDD("\t compact adddelrec");
             addDeletedRec(txn, a);
@@ -296,7 +296,7 @@ void CappedRecordStoreV1::_compact(OperationContext* txn) {
             // a & b are adjacent.  merge.
             txn->recoveryUnit()->writingInt(drec(a)->lengthWithHeaders()) +=
                 drec(b)->lengthWithHeaders();
-            j++;
+            ++j;
             if (j == drecs.end()) {
                 DDD("\t compact adddelrec2");
                 addDeletedRec(txn, a);

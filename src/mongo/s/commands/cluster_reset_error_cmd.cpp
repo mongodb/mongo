@@ -69,7 +69,7 @@ public:
 
         const std::set<std::string>* shards = ClusterLastErrorInfo::get(cc()).getPrevShardHosts();
 
-        for (std::set<std::string>::const_iterator i = shards->begin(); i != shards->end(); i++) {
+        for (std::set<std::string>::const_iterator i = shards->begin(); i != shards->end(); ++i) {
             const std::string shardName = *i;
 
             ShardConnection conn(ConnectionString(shardName, ConnectionString::SET), "");

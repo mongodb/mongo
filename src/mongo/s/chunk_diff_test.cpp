@@ -395,7 +395,7 @@ private:
 
         for (VersionMap::iterator it = foundMaxShardVersions.begin();
              it != foundMaxShardVersions.end();
-             it++) {
+             ++it) {
             ChunkVersion foundVersion = it->second;
             VersionMap::const_iterator maxIt = maxShardVersions.find(it->first);
 

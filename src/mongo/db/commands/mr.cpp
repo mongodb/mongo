@@ -1193,12 +1193,12 @@ void State::dumpToInc() {
     if (!_onDisk)
         return;
 
-    for (InMemory::iterator i = _temp->begin(); i != _temp->end(); i++) {
+    for (InMemory::iterator i = _temp->begin(); i != _temp->end(); ++i) {
         BSONList& all = i->second;
         if (all.size() < 1)
             continue;
 
-        for (BSONList::iterator j = all.begin(); j != all.end(); j++)
+        for (BSONList::iterator j = all.begin(); j != all.end(); ++j)
             _insertToInc(*j);
     }
     _temp->clear();

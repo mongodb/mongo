@@ -333,7 +333,7 @@ void GeoNear2DStage::DensityEstimator::buildIndexScan(OperationContext* txn,
     _centroidCell.appendVertexNeighbors(_currentLevel, &neighbors);
     std::sort(neighbors.begin(), neighbors.end());
 
-    for (vector<GeoHash>::const_iterator it = neighbors.begin(); it != neighbors.end(); it++) {
+    for (vector<GeoHash>::const_iterator it = neighbors.begin(); it != neighbors.end(); ++it) {
         mongo::BSONObjBuilder builder;
         it->appendHashMin(&builder, "");
         it->appendHashMax(&builder, "");

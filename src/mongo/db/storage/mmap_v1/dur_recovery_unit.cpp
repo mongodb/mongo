@@ -229,7 +229,7 @@ void DurRecoveryUnit::mergingWritingPtr(char* addr, size_t len) {
                 }
 
                 addr = cwEnd;
-                coveringWrite++;
+                ++coveringWrite;
                 dassert(coveringWrite == _mergedWrites.end() || coveringWrite->addr >= cwEnd);
             }
         }

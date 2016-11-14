@@ -110,7 +110,7 @@ Status storeSASLOptions(const moe::Environment& params) {
             params["setParameter"].as<std::map<std::string, std::string>>();
         for (std::map<std::string, std::string>::iterator parametersIt = parameters.begin();
              parametersIt != parameters.end();
-             parametersIt++) {
+             ++parametersIt) {
             if (parametersIt->first == "authenticationMechanisms") {
                 haveAuthenticationMechanisms = true;
             } else if (parametersIt->first == "saslHostName") {

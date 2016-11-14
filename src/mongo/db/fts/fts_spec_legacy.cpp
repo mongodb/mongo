@@ -170,7 +170,7 @@ void FTSSpec::_scoreDocumentV1(const BSONObj& obj, TermFrequencyMap* term_freqs)
 
     // otherwise, we need to remember the different weights for each field
     // and act accordingly (in other words, call _score)
-    for (Weights::const_iterator i = _weights.begin(); i != _weights.end(); i++) {
+    for (Weights::const_iterator i = _weights.begin(); i != _weights.end(); ++i) {
         const char* leftOverName = i->first.c_str();
         // name of field
         BSONElement e = dps::extractElementAtPath(obj, leftOverName);

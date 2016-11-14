@@ -131,7 +131,7 @@ public:
 
 
         BSONObjBuilder bb(result.subobjStart("collections"));
-        for (list<string>::iterator i = colls.begin(); i != colls.end(); i++) {
+        for (list<string>::iterator i = colls.begin(); i != colls.end(); ++i) {
             string fullCollectionName = *i;
             if (fullCollectionName.size() - 1 <= dbname.size()) {
                 errmsg = str::stream() << "weird fullCollectionName [" << fullCollectionName << "]";

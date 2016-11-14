@@ -82,7 +82,7 @@ public:
         std::vector<ShardType> shards = std::move(shardsStatus.getValue().value);
 
         std::vector<BSONObj> shardsObj;
-        for (std::vector<ShardType>::const_iterator it = shards.begin(); it != shards.end(); it++) {
+        for (std::vector<ShardType>::const_iterator it = shards.begin(); it != shards.end(); ++it) {
             shardsObj.push_back(it->toBSON());
         }
         result.append("shards", shardsObj);

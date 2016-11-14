@@ -118,7 +118,7 @@ public:
             dbInfoBuilder.append("note", "you need to drop or movePrimary these databases");
             BSONArrayBuilder dbs(dbInfoBuilder.subarrayStart("dbsToMove"));
             for (vector<string>::const_iterator it = databases.begin(); it != databases.end();
-                 it++) {
+                 ++it) {
                 if (*it != "local") {
                     dbs.append(*it);
                 }

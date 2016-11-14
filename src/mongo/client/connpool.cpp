@@ -286,7 +286,7 @@ void DBConnectionPool::onRelease(DBClientBase* conn) {
         return;
     }
 
-    for (list<DBConnectionHook*>::iterator i = _hooks->begin(); i != _hooks->end(); i++) {
+    for (list<DBConnectionHook*>::iterator i = _hooks->begin(); i != _hooks->end(); ++i) {
         (*i)->onRelease(conn);
     }
 }
@@ -305,7 +305,7 @@ DBConnectionPool::~DBConnectionPool() {
 
 void DBConnectionPool::flush() {
     stdx::lock_guard<stdx::mutex> L(_mutex);
-    for (PoolMap::iterator i = _pools.begin(); i != _pools.end(); i++) {
+    for (PoolMap::iterator i = _pools.begin(); i != _pools.end(); ++i) {
         PoolForHost& p = i->second;
         p.flush();
     }
@@ -339,7 +339,7 @@ void DBConnectionPool::onCreate(DBClientBase* conn) {
     if (_hooks->size() == 0)
         return;
 
-    for (list<DBConnectionHook*>::iterator i = _hooks->begin(); i != _hooks->end(); i++) {
+    for (list<DBConnectionHook*>::iterator i = _hooks->begin(); i != _hooks->end(); ++i) {
         (*i)->onCreate(conn);
     }
 }
@@ -348,7 +348,7 @@ void DBConnectionPool::onHandedOut(DBClientBase* conn) {
     if (_hooks->size() == 0)
         return;
 
-    for (list<DBConnectionHook*>::iterator i = _hooks->begin(); i != _hooks->end(); i++) {
+    for (list<DBConnectionHook*>::iterator i = _hooks->begin(); i != _hooks->end(); ++i) {
         (*i)->onHandedOut(conn);
     }
 }
@@ -357,7 +357,7 @@ void DBConnectionPool::onDestroy(DBClientBase* conn) {
     if (_hooks->size() == 0)
         return;
 
-    for (list<DBConnectionHook*>::iterator i = _hooks->begin(); i != _hooks->end(); i++) {
+    for (list<DBConnectionHook*>::iterator i = _hooks->begin(); i != _hooks->end(); ++i) {
         (*i)->onDestroy(conn);
     }
 }

@@ -48,7 +48,7 @@ void StartupTest::registerTest(StartupTest* t) {
 
 void StartupTest::runTests() {
     running = true;
-    for (std::vector<StartupTest*>::const_iterator i = tests->begin(); i != tests->end(); i++) {
+    for (std::vector<StartupTest*>::const_iterator i = tests->begin(); i != tests->end(); ++i) {
         (*i)->run();
     }
     running = false;

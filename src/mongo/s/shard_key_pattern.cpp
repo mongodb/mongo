@@ -346,7 +346,7 @@ BoundList ShardKeyPattern::flattenBounds(const IndexBounds& indexBounds) const {
     // If any field is unsatisfied, return empty bound list.
     for (vector<OrderedIntervalList>::const_iterator it = indexBounds.fields.begin();
          it != indexBounds.fields.end();
-         it++) {
+         ++it) {
         if (it->intervals.size() == 0) {
             return BoundList();
         }

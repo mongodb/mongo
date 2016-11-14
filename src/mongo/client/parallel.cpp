@@ -1206,7 +1206,7 @@ void ParallelSortClusteredCursor::_oldInit() {
 
         stringstream errMsg;
         errMsg << "could not initialize cursor across all shards because : ";
-        for (vector<string>::iterator i = errMsgs.begin(); i != errMsgs.end(); i++) {
+        for (vector<string>::iterator i = errMsgs.begin(); i != errMsgs.end(); ++i) {
             if (i != errMsgs.begin())
                 errMsg << " :: and :: ";
             errMsg << *i;

@@ -638,11 +638,11 @@ void LockerImpl<IsForMMAPV1>::restoreLockState(const Locker::LockSnapshot& state
     // If we locked the PBWM, it must be locked before the resourceIdGlobal resource.
     if (it != state.locks.end() && it->resourceId == resourceIdParallelBatchWriterMode) {
         invariant(LOCK_OK == lock(it->resourceId, it->mode));
-        it++;
+        ++it;
     }
 
     invariant(LOCK_OK == lockGlobal(state.globalMode));
-    for (; it != state.locks.end(); it++) {
+    for (; it != state.locks.end(); ++it) {
         // This is a sanity check that lockGlobal restored the MMAP V1 flush lock in the
         // expected mode.
         if (IsForMMAPV1 && (it->resourceId == resourceIdMMAPV1Flush)) {

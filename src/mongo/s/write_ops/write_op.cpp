@@ -183,7 +183,7 @@ void WriteOp::updateOpState() {
     vector<ChildWriteOp*> childErrors;
 
     bool isRetryError = true;
-    for (vector<ChildWriteOp*>::iterator it = _childOps.begin(); it != _childOps.end(); it++) {
+    for (vector<ChildWriteOp*>::iterator it = _childOps.begin(); it != _childOps.end(); ++it) {
         ChildWriteOp* childOp = *it;
 
         // Don't do anything till we have all the info

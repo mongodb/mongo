@@ -356,7 +356,7 @@ void syncFixUp(OperationContext* txn,
     unsigned long long numFetched = 0;
     try {
         for (set<DocID>::iterator it = fixUpInfo.toRefetch.begin(); it != fixUpInfo.toRefetch.end();
-             it++) {
+             ++it) {
             doc = *it;
 
             verify(!doc._id.eoo());
@@ -544,7 +544,7 @@ void syncFixUp(OperationContext* txn,
     log() << "rollback 4.6";
     // drop collections to drop before doing individual fixups - that might make things faster
     // below actually if there were subsequent inserts to rollback
-    for (set<string>::iterator it = fixUpInfo.toDrop.begin(); it != fixUpInfo.toDrop.end(); it++) {
+    for (set<string>::iterator it = fixUpInfo.toDrop.begin(); it != fixUpInfo.toDrop.end(); ++it) {
         log() << "rollback drop: " << *it;
 
         fixUpInfo.indexesToDrop.erase(*it);

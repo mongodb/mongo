@@ -240,7 +240,7 @@ void WiredTigerSessionCache::closeAllCursors() {
     _cursorEpoch.fetchAndAdd(1);
 
     stdx::lock_guard<stdx::mutex> lock(_cacheLock);
-    for (SessionCache::iterator i = _sessions.begin(); i != _sessions.end(); i++) {
+    for (SessionCache::iterator i = _sessions.begin(); i != _sessions.end(); ++i) {
         (*i)->closeAllCursors();
     }
 }
@@ -255,7 +255,7 @@ void WiredTigerSessionCache::closeAll() {
         _sessions.swap(swap);
     }
 
-    for (SessionCache::iterator i = swap.begin(); i != swap.end(); i++) {
+    for (SessionCache::iterator i = swap.begin(); i != swap.end(); ++i) {
         delete (*i);
     }
 }

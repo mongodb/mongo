@@ -464,7 +464,7 @@ Status SimpleRecordStoreV1::compact(OperationContext* txn,
 
     // Go through all old extents and move each record to a new set of extents.
     int extentNumber = 0;
-    for (std::vector<DiskLoc>::iterator it = extents.begin(); it != extents.end(); it++) {
+    for (std::vector<DiskLoc>::iterator it = extents.begin(); it != extents.end(); ++it) {
         txn->checkForInterrupt();
         invariant(_details->firstExtent(txn) == *it);
         // empties and removes the first extent

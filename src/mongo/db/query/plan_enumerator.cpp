@@ -971,8 +971,8 @@ void PlanEnumerator::enumerateAndIntersect(const IndexToPredMap& idxToFirst,
         // Start looking at all other indices to find one that we want to bundle
         // with firstAssign.
         IndexToPredMap::const_iterator secondIt = firstIt;
-        secondIt++;
-        for (; secondIt != idxToFirst.end(); secondIt++) {
+        ++secondIt;
+        for (; secondIt != idxToFirst.end(); ++secondIt) {
             const IndexEntry& firstIndex = (*_indices)[secondIt->first];
             const IndexEntry& secondIndex = (*_indices)[secondIt->first];
 

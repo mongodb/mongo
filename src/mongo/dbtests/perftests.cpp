@@ -195,7 +195,7 @@ public:
                     BSONObj fields = BSON("rps" << 1 << "info" << 1);
                     vector<BSONObj> v;
                     conn->findN(v, ns, q, frameworkGlobalParams.perfHist, 0, &fields);
-                    for (vector<BSONObj>::iterator i = v.begin(); i != v.end(); i++) {
+                    for (vector<BSONObj>::iterator i = v.begin(); i != v.end(); ++i) {
                         BSONObj o = *i;
                         double lastrps = o["rps"].Number();
                         if (0 && lastrps) {

@@ -751,7 +751,7 @@ std::vector<PlanCacheEntry*> PlanCache::getAllEntries() const {
     stdx::lock_guard<stdx::mutex> cacheLock(_cacheMutex);
     std::vector<PlanCacheEntry*> entries;
     typedef std::list<std::pair<PlanCacheKey, PlanCacheEntry*>>::const_iterator ConstIterator;
-    for (ConstIterator i = _cache.begin(); i != _cache.end(); i++) {
+    for (ConstIterator i = _cache.begin(); i != _cache.end(); ++i) {
         PlanCacheEntry* entry = i->second;
         entries.push_back(entry->clone());
     }
