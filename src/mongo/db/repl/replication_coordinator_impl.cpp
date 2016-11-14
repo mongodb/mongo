@@ -610,16 +610,18 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn,
             drCopy.reset();
             lk.lock();
 
-            if (ErrorCodes::CallbackCanceled == status ||
-                ErrorCodes::ShutdownInProgress == status) {
-
+            if (status == ErrorCodes::CallbackCanceled) {
                 log() << "Initial Sync has been cancelled: " << status.getStatus();
                 return;
-            } else if (!_inShutdown) {
-                fassertNoTrace(40088, status.getStatus());
             } else if (!status.isOK()) {
-                log() << "Initial Sync failed during shutdown due to " << status.getStatus();
-                return;
+                if (_inShutdown) {
+                    log() << "Initial Sync failed during shutdown due to " << status.getStatus();
+                    return;
+                } else {
+                    error() << "Initial sync failed, shutting down now. Restart the server to "
+                               "attempt a new initial sync.";
+                    fassertFailedWithStatusNoTrace(40088, status.getStatus());
+                }
             }
 
             const auto lastApplied = status.getValue();
