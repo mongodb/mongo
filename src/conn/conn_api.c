@@ -926,6 +926,7 @@ __conn_load_extension_int(WT_SESSION_IMPL *session,
 
 err:	if (dlh != NULL)
 		WT_TRET(__wt_dlclose(session, dlh));
+	__wt_free(session, ext_config);
 	__wt_free(session, init_name);
 	__wt_free(session, terminate_name);
 	return (ret);
