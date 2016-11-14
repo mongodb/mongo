@@ -102,8 +102,9 @@ public:
 
     /**
      * Non-blocking method that puts the migration manager in the kRecovering state, in which
-     * new migration requests will block until finishRecovery is called. Then does local writes to
-     * reacquire the distributed locks for active migrations.
+     * new migration requests will block until finishRecovery is called. Then reacquires distributed
+     * locks for the balancer and any active migrations. The distributed locks are taken with local
+     * write concern, since this is called in drain mode where majority writes are not yet possible.
      *
      * The active migration recovery may fail and be abandoned, setting the state to kEnabled.
      */
@@ -137,6 +138,11 @@ public:
      * migrations again.
      */
     void drainActiveMigrations();
+
+    /**
+     * Tries to take or take over the balancer distributed lock.
+     */
+    Status tryTakeBalancerLock(OperationContext* txn, StringData whyMessage);
 
 private:
     // The current state of the migration manager
@@ -282,7 +288,7 @@ private:
     // Used as a constant session ID for all distributed locks that this MigrationManager holds.
     // Currently required so that locks can be reacquired for the balancer in startRecovery and then
     // overtaken in later operations.
-    OID _lockSessionID;
+    const OID _lockSessionID{OID::gen()};
 
     // Carries migration information over from startRecovery to finishRecovery. Should only be set
     // in startRecovery and then accessed in finishRecovery.

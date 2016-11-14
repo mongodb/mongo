@@ -116,8 +116,9 @@ protected:
     void setUpMigration(const ChunkType& chunk, const ShardId& toShard);
 
     /**
-     * Asserts that config.migrations is empty and config.locks contains no locked documents, both
-     * of which should be true if the MigrationManager is inactive and behaving properly.
+     * Asserts that config.migrations is empty and config.locks contains no locked documents other
+     * than the balancer's, both of which should be true if the MigrationManager is inactive and
+     * behaving properly.
      */
     void checkMigrationsCollectionIsEmptyAndLocksAreUnlocked();
 
@@ -250,7 +251,7 @@ void MigrationManagerTest::checkMigrationsCollectionIsEmptyAndLocksAreUnlocked()
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kMajorityReadConcern,
         NamespaceString(LocksType::ConfigNS),
-        BSON(LocksType::state(LocksType::LOCKED)),
+        BSON(LocksType::state(LocksType::LOCKED) << LocksType::name("{ '$ne' : 'balancer'}")),
         BSONObj(),
         boost::none);
     Shard::QueryResponse locksQueryResponse = uassertStatusOK(statusWithLocksQueryResponse);
@@ -872,6 +873,10 @@ TEST_F(MigrationManagerTest, MigrationRecovery) {
 
     setUpMigration(chunk1, kShardId1.toString());
     setUpMigration(chunk2, kShardId3.toString());
+
+    // Mimic all config distlocks being released on config server stepup to primary.
+    auto distLockManager = catalogClient()->getDistLockManager();
+    distLockManager->unlockAll(operationContext(), distLockManager->getProcessID());
 
     _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
 

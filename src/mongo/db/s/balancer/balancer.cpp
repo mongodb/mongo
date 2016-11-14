@@ -308,17 +308,11 @@ void Balancer::_mainThread() {
     // Take the balancer distributed lock and hold it permanently. Do the attempts with single
     // attempts in order to not block the thread and be able to check for interrupt more frequently.
     while (!_stopRequested()) {
-        auto distLockHandleStatus =
-            shardingContext->catalogClient(txn.get())->getDistLockManager()->lockWithSessionID(
-                txn.get(),
-                "balancer",
-                "CSRS Balancer",
-                OID::gen(),
-                DistLockManager::kSingleLockAttemptTimeout);
-        if (!distLockHandleStatus.isOK()) {
-            warning() << "Balancer distributed lock could not be acquired and will be retried in "
-                      << durationCount<Seconds>(kInitBackoffInterval) << " seconds"
-                      << causedBy(distLockHandleStatus.getStatus());
+        auto status = _migrationManager.tryTakeBalancerLock(txn.get(), "CSRS Balancer");
+        if (!status.isOK()) {
+            log() << "Balancer distributed lock could not be acquired and will be retried in "
+                  << durationCount<Seconds>(kInitBackoffInterval) << " seconds"
+                  << causedBy(redact(status));
 
             _sleepFor(txn.get(), kInitBackoffInterval);
             continue;

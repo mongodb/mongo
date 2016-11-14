@@ -130,7 +130,7 @@ bool isErrorDueToConfigStepdown(Status status, bool isStopping) {
 }  // namespace
 
 MigrationManager::MigrationManager(ServiceContext* serviceContext)
-    : _serviceContext(serviceContext), _lockSessionID(OID::gen()) {}
+    : _serviceContext(serviceContext) {}
 
 MigrationManager::~MigrationManager() {
     // The migration manager must be completely quiesced at destruction time
@@ -290,6 +290,17 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* txn) {
         _abandonActiveMigrationsAndEnableManager(txn);
     });
 
+    auto distLockManager = Grid::get(txn)->catalogClient(txn)->getDistLockManager();
+
+    // Must claim the balancer lock to prevent any 3.2 mongos clients from acquiring it.
+    auto balancerLockStatus = distLockManager->tryLockWithLocalWriteConcern(
+        txn, "balancer", "CSRS Balancer", _lockSessionID);
+    if (!balancerLockStatus.isOK()) {
+        log() << "Failed to acquire balancer distributed lock. Abandoning balancer recovery."
+              << causedBy(redact(balancerLockStatus.getStatus()));
+        return;
+    }
+
     // Load the active migrations from the config.migrations collection.
     auto statusWithMigrationsQueryResponse =
         Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
@@ -302,9 +313,9 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* txn) {
             boost::none);
 
     if (!statusWithMigrationsQueryResponse.isOK()) {
-        warning() << "Unable to read config.migrations collection documents for balancer migration"
-                  << " recovery. Abandoning balancer recovery."
-                  << causedBy(redact(statusWithMigrationsQueryResponse.getStatus()));
+        log() << "Unable to read config.migrations collection documents for balancer migration"
+              << " recovery. Abandoning balancer recovery."
+              << causedBy(redact(statusWithMigrationsQueryResponse.getStatus()));
         return;
     }
 
@@ -314,10 +325,9 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* txn) {
             // The format of this migration document is incorrect. The balancer holds a distlock for
             // this migration, but without parsing the migration document we cannot identify which
             // distlock must be released. So we must release all distlocks.
-            warning() << "Unable to parse config.migrations document '"
-                      << redact(migration.toString())
-                      << "' for balancer migration recovery. Abandoning balancer recovery."
-                      << causedBy(redact(statusWithMigrationType.getStatus()));
+            log() << "Unable to parse config.migrations document '" << redact(migration.toString())
+                  << "' for balancer migration recovery. Abandoning balancer recovery."
+                  << causedBy(redact(statusWithMigrationType.getStatus()));
             return;
         }
         MigrationType migrateType = std::move(statusWithMigrationType.getValue());
@@ -330,21 +340,18 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* txn) {
             // Reacquire the matching distributed lock for this namespace.
             const std::string whyMessage(stream() << "Migrating chunk(s) in collection "
                                                   << migrateType.getNss().ns());
-            auto statusWithDistLockHandle =
-                Grid::get(txn)
-                    ->catalogClient(txn)
-                    ->getDistLockManager()
-                    ->tryLockWithLocalWriteConcern(
-                        txn, migrateType.getNss().ns(), whyMessage, _lockSessionID);
+
+            auto statusWithDistLockHandle = distLockManager->tryLockWithLocalWriteConcern(
+                txn, migrateType.getNss().ns(), whyMessage, _lockSessionID);
             if (!statusWithDistLockHandle.isOK() &&
                 statusWithDistLockHandle.getStatus() != ErrorCodes::LockBusy) {
                 // LockBusy is alright because that should mean a 3.2 shard has it for the active
                 // migration.
-                warning() << "Failed to acquire distributed lock for collection '"
-                          << migrateType.getNss().ns()
-                          << "' during balancer recovery of an active migration. Abandoning"
-                          << " balancer recovery."
-                          << causedBy(redact(statusWithDistLockHandle.getStatus()));
+                log() << "Failed to acquire distributed lock for collection '"
+                      << migrateType.getNss().ns()
+                      << "' during balancer recovery of an active migration. Abandoning"
+                      << " balancer recovery."
+                      << causedBy(redact(statusWithDistLockHandle.getStatus()));
                 return;
             }
         }
@@ -393,9 +400,9 @@ void MigrationManager::finishRecovery(OperationContext* txn,
             // This shouldn't happen because the collection was intact and sharded when the previous
             // config primary was active and the dist locks have been held by the balancer
             // throughout. Abort migration recovery.
-            warning() << "Unable to reload chunk metadata for collection '" << nss
-                      << "' during balancer recovery. Abandoning recovery."
-                      << causedBy(redact(scopedCMStatus.getStatus()));
+            log() << "Unable to reload chunk metadata for collection '" << nss
+                  << "' during balancer recovery. Abandoning recovery."
+                  << causedBy(redact(scopedCMStatus.getStatus()));
             return;
         }
 
@@ -791,6 +798,15 @@ Status MigrationManager::_processRemoteCommandResponse(
     }
 
     return commandStatus;
+}
+
+Status MigrationManager::tryTakeBalancerLock(OperationContext* txn, StringData whyMessage) {
+    return Grid::get(txn)
+        ->catalogClient(txn)
+        ->getDistLockManager()
+        ->lockWithSessionID(
+            txn, "balancer", whyMessage, _lockSessionID, DistLockManager::kSingleLockAttemptTimeout)
+        .getStatus();
 }
 
 MigrationManager::Migration::Migration(NamespaceString inNss, BSONObj inMoveChunkCmdObj)
