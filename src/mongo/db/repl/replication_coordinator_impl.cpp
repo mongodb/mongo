@@ -731,7 +731,12 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* txn) {
 
     // joining the replication executor is blocking so it must be run outside of the mutex
     if (drCopy) {
-        drCopy->shutdown(txn);
+        LOG(1) << "ReplicationCoordinatorImpl::shutdown calling DataReplicator::shutdown.";
+        const auto status = drCopy->shutdown(txn);
+        if (!status.isOK()) {
+            warning() << "DataReplicator shutdown failed: " << status;
+        }
+        drCopy.reset();
     }
     _externalState->shutdown(txn);
     _replExecutor.shutdown();
