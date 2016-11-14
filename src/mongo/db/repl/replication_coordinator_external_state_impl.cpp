@@ -335,6 +335,10 @@ void ReplicationCoordinatorExternalStateImpl::cleanUpLastApplyBatch(OperationCon
         return;  // Initial Sync will take over so no cleanup is needed.
     }
 
+    // This initializes the minvalid document with a null "ts" because older versions (<3.2.10)
+    // get angry if the minValid document is present but doesn't have a "ts" field.
+    setMinValidToAtLeast(txn, {});
+
     const auto deleteFromPoint = getOplogDeleteFromPoint(txn);
     const auto appliedThrough = getAppliedThrough(txn);
 
