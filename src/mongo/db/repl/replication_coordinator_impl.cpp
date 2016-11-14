@@ -616,8 +616,6 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn,
                 log() << "Initial Sync has been cancelled: " << status.getStatus();
                 return;
             } else if (!_inShutdown) {
-                error() << "Initial sync failed, shutting down now. Restart the server to "
-                           "attempt a new initial sync.";
                 fassertNoTrace(40088, status.getStatus());
             } else if (!status.isOK()) {
                 log() << "Initial Sync failed during shutdown due to " << status.getStatus();
