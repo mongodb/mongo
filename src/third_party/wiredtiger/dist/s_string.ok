@@ -863,6 +863,7 @@ lu
 lwsync
 lz
 lzo
+mT
 madvise
 majorp
 malloc
