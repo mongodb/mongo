@@ -614,6 +614,19 @@ void _scheduleRequiredOpTimeFetcherResponse(executor::NetworkInterfaceMock* net,
         {BSON("ts" << requiredOpTime.getTimestamp() << "t" << requiredOpTime.getTerm())});
 }
 
+void _scheduleRBIDResponse(executor::NetworkInterfaceMock* net,
+                           HostAndPort currentSyncSource,
+                           const BSONObj& reply = BSON("ok" << 1 << "rbid" << 1)) {
+    executor::NetworkInterfaceMock::InNetworkGuard networkGuard(net);
+    ASSERT_TRUE(net->hasReadyRequests());
+    auto request = net->scheduleSuccessfulResponse(reply);
+    ASSERT_EQUALS(currentSyncSource, request.target);
+    ASSERT_EQUALS("admin", request.dbname);
+    ASSERT_EQUALS(SyncSourceResolver::kFetcherTimeout, request.timeout);
+    ASSERT_BSONOBJ_EQ(BSON("replSetGetRBID" << 1), request.cmdObj);
+    net->runReadyNetworkOperations();
+}
+
 const OpTime requiredOpTime(Timestamp(200, 1U), 1LL);
 
 TEST_F(
@@ -631,11 +644,14 @@ TEST_F(
 
     ASSERT_TRUE(_resolver->isActive());
 
+    _scheduleRBIDResponse(getNet(), candidate1, BSON("ok" << 1 << "rbid" << 7));
     _scheduleRequiredOpTimeFetcherResponse(getNet(), _selector.get(), candidate1, requiredOpTime);
 
     _resolver->join();
     ASSERT_FALSE(_resolver->isActive());
     ASSERT_EQUALS(candidate1, unittest::assertGet(_response.syncSourceStatus));
+    ASSERT(_response.rbid);
+    ASSERT_EQ(*_response.rbid, 7);
 }
 
 TEST_F(SyncSourceResolverTest,
@@ -653,6 +669,7 @@ TEST_F(SyncSourceResolverTest,
 
     ASSERT_TRUE(_resolver->isActive());
 
+    _scheduleRBIDResponse(getNet(), candidate1);
     _scheduleRequiredOpTimeFetcherResponse(
         getNet(),
         _selector.get(),
@@ -667,6 +684,7 @@ TEST_F(SyncSourceResolverTest,
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 0));
+    _scheduleRBIDResponse(getNet(), candidate2);
     _scheduleRequiredOpTimeFetcherResponse(getNet(), _selector.get(), candidate2, requiredOpTime);
 
     _resolver->join();
@@ -692,6 +710,7 @@ TEST_F(
 
     ASSERT_TRUE(_resolver->isActive());
 
+    _scheduleRBIDResponse(getNet(), candidate1);
     _scheduleRequiredOpTimeFetcherResponse(getNet(), _selector.get(), candidate1, requiredOpTime);
 
     ASSERT_TRUE(_resolver->isActive());
@@ -701,6 +720,7 @@ TEST_F(
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 0));
+    _scheduleRBIDResponse(getNet(), candidate2);
     _scheduleRequiredOpTimeFetcherResponse(
         getNet(), _selector.get(), candidate2, requireOpTimeWithUninitializedTerm);
 
@@ -724,6 +744,7 @@ TEST_F(SyncSourceResolverTest,
 
     ASSERT_TRUE(_resolver->isActive());
 
+    _scheduleRBIDResponse(getNet(), candidate1);
     _scheduleRequiredOpTimeFetcherResponse(
         getNet(), _selector.get(), candidate1, requiredOpTime, {});
 
@@ -734,6 +755,7 @@ TEST_F(SyncSourceResolverTest,
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 0));
+    _scheduleRBIDResponse(getNet(), candidate2);
     _scheduleRequiredOpTimeFetcherResponse(getNet(), _selector.get(), candidate2, requiredOpTime);
 
     _resolver->join();
@@ -756,6 +778,7 @@ TEST_F(SyncSourceResolverTest,
 
     ASSERT_TRUE(_resolver->isActive());
 
+    _scheduleRBIDResponse(getNet(), candidate1);
     _scheduleRequiredOpTimeFetcherResponse(
         getNet(),
         _selector.get(),
@@ -770,11 +793,33 @@ TEST_F(SyncSourceResolverTest,
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 0));
+    _scheduleRBIDResponse(getNet(), candidate2);
     _scheduleRequiredOpTimeFetcherResponse(getNet(), _selector.get(), candidate2, requiredOpTime);
 
     _resolver->join();
     ASSERT_FALSE(_resolver->isActive());
     ASSERT_EQUALS(candidate2, unittest::assertGet(_response.syncSourceStatus));
+}
+
+TEST_F(SyncSourceResolverTest,
+       SyncSourceResolverReturnsScheduleErrorWhenSchedulingRBIDCommandFails) {
+    _resolver = _makeResolver(lastOpTimeFetched, requiredOpTime);
+
+    _shouldFailRequest = [](const executor::RemoteCommandRequest& request) {
+        return request.cmdObj.firstElementFieldName() == "replSetGetRBID"_sd;
+    };
+
+    HostAndPort candidate1("node1", 12345);
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
+    ASSERT_OK(_resolver->startup());
+    ASSERT_TRUE(_resolver->isActive());
+
+    _scheduleFirstOplogEntryFetcherResponse(
+        getNet(), _selector.get(), candidate1, HostAndPort(), Timestamp(10, 0));
+
+    _resolver->join();
+    ASSERT_FALSE(_resolver->isActive());
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, _response.syncSourceStatus);
 }
 
 TEST_F(SyncSourceResolverTest,
@@ -792,6 +837,7 @@ TEST_F(SyncSourceResolverTest,
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate1, HostAndPort(), Timestamp(10, 0));
+    _scheduleRBIDResponse(getNet(), candidate1);
 
     _resolver->join();
     ASSERT_FALSE(_resolver->isActive());
@@ -843,6 +889,60 @@ TEST_F(
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _response.syncSourceStatus);
 }
 
+TEST_F(SyncSourceResolverTest,
+       SyncSourceResolverReturnsEmptyHostIfNoViableHostExistsAfterNetworkErrorOnRBIDCommand) {
+    _resolver = _makeResolver(lastOpTimeFetched, requiredOpTime);
+
+    HostAndPort candidate1("node1", 12345);
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
+    ASSERT_OK(_resolver->startup());
+    ASSERT_TRUE(_resolver->isActive());
+
+    _scheduleFirstOplogEntryFetcherResponse(
+        getNet(), _selector.get(), candidate1, candidate1, Timestamp(10, 0));
+
+    _scheduleNetworkErrorForFirstNode(getNet(), _selector.get(), candidate1, HostAndPort());
+
+    ASSERT_FALSE(_resolver->isActive());
+    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
+    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFetcherErrorBlacklistDuration,
+                  _selector->getLastBlacklistExpiration_forTest());
+
+    _resolver->join();
+    ASSERT_FALSE(_resolver->isActive());
+    ASSERT_EQUALS(HostAndPort(), unittest::assertGet(_response.syncSourceStatus));
+}
+
+TEST_F(SyncSourceResolverTest,
+       SyncSourceResolverReturnsEmptyHostIfNoViableHostExistsAfterRBIDCommandNotOk) {
+    _resolver = _makeResolver(lastOpTimeFetched, requiredOpTime);
+
+    HostAndPort candidate1("node1", 12345);
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
+    ASSERT_OK(_resolver->startup());
+    ASSERT_TRUE(_resolver->isActive());
+
+    _scheduleFirstOplogEntryFetcherResponse(
+        getNet(), _selector.get(), candidate1, candidate1, Timestamp(10, 0));
+
+    // _scheduleNetworkErrorForFirstNode does this for us.
+    _selector->setChooseNewSyncSourceResult_forTest(HostAndPort());
+
+    _scheduleRBIDResponse(getNet(),
+                          candidate1,
+                          BSON("ok" << 0 << "code" << 9000 << "errmsg"
+                                    << "I'm sorry Dave, I'm afraid I can't do that."));
+
+    ASSERT_FALSE(_resolver->isActive());
+    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
+    ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFetcherErrorBlacklistDuration,
+                  _selector->getLastBlacklistExpiration_forTest());
+
+    _resolver->join();
+    ASSERT_FALSE(_resolver->isActive());
+    ASSERT_EQUALS(HostAndPort(), unittest::assertGet(_response.syncSourceStatus));
+}
+
 TEST_F(
     SyncSourceResolverTest,
     SyncSourceResolverReturnsEmptyHostIfNoViableHostExistsAfterNetworkErrorOnRequiredOpTimeCommand) {
@@ -856,6 +956,7 @@ TEST_F(
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate1, candidate1, Timestamp(10, 0));
 
+    _scheduleRBIDResponse(getNet(), candidate1);
     _scheduleNetworkErrorForFirstNode(getNet(), _selector.get(), candidate1, HostAndPort());
 
     ASSERT_FALSE(_resolver->isActive());

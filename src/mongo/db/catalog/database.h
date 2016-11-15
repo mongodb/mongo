@@ -149,7 +149,12 @@ public:
 
     const DatabaseCatalogEntry* getDatabaseCatalogEntry() const;
 
+    /**
+     * dropCollection() will refuse to drop system collections. Use dropCollectionEvenIfSystem() if
+     * that is required.
+     */
     Status dropCollection(OperationContext* txn, StringData fullns);
+    Status dropCollectionEvenIfSystem(OperationContext* txn, const NamespaceString& fullns);
 
     Status dropView(OperationContext* txn, StringData fullns);
 

@@ -70,6 +70,11 @@ struct SyncSourceResolverResponse {
     // Contains the new MinValid boundry if syncSourceStatus is ErrorCodes::OplogStartMissing.
     OpTime earliestOpTimeSeen;
 
+    // Rollback ID of the selected sync source. Only filled in when there is a required optime.
+    // The rbid is fetched before the required optime so callers can be sure that as long as the
+    // rbid is the same, the required optime is still present.
+    boost::optional<int> rbid;
+
     bool isOK() {
         return syncSourceStatus.isOK();
     }
@@ -172,6 +177,14 @@ private:
                                          OpTime earliestOpTimeSeen);
 
     /**
+     * Schedules a replSetGetRBID command against the candidate to fetch its current rollback id.
+     */
+    void _scheduleRBIDRequest(HostAndPort candidate, OpTime earliestOpTimeSeen);
+    void _rbidRequestCallback(HostAndPort candidate,
+                              OpTime earliestOpTimeSeen,
+                              const executor::TaskExecutor::RemoteCommandCallbackArgs& rbidReply);
+
+    /**
      * Checks query response for required optime.
      */
     Status _compareRequiredOpTimeWithQueryResponse(const Fetcher::QueryResponse& queryResponse);
@@ -216,7 +229,10 @@ private:
     // resolver via this callback in a SyncSourceResolverResponse struct when the resolver finishes.
     const OnCompletionFn _onCompletion;
 
-    // Protects members of this sync source resolver.
+    // The rbid we will return to our caller.
+    boost::optional<int> _rbid;
+
+    // Protects members of this sync source resolver defined below.
     mutable stdx::mutex _mutex;
     mutable stdx::condition_variable _condition;
 
@@ -233,6 +249,8 @@ private:
 
     // Holds reference to fetcher in the process of shutting down.
     std::unique_ptr<Fetcher> _shuttingDownFetcher;
+
+    executor::TaskExecutor::CallbackHandle _rbidCommandHandle;
 };
 
 }  // namespace repl

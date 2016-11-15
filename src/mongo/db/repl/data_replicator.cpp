@@ -1467,15 +1467,15 @@ StatusWith<HostAndPort> DataReplicator::_chooseSyncSource_inlock() {
     return syncSource;
 }
 
-void DataReplicator::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
-                                       Fetcher::Documents::const_iterator end,
-                                       const OplogFetcher::DocumentsInfo& info) {
+Status DataReplicator::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
+                                         Fetcher::Documents::const_iterator end,
+                                         const OplogFetcher::DocumentsInfo& info) {
     if (info.toApplyDocumentCount == 0) {
-        return;
+        return Status::OK();
     }
 
     if (_isShuttingDown()) {
-        return;
+        return Status::OK();
     }
 
     invariant(_oplogBuffer);
@@ -1494,6 +1494,7 @@ void DataReplicator::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
     _lastFetched = info.lastDocument;
 
     // TODO: updates metrics with "info".
+    return Status::OK();
 }
 
 DataReplicator::OnCompletionGuard::OnCompletionGuard(

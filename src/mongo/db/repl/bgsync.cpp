@@ -50,6 +50,7 @@
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
@@ -237,6 +238,8 @@ void BackgroundSync::_runProducer() {
         return;
     }
 
+    invariant(!state.rollback());
+
     // We need to wait until initial sync has started.
     if (_replCoord->getMyLastAppliedOpTime().isNull()) {
         sleepsecs(1);
@@ -287,39 +290,32 @@ void BackgroundSync::_produce(OperationContext* txn) {
     OpTime lastOpTimeFetched;
     HostAndPort source;
     SyncSourceResolverResponse syncSourceResp;
-    SyncSourceResolver* syncSourceResolver;
-    OpTime minValid;
-    OpTime minValidSaved;
-    if (_replCoord->getMemberState().recovering()) {
-        minValidSaved = StorageInterface::get(txn)->getMinValid(txn);
-    }
     {
+        const OpTime minValidSaved = StorageInterface::get(txn)->getMinValid(txn);
+
         stdx::lock_guard<stdx::mutex> lock(_mutex);
-        if (minValidSaved > _lastOpTimeFetched) {
-            minValid = minValidSaved;
-        }
+        const auto requiredOpTime = (minValidSaved > _lastOpTimeFetched) ? minValidSaved : OpTime();
         lastOpTimeFetched = _lastOpTimeFetched;
         _syncSourceHost = HostAndPort();
         _syncSourceResolver = stdx::make_unique<SyncSourceResolver>(
             _replicationCoordinatorExternalState->getTaskExecutor(),
             _replCoord,
             lastOpTimeFetched,
-            minValid,
+            requiredOpTime,
             [&syncSourceResp](const SyncSourceResolverResponse& resp) { syncSourceResp = resp; });
-        syncSourceResolver = _syncSourceResolver.get();
     }
     // This may deadlock if called inside the mutex because SyncSourceResolver::startup() calls
     // ReplicationCoordinator::chooseNewSyncSource(). ReplicationCoordinatorImpl's mutex has to
     // acquired before BackgroundSync's.
     // It is safe to call startup() outside the mutex on this instance of SyncSourceResolver because
-    // we do not destroy this instance outside of this function.
+    // we do not destroy this instance outside of this function which is only called from a single
+    // thread.
     auto status = _syncSourceResolver->startup();
     if (ErrorCodes::CallbackCanceled == status || ErrorCodes::isShutdownError(status.code())) {
         return;
     }
     fassertStatusOK(40349, status);
-    syncSourceResolver->join();
-    syncSourceResolver = nullptr;
+    _syncSourceResolver->join();
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         _syncSourceResolver.reset();
@@ -388,6 +384,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
     Status fetcherReturnStatus = Status::OK();
     DataReplicatorExternalStateBackgroundSync dataReplicatorExternalState(
         _replCoord, _replicationCoordinatorExternalState, this);
+    auto rbidCopyForFetcher = syncSourceResp.rbid;  // OplogFetcher's callback modifies this.
     OplogFetcher* oplogFetcher;
     try {
         auto executor = _replicationCoordinatorExternalState->getTaskExecutor();
@@ -410,7 +407,8 @@ void BackgroundSync::_produce(OperationContext* txn) {
                        this,
                        stdx::placeholders::_1,
                        stdx::placeholders::_2,
-                       stdx::placeholders::_3),
+                       stdx::placeholders::_3,
+                       &rbidCopyForFetcher),
             onOplogFetcherShutdownCallbackFn);
         oplogFetcher = _oplogFetcher.get();
     } catch (const mongo::DBException& ex) {
@@ -484,20 +482,8 @@ void BackgroundSync::_produce(OperationContext* txn) {
                 }
             }
         }
-        // check that we are at minvalid, otherwise we cannot roll back as we may be in an
-        // inconsistent state
-        const auto minValid = StorageInterface::get(txn)->getMinValid(txn);
-        if (lastApplied < minValid) {
-            fassertNoTrace(18750,
-                           Status(ErrorCodes::UnrecoverableRollbackError,
-                                  str::stream() << "need to rollback, but in inconsistent state. "
-                                                << "minvalid: "
-                                                << minValid.toString()
-                                                << " > our last optime: "
-                                                << lastApplied.toString()));
-        }
 
-        _rollback(txn, source, getConnection);
+        _rollback(txn, source, syncSourceResp.rbid, getConnection);
         stop();
     } else if (fetcherReturnStatus == ErrorCodes::InvalidBSON) {
         Seconds blacklistDuration(60);
@@ -510,14 +496,57 @@ void BackgroundSync::_produce(OperationContext* txn) {
     }
 }
 
-void BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
-                                       Fetcher::Documents::const_iterator end,
-                                       const OplogFetcher::DocumentsInfo& info) {
+Status BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
+                                         Fetcher::Documents::const_iterator end,
+                                         const OplogFetcher::DocumentsInfo& info,
+                                         boost::optional<int>* requiredRBID) {
+    // Once we establish our cursor, we need to ensure that our upstream node hasn't rolled back
+    // since that could cause it to not have our required minValid point. The cursor will be killed
+    // if the upstream node rolls back so we don't need to keep checking. This must be blocking
+    // since the Fetcher doesn't give us a way to defer sending the getmores after we return.
+    if (*requiredRBID) {
+        auto rbidStatus = Status(ErrorCodes::InternalError, "");
+        auto handle =
+            _replicationCoordinatorExternalState->getTaskExecutor()->scheduleRemoteCommand(
+                {getSyncTarget(), "admin", BSON("replSetGetRBID" << 1), nullptr},
+                [&](const executor::TaskExecutor::RemoteCommandCallbackArgs& rbidReply) {
+                    rbidStatus = rbidReply.response.status;
+                    if (!rbidStatus.isOK())
+                        return;
+
+                    rbidStatus = getStatusFromCommandResult(rbidReply.response.data);
+                    if (!rbidStatus.isOK())
+                        return;
+
+                    const auto rbidElem = rbidReply.response.data["rbid"];
+                    if (rbidElem.type() != NumberInt) {
+                        rbidStatus = Status(ErrorCodes::BadValue,
+                                            str::stream() << "Upstream node returned an "
+                                                          << "rbid with invalid type "
+                                                          << rbidElem.type());
+                        return;
+                    }
+                    if (rbidElem.Int() != **requiredRBID) {
+                        rbidStatus = Status(ErrorCodes::BadValue,
+                                            "Upstream node rolled back after verifying "
+                                            "that it had our MinValid point. Retrying.");
+                    }
+                });
+        if (!handle.isOK())
+            return handle.getStatus();
+
+        _replicationCoordinatorExternalState->getTaskExecutor()->wait(handle.getValue());
+        if (!rbidStatus.isOK())
+            return rbidStatus;
+
+        requiredRBID->reset();  // Don't come back to this block while on this cursor.
+    }
+
     // If this is the first batch of operations returned from the query, "toApplyDocumentCount" will
     // be one fewer than "networkDocumentCount" because the first document (which was applied
     // previously) is skipped.
     if (info.toApplyDocumentCount == 0) {
-        return;  // Nothing to do.
+        return Status::OK();  // Nothing to do.
     }
 
     auto txn = cc().makeOperationContext();
@@ -532,7 +561,7 @@ void BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
         // buffer.
         stdx::unique_lock<stdx::mutex> lock(_mutex);
         if (_inShutdown) {
-            return;
+            return Status::OK();
         }
 
         OCCASIONALLY {
@@ -561,6 +590,8 @@ void BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begin,
         // The inference here is basically if the batch is really small, we are "caught up".
         sleepmillis(kSleepToAllowBatchingMillis);
     }
+
+    return Status::OK();
 }
 
 bool BackgroundSync::peek(OperationContext* txn, BSONObj* op) {
@@ -589,59 +620,88 @@ void BackgroundSync::consume(OperationContext* txn) {
 
 void BackgroundSync::_rollback(OperationContext* txn,
                                const HostAndPort& source,
+                               boost::optional<int> requiredRBID,
                                stdx::function<DBClientBase*()> getConnection) {
-    // Abort only when syncRollback detects we are in a unrecoverable state.
-    // In other cases, we log the message contained in the error status and retry later.
-    auto status = syncRollback(txn,
-                               OplogInterfaceLocal(txn, rsOplogName),
-                               RollbackSourceImpl(getConnection, source, rsOplogName),
-                               _replCoord);
-    if (status.isOK()) {
-        // When the syncTail thread sees there is no new data by adding something to the buffer.
-        _signalNoNewDataForApplier(txn);
-        // Wait until the buffer is empty.
-        // This is an indication that syncTail has removed the sentinal marker from the buffer
-        // and reset its local lastAppliedOpTime via the replCoord.
-        while (!_oplogBuffer->isEmpty()) {
-            sleepmillis(10);
-            if (inShutdown()) {
-                return;
-            }
+    // Set state to ROLLBACK while we are in this function. This prevents serving reads, even from
+    // the oplog. This can fail if we are elected PRIMARY, in which case we better not do any
+    // rolling back. If we successfully enter ROLLBACK we will only exit this function fatally or
+    // after transitioning to RECOVERING. We always transition to RECOVERING regardless of success
+    // or (recoverable) failure since we may be in an inconsistent state. If rollback failed before
+    // writing anything, SyncTail will quickly take us to SECONDARY since are are still at our
+    // original MinValid, which is fine because we may choose a sync source that doesn't require
+    // rollback. If it failed after we wrote to MinValid, then we will pick a sync source that will
+    // cause us to roll back to the same common point, which is fine. If we succeeded, we will be
+    // consistent as soon as we apply up to/through MinValid and SyncTail will make us SECONDARY
+    // then.
+    {
+        log() << "rollback 0";
+        Lock::GlobalWrite globalWrite(txn->lockState());
+        if (!_replCoord->setFollowerMode(MemberState::RS_ROLLBACK)) {
+            log() << "Cannot transition from " << _replCoord->getMemberState().toString() << " to "
+                  << MemberState(MemberState::RS_ROLLBACK).toString();
+            return;
         }
-
-        // At this point we are about to leave rollback.  Before we do, wait for any writes done
-        // as part of rollback to be durable, and then do any necessary checks that we didn't
-        // wind up rolling back something illegal.  We must wait for the rollback to be durable
-        // so that if we wind up shutting down uncleanly in response to something we rolled back
-        // we know that we won't wind up right back in the same situation when we start back up
-        // because the rollback wasn't durable.
-        txn->recoveryUnit()->waitUntilDurable();
-
-        // If we detected that we rolled back the shardIdentity document as part of this rollback
-        // then we must shut down to clear the in-memory ShardingState associated with the
-        // shardIdentity document.
-        if (ShardIdentityRollbackNotifier::get(txn)->didRollbackHappen()) {
-            severe()
-                << "shardIdentity document rollback detected.  Shutting down to clear "
-                   "in-memory sharding state.  Restarting this process should safely return it "
-                   "to a healthy state";
-            fassertFailedNoTrace(40276);
-        }
-
-        // It is now safe to clear the ROLLBACK state, which may result in the applier thread
-        // transitioning to SECONDARY.  This is safe because the applier thread has now reloaded
-        // the new rollback minValid from the database.
-        if (!_replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
-            warning() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING)
-                      << "; expected to be in state " << MemberState(MemberState::RS_ROLLBACK)
-                      << " but found self in " << _replCoord->getMemberState();
-        }
-        return;
     }
-    if (ErrorCodes::UnrecoverableRollbackError == status.code()) {
-        fassertNoTrace(28723, status);
+
+    try {
+        auto status = syncRollback(txn,
+                                   OplogInterfaceLocal(txn, rsOplogName),
+                                   RollbackSourceImpl(getConnection, source, rsOplogName),
+                                   requiredRBID,
+                                   _replCoord);
+
+        // Abort only when syncRollback detects we are in a unrecoverable state.
+        // WARNING: these statuses sometimes have location codes which are lost with uassertStatusOK
+        // so we need to check here first.
+        if (ErrorCodes::UnrecoverableRollbackError == status.code()) {
+            severe() << "Unable to complete rollback. A full resync may be needed: "
+                     << redact(status);
+            fassertFailedNoTrace(28723);
+        }
+
+        // In other cases, we log the message contained in the error status and retry later.
+        uassertStatusOK(status);
+    } catch (const DBException& ex) {
+        // UnrecoverableRollbackError should only come from a returned status which is handled
+        // above.
+        invariant(ex.getCode() != ErrorCodes::UnrecoverableRollbackError);
+
+        warning() << "rollback cannot complete at this time (retrying later): " << redact(ex)
+                  << " appliedThrough=" << _replCoord->getMyLastAppliedOpTime()
+                  << " minvalid=" << StorageInterface::get(txn)->getMinValid(txn);
+
+        // Sleep a bit to allow upstream node to coalesce, if that was the cause of the failure. If
+        // we failed in a way that will keep failing, but wasn't flagged as a fatal failure, this
+        // will also prevent us from hot-looping and putting too much load on upstream nodes.
+        sleepsecs(5);  // 5 seconds was chosen as a completely arbitrary amount of time.
+    } catch (...) {
+        std::terminate();
     }
-    warning() << "rollback cannot proceed at this time (retrying later): " << redact(status);
+
+    // At this point we are about to leave rollback.  Before we do, wait for any writes done
+    // as part of rollback to be durable, and then do any necessary checks that we didn't
+    // wind up rolling back something illegal.  We must wait for the rollback to be durable
+    // so that if we wind up shutting down uncleanly in response to something we rolled back
+    // we know that we won't wind up right back in the same situation when we start back up
+    // because the rollback wasn't durable.
+    txn->recoveryUnit()->waitUntilDurable();
+
+    // If we detected that we rolled back the shardIdentity document as part of this rollback
+    // then we must shut down to clear the in-memory ShardingState associated with the
+    // shardIdentity document.
+    if (ShardIdentityRollbackNotifier::get(txn)->didRollbackHappen()) {
+        severe() << "shardIdentity document rollback detected.  Shutting down to clear "
+                    "in-memory sharding state.  Restarting this process should safely return it "
+                    "to a healthy state";
+        fassertFailedNoTrace(40276);
+    }
+
+    if (!_replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
+        severe() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING)
+                 << "; expected to be in state " << MemberState(MemberState::RS_ROLLBACK)
+                 << " but found self in " << _replCoord->getMemberState();
+        fassertFailedNoTrace(40364);
+    }
 }
 
 HostAndPort BackgroundSync::getSyncTarget() const {
