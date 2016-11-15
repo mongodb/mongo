@@ -143,6 +143,12 @@ Status waitForLinearizableReadConcern(OperationContext* txn) {
         ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
         Lock::CollectionLock lock(txn->lockState(), "local.oplog.rs", MODE_IX);
+
+        if (!replCoord->canAcceptWritesForDatabase("admin")) {
+            return {ErrorCodes::NotMaster,
+                    "No longer primary when waiting for linearizable read concern"};
+        }
+
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
 
             WriteUnitOfWork uow(txn);
