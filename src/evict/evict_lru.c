@@ -1449,7 +1449,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue,
 
 		/* Limit internal pages to 50% of the total. */
 		if (WT_PAGE_IS_INTERNAL(page) &&
-		    internal_pages >= (int)(evict - start) / 2)
+		    internal_pages > (int)(evict - start) / 2)
 			continue;
 
 		/* If eviction gets aggressive, anything else is fair game. */
