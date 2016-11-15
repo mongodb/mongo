@@ -365,6 +365,12 @@ long long Helpers::removeRange(OperationContext* txn,
 
             IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(txn, indexName);
 
+            if (!desc) {
+                warning(LogComponent::kSharding) << "shard key index '" << indexName << "' on '"
+                                                 << ns << "' was dropped";
+                return -1;
+            }
+
             unique_ptr<PlanExecutor> exec(
                 InternalPlanner::indexScan(txn,
                                            collection,
