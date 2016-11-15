@@ -265,7 +265,7 @@ std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* txn, int milli
     for (unsigned i = 0; i < todo.size(); i++) {
         const std::string& ns = todo[i];
 
-        AutoGetCollectionForRead ctx(txn, ns);
+        AutoGetCollectionOrViewForRead ctx(txn, ns);
         if (!ctx.getDb()) {
             continue;
         }
