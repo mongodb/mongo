@@ -495,7 +495,11 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
     getmoreReplStats.recordMillis(durationCount<Milliseconds>(queryResponse.elapsedMillis));
 
     // TODO: back pressure handling will be added in SERVER-23499.
-    _enqueueDocumentsFn(firstDocToApply, documents.cend(), info);
+    auto status = _enqueueDocumentsFn(firstDocToApply, documents.cend(), info);
+    if (!status.isOK()) {
+        _finishCallback(status);
+        return;
+    }
 
     // Update last fetched info.
     if (firstDocToApply != documents.cend()) {

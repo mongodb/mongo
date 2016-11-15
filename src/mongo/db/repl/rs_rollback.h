@@ -77,12 +77,14 @@ using SleepSecondsFn = stdx::function<void(Seconds)>;
 Status syncRollback(OperationContext* txn,
                     const OplogInterface& localOplog,
                     const RollbackSource& rollbackSource,
+                    boost::optional<int> requiredRBID,
                     ReplicationCoordinator* replCoord,
                     const SleepSecondsFn& sleepSecondsFn);
 
 Status syncRollback(OperationContext* txn,
                     const OplogInterface& localOplog,
                     const RollbackSource& rollbackSource,
+                    boost::optional<int> requiredRBID,
                     ReplicationCoordinator* replCoord);
 
 }  // namespace repl

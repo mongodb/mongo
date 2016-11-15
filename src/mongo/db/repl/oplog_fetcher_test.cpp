@@ -140,9 +140,10 @@ void OplogFetcherTest::setUp() {
 
     enqueueDocumentsFn = [this](Fetcher::Documents::const_iterator begin,
                                 Fetcher::Documents::const_iterator end,
-                                const OplogFetcher::DocumentsInfo& info) {
+                                const OplogFetcher::DocumentsInfo& info) -> Status {
         lastEnqueuedDocuments = {begin, end};
         lastEnqueuedDocumentsInfo = info;
+        return Status::OK();
     };
 }
 
@@ -650,6 +651,23 @@ TEST_F(OplogFetcherTest, OplogFetcherShouldExcludeFirstDocumentInFirstBatchWhenE
     ASSERT_EQUALS(OpTimeWithHash(thirdEntry["h"].numberLong(),
                                  unittest::assertGet(OpTime::parseFromOplogEntry(thirdEntry))),
                   shutdownState->getLastFetched());
+}
+
+TEST_F(OplogFetcherTest, OplogFetcherShouldReportErrorsThrownFromCallback) {
+    auto firstEntry = makeNoopOplogEntry(lastFetched);
+    auto secondEntry = makeNoopOplogEntry({{Seconds(456), 0}, lastFetched.opTime.getTerm()}, 200);
+    auto thirdEntry = makeNoopOplogEntry({{Seconds(789), 0}, lastFetched.opTime.getTerm()}, 300);
+    Fetcher::Documents documents{firstEntry, secondEntry, thirdEntry};
+
+    enqueueDocumentsFn = [](Fetcher::Documents::const_iterator,
+                            Fetcher::Documents::const_iterator,
+                            const OplogFetcher::DocumentsInfo&) -> Status {
+        return Status(ErrorCodes::InternalError, "my custom error");
+    };
+
+    auto shutdownState = processSingleBatch(
+        {makeCursorResponse(0, documents), rpc::makeEmptyMetadata(), Milliseconds(0)});
+    ASSERT_EQ(shutdownState->getStatus(), Status(ErrorCodes::InternalError, "my custom error"));
 }
 
 void OplogFetcherTest::testSyncSourceChecking(rpc::ReplSetMetadata* metadata) {

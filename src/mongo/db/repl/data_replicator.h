@@ -510,10 +510,13 @@ private:
     /**
      * Pushes documents from oplog fetcher to blocking queue for
      * applier to consume.
+     *
+     * Returns a status even though it always returns OK, to conform the interface OplogFetcher
+     * expects for the EnqueueDocumentsFn.
      */
-    void _enqueueDocuments(Fetcher::Documents::const_iterator begin,
-                           Fetcher::Documents::const_iterator end,
-                           const OplogFetcher::DocumentsInfo& info);
+    Status _enqueueDocuments(Fetcher::Documents::const_iterator begin,
+                             Fetcher::Documents::const_iterator end,
+                             const OplogFetcher::DocumentsInfo& info);
 
     BSONObj _getInitialSyncProgress_inlock() const;
 

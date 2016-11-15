@@ -35,6 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
@@ -129,6 +130,9 @@ void SyncSourceResolver::shutdown() {
     if (_fetcher) {
         _fetcher->shutdown();
     }
+    if (_rbidCommandHandle) {
+        _taskExecutor->cancel(_rbidCommandHandle);
+    }
 }
 
 void SyncSourceResolver::join() {
@@ -196,6 +200,7 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeRequiredOpTimeFetcher(HostAndP
 
 Status SyncSourceResolver::_scheduleFetcher(std::unique_ptr<Fetcher> fetcher) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
+    // TODO SERVER-27499 need to check if _state is kShuttingDown inside the mutex.
     // Must schedule fetcher inside lock in case fetcher's callback gets invoked immediately by task
     // executor.
     auto status = fetcher->schedule();
@@ -306,16 +311,63 @@ void SyncSourceResolver::_firstOplogEntryFetcherCallback(
         return;
     }
 
-    // Schedules fetcher to look for '_requiredOpTime' in the remote oplog.
     if (!_requiredOpTime.isNull()) {
-        auto status = _scheduleFetcher(_makeRequiredOpTimeFetcher(candidate, earliestOpTimeSeen));
-        if (!status.isOK()) {
-            _finishCallback(status);
-        }
+        _scheduleRBIDRequest(candidate, earliestOpTimeSeen);
         return;
     }
 
     _finishCallback(candidate);
+}
+
+void SyncSourceResolver::_scheduleRBIDRequest(HostAndPort candidate, OpTime earliestOpTimeSeen) {
+    auto handle = _taskExecutor->scheduleRemoteCommand(
+        {candidate, "admin", BSON("replSetGetRBID" << 1), nullptr, kFetcherTimeout},
+        stdx::bind(&SyncSourceResolver::_rbidRequestCallback,
+                   this,
+                   candidate,
+                   earliestOpTimeSeen,
+                   stdx::placeholders::_1));
+
+    if (!handle.isOK()) {
+        _finishCallback(handle.getStatus());
+        return;
+    }
+
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _rbidCommandHandle = std::move(handle.getValue());
+    if (_state == State::kShuttingDown) {
+        _taskExecutor->cancel(_rbidCommandHandle);
+    }
+}
+
+void SyncSourceResolver::_rbidRequestCallback(
+    HostAndPort candidate,
+    OpTime earliestOpTimeSeen,
+    const executor::TaskExecutor::RemoteCommandCallbackArgs& rbidReply) {
+    if (rbidReply.response.status == ErrorCodes::CallbackCanceled) {
+        _finishCallback(rbidReply.response.status);
+        return;
+    }
+
+    try {
+        uassertStatusOK(rbidReply.response.status);
+        uassertStatusOK(getStatusFromCommandResult(rbidReply.response.data));
+        _rbid = rbidReply.response.data["rbid"].Int();
+    } catch (const DBException& ex) {
+        const auto until = _taskExecutor->now() + kFetcherErrorBlacklistDuration;
+        log() << "Blacklisting " << candidate << " due to error: '" << ex << "' for "
+              << kFetcherErrorBlacklistDuration << " until: " << until;
+        _syncSourceSelector->blacklistSyncSource(candidate, until);
+        _chooseAndProbeNextSyncSource(earliestOpTimeSeen);
+        return;
+    }
+
+    // Schedule fetcher to look for '_requiredOpTime' in the remote oplog.
+    // Unittest requires that this kind of failure be handled specially.
+    auto status = _scheduleFetcher(_makeRequiredOpTimeFetcher(candidate, earliestOpTimeSeen));
+    if (!status.isOK()) {
+        _finishCallback(status);
+    }
 }
 
 Status SyncSourceResolver::_compareRequiredOpTimeWithQueryResponse(
@@ -425,6 +477,10 @@ Status SyncSourceResolver::_chooseAndProbeNextSyncSource(OpTime earliestOpTimeSe
 Status SyncSourceResolver::_finishCallback(StatusWith<HostAndPort> result) {
     SyncSourceResolverResponse response;
     response.syncSourceStatus = std::move(result);
+    if (response.isOK() && !response.getSyncSource().empty()) {
+        invariant(_requiredOpTime.isNull() || _rbid);
+        response.rbid = _rbid;
+    }
     return _finishCallback(response);
 }
 

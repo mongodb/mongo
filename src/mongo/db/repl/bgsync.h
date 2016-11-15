@@ -147,10 +147,13 @@ private:
     /**
      * Checks current background sync state before pushing operations into blocking queue and
      * updating metrics. If the queue is full, might block.
+     *
+     * requiredRBID is reset to empty after the first call.
      */
-    void _enqueueDocuments(Fetcher::Documents::const_iterator begin,
-                           Fetcher::Documents::const_iterator end,
-                           const OplogFetcher::DocumentsInfo& info);
+    Status _enqueueDocuments(Fetcher::Documents::const_iterator begin,
+                             Fetcher::Documents::const_iterator end,
+                             const OplogFetcher::DocumentsInfo& info,
+                             boost::optional<int>* requiredRBID);
 
     /**
      * Executes a rollback.
@@ -158,6 +161,7 @@ private:
      */
     void _rollback(OperationContext* txn,
                    const HostAndPort& source,
+                   boost::optional<int> requiredRBID,
                    stdx::function<DBClientBase*()> getConnection);
 
     // restart syncing
@@ -195,11 +199,11 @@ private:
     HostAndPort _syncSourceHost;
 
     // Current sync source resolver validating sync source candidates.
-    // Owned by us.
+    // Pointer may be read on any thread that locks _mutex or unlocked on the BGSync thread. It can
+    // only be written to by the BGSync thread while holding _mutex.
     std::unique_ptr<SyncSourceResolver> _syncSourceResolver;
 
     // Current oplog fetcher tailing the oplog on the sync source.
-    // Owned by us.
     std::unique_ptr<OplogFetcher> _oplogFetcher;
 };
 

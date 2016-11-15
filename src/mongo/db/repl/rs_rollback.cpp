@@ -828,6 +828,7 @@ void syncFixUp(OperationContext* txn,
 Status _syncRollback(OperationContext* txn,
                      const OplogInterface& localOplog,
                      const RollbackSource& rollbackSource,
+                     boost::optional<int> requiredRBID,
                      ReplicationCoordinator* replCoord,
                      const SleepSecondsFn& sleepSecondsFn) {
     invariant(!txn->lockState()->isLocked());
@@ -854,6 +855,14 @@ Status _syncRollback(OperationContext* txn,
     FixUpInfo how;
     log() << "rollback 1";
     how.rbid = rollbackSource.getRollbackId();
+    if (requiredRBID && how.rbid != requiredRBID) {
+        log() << "Upstream node rolled back. Need to retry our rollback.";
+        // Currently the transitive callers of this function require that we return Status::OK() for
+        // all recoverable errors such as this. Even though we aren't able to rollback we are still
+        // "OK" because the system is still in a consistent state.
+        return Status::OK();
+    }
+
     {
         log() << "rollback 2 FindCommonPoint";
         try {
@@ -928,6 +937,7 @@ Status _syncRollback(OperationContext* txn,
 Status syncRollback(OperationContext* txn,
                     const OplogInterface& localOplog,
                     const RollbackSource& rollbackSource,
+                    boost::optional<int> requiredRBID,
                     ReplicationCoordinator* replCoord,
                     const SleepSecondsFn& sleepSecondsFn) {
     invariant(txn);
@@ -937,7 +947,8 @@ Status syncRollback(OperationContext* txn,
 
     DisableDocumentValidation validationDisabler(txn);
     txn->setReplicatedWrites(false);
-    Status status = _syncRollback(txn, localOplog, rollbackSource, replCoord, sleepSecondsFn);
+    Status status =
+        _syncRollback(txn, localOplog, rollbackSource, requiredRBID, replCoord, sleepSecondsFn);
 
     log() << "rollback finished" << rsLog;
     return status;
@@ -946,10 +957,12 @@ Status syncRollback(OperationContext* txn,
 Status syncRollback(OperationContext* txn,
                     const OplogInterface& localOplog,
                     const RollbackSource& rollbackSource,
+                    boost::optional<int> requiredRBID,
                     ReplicationCoordinator* replCoord) {
-    return syncRollback(txn, localOplog, rollbackSource, replCoord, [](Seconds seconds) {
-        sleepsecs(durationCount<Seconds>(seconds));
-    });
+    return syncRollback(
+        txn, localOplog, rollbackSource, requiredRBID, replCoord, [](Seconds seconds) {
+            sleepsecs(durationCount<Seconds>(seconds));
+        });
 }
 
 }  // namespace repl
