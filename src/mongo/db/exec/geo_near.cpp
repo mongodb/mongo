@@ -267,13 +267,8 @@ class GeoNear2DStage::DensityEstimator {
 public:
     DensityEstimator(PlanStage::Children* children,
                      const IndexDescriptor* twoDindex,
-                     const GeoNearParams* nearParams,
-                     const R2Annulus& fullBounds)
-        : _children(children),
-          _twoDIndex(twoDindex),
-          _nearParams(nearParams),
-          _fullBounds(fullBounds),
-          _currentLevel(0) {
+                     const GeoNearParams* nearParams)
+        : _children(children), _twoDIndex(twoDindex), _nearParams(nearParams), _currentLevel(0) {
         GeoHashConverter::Parameters hashParams;
         Status status = GeoHashConverter::parseParameters(_twoDIndex->infoObj(), &hashParams);
         // The index status should always be valid.
@@ -300,8 +295,7 @@ private:
     PlanStage::Children* _children;     // Points to PlanStage::_children in the NearStage.
     const IndexDescriptor* _twoDIndex;  // Not owned here.
     const GeoNearParams* _nearParams;   // Not owned here.
-    const R2Annulus& _fullBounds;
-    IndexScan* _indexScan = nullptr;  // Owned in PlanStage::_children.
+    IndexScan* _indexScan = nullptr;    // Owned in PlanStage::_children.
     unique_ptr<GeoHashConverter> _converter;
     GeoHash _centroidCell;
     unsigned _currentLevel;
@@ -369,39 +363,6 @@ PlanStage::StageState GeoNear2DStage::DensityEstimator::work(OperationContext* t
 
     if (state == PlanStage::IS_EOF) {
         // We ran through the neighbors but found nothing.
-        //
-        // Before going to the next-coarsest level, check whether our search area contains the
-        // entire search annulus, since we don't want to spend time doing density estimation over
-        // areas that are much larger than the requested $maxDistance. In this case we stop the
-        // density estimation process, and return an estimated distance of $maxDistance.
-        //
-        // The search area consists of four cells with side length S. Within its cell, the closest
-        // vertex to the search point must be the vertex shared with the other three cells. If the
-        // search point lies in the upper left cell, this means that it must lie in the lower right
-        // quadrant of that cell. Furthermore, this lower-right quadrant has a side-length of S/2.
-        //
-        //   +-----------+-----------+
-        //   |           |           |
-        //   |       S/2 |           |
-        //   +     +-----+           |
-        //   |     | o   |           |
-        //   |     |     |           |
-        //   +-----+-----+-----------+
-        //   |           |           |
-        //   |           |           |
-        //   |           |           |
-        //   |           |           |
-        //   |           |           |
-        //   +-----------+-----------+
-        //         S
-        //
-        // As long as the outer radius of the search annulus is less than S/2, it must be entirely
-        // contained within these four cells.
-        if (_fullBounds.getOuter() < (0.5 * _converter->sizeEdge(_currentLevel))) {
-            *estimatedDistance = _fullBounds.getOuter();
-            return PlanStage::IS_EOF;
-        }
-
         if (_currentLevel > 0u) {
             // Advance to the next level and search again.
             _currentLevel--;
@@ -434,8 +395,7 @@ PlanStage::StageState GeoNear2DStage::initialize(OperationContext* txn,
                                                  Collection* collection,
                                                  WorkingSetID* out) {
     if (!_densityEstimator) {
-        _densityEstimator.reset(
-            new DensityEstimator(&_children, _twoDIndex, &_nearParams, _fullBounds));
+        _densityEstimator.reset(new DensityEstimator(&_children, _twoDIndex, &_nearParams));
     }
 
     double estimatedDistance;
@@ -845,13 +805,11 @@ public:
     DensityEstimator(PlanStage::Children* children,
                      const IndexDescriptor* s2Index,
                      const GeoNearParams* nearParams,
-                     const S2IndexingParams& indexParams,
-                     const R2Annulus& fullBounds)
+                     const S2IndexingParams& indexParams)
         : _children(children),
           _s2Index(s2Index),
           _nearParams(nearParams),
           _indexParams(indexParams),
-          _fullBounds(fullBounds),
           _currentLevel(0) {
         // cellId.AppendVertexNeighbors(level, output) requires level < finest,
         // so we use the minimum of max_level - 1 and the user specified finest
@@ -874,7 +832,6 @@ private:
     const IndexDescriptor* _s2Index;   // Not owned here.
     const GeoNearParams* _nearParams;  // Not owned here.
     const S2IndexingParams _indexParams;
-    const R2Annulus& _fullBounds;
     int _currentLevel;
     IndexScan* _indexScan = nullptr;  // Owned in PlanStage::_children.
 };
@@ -928,41 +885,6 @@ PlanStage::StageState GeoNear2DSphereStage::DensityEstimator::work(OperationCont
 
     if (state == PlanStage::IS_EOF) {
         // We ran through the neighbors but found nothing.
-        //
-        // Before going to the next-coarsest level, check whether our search area contains the
-        // entire search annulus, since we don't want to spend time doing density estimation over
-        // areas that are much larger than the requested $maxDistance. In this case we stop the
-        // density estimation process, and return an estimated distance of $maxDistance.
-        //
-        // The search area consists of four cells at level L. Within its cell, the closest vertex to
-        // the search point must be the vertex shared with the other three cells. If the search
-        // point lies in the upper left cell, this means that it must lie in the lower right
-        // sub-cell at level L+1.
-        //
-        //   +-----------+-----------+
-        //   |           |           |
-        //   |        S  |           |
-        //   +     +-----+           |
-        //   |     | o   |           |
-        //   |     |     |           |
-        //   +-----+-----+-----------+
-        //   |           |           |
-        //   |           |           |
-        //   |           |           |
-        //   |           |           |
-        //   |           |           |
-        //   +-----------+-----------+
-        //
-        // In the diagram above, S is the width of the cell at level L+1. We can determine a lower
-        // bound for the width any cell at this level, i.e. S > minWidth(L+1). As long as the outer
-        // radius of the search annulus is less than minWidth(L+1), it must be entirely contained
-        // within these four level L cells.
-        if (_fullBounds.getOuter() <
-            (S2::kMinWidth.GetValue(_currentLevel + 1) * kRadiusOfEarthInMeters)) {
-            *estimatedDistance = _fullBounds.getOuter();
-            return PlanStage::IS_EOF;
-        }
-
         if (_currentLevel > 0) {
             // Advance to the next level and search again.
             _currentLevel--;
@@ -997,7 +919,7 @@ PlanStage::StageState GeoNear2DSphereStage::initialize(OperationContext* txn,
                                                        WorkingSetID* out) {
     if (!_densityEstimator) {
         _densityEstimator.reset(
-            new DensityEstimator(&_children, _s2Index, &_nearParams, _indexParams, _fullBounds));
+            new DensityEstimator(&_children, _s2Index, &_nearParams, _indexParams));
     }
 
     double estimatedDistance;
