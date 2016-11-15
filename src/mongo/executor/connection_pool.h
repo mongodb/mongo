@@ -67,11 +67,11 @@ public:
 
     using GetConnectionCallback = stdx::function<void(StatusWith<ConnectionHandle>)>;
 
-    static constexpr Milliseconds kDefaultHostTimeout = Milliseconds(300000);  // 5mins
+    static const Milliseconds kDefaultHostTimeout;
     static const size_t kDefaultMaxConns;
     static const size_t kDefaultMinConns;
-    static constexpr Milliseconds kDefaultRefreshRequirement = Milliseconds(60000);  // 1min
-    static constexpr Milliseconds kDefaultRefreshTimeout = Milliseconds(20000);      // 20secs
+    static const Milliseconds kDefaultRefreshRequirement;
+    static const Milliseconds kDefaultRefreshTimeout;
 
     static const Status kConnectionStateUnknown;
 

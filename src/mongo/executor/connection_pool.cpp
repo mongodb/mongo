@@ -166,11 +166,11 @@ private:
     State _state;
 };
 
-constexpr Milliseconds ConnectionPool::kDefaultHostTimeout;
+const Milliseconds ConnectionPool::kDefaultHostTimeout = Milliseconds(300000);  // 5mins
 size_t const ConnectionPool::kDefaultMaxConns = std::numeric_limits<size_t>::max();
 size_t const ConnectionPool::kDefaultMinConns = 1;
-constexpr Milliseconds ConnectionPool::kDefaultRefreshRequirement;
-constexpr Milliseconds ConnectionPool::kDefaultRefreshTimeout;
+const Milliseconds ConnectionPool::kDefaultRefreshRequirement = Milliseconds(60000);  // 1min
+const Milliseconds ConnectionPool::kDefaultRefreshTimeout = Milliseconds(20000);      // 20secs
 
 const Status ConnectionPool::kConnectionStateUnknown =
     Status(ErrorCodes::InternalError, "Connection is in an unknown state");
