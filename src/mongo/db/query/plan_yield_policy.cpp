@@ -108,14 +108,14 @@ bool PlanYieldPolicy::yield(RecordFetcher* fetcher) {
                 opCtx->recoveryUnit()->abandonSnapshot();
             } else {
                 // Release and reacquire locks.
-                QueryYield::yieldAllLocks(opCtx, fetcher, _planYielding->ns());
+                QueryYield::yieldAllLocks(opCtx, fetcher, _planYielding->nss());
             }
 
             return _planYielding->restoreStateWithoutRetrying();
         } catch (const WriteConflictException& wce) {
             CurOp::get(opCtx)->debug().writeConflicts++;
             WriteConflictException::logAndBackoff(
-                attempt, "plan execution restoreState", _planYielding->ns());
+                attempt, "plan execution restoreState", _planYielding->nss().ns());
             // retry
         }
     }

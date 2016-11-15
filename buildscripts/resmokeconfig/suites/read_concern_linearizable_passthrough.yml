@@ -54,7 +54,11 @@ selector:
     - jstests/core/profile_getmore.js # system.profile not replicated
     - jstests/core/profile_group.js # system.profile not replicated
     - jstests/core/profile_insert.js # system.profile not replicated
+    - jstests/core/profile_list_collections.js # system.profile not replicated
+    - jstests/core/profile_list_indexes.js # system.profile not replicated
     - jstests/core/profile_mapreduce.js # system.profile not replicated
+    - jstests/core/profile_parallel_collection_scan.js # system.profile not replicated
+    - jstests/core/profile_repair_cursor.js # system.profile not replicated
     - jstests/core/profile_sampling.js # system.profile not replicated
     - jstests/core/profile_update.js # system.profile not replicated
     - jstests/core/read_after_optime.js # verifies read after optime fails on standalone

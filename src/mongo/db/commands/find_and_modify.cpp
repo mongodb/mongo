@@ -203,13 +203,11 @@ Status checkCanAcceptWritesForDatabase(OperationContext* opCtx, const NamespaceS
 
 void recordStatsForTopCommand(OperationContext* opCtx) {
     auto curOp = CurOp::get(opCtx);
-    const int writeLocked = 1;
-
     Top::get(opCtx->getClient()->getServiceContext())
         .record(opCtx,
                 curOp->getNS(),
                 curOp->getLogicalOp(),
-                writeLocked,
+                Top::LockType::WriteLocked,
                 curOp->elapsedMicros(),
                 curOp->isCommand(),
                 curOp->getReadWriteType());

@@ -75,7 +75,7 @@ Top& Top::get(ServiceContext* service) {
 void Top::record(OperationContext* opCtx,
                  StringData ns,
                  LogicalOp logicalOp,
-                 int lockType,
+                 LockType lockType,
                  long long micros,
                  bool command,
                  Command::ReadWriteType readWriteType) {
@@ -97,7 +97,7 @@ void Top::record(OperationContext* opCtx,
 void Top::_record(OperationContext* opCtx,
                   CollectionData& c,
                   LogicalOp logicalOp,
-                  int lockType,
+                  LockType lockType,
                   long long micros,
                   Command::ReadWriteType readWriteType) {
 
@@ -105,9 +105,9 @@ void Top::_record(OperationContext* opCtx,
 
     c.total.inc(micros);
 
-    if (lockType > 0)
+    if (lockType == LockType::WriteLocked)
         c.writeLock.inc(micros);
-    else if (lockType < 0)
+    else if (lockType == LockType::ReadLocked)
         c.readLock.inc(micros);
 
     switch (logicalOp) {

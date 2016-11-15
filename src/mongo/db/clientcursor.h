@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/plan_executor.h"
@@ -42,30 +43,30 @@ class CursorManager;
 class RecoveryUnit;
 
 /**
- * Parameters used for constructing a ClientCursor. ClientCursors cannot be constructed in
- * isolation, but rather must be constructed and managed using a CursorManager. See cursor_manager.h
- * for more details.
+ * Parameters used for constructing a ClientCursor. Makes an owned copy of 'originatingCommandObj'
+ * to be used across getMores.
+ *
+ * ClientCursors cannot be constructed in isolation, but rather must be
+ * constructed and managed using a CursorManager. See cursor_manager.h for more details.
  */
 struct ClientCursorParams {
-    ClientCursorParams(PlanExecutor* exec,
-                       std::string ns,
+    ClientCursorParams(std::unique_ptr<PlanExecutor> planExecutor,
+                       NamespaceString nss,
                        bool isReadCommitted,
-                       int qopts = 0,
-                       const BSONObj query = BSONObj(),
-                       bool isAggCursor = false)
-        : exec(exec),
-          ns(std::move(ns)),
+                       BSONObj originatingCommandObj)
+        : exec(std::move(planExecutor)),
+          nss(std::move(nss)),
           isReadCommitted(isReadCommitted),
-          qopts(qopts),
-          query(query),
-          isAggCursor(isAggCursor) {}
+          queryOptions(exec->getCanonicalQuery()
+                           ? exec->getCanonicalQuery()->getQueryRequest().getOptions()
+                           : 0),
+          originatingCommandObj(originatingCommandObj.getOwned()) {}
 
-    PlanExecutor* exec = nullptr;
-    const std::string ns;
+    std::unique_ptr<PlanExecutor> exec;
+    const NamespaceString nss;
     bool isReadCommitted = false;
-    int qopts = 0;
-    const BSONObj query = BSONObj();
-    bool isAggCursor = false;
+    int queryOptions = 0;
+    BSONObj originatingCommandObj;
 };
 
 /**
@@ -92,16 +93,12 @@ public:
         return _cursorid;
     }
 
-    std::string ns() const {
-        return _ns;
+    const NamespaceString& nss() const {
+        return _nss;
     }
 
     bool isReadCommitted() const {
         return _isReadCommitted;
-    }
-
-    bool isAggCursor() const {
-        return _isAggCursor;
     }
 
     PlanExecutor* getExecutor() const {
@@ -112,8 +109,8 @@ public:
         return _queryOptions;
     }
 
-    const BSONObj& getQuery() const {
-        return _query;
+    const BSONObj& getOriginatingCommandObj() const {
+        return _originatingCommand;
     }
 
     /**
@@ -223,7 +220,7 @@ private:
      * Constructs a ClientCursor. Since cursors must come into being registered and pinned, this is
      * private. See cursor_manager.h for more details.
      */
-    ClientCursor(const ClientCursorParams& params, CursorManager* cursorManager, CursorId cursorId);
+    ClientCursor(ClientCursorParams&& params, CursorManager* cursorManager, CursorId cursorId);
 
     /**
      * Constructs a special ClientCursor used to track sharding state for the given collection.
@@ -246,11 +243,15 @@ private:
      */
     void kill();
 
+    bool isNoTimeout() const {
+        return (_queryOptions & QueryOption_NoCursorTimeout);
+    }
+
     // The ID of the ClientCursor. A value of 0 is used to mean that no cursor id has been assigned.
     CursorId _cursorid = 0;
 
     // The namespace we're operating on.
-    std::string _ns;
+    const NamespaceString _nss;
 
     const bool _isReadCommitted = false;
 
@@ -265,31 +266,17 @@ private:
     // Tracks the number of results returned by this cursor so far.
     long long _pos = 0;
 
-    // If this cursor was created by a find operation, '_query' holds the query predicate for
-    // the find. If this cursor was created by a command (e.g. the aggregate command), then
-    // '_query' holds the command specification received from the client.
-    BSONObj _query;
+    // Holds an owned copy of the command specification received from the client.
+    const BSONObj _originatingCommand;
 
     // See the QueryOptions enum in dbclientinterface.h.
-    int _queryOptions = 0;
-
-    // Is this ClientCursor backed by an aggregation pipeline?
-    //
-    // Agg executors differ from others in that they manage their own locking internally and
-    // should not be killed or destroyed when the underlying collection is deleted.
-    //
-    // Note: This should *not* be set for the internal cursor used as input to an aggregation.
-    const bool _isAggCursor = false;
+    const int _queryOptions = 0;
 
     // While a cursor is being used by a client, it is marked as "pinned". See ClientCursorPin
     // below.
     //
     // Cursors always come into existence in a pinned state.
     bool _isPinned = true;
-
-    // Is the "no timeout" flag set on this cursor?  If false, this cursor may be automatically
-    // deleted after an interval of inactivity.
-    bool _isNoTimeout = false;
 
     // The replication position only used in master-slave.
     Timestamp _slaveReadTill;

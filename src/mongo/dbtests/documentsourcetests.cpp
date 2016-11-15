@@ -108,10 +108,7 @@ protected:
             getExecutor(&_opCtx, ctx.getCollection(), std::move(cq), PlanExecutor::YIELD_MANUAL));
 
         exec->saveState();
-        exec->registerExec(ctx.getCollection());
-
-        _source =
-            DocumentSourceCursor::create(ctx.getCollection(), nss.ns(), std::move(exec), _ctx);
+        _source = DocumentSourceCursor::create(ctx.getCollection(), std::move(exec), _ctx);
     }
 
     intrusive_ptr<ExpressionContextForTest> ctx() {

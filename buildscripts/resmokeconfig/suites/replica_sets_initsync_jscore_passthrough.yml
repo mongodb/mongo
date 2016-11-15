@@ -45,6 +45,12 @@ selector:
     - jstests/core/or4.js
     # This test is blacklisted due to both map-reduce and getLatestProfilerEntry().
     - jstests/core/profile_mapreduce.js
+    # Tests that query the system.profile collection cannot run in this suite since an initial sync
+    # may insert unexpected operations into the profile collection.
+    - jstests/core/profile_list_collections.js
+    - jstests/core/profile_list_indexes.js
+    - jstests/core/profile_parallel_collection_scan.js
+    - jstests/core/profile_repair_cursor.js
     - jstests/core/recursion.js
     - jstests/core/system_profile.js
     - jstests/core/temp_cleanup.js

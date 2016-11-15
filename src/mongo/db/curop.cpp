@@ -266,10 +266,12 @@ void CurOp::ensureStarted() {
     }
 }
 
-void CurOp::enter_inlock(const char* ns, int dbProfileLevel) {
+void CurOp::enter_inlock(const char* ns, boost::optional<int> dbProfileLevel) {
     ensureStarted();
     _ns = ns;
-    raiseDbProfileLevel(dbProfileLevel);
+    if (dbProfileLevel) {
+        raiseDbProfileLevel(*dbProfileLevel);
+    }
 }
 
 void CurOp::raiseDbProfileLevel(int dbProfileLevel) {

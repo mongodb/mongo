@@ -107,9 +107,10 @@ public:
         exec->detachFromOperationContext();
 
         auto pinnedCursor = collection->getCursorManager()->registerCursor(
-            {exec.release(),
-             ns.ns(),
-             opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot()});
+            {std::move(exec),
+             ns,
+             opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+             cmdObj});
 
         appendCursorResponseObject(
             pinnedCursor.getCursor()->cursorid(), ns.ns(), BSONArray(), &result);

@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include <string>
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
@@ -50,7 +50,7 @@ public:
      */
     static void yieldAllLocks(OperationContext* opCtx,
                               RecordFetcher* fetcher,
-                              const std::string& planExecNS);
+                              const NamespaceString& planExecNS);
 };
 
 }  // namespace mongo

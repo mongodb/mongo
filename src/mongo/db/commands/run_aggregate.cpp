@@ -60,6 +60,7 @@
 #include "mongo/db/views/view_sharding_check.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -76,19 +77,15 @@ namespace {
 /**
  * Returns true if we need to keep a ClientCursor saved for this pipeline (for future getMore
  * requests). Otherwise, returns false. The passed 'nsForCursor' is only used to determine the
- * namespace used in the returned cursor. In the case of views, this can be different from that
- * in 'request'.
+ * namespace used in the returned cursor, which will be registered with the global cursor manager,
+ * and thus will be different from that in 'request'.
  */
 bool handleCursorCommand(OperationContext* opCtx,
-                         const string& nsForCursor,
+                         const NamespaceString& nsForCursor,
                          ClientCursor* cursor,
-                         PlanExecutor* exec,
                          const AggregationRequest& request,
                          BSONObjBuilder& result) {
-    if (cursor) {
-        invariant(cursor->getExecutor() == exec);
-        invariant(cursor->isAggCursor());
-    }
+    invariant(cursor);
 
     long long batchSize = request.getBatchSize();
 
@@ -99,43 +96,27 @@ bool handleCursorCommand(OperationContext* opCtx,
         // The initial getNext() on a PipelineProxyStage may be very expensive so we don't
         // do it when batchSize is 0 since that indicates a desire for a fast return.
         PlanExecutor::ExecState state;
-        if ((state = exec->getNext(&next, NULL)) == PlanExecutor::IS_EOF) {
+        if ((state = cursor->getExecutor()->getNext(&next, nullptr)) == PlanExecutor::IS_EOF) {
             // make it an obvious error to use cursor or executor after this point
-            cursor = NULL;
-            exec = NULL;
+            cursor = nullptr;
             break;
         }
 
-        uassert(34426,
-                "Plan executor error during aggregation: " + WorkingSetCommon::toStatusString(next),
-                PlanExecutor::ADVANCED == state);
+        if (PlanExecutor::ADVANCED != state) {
+            auto status = WorkingSetCommon::getMemberObjectStatus(next);
+            uasserted(status.code(),
+                      "PlanExecutor error during aggregation: " +
+                          WorkingSetCommon::toStatusString(next));
+        }
 
         // If adding this object will cause us to exceed the message size limit, then we stash it
         // for later.
         if (!FindCommon::haveSpaceForNext(next, objCount, resultsArray.len())) {
-            exec->enqueue(next);
+            cursor->getExecutor()->enqueue(next);
             break;
         }
 
         resultsArray.append(next);
-    }
-
-    // NOTE: exec->isEOF() can have side effects such as writing by $out. However, it should
-    // be relatively quick since if there was no cursor then the input is empty. Also, this
-    // violates the contract for batchSize==0. Sharding requires a cursor to be returned in that
-    // case. This is ok for now however, since you can't have a sharded collection that doesn't
-    // exist.
-    const bool canReturnMoreBatches = cursor;
-    if (!canReturnMoreBatches && exec && !exec->isEOF()) {
-        // msgasserting since this shouldn't be possible to trigger from today's aggregation
-        // language. The wording assumes that the only reason cursor would be null is if the
-        // collection doesn't exist.
-        msgasserted(
-            17391,
-            str::stream() << "Aggregation has more results than fit in initial batch, but can't "
-                          << "create cursor since collection "
-                          << nsForCursor
-                          << " doesn't exist");
     }
 
     if (cursor) {
@@ -147,14 +128,14 @@ bool handleCursorCommand(OperationContext* opCtx,
 
         // Cursor needs to be in a saved state while we yield locks for getmore. State
         // will be restored in getMore().
-        exec->saveState();
-        exec->detachFromOperationContext();
+        cursor->getExecutor()->saveState();
+        cursor->getExecutor()->detachFromOperationContext();
     } else {
         CurOp::get(opCtx)->debug().cursorExhausted = true;
     }
 
-    const long long cursorId = cursor ? cursor->cursorid() : 0LL;
-    appendCursorResponseObject(cursorId, nsForCursor, resultsArray.arr(), &result);
+    const CursorId cursorId = cursor ? cursor->cursorid() : 0LL;
+    appendCursorResponseObject(cursorId, nsForCursor.ns(), resultsArray.arr(), &result);
 
     return static_cast<bool>(cursor);
 }
@@ -296,7 +277,6 @@ Status runAggregate(OperationContext* opCtx,
         : uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
                               ->makeFromBSON(request.getCollation()));
 
-    boost::optional<ClientCursorPin> pin;  // either this OR the exec will be non-null
     unique_ptr<PlanExecutor> exec;
     boost::intrusive_ptr<ExpressionContext> expCtx;
     boost::intrusive_ptr<Pipeline> pipeline;
@@ -304,11 +284,6 @@ Status runAggregate(OperationContext* opCtx,
     {
         // This will throw if the sharding version for this connection is out of date. If the
         // namespace is a view, the lock will be released before re-running the aggregation.
-        // Otherwise, the lock must be held continuously from now until we have we created both
-        // the output ClientCursor and the input executor. This ensures that both are using the
-        // same sharding version that we synchronize on here. This is also why we always need to
-        // create a ClientCursor even when we aren't outputting to a cursor. See the comment on
-        // ShardFilterStage for more details.
         AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss);
         Collection* collection = ctx.getCollection();
 
@@ -416,17 +391,15 @@ Status runAggregate(OperationContext* opCtx,
         // it to the front of the pipeline if needed.
         PipelineD::prepareCursorSource(collection, &request, pipeline);
 
-        // Create the PlanExecutor which returns results from the pipeline. The WorkingSet
-        // ('ws') and the PipelineProxyStage ('proxy') will be owned by the created
-        // PlanExecutor.
         auto ws = make_unique<WorkingSet>();
         auto proxy = make_unique<PipelineProxyStage>(opCtx, pipeline, ws.get());
 
-        auto statusWithPlanExecutor = (NULL == collection)
-            ? PlanExecutor::make(
-                  opCtx, std::move(ws), std::move(proxy), nss.ns(), PlanExecutor::YIELD_MANUAL)
-            : PlanExecutor::make(
-                  opCtx, std::move(ws), std::move(proxy), collection, PlanExecutor::YIELD_MANUAL);
+        // This PlanExecutor will simply forward requests to the Pipeline, so does not need to
+        // yield or to be registered with any collection's CursorManager to receive invalidations.
+        // The Pipeline may contain PlanExecutors which *are* yielding PlanExecutors and which *are*
+        // registered with their respective collection's CursorManager
+        auto statusWithPlanExecutor = PlanExecutor::make(
+            opCtx, std::move(ws), std::move(proxy), nss, PlanExecutor::YIELD_MANUAL);
         invariant(statusWithPlanExecutor.isOK());
         exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -435,75 +408,39 @@ Status runAggregate(OperationContext* opCtx,
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             curOp->setPlanSummary_inlock(std::move(planSummary));
         }
-
-        if (collection) {
-            const bool isAggCursor = true;  // enable special locking behavior
-            pin.emplace(collection->getCursorManager()->registerCursor(
-                {exec.release(),
-                 nss.ns(),
-                 opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
-                 0,
-                 cmdObj.getOwned(),
-                 isAggCursor}));
-            // Don't add any code between here and the start of the try block.
-        }
-
-        // At this point, it is safe to release the collection lock.
-        // - In the case where we have a collection: we will need to reacquire the
-        //   collection lock later when cleaning up our ClientCursorPin.
-        // - In the case where we don't have a collection: our PlanExecutor won't be
-        //   registered, so it will be safe to clean it up outside the lock.
-        invariant(!exec || !collection);
     }
 
-    try {
-        // Unless set to true, the ClientCursor created above will be deleted on block exit.
-        bool keepCursor = false;
+    // Having released the collection lock, we can now create a cursor that returns results from the
+    // pipeline. This cursor owns no collection state, and thus we register it with the global
+    // cursor manager. The global cursor manager does not deliver invalidations or kill
+    // notifications; the underlying PlanExecutor(s) used by the pipeline will be receiving
+    // invalidations and kill notifications themselves, not the cursor we create here.
+    auto pin = CursorManager::getGlobalCursorManager()->registerCursor(
+        {std::move(exec),
+         origNss,
+         opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+         cmdObj});
+    ScopeGuard cursorFreer = MakeGuard(&ClientCursorPin::deleteUnderlying, &pin);
 
-        // If both explain and cursor are specified, explain wins.
-        if (expCtx->explain) {
-            result << "stages" << Value(pipeline->writeExplainOps(*expCtx->explain));
-        } else {
-            // Cursor must be specified, if explain is not.
-            keepCursor = handleCursorCommand(opCtx,
-                                             origNss.ns(),
-                                             pin ? pin->getCursor() : nullptr,
-                                             pin ? pin->getCursor()->getExecutor() : exec.get(),
-                                             request,
-                                             result);
+    // If both explain and cursor are specified, explain wins.
+    if (expCtx->explain) {
+        result << "stages" << Value(pipeline->writeExplainOps(*expCtx->explain));
+    } else {
+        // Cursor must be specified, if explain is not.
+        const bool keepCursor =
+            handleCursorCommand(opCtx, origNss, pin.getCursor(), request, result);
+        if (keepCursor) {
+            cursorFreer.Dismiss();
         }
-
-        if (!expCtx->explain) {
-            PlanSummaryStats stats;
-            Explain::getSummaryStats(pin ? *pin->getCursor()->getExecutor() : *exec.get(), &stats);
-            curOp->debug().setPlanSummaryMetrics(stats);
-            curOp->debug().nreturned = stats.nReturned;
-        }
-
-        // Clean up our ClientCursorPin, if needed.  We must reacquire the collection lock
-        // in order to do so.
-        if (pin) {
-            // We acquire locks here with DBLock and CollectionLock instead of using
-            // AutoGetCollectionForRead.  AutoGetCollectionForRead will throw if the
-            // sharding version is out of date, and we don't care if the sharding version
-            // has changed.
-            Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
-            Lock::CollectionLock collLock(opCtx->lockState(), nss.ns(), MODE_IS);
-            if (keepCursor) {
-                pin->release();
-            } else {
-                pin->deleteUnderlying();
-            }
-        }
-    } catch (...) {
-        // On our way out of scope, we clean up our ClientCursorPin if needed.
-        if (pin) {
-            Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
-            Lock::CollectionLock collLock(opCtx->lockState(), nss.ns(), MODE_IS);
-            pin->deleteUnderlying();
-        }
-        throw;
     }
+
+    if (!expCtx->explain) {
+        PlanSummaryStats stats;
+        Explain::getSummaryStats(*(pin.getCursor()->getExecutor()), &stats);
+        curOp->debug().setPlanSummaryMetrics(stats);
+        curOp->debug().nreturned = stats.nReturned;
+    }
+
     // Any code that needs the cursor pinned must be inside the try block, above.
     return Status::OK();
 }

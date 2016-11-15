@@ -91,13 +91,10 @@ public:
     }
 
     /**
-     * Given a match expression, represented as the BSON object 'filterObj',
-     * create a PlanExecutor capable of executing a simple collection
-     * scan.
-     *
-     * The caller takes ownership of the returned PlanExecutor*.
+     * Given a match expression, represented as the BSON object 'filterObj', create a PlanExecutor
+     * capable of executing a simple collection scan.
      */
-    PlanExecutor* makeCollScanExec(Collection* coll, BSONObj& filterObj) {
+    unique_ptr<PlanExecutor> makeCollScanExec(Collection* coll, BSONObj& filterObj) {
         CollectionScanParams csparams;
         csparams.collection = coll;
         csparams.direction = CollectionScanParams::FORWARD;
@@ -124,7 +121,7 @@ public:
                                                          coll,
                                                          PlanExecutor::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
-        return statusWithPlanExecutor.getValue().release();
+        return std::move(statusWithPlanExecutor.getValue());
     }
 
     /**
@@ -302,8 +299,7 @@ public:
         // Wrap the "inner" plan executor in a DocumentSourceCursor and add it as the first source
         // in the pipeline.
         innerExec->saveState();
-        auto cursorSource =
-            DocumentSourceCursor::create(collection, nss.ns(), std::move(innerExec), expCtx);
+        auto cursorSource = DocumentSourceCursor::create(collection, std::move(innerExec), expCtx);
         auto pipeline = assertGet(Pipeline::create({cursorSource}, expCtx));
 
         // Create the output PlanExecutor that pulls results from the pipeline.
@@ -323,7 +319,7 @@ public:
 
         // Verify that the aggregation pipeline returns an error because its "inner" plan executor
         // has been killed due to the collection being dropped.
-        ASSERT_THROWS_CODE(pipeline->getNext(), UserException, 16028);
+        ASSERT_THROWS_CODE(pipeline->getNext(), UserException, ErrorCodes::QueryPlanKilled);
 
         // Verify that the "outer" plan executor has been killed due to the collection being
         // dropped.
@@ -450,10 +446,10 @@ public:
         BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
 
         Collection* coll = ctx.getCollection();
-        PlanExecutor* exec = makeCollScanExec(coll, filterObj);
+        auto exec = makeCollScanExec(coll, filterObj);
 
         // Make a client cursor from the plan executor.
-        coll->getCursorManager()->registerCursor({exec, nss.ns(), false, 0, BSONObj()});
+        coll->getCursorManager()->registerCursor({std::move(exec), nss, false, BSONObj()});
 
         // There should be one cursor before invalidation,
         // and zero cursors after invalidation.
@@ -476,11 +472,11 @@ public:
         Collection* collection = ctx.getCollection();
 
         BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
-        PlanExecutor* exec = makeCollScanExec(collection, filterObj);
+        auto exec = makeCollScanExec(collection, filterObj);
 
         // Make a client cursor from the plan executor.
-        auto ccPin =
-            collection->getCursorManager()->registerCursor({exec, nss.ns(), false, 0, BSONObj()});
+        auto ccPin = collection->getCursorManager()->registerCursor(
+            {std::move(exec), nss, false, BSONObj()});
 
         // If the cursor is pinned, it sticks around, even after invalidation.
         ASSERT_EQUALS(1U, numCursors());
@@ -490,7 +486,7 @@ public:
 
         // The invalidation should have killed the plan executor.
         BSONObj objOut;
-        ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
+        ASSERT_EQUALS(PlanExecutor::DEAD, ccPin.getCursor()->getExecutor()->getNext(&objOut, NULL));
         ASSERT(WorkingSetCommon::isValidStatusMemberObject(objOut));
         const Status status = WorkingSetCommon::getMemberObjectStatus(objOut);
         ASSERT(status.reason().find(invalidateReason) != string::npos);
@@ -519,10 +515,11 @@ public:
             Collection* collection = ctx.getCollection();
 
             BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
-            PlanExecutor* exec = makeCollScanExec(collection, filterObj);
+            auto exec = makeCollScanExec(collection, filterObj);
 
             // Make a client cursor from the plan executor.
-            collection->getCursorManager()->registerCursor({exec, nss.ns(), false, 0, BSONObj()});
+            collection->getCursorManager()->registerCursor(
+                {std::move(exec), nss, false, BSONObj()});
         }
 
         // There should be one cursor before timeout,

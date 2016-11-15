@@ -50,8 +50,22 @@
 
     assert.eq(cursor.itcount(), 8);  // Iterate the cursor established above to trigger getMore.
 
+    /**
+     * Be sure to avoid rounding errors when converting a cursor ID to a string, since converting a
+     * NumberLong to a string may not preserve all digits.
+     */
+    function cursorIdToString(cursorId) {
+        let cursorIdString = cursorId.toString();
+        if (cursorIdString.indexOf("NumberLong") === -1) {
+            return cursorIdString;
+        }
+        return cursorIdString.substring("NumberLong(\"".length,
+                                        cursorIdString.length - "\")".length);
+    }
+
     logLine = 'command log_getmore.test appName: "MongoDB Shell" command: getMore { getMore: ' +
-        cursorid + ', collection: "test", batchSize: 5.0 } originatingCommand: { find: "test", ' +
+        cursorIdToString(cursorid) +
+        ', collection: "test", batchSize: 5.0 } originatingCommand: { find: "test", ' +
         'filter: { a: { $gt: 0.0 } }, skip: 1.0, batchSize: 5.0, limit: 10.0, singleBatch: ' +
         'false, sort: { a: 1.0 }, hint: { a: 1.0 } }';
 
@@ -64,7 +78,8 @@
     assert.eq(cursor.itcount(), 10);
 
     logLine = 'command log_getmore.test appName: "MongoDB Shell" command: getMore { getMore: ' +
-        cursorid + ', collection: "test" } originatingCommand: { aggregate: "test", pipeline: ' +
+        cursorIdToString(cursorid) +
+        ', collection: "test" } originatingCommand: { aggregate: "test", pipeline: ' +
         '[ { $match: { a: { $gt: 0.0 } } } ], cursor: { batchSize: 0.0 }, hint: { a: 1.0 } }';
 
     checkLog.contains(conn, logLine);
@@ -93,7 +108,8 @@
 
     assert.eq(cursor.itcount(), 8);  // Iterate the cursor established above to trigger getMore.
 
-    logLine = 'getmore log_getmore.test appName: "MongoDB Shell" query: { getMore: ' + cursorid +
+    logLine = 'getmore log_getmore.test appName: "MongoDB Shell" query: { getMore: ' +
+        cursorIdToString(cursorid) +
         ', collection: "test", batchSize: 5 } originatingCommand: { find: "test", filter: { a: {' +
         ' $gt: 0.0 } }, skip: 1, ntoreturn: 5, sort: { a: 1.0 }, hint: { a: 1.0 } }';
 
@@ -107,7 +123,8 @@
 
     assert.eq(cursor.itcount(), 10);
 
-    logLine = 'getmore log_getmore.test appName: "MongoDB Shell" query: { getMore: ' + cursorid +
+    logLine = 'getmore log_getmore.test appName: "MongoDB Shell" query: { getMore: ' +
+        cursorIdToString(cursorid) +
         ', collection: "test", batchSize: 0 } originatingCommand: { aggregate: "test", pipeline:' +
         ' [ { $match: { a: { $gt: 0.0 } } } ], cursor: { batchSize: 0.0 }, hint: { a: 1.0 } }';
 

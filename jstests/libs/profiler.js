@@ -2,8 +2,14 @@
 
 // Retrieve latest system.profile entry.
 function getLatestProfilerEntry(inputDb, filter) {
-    var cursor = inputDb.system.profile.find(filter === null ? {} : filter);
-    return cursor.sort({$natural: -1}).next();
+    if (filter === null) {
+        filter = {};
+    }
+    var cursor = inputDb.system.profile.find(filter).sort({$natural: -1});
+    assert(
+        cursor.hasNext(),
+        "could not find any entries in the profile collection matching filter: " + tojson(filter));
+    return cursor.next();
 }
 
 // Returns a string representing the wire protocol used for commands run on the given connection.

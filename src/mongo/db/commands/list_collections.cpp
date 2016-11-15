@@ -298,7 +298,7 @@ public:
         const NamespaceString cursorNss = NamespaceString::makeListCollectionsNSS(dbname);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            opCtx, std::move(ws), std::move(root), cursorNss.ns(), PlanExecutor::YIELD_MANUAL);
+            opCtx, std::move(ws), std::move(root), cursorNss, PlanExecutor::YIELD_MANUAL);
         if (!statusWithPlanExecutor.isOK()) {
             return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
@@ -328,9 +328,10 @@ public:
             exec->saveState();
             exec->detachFromOperationContext();
             auto pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
-                {exec.release(),
-                 cursorNss.ns(),
-                 opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot()});
+                {std::move(exec),
+                 cursorNss,
+                 opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+                 jsobj});
             cursorId = pinnedCursor.getCursor()->cursorid();
         }
 

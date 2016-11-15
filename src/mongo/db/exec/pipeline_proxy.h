@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/record_id.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -64,13 +65,18 @@ public:
 
     // Not used.
     SpecificStats* getSpecificStats() const final {
-        return NULL;
+        MONGO_UNREACHABLE;
+    }
+
+    void doInvalidate(OperationContext* txn, const RecordId& rid, InvalidationType type) final {
+        // A PlanExecutor with a PipelineProxyStage should be registered with the global cursor
+        // manager, so should not receive invalidations.
+        MONGO_UNREACHABLE;
     }
 
     std::string getPlanSummaryStr() const;
     void getPlanSummaryStats(PlanSummaryStats* statsOut) const;
 
-    // Not used.
     StageType stageType() const final {
         return STAGE_PIPELINE_PROXY;
     }

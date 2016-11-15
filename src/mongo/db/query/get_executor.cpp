@@ -739,8 +739,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorDelete(OperationContext* opCtx,
                    << " Using EOF stage: " << redact(unparsedQuery);
             auto deleteStage = make_unique<DeleteStage>(
                 opCtx, deleteStageParams, ws.get(), nullptr, new EOFStage(opCtx));
-            return PlanExecutor::make(
-                opCtx, std::move(ws), std::move(deleteStage), nss.ns(), policy);
+            return PlanExecutor::make(opCtx, std::move(ws), std::move(deleteStage), nss, policy);
         }
 
         const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
@@ -906,7 +905,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorUpdate(OperationContext* opCtx,
             auto updateStage = make_unique<UpdateStage>(
                 opCtx, updateStageParams, ws.get(), collection, new EOFStage(opCtx));
             return PlanExecutor::make(
-                opCtx, std::move(ws), std::move(updateStage), nsString.ns(), policy);
+                opCtx, std::move(ws), std::move(updateStage), nsString, policy);
         }
 
         const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
@@ -1004,8 +1003,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorGroup(OperationContext* opCtx,
         unique_ptr<PlanStage> root =
             make_unique<GroupStage>(opCtx, request, ws.get(), new EOFStage(opCtx));
 
-        return PlanExecutor::make(
-            opCtx, std::move(ws), std::move(root), request.ns.ns(), yieldPolicy);
+        return PlanExecutor::make(opCtx, std::move(ws), std::move(root), request.ns, yieldPolicy);
     }
 
     const NamespaceString nss(request.ns);
@@ -1263,7 +1261,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* opCtx,
         unique_ptr<PlanStage> root = make_unique<CountStage>(
             opCtx, collection, std::move(params), ws.get(), new EOFStage(opCtx));
         return PlanExecutor::make(
-            opCtx, std::move(ws), std::move(root), request.getNs().ns(), yieldPolicy);
+            opCtx, std::move(ws), std::move(root), request.getNs(), yieldPolicy);
     }
 
     // If the query is empty, then we can determine the count by just asking the collection
@@ -1280,7 +1278,7 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorCount(OperationContext* opCtx,
         unique_ptr<PlanStage> root =
             make_unique<CountStage>(opCtx, collection, std::move(params), ws.get(), nullptr);
         return PlanExecutor::make(
-            opCtx, std::move(ws), std::move(root), request.getNs().ns(), yieldPolicy);
+            opCtx, std::move(ws), std::move(root), request.getNs(), yieldPolicy);
     }
 
     const size_t plannerOptions = QueryPlannerParams::IS_COUNT;

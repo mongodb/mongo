@@ -54,9 +54,15 @@ public:
         }
     }
 
-    ~RangePreserver() {
-        if (_pin)
+    void release() {
+        if (_pin) {
             _pin->deleteUnderlying();
+            _pin.reset();
+        }
+    }
+
+    ~RangePreserver() {
+        release();
     }
 
 private:

@@ -47,7 +47,7 @@ MONGO_FP_DECLARE(setYieldAllLocksWait);
 // static
 void QueryYield::yieldAllLocks(OperationContext* opCtx,
                                RecordFetcher* fetcher,
-                               const std::string& planExecNS) {
+                               const NamespaceString& planExecNS) {
     // Things have to happen here in a specific order:
     //   1) Tell the RecordFetcher to do any setup which needs to happen inside locks
     //   2) Release lock mgr locks

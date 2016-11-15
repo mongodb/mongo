@@ -52,8 +52,8 @@ std::unique_ptr<PlanExecutor> InternalPlanner::collectionScan(OperationContext* 
     if (NULL == collection) {
         auto eof = stdx::make_unique<EOFStage>(opCtx);
         // Takes ownership of 'ws' and 'eof'.
-        auto statusWithPlanExecutor =
-            PlanExecutor::make(opCtx, std::move(ws), std::move(eof), ns.toString(), yieldPolicy);
+        auto statusWithPlanExecutor = PlanExecutor::make(
+            opCtx, std::move(ws), std::move(eof), NamespaceString(ns), yieldPolicy);
         invariant(statusWithPlanExecutor.isOK());
         return std::move(statusWithPlanExecutor.getValue());
     }

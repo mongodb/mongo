@@ -94,7 +94,7 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
             .record(opCtx,
                     curOp->getNS(),
                     curOp->getLogicalOp(),
-                    1,  // "write locked"
+                    Top::LockType::WriteLocked,
                     curOp->totalTimeMicros(),
                     curOp->isCommand(),
                     curOp->getReadWriteType());
@@ -412,7 +412,7 @@ WriteResult performInserts(OperationContext* opCtx, const InsertOp& wholeOp) {
             .record(opCtx,
                     wholeOp.ns.ns(),
                     LogicalOp::opInsert,
-                    1 /* write locked*/,
+                    Top::LockType::WriteLocked,
                     curOp.totalTimeMicros(),
                     curOp.isCommand(),
                     curOp.getReadWriteType());

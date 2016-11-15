@@ -399,11 +399,10 @@ public:
             // Create a ClientCursor containing this plan executor and register it with the cursor
             // manager.
             ClientCursorPin pinnedCursor = collection->getCursorManager()->registerCursor(
-                {exec.release(),
-                 nss.ns(),
+                {std::move(exec),
+                 nss,
                  opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
-                 originalQR.getOptions(),
-                 cmdObj.getOwned()});
+                 cmdObj});
             cursorId = pinnedCursor.getCursor()->cursorid();
 
             invariant(!exec);

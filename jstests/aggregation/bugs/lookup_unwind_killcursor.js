@@ -49,7 +49,7 @@
     cursor.close();  // Closing the cursor will issue the "killCursors" command.
 
     const serverStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
-    assert.eq(0, serverStatus.metrics.cursor.open.total, tojson(serverStatus));
+    assert.eq(0, serverStatus.metrics.cursor.open.total, tojson(serverStatus.metrics.cursor));
 
     MongoRunner.stopMongod(conn);
 })();

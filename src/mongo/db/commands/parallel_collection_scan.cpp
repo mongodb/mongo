@@ -148,11 +148,12 @@ public:
                 exec->saveState();
                 exec->detachFromOperationContext();
 
-                // Create and regiter a new ClientCursor.
+                // Create and register a new ClientCursor.
                 auto pinnedCursor = collection->getCursorManager()->registerCursor(
-                    {exec.release(),
-                     ns.ns(),
-                     opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot()});
+                    {std::move(exec),
+                     ns,
+                     opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+                     cmdObj});
                 pinnedCursor.getCursor()->setLeftoverMaxTimeMicros(
                     opCtx->getRemainingMaxTimeMicros());
 

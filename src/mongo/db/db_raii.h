@@ -35,6 +35,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/stats/top.h"
 #include "mongo/db/views/view.h"
 #include "mongo/util/timer.h"
 
@@ -170,6 +171,36 @@ private:
 };
 
 /**
+ * RAII-style class which automatically tracks the operation namespace in CurrentOp and records the
+ * operation via Top upon destruction.
+ */
+class AutoStatsTracker {
+    MONGO_DISALLOW_COPYING(AutoStatsTracker);
+
+public:
+    /**
+     * Sets the namespace of the CurOp object associated with 'opCtx' to be 'nss' and starts the
+     * CurOp timer. 'lockType' describes which type of lock is held by this operation, and will be
+     * used for reporting via Top. If 'dbProfilingLevel' is not given, this constructor will acquire
+     * and then drop a database lock in order to determine the database's profiling level.
+     */
+    AutoStatsTracker(OperationContext* opCtx,
+                     const NamespaceString& nss,
+                     Top::LockType lockType,
+                     boost::optional<int> dbProfilingLevel);
+
+    /**
+     * Records stats about the current operation via Top.
+     */
+    ~AutoStatsTracker();
+
+private:
+    const Timer _timer;
+    OperationContext* _opCtx;
+    Top::LockType _lockType;
+};
+
+/**
  * RAII-style class, which would acquire the appropriate hierarchy of locks for obtaining
  * a particular collection and would retrieve a reference to the collection. In addition, this
  * utility will ensure that the read will be performed against an appropriately committed snapshot
@@ -236,8 +267,6 @@ public:
         : AutoGetCollectionForReadCommand(
               opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden) {}
 
-    ~AutoGetCollectionForReadCommand();
-
     Database* getDb() const {
         return _autoCollForRead->getDb();
     }
@@ -246,21 +275,18 @@ public:
         return _autoCollForRead->getCollection();
     }
 
-private:
-    OperationContext* const _opCtx;
-    const Timer _timer;
-
 protected:
     AutoGetCollectionForReadCommand(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     AutoGetCollection::ViewMode viewMode);
 
-    /**
-     * This protected section must come after the private section because
-     * AutoGetCollectionOrViewForRead needs access to _autoColl, but _autoColl must be initialized
-     * after _transaction.
-     */
+    // '_autoCollForRead' may need to be reset by AutoGetCollectionOrViewForReadCommand, so needs to
+    // be a boost::optional.
     boost::optional<AutoGetCollectionForRead> _autoCollForRead;
+
+    // This needs to be initialized after 'autoCollForRead', since we need to consult the Database
+    // object to get the profiling level. Thus, it needs to be a boost::optional.
+    boost::optional<AutoStatsTracker> _statsTracker;
 };
 
 /**

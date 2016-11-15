@@ -91,17 +91,23 @@ StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
                                                         const Collection* collection,
                                                         YieldPolicy yieldPolicy) {
     return PlanExecutor::make(
-        opCtx, std::move(ws), std::move(rt), nullptr, nullptr, collection, "", yieldPolicy);
+        opCtx, std::move(ws), std::move(rt), nullptr, nullptr, collection, {}, yieldPolicy);
 }
 
 // static
 StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
                                                         unique_ptr<WorkingSet> ws,
                                                         unique_ptr<PlanStage> rt,
-                                                        const string& ns,
+                                                        NamespaceString nss,
                                                         YieldPolicy yieldPolicy) {
-    return PlanExecutor::make(
-        opCtx, std::move(ws), std::move(rt), nullptr, nullptr, nullptr, ns, yieldPolicy);
+    return PlanExecutor::make(opCtx,
+                              std::move(ws),
+                              std::move(rt),
+                              nullptr,
+                              nullptr,
+                              nullptr,
+                              std::move(nss),
+                              yieldPolicy);
 }
 
 // static
@@ -112,7 +118,7 @@ StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
                                                         const Collection* collection,
                                                         YieldPolicy yieldPolicy) {
     return PlanExecutor::make(
-        opCtx, std::move(ws), std::move(rt), nullptr, std::move(cq), collection, "", yieldPolicy);
+        opCtx, std::move(ws), std::move(rt), nullptr, std::move(cq), collection, {}, yieldPolicy);
 }
 
 // static
@@ -129,7 +135,7 @@ StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
                               std::move(qs),
                               std::move(cq),
                               collection,
-                              "",
+                              {},
                               yieldPolicy);
 }
 
@@ -140,10 +146,15 @@ StatusWith<unique_ptr<PlanExecutor>> PlanExecutor::make(OperationContext* opCtx,
                                                         unique_ptr<QuerySolution> qs,
                                                         unique_ptr<CanonicalQuery> cq,
                                                         const Collection* collection,
-                                                        const string& ns,
+                                                        NamespaceString nss,
                                                         YieldPolicy yieldPolicy) {
-    unique_ptr<PlanExecutor> exec(new PlanExecutor(
-        opCtx, std::move(ws), std::move(rt), std::move(qs), std::move(cq), collection, ns));
+    unique_ptr<PlanExecutor> exec(new PlanExecutor(opCtx,
+                                                   std::move(ws),
+                                                   std::move(rt),
+                                                   std::move(qs),
+                                                   std::move(cq),
+                                                   collection,
+                                                   std::move(nss)));
 
     // Perform plan selection, if necessary.
     Status status = exec->pickBestPlan(yieldPolicy, collection);
@@ -160,25 +171,24 @@ PlanExecutor::PlanExecutor(OperationContext* opCtx,
                            unique_ptr<QuerySolution> qs,
                            unique_ptr<CanonicalQuery> cq,
                            const Collection* collection,
-                           const string& ns)
+                           NamespaceString nss)
     : _opCtx(opCtx),
       _cq(std::move(cq)),
       _workingSet(std::move(ws)),
       _qs(std::move(qs)),
       _root(std::move(rt)),
-      _ns(ns),
+      _nss(std::move(nss)),
       _yieldPolicy(new PlanYieldPolicy(this, YIELD_MANUAL)) {
-    // We may still need to initialize _ns from either collection or _cq.
-    if (!_ns.empty()) {
-        // We already have an _ns set, so there's nothing more to do.
-        return;
+    // We may still need to initialize _nss from either collection or _cq.
+    if (!_nss.isEmpty()) {
+        return;  // We already have an _nss set, so there's nothing more to do.
     }
 
     if (collection) {
-        _ns = collection->ns().ns();
+        _nss = collection->ns();
     } else {
         invariant(_cq);
-        _ns = _cq->getQueryRequest().ns();
+        _nss = _cq->getQueryRequest().nss();
     }
 }
 
@@ -362,7 +372,7 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
     MONGO_FAIL_POINT_BLOCK(planExecutorAlwaysDead, customKill) {
         const BSONObj& data = customKill.getData();
         BSONElement customKillNS = data["namespace"];
-        if (!customKillNS || _ns == customKillNS.str()) {
+        if (!customKillNS || _nss.ns() == customKillNS.str()) {
             deregisterExec();
             kill("hit planExecutorAlwaysDead fail point");
         }
@@ -469,7 +479,8 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
                     throw WriteConflictException();
                 CurOp::get(_opCtx)->debug().writeConflicts++;
                 writeConflictsInARow++;
-                WriteConflictException::logAndBackoff(writeConflictsInARow, "plan execution", _ns);
+                WriteConflictException::logAndBackoff(
+                    writeConflictsInARow, "plan execution", _nss.ns());
 
             } else {
                 WorkingSetMember* member = _workingSet->get(id);
@@ -544,10 +555,6 @@ Status PlanExecutor::executePlan() {
     invariant(!killed());
     invariant(PlanExecutor::IS_EOF == state);
     return Status::OK();
-}
-
-const string& PlanExecutor::ns() {
-    return _ns;
 }
 
 void PlanExecutor::setYieldPolicy(YieldPolicy policy,

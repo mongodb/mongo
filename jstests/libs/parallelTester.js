@@ -227,8 +227,9 @@ if (typeof _threadInject != "undefined") {
             // be run in parallel with tests that perform fsyncLock. User operations skip writing to
             // the system.profile collection while the server is fsyncLocked.
             //
-            // The profiler tests can be run in parallel with each other as they use test-specific
-            // databases.
+            // Most profiler tests can be run in parallel with each other as they use test-specific
+            // databases, with the exception of tests which modify slowms or the profiler's sampling
+            // rate, since those affect profile settings globally.
             parallelFilesDir + "/apitest_db.js",
             parallelFilesDir + "/evalb.js",
             parallelFilesDir + "/geo_s2cursorlimitskip.js",
@@ -245,8 +246,12 @@ if (typeof _threadInject != "undefined") {
             parallelFilesDir + "/profile_getmore.js",
             parallelFilesDir + "/profile_group.js",
             parallelFilesDir + "/profile_insert.js",
+            parallelFilesDir + "/profile_list_collections.js",
+            parallelFilesDir + "/profile_list_indexes.js",
             parallelFilesDir + "/profile_mapreduce.js",
             parallelFilesDir + "/profile_no_such_db.js",
+            parallelFilesDir + "/profile_parallel_collection_scan.js",
+            parallelFilesDir + "/profile_repair_cursor.js",
             parallelFilesDir + "/profile_sampling.js",
             parallelFilesDir + "/profile_update.js"
         ];

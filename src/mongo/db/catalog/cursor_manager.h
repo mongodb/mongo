@@ -73,7 +73,7 @@ class PlanExecutor;
  */
 class CursorManager {
 public:
-    CursorManager(StringData ns);
+    CursorManager(NamespaceString nss);
 
     /**
      * Destroys the CursorManager. Managed cursors which are not pinned are destroyed. Ownership of
@@ -124,7 +124,7 @@ public:
      * Constructs a new ClientCursor according to the given 'cursorParams'. The cursor is atomically
      * registered with the manager and returned in pinned state.
      */
-    ClientCursorPin registerCursor(const ClientCursorParams& cursorParams);
+    ClientCursorPin registerCursor(ClientCursorParams&& cursorParams);
 
     /**
      * Constructs and pins a special ClientCursor used to track sharding state for the given
@@ -153,15 +153,6 @@ public:
      */
     Status eraseCursor(OperationContext* opCtx, CursorId id, bool shouldAudit);
 
-    /**
-     * Returns true if the space of cursor ids that cursor manager is responsible for includes
-     * the given cursor id.  Otherwise, returns false.
-     *
-     * The return value of this method does not indicate any information about whether or not a
-     * cursor actually exists with the given cursor id.
-     */
-    bool ownsCursorId(CursorId cursorId) const;
-
     void getCursorIds(std::set<CursorId>* openCursors) const;
 
     /**
@@ -171,6 +162,17 @@ public:
     std::size_t numCursors() const;
 
     static CursorManager* getGlobalCursorManager();
+
+    /**
+     * Returns true if this CursorId would be registered with the global CursorManager. Note that if
+     * this method returns true it does not imply the cursor exists.
+     */
+    static bool isGloballyManagedCursor(CursorId cursorId) {
+        // The first two bits are 01 for globally managed cursors, and 00 for cursors owned by a
+        // collection. The leading bit is always 0 so that CursorIds do not appear as negative.
+        const long long mask = static_cast<long long>(0b11) << 62;
+        return (cursorId & mask) == (static_cast<long long>(0b01) << 62);
+    }
 
     static int eraseCursorGlobalIfAuthorized(OperationContext* opCtx, int n, const char* ids);
 
@@ -196,8 +198,12 @@ private:
 
     void unpin(ClientCursor* cursor);
 
+    bool isGlobalManager() const {
+        return _nss.isEmpty();
+    }
+
     NamespaceString _nss;
-    unsigned _collectionCacheRuntimeId;
+    uint32_t _collectionCacheRuntimeId;
     std::unique_ptr<PseudoRandom> _random;
 
     mutable SimpleMutex _mutex;

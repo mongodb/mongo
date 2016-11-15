@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional.hpp>
 #include <iostream>
 
 #include "mongo/client/dbclientcursor.h"
@@ -39,6 +40,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
@@ -244,8 +246,8 @@ protected:
         return !_client.getPrevError().getField("err").isNull();
     }
 
-    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _opCtx = *_txnPtr;
+    const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
+    OperationContext& _opCtx = *_opCtxPtr;
     DBDirectClient _client;
 };
 
@@ -1751,6 +1753,107 @@ public:
     }
 };
 
+class CursorManagerIsGloballyManagedCursorShouldReturnFalseIfLeadingBitsAreZeroes {
+public:
+    void run() {
+        ASSERT_FALSE(CursorManager::isGloballyManagedCursor(0x0000000000000000));
+        ASSERT_FALSE(CursorManager::isGloballyManagedCursor(0x000000000FFFFFFF));
+        ASSERT_FALSE(CursorManager::isGloballyManagedCursor(0x000000007FFFFFFF));
+        ASSERT_FALSE(CursorManager::isGloballyManagedCursor(0x0FFFFFFFFFFFFFFF));
+        ASSERT_FALSE(CursorManager::isGloballyManagedCursor(0x3FFFFFFFFFFFFFFF));
+        ASSERT_FALSE(CursorManager::isGloballyManagedCursor(0x3dedbeefdeadbeef));
+    }
+};
+
+class CursorManagerIsGloballyManagedCursorShouldReturnTrueIfLeadingBitsAreZeroAndOne {
+public:
+    void run() {
+        ASSERT_TRUE(CursorManager::isGloballyManagedCursor(0x4FFFFFFFFFFFFFFF));
+        ASSERT_TRUE(CursorManager::isGloballyManagedCursor(0x5FFFFFFFFFFFFFFF));
+        ASSERT_TRUE(CursorManager::isGloballyManagedCursor(0x6FFFFFFFFFFFFFFF));
+        ASSERT_TRUE(CursorManager::isGloballyManagedCursor(0x7FFFFFFFFFFFFFFF));
+        ASSERT_TRUE(CursorManager::isGloballyManagedCursor(0x4000000000000000));
+        ASSERT_TRUE(CursorManager::isGloballyManagedCursor(0x4dedbeefdeadbeef));
+    }
+};
+
+class CursorManagerIsGloballyManagedCursorShouldReturnFalseIfLeadingBitIsAOne {
+public:
+    void run() {
+        ASSERT_FALSE(CursorManager::isGloballyManagedCursor(~0LL));
+        ASSERT_FALSE(CursorManager::isGloballyManagedCursor(0xFFFFFFFFFFFFFFFF));
+        ASSERT_FALSE(CursorManager::isGloballyManagedCursor(0x8FFFFFFFFFFFFFFF));
+        ASSERT_FALSE(CursorManager::isGloballyManagedCursor(0x8dedbeefdeadbeef));
+    }
+};
+
+class CursorManagerTest {
+public:
+    std::unique_ptr<PlanExecutor> makeFakePlanExecutor(OperationContext* opCtx) {
+        auto workingSet = stdx::make_unique<WorkingSet>();
+        auto queuedDataStage = stdx::make_unique<QueuedDataStage>(opCtx, workingSet.get());
+        return unittest::assertGet(PlanExecutor::make(opCtx,
+                                                      std::move(workingSet),
+                                                      std::move(queuedDataStage),
+                                                      NamespaceString{"test.collection"},
+                                                      PlanExecutor::YieldPolicy::YIELD_MANUAL));
+    }
+};
+
+class GlobalCursorManagerShouldReportOwnershipOfCursorsItCreated : public CursorManagerTest {
+public:
+    void run() {
+        auto opCtx = cc().makeOperationContext();
+        for (int i = 0; i < 1000; i++) {
+            auto exec = makeFakePlanExecutor(opCtx.get());
+            auto cursorPin = CursorManager::getGlobalCursorManager()->registerCursor(
+                {std::move(exec), NamespaceString{"test.collection"}, false, BSONObj()});
+            ASSERT_TRUE(CursorManager::isGloballyManagedCursor(cursorPin.getCursor()->cursorid()));
+        }
+    }
+};
+
+class CursorsFromCollectionCursorManagerShouldNotReportBeingManagedByGlobalCursorManager
+    : public CursorManagerTest {
+public:
+    void run() {
+        CursorManager testManager(NamespaceString{"test.collection"});
+        auto opCtx = cc().makeOperationContext();
+        for (int i = 0; i < 1000; i++) {
+            auto exec = makeFakePlanExecutor(opCtx.get());
+            auto cursorPin = testManager.registerCursor(
+                {std::move(exec), NamespaceString{"test.collection"}, false, BSONObj()});
+            ASSERT_FALSE(CursorManager::isGloballyManagedCursor(cursorPin.getCursor()->cursorid()));
+        }
+    }
+};
+
+class AllCursorsFromCollectionCursorManagerShouldContainIdentical32BitPrefixes
+    : public CursorManagerTest {
+public:
+    void run() {
+        CursorManager testManager(NamespaceString{"test.collection"});
+        auto opCtx = cc().makeOperationContext();
+        boost::optional<uint32_t> prefix;
+        for (int i = 0; i < 1000; i++) {
+            auto exec = makeFakePlanExecutor(opCtx.get());
+            auto cursorPin = testManager.registerCursor(
+                {std::move(exec), NamespaceString{"test.collection"}, false, BSONObj()});
+            auto cursorId = cursorPin.getCursor()->cursorid();
+            if (prefix) {
+                ASSERT_EQ(*prefix, extractLeading32Bits(cursorId));
+            } else {
+                prefix = extractLeading32Bits(cursorId);
+            }
+        }
+    }
+
+private:
+    uint32_t extractLeading32Bits(CursorId cursorId) {
+        return static_cast<uint32_t>((cursorId & 0xFFFFFFFF00000000) >> 32);
+    }
+};
+
 class All : public Suite {
 public:
     All() : Suite("query") {}
@@ -1808,10 +1911,14 @@ public:
         add<QueryCursorTimeout>();
         add<QueryReadsAll>();
         add<KillPinnedCursor>();
-
         add<queryobjecttests::names1>();
-
         add<OrderingTest>();
+        add<CursorManagerIsGloballyManagedCursorShouldReturnFalseIfLeadingBitsAreZeroes>();
+        add<CursorManagerIsGloballyManagedCursorShouldReturnTrueIfLeadingBitsAreZeroAndOne>();
+        add<CursorManagerIsGloballyManagedCursorShouldReturnFalseIfLeadingBitIsAOne>();
+        add<GlobalCursorManagerShouldReportOwnershipOfCursorsItCreated>();
+        add<CursorsFromCollectionCursorManagerShouldNotReportBeingManagedByGlobalCursorManager>();
+        add<AllCursorsFromCollectionCursorManagerShouldContainIdentical32BitPrefixes>();
     }
 };
 

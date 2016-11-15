@@ -84,13 +84,19 @@ public:
         OperationLatencyHistogram opLatencyHistogram;
     };
 
+    enum class LockType {
+        ReadLocked,
+        WriteLocked,
+        NotLocked,
+    };
+
     typedef StringMap<CollectionData> UsageMap;
 
 public:
     void record(OperationContext* opCtx,
                 StringData ns,
                 LogicalOp logicalOp,
-                int lockType,
+                LockType lockType,
                 long long micros,
                 bool command,
                 Command::ReadWriteType readWriteType);
@@ -126,7 +132,7 @@ private:
     void _record(OperationContext* opCtx,
                  CollectionData& c,
                  LogicalOp logicalOp,
-                 int lockType,
+                 LockType lockType,
                  long long micros,
                  Command::ReadWriteType readWriteType);
 

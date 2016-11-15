@@ -579,15 +579,12 @@ void PipelineD::addCursorSource(Collection* collection,
                                 const BSONObj& queryObj,
                                 const BSONObj& sortObj,
                                 const BSONObj& projectionObj) {
-    // Get the full "namespace" name.
-    const string& fullName = expCtx->ns.ns();
-
     // DocumentSourceCursor expects a yielding PlanExecutor that has had its state saved.
     exec->saveState();
 
     // Put the PlanExecutor into a DocumentSourceCursor and add it to the front of the pipeline.
     intrusive_ptr<DocumentSourceCursor> pSource =
-        DocumentSourceCursor::create(collection, fullName, std::move(exec), expCtx);
+        DocumentSourceCursor::create(collection, std::move(exec), expCtx);
 
     // Note the query, sort, and projection for explain.
     pSource->setQuery(queryObj);

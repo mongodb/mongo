@@ -35,6 +35,8 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/query/killcursors_request.h"
+#include "mongo/db/stats/top.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -48,34 +50,51 @@ private:
     Status _killCursor(OperationContext* opCtx,
                        const NamespaceString& nss,
                        CursorId cursorId) final {
-        std::unique_ptr<AutoGetCollectionOrViewForReadCommand> ctx;
-
+        // Cursors come in one of two flavors:
+        // - Cursors owned by the collection cursor manager, such as those generated via the find
+        //   command. For these cursors, we hold the appropriate collection lock for the duration of
+        //   the getMore using AutoGetCollectionForRead. This will automatically update the CurOp
+        //   object appropriately and record execution time via Top upon completion.
+        // - Cursors owned by the global cursor manager, such as those generated via the aggregate
+        //   command. These cursors either hold no collection state or manage their collection state
+        //   internally, so we acquire no locks. In this case we use the AutoStatsTracker object to
+        //   update the CurOp object appropriately and record execution time via Top upon
+        //   completion.
+        //
+        // Thus, exactly one of 'readLock' and 'statsTracker' will be populated as we populate
+        // 'cursorManager'.
+        boost::optional<AutoGetCollectionForReadCommand> readLock;
+        boost::optional<AutoStatsTracker> statsTracker;
         CursorManager* cursorManager;
-        if (nss.isListIndexesCursorNS() || nss.isListCollectionsCursorNS()) {
-            // listCollections and listIndexes are special cursor-generating commands whose cursors
-            // are managed globally, as they operate over catalog data rather than targeting the
-            // data within a collection.
+
+        if (CursorManager::isGloballyManagedCursor(cursorId)) {
             cursorManager = CursorManager::getGlobalCursorManager();
-        } else {
-            ctx = stdx::make_unique<AutoGetCollectionOrViewForReadCommand>(opCtx, nss);
-            Collection* collection = ctx->getCollection();
-            ViewDefinition* view = ctx->getView();
-            if (view) {
-                Database* db = ctx->getDb();
-                auto resolved = db->getViewCatalog()->resolveView(opCtx, nss);
-                if (!resolved.isOK()) {
-                    return resolved.getStatus();
-                }
-                ctx->releaseLocksForView();
-                Status status = _killCursor(opCtx, resolved.getValue().getNamespace(), cursorId);
-                {
-                    // Set the namespace of the curop back to the view namespace so ctx records
-                    // stats on this view namespace on destruction.
-                    stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->setNS_inlock(nss.ns());
-                }
-                return status;
+
+            if (auto nssForCurOp = nss.isGloballyManagedNamespace()
+                    ? nss.getTargetNSForGloballyManagedNamespace()
+                    : nss) {
+                const boost::optional<int> dbProfilingLevel = boost::none;
+                statsTracker.emplace(
+                    opCtx, *nssForCurOp, Top::LockType::NotLocked, dbProfilingLevel);
             }
+
+            // Make sure the namespace of the cursor matches the namespace passed to the killCursors
+            // command so we can be sure we checked the correct privileges.
+            auto ccPin = cursorManager->pinCursor(cursorId);
+            if (ccPin.isOK()) {
+                auto cursorNs = ccPin.getValue().getCursor()->nss();
+                if (cursorNs != nss) {
+                    return Status{ErrorCodes::Unauthorized,
+                                  str::stream() << "issued killCursors on namespace '" << nss.ns()
+                                                << "', but cursor with id "
+                                                << cursorId
+                                                << " belongs to a different namespace: "
+                                                << cursorNs.ns()};
+                }
+            }
+        } else {
+            readLock.emplace(opCtx, nss);
+            Collection* collection = readLock->getCollection();
             if (!collection) {
                 return {ErrorCodes::CursorNotFound,
                         str::stream() << "collection does not exist: " << nss.ns()};

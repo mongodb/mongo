@@ -75,6 +75,35 @@ AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx, StringData ns, Loc
     }
 }
 
+AutoStatsTracker::AutoStatsTracker(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   Top::LockType lockType,
+                                   boost::optional<int> dbProfilingLevel)
+    : _opCtx(opCtx), _lockType(lockType) {
+    if (!dbProfilingLevel) {
+        // No profiling level was determined, attempt to read the profiling level from the Database
+        // object.
+        AutoGetDb autoDb(_opCtx, nss.db(), MODE_IS);
+        if (autoDb.getDb()) {
+            dbProfilingLevel = autoDb.getDb()->getProfilingLevel();
+        }
+    }
+    stdx::lock_guard<Client> clientLock(*_opCtx->getClient());
+    CurOp::get(_opCtx)->enter_inlock(nss.ns().c_str(), dbProfilingLevel);
+}
+
+AutoStatsTracker::~AutoStatsTracker() {
+    auto curOp = CurOp::get(_opCtx);
+    Top::get(_opCtx->getServiceContext())
+        .record(_opCtx,
+                curOp->getNS(),
+                curOp->getLogicalOp(),
+                _lockType,
+                _timer.micros(),
+                curOp->isCommand(),
+                curOp->getReadWriteType());
+}
+
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
                                                    const NamespaceString& nss,
                                                    AutoGetCollection::ViewMode viewMode) {
@@ -82,19 +111,6 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
 
     // Note: this can yield.
     _ensureMajorityCommittedSnapshotIsValid(nss, opCtx);
-}
-
-AutoGetCollectionForReadCommand::~AutoGetCollectionForReadCommand() {
-    // Report time spent in read lock
-    auto currentOp = CurOp::get(_opCtx);
-    Top::get(_opCtx->getClient()->getServiceContext())
-        .record(_opCtx,
-                currentOp->getNS(),
-                currentOp->getLogicalOp(),
-                -1,  // "read locked"
-                _timer.micros(),
-                currentOp->isCommand(),
-                currentOp->getReadWriteType());
 }
 
 void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(const NamespaceString& nss,
@@ -134,25 +150,15 @@ void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(const Nam
 }
 
 AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
-    OperationContext* opCtx, const NamespaceString& nss, AutoGetCollection::ViewMode viewMode)
-    : _opCtx(opCtx) {
-    {
-        _autoCollForRead.emplace(opCtx, nss, viewMode);
+    OperationContext* opCtx, const NamespaceString& nss, AutoGetCollection::ViewMode viewMode) {
 
-        auto curOp = CurOp::get(_opCtx);
-        stdx::lock_guard<Client> lk(*_opCtx->getClient());
-
-        // TODO: OldClientContext legacy, needs to be removed
-        curOp->ensureStarted();
-        curOp->setNS_inlock(nss.ns());
-
-        // At this point, we are locked in shared mode for the database by the DB lock in the
-        // constructor, so it is safe to load the DB pointer.
-        if (_autoCollForRead->getDb()) {
-            // TODO: OldClientContext legacy, needs to be removed
-            curOp->enter_inlock(nss.ns().c_str(), _autoCollForRead->getDb()->getProfilingLevel());
-        }
-    }
+    _autoCollForRead.emplace(opCtx, nss, viewMode);
+    const int doNotChangeProfilingLevel = 0;
+    _statsTracker.emplace(opCtx,
+                          nss,
+                          Top::LockType::ReadLocked,
+                          _autoCollForRead->getDb() ? _autoCollForRead->getDb()->getProfilingLevel()
+                                                    : doNotChangeProfilingLevel);
 
     // We have both the DB and collection locked, which is the prerequisite to do a stable shard
     // version check, but we'd like to do the check after we have a satisfactory snapshot.
@@ -231,7 +237,8 @@ OldClientContext::~OldClientContext() {
         .record(_opCtx,
                 currentOp->getNS(),
                 currentOp->getLogicalOp(),
-                _opCtx->lockState()->isWriteLocked() ? 1 : -1,
+                _opCtx->lockState()->isWriteLocked() ? Top::LockType::WriteLocked
+                                                     : Top::LockType::ReadLocked,
                 _timer.micros(),
                 currentOp->isCommand(),
                 currentOp->getReadWriteType());
