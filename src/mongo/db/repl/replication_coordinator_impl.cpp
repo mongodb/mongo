@@ -921,8 +921,9 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
         return;
     }
     invariant(!_isCatchingUp);
+    invariant(!_canAcceptNonLocalWrites);
     _isWaitingForDrainToComplete = false;
-    _drainFinishedCond.notify_all();
+    _drainFinishedCond_forTest.notify_all();
 
     if (!_getMemberState_inlock().primary()) {
         // We must have decided not to transition to primary while waiting for the applier to drain.
@@ -930,7 +931,6 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
         return;
     }
 
-    invariant(!_canAcceptNonLocalWrites);
     _canAcceptNonLocalWrites = true;
 
     lk.unlock();
@@ -952,7 +952,7 @@ Status ReplicationCoordinatorImpl::waitForDrainFinish(Milliseconds timeout) {
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     auto pred = [this]() { return !_isCatchingUp && !_isWaitingForDrainToComplete; };
-    if (!_drainFinishedCond.wait_for(lk, timeout.toSystemDuration(), pred)) {
+    if (!_drainFinishedCond_forTest.wait_for(lk, timeout.toSystemDuration(), pred)) {
         return Status(ErrorCodes::ExceededTimeLimit,
                       "Timed out waiting to finish draining applier buffer");
     }
@@ -2516,9 +2516,11 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
         _replicationWaiterList.signalAndRemoveAll_inlock();
         // Wake up the optime waiter that is waiting for primary catch-up to finish.
         _opTimeWaiterList.signalAndRemoveAll_inlock();
-        // _isCatchingUp and _isWaitingForDrainToComplete could be cleaned up asynchronously
-        // by freshness scan.
+        // Clean up primary states.
         _canAcceptNonLocalWrites = false;
+        _isCatchingUp = false;
+        _isWaitingForDrainToComplete = false;
+        _drainFinishedCond_forTest.notify_all();
         serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.store(false);
         result = kActionCloseAllConnections;
     } else {
@@ -2652,7 +2654,6 @@ void ReplicationCoordinatorImpl::_scanOpTimeForCatchUp_inlock() {
     auto evhStatus =
         scanner->start(&_replExecutor, _rsConfig, _selfIndex, _rsConfig.getCatchUpTimeoutPeriod());
     if (evhStatus == ErrorCodes::ShutdownInProgress) {
-        _finishCatchUpOplog_inlock(true);
         return;
     }
     fassertStatusOK(40254, evhStatus.getStatus());
@@ -2661,7 +2662,7 @@ void ReplicationCoordinatorImpl::_scanOpTimeForCatchUp_inlock() {
         evhStatus.getValue(), [this, scanner, scanStartTime, term](const CallbackArgs& cbData) {
             LockGuard lk(_mutex);
             if (cbData.status == ErrorCodes::CallbackCanceled) {
-                _finishCatchUpOplog_inlock(true);
+                _finishCatchUpOplog_inlock(false);
                 return;
             }
             auto totalTimeout = _rsConfig.getCatchUpTimeoutPeriod();
@@ -2728,10 +2729,11 @@ void ReplicationCoordinatorImpl::_catchUpOplogToLatest_inlock(const FreshnessSca
 }
 
 void ReplicationCoordinatorImpl::_finishCatchUpOplog_inlock(bool startToDrain) {
-    invariant(_isCatchingUp);
     _isCatchingUp = false;
     // If the node steps down during the catch-up, we don't go into drain mode.
     if (startToDrain) {
+        invariant(_getMemberState_inlock().primary());
+        invariant(!_canAcceptNonLocalWrites);
         invariant(!_isWaitingForDrainToComplete);
         _isWaitingForDrainToComplete = true;
         // Signal applier in executor to avoid the deadlock with bgsync's mutex that is required to
