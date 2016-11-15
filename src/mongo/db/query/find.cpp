@@ -267,7 +267,17 @@ Message getMore(OperationContext* txn,
         // the data within a collection.
         cursorManager = CursorManager::getGlobalCursorManager();
     } else {
-        ctx = stdx::make_unique<AutoGetCollectionForRead>(txn, nss);
+        ctx = stdx::make_unique<AutoGetCollectionOrViewForRead>(txn, nss);
+        auto viewCtx = static_cast<AutoGetCollectionOrViewForRead*>(ctx.get());
+        if (viewCtx->getView()) {
+            uasserted(
+                ErrorCodes::CommandNotSupportedOnView,
+                str::stream() << "Namespace " << nss.ns()
+                              << " is a view. OP_GET_MORE operations are not supported on views. "
+                              << "Only clients which support the getMore command can be used to "
+                                 "query views.");
+        }
+
         Collection* collection = ctx->getCollection();
         uassert(17356, "collection dropped between getMore calls", collection);
         cursorManager = collection->getCursorManager();
@@ -514,8 +524,17 @@ std::string runQuery(OperationContext* txn,
     LOG(2) << "Running query: " << redact(cq->toStringShort());
 
     // Parse, canonicalize, plan, transcribe, and get a plan executor.
-    AutoGetCollectionForRead ctx(txn, nss);
+    AutoGetCollectionOrViewForRead ctx(txn, nss);
     Collection* collection = ctx.getCollection();
+
+    if (ctx.getView()) {
+        uasserted(ErrorCodes::CommandNotSupportedOnView,
+                  str::stream()
+                      << "Namespace "
+                      << nss.ns()
+                      << " is a view. Legacy find operations are not supported on views. "
+                      << "Only clients which support the find command can be used to query views.");
+    }
 
     // We have a parsed query. Time to get the execution plan for it.
     std::unique_ptr<PlanExecutor> exec = uassertStatusOK(
