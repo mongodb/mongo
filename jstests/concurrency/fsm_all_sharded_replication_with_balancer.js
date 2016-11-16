@@ -105,7 +105,8 @@ var blacklist = [
     return dir + '/' + file;
 });
 
-runWorkloadsSerially(ls(dir).filter(function(file) {
-    return !Array.contains(blacklist, file);
-}),
-                     {sharded: true, replication: true, enableBalancer: true});
+runWorkloadsSerially(
+    ls(dir).filter(function(file) {
+        return !Array.contains(blacklist, file);
+    }),
+    {sharded: {enabled: true, enableBalancer: true}, replication: {enabled: true}});

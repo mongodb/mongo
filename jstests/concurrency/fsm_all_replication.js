@@ -19,4 +19,4 @@ var blacklist = [
 runWorkloadsSerially(ls(dir).filter(function(file) {
     return !Array.contains(blacklist, file);
 }),
-                     {replication: true});
+                     {replication: {enabled: true}});
