@@ -872,6 +872,12 @@ bool DataReplicator::_anyActiveHandles_inlock() const {
         retVal = true;
     }
 
+    if (_lastOplogEntryFetcher && _lastOplogEntryFetcher->isActive()) {
+        LOG(0 /*1*/) << "_lastOplogEntryFetcher is active (_anyActiveHandles_inlock): "
+                     << _lastOplogEntryFetcher->toString();
+        retVal = true;
+    }
+
     if (!retVal) {
         LOG(0 /*2*/)
             << "DataReplicator::_anyActiveHandles_inlock returned false as nothing is active.";
@@ -897,13 +903,16 @@ void DataReplicator::_cancelAllHandles_inlock() {
 }
 
 void DataReplicator::_waitOnAndResetAll_inlock(UniqueLock* lk) {
-    swapAndJoin_inlock(lk, _lastOplogEntryFetcher, "Waiting on fetcher (last oplog entry): ");
     swapAndJoin_inlock(lk, _oplogFetcher, "Waiting on oplog fetcher: ");
     swapAndJoin_inlock(lk, _applier, "Waiting on applier: ");
     swapAndJoin_inlock(lk, _shuttingDownApplier, "Waiting on most recently completed applier: ");
     if (_initialSyncState) {
         swapAndJoin_inlock(lk, _initialSyncState->dbsCloner, "Waiting on databases cloner: ");
     }
+    // A new _lastOplogEntryFetcher may be scheduled on completion of the DatabasesCloner and
+    // MultiApplier so we wait on the fetcher after the DatabasesCloner and MultiApplier are
+    // destroyed.
+    swapAndJoin_inlock(lk, _lastOplogEntryFetcher, "Waiting on fetcher (last oplog entry): ");
 }
 
 void DataReplicator::_doNextActions() {
