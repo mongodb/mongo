@@ -16,6 +16,8 @@ selector:
     - jstests/replsets/stepup.js
     # The combination of new bridges and PV0 can lead to an improper spanning tree in sync2.js.
     - jstests/replsets/sync2.js
+    # PV0's w:majority guarantees aren't strong enough for this test to pass.
+    - jstests/replsets/write_concern_after_stepdown_and_stepup.js
 
 executor:
   js_test:

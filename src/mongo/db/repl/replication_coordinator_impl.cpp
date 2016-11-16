@@ -1617,9 +1617,35 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
         return Status::OK();
     }
 
-    if (replMode == modeReplSet && !_memberState.primary()) {
-        return {ErrorCodes::PrimarySteppedDown,
-                "Primary stepped down while waiting for replication"};
+    auto checkForStepDown = [&]() -> Status {
+        if (replMode == modeReplSet && !_memberState.primary()) {
+            return {ErrorCodes::PrimarySteppedDown,
+                    "Primary stepped down while waiting for replication"};
+        }
+
+        if (opTime.getTerm() != _cachedTerm) {
+            return {
+                ErrorCodes::PrimarySteppedDown,
+                str::stream() << "Term changed from " << opTime.getTerm() << " to " << _cachedTerm
+                              << " while waiting for replication, indicating that this node must "
+                                 "have stepped down."};
+        }
+
+        if (_stepDownPending) {
+            return {ErrorCodes::PrimarySteppedDown,
+                    "Received stepdown request while waiting for replication"};
+        }
+        return Status::OK();
+    };
+
+    Status stepdownStatus = checkForStepDown();
+    if (!stepdownStatus.isOK()) {
+        return stepdownStatus;
+    }
+
+    auto interruptStatus = txn->checkForInterruptNoAssert();
+    if (!interruptStatus.isOK()) {
+        return interruptStatus;
     }
 
     if (writeConcern.wMode.empty()) {
@@ -1647,10 +1673,6 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
     WaiterInfoGuard waitInfo(
         &_replicationWaiterList, txn->getOpID(), opTime, &writeConcern, &condVar);
     while (!_doneWaitingForReplication_inlock(opTime, minSnapshot, writeConcern)) {
-        if (replMode == modeReplSet && !_getMemberState_inlock().primary()) {
-            return {ErrorCodes::PrimarySteppedDown,
-                    "Not primary anymore while waiting for replication - primary stepped down"};
-        }
 
         if (_inShutdown) {
             return {ErrorCodes::ShutdownInProgress, "Replication is being shut down"};
@@ -1671,6 +1693,11 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
                       << ", progress: " << progress.done();
             }
             return {ErrorCodes::WriteConcernFailed, "waiting for replication timed out"};
+        }
+
+        stepdownStatus = checkForStepDown();
+        if (!stepdownStatus.isOK()) {
+            return stepdownStatus;
         }
     }
 
@@ -2520,6 +2547,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
         _canAcceptNonLocalWrites = false;
         _isCatchingUp = false;
         _isWaitingForDrainToComplete = false;
+        _stepDownPending = false;
         _drainFinishedCond_forTest.notify_all();
         serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.store(false);
         result = kActionCloseAllConnections;
@@ -3367,7 +3395,7 @@ EventHandle ReplicationCoordinatorImpl::_updateTerm_incallback(
     if (localUpdateTermResult == TopologyCoordinator::UpdateTermResult::kTriggerStepDown) {
         log() << "stepping down from primary, because a new term has begun: " << term;
         _topCoord->prepareForStepDown();
-        return _stepDownStart();
+        return _stepDownStart(false);
     }
     return EventHandle();
 }
