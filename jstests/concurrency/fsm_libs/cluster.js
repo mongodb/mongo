@@ -40,7 +40,6 @@ var Cluster = function(options) {
             'sameDB',
             'setupFunctions',
             'sharded.enabled',
-            'sharded.enableAutoSplit',
             'sharded.enableBalancer',
             'sharded.numMongos',
             'sharded.numShards',
@@ -53,12 +52,6 @@ var Cluster = function(options) {
                             'invalid option: ' + tojson(option) + '; valid options are: ' +
                                 tojson(allowedKeys));
         });
-
-        options.sharded.enableAutoSplit = options.sharded.enableAutoSplit || false;
-        assert.eq('boolean', typeof options.sharded.enableAutoSplit);
-
-        options.sharded.enableBalancer = options.sharded.enableBalancer || false;
-        assert.eq('boolean', typeof options.sharded.enableBalancer);
 
         options.masterSlave = options.masterSlave || false;
         assert.eq('boolean', typeof options.masterSlave);
@@ -200,10 +193,7 @@ var Cluster = function(options) {
                 shards: options.sharded.numShards,
                 mongos: options.sharded.numMongos,
                 verbose: verbosityLevel,
-                other: {
-                    enableAutoSplit: options.sharded.enableAutoSplit,
-                    enableBalancer: options.sharded.enableBalancer,
-                }
+                other: {enableBalancer: options.sharded.enableBalancer}
             };
 
             // TODO: allow 'options' to specify an 'rs' config
@@ -471,10 +461,6 @@ var Cluster = function(options) {
 
     this.isBalancerEnabled = function isBalancerEnabled() {
         return this.isSharded() && options.sharded.enableBalancer;
-    };
-
-    this.isAutoSplitEnabled = function isAutoSplitEnabled() {
-        return this.isSharded() && options.sharded.enableAutoSplit;
     };
 
     this.validateAllCollections = function validateAllCollections(phase) {

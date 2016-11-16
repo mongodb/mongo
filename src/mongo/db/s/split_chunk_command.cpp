@@ -266,7 +266,7 @@ public:
                                    << " to split chunk [" << redact(min) << "," << redact(max)
                                    << ") " << causedBy(redact(scopedDistLock.getStatus()));
             warning() << errmsg;
-            return appendCommandStatus(result, scopedDistLock.getStatus());
+            return false;
         }
 
         // Always check our version remotely
