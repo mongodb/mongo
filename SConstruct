@@ -760,6 +760,10 @@ env_vars.Add('VERBOSE',
     default='auto',
 )
 
+env_vars.Add('WINDOWS_OPENSSL_BIN',
+    help='Sets the path to the openssl binaries for packaging',
+    default='c:/openssl/bin')
+
 # -- Validate user provided options --
 
 # A dummy environment that should *only* have the variables we have set. In practice it has
@@ -2620,12 +2624,30 @@ def doConfigure(myenv):
     })
     libdeps.setup_conftests(conf)
 
+    def addOpenSslLibraryToDistArchive(file_name):
+        openssl_bin_path = os.path.normpath(env['WINDOWS_OPENSSL_BIN'].lower())
+        full_file_name = os.path.join(openssl_bin_path, file_name)
+        if os.path.exists(full_file_name):
+            env.Append(ARCHIVE_ADDITIONS=[full_file_name])
+            env.Append(ARCHIVE_ADDITION_DIR_MAP={
+                    openssl_bin_path: "bin"
+                    })
+            return True
+        else:
+            return False
+
     if has_option( "ssl" ):
         sslLibName = "ssl"
         cryptoLibName = "crypto"
         if conf.env.TargetOSIs('windows'):
             sslLibName = "ssleay32"
             cryptoLibName = "libeay32"
+
+            # Add the SSL binaries to the zip file distribution
+            files = ['ssleay32.dll', 'libeay32.dll']
+            for extra_file in files:
+                if not addOpenSslLibraryToDistArchive(extra_file):
+                    print("WARNING: Cannot find SSL library '%s'" % extra_file)
 
         # Used to import system certificate keychains
         if conf.env.TargetOSIs('osx'):
