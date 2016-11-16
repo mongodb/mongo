@@ -1498,11 +1498,13 @@ fast:		/* If the page can't be evicted, give up. */
 	 */
 	if (give_up)
 		btree->evict_walk_reverse = !btree->evict_walk_reverse;
-	if (give_up && !urgent_queued)
+	if (pages_queued == 0 && !urgent_queued)
 		btree->evict_walk_period = WT_MIN(
 		    WT_MAX(1, 2 * btree->evict_walk_period), 100);
 	else if (pages_queued == target_pages)
 		btree->evict_walk_period = 0;
+	else if (btree->evict_walk_period > 0)
+		btree->evict_walk_period /= 2;
 
 	/*
 	 * If we happen to end up on the root page or a page requiring urgent

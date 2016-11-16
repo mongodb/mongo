@@ -701,7 +701,8 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * can safely ignore the checkpoint ID (see the visible all check for
 	 * details).
 	 */
-	txn_state->id = txn_state->pinned_id = WT_TXN_NONE;
+	txn_state->id = txn_state->pinned_id =
+	    txn_state->metadata_pinned = WT_TXN_NONE;
 	__wt_writeunlock(session, txn_global->scan_rwlock);
 
 	/*
