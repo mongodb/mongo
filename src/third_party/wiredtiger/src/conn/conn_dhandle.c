@@ -447,7 +447,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session, const char *uri,
 			    F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
 			    dhandle->checkpoint != NULL ||
 			    !WT_PREFIX_MATCH(dhandle->name, "file:") ||
-			    WT_IS_METADATA(session, dhandle))
+			    WT_IS_METADATA(dhandle))
 				continue;
 			WT_RET(__conn_btree_apply_internal(
 			    session, dhandle, file_func, name_func, cfg));
@@ -627,7 +627,7 @@ __wt_conn_dhandle_discard(WT_SESSION_IMPL *session)
 	 */
 restart:
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
-		if (WT_IS_METADATA(session, dhandle))
+		if (WT_IS_METADATA(dhandle))
 			continue;
 
 		WT_WITH_DHANDLE(session, dhandle,

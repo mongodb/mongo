@@ -34,7 +34,7 @@ __wt_clsm_request_switch(WT_CURSOR_LSM *clsm)
 	lsm_tree = clsm->lsm_tree;
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
 
-	if (!F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+	if (!lsm_tree->need_switch) {
 		/*
 		 * Check that we are up-to-date: don't set the switch if the
 		 * tree has changed since we last opened cursors: that can lead
@@ -44,8 +44,8 @@ __wt_clsm_request_switch(WT_CURSOR_LSM *clsm)
 		__wt_lsm_tree_readlock(session, lsm_tree);
 		if (lsm_tree->nchunks == 0 ||
 		    (clsm->dsk_gen == lsm_tree->dsk_gen &&
-		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))) {
-			F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
+		    !lsm_tree->need_switch)) {
+			lsm_tree->need_switch = true;
 			ret = __wt_lsm_manager_push_entry(
 			    session, WT_LSM_WORK_SWITCH, 0, lsm_tree);
 		}
@@ -129,7 +129,7 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	 * chunk grows twice as large as the configured size, block until it
 	 * can be switched.
 	 */
-	hard_limit = F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
+	hard_limit = lsm_tree->need_switch;
 
 	if (have_primary) {
 		WT_ENTER_PAGE_INDEX(session);
@@ -215,7 +215,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, bool reset, bool update)
 				goto open;
 
 			if (txn->isolation == WT_ISO_SNAPSHOT)
-				WT_RET(__wt_txn_cursor_op(session));
+				__wt_txn_cursor_op(session);
 
 			/*
 			 * Figure out how many updates are required for
@@ -700,7 +700,7 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		if (btree->bulk_load_ok) {
 			btree->bulk_load_ok = false;
 			WT_WITH_BTREE(session, btree,
-			    __wt_btree_evictable(session, false));
+			    __wt_btree_lsm_switch_primary(session, true));
 		}
 	}
 

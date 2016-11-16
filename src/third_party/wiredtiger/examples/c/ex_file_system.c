@@ -194,19 +194,9 @@ demo_file_system_create(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
 	 * the underlying filesystem implementation. See the main function for
 	 * the setup of those configuration strings; here we parse configuration
 	 * information as passed in by main, through WiredTiger.
-	 *
-	 * Retrieve our configuration information, the "config" value.
 	 */
-	if ((ret = wtext->config_get(wtext, NULL, config, "config", &v)) != 0) {
-		(void)wtext->err_printf(wtext, NULL,
-		    "WT_EXTENSION_API.config_get: config: %s",
-		    wtext->strerror(wtext, NULL, ret));
-		goto err;
-	}
-
-	/* Open a WiredTiger parser on the "config" value. */
-	if ((ret = wtext->config_parser_open(
-	    wtext, NULL, v.str, v.len, &config_parser)) != 0) {
+	if ((ret = wtext->config_parser_open_arg(
+	    wtext, NULL, config, &config_parser)) != 0) {
 		(void)wtext->err_printf(wtext, NULL,
 		    "WT_EXTENSION_API.config_parser_open: config: %s",
 		    wtext->strerror(wtext, NULL, ret));

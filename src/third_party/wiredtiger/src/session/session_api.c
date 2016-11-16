@@ -249,18 +249,36 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, reconfigure, config, cfg);
 
+	/*
+	 * Note that this method only checks keys that are passed in by the
+	 * application: we don't want to reset other session settings to their
+	 * default values.
+	 */
+	WT_UNUSED(cfg);
+
 	if (F_ISSET(&session->txn, WT_TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "transaction in progress");
 
-	WT_TRET(__wt_session_reset_cursors(session, false));
+	WT_ERR(__wt_session_reset_cursors(session, false));
 
-	WT_ERR(__wt_config_gets_def(session, cfg, "isolation", 0, &cval));
-	if (cval.len != 0)
+	ret = __wt_config_getones(session, config, "isolation", &cval);
+	if (ret == 0 && cval.len != 0) {
 		session->isolation = session->txn.isolation =
 		    WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
 		    WT_ISO_SNAPSHOT :
 		    WT_STRING_MATCH("read-uncommitted", cval.str, cval.len) ?
 		    WT_ISO_READ_UNCOMMITTED : WT_ISO_READ_COMMITTED;
+	}
+	WT_ERR_NOTFOUND_OK(ret);
+
+	ret = __wt_config_getones(session, config, "ignore_cache_size", &cval);
+	if (ret == 0) {
+		if (cval.val)
+			F_SET(session, WT_SESSION_NO_EVICTION);
+		else
+			F_CLR(session, WT_SESSION_NO_EVICTION);
+	}
+	WT_ERR_NOTFOUND_OK(ret);
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }

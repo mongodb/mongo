@@ -158,15 +158,16 @@ struct __wt_btree {
 #define	WT_BTREE_IGNORE_CACHE	0x000200 /* Cache-resident object */
 #define	WT_BTREE_IN_MEMORY	0x000400 /* Cache-resident object */
 #define	WT_BTREE_LOOKASIDE	0x000800 /* Look-aside table */
-#define	WT_BTREE_NO_CHECKPOINT	0x001000 /* Disable checkpoints */
-#define	WT_BTREE_NO_EVICTION	0x002000 /* Disable eviction */
-#define	WT_BTREE_NO_LOGGING	0x004000 /* Disable logging */
-#define	WT_BTREE_NO_RECONCILE	0x008000 /* Allow splits, even with no evict */
-#define	WT_BTREE_REBALANCE	0x010000 /* Handle is for rebalance */
-#define	WT_BTREE_SALVAGE	0x020000 /* Handle is for salvage */
-#define	WT_BTREE_SKIP_CKPT	0x040000 /* Handle skipped checkpoint */
-#define	WT_BTREE_UPGRADE	0x080000 /* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x100000 /* Handle is for verify */
+#define	WT_BTREE_LSM_PRIMARY	0x001000 /* Handle is current LSM primary */
+#define	WT_BTREE_NO_CHECKPOINT	0x002000 /* Disable checkpoints */
+#define	WT_BTREE_NO_EVICTION	0x004000 /* Disable eviction */
+#define	WT_BTREE_NO_LOGGING	0x008000 /* Disable logging */
+#define	WT_BTREE_NO_RECONCILE	0x010000 /* Allow splits, even with no evict */
+#define	WT_BTREE_REBALANCE	0x020000 /* Handle is for rebalance */
+#define	WT_BTREE_SALVAGE	0x040000 /* Handle is for salvage */
+#define	WT_BTREE_SKIP_CKPT	0x080000 /* Handle skipped checkpoint */
+#define	WT_BTREE_UPGRADE	0x100000 /* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x200000 /* Handle is for verify */
 	uint32_t flags;
 };
 

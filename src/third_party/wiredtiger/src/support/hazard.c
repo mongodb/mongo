@@ -26,6 +26,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
+	WT_PAGE *page;
 	int restarts = 0;
 
 	btree = S2BT(session);
@@ -35,6 +36,16 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
 	/* If a file can never be evicted, hazard pointers aren't required. */
 	if (F_ISSET(btree, WT_BTREE_IN_MEMORY))
 		return (0);
+
+	/*
+	 * If there isn't a valid page pointer, we're done.  This read can race
+	 * with eviction and splits, we re-check it after a barrier to make
+	 * sure we have a valid pointer.
+	 */
+	if (ref->state != WT_REF_MEM || (page = ref->page) == NULL) {
+		*busyp = true;
+		return (0);
+	}
 
 	/*
 	 * Do the dance:
@@ -82,7 +93,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
 		if (hp->page != NULL)
 			continue;
 
-		hp->page = ref->page;
+		hp->page = page;
 #ifdef HAVE_DIAGNOSTIC
 		hp->file = file;
 		hp->line = line;
@@ -101,9 +112,12 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
 		 * found this page using the tree's key space, whatever page we
 		 * find here is the page for us to use.)
 		 */
-		if (ref->page == hp->page && ref->state == WT_REF_MEM) {
-			++session->nhazard;
-			return (0);
+		if (ref->state == WT_REF_MEM) {
+			WT_READ_BARRIER();
+			if (ref->page == page) {
+				++session->nhazard;
+				return (0);
+			}
 		}
 
 		/*

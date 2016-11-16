@@ -100,7 +100,7 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 	    session->txn.isolation == WT_ISO_READ_UNCOMMITTED ||
 	    !__wt_txn_visible_all(session, txn_state->pinned_id));
 
-	txn_state->pinned_id = WT_TXN_NONE;
+	txn_state->metadata_pinned = txn_state->pinned_id = WT_TXN_NONE;
 	F_CLR(txn, WT_TXN_HAS_SNAPSHOT);
 }
 
@@ -108,7 +108,7 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
  * __wt_txn_get_snapshot --
  *	Allocate a snapshot.
  */
-int
+void
 __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -137,8 +137,10 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	 * metadata.  We don't have to keep the checkpoint's changes pinned so
 	 * don't including it in the published pinned ID.
 	 */
-	if ((id = txn_global->checkpoint_txnid) != WT_TXN_NONE)
+	if ((id = txn_global->checkpoint_txnid) != WT_TXN_NONE) {
 		txn->snapshot[n++] = id;
+		txn_state->metadata_pinned = id;
+	}
 
 	/* For pure read-only workloads, avoid scanning. */
 	if (prev_oldest_id == current_id) {
@@ -180,7 +182,6 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 
 done:	__wt_readunlock(session, txn_global->scan_rwlock);
 	__txn_sort_snapshot(session, n, current_id);
-	return (0);
 }
 
 /*
@@ -189,14 +190,14 @@ done:	__wt_readunlock(session, txn_global->scan_rwlock);
  */
 static void
 __txn_oldest_scan(WT_SESSION_IMPL *session,
-    uint64_t *oldest_idp, uint64_t *last_runningp,
+    uint64_t *oldest_idp, uint64_t *last_runningp, uint64_t *metadata_pinnedp,
     WT_SESSION_IMPL **oldest_sessionp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *oldest_session;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s;
-	uint64_t id, last_running, oldest_id, prev_oldest_id;
+	uint64_t id, last_running, metadata_pinned, oldest_id, prev_oldest_id;
 	uint32_t i, session_cnt;
 
 	conn = S2C(session);
@@ -205,23 +206,23 @@ __txn_oldest_scan(WT_SESSION_IMPL *session,
 
 	/* The oldest ID cannot change while we are holding the scan lock. */
 	prev_oldest_id = txn_global->oldest_id;
-	oldest_id = last_running = txn_global->current;
+	last_running = oldest_id = txn_global->current;
+	if ((metadata_pinned = txn_global->checkpoint_txnid) == WT_TXN_NONE)
+		metadata_pinned = oldest_id;
 
 	/* Walk the array of concurrent transactions. */
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
-		/*
-		 * Update the oldest ID.
-		 *
-		 * Ignore: IDs older than the oldest ID we saw. This can happen
-		 * if we race with a thread that is allocating an ID -- the ID
-		 * will not be used because the thread will keep spinning until
-		 * it gets a valid one.
-		 */
+		/* Update the last running transaction ID. */
 		if ((id = s->id) != WT_TXN_NONE &&
 		    WT_TXNID_LE(prev_oldest_id, id) &&
 		    WT_TXNID_LT(id, last_running))
 			last_running = id;
+
+		/* Update the metadata pinned ID. */
+		if ((id = s->metadata_pinned) != WT_TXN_NONE &&
+		    WT_TXNID_LT(id, metadata_pinned))
+			metadata_pinned = id;
 
 		/*
 		 * !!!
@@ -246,9 +247,14 @@ __txn_oldest_scan(WT_SESSION_IMPL *session,
 	    WT_TXNID_LT(id, oldest_id))
 		oldest_id = id;
 
+	/* The metadata pinned ID can't move past the oldest ID. */
+	if (WT_TXNID_LT(oldest_id, metadata_pinned))
+		metadata_pinned = oldest_id;
+
+	*last_runningp = last_running;
+	*metadata_pinnedp = metadata_pinned;
 	*oldest_idp = oldest_id;
 	*oldest_sessionp = oldest_session;
-	*last_runningp = last_running;
 }
 
 /*
@@ -262,8 +268,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *oldest_session;
 	WT_TXN_GLOBAL *txn_global;
-	uint64_t current_id, last_running, oldest_id;
-	uint64_t prev_last_running, prev_oldest_id;
+	uint64_t current_id, last_running, metadata_pinned, oldest_id;
+	uint64_t prev_last_running, prev_metadata_pinned, prev_oldest_id;
 	bool strict, wait;
 
 	conn = S2C(session);
@@ -271,15 +277,17 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 	strict = LF_ISSET(WT_TXN_OLDEST_STRICT);
 	wait = LF_ISSET(WT_TXN_OLDEST_WAIT);
 
-	current_id = last_running = txn_global->current;
+	current_id = last_running = metadata_pinned = txn_global->current;
 	prev_last_running = txn_global->last_running;
+	prev_metadata_pinned = txn_global->metadata_pinned;
 	prev_oldest_id = txn_global->oldest_id;
 
 	/*
 	 * For pure read-only workloads, or if the update isn't forced and the
 	 * oldest ID isn't too far behind, avoid scanning.
 	 */
-	if (prev_oldest_id == current_id ||
+	if ((prev_oldest_id == current_id &&
+	    prev_metadata_pinned == current_id) ||
 	    (!strict && WT_TXNID_LT(current_id, prev_oldest_id + 100)))
 		return (0);
 
@@ -289,7 +297,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 	else if ((ret =
 	    __wt_try_readlock(session, txn_global->scan_rwlock)) != 0)
 		return (ret == EBUSY ? 0 : ret);
-	__txn_oldest_scan(session, &oldest_id, &last_running, &oldest_session);
+	__txn_oldest_scan(session,
+	    &oldest_id, &last_running, &metadata_pinned, &oldest_session);
 	__wt_readunlock(session, txn_global->scan_rwlock);
 
 	/*
@@ -299,7 +308,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 	if ((oldest_id == prev_oldest_id ||
 	    (!strict && WT_TXNID_LT(oldest_id, prev_oldest_id + 100))) &&
 	    ((last_running == prev_last_running) ||
-	    (!strict && WT_TXNID_LT(last_running, prev_last_running + 100))))
+	    (!strict && WT_TXNID_LT(last_running, prev_last_running + 100))) &&
+	    metadata_pinned == prev_metadata_pinned)
 		return (0);
 
 	/* It looks like an update is necessary, wait for exclusive access. */
@@ -314,7 +324,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 	 * scanning.
 	 */
 	if (WT_TXNID_LE(oldest_id, txn_global->oldest_id) &&
-	    WT_TXNID_LE(last_running, txn_global->last_running))
+	    WT_TXNID_LE(last_running, txn_global->last_running) &&
+	    WT_TXNID_LE(metadata_pinned, txn_global->metadata_pinned))
 		goto done;
 
 	/*
@@ -323,7 +334,8 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 	 * sure that there isn't a thread that has got a snapshot locally but
 	 * not yet published its snap_min.
 	 */
-	__txn_oldest_scan(session, &oldest_id, &last_running, &oldest_session);
+	__txn_oldest_scan(session,
+	    &oldest_id, &last_running, &metadata_pinned, &oldest_session);
 
 #ifdef HAVE_DIAGNOSTIC
 	{
@@ -339,7 +351,9 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 	    id == WT_TXN_NONE || !WT_TXNID_LT(id, oldest_id));
 	}
 #endif
-	/* Update the oldest ID. */
+	/* Update the public IDs. */
+	if (WT_TXNID_LT(txn_global->metadata_pinned, metadata_pinned))
+		txn_global->metadata_pinned = metadata_pinned;
 	if (WT_TXNID_LT(txn_global->oldest_id, oldest_id))
 		txn_global->oldest_id = oldest_id;
 	if (WT_TXNID_LT(txn_global->last_running, last_running)) {
@@ -750,7 +764,7 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 
 	txn_global = &conn->txn_global;
 	txn_global->current = txn_global->last_running =
-	    txn_global->oldest_id = WT_TXN_FIRST;
+	    txn_global->metadata_pinned = txn_global->oldest_id = WT_TXN_FIRST;
 
 	WT_RET(__wt_spin_init(session,
 	    &txn_global->id_lock, "transaction id lock"));
@@ -766,7 +780,7 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CACHE_LINE_ALIGNMENT_VERIFY(session, txn_global->states);
 
 	for (i = 0, s = txn_global->states; i < conn->session_size; i++, s++)
-		s->id = s->pinned_id = WT_TXN_NONE;
+		s->id = s->metadata_pinned = s->pinned_id = WT_TXN_NONE;
 
 	return (0);
 }

@@ -420,7 +420,8 @@ __wt_json_column_init(WT_CURSOR *cursor, const char *keyformat,
 		const char *_bad = in;					\
 		while (__wt_isalnum((u_char)*in))			\
 			in++;						\
-		__wt_errx(session, "unknown keyword \"%.*s\" in JSON",	\
+		WT_RET_MSG(session, EINVAL,				\
+		    "unknown keyword \"%.*s\" in JSON",			\
 		    (int)(in - _bad), _bad);				\
 	}								\
 } while (0)
@@ -501,9 +502,9 @@ __wt_json_token(WT_SESSION *wt_session, const char *src, int *toktype,
 			}
 			src++;
 		}
-		if (result != 's')
-			__wt_errx(session, "unterminated string in JSON");
-		break;
+		if (result == 's')
+			break;
+		WT_RET_MSG(session, EINVAL, "unterminated string in JSON");
 	case '-':
 	case '0':
 	case '1':
@@ -561,15 +562,14 @@ __wt_json_token(WT_SESSION *wt_session, const char *src, int *toktype,
 		if (isalph)
 			while (*src != '\0' && __wt_isalnum((u_char)*src))
 				src++;
-		__wt_errx(session, "unknown token \"%.*s\" in JSON",
-		    (int)(src - bad), bad);
-		break;
+		WT_RET_MSG(session, EINVAL,
+		    "unknown token \"%.*s\" in JSON", (int)(src - bad), bad);
+		/* NOTREACHED */
 	}
+	WT_ASSERT(session, result != -1);
+
 	*toklen = (size_t)(src - *tokstart);
 	*toktype = result;
-
-	if (result < 0)
-		WT_RET_MSG(session, EINVAL, "illegal token in JSON");
 	return (0);
 }
 

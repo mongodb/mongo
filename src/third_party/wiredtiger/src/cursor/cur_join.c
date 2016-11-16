@@ -326,8 +326,7 @@ __curjoin_close(WT_CURSOR *cursor)
 	JOINABLE_CURSOR_API_CALL(cursor, session, close, NULL);
 
 	__wt_schema_release_table(session, cjoin->table);
-	/* These are owned by the table */
-	cursor->internal_uri = NULL;
+	/* This is owned by the table */
 	cursor->key_format = NULL;
 	if (cjoin->projection != NULL) {
 		__wt_free(session, cjoin->projection);
@@ -921,7 +920,7 @@ __curjoin_init_next(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		    "cursors");
 
 	/* Get a consistent view of our subordinate cursors if appropriate. */
-	WT_RET(__wt_txn_cursor_op(session));
+	__wt_txn_cursor_op(session);
 
 	if (F_ISSET((WT_CURSOR *)cjoin, WT_CURSTD_RAW))
 		config = &raw_cfg[0];
@@ -1310,11 +1309,10 @@ __wt_curjoin_open(WT_SESSION_IMPL *session,
 		WT_RET_MSG(session, EINVAL,
 		    "unable to initialize a join cursor with existing owner");
 
-	if (!WT_PREFIX_SKIP(uri, "join:"))
-		return (__wt_unexpected_object_type(session, uri, "join:"));
 	tablename = uri;
-	if (!WT_PREFIX_SKIP(tablename, "table:"))
-		return (__wt_unexpected_object_type(session, uri, "table:"));
+	if (!WT_PREFIX_SKIP(tablename, "join:table:"))
+		return (
+		    __wt_unexpected_object_type(session, uri, "join:table:"));
 
 	columns = strchr(tablename, '(');
 	if (columns == NULL)
@@ -1327,7 +1325,6 @@ __wt_curjoin_open(WT_SESSION_IMPL *session,
 	cursor = &cjoin->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
-	cursor->internal_uri = table->name;
 	cursor->key_format = table->key_format;
 	cursor->value_format = table->value_format;
 	cjoin->table = table;

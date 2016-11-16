@@ -171,12 +171,12 @@ __wt_lsm_work_switch(
 	*ran = false;
 	*entryp = NULL;
 
-	if (F_ISSET(entry->lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+	if (entry->lsm_tree->need_switch) {
 		WT_WITH_SCHEMA_LOCK(session, ret,
 		    ret = __wt_lsm_tree_switch(session, entry->lsm_tree));
 		/* Failing to complete the switch is fine */
 		if (ret == EBUSY) {
-			if (F_ISSET(entry->lsm_tree, WT_LSM_TREE_NEED_SWITCH))
+			if (entry->lsm_tree->need_switch)
 				WT_ERR(__wt_lsm_manager_push_entry(session,
 				    WT_LSM_WORK_SWITCH, 0, entry->lsm_tree));
 			ret = 0;
@@ -383,7 +383,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	 * forced eviction.
 	 */
 	WT_ERR(__wt_session_get_btree(session, chunk->uri, NULL, NULL, 0));
-	__wt_btree_evictable(session, true);
+	__wt_btree_lsm_switch_primary(session, false);
 	WT_ERR(__wt_session_release_btree(session));
 
 	/* Make sure we aren't pinning a transaction ID. */

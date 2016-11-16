@@ -239,8 +239,6 @@ __conn_add_compressor(WT_CONNECTION *wt_conn,
 	WT_NAMED_COMPRESSOR *ncomp;
 	WT_SESSION_IMPL *session;
 
-	WT_UNUSED(name);
-	WT_UNUSED(compressor);
 	ncomp = NULL;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
@@ -756,8 +754,11 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 	conn->extension_api.scr_free = __wt_ext_scr_free;
 	conn->extension_api.collator_config = ext_collator_config;
 	conn->extension_api.collate = ext_collate;
-	conn->extension_api.config_parser_open = __wt_ext_config_parser_open;
 	conn->extension_api.config_get = __wt_ext_config_get;
+	conn->extension_api.config_get_string = __wt_ext_config_get_string;
+	conn->extension_api.config_parser_open = __wt_ext_config_parser_open;
+	conn->extension_api.config_parser_open_arg =
+	    __wt_ext_config_parser_open_arg;
 	conn->extension_api.metadata_insert = __wt_ext_metadata_insert;
 	conn->extension_api.metadata_remove = __wt_ext_metadata_remove;
 	conn->extension_api.metadata_search = __wt_ext_metadata_search;
@@ -789,40 +790,75 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 	return (&conn->extension_api);
 }
 
+/*
+ * __conn_builtin_init --
+ *	Initialize and configure a builtin extension.
+ */
+static int
+__conn_builtin_init(WT_CONNECTION_IMPL *conn, const char *name,
+    int (*extension_init)(WT_CONNECTION *, WT_CONFIG_ARG *),
+    const char *cfg[])
+{
+	WT_CONFIG_ITEM all_configs, cval;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	char *config;
+	const char *ext_cfg[] = { NULL, NULL };
+
+	session = conn->default_session;
+
+	WT_RET(__wt_config_gets(
+	    session, cfg, "builtin_extension_config", &all_configs));
+	WT_CLEAR(cval);
+	WT_RET_NOTFOUND_OK(__wt_config_subgets(
+	    session, &all_configs, name, &cval));
+	WT_RET(__wt_strndup(session, cval.str, cval.len, &config));
+	ext_cfg[0] = config;
+
+	ret = extension_init(&conn->iface, (WT_CONFIG_ARG *)ext_cfg);
+	__wt_free(session, config);
+
+	return (ret);
+}
+
 #ifdef HAVE_BUILTIN_EXTENSION_LZ4
-	extern int lz4_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
+extern int lz4_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
 #endif
 #ifdef HAVE_BUILTIN_EXTENSION_SNAPPY
-	extern int snappy_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
+extern int snappy_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
 #endif
 #ifdef HAVE_BUILTIN_EXTENSION_ZLIB
-	extern int zlib_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
+extern int zlib_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
 #endif
 #ifdef HAVE_BUILTIN_EXTENSION_ZSTD
-	extern int zstd_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
+extern int zstd_extension_init(WT_CONNECTION *, WT_CONFIG_ARG *);
 #endif
 
 /*
- * __conn_load_default_extensions --
+ * __conn_builtin_extensions --
  *	Load extensions that are enabled via --with-builtins
  */
 static int
-__conn_load_default_extensions(WT_CONNECTION_IMPL *conn)
+__conn_builtin_extensions(WT_CONNECTION_IMPL *conn, const char *cfg[])
 {
-	WT_UNUSED(conn);
-
 #ifdef HAVE_BUILTIN_EXTENSION_LZ4
-	WT_RET(lz4_extension_init(&conn->iface, NULL));
+	WT_RET(__conn_builtin_init(conn, "lz4", lz4_extension_init, cfg));
 #endif
 #ifdef HAVE_BUILTIN_EXTENSION_SNAPPY
-	WT_RET(snappy_extension_init(&conn->iface, NULL));
+	WT_RET(__conn_builtin_init(conn, "snappy", snappy_extension_init, cfg));
 #endif
 #ifdef HAVE_BUILTIN_EXTENSION_ZLIB
-	WT_RET(zlib_extension_init(&conn->iface, NULL));
+	WT_RET(__conn_builtin_init(conn, "zlib", zlib_extension_init, cfg));
 #endif
 #ifdef HAVE_BUILTIN_EXTENSION_ZSTD
-	WT_RET(zstd_extension_init(&conn->iface, NULL));
+	WT_RET(__conn_builtin_init(conn, "zstd", zstd_extension_init, cfg));
 #endif
+
+	/* Avoid warnings if no builtin extensions are configured. */
+	WT_UNUSED(conn);
+	WT_UNUSED(cfg);
+	WT_UNUSED(__conn_builtin_init);
+
 	return (0);
 }
 
@@ -839,10 +875,11 @@ __conn_load_extension_int(WT_SESSION_IMPL *session,
 	WT_DLH *dlh;
 	int (*load)(WT_CONNECTION *, WT_CONFIG_ARG *);
 	bool is_local;
-	const char *init_name, *terminate_name;
+	const char *ext_config, *init_name, *terminate_name;
+	const char *ext_cfg[2];
 
 	dlh = NULL;
-	init_name = terminate_name = NULL;
+	ext_config = init_name = terminate_name = NULL;
 	is_local = strcmp(path, "local") == 0;
 
 	/* Ensure that the load matches the phase of startup we are in. */
@@ -872,8 +909,14 @@ __conn_load_extension_int(WT_SESSION_IMPL *session,
 	WT_ERR(
 	    __wt_dlsym(session, dlh, terminate_name, false, &dlh->terminate));
 
+	WT_CLEAR(cval);
+	WT_ERR_NOTFOUND_OK(__wt_config_gets(session, cfg, "config", &cval));
+	WT_ERR(__wt_strndup(session, cval.str, cval.len, &ext_config));
+	ext_cfg[0] = ext_config;
+	ext_cfg[1] = NULL;
+
 	/* Call the load function last, it simplifies error handling. */
-	WT_ERR(load(&S2C(session)->iface, (WT_CONFIG_ARG *)cfg));
+	WT_ERR(load(&S2C(session)->iface, (WT_CONFIG_ARG *)ext_cfg));
 
 	/* Link onto the environment's list of open libraries. */
 	__wt_spin_lock(session, &S2C(session)->api_lock);
@@ -883,6 +926,7 @@ __conn_load_extension_int(WT_SESSION_IMPL *session,
 
 err:	if (dlh != NULL)
 		WT_TRET(__wt_dlclose(session, dlh));
+	__wt_free(session, ext_config);
 	__wt_free(session, init_name);
 	__wt_free(session, terminate_name);
 	return (ret);
@@ -2355,7 +2399,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * everything else to be in place, and the extensions call back into the
 	 * library.
 	 */
-	WT_ERR(__conn_load_default_extensions(conn));
+	WT_ERR(__conn_builtin_extensions(conn, cfg));
 	WT_ERR(__conn_load_extensions(session, cfg, false));
 
 	/*
