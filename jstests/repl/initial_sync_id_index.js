@@ -31,8 +31,15 @@
     const slave = rt.start(false);
     const slaveDB = slave.getDB("test");
 
-    // Perform a w=2 write to ensure that slave can be read from, and initial sync is complete.
-    assert.writeOK(masterDB.coll.insert({}, {writeConcern: {w: 2}}));
+    // Wait for the slave to sync the collections.
+    assert.soon(function() {
+        var res = slaveDB.runCommand({listCollections: 1, filter: {name: "collV2"}});
+        return res.cursor.firstBatch.length === 1;
+    }, "Collection with v:2 _id index failed to sync on slave");
+    assert.soon(function() {
+        var res = slaveDB.runCommand({listCollections: 1, filter: {name: "collV1"}});
+        return res.cursor.firstBatch.length === 1;
+    }, "Collection with v:1 _id index failed to sync on slave");
 
     // Check _id index versions on slave.
     spec = GetIndexHelpers.findByName(slaveDB.collV2.getIndexes(), "_id_");
