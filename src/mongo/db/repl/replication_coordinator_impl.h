@@ -910,7 +910,10 @@ private:
      */
     void _requestRemotePrimaryStepdown(const HostAndPort& target);
 
-    ReplicationExecutor::EventHandle _stepDownStart();
+    /**
+     * Schedules stepdown to run with the global exclusive lock.
+     */
+    ReplicationExecutor::EventHandle _stepDownStart(bool hasMutex);
 
     /**
      * Completes a step-down of the current node.  Must be run with a global
@@ -949,9 +952,11 @@ private:
      * Utility method that schedules or performs actions specified by a HeartbeatResponseAction
      * returned by a TopologyCoordinator::processHeartbeatResponse(V1) call with the given
      * value of "responseStatus".
+     * 'hasMutex' is true if the caller is holding _mutex.  TODO(SERVER-27083): Remove this.
      */
     void _handleHeartbeatResponseAction(const HeartbeatResponseAction& action,
-                                        const StatusWith<ReplSetHeartbeatResponse>& responseStatus);
+                                        const StatusWith<ReplSetHeartbeatResponse>& responseStatus,
+                                        bool hasMutex);
 
     /**
      * Scan the SlaveInfoVector and determine the highest OplogEntry present on a majority of
@@ -1179,6 +1184,14 @@ private:
     // Rollback ID. Used to check if a rollback happened during some interval of time
     // TODO: ideally this should only change on rollbacks NOT on mongod restarts also.
     int _rbid;  // (M)
+
+    // Indicates that we've received a request to stepdown from PRIMARY (likely via a heartbeat)
+    // TODO(SERVER-27083): This bool is redundant of the same-named bool in TopologyCoordinatorImpl,
+    // but due to mutex ordering between _mutex and _topoMutex we can't inspect the
+    // TopologyCoordinator field in awaitReplication() where this bool is used.  Once we get rid
+    // of topoMutex and start guarding access to the TopologyCoordinator via _mutex we should
+    // consolidate the two bools.
+    bool _stepDownPending = false;  // (M)
 
     // list of information about clients waiting on replication.  Does *not* own the WaiterInfos.
     WaiterList _replicationWaiterList;  // (M)

@@ -45,6 +45,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/protocol.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -58,6 +59,8 @@ static ServerStatusMetricField<TimerStats> displayGleLatency("getLastError.wtime
 static Counter64 gleWtimeouts;
 static ServerStatusMetricField<Counter64> gleWtimeoutsDisplay("getLastError.wtimeouts",
                                                               &gleWtimeouts);
+
+MONGO_FP_DECLARE(hangBeforeWaitingForWriteConcern);
 
 StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* txn,
                                                     const BSONObj& cmdObj,
@@ -181,6 +184,8 @@ Status waitForWriteConcern(OperationContext* txn,
     LOG(2) << "Waiting for write concern. OpTime: " << replOpTime
            << ", write concern: " << writeConcern.toBSON();
     auto replCoord = repl::ReplicationCoordinator::get(txn);
+
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeWaitingForWriteConcern);
 
     // Next handle blocking on disk
     Timer syncTimer;
