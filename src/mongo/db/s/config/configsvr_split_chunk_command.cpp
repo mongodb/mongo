@@ -45,6 +45,8 @@
 namespace mongo {
 namespace {
 
+using std::string;
+
 /**
  * Internal sharding command run on config servers to split a chunk.
  *
@@ -100,24 +102,26 @@ public:
              int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << getName() << " can only be run on config servers",
-                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+            uasserted(ErrorCodes::IllegalOperation,
+                      "_configsvrCommitChunkSplit can only be run on config servers");
+        }
 
         auto parsedRequest = uassertStatusOK(SplitChunkRequest::parseFromConfigCommand(cmdObj));
 
-        uassertStatusOK(
+        Status splitChunkResult =
             Grid::get(txn)->catalogManager()->commitChunkSplit(txn,
                                                                parsedRequest.getNamespace(),
                                                                parsedRequest.getEpoch(),
                                                                parsedRequest.getChunkRange(),
                                                                parsedRequest.getSplitPoints(),
-                                                               parsedRequest.getShardName()));
+                                                               parsedRequest.getShardName());
+        if (!splitChunkResult.isOK()) {
+            return appendCommandStatus(result, splitChunkResult);
+        }
 
         return true;
     }
-
 } configsvrSplitChunkCmd;
-
 }  // namespace
 }  // namespace mongo

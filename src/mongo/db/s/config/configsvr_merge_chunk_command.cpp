@@ -45,6 +45,8 @@
 namespace mongo {
 namespace {
 
+using std::string;
+
 /**
  * Internal sharding command run on config servers to merge a set of chunks.
  *
@@ -102,23 +104,26 @@ public:
              int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << getName() << " can only be run on config servers",
-                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+            uasserted(ErrorCodes::IllegalOperation,
+                      "_configsvrCommitChunkMerge can only be run on config servers");
+        }
 
         auto parsedRequest = uassertStatusOK(MergeChunkRequest::parseFromConfigCommand(cmdObj));
 
-        uassertStatusOK(
+        Status mergeChunkResult =
             Grid::get(txn)->catalogManager()->commitChunkMerge(txn,
                                                                parsedRequest.getNamespace(),
                                                                parsedRequest.getEpoch(),
                                                                parsedRequest.getChunkBoundaries(),
-                                                               parsedRequest.getShardName()));
+                                                               parsedRequest.getShardName());
+
+        if (!mergeChunkResult.isOK()) {
+            return appendCommandStatus(result, mergeChunkResult);
+        }
 
         return true;
     }
-
 } configsvrMergeChunkCmd;
-
 }  // namespace
 }  // namespace mongo
