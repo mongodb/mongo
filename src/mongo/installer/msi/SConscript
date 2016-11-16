@@ -142,7 +142,7 @@ env.Command(objects,
             ' -dTargetFileName=${SERVER_ARCHIVE}'
             r' -dSaslSource=c:\sasl\bin'
             r' -dSnmpSource=c:\snmp\bin'
-            r' -dSslSource=c:\openssl\bin'
+            r' -dSslSource=' + env['WINDOWS_OPENSSL_BIN'] +
             ' -out ' + buildDir + r'\msi\\'
             ' -arch ' + msi_platform +
             ' -ext "$WIXUIEXT"'
