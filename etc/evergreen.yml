@@ -152,7 +152,7 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/artifacts/${build_id}.tgz
+      remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/artifacts/${build_id}.tgz
       bucket: mciuploads
       extract_to: src
 
@@ -161,7 +161,7 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/binaries/mongo-${build_id}.${ext|tgz}
+      remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/binaries/mongo-${build_id}.${ext|tgz}
       bucket: mciuploads
       local_file: src/mongo-binaries.tgz
 
@@ -196,7 +196,7 @@ functions:
   "get buildnumber" : &get_buildnumber
     command: keyval.inc
     params:
-      key: "${build_variant}_master"
+      key: "${build_variant}_v3.4"
       destination: "builder_num"
 
   "run diskstats": &run_diskstats
@@ -297,7 +297,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/mongo-debugsymbols.tgz
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/debugsymbols/debugsymbols-${build_id}.${ext|tgz}
+      remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/debugsymbols/debugsymbols-${build_id}.${ext|tgz}
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
@@ -309,7 +309,7 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/debugsymbols/debugsymbols-${build_id}.${ext|tgz}
+      remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/debugsymbols/debugsymbols-${build_id}.${ext|tgz}
       bucket: mciuploads
       local_file: src/mongo-debugsymbols.tgz
       build_variants:
@@ -622,7 +622,7 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: jstests.tgz
-        remote_file: mongodb-mongo-master/${build_variant}/${revision}/jstestfuzz/${task_id}-${execution}.tgz
+        remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/jstestfuzz/${task_id}-${execution}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -803,7 +803,7 @@ post:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/diagnostic-data.tgz
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/ftdc/mongo-diagnostic-data-${task_id}-${execution}.tgz
+      remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/ftdc/mongo-diagnostic-data-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
@@ -834,7 +834,7 @@ post:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: "src/gcov-intermediate-files.tgz"
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/gcov/gcov-intermediate-files-${task_id}-${execution}.tgz
+      remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/gcov/gcov-intermediate-files-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
@@ -884,7 +884,7 @@ post:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/jepsen-mongod-logs.tgz
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/jepsen/jepsen-mongod-logs-${task_id}-${execution}.tgz
+      remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/jepsen/jepsen-mongod-logs-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
@@ -903,7 +903,7 @@ post:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/jepsen-results.tgz
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/jepsen/jepsen-results-${task_id}-${execution}.tgz
+      remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/jepsen/jepsen-results-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
@@ -923,7 +923,7 @@ post:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: mongo-coredumps.tgz
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/coredumps/mongo-coredumps-${build_id}-${task_name}-${execution}.tgz
+      remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/coredumps/mongo-coredumps-${build_id}-${task_name}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
@@ -943,7 +943,7 @@ post:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: diskstats.tgz
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/diskstats/mongo-diskstats-${task_id}-${execution}.tgz
+      remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/diskstats/mongo-diskstats-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
@@ -1102,7 +1102,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongodb-binaries.tgz
-        remote_file: mongodb-mongo-master/${build_variant}/${revision}/binaries/mongo-${build_id}.${ext|tgz}
+        remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/binaries/mongo-${build_id}.${ext|tgz}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -1112,7 +1112,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: artifacts.tgz
-        remote_file: mongodb-mongo-master/${build_variant}/${revision}/artifacts/${build_id}.tgz
+        remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/artifacts/${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
@@ -1122,7 +1122,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongodb-unittests.tgz
-        remote_file: mongodb-mongo-master/${build_variant}/${revision}/unittests/${build_id}.tgz
+        remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/unittests/${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -1133,7 +1133,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/distsrc.${ext|tgz}
-        remote_file: mongodb-mongo-master/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
+        remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -1331,7 +1331,7 @@ tasks:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/unittests/${build_id}.tgz
+      remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/unittests/${build_id}.tgz
       bucket: mciuploads
       extract_to: src
   - func: "run tests"
@@ -2614,7 +2614,7 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: mongodb-mongo-master/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
+        remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
         bucket: mciuploads
         local_file: src/distsrc.${ext|tgz}
         build_variants: [ linux-64, windows-64-2k8 ]
@@ -3087,7 +3087,7 @@ modules:
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
   prefix: src/mongo/db/modules
-  branch: master
+  branch: v3.4
 
 - name: rocksdb
   repo: git@github.com:mongodb-partners/mongo-rocks.git
