@@ -385,12 +385,14 @@ void CollectionCloner::_findCallback(const StatusWith<Fetcher::QueryResponse>& f
                                      Fetcher::NextAction* nextAction,
                                      BSONObjBuilder* getMoreBob) {
     if (!fetchResult.isOK()) {
+        // Wait for active inserts to complete.
+        waitForDbWorker();
+
         Status newStatus{fetchResult.getStatus().code(),
                          str::stream() << "While querying collection '" << _sourceNss.ns()
                                        << "' there was an error '"
                                        << fetchResult.getStatus().reason()
                                        << "'"};
-        // TODO: cancel active inserts?
         _finishCallback(newStatus);
         return;
     }
