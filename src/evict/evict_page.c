@@ -163,8 +163,19 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		 */
 		WT_ERR(__evict_page_clean_update(
 		    session, ref, tree_dead || closing));
-	else
-		WT_ERR(__evict_page_dirty_update(session, ref, closing));
+	else {
+		/*
+		 * The page is not being completely evicted: instead it is
+		 * being split or replaced.  In that case, don't increment the
+		 * count of pages evicted, which we use to decide whether
+		 * eviction is making progress.  Repeatedly rewriting the same
+		 * page isn't progress.
+		 */
+		F_SET(session, WT_SESSION_IN_SPLIT);
+		ret = __evict_page_dirty_update(session, ref, closing);
+		F_CLR(session, WT_SESSION_IN_SPLIT);
+		WT_ERR(ret);
+	}
 
 	if (clean_page) {
 		WT_STAT_CONN_INCR(session, cache_eviction_clean);
