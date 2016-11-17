@@ -608,14 +608,16 @@ namespace {
 unsigned long long _collectionCount(OperationContext* txn,
                                     const string& ns,
                                     bool callerHoldsGlobalLock) {
-    Collection* coll;
+    Collection* coll = nullptr;
     boost::optional<AutoGetCollectionForRead> ctx;
 
     // If the global write lock is held, we must avoid using AutoGetCollectionForRead as it may lead
     // to deadlock when waiting for a majority snapshot to be committed. See SERVER-24596.
     if (callerHoldsGlobalLock) {
         Database* db = dbHolder().get(txn, ns);
-        coll = db->getCollection(ns);
+        if (db) {
+            coll = db->getCollection(ns);
+        }
     } else {
         ctx.emplace(txn, NamespaceString(ns));
         coll = ctx->getCollection();
