@@ -76,7 +76,7 @@ std::unique_ptr<OplogBuffer> DataReplicatorExternalStateMock::makeSteadyStateOpl
 }
 
 StatusWith<ReplicaSetConfig> DataReplicatorExternalStateMock::getCurrentConfig() const {
-    return replSetConfig;
+    return replSetConfigResult;
 }
 
 StatusWith<OpTime> DataReplicatorExternalStateMock::_multiApply(
@@ -93,7 +93,8 @@ Status DataReplicatorExternalStateMock::_multiSyncApply(MultiApplier::OperationP
 Status DataReplicatorExternalStateMock::_multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
                                                                const HostAndPort& source,
                                                                AtomicUInt32* fetchCount) {
-    return Status::OK();
+
+    return multiInitialSyncApplyFn(ops, source, fetchCount);
 }
 
 }  // namespace repl

@@ -37,6 +37,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/fetcher.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/global_timestamp.h"
@@ -560,7 +561,7 @@ void ReplicationCoordinatorImpl::_stopDataReplication(OperationContext* txn) {
         LockGuard lk(_mutex);
         _dr.swap(drCopy);
     }
-    if (drCopy && drCopy->getState() == DataReplicatorState::InitialSync) {
+    if (drCopy) {
         LOG(1)
             << "ReplicationCoordinatorImpl::_stopDataReplication calling DataReplicator::shutdown.";
         const auto status = drCopy->shutdown();
@@ -591,42 +592,32 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn,
 
     // Do initial sync.
     if (_externalState->shouldUseDataReplicatorInitialSync()) {
-        _externalState->runOnInitialSyncThread([this, startCompleted](OperationContext* txn) {
-            std::shared_ptr<DataReplicator> drCopy;
-            UniqueLock lk(_mutex);  // Must take the lock to set _dr, but not call it.
-            drCopy = std::make_shared<DataReplicator>(
-                createDataReplicatorOptions(this, _externalState.get()),
-                stdx::make_unique<DataReplicatorExternalStateImpl>(this, _externalState.get()),
-                _storage);
-            _dr = drCopy;
-            lk.unlock();
+        if (!_externalState->getTaskExecutor()) {
+            log() << "not running initial sync during test.";
+            return;
+        }
 
-            const auto status = drCopy->doInitialSync(txn, numInitialSyncAttempts);
-            // If it is interrupted by resync, we do not need to cleanup the DataReplicator.
-            if (status == ErrorCodes::ShutdownInProgress) {
-                return;
-            }
-
-            drCopy.reset();
-            lk.lock();
-
-            if (status == ErrorCodes::CallbackCanceled) {
-                log() << "Initial Sync has been cancelled: " << status.getStatus();
-                return;
-            } else if (!status.isOK()) {
-                if (_inShutdown) {
-                    log() << "Initial Sync failed during shutdown due to " << status.getStatus();
+        auto onCompletion = [this, startCompleted](const StatusWith<OpTimeWithHash>& status) {
+            {
+                stdx::lock_guard<stdx::mutex> lock(_mutex);
+                if (status == ErrorCodes::CallbackCanceled) {
+                    log() << "Initial Sync has been cancelled: " << status.getStatus();
                     return;
-                } else {
-                    error() << "Initial sync failed, shutting down now. Restart the server to "
-                               "attempt a new initial sync.";
-                    fassertFailedWithStatusNoTrace(40088, status.getStatus());
+                } else if (!status.isOK()) {
+                    if (_inShutdown) {
+                        log() << "Initial Sync failed during shutdown due to "
+                              << status.getStatus();
+                        return;
+                    } else {
+                        error() << "Initial sync failed, shutting down now. Restart the server "
+                                   "to attempt a new initial sync.";
+                        fassertFailedWithStatusNoTrace(40088, status.getStatus());
+                    }
                 }
-            }
 
-            const auto lastApplied = status.getValue();
-            _setMyLastAppliedOpTime_inlock(lastApplied.opTime, false);
-            lk.unlock();
+                const auto lastApplied = status.getValue();
+                _setMyLastAppliedOpTime_inlock(lastApplied.opTime, false);
+            }
 
             // Clear maint. mode.
             while (getMaintenanceMode()) {
@@ -637,9 +628,35 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn,
                 startCompleted();
             }
             // Repair local db (to compact it).
-            uassertStatusOK(_externalState->runRepairOnLocalDB(txn));
-            _externalState->startSteadyStateReplication(txn, this);
-        });
+            auto txn = cc().makeOperationContext();
+            uassertStatusOK(_externalState->runRepairOnLocalDB(txn.get()));
+            _externalState->startSteadyStateReplication(txn.get(), this);
+        };
+
+        std::shared_ptr<DataReplicator> drCopy;
+        try {
+            {
+                // Must take the lock to set _dr, but not call it.
+                stdx::lock_guard<stdx::mutex> lock(_mutex);
+                drCopy = std::make_shared<DataReplicator>(
+                    createDataReplicatorOptions(this, _externalState.get()),
+                    stdx::make_unique<DataReplicatorExternalStateImpl>(this, _externalState.get()),
+                    _storage,
+                    onCompletion);
+                _dr = drCopy;
+            }
+            // DataReplicator::startup() must be called outside lock because it uses features (eg.
+            // setting the initial sync flag) which depend on the ReplicationCoordinatorImpl.
+            uassertStatusOK(drCopy->startup(txn, numInitialSyncAttempts));
+        } catch (...) {
+            auto status = exceptionToStatus();
+            log() << "Initial Sync failed to start: " << status;
+            if (ErrorCodes::CallbackCanceled == status ||
+                ErrorCodes::isShutdownError(status.code())) {
+                return;
+            }
+            fassertFailedWithStatusNoTrace(40354, status);
+        }
     } else {
         _externalState->startInitialSync([this, startCompleted](OperationContext* txn) {
             stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -736,6 +753,7 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* txn) {
         if (!status.isOK()) {
             warning() << "DataReplicator shutdown failed: " << status;
         }
+        drCopy->join();
         drCopy.reset();
     }
     _externalState->shutdown(txn);
@@ -2174,7 +2192,7 @@ Status ReplicationCoordinatorImpl::processReplSetSyncFrom(OperationContext* txn,
         auto opTime = _getMyLastAppliedOpTime_inlock();
         _topCoord->prepareSyncFromResponse(target, opTime, resultObj, &result);
         // If we are in the middle of an initial sync, do a resync.
-        doResync = result.isOK() && _dr && _dr->getState() == DataReplicatorState::InitialSync;
+        doResync = result.isOK() && _dr && _dr->isActive();
     }
 
     if (doResync) {

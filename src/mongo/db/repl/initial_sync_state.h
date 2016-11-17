@@ -48,16 +48,12 @@ namespace repl {
  * Holder of state for initial sync (DataReplicator).
  */
 struct InitialSyncState {
-    InitialSyncState(std::unique_ptr<DatabasesCloner> cloner, Event finishEvent)
-        : dbsCloner(std::move(cloner)), finishEvent(finishEvent), status(Status::OK()){};
+    InitialSyncState(std::unique_ptr<DatabasesCloner> cloner) : dbsCloner(std::move(cloner)){};
 
     std::unique_ptr<DatabasesCloner>
         dbsCloner;             // Cloner for all databases included in initial sync.
-    BSONObj oplogSeedDoc;      // Document to seed the oplog with when initial sync is done.
     Timestamp beginTimestamp;  // Timestamp from the latest entry in oplog when started.
     Timestamp stopTimestamp;   // Referred to as minvalid, or the place we can transition states.
-    Event finishEvent;         // event fired on completion, either successful or not.
-    Status status;             // final status, only valid after the finishEvent fires.
     Timer timer;               // Timer for timing how long each initial sync attempt takes.
     size_t fetchedMissingDocs = 0;
     size_t appliedOps = 0;

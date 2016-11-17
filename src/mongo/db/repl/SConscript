@@ -1047,6 +1047,7 @@ env.Library(
         'databases_cloner',
         'multiapplier',
         'oplog_buffer_blocking_queue',
+        'oplog_entry',
         'oplog_fetcher',
         'optime',
         'rollback_checker',
