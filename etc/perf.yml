@@ -204,6 +204,16 @@ functions:
           #  give mongod a few seconds to start up so that we can connect.
           sleep 5
           ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t ${threads} --trialCount 5 -f testcases/*.js --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongod.log
+        remote_file: ${project}/${version_id}/${revision}/mongod-${task_id}.log
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|text/html}
+        display_name: mongod.log
     - command: "json.send"
       params:
         name: "perf"
@@ -548,7 +558,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy --ssl
     mongod_exec_wrapper: &exec_wrapper "numactl --physcpubind=4,5,6,7 -i 1"
     perf_exec_wrapper: &perf_wrapper "numactl --physcpubind=1,2,3 -i 0"
-    mongod_flags: "--storageEngine=inMemory --logpath ./mongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false  --wiredTigerCacheSizeGB 16"
+    mongod_flags: "--storageEngine=inMemory --logpath ./mongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false  --inMemorySizeGB 16"
     use_scons_cache: true
     project: &project perf
   run_on:
@@ -592,7 +602,7 @@ buildvariants:
   expansions:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--replSet=test --storageEngine=inMemory  --logpath ./mongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --wiredTigerCacheSizeGB 16 --oplogSize 100000 --setParameter diagnosticDataCollectionEnabled=false "
+    mongod_flags: "--replSet=test --storageEngine=inMemory  --logpath ./mongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --inMemorySizeGB 16 --oplogSize 10000 --setParameter diagnosticDataCollectionEnabled=false "
     project: *project
   run_on:
   - "centos6-perf"
