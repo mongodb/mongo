@@ -147,17 +147,17 @@ public:
                 exec->saveState();
                 exec->detachFromOperationContext();
 
-                // transfer ownership of an executor to the ClientCursor (which manages its own
-                // lifetime).
-                ClientCursor* cc =
-                    new ClientCursor(collection->getCursorManager(),
-                                     exec.release(),
-                                     ns.ns(),
-                                     txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot());
-                cc->setLeftoverMaxTimeMicros(txn->getRemainingMaxTimeMicros());
+                // Create and regiter a new ClientCursor.
+                auto pinnedCursor = collection->getCursorManager()->registerCursor(
+                    {exec.release(),
+                     ns.ns(),
+                     txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot()});
+                pinnedCursor.getCursor()->setLeftoverMaxTimeMicros(
+                    txn->getRemainingMaxTimeMicros());
 
                 BSONObjBuilder threadResult;
-                appendCursorResponseObject(cc->cursorid(), ns.ns(), BSONArray(), &threadResult);
+                appendCursorResponseObject(
+                    pinnedCursor.getCursor()->cursorid(), ns.ns(), BSONArray(), &threadResult);
                 threadResult.appendBool("ok", 1);
 
                 bucketsBuilder.append(threadResult.obj());

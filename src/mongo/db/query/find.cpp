@@ -295,8 +295,8 @@ Message getMore(OperationContext* txn,
     // A pin performs a CC lookup and if there is a CC, increments the CC's pin value so it
     // doesn't time out.  Also informs ClientCursor that there is somebody actively holding the
     // CC, so don't delete it.
-    ClientCursorPin ccPin(cursorManager, cursorid);
-    ClientCursor* cc = ccPin.c();
+    auto ccPin = cursorManager->pinCursor(cursorid);
+
     // These are set in the QueryResult msg we return.
     int resultFlags = ResultFlag_AwaitCapable;
 
@@ -309,10 +309,13 @@ Message getMore(OperationContext* txn,
     BufBuilder bb(InitialBufSize);
     bb.skip(sizeof(QueryResult::Value));
 
-    if (NULL == cc) {
+    if (!ccPin.isOK()) {
+        invariant(ccPin == ErrorCodes::CursorNotFound);
         cursorid = 0;
         resultFlags = ResultFlag_CursorNotFound;
     } else {
+        ClientCursor* cc = ccPin.getValue().getCursor();
+
         // Check for spoofing of the ns such that it does not match the one originally
         // there for the cursor.
         uassert(ErrorCodes::Unauthorized,
@@ -327,7 +330,7 @@ Message getMore(OperationContext* txn,
             uassertStatusOK(txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
 
         // Reset timeout timer on the cursor since the cursor is still in use.
-        cc->setIdleTime(0);
+        cc->resetIdleTime();
 
         // If the operation that spawned this cursor had a time limit set, apply leftover
         // time to this getmore.
@@ -454,7 +457,7 @@ Message getMore(OperationContext* txn,
         //    pin.  Because our ClientCursorPin is declared after our lock is declared, this
         //    will happen under the lock.
         if (!shouldSaveCursor) {
-            ccPin.deleteUnderlying();
+            ccPin.getValue().deleteUnderlying();
 
             // cc is now invalid, as is the executor
             cursorid = 0;
@@ -663,23 +666,21 @@ std::string runQuery(OperationContext* txn,
         exec->saveState();
         exec->detachFromOperationContext();
 
-        // Allocate a new ClientCursor.  We don't have to worry about leaking it as it's
-        // inserted into a global map by its ctor.
-        ClientCursor* cc =
-            new ClientCursor(collection->getCursorManager(),
-                             exec.release(),
-                             nss.ns(),
-                             txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
-                             qr.getOptions(),
-                             qr.getFilter());
-        ccId = cc->cursorid();
+        // Allocate a new ClientCursor and register it with the cursor manager.
+        ClientCursorPin pinnedCursor = collection->getCursorManager()->registerCursor(
+            {exec.release(),
+             nss.ns(),
+             txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+             qr.getOptions(),
+             qr.getFilter()});
+        ccId = pinnedCursor.getCursor()->cursorid();
 
         LOG(5) << "caching executor with cursorid " << ccId << " after returning " << numResults
                << " results";
 
         // TODO document
         if (qr.isOplogReplay() && !slaveReadTill.isNull()) {
-            cc->slaveReadTill(slaveReadTill);
+            pinnedCursor.getCursor()->slaveReadTill(slaveReadTill);
         }
 
         // TODO document
@@ -687,13 +688,13 @@ std::string runQuery(OperationContext* txn,
             curOp.debug().exhaust = true;
         }
 
-        cc->setPos(numResults);
+        pinnedCursor.getCursor()->setPos(numResults);
 
         // If the query had a time limit, remaining time is "rolled over" to the cursor (for
         // use by future getmore ops).
-        cc->setLeftoverMaxTimeMicros(txn->getRemainingMaxTimeMicros());
+        pinnedCursor.getCursor()->setLeftoverMaxTimeMicros(txn->getRemainingMaxTimeMicros());
 
-        endQueryOp(txn, collection, *cc->getExecutor(), numResults, ccId);
+        endQueryOp(txn, collection, *pinnedCursor.getCursor()->getExecutor(), numResults, ccId);
     } else {
         LOG(5) << "Not caching executor but returning " << numResults << " results.";
         endQueryOp(txn, collection, *exec, numResults, ccId);

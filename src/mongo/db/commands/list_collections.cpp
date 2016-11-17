@@ -320,12 +320,11 @@ public:
         if (!exec->isEOF()) {
             exec->saveState();
             exec->detachFromOperationContext();
-            ClientCursor* cursor =
-                new ClientCursor(CursorManager::getGlobalCursorManager(),
-                                 exec.release(),
-                                 cursorNss.ns(),
-                                 txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot());
-            cursorId = cursor->cursorid();
+            auto pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
+                {exec.release(),
+                 cursorNss.ns(),
+                 txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot()});
+            cursorId = pinnedCursor.getCursor()->cursorid();
         }
 
         appendCursorResponseObject(cursorId, cursorNss.ns(), firstBatch.arr(), &result);

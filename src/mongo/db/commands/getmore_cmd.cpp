@@ -236,15 +236,13 @@ public:
             cursorManager = collection->getCursorManager();
         }
 
-        ClientCursorPin ccPin(cursorManager, request.cursorid);
-        ClientCursor* cursor = ccPin.c();
-        if (!cursor) {
+        auto ccPin = cursorManager->pinCursor(request.cursorid);
+        if (!ccPin.isOK()) {
             // We didn't find the cursor.
-            return appendCommandStatus(
-                result,
-                Status(ErrorCodes::CursorNotFound,
-                       str::stream() << "Cursor not found, cursor id: " << request.cursorid));
+            return appendCommandStatus(result, ccPin.getStatus());
         }
+
+        ClientCursor* cursor = ccPin.getValue().getCursor();
 
         // If the fail point is enabled, busy wait until it is disabled. We unlock and re-acquire
         // the locks periodically in order to avoid deadlock (see SERVER-21997 for details).
@@ -291,13 +289,14 @@ public:
         }
 
         // On early return, get rid of the cursor.
-        ScopeGuard cursorFreer = MakeGuard(&GetMoreCmd::cleanupCursor, txn, &ccPin, request);
+        ScopeGuard cursorFreer =
+            MakeGuard(&GetMoreCmd::cleanupCursor, txn, &ccPin.getValue(), request);
 
         if (cursor->isReadCommitted())
             uassertStatusOK(txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
 
         // Reset timeout timer on the cursor since the cursor is still in use.
-        cursor->setIdleTime(0);
+        cursor->resetIdleTime();
 
         const bool hasOwnMaxTime = txn->hasDeadline();
 
@@ -563,7 +562,7 @@ public:
     static void cleanupCursor(OperationContext* txn,
                               ClientCursorPin* ccPin,
                               const GetMoreRequest& request) {
-        ClientCursor* cursor = ccPin->c();
+        ClientCursor* cursor = ccPin->getCursor();
 
         std::unique_ptr<Lock::DBLock> unpinDBLock;
         std::unique_ptr<Lock::CollectionLock> unpinCollLock;

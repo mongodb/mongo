@@ -181,13 +181,14 @@ bool GlobalCursorIdCache::eraseCursor(OperationContext* txn, CursorId id, bool c
     // Figure out what the namespace of this cursor is.
     std::string ns;
     if (globalCursorManager->ownsCursorId(id)) {
-        ClientCursorPin pin(globalCursorManager.get(), id);
-        if (!pin.c()) {
+        auto pin = globalCursorManager.get()->pinCursor(id);
+        if (!pin.isOK()) {
+            invariant(pin == ErrorCodes::CursorNotFound);
             // No such cursor.  TODO: Consider writing to audit log here (even though we don't
             // have a namespace).
             return false;
         }
-        ns = pin.c()->ns();
+        ns = pin.getValue().getCursor()->ns();
     } else {
         stdx::lock_guard<SimpleMutex> lk(_mutex);
         unsigned nsid = idFromCursorId(id);
@@ -351,7 +352,7 @@ void CursorManager::invalidateAll(bool collectionGoingAway, const std::string& r
                 //
                 // If the CC is not pinned, there is nobody actively holding it.  We can safely
                 // delete it.
-                if (!cc->isPinned()) {
+                if (!cc->_isPinned) {
                     toDelete.push_back(cc);
                 }
             }
@@ -364,13 +365,13 @@ void CursorManager::invalidateAll(bool collectionGoingAway, const std::string& r
 
                 // Note that a valid ClientCursor state is "no cursor no executor."  This is because
                 // the set of active cursor IDs in ClientCursor is used as representation of query
-                // state.  See sharding_block.h.  TODO(greg,hk): Move this out.
-                if (NULL == cc->getExecutor()) {
+                // state.
+                if (!cc->getExecutor()) {
                     newMap.insert(*i);
                     continue;
                 }
 
-                if (cc->isPinned() || cc->isAggCursor()) {
+                if (cc->_isPinned || cc->isAggCursor()) {
                     // Pinned cursors need to stay alive, so we leave them around.  Aggregation
                     // cursors also can stay alive (since they don't have their lifetime bound to
                     // the underlying collection).  However, if they have an associated executor, we
@@ -430,6 +431,7 @@ std::size_t CursorManager::timeoutCursors(int millisSinceLastCall) {
 
         for (CursorMap::const_iterator i = _cursors.begin(); i != _cursors.end(); ++i) {
             ClientCursor* cc = i->second;
+            // shouldTimeout() ensures that we skip pinned cursors.
             if (cc->shouldTimeout(millisSinceLastCall))
                 toDelete.push_back(cc);
         }
@@ -462,26 +464,24 @@ void CursorManager::deregisterExecutor(PlanExecutor* exec) {
     _nonCachedExecutors.erase(exec);
 }
 
-ClientCursor* CursorManager::find(CursorId id, bool pin) {
+StatusWith<ClientCursorPin> CursorManager::pinCursor(CursorId id) {
     stdx::lock_guard<SimpleMutex> lk(_mutex);
     CursorMap::const_iterator it = _cursors.find(id);
-    if (it == _cursors.end())
-        return NULL;
-
-    ClientCursor* cursor = it->second;
-    if (pin) {
-        uassert(12051, "clientcursor already in use? driver problem?", !cursor->isPinned());
-        cursor->setPinned();
+    if (it == _cursors.end()) {
+        return {ErrorCodes::CursorNotFound, str::stream() << "cursor id " << id << " not found"};
     }
 
-    return cursor;
+    ClientCursor* cursor = it->second;
+    uassert(12051, str::stream() << "cursor id " << id << " is already in use", !cursor->_isPinned);
+    cursor->_isPinned = true;
+    return ClientCursorPin(cursor);
 }
 
 void CursorManager::unpin(ClientCursor* cursor) {
     stdx::lock_guard<SimpleMutex> lk(_mutex);
 
-    invariant(cursor->isPinned());
-    cursor->unsetPinned();
+    invariant(cursor->_isPinned);
+    cursor->_isPinned = false;
 }
 
 bool CursorManager::ownsCursorId(CursorId cursorId) const {
@@ -512,12 +512,31 @@ CursorId CursorManager::_allocateCursorId_inlock() {
     fassertFailed(17360);
 }
 
-CursorId CursorManager::registerCursor(ClientCursor* cc) {
-    invariant(cc);
+ClientCursorPin CursorManager::registerCursor(const ClientCursorParams& cursorParams) {
     stdx::lock_guard<SimpleMutex> lk(_mutex);
-    CursorId id = _allocateCursorId_inlock();
-    _cursors[id] = cc;
-    return id;
+    CursorId cursorId = _allocateCursorId_inlock();
+    std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor(
+        new ClientCursor(cursorParams, this, cursorId));
+    return _registerCursor_inlock(std::move(clientCursor));
+}
+
+ClientCursorPin CursorManager::registerRangePreserverCursor(const Collection* collection) {
+    stdx::lock_guard<SimpleMutex> lk(_mutex);
+    CursorId cursorId = _allocateCursorId_inlock();
+    std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor(
+        new ClientCursor(collection, this, cursorId));
+    return _registerCursor_inlock(std::move(clientCursor));
+}
+
+ClientCursorPin CursorManager::_registerCursor_inlock(
+    std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor) {
+    CursorId cursorId = clientCursor->cursorid();
+    invariant(cursorId);
+
+    // Transfer ownership of the cursor to '_cursors'.
+    ClientCursor* unownedCursor = clientCursor.release();
+    _cursors[cursorId] = unownedCursor;
+    return ClientCursorPin(unownedCursor);
 }
 
 void CursorManager::deregisterCursor(ClientCursor* cc) {
@@ -542,7 +561,7 @@ Status CursorManager::eraseCursor(OperationContext* txn, CursorId id, bool shoul
 
         cursor = it->second;
 
-        if (cursor->isPinned()) {
+        if (cursor->_isPinned) {
             if (shouldAudit) {
                 audit::logKillCursorsAuthzCheck(
                     txn->getClient(), _nss, id, ErrorCodes::OperationFailed);
@@ -571,4 +590,4 @@ void CursorManager::_deregisterCursor_inlock(ClientCursor* cc) {
     CursorId id = cc->cursorid();
     _cursors.erase(id);
 }
-}
+}  // namespace mongo

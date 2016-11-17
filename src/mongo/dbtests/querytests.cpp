@@ -280,8 +280,9 @@ public:
         {
             // Check internal server handoff to getmore.
             OldClientWriteContext ctx(&_txn, ns);
-            ClientCursorPin clientCursor(ctx.getCollection()->getCursorManager(), cursorId);
-            ASSERT_EQUALS(2, clientCursor.c()->pos());
+            auto pinnedCursor =
+                unittest::assertGet(ctx.getCollection()->getCursorManager()->pinCursor(cursorId));
+            ASSERT_EQUALS(2, pinnedCursor.getCursor()->pos());
         }
 
         cursor = _client.getMore(ns, cursorId);
@@ -379,7 +380,7 @@ public:
         {
             AutoGetCollectionForRead ctx(&_txn, ns);
             ASSERT(1 == ctx.getCollection()->getCursorManager()->numCursors());
-            ASSERT(ctx.getCollection()->getCursorManager()->find(cursorId, false));
+            ASSERT_OK(ctx.getCollection()->getCursorManager()->pinCursor(cursorId).getStatus());
         }
 
         // Check that the cursor can be iterated until all documents are returned.
@@ -685,8 +686,9 @@ public:
         ASSERT_EQUALS(two, c->next()["ts"].Date());
         long long cursorId = c->getCursorId();
 
-        ClientCursorPin clientCursor(ctx.db()->getCollection(ns)->getCursorManager(), cursorId);
-        ASSERT_EQUALS(three.toULL(), clientCursor.c()->getSlaveReadTill().asULL());
+        auto pinnedCursor = unittest::assertGet(
+            ctx.db()->getCollection(ns)->getCursorManager()->pinCursor(cursorId));
+        ASSERT_EQUALS(three.toULL(), pinnedCursor.getCursor()->getSlaveReadTill().asULL());
     }
 };
 
@@ -1644,8 +1646,9 @@ public:
         ClientCursor* clientCursor = 0;
         {
             AutoGetCollectionForRead ctx(&_txn, ns());
-            ClientCursorPin clientCursorPointer(ctx.getCollection()->getCursorManager(), cursorId);
-            clientCursor = clientCursorPointer.c();
+            auto clientCursorPin =
+                unittest::assertGet(ctx.getCollection()->getCursorManager()->pinCursor(cursorId));
+            clientCursor = clientCursorPin.getCursor();
             // clientCursorPointer destructor unpins the cursor.
         }
         ASSERT(clientCursor->shouldTimeout(600001));
@@ -1695,7 +1698,8 @@ public:
 
         {
             OldClientWriteContext ctx(&_txn, ns());
-            ClientCursorPin pinCursor(ctx.db()->getCollection(ns())->getCursorManager(), cursorId);
+            auto pinnedCursor = unittest::assertGet(
+                ctx.db()->getCollection(ns())->getCursorManager()->pinCursor(cursorId));
             string expectedAssertion = str::stream() << "Cannot kill pinned cursor: " << cursorId;
             ASSERT_THROWS_WHAT(CursorManager::eraseCursorGlobal(&_txn, cursorId),
                                MsgAssertionException,

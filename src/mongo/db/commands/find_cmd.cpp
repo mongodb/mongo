@@ -390,26 +390,25 @@ public:
             // First unregister the PlanExecutor so it can be re-registered with ClientCursor.
             exec->deregisterExec();
 
-            // Create a ClientCursor containing this plan executor. We don't have to worry about
-            // leaking it as it's inserted into a global map by its ctor.
-            ClientCursor* cursor =
-                new ClientCursor(collection->getCursorManager(),
-                                 exec.release(),
-                                 nss.ns(),
-                                 txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
-                                 originalQR.getOptions(),
-                                 cmdObj.getOwned());
-            cursorId = cursor->cursorid();
+            // Create a ClientCursor containing this plan executor and register it with the cursor
+            // manager.
+            ClientCursorPin pinnedCursor = collection->getCursorManager()->registerCursor(
+                {exec.release(),
+                 nss.ns(),
+                 txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+                 originalQR.getOptions(),
+                 cmdObj.getOwned()});
+            cursorId = pinnedCursor.getCursor()->cursorid();
 
             invariant(!exec);
-            PlanExecutor* cursorExec = cursor->getExecutor();
+            PlanExecutor* cursorExec = pinnedCursor.getCursor()->getExecutor();
 
             // State will be restored on getMore.
             cursorExec->saveState();
             cursorExec->detachFromOperationContext();
 
-            cursor->setLeftoverMaxTimeMicros(txn->getRemainingMaxTimeMicros());
-            cursor->setPos(numResults);
+            pinnedCursor.getCursor()->setLeftoverMaxTimeMicros(txn->getRemainingMaxTimeMicros());
+            pinnedCursor.getCursor()->setPos(numResults);
 
             // Fill out curop based on the results.
             endQueryOp(txn, collection, *cursorExec, numResults, cursorId);

@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional.hpp>
 #include <deque>
 #include <vector>
 
@@ -89,13 +90,11 @@ namespace {
  */
 bool handleCursorCommand(OperationContext* txn,
                          const string& nsForCursor,
-                         ClientCursorPin* pin,
+                         ClientCursor* cursor,
                          PlanExecutor* exec,
                          const AggregationRequest& request,
                          BSONObjBuilder& result) {
-    ClientCursor* cursor = pin ? pin->c() : NULL;
-    if (pin) {
-        invariant(cursor);
+    if (cursor) {
         invariant(cursor->getExecutor() == exec);
         invariant(cursor->isAggCursor());
     }
@@ -132,14 +131,14 @@ bool handleCursorCommand(OperationContext* txn,
     }
 
     // NOTE: exec->isEOF() can have side effects such as writing by $out. However, it should
-    // be relatively quick since if there was no pin then the input is empty. Also, this
+    // be relatively quick since if there was no cursor then the input is empty. Also, this
     // violates the contract for batchSize==0. Sharding requires a cursor to be returned in that
     // case. This is ok for now however, since you can't have a sharded collection that doesn't
     // exist.
-    const bool canReturnMoreBatches = pin;
+    const bool canReturnMoreBatches = cursor;
     if (!canReturnMoreBatches && exec && !exec->isEOF()) {
         // msgasserting since this shouldn't be possible to trigger from today's aggregation
-        // language. The wording assumes that the only reason pin would be null is if the
+        // language. The wording assumes that the only reason cursor would be null is if the
         // collection doesn't exist.
         msgasserted(
             17391,
@@ -361,7 +360,7 @@ public:
         }
         expCtx->resolvedNamespaces = std::move(resolvedNamespaces.getValue());
 
-        unique_ptr<ClientCursorPin> pin;  // either this OR the exec will be non-null
+        boost::optional<ClientCursorPin> pin;  // either this OR the exec will be non-null
         unique_ptr<PlanExecutor> exec;
         boost::intrusive_ptr<Pipeline> pipeline;
         auto curOp = CurOp::get(txn);
@@ -514,15 +513,13 @@ public:
 
             if (collection) {
                 const bool isAggCursor = true;  // enable special locking behavior
-                ClientCursor* cursor =
-                    new ClientCursor(collection->getCursorManager(),
-                                     exec.release(),
-                                     nss.ns(),
-                                     txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
-                                     0,
-                                     cmdObj.getOwned(),
-                                     isAggCursor);
-                pin.reset(new ClientCursorPin(collection->getCursorManager(), cursor->cursorid()));
+                pin.emplace(collection->getCursorManager()->registerCursor(
+                    {exec.release(),
+                     nss.ns(),
+                     txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+                     0,
+                     cmdObj.getOwned(),
+                     isAggCursor}));
                 // Don't add any code between here and the start of the try block.
             }
 
@@ -559,8 +556,8 @@ public:
             } else if (request.isCursorCommand()) {
                 keepCursor = handleCursorCommand(txn,
                                                  origNss.ns(),
-                                                 pin.get(),
-                                                 pin ? pin->c()->getExecutor() : exec.get(),
+                                                 pin ? pin->getCursor() : nullptr,
+                                                 pin ? pin->getCursor()->getExecutor() : exec.get(),
                                                  request,
                                                  result);
             } else {
@@ -569,7 +566,8 @@ public:
 
             if (!expCtx->isExplain) {
                 PlanSummaryStats stats;
-                Explain::getSummaryStats(pin ? *pin->c()->getExecutor() : *exec.get(), &stats);
+                Explain::getSummaryStats(pin ? *pin->getCursor()->getExecutor() : *exec.get(),
+                                         &stats);
                 curOp->debug().setPlanSummaryMetrics(stats);
                 curOp->debug().nreturned = stats.nReturned;
             }

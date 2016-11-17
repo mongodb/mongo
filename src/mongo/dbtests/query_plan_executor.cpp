@@ -227,8 +227,7 @@ public:
         ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
         ASSERT_EQUALS(1, objOut["_id"].numberInt());
 
-        // After dropping the collection, the runner
-        // should be dead.
+        // After dropping the collection, the plan executor should be dead.
         dropCollection();
         ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
 
@@ -256,8 +255,7 @@ public:
         ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
         ASSERT_EQUALS(7, objOut["a"].numberInt());
 
-        // After dropping the collection, the runner
-        // should be dead.
+        // After dropping the collection, the plan executor should be dead.
         dropCollection();
         ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
 
@@ -443,8 +441,8 @@ public:
         Collection* coll = ctx.getCollection();
         PlanExecutor* exec = makeCollScanExec(coll, filterObj);
 
-        // Make a client cursor from the runner.
-        new ClientCursor(coll->getCursorManager(), exec, nss.ns(), false, 0, BSONObj());
+        // Make a client cursor from the plan executor.
+        coll->getCursorManager()->registerCursor({exec, nss.ns(), false, 0, BSONObj()});
 
         // There should be one cursor before invalidation,
         // and zero cursors after invalidation.
@@ -469,19 +467,17 @@ public:
         BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
         PlanExecutor* exec = makeCollScanExec(collection, filterObj);
 
-        // Make a client cursor from the runner.
-        ClientCursor* cc =
-            new ClientCursor(collection->getCursorManager(), exec, nss.ns(), false, 0, BSONObj());
-        ClientCursorPin ccPin(collection->getCursorManager(), cc->cursorid());
+        // Make a client cursor from the plan executor.
+        auto ccPin =
+            collection->getCursorManager()->registerCursor({exec, nss.ns(), false, 0, BSONObj()});
 
-        // If the cursor is pinned, it sticks around,
-        // even after invalidation.
+        // If the cursor is pinned, it sticks around, even after invalidation.
         ASSERT_EQUALS(1U, numCursors());
         const std::string invalidateReason("InvalidatePinned Test");
         collection->getCursorManager()->invalidateAll(false, invalidateReason);
         ASSERT_EQUALS(1U, numCursors());
 
-        // The invalidation should have killed the runner.
+        // The invalidation should have killed the plan executor.
         BSONObj objOut;
         ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
         ASSERT(WorkingSetCommon::isValidStatusMemberObject(objOut));
@@ -514,8 +510,8 @@ public:
             BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
             PlanExecutor* exec = makeCollScanExec(collection, filterObj);
 
-            // Make a client cursor from the runner.
-            new ClientCursor(collection->getCursorManager(), exec, nss.ns(), false, 0, BSONObj());
+            // Make a client cursor from the plan executor.
+            collection->getCursorManager()->registerCursor({exec, nss.ns(), false, 0, BSONObj()});
         }
 
         // There should be one cursor before timeout,
