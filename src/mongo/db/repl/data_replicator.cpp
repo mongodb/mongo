@@ -240,7 +240,7 @@ std::string toString(DataReplicatorState s) {
 
 // Data Replicator
 DataReplicator::DataReplicator(
-    DataReplicatorOptions opts,
+    const DataReplicatorOptions& opts,
     std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
     StorageInterface* storage)
     : _fetchCount(0),

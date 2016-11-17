@@ -54,7 +54,7 @@ using executor::RemoteCommandResponse;
 class ReplCoordHBTest : public ReplCoordTest {
 protected:
     void assertStartSuccess(const BSONObj& configDoc, const HostAndPort& selfHost);
-    void assertMemberState(MemberState expected, std::string msg = "");
+    void assertMemberState(MemberState expected, const std::string& msg = "");
     ReplSetHeartbeatResponse receiveHeartbeatFrom(const ReplicaSetConfig& rsConfig,
                                                   int sourceId,
                                                   const HostAndPort& source);
@@ -64,7 +64,7 @@ void ReplCoordHBTest::assertStartSuccess(const BSONObj& configDoc, const HostAnd
     ReplCoordTest::assertStartSuccess(addProtocolVersion(configDoc, 0), selfHost);
 }
 
-void ReplCoordHBTest::assertMemberState(const MemberState expected, std::string msg) {
+void ReplCoordHBTest::assertMemberState(const MemberState expected, const std::string& msg) {
     const MemberState actual = getReplCoord()->getMemberState();
     ASSERT(expected == actual) << "Expected coordinator to report state " << expected.toString()
                                << " but found " << actual.toString() << " - " << msg;

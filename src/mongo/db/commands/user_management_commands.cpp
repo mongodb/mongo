@@ -161,7 +161,7 @@ Status getCurrentUserRoles(OperationContext* txn,
  */
 Status checkOkayToGrantRolesToRole(OperationContext* txn,
                                    const RoleName& role,
-                                   const std::vector<RoleName> rolesToAdd,
+                                   const std::vector<RoleName>& rolesToAdd,
                                    AuthorizationManager* authzManager) {
     for (std::vector<RoleName>::const_iterator it = rolesToAdd.begin(); it != rolesToAdd.end();
          ++it) {

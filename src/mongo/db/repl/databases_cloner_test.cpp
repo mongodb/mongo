@@ -89,7 +89,7 @@ public:
         return _dbWorkThreadPool;
     }
 
-    void scheduleNetworkResponse(std::string cmdName, const BSONObj& obj) {
+    void scheduleNetworkResponse(const std::string& cmdName, const BSONObj& obj) {
         NetworkInterfaceMock* net = getNet();
         if (!net->hasReadyRequests()) {
             log() << "The network doesn't have a request to process for this response: " << obj;
@@ -107,7 +107,7 @@ public:
         net->scheduleResponse(noi, net->now(), responseStatus);
     }
 
-    void scheduleNetworkResponse(std::string cmdName, Status errorStatus) {
+    void scheduleNetworkResponse(const std::string& cmdName, Status errorStatus) {
         NetworkInterfaceMock* net = getNet();
         if (!getNet()->hasReadyRequests()) {
             log() << "The network doesn't have a request to process for the error: " << errorStatus;
@@ -116,12 +116,12 @@ public:
         net->scheduleResponse(net->getNextReadyRequest(), net->now(), errorStatus);
     }
 
-    void processNetworkResponse(std::string cmdName, const BSONObj& obj) {
+    void processNetworkResponse(const std::string& cmdName, const BSONObj& obj) {
         scheduleNetworkResponse(cmdName, obj);
         finishProcessingNetworkResponse();
     }
 
-    void processNetworkResponse(std::string cmdName, Status errorStatus) {
+    void processNetworkResponse(const std::string& cmdName, Status errorStatus) {
         scheduleNetworkResponse(cmdName, errorStatus);
         finishProcessingNetworkResponse();
     }
@@ -197,7 +197,7 @@ protected:
     /**
      * Note: An empty cmdName will skip validation.
      */
-    void verifyNextRequestCommandName(std::string cmdName) {
+    void verifyNextRequestCommandName(const std::string& cmdName) {
         const auto net = getNet();
         ASSERT_TRUE(net->hasReadyRequests());
 

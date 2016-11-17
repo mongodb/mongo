@@ -125,7 +125,7 @@ namespace {
 
 class RSFatalException : public std::exception {
 public:
-    RSFatalException(std::string m = "replica set fatal exception") : msg(m) {}
+    RSFatalException(const std::string& m = "replica set fatal exception") : msg(m) {}
     virtual ~RSFatalException() throw(){};
     virtual const char* what() const throw() {
         return msg.c_str();

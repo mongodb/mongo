@@ -154,7 +154,7 @@ const NamespaceString nss("local.oplog.rs");
 
 BSONObj makeCursorResponse(CursorId cursorId,
                            const NamespaceString& nss,
-                           std::vector<BSONObj> docs,
+                           const std::vector<BSONObj>& docs,
                            bool isFirstBatch = true) {
     BSONObjBuilder bob;
     {
@@ -299,7 +299,7 @@ void _scheduleFirstOplogEntryFetcherResponse(executor::NetworkInterfaceMock* net
                                              SyncSourceSelectorMock* selector,
                                              HostAndPort currentSyncSource,
                                              HostAndPort nextSyncSource,
-                                             std::vector<BSONObj> docs) {
+                                             const std::vector<BSONObj>& docs) {
     executor::NetworkInterfaceMock::InNetworkGuard networkGuard(net);
     ASSERT_TRUE(net->hasReadyRequests());
     auto request = net->scheduleSuccessfulResponse(makeCursorResponse(0, nss, docs));
@@ -599,7 +599,7 @@ void _scheduleRequiredOpTimeFetcherResponse(executor::NetworkInterfaceMock* net,
                                             SyncSourceSelectorMock* selector,
                                             HostAndPort currentSyncSource,
                                             OpTime requiredOpTime,
-                                            std::vector<BSONObj> docs) {
+                                            const std::vector<BSONObj>& docs) {
     executor::NetworkInterfaceMock::InNetworkGuard networkGuard(net);
     ASSERT_TRUE(net->hasReadyRequests());
     auto request = net->scheduleSuccessfulResponse(makeCursorResponse(0, nss, docs));

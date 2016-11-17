@@ -38,7 +38,7 @@
 namespace mongo {
 namespace {
 
-SaslClientSession* createNativeSaslClientSession(const std::string mech) {
+SaslClientSession* createNativeSaslClientSession(const std::string& mech) {
     return new NativeSaslClientSession();
 }
 
