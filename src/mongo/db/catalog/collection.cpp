@@ -1129,7 +1129,7 @@ public:
 
                 if (indexEntryCount != 0) {
                     indexEntryCount--;
-                    dassert(indexEntryCount >= 0);
+                    //dassert(indexEntryCount >= 0);
                     if (indexEntryCount == 0) {
                         _indexKeyCountTableNumEntries--;
                     }

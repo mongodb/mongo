@@ -144,7 +144,7 @@ bool SockAddr::isLocalHost() const {
         default:
             return false;
     }
-    fassert(16502, false);
+    //fassert(16502, false);
     return false;
 }
 

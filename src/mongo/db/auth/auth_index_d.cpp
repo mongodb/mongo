@@ -100,7 +100,7 @@ Status verifySystemIndexes(OperationContext* txn) {
     std::vector<IndexDescriptor*> indexes;
     indexCatalog->findIndexesByKeyPattern(txn, v1SystemUsersKeyPattern, false, &indexes);
 
-    if (indexCatalog && !indexes.empty()) {
+    if (!indexes.empty()) {
         fassert(ErrorCodes::AmbiguousIndexKeyPattern, indexes.size() == 1);
         return Status(ErrorCodes::AuthSchemaIncompatible,
                       "Old 2.4 style user index identified. "

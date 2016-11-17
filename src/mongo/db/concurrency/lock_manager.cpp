@@ -229,7 +229,7 @@ struct LockHead {
 
     // Methods to maintain the granted queue
     void incGrantedModeCount(LockMode mode) {
-        invariant(grantedCounts[mode] >= 0);
+        //invariant(grantedCounts[mode] >= 0);
         if (++grantedCounts[mode] == 1) {
             invariant((grantedModes & modeMask(mode)) == 0);
             grantedModes |= modeMask(mode);
@@ -246,7 +246,7 @@ struct LockHead {
 
     // Methods to maintain the conflict queue
     void incConflictModeCount(LockMode mode) {
-        invariant(conflictCounts[mode] >= 0);
+        //invariant(conflictCounts[mode] >= 0);
         if (++conflictCounts[mode] == 1) {
             invariant((conflictModes & modeMask(mode)) == 0);
             conflictModes |= modeMask(mode);

@@ -1439,7 +1439,7 @@ class DeeplyNestedObject : public TestRoundTrip {
         } else {
             std::stringstream ss;
             ss << "{\"" << depth << "\":" << buildJson(depth - 1) << "}";
-            depth--;
+            depth--; // For developers: Is this operation redundant? Is something missed?
             return ss.str();
         }
     }

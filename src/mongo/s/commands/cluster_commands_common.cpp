@@ -129,14 +129,14 @@ bool Future::CommandResult::join(OperationContext* txn, int maxRetries) {
             if (i >= maxRetries) {
                 error() << "Future::spawnCommand (part 2) stale config exception"
                         << causedBy(redact(e));
-                throw e;
+                throw;
             }
 
             if (i >= maxRetries / 2) {
                 if (!versionManager.forceRemoteCheckShardVersionCB(txn, staleNS)) {
                     error() << "Future::spawnCommand (part 2) no config detected"
                             << causedBy(redact(e));
-                    throw e;
+                    throw;
                 }
             }
 

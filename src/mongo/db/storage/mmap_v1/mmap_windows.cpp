@@ -185,7 +185,7 @@ void* MemoryMappedFile::map(const char* filenameIn, unsigned long long& length) 
     filename[255] = 0;
     {
         size_t len = strlen(filename);
-        for (size_t i = len - 1; i >= 0; i--) {
+        for (int i = (len > 0 ? static_cast<int>(len - 1) : -1); i >= 0; i--) {
             if (filename[i] == '/' || filename[i] == '\\')
                 break;
 
