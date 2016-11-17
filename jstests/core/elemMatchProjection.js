@@ -214,14 +214,6 @@ assert.eq(
     t.find({group: 10}, {_id: 0, x: {$elemMatch: {a: 1}}, y: {$elemMatch: {c: 3}}}).toArray()[0],
     "multiple $elemMatch on unique fields 1");
 
-assert.eq({"x": [{"y": [{"a": 1, "b": 2}, {"a": 3, "b": 4}]}]},
-          t.find({group: 8}, {_id: 0, x: {$elemMatch: {y: {$elemMatch: {a: 3}}}}}).toArray()[0],
-          "nested $elemMatch");
-
-assert.throws(function() {
-    t.find({group: 3, 'x.a': 1}, {'x.$': 1, y: {$elemMatch: {aa: 1}}}).toArray();
-}, [], "throw on positional operator with $elemMatch");
-
 if (false) {
     assert.eq(2,  // SERVER-1243: handle multiple $elemMatch results
               t.find({group: 4}, {x: {$elemMatchAll: {a: {$lte: 2}}}}).toArray()[0].x.length,
@@ -254,3 +246,29 @@ a = t.find({group: 3}, {x: {$elemMatch: {a: 1}}}).batchSize(1);
 while (a.hasNext()) {
     assert.eq(1, a.next().x[0].a, "positional getMore test");
 }
+
+// verify the positional update operator matches the same element as the the positional find.  this
+// is to ensure consistent behavior with updates until SERVER-1013 is resolved, at which point the
+// following tests should be updated.
+
+t.update({group: 10, 'x.a': 3, 'y.c': 1}, {$set: {'x.$': 100}}, false, true);
+// updated the wrong element, so the following assertions should be true
+assert.eq(100,
+          t.find({group: 10, 'y.c': 1, x: 100}, {'x.$': 1}).toArray()[0].x[0],
+          "wrong single element match after update");
+
+assert.eq(100,
+          t.find({group: 10, x: 100, 'y.c': 1}, {'x.$': 1}).toArray()[0].x[0],
+          "wrong single element match after update");
+
+t.remove({group: 10});
+t.insert({group: 10, x: [{a: 1, b: 2}, {a: 3, b: 4}], y: [{c: 1, d: 2}, {c: 3, d: 4}]});
+
+t.update({group: 10, 'y.c': 1, 'x.a': 3}, {$set: {'x.$': 100}}, false, true);
+// updated the correct element
+assert.eq(100,
+          t.find({group: 10, 'y.c': 1, x: 100}, {'x.$': 1}).toArray()[0].x[0],
+          "right single element match after update");
+assert.eq(100,
+          t.find({group: 10, x: 100, 'y.c': 1}, {'x.$': 1}).toArray()[0].x[0],
+          "right single element match after update");
