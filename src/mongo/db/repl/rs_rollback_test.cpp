@@ -62,6 +62,7 @@ namespace {
 
 using namespace mongo;
 using namespace mongo::repl;
+using namespace mongo::repl::rollback_internal;
 
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
@@ -1015,6 +1016,60 @@ TEST_F(RSRollbackTest, RollbackCollectionModificationCommandInvalidCollectionOpt
                      noSleep);
     ASSERT_EQUALS(ErrorCodes::UnrecoverableRollbackError, status.code());
     ASSERT_EQUALS(18753, status.location());
+}
+
+// The testcases used here are trying to detect off-by-one errors in
+// FixUpInfo::removeAllDocsToRefectchFor.
+TEST(FixUpInfoTest, RemoveAllDocsToRefetchForWorks) {
+    const auto normalHolder = BSON("" << OID::gen());
+    const auto normalKey = normalHolder.firstElement();
+
+    // Can't use ASSERT_EQ with this since it isn't ostream-able. Failures will at least give you
+    // the size. If that isn't enough, use GDB.
+    using DocSet = std::set<DocID>;
+
+    FixUpInfo fui;
+    fui.docsToRefetch = {
+        DocID::minFor("a"),
+        DocID{{}, "a", normalKey},
+        DocID::maxFor("a"),
+
+        DocID::minFor("b"),
+        DocID{{}, "b", normalKey},
+        DocID::maxFor("b"),
+
+        DocID::minFor("c"),
+        DocID{{}, "c", normalKey},
+        DocID::maxFor("c"),
+    };
+
+    // Remove from the middle.
+    fui.removeAllDocsToRefetchFor("b");
+    ASSERT((fui.docsToRefetch ==
+            DocSet{
+                DocID::minFor("a"),
+                DocID{{}, "a", normalKey},
+                DocID::maxFor("a"),
+
+                DocID::minFor("c"),
+                DocID{{}, "c", normalKey},
+                DocID::maxFor("c"),
+            }))
+        << "remaining docs: " << fui.docsToRefetch.size();
+
+    // Remove from the end.
+    fui.removeAllDocsToRefetchFor("c");
+    ASSERT((fui.docsToRefetch ==
+            DocSet{
+                DocID::minFor("a"),  // This comment helps clang-format.
+                DocID{{}, "a", normalKey},
+                DocID::maxFor("a"),
+            }))
+        << "remaining docs: " << fui.docsToRefetch.size();
+
+    // Everything else.
+    fui.removeAllDocsToRefetchFor("a");
+    ASSERT((fui.docsToRefetch == DocSet{})) << "remaining docs: " << fui.docsToRefetch.size();
 }
 
 }  // namespace

@@ -121,6 +121,48 @@ namespace repl {
 // Failpoint which causes rollback to hang before finishing.
 MONGO_FP_DECLARE(rollbackHangBeforeFinish);
 
+using namespace rollback_internal;
+
+bool DocID::operator<(const DocID& other) const {
+    int comp = strcmp(ns, other.ns);
+    if (comp < 0)
+        return true;
+    if (comp > 0)
+        return false;
+
+    const StringData::ComparatorInterface* stringComparator = nullptr;
+    BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore, stringComparator);
+    return eltCmp.evaluate(_id < other._id);
+}
+
+bool DocID::operator==(const DocID& other) const {
+    // Since this is only used for tests, going with the simple impl that reuses operator< which is
+    // used in the real code.
+    return !(*this < other || other < *this);
+}
+
+void FixUpInfo::removeAllDocsToRefetchFor(const std::string& collection) {
+    docsToRefetch.erase(docsToRefetch.lower_bound(DocID::minFor(collection.c_str())),
+                        docsToRefetch.upper_bound(DocID::maxFor(collection.c_str())));
+}
+
+void FixUpInfo::removeRedundantOperations() {
+    // These loops and their bodies can be done in any order. The final result of the FixUpInfo
+    // members will be the same either way.
+    for (const auto& collection : collectionsToDrop) {
+        removeAllDocsToRefetchFor(collection);
+        indexesToDrop.erase(collection);
+        collectionsToResyncMetadata.erase(collection);
+    }
+
+    for (const auto& collection : collectionsToResyncData) {
+        removeAllDocsToRefetchFor(collection);
+        indexesToDrop.erase(collection);
+        collectionsToResyncMetadata.erase(collection);
+        collectionsToDrop.erase(collection);
+    }
+}
+
 namespace {
 
 class RSFatalException : public std::exception {
@@ -133,46 +175,6 @@ public:
 
 private:
     std::string msg;
-};
-
-struct DocID {
-    // ns and _id both point into ownedObj's buffer
-    BSONObj ownedObj;
-    const char* ns;
-    BSONElement _id;
-    bool operator<(const DocID& other) const {
-        int comp = strcmp(ns, other.ns);
-        if (comp < 0)
-            return true;
-        if (comp > 0)
-            return false;
-
-        const StringData::ComparatorInterface* stringComparator = nullptr;
-        BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
-                                     stringComparator);
-        return eltCmp.evaluate(_id < other._id);
-    }
-};
-
-struct FixUpInfo {
-    // note this is a set -- if there are many $inc's on a single document we need to rollback,
-    // we only need to refetch it once.
-    set<DocID> toRefetch;
-
-    // collections to drop
-    set<string> toDrop;
-
-    // Indexes to drop.
-    // Key is collection namespace. Value is name of index to drop.
-    multimap<string, string> indexesToDrop;
-
-    set<string> collectionsToResyncData;
-    set<string> collectionsToResyncMetadata;
-
-    OpTime commonPoint;
-    RecordId commonPointOurDiskloc;
-
-    int rbid;  // remote server's current rollback sequence #
 };
 
 
@@ -213,7 +215,7 @@ Status refetch(FixUpInfo& fixUpInfo, const BSONObj& ourObj) {
             // Create collection operation
             // { ts: ..., h: ..., op: "c", ns: "foo.$cmd", o: { create: "abc", ... } }
             string ns = nss.db().toString() + '.' + obj["create"].String();  // -> foo.abc
-            fixUpInfo.toDrop.insert(ns);
+            fixUpInfo.collectionsToDrop.insert(ns);
             return Status::OK();
         } else if (cmdname == "drop") {
             string ns = nss.db().toString() + '.' + first.valuestr();
@@ -333,13 +335,13 @@ Status refetch(FixUpInfo& fixUpInfo, const BSONObj& ourObj) {
         throw RSFatalException();
     }
 
-    fixUpInfo.toRefetch.insert(doc);
+    fixUpInfo.docsToRefetch.insert(doc);
     return Status::OK();
 }
 
 
 void syncFixUp(OperationContext* txn,
-               FixUpInfo& fixUpInfo,
+               const FixUpInfo& fixUpInfo,
                const RollbackSource& rollbackSource,
                ReplicationCoordinator* replCoord) {
     // fetch all first so we needn't handle interruption in a fancy way
@@ -355,7 +357,8 @@ void syncFixUp(OperationContext* txn,
     DocID doc;
     unsigned long long numFetched = 0;
     try {
-        for (set<DocID>::iterator it = fixUpInfo.toRefetch.begin(); it != fixUpInfo.toRefetch.end();
+        for (set<DocID>::iterator it = fixUpInfo.docsToRefetch.begin();
+             it != fixUpInfo.docsToRefetch.end();
              it++) {
             doc = *it;
 
@@ -389,7 +392,7 @@ void syncFixUp(OperationContext* txn,
     } catch (const DBException& e) {
         LOG(1) << "rollback re-get objects: " << redact(e);
         error() << "rollback couldn't re-get ns:" << doc.ns << " _id:" << redact(doc._id) << ' '
-                << numFetched << '/' << fixUpInfo.toRefetch.size();
+                << numFetched << '/' << fixUpInfo.docsToRefetch.size();
         throw e;
     }
 
@@ -423,8 +426,8 @@ void syncFixUp(OperationContext* txn,
         for (const string& ns : fixUpInfo.collectionsToResyncData) {
             log() << "rollback 4.1.1 coll resync " << ns;
 
-            fixUpInfo.indexesToDrop.erase(ns);
-            fixUpInfo.collectionsToResyncMetadata.erase(ns);
+            invariant(!fixUpInfo.indexesToDrop.count(ns));
+            invariant(!fixUpInfo.collectionsToResyncMetadata.count(ns));
 
             const NamespaceString nss(ns);
 
@@ -457,9 +460,11 @@ void syncFixUp(OperationContext* txn,
             auto infoResult = rollbackSource.getCollectionInfo(nss);
 
             if (!infoResult.isOK()) {
-                // Collection dropped by "them" so we should drop it too.
-                log() << ns << " not found on remote host, dropping";
-                fixUpInfo.toDrop.insert(ns);
+                // Collection dropped by "them" so we can't correctly change it here. If we get to
+                // the roll-forward phase, we will drop it then. If the drop is rolled-back upstream
+                // and we restart, we will be expected to still have the collection.
+                log() << ns << " not found on remote host, so not rolling back collmod operation."
+                               " We will drop the collection soon.";
                 continue;
             }
 
@@ -542,12 +547,13 @@ void syncFixUp(OperationContext* txn,
     }
 
     log() << "rollback 4.6";
-    // drop collections to drop before doing individual fixups - that might make things faster
-    // below actually if there were subsequent inserts to rollback
-    for (set<string>::iterator it = fixUpInfo.toDrop.begin(); it != fixUpInfo.toDrop.end(); it++) {
+    // drop collections to drop before doing individual fixups
+    for (set<string>::iterator it = fixUpInfo.collectionsToDrop.begin();
+         it != fixUpInfo.collectionsToDrop.end();
+         it++) {
         log() << "rollback drop: " << *it;
 
-        fixUpInfo.indexesToDrop.erase(*it);
+        invariant(!fixUpInfo.indexesToDrop.count(*it));
 
         ScopedTransaction transaction(txn, MODE_IX);
         const NamespaceString nss(*it);
@@ -637,9 +643,8 @@ void syncFixUp(OperationContext* txn,
         // while rolling back createCollection operations.
         const auto& ns = nsAndGoodVersionsByDocID.first;
         unique_ptr<Helpers::RemoveSaver> removeSaver;
-        if (!fixUpInfo.toDrop.count(ns)) {
-            removeSaver.reset(new Helpers::RemoveSaver("rollback", "", ns));
-        }
+        invariant(!fixUpInfo.collectionsToDrop.count(ns));
+        removeSaver.reset(new Helpers::RemoveSaver("rollback", "", ns));
 
         const auto& goodVersionsByDocID = nsAndGoodVersionsByDocID.second;
         for (const auto& idAndDoc : goodVersionsByDocID) {
@@ -654,10 +659,7 @@ void syncFixUp(OperationContext* txn,
             BSONObj pattern = doc._id.wrap();  // { _id : ... }
             try {
                 verify(doc.ns && *doc.ns);
-                if (fixUpInfo.collectionsToResyncData.count(doc.ns)) {
-                    // We just synced this entire collection.
-                    continue;
-                }
+                invariant(!fixUpInfo.collectionsToResyncData.count(doc.ns));
 
                 // TODO: Lots of overhead in context. This can be faster.
                 const NamespaceString docNss(doc.ns);
@@ -882,10 +884,11 @@ Status _syncRollback(OperationContext* txn,
                     default:
                         throw RSFatalException(status.toString());
                 }
-            } else {
-                how.commonPoint = res.getValue().first;
-                how.commonPointOurDiskloc = res.getValue().second;
             }
+
+            how.commonPoint = res.getValue().first;
+            how.commonPointOurDiskloc = res.getValue().second;
+            how.removeRedundantOperations();
         } catch (const RSFatalException& e) {
             error() << redact(e.what());
             return Status(ErrorCodes::UnrecoverableRollbackError,

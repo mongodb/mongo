@@ -32,6 +32,8 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/time_support.h"
 
@@ -44,7 +46,6 @@ class OperationContext;
 namespace repl {
 
 class OplogInterface;
-class OpTime;
 class ReplicationCoordinator;
 class RollbackSource;
 
@@ -87,5 +88,50 @@ Status syncRollback(OperationContext* txn,
                     boost::optional<int> requiredRBID,
                     ReplicationCoordinator* replCoord);
 
+/**
+ * This namespace contains internal details of the rollback system. It is only exposed in a header
+ * for unittesting. Nothing here should be used outside of rs_rollback.cpp or its unittest.
+ */
+namespace rollback_internal {
+
+struct DocID {
+    BSONObj ownedObj;
+    const char* ns;
+    BSONElement _id;
+    bool operator<(const DocID& other) const;
+    bool operator==(const DocID& other) const;
+
+    static DocID minFor(const char* ns) {
+        auto obj = BSON("" << MINKEY);
+        return {obj, ns, obj.firstElement()};
+    }
+
+    static DocID maxFor(const char* ns) {
+        auto obj = BSON("" << MAXKEY);
+        return {obj, ns, obj.firstElement()};
+    }
+};
+
+struct FixUpInfo {
+    // note this is a set -- if there are many $inc's on a single document we need to rollback,
+    // we only need to refetch it once.
+    std::set<DocID> docsToRefetch;
+
+    // Key is collection namespace. Value is name of index to drop.
+    std::multimap<std::string, std::string> indexesToDrop;
+
+    std::set<std::string> collectionsToDrop;
+    std::set<std::string> collectionsToResyncData;
+    std::set<std::string> collectionsToResyncMetadata;
+
+    OpTime commonPoint;
+    RecordId commonPointOurDiskloc;
+
+    int rbid;  // remote server's current rollback sequence #
+
+    void removeAllDocsToRefetchFor(const std::string& collection);
+    void removeRedundantOperations();
+};
+}  // namespace rollback_internal
 }  // namespace repl
 }  // namespace mongo
