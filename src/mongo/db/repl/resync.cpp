@@ -83,6 +83,14 @@ public:
         // Replica set resync.
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
         if (getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
+            // Resync is disabled in production on replica sets until it stabilizes (SERVER-27081).
+            if (!Command::testCommandsEnabled) {
+                return appendCommandStatus(
+                    result,
+                    Status(ErrorCodes::OperationFailed,
+                           "Replica sets do not support the resync command"));
+            }
+
             const MemberState memberState = replCoord->getMemberState();
             if (memberState.startup()) {
                 return appendCommandStatus(
