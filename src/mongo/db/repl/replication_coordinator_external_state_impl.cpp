@@ -412,11 +412,11 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
 void ReplicationCoordinatorExternalStateImpl::onDrainComplete(OperationContext* txn) {
     invariant(!txn->lockState()->isLocked());
 
-    // If this is a config server node becoming a primary, start the balancer
+    // If this is a config server node becoming a primary, ensure the balancer is ready to start.
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        // We need to join the balancer here, because it might have been running at a previous time
-        // when this node was a primary.
-        Balancer::get(txn)->onDrainComplete(txn);
+        // We must ensure the balancer has stopped because it may still be in the process of
+        // stopping if this node was previously primary.
+        Balancer::get(txn)->waitForBalancerToStop();
     }
 }
 
@@ -707,7 +707,7 @@ void ReplicationCoordinatorExternalStateImpl::killAllUserOperations(OperationCon
 
 void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        Balancer::get(getGlobalServiceContext())->onStepDownFromPrimary();
+        Balancer::get(getGlobalServiceContext())->interruptBalancer();
     }
 
     ShardingState::get(getGlobalServiceContext())->markCollectionsNotShardedAtStepdown();
@@ -775,7 +775,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         distLockManager->unlockAll(txn, distLockManager->getProcessID());
 
         // If this is a config server node becoming a primary, start the balancer
-        Balancer::get(txn)->onTransitionToPrimary(txn);
+        Balancer::get(txn)->initiateBalancer(txn);
     } else if (ShardingState::get(txn)->enabled()) {
         const auto configsvrConnStr =
             Grid::get(txn)->shardRegistry()->getConfigShard()->getConnString();

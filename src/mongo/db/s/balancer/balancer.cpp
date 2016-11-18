@@ -53,6 +53,7 @@
 #include "mongo/s/shard_util.h"
 #include "mongo/s/sharding_raii.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/version.h"
@@ -166,6 +167,15 @@ Balancer::~Balancer() {
 void Balancer::create(ServiceContext* serviceContext) {
     invariant(!getBalancer(serviceContext));
     getBalancer(serviceContext) = stdx::make_unique<Balancer>(serviceContext);
+
+    // Register a shutdown task to terminate the balancer thread so that it doesn't leak memory.
+    registerShutdownTask([serviceContext] {
+        auto balancer = Balancer::get(serviceContext);
+        // Make sure that the balancer thread has been interrupted.
+        balancer->interruptBalancer();
+        // Make sure the balancer thread has terminated.
+        balancer->waitForBalancerToStop();
+    });
 }
 
 Balancer* Balancer::get(ServiceContext* serviceContext) {
@@ -176,7 +186,7 @@ Balancer* Balancer::get(OperationContext* operationContext) {
     return get(operationContext->getServiceContext());
 }
 
-void Balancer::onTransitionToPrimary(OperationContext* txn) {
+void Balancer::initiateBalancer(OperationContext* txn) {
     stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
     invariant(_state == kStopped);
     _state = kRunning;
@@ -188,7 +198,7 @@ void Balancer::onTransitionToPrimary(OperationContext* txn) {
     _thread = stdx::thread([this] { _mainThread(); });
 }
 
-void Balancer::onStepDownFromPrimary() {
+void Balancer::interruptBalancer() {
     stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
     if (_state != kRunning)
         return;
@@ -211,9 +221,7 @@ void Balancer::onStepDownFromPrimary() {
     _condVar.notify_all();
 }
 
-void Balancer::onDrainComplete(OperationContext* txn) {
-    invariant(!txn->lockState()->isLocked());
-
+void Balancer::waitForBalancerToStop() {
     {
         stdx::lock_guard<stdx::mutex> scopedLock(_mutex);
         if (_state == kStopped)

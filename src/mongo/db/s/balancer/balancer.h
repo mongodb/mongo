@@ -76,35 +76,37 @@ public:
     /**
      * Invoked when the config server primary enters the 'PRIMARY' state and is invoked while the
      * caller is holding the global X lock. Kicks off the main balancer thread and returns
-     * immediately.
+     * immediately. Auto-balancing (if enabled) should commence shortly, and manual migrations will
+     * be processed and run.
      *
      * Must only be called if the balancer is in the stopped state (i.e., just constructed or
-     * onDrainComplete has been called before). Any code in this call must not try to acquire any
-     * locks or to wait on operations, which acquire locks.
+     * waitForBalancerToStop has been called before). Any code in this call must not try to acquire
+     * any locks or to wait on operations, which acquire locks.
      */
-    void onTransitionToPrimary(OperationContext* txn);
+    void initiateBalancer(OperationContext* txn);
 
     /**
      * Invoked when this node which is currently serving as a 'PRIMARY' steps down and is invoked
      * while the global X lock is held. Requests the main balancer thread to stop and returns
-     * immediately without waiting for it to terminate.
+     * immediately without waiting for it to terminate. Once the balancer has stopped, manual
+     * migrations will be rejected.
      *
      * This method might be called multiple times in succession, which is what happens as a result
      * of incomplete transition to primary so it is resilient to that.
      *
-     * The onDrainComplete method must be called afterwards in order to wait for the main balancer
-     * thread to terminate and to allow onTransitionToPrimary to be called again.
+     * The waitForBalancerToStop method must be called afterwards in order to wait for the main
+     * balancer thread to terminate and to allow initiateBalancer to be called again.
      */
-    void onStepDownFromPrimary();
+    void interruptBalancer();
 
     /**
      * Invoked when a node on its way to becoming a primary finishes draining and is about to
      * acquire the global X lock in order to allow writes. Waits for the balancer thread to
-     * terminate and primes the balancer so that onTransitionToPrimary can be called.
+     * terminate and primes the balancer so that initiateBalancer can be called.
      *
-     * This method is called without any locks held.
+     * This must not be called while holding any locks!
      */
-    void onDrainComplete(OperationContext* txn);
+    void waitForBalancerToStop();
 
     /**
      * Potentially blocking method, which will return immediately if the balancer is not running a
