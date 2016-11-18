@@ -69,7 +69,7 @@ sh.help = function() {
     print("\tsh.removeShardFromZone(shard,zone)      removes the shard from zone");
     print(
         "\tsh.removeRangeFromZone(fullName,min,max)   removes the range of the given collection from any zone");
-    print("\tsh.shardCollection(fullName,key,unique)   shards the collection");
+    print("\tsh.shardCollection(fullName,key,unique,options)   shards the collection");
     print(
         "\tsh.splitAt(fullName,middle)               splits the chunk that middle is in at middle");
     print(
@@ -98,7 +98,7 @@ sh.enableSharding = function(dbname) {
     return sh._adminCommand({enableSharding: dbname});
 };
 
-sh.shardCollection = function(fullName, key, unique) {
+sh.shardCollection = function(fullName, key, unique, options) {
     sh._checkFullName(fullName);
     assert(key, "need a key");
     assert(typeof(key) == "object", "key needs to be an object");
@@ -106,6 +106,12 @@ sh.shardCollection = function(fullName, key, unique) {
     var cmd = {shardCollection: fullName, key: key};
     if (unique)
         cmd.unique = true;
+    if (options) {
+        if (typeof(options) !== "object") {
+            throw new Error("options must be an object");
+        }
+        Object.extend(cmd, options);
+    }
 
     return sh._adminCommand(cmd);
 };
