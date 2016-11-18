@@ -1222,8 +1222,8 @@ private:
     // Current ReplicaSet state.
     MemberState _memberState;  // (MX)
 
-    // Used to signal threads waiting for changes to _memberState. Only used in testing.
-    stdx::condition_variable _drainFinishedCond_forTest;  // (M)
+    // Used to signal threads waiting for changes to _memberState.
+    stdx::condition_variable _drainFinishedCond;  // (M)
 
     // True if we are waiting for the applier to finish draining.
     bool _isWaitingForDrainToComplete;  // (M)
