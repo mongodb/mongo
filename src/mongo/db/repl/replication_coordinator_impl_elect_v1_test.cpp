@@ -1348,12 +1348,11 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringFreshnessScan) {
     ASSERT_TRUE(evh.isValid());
     getReplExec()->waitForEvent(evh);
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
-    ASSERT_FALSE(getReplCoord()->isCatchingUp());
-    ASSERT_FALSE(getReplCoord()->isWaitingForApplierToDrain());
     auto net = getNet();
     net->enterNetwork();
     net->runUntil(net->now() + config.getCatchUpTimeoutPeriod());
     net->exitNetwork();
+    ASSERT_FALSE(getReplCoord()->isWaitingForApplierToDrain());
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Stopped transition to primary"));
     ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase("test"));
@@ -1378,12 +1377,15 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
     ASSERT_TRUE(evh.isValid());
     getReplExec()->waitForEvent(evh);
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
-    ASSERT_FALSE(getReplCoord()->isCatchingUp());
-    ASSERT_FALSE(getReplCoord()->isWaitingForApplierToDrain());
     auto net = getNet();
     net->enterNetwork();
     net->runReadyNetworkOperations();
     net->exitNetwork();
+    auto txn = makeOperationContext();
+    // Simulate bgsync signaling replCoord to exit drain mode.
+    // At this point, we see the stepdown and reset the states.
+    getReplCoord()->signalDrainComplete(txn.get());
+    ASSERT_FALSE(getReplCoord()->isWaitingForApplierToDrain());
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Cannot catch up oplog after becoming primary"));
     ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase("test"));
