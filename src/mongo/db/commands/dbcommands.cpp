@@ -261,23 +261,9 @@ public:
             return false;
         }
 
-        // Closing a database requires a global lock.
+        // TODO: SERVER-4328 Don't lock globally
         ScopedTransaction transaction(txn, MODE_X);
         Lock::GlobalWrite lk(txn->lockState());
-        if (!dbHolder().get(txn, dbname)) {
-            // If the name doesn't make an exact match, check for a case insensitive match.
-            std::string otherCasing = Database::duplicateUncasedName(dbname, nullptr);
-            if (otherCasing == nullptr) {
-                // Database doesn't exist. Treat this as a success (historical behavior).
-                return true;
-            }
-
-            // Database exists with a differing case. Treat this as an error. Report the casing
-            // conflict.
-            errmsg = str::stream() << "Database exists with a different case. Given: `" << dbname
-                                   << "` Found: `" << otherCasing << "`";
-            return false;
-        }
 
         // TODO (Kal): OldClientContext legacy, needs to be removed
         {
