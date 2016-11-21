@@ -20,7 +20,12 @@
  *
  */
 (function() {
+    load("jstests/libs/write_concern_util.js");  // for stopReplicationOnSecondaries,
+                                                 // restartServerReplication,
+                                                 // restartReplSetReplication
+
     'use strict';
+
     var name = 'stepdown_needs_electable_secondary';
 
     var replTest = new ReplSetTest({name: name, nodes: 5});
@@ -38,20 +43,6 @@
         ]
     });
 
-    /* Disable all incoming writes to a node (secondary) */
-    function disableReplicationToNode(node) {
-        assert.commandWorked(node.getDB('admin').runCommand(
-                                 {configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}),
-                             'Failed to enable rsSyncApplyStop failpoint.');
-    }
-
-    /* Re-enable all incoming writes to a node (secondary) */
-    function enableReplicationToNode(node) {
-        assert.commandWorked(
-            node.getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}),
-            'Failed to disable rsSyncApplyStop failpoint.');
-    }
-
     function assertStepDownFailsWithExceededTimeLimit(node) {
         assert.commandFailedWithCode(
             node.getDB("admin").runCommand({replSetStepDown: 5, secondaryCatchUpPeriodSecs: 5}),
@@ -68,7 +59,7 @@
     var primary = replTest.getPrimary();
 
     jsTestLog("Blocking writes to all secondaries.");
-    replTest.liveNodes.slaves.forEach(disableReplicationToNode);
+    stopReplicationOnSecondaries(replTest);
 
     jsTestLog("Doing a write to primary.");
     var testDB = replTest.getPrimary().getDB('testdb');
@@ -95,7 +86,7 @@
     // stepDown should fail due to no caught up majority.
     jsTestLog("Re-enabling writes to unelectable secondary: node #" +
               replTest.getNodeId(secondaryB_unelectable) + ", " + secondaryB_unelectable);
-    enableReplicationToNode(secondaryB_unelectable);
+    restartServerReplication(secondaryB_unelectable);
 
     // Wait for this secondary to catch up by issuing a write that must be replicated to 2 nodes
     assert.writeOK(coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 2}}));
@@ -109,7 +100,7 @@
     // stepDown should fail due to caught up majority without electable node.
     jsTestLog("Re-enabling writes to unelectable secondary: node #" +
               replTest.getNodeId(secondaryC_unelectable) + ", " + secondaryC_unelectable);
-    enableReplicationToNode(secondaryC_unelectable);
+    restartServerReplication(secondaryC_unelectable);
 
     // Wait for this secondary to catch up by issuing a write that must be replicated to 3 nodes
     assert.writeOK(coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 3}}));
@@ -124,7 +115,7 @@
     // stepDown should succeed due to caught up majority containing an electable node.
     jsTestLog("Re-enabling writes to electable secondary: node #" +
               replTest.getNodeId(secondaryA_electable) + ", " + secondaryA_electable);
-    enableReplicationToNode(secondaryA_electable);
+    restartServerReplication(secondaryA_electable);
 
     // Wait for this secondary to catch up by issuing a write that must be replicated to 4 nodes
     assert.writeOK(coll.insert({"dummy_key": "dummy_val"}, {writeConcern: {w: 4}}));
@@ -140,7 +131,7 @@
     replTest.waitForState(primary, ReplSetTest.State.SECONDARY);
 
     // Disable all fail points for clean shutdown
-    replTest.liveNodes.slaves.forEach(enableReplicationToNode);
+    restartReplSetReplication(replTest);
     replTest.stopSet();
 
 }());
