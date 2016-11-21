@@ -6,6 +6,14 @@
 (function() {
     'use strict';
 
+    // Cursor timeout on mongod is handled by a single thread/timer that will sleep for
+    // "clientCursorMonitorFrequencySecs" and add the sleep value to each operation's duration when
+    // it wakes up, timing out those whose "now() - last accessed since" time exceeds. A cursor
+    // timeout of 2 seconds with a monitor frequency of 1 second means an effective timeout period
+    // of 1 to 2 seconds.
+    const cursorTimeoutMs = 2000;
+    const cursorMonitorFrequencySecs = 1;
+
     const options = {
         setParameter: {
             internalDocumentSourceCursorBatchSizeBytes: 1,
@@ -14,8 +22,8 @@
             // server parameter to make the ClientCursorMonitor that cleans up the timed out cursors
             // run more often. The combination of these server parameters reduces the amount of time
             // we need to wait within this test.
-            cursorTimeoutMillis: 1000,
-            clientCursorMonitorFrequencySecs: 1,
+            cursorTimeoutMillis: cursorTimeoutMs,
+            clientCursorMonitorFrequencySecs: cursorMonitorFrequencySecs,
         }
     };
     const conn = MongoRunner.runMongod(options);
@@ -50,8 +58,7 @@
             },
             function() {
                 return "aggregation cursor failed to time out: " + tojson(serverStatus);
-            },
-            5000);
+            });
 
         assert.eq(0, serverStatus.metrics.cursor.open.total, tojson(serverStatus));
 
