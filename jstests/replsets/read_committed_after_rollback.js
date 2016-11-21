@@ -58,7 +58,7 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
             {"_id": 4, "host": nodes[4], arbiterOnly: true},
         ]
     };
-    updateConfigIfNotDurable(config);
+
     replTest.initiate(config);
 
     // Get connections.

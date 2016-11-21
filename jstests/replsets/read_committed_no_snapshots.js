@@ -30,7 +30,7 @@ load("jstests/replsets/rslib.js");  // For reconfig and startSetIfSupportsReadMa
         ],
         "protocolVersion": 1
     };
-    updateConfigIfNotDurable(config);
+
     replTest.initiate(config);
 
     // Get connections and collection.

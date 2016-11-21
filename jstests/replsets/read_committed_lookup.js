@@ -34,7 +34,7 @@ load("jstests/libs/read_committed_lib.js");  // For testReadCommittedLookup
             {_id: 2, host: nodes[2], arbiterOnly: true},
         ]
     };
-    updateConfigIfNotDurable(config);
+
     rst.initiate(config);
 
     let shardSecondary = rst.liveNodes.slaves[0];
