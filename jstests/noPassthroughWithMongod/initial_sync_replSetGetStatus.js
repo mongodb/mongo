@@ -103,4 +103,7 @@
 
     assert.commandFailedWithCode(secondary.adminCommand({replSetGetStatus: 1, initialSync: "m"}),
                                  ErrorCodes.TypeMismatch);
+    assert.eq(0,
+              secondary.getDB('local')['temp_oplog_buffer'].find().itcount(),
+              "Oplog buffer was not dropped after initial sync");
 })();

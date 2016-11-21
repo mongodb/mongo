@@ -76,4 +76,8 @@
     assert.eq(i,
               secondary.getDB('test').foo.count({a: 2}),
               'collection successfully synced to secondary');
+
+    assert.eq(0,
+              secondary.getDB('local')['temp_oplog_buffer'].find().itcount(),
+              "Oplog buffer was not dropped after initial sync");
 })();

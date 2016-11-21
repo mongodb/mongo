@@ -594,6 +594,13 @@ StatusWith<OpTimeWithHash> DataReplicator::doInitialSync(OperationContext* txn,
     LOG(1) << "Creating oplogBuffer.";
     _oplogBuffer = _dataReplicatorExternalState->makeInitialSyncOplogBuffer(txn);
     _oplogBuffer->startup(txn);
+    ON_BLOCK_EXIT([this, txn, &lk]() {
+        if (!lk.owns_lock()) {
+            lk.lock();
+        }
+        invariant(_oplogBuffer);
+        _oplogBuffer->shutdown(txn);
+    });
 
     lk.unlock();
     // This will call through to the storageInterfaceImpl to ReplicationCoordinatorImpl.
