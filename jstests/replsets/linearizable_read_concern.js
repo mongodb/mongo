@@ -39,7 +39,7 @@ load('jstests/libs/write_concern_util.js');
     // Increased election timeout to avoid having the primary step down while we are
     // testing linearizable functionality on an isolated primary.
     config.settings = {electionTimeoutMillis: 60000};
-    updateConfigIfNotDurable(config);
+
     replTest.startSet();
     replTest.initiate(config);
 

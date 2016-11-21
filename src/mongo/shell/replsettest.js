@@ -597,11 +597,44 @@ var ReplSetTest = function(opts) {
         }
     };
 
+    /*
+     * If journaling is disabled or we are using an ephemeral storage engine, set
+     * 'writeConcernMajorityJournalDefault' to false for the given 'config' object. If the
+     * 'writeConcernMajorityJournalDefault' field is already set, it does not override it,
+     * and returns the 'config' object unchanged. Does not affect 'config' when running CSRS.
+     */
+    this._updateConfigIfNotDurable = function(config) {
+
+        // Get a replica set node (check for use of bridge).
+        var replNode = _useBridge ? _unbridgedNodes[0] : this.nodes[0];
+
+        // Don't update replset config for sharding config servers since config servers always
+        // require durable storage.
+        if (replNode.hasOwnProperty("fullOptions") &&
+            replNode.fullOptions.hasOwnProperty("configsvr")) {
+            return config;
+        }
+
+        // Don't override existing value.
+        var wcMajorityJournalField = "writeConcernMajorityJournalDefault";
+        if (config.hasOwnProperty(wcMajorityJournalField)) {
+            return config;
+        }
+        var runningWithoutJournaling = TestData.noJournal || TestData.storageEngine == "inMemory" ||
+            TestData.storageEngine == "ephemeralForTest";
+        if (runningWithoutJournaling) {
+            config[wcMajorityJournalField] = false;
+        }
+        return config;
+    };
+
     this._setDefaultConfigOptions = function(config) {
         if (jsTestOptions().useLegacyReplicationProtocol &&
             !config.hasOwnProperty("protocolVersion")) {
             config.protocolVersion = 0;
         }
+        // Update config for non journaling test variants
+        this._updateConfigIfNotDurable(config);
     };
 
     this.initiate = function(cfg, initCmd, timeout) {

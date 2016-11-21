@@ -7,7 +7,6 @@ var reconfig;
 var awaitOpTime;
 var startSetIfSupportsReadMajority;
 var waitUntilAllNodesCaughtUp;
-var updateConfigIfNotDurable;
 var reInitiateWithoutThrowingOnAbortedMember;
 var awaitRSClientHosts;
 var getLastOpTime;
@@ -121,7 +120,8 @@ var getLastOpTime;
         var e;
         var master;
         try {
-            assert.commandWorked(admin.runCommand({replSetReconfig: config, force: force}));
+            assert.commandWorked(admin.runCommand(
+                {replSetReconfig: rs._updateConfigIfNotDurable(config), force: force}));
         } catch (e) {
             if (tojson(e).indexOf("error doing query: failed") < 0) {
                 throw e;
@@ -231,19 +231,6 @@ var getLastOpTime;
             throw e;
         }
         return true;
-    };
-
-    /**
-     * Changes the replica set config if journaling/ephemal storage engine to set
-     * writeConcernMajorityJournalDefault to false.
-     */
-    updateConfigIfNotDurable = function(config) {
-        var runningWithoutJournaling = TestData.noJournal ||
-            0 != ["inMemory", "ephemeralForTest"].filter((a) => a == TestData.storageEngine).length;
-        if (runningWithoutJournaling) {
-            config.writeConcernMajorityJournalDefault = false;
-        }
-        return config;
     };
 
     /**
