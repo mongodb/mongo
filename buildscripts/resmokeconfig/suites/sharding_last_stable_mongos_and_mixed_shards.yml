@@ -3,91 +3,14 @@ selector:
     roots:
     - jstests/sharding/*.js
     exclude_files:
-    # Error format changes. See SERVER-22184.
-    - jstests/sharding/error_propagation.js
-    # New features for v3.4
-    - jstests/sharding/add_shard_to_zone.js
-    - jstests/sharding/max_time_ms_sharded_new_commands.js
-    - jstests/sharding/movechunk_interrupt_at_primary_stepdown.js
-    - jstests/sharding/remove_shard_from_zone.js
-    - jstests/sharding/shard_aware_init.js
-    - jstests/sharding/shard_aware_on_add_shard.js
-    - jstests/sharding/shard_aware_on_config_election.js
-    - jstests/sharding/shard_aware_on_set_shard_version.js
-    - jstests/sharding/shard_aware_primary_failover.js
-    - jstests/sharding/shard_identity_config_update.js
-    - jstests/sharding/update_zone_key_range.js
     # Doesn't use ShardingTest so won't actually be run in a mixed version configuration
     - jstests/sharding/config_version_rollback.js
-    # TODO Assumes mongod and mongos handle read on view. Enable when 3.4 becomes 'last-stable'.
-    - jstests/sharding/movePrimary1.js
-    # v3.4 replace noAutoSplit flag with document in config.settings
-    - jstests/sharding/disable_autosplit.js
-    # v3.4 changes $in shard key extraction.
-    - jstests/sharding/upsert_sharded.js
-    - jstests/sharding/update_sharded.js
-    # validate() format changes. See SERVER-22588.
-    - jstests/sharding/validate_collection.js
-    # Write concern error format changes. See SERVER-22540.
-    - jstests/sharding/move_chunk_wc.js
-    - jstests/sharding/commands_that_write_accept_wc_configRS.js
-    - jstests/sharding/commands_that_write_accept_wc_shards.js
-    # NumInitialChunks verification changed. See SERVER-23327.
-    - jstests/sharding/shard_collection_verify_initial_chunks.js
-    # avgObjSize scaling behavior fixed. See SERVER-19533.
-    - jstests/sharding/stats.js
     # TODO: Enable when SERVER-22672 is complete
     - jstests/sharding/printShardingStatus.js
-    # TODO: Change in error reporting, enable when 3.4 becomes 'last-stable'.
-    - jstests/sharding/map_reduce_validation.js
-    # TODO Assumes mapReduce can handle the collation option; enable when 3.4 becomes 'last-stable'.
-    - jstests/sharding/mapReduce_inSharded.js
-    # TODO Assumes shardCollection can handle the collation option; enable when 3.4 becomes
-    # 'last-stable'.
-    - jstests/sharding/shard_collection_basic.js
-    # TODO Requires mongos to have the 'clientCursorMonitorFrequencySecs' server parameter; enable
-    # when 3.4 becomes 'last-stable'.
-    - jstests/sharding/cursor_timeout.js
-    # Bug in v3.2 shards, fixed in v3.4.
-    - jstests/sharding/auth_sharding_cmd_metadata.js
-    - jstests/sharding/split_against_shard_with_invalid_split_points.js
-    # TODO Assumes shardCollection can handle the collation option; enable when 3.4 becomes
-    # 'last-stable'.
-    - jstests/sharding/collation_targeting.js
-    # TODO Assumes shardCollection can handle the collation option; enable when 3.4 becomes
-    # 'last-stable'.
-    - jstests/sharding/collation_targeting_inherited.js
     # Behavior change to addShard
     - jstests/sharding/addshard_idempotent.js
-    # Uses a failpoint that does not exist in v3.2, so the test is incompatible with a v3.2 shard.
-    - jstests/sharding/cleanup_orphaned_cmd_during_movechunk.js
-    - jstests/sharding/cleanup_orphaned_cmd_during_movechunk_hashed.js
-    - jstests/sharding/migration_failure.js
-    - jstests/sharding/migration_with_source_ops.js
-    - jstests/sharding/migration_move_chunk_after_receive.js
-    # Testing features that do not exist on v3.2 shards.
-    - jstests/sharding/migration_server_status.js
-    - jstests/sharding/movechunk_parallel.js
-    # These tests do not use ShardingTest which handles setting the featureCompatibilityVersion to
-    # 3.2 when in a mixed configuration. Enable when 3.4 becomes last-stable.
-    - jstests/sharding/autodiscover_config_rs_from_secondary.js
-    - jstests/sharding/config_rs_change.js
-    - jstests/sharding/mongos_wait_csrs_initiate.js
-    # v3.2 cluster does not support parallel migrations.
-    - jstests/sharding/migration_ignore_interrupts_1.js
     # Temporarily blacklisted (see SERVER-26615).
     - jstests/sharding/addshard2.js
-    # This test checks the behavior of a singleBatch fix for mongos that does not exist in 3.2.
-    # Enable when 3.4 becomes last-stable or after backporting SERVER-26112 to the 3.2 branch.
-    - jstests/sharding/sharded_limit_batchsize.js
-    # Enable when 3.2.11 becomes last-stable
-    - jstests/sharding/merge_chunks_test.js
-    # $graphLookup is not supported in versions <= 3.2
-    - jstests/sharding/read_committed_lookup.js
-    - jstests/sharding/balancer_shell_commands.js
-    # TODO (SERVER-27379): Cannot create views when featureCompatibilityVersion is 3.2.
-    # Unblacklist when the featureCompatibilityVersion is 3.4 or higher.
-    - jstests/sharding/views.js
 
 executor:
   js_test:
