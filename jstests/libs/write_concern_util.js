@@ -1,0 +1,47 @@
+/**
+ * Utilities for testing writeConcern.
+ */
+// Stops replication at a server.
+function stopServerReplication(conn) {
+    var errMsg = 'Failed to enable rsSyncApplyStop failpoint.';
+    assert.commandWorked(
+        conn.getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}),
+        errMsg);
+}
+
+// Stops replication at all replicaset secondaries.
+function stopReplicationOnSecondaries(rs) {
+    var secondaries = rs.getSecondaries();
+    secondaries.forEach(stopServerReplication);
+}
+
+// Stops replication at all shard secondaries.
+function stopReplicationOnSecondariesOfAllShards(st) {
+    st._rsObjects.forEach(stopReplicationOnSecondaries);
+}
+
+// Restarts replication at a server.
+function restartServerReplication(conn) {
+    var errMsg = 'Failed to disable rsSyncApplyStop failpoint.';
+    assert.commandWorked(
+        conn.getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}),
+        errMsg);
+}
+
+// Restarts replication at all nodes in a replicaset.
+function restartReplSetReplication(rs) {
+    rs.nodes.forEach(restartServerReplication);
+}
+
+// Restarts replication at all nodes in a sharded cluster.
+function restartReplicationOnAllShards(st) {
+    st._rsObjects.forEach(restartReplSetReplication);
+    restartReplSetReplication(st.configRS);
+}
+
+// Asserts that a writeConcernError was received.
+function assertWriteConcernError(res) {
+    assert(res.writeConcernError, "No writeConcernError received, got: " + tojson(res));
+    assert(res.writeConcernError.code);
+    assert(res.writeConcernError.errmsg);
+}
