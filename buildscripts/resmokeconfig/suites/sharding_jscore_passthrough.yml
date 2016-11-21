@@ -1,7 +1,7 @@
 selector:
   js_test:
     roots:
-    - jstests/core/*.js
+    - jstests/core/**/*.js
     exclude_files:
     # The following tests fail because a certain command or functionality is not supported on
     # mongos. This command or functionality is placed in a comment next to the failing test.
@@ -45,6 +45,9 @@ selector:
     - jstests/core/invalid_db_name.js
     - jstests/core/validate_cmd_ns.js
     - jstests/core/killop_drop_collection.js # Uses fsyncLock.
+    - jstests/core/views/invalid_system_views.js # We expect listCollections to fail when there's an invalid view.
+    # TODO: SERVER-27269: mongos can't establish cursor if view has $collStats and views another view.
+    - jstests/core/views/views_coll_stats.js
 
 executor:
   js_test:

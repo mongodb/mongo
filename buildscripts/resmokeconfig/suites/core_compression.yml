@@ -1,7 +1,7 @@
 selector:
   js_test:
     roots:
-    - jstests/core/*.js
+    - jstests/core/**/*.js
 
 executor:
   js_test:
