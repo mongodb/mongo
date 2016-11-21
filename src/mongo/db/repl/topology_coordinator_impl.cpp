@@ -154,7 +154,7 @@ HostAndPort TopologyCoordinatorImpl::getSyncSourceAddress() const {
 }
 
 HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
-                                                         const Timestamp& lastTimestampFetched,
+                                                         const OpTime& lastOpTimeFetched,
                                                          ChainingPreference chainingPreference) {
     // If we are not a member of the current replica set configuration, no sync source is valid.
     if (_selfIndex == -1) {
@@ -305,12 +305,12 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
                 }
             }
             // only consider candidates that are ahead of where we are
-            if (it->getAppliedOpTime().getTimestamp() <= lastTimestampFetched) {
+            if (it->getAppliedOpTime() <= lastOpTimeFetched) {
                 LOG(1) << "Cannot select sync source equal to or behind our last fetched optime. "
-                       << "My last fetched oplog timestamp: " << lastTimestampFetched.toBSON()
-                       << ", latest oplog timestamp of sync candidate "
+                       << "My last fetched oplog optime: " << lastOpTimeFetched.toBSON()
+                       << ", latest oplog optime of sync candidate "
                        << itMemberConfig.getHostAndPort() << ": "
-                       << it->getAppliedOpTime().getTimestamp().toBSON();
+                       << it->getAppliedOpTime().toBSON();
                 continue;
             }
             // Candidate cannot be more latent than anything we've already considered.
