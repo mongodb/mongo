@@ -40,6 +40,7 @@ function retryOnNetworkError(func) {
     var originalReplSetTest = ReplSetTest;
     var originalShardingTest = ShardingTest;
 
+    const stepdownDelaySeconds = 10;
     const verbositySetting =
         "{ verbosity: 0, command: {verbosity: 1}, network: {verbosity: 1, asio: {verbosity: 2}}, \
 tracking: {verbosity: 1} }";
@@ -70,8 +71,6 @@ tracking: {verbosity: 1} }";
             'use strict';
 
             load('jstests/libs/override_methods/sharding_continuous_config_stepdown.js');
-
-            var stepdownDelaySeconds = 10;
 
             print('*** Continuous stepdown thread running with seed node ' + seedNode);
 
@@ -169,6 +168,21 @@ tracking: {verbosity: 1} }";
                 throw new Error('Continuous failover thread is already active');
             }
 
+            // This suite will step down the config primary every 10 seconds, and
+            // electionTimeoutMillis defaults to 10 seconds. Set electionTimeoutMillis to 5 seconds,
+            // so config operations have some time to run before being interrupted by stepdown.
+            //
+            // Note: this is done after ShardingTest runs because ShardingTest operations are not
+            // resilient to stepdowns, which a shorter election timeout can cause to happen on
+            // slow machines.
+            var rsconfig = this.getReplSetConfigFromNode();
+            rsconfig.settings.electionTimeoutMillis = stepdownDelaySeconds * 1000 / 2;
+            rsconfig.version++;
+            reconfig(this, rsconfig);
+            assert.eq(this.getReplSetConfigFromNode().settings.electionTimeoutMillis,
+                      5000,
+                      "Failed to lower the electionTimeoutMillis to 5000 milliseconds.");
+
             _scopedPrimaryStepdownThreadStopCounter = new CountDownLatch(1);
             _scopedPrimaryStepdownThread =
                 new ScopedThread(_continuousPrimaryStepdownFn,
@@ -220,15 +234,6 @@ tracking: {verbosity: 1} }";
             arguments[0].other.setParameter = {logComponentVerbosity: verbositySetting};
         }
 
-        // Set electionTimeoutMillis to 5 seconds, from 10, so that chunk migrations don't
-        // time out because of the CSRS primary being down so often for so long.
-        arguments[0].configReplSetTestOptions =
-            Object.merge(arguments[0].configReplSetTestOptions, {
-                settings: {
-                    electionTimeoutMillis: 5000,
-                },
-            });
-
         // Construct the original object
         originalShardingTest.apply(this, arguments);
 
@@ -243,10 +248,6 @@ tracking: {verbosity: 1} }";
         this.printShardingStatus = function() {
 
         };
-
-        assert.eq(this.configRS.getReplSetConfigFromNode().settings.electionTimeoutMillis,
-                  5000,
-                  "Failed to set the electionTimeoutMillis to 5000 milliseconds");
 
         // Start the continuous config server stepdown thread
         this.configRS.startContinuousFailover();
