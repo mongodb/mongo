@@ -1223,8 +1223,7 @@ void DataReplicator::_setState_inlock(const DataReplicatorState& newState) {
 }
 
 StatusWith<HostAndPort> DataReplicator::_chooseSyncSource_inlock() {
-    auto syncSource =
-        _opts.syncSourceSelector->chooseNewSyncSource(_lastFetched.opTime.getTimestamp());
+    auto syncSource = _opts.syncSourceSelector->chooseNewSyncSource(_lastFetched.opTime);
     if (syncSource.empty()) {
         return Status{ErrorCodes::InvalidSyncSource,
                       str::stream() << "No valid sync source available. Our last fetched optime: "

@@ -144,7 +144,7 @@ bool SyncSourceResolver::_isShuttingDown() const {
 StatusWith<HostAndPort> SyncSourceResolver::_chooseNewSyncSource() {
     HostAndPort candidate;
     try {
-        candidate = _syncSourceSelector->chooseNewSyncSource(_lastOpTimeFetched.getTimestamp());
+        candidate = _syncSourceSelector->chooseNewSyncSource(_lastOpTimeFetched);
     } catch (...) {
         return exceptionToStatus();
     }
