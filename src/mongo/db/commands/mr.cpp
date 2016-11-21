@@ -364,7 +364,20 @@ Config::Config(const string& _dbname, const BSONObj& cmdObj) {
  * Clean up the temporary and incremental collections
  */
 void State::dropTempCollections() {
-    _db.dropCollection(_config.tempNamespace);
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        ScopedTransaction scopedXact(_txn, MODE_IX);
+        AutoGetDb autoDb(_txn, nsToDatabaseSubstring(_config.tempNamespace), MODE_X);
+        if (auto db = autoDb.getDb()) {
+            WriteUnitOfWork wunit(_txn);
+            NamespaceString tempNss(_config.tempNamespace);
+            uassert(ErrorCodes::PrimarySteppedDown,
+                    "no longer primary",
+                    repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(tempNss));
+            db->dropCollection(_txn, _config.tempNamespace);
+            wunit.commit();
+        }
+    }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_txn, "M/R dropTempCollections", _config.tempNamespace)
     // Always forget about temporary namespaces, so we don't cache lots of them
     ShardConnection::forgetNS(_config.tempNamespace);
     if (_useIncremental) {
