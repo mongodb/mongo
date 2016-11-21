@@ -334,9 +334,6 @@
         "mapreduce.shardedfinish": {skip: isAnInternalCommand},
         mergeChunks: {
             command: {mergeChunks: "test.view", bounds: [{x: 0}, {x: 10}]},
-            setup: function(conn) {
-                assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
-            },
             skipStandalone: true,
             isAdminCommand: true,
             expectFailure: true,
@@ -344,9 +341,6 @@
         },
         moveChunk: {
             command: {moveChunk: "test.view"},
-            setup: function(conn) {
-                assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
-            },
             skipStandalone: true,
             isAdminCommand: true,
             expectFailure: true,
@@ -372,12 +366,14 @@
               isAdminCommand: true,
               command: {renameCollection: "test.view", to: "test.otherview"},
               expectFailure: true,
+              skipSharded: true,
             },
             {
               isAdminCommand: true,
               command: {renameCollection: "test.collection", to: "test.view"},
               expectFailure: true,
               expectedErrorCode: ErrorCodes.NamespaceExists,
+              skipSharded: true,
             }
         ],
         repairCursor: {command: {repairCursor: "view"}, expectFailure: true},
@@ -438,9 +434,6 @@
         sleep: {skip: isUnrelated},
         split: {
             command: {split: "test.view", find: {_id: 1}},
-            setup: function(conn) {
-                assert.commandWorked(conn.adminCommand({enableSharding: "test"}));
-            },
             skipStandalone: true,
             expectFailure: true,
             expectedErrorCode: ErrorCodes.NamespaceNotSharded,
@@ -511,89 +504,79 @@
             assert.commandFailed(res, msg);
     };
 
-    function runTests(db) {
-        // Are we on a mongos?
-        var isMaster = db.runCommand("ismaster");
-        assert.commandWorked(isMaster);
-        var isMongos = (isMaster.msg === "isdbgrid");
+    // Are we on a mongos?
+    var isMaster = db.runCommand("ismaster");
+    assert.commandWorked(isMaster);
+    var isMongos = (isMaster.msg === "isdbgrid");
 
-        // Obtain a list of all commands.
-        let res = db.runCommand({listCommands: 1});
-        assert.commandWorked(res);
+    // Obtain a list of all commands.
+    let res = db.runCommand({listCommands: 1});
+    assert.commandWorked(res);
 
-        let commands = Object.keys(res.commands);
-        for (let command of commands) {
-            let test = viewsCommandTests[command];
-            assert(test !== undefined,
-                   "Coverage failure: must explicitly define a views test for " + command);
+    let commands = Object.keys(res.commands);
+    for (let command of commands) {
+        let test = viewsCommandTests[command];
+        assert(test !== undefined,
+               "Coverage failure: must explicitly define a views test for " + command);
 
-            if (!(test instanceof Array))
-                test = [test];
-            let subtest_nr = 0;
-            for (let subtest of test) {
-                // Tests can be explicitly skipped. Print the name of the skipped test, as well as
-                // the reason why.
-                if (subtest.skip !== undefined) {
-                    print("Skipping " + command + ": " + subtest.skip);
-                    continue;
-                }
-
-                let dbHandle = db.getSiblingDB("test");
-                let commandHandle = dbHandle;
-
-                // Skip tests depending on sharding configuration.
-                if (subtest.skipSharded && isMongos) {
-                    print("Skipping " + command + ": not applicable to mongoS");
-                    continue;
-                }
-
-                if (subtest.skipStandalone && !isMongos) {
-                    print("Skipping " + command + ": not applicable to mongoD");
-                    continue;
-                }
-
-                // Perform test setup, and call any additional setup callbacks provided by the test.
-                // All tests assume that there exists a view named 'view' that is backed by
-                // 'collection'.
-                assert.commandWorked(dbHandle.dropDatabase());
-                assert.commandWorked(dbHandle.runCommand({create: "view", viewOn: "collection"}));
-                assert.writeOK(dbHandle.collection.insert({x: 1}));
-                if (subtest.setup !== undefined)
-                    subtest.setup(dbHandle);
-
-                // Execute the command. Print the command name for the first subtest, as otherwise
-                // it may be hard to figure out what command caused a failure.
-                if (!subtest_nr++)
-                    print("Testing " + command);
-
-                if (subtest.isAdminCommand)
-                    commandHandle = db.getSiblingDB("admin");
-
-                if (subtest.expectFailure) {
-                    let expectedErrorCode = subtest.expectedErrorCode;
-                    if (expectedErrorCode === undefined)
-                        expectedErrorCode = ErrorCodes.CommandNotSupportedOnView;
-
-                    assertCommandOrWriteFailed(commandHandle.runCommand(subtest.command),
-                                               expectedErrorCode,
-                                               tojson(subtest.command));
-                } else if (subtest.command instanceof Function)
-                    subtest.command(commandHandle);
-                else
-                    assert.commandWorked(commandHandle.runCommand(subtest.command),
-                                         tojson(subtest.command));
-
-                if (subtest.teardown !== undefined)
-                    subtest.teardown(dbHandle);
+        if (!(test instanceof Array))
+            test = [test];
+        let subtest_nr = 0;
+        for (let subtest of test) {
+            // Tests can be explicitly skipped. Print the name of the skipped test, as well as
+            // the reason why.
+            if (subtest.skip !== undefined) {
+                print("Skipping " + command + ": " + subtest.skip);
+                continue;
             }
+
+            let dbHandle = db.getSiblingDB("test");
+            let commandHandle = dbHandle;
+
+            // Skip tests depending on sharding configuration.
+            if (subtest.skipSharded && isMongos) {
+                print("Skipping " + command + ": not applicable to mongoS");
+                continue;
+            }
+
+            if (subtest.skipStandalone && !isMongos) {
+                print("Skipping " + command + ": not applicable to mongoD");
+                continue;
+            }
+
+            // Perform test setup, and call any additional setup callbacks provided by the test.
+            // All tests assume that there exists a view named 'view' that is backed by
+            // 'collection'.
+            assert.commandWorked(dbHandle.dropDatabase());
+            assert.commandWorked(dbHandle.runCommand({create: "view", viewOn: "collection"}));
+            assert.writeOK(dbHandle.collection.insert({x: 1}));
+            if (subtest.setup !== undefined)
+                subtest.setup(dbHandle);
+
+            // Execute the command. Print the command name for the first subtest, as otherwise
+            // it may be hard to figure out what command caused a failure.
+            if (!subtest_nr++)
+                print("Testing " + command);
+
+            if (subtest.isAdminCommand)
+                commandHandle = db.getSiblingDB("admin");
+
+            if (subtest.expectFailure) {
+                let expectedErrorCode = subtest.expectedErrorCode;
+                if (expectedErrorCode === undefined)
+                    expectedErrorCode = ErrorCodes.CommandNotSupportedOnView;
+
+                assertCommandOrWriteFailed(commandHandle.runCommand(subtest.command),
+                                           expectedErrorCode,
+                                           tojson(subtest.command));
+            } else if (subtest.command instanceof Function)
+                subtest.command(commandHandle);
+            else
+                assert.commandWorked(commandHandle.runCommand(subtest.command),
+                                     tojson(subtest.command));
+
+            if (subtest.teardown !== undefined)
+                subtest.teardown(dbHandle);
         }
     }
-
-    // Run tests against mongoD.
-    runTests(db.getSiblingDB("test"));
-
-    // Run tests against mongoS.
-    var st = new ShardingTest({shards: 2});
-    runTests(st.s.getDB("test"));
-    st.stop();
 }());

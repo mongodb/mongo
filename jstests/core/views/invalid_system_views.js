@@ -105,12 +105,12 @@
     }
 
     let badViews = [
-        {_id: "badview", pipeline: "bad"},
-        {_id: "badview", pipeline: {}},
-        {_id: "badview", pipeline: 7},
-        {_id: "badview", pipeline: [1]},
-        {_id: "badview", pipeline: [{}]},
-        {_id: "badview", pipeline: [[]]},
+        {_id: "badViewStringPipeline", pipeline: "bad"},
+        {_id: "badViewEmptyObjectPipeline", pipeline: {}},
+        {_id: "badViewNumericalPipeline", pipeline: 7},
+        {_id: "badViewArrayWithIntegerPipeline", pipeline: [1]},
+        {_id: "badViewArrayWithEmptyObjectPipeline", pipeline: [{}]},
+        {_id: "badViewArrayWithEmptyArrayPipeline", pipeline: [[]]},
         {_id: 7, pipeline: []},
     ];
     badViews.forEach(runTest);

@@ -109,17 +109,18 @@
     // Check that collMod also checks for cycles.
     makeView("a", "b");
     makeView("b", "c");
-    assert.commandFailedWithCode(viewsDb.runCommand({collMod: "b", viewOn: "a"}),
+    assert.commandFailedWithCode(viewsDb.runCommand({collMod: "b", viewOn: "a", pipeline: []}),
                                  ErrorCodes.GraphContainsCycle,
                                  "collmod changed view to create a cycle");
 
     // Check that collMod disallows the specification of invalid pipelines.
-    assert.commandFailedWithCode(viewsDb.runCommand({collMod: "b", pipeline: {}}),
+    assert.commandFailedWithCode(viewsDb.runCommand({collMod: "b", viewOn: "c", pipeline: {}}),
                                  ErrorCodes.InvalidOptions,
                                  "collMod modified view to have invalid pipeline");
-    assert.commandFailedWithCode(viewsDb.runCommand({collMod: "b", pipeline: {0: {$limit: 7}}}),
-                                 ErrorCodes.InvalidOptions,
-                                 "collMod modified view to have invalid pipeline");
+    assert.commandFailedWithCode(
+        viewsDb.runCommand({collMod: "b", viewOn: "c", pipeline: {0: {$limit: 7}}}),
+        ErrorCodes.InvalidOptions,
+        "collMod modified view to have invalid pipeline");
     clear();
 
     // Check that invalid pipelines are disallowed.

@@ -1,4 +1,7 @@
-// Tests the find command on views.
+/**
+ * Tests the find command on views.
+ * @tags: [requires_find_command]
+ */
 (function() {
     "use strict";
 

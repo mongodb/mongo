@@ -1,7 +1,7 @@
 selector:
   js_test:
     roots:
-    - jstests/core/*.js
+    - jstests/core/**/*.js
     exclude_files:
     # Tests that won't work with an injected 'majority' readConcern
     # and/or an injected 'majority' writeConcern. Where a function is

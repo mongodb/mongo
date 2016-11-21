@@ -1,7 +1,7 @@
 selector:
   js_test:
     roots:
-    - jstests/core/*.js
+    - jstests/core/**/*.js
     exclude_files:
     # The following tests fail when specifying a minimal batchSize:
     - jstests/core/find9.js # Reduction of objsLeftInBatch.
