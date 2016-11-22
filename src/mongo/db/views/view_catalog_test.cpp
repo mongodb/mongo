@@ -45,18 +45,13 @@
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/db/views/view_graph.h"
+#include "mongo/db/views/view_test_crutch.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
-// Stub to avoid including the server_options library.
-bool isMongos() {
-    return false;
-}
-
 namespace {
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion34, ("EndStartupOptionStorage"))

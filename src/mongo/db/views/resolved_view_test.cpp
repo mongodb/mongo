@@ -36,15 +36,10 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/views/resolved_view.h"
+#include "mongo/db/views/view_test_crutch.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-
-// Stub to avoid including the server_options library.
-bool isMongos() {
-    return false;
-}
-
 namespace {
 
 const NamespaceString viewNss("testdb.testview");

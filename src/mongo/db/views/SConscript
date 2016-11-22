@@ -34,27 +34,18 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='view_catalog_test',
-    source=[
-        'view_catalog_test.cpp',
-    ],
-    LIBDEPS=[
-        'views',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
-        '$BUILD_DIR/mongo/unittest/unittest',
-    ],
-)
-
-env.CppUnitTest(
-    target='resolved_view_test',
+    target='views_test',
     source=[
         'resolved_view_test.cpp',
+        'view_catalog_test.cpp',
+        'view_definition_test.cpp',
+        'view_test_crutch.cpp'
     ],
     LIBDEPS=[
         'views',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/unittest/unittest',
     ],
