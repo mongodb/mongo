@@ -1,7 +1,7 @@
 var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
 
 (function() {
-    "use_strict";
+    "use strict";
 
     function makeDirectoryReadOnly(dir) {
         if (_isWindows()) {
