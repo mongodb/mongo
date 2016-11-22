@@ -12,7 +12,7 @@ UTILITIES
 
   mongodump         - MongoDB dump tool - for backups, snapshots, etc.
   mongorestore      - MongoDB restore a dump
-  mongoexport       - Export a single collection to test (JSON, CSV)
+  mongoexport       - Export a single collection to text (JSON, CSV)
   mongoimport       - Import from JSON or CSV
   mongofiles        - Utility for putting and getting files from MongoDB GridFS
   mongostat         - Show performance statistics
