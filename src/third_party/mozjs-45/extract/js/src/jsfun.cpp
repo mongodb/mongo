@@ -1219,7 +1219,7 @@ js::fun_apply(JSContext* cx, unsigned argc, Value* vp)
         // Step 3-6.
         ScriptFrameIter iter(cx);
         MOZ_ASSERT(iter.numActualArgs() <= ARGS_LENGTH_MAX);
-        if (!args2.init(iter.numActualArgs()))
+        if (!args2.init(cx, iter.numActualArgs()))
             return false;
 
         args2.setCallee(fval);
@@ -1243,12 +1243,7 @@ js::fun_apply(JSContext* cx, unsigned argc, Value* vp)
             return false;
 
         // Step 6.
-        if (length > ARGS_LENGTH_MAX) {
-            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_TOO_MANY_FUN_APPLY_ARGS);
-            return false;
-        }
-
-        if (!args2.init(length))
+        if (!args2.init(cx, length))
             return false;
 
         // Push fval, obj, and aobj's elements as args.
@@ -1536,7 +1531,7 @@ js::CallOrConstructBoundFunction(JSContext* cx, unsigned argc, Value* vp)
 
     if (args.isConstructing()) {
         ConstructArgs cargs(cx);
-        if (!cargs.init(argsLen + boundArgsLen))
+        if (!cargs.init(cx, argsLen + boundArgsLen))
             return false;
 
         /* 15.3.4.5.1, 15.3.4.5.2 step 4. */
@@ -1558,7 +1553,7 @@ js::CallOrConstructBoundFunction(JSContext* cx, unsigned argc, Value* vp)
     }
 
     InvokeArgs invokeArgs(cx);
-    if (!invokeArgs.init(argsLen + boundArgsLen))
+    if (!invokeArgs.init(cx, argsLen + boundArgsLen))
         return false;
 
     /* 15.3.4.5.1, 15.3.4.5.2 step 4. */

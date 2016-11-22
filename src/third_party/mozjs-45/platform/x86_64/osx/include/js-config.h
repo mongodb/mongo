@@ -54,6 +54,6 @@
 
 /* MOZILLA JSAPI version number components */
 #define MOZJS_MAJOR_VERSION 45
-#define MOZJS_MINOR_VERSION 4
+#define MOZJS_MINOR_VERSION 5
 
 #endif /* js_config_h */

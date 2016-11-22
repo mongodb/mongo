@@ -23,6 +23,7 @@
 #include "jit/Registers.h" // for RegisterDump
 #endif
 #include "js/RootingAPI.h"
+#include "vm/ArgumentsObject.h"
 #include "vm/SavedFrame.h"
 
 struct JSCompartment;
@@ -1089,7 +1090,12 @@ class GenericInvokeArgs : public JS::CallArgs
 
     explicit GenericInvokeArgs(JSContext* cx) : v_(cx) {}
 
-    bool init(unsigned argc, bool construct) {
+    bool init(JSContext* cx, unsigned argc, bool construct) {
+        if (argc > ARGS_LENGTH_MAX) {
+            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_TOO_MANY_ARGUMENTS);
+            return false;
+        }
+
         MOZ_ASSERT(2 + argc + construct > argc);  // no overflow
         if (!v_.resize(2 + argc + construct))
             return false;
@@ -1107,8 +1113,8 @@ class InvokeArgs : public detail::GenericInvokeArgs
   public:
     explicit InvokeArgs(JSContext* cx) : detail::GenericInvokeArgs(cx) {}
 
-    bool init(unsigned argc) {
-        return detail::GenericInvokeArgs::init(argc, false);
+    bool init(JSContext* cx, unsigned argc) {
+        return detail::GenericInvokeArgs::init(cx, argc, false);
     }
 };
 
@@ -1117,8 +1123,8 @@ class ConstructArgs : public detail::GenericInvokeArgs
   public:
     explicit ConstructArgs(JSContext* cx) : detail::GenericInvokeArgs(cx) {}
 
-    bool init(unsigned argc) {
-        return detail::GenericInvokeArgs::init(argc, true);
+    bool init(JSContext* cx, unsigned argc) {
+        return detail::GenericInvokeArgs::init(cx, argc, true);
     }
 };
 
@@ -1127,7 +1133,7 @@ inline bool
 FillArgumentsFromArraylike(JSContext* cx, Args& args, const Arraylike& arraylike)
 {
     uint32_t len = arraylike.length();
-    if (!args.init(len))
+    if (!args.init(cx, len))
         return false;
 
     for (uint32_t i = 0; i < len; i++)

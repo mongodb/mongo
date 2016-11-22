@@ -388,7 +388,7 @@ WeakMap_construct(JSContext* cx, unsigned argc, Value* vp)
                 if (!SetWeakMapEntry(cx, obj, keyObject, val))
                     return false;
             } else {
-                if (!args2.init(2))
+                if (!args2.init(cx, 2))
                     return false;
 
                 args2.setCallee(adderVal);

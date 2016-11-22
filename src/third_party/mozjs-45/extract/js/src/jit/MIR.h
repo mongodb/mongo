@@ -903,6 +903,26 @@ class MUseDefIterator
 typedef Vector<MDefinition*, 8, JitAllocPolicy> MDefinitionVector;
 typedef Vector<MInstruction*, 6, JitAllocPolicy> MInstructionVector;
 
+class MRootList : public TempObject
+{
+  private:
+    Vector<JSScript*, 0, JitAllocPolicy> roots_;
+
+    MRootList(const MRootList&) = delete;
+    void operator=(const MRootList&) = delete;
+
+  public:
+    explicit MRootList(TempAllocator& alloc);
+
+    void trace(JSTracer* trc);
+
+    MOZ_MUST_USE bool append(JSScript* script) {
+        if (script)
+            return roots_.append(script);
+        return true;
+    }
+};
+
 // An instruction is an SSA name that is inserted into a basic block's IR
 // stream.
 class MInstruction

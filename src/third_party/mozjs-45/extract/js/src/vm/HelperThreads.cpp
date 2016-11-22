@@ -200,9 +200,9 @@ ParseTask::ParseTask(ExclusiveContext* cx, JSObject* exclusiveContextGlobal, JSC
                      JS::OffThreadCompileCallback callback, void* callbackData)
   : cx(cx), options(initCx), chars(chars), length(length),
     alloc(JSRuntime::TEMP_LIFO_ALLOC_PRIMARY_CHUNK_SIZE),
-    exclusiveContextGlobal(initCx->runtime(), exclusiveContextGlobal),
+    exclusiveContextGlobal(exclusiveContextGlobal),
     callback(callback), callbackData(callbackData),
-    script(initCx->runtime()), sourceObject(initCx->runtime()),
+    script(nullptr), sourceObject(nullptr),
     errors(cx), overRecursed(false)
 {
 }
@@ -242,6 +242,18 @@ ParseTask::~ParseTask()
 
     for (size_t i = 0; i < errors.length(); i++)
         js_delete(errors[i]);
+}
+void
+ParseTask::trace(JSTracer* trc)
+{
+    if (!cx->runtimeMatches(trc->runtime()))
+        return;
+
+    TraceManuallyBarrieredEdge(trc, &exclusiveContextGlobal, "ParseTask::exclusiveContextGlobal");
+    if (script)
+        TraceManuallyBarrieredEdge(trc, &script, "ParseTask::script");
+    if (sourceObject)
+        TraceManuallyBarrieredEdge(trc, &sourceObject, "ParseTask::sourceObject");
 }
 
 void
@@ -1046,11 +1058,11 @@ GlobalHelperThreadState::finishParseTask(JSContext* maybecx, JSRuntime* rt, void
 
     mergeParseTaskCompartment(rt, parseTask, global, cx->compartment());
 
-    if (!parseTask->finish(cx))
-        return nullptr;
-
     RootedScript script(rt, parseTask->script);
     releaseAssertSameCompartment(cx, script);
+
+    if (!parseTask->finish(cx))
+        return nullptr;
 
     // Report any error or warnings generated during the parse, and inform the
     // debugger about the compiled scripts.
@@ -1386,7 +1398,7 @@ HelperThread::handleParseWorkload()
                                                task->options, srcBuf,
                                                /* source_ = */ nullptr,
                                                /* extraSct = */ nullptr,
-                                               /* sourceObjectOut = */ task->sourceObject.address());
+                                               /* sourceObjectOut = */ &task->sourceObject);
     }
 
     // The callback is invoked while we are still off the main thread.
@@ -1510,6 +1522,37 @@ GlobalHelperThreadState::compressionTaskForSource(ScriptSource* ss)
             return task;
     }
     return nullptr;
+}
+
+void
+GlobalHelperThreadState::trace(JSTracer* trc)
+{
+    AutoLockHelperThreadState lock;
+    for (auto builder : ionWorklist())
+        builder->trace(trc);
+    for (auto builder : ionFinishedList())
+        builder->trace(trc);
+
+    if (HelperThreadState().threads) {
+        for (size_t i = 0; i < HelperThreadState().threadCount; i++) {
+            HelperThread& helper = HelperThreadState().threads[i];
+            if (auto builder = helper.ionBuilder())
+                builder->trace(trc);
+        }
+    }
+
+    jit::IonBuilder* builder = HelperThreadState().ionLazyLinkList().getFirst();
+    while (builder) {
+        builder->trace(trc);
+        builder = builder->getNext();
+    }
+
+    for (auto parseTask : parseWorklist_)
+        parseTask->trace(trc);
+    for (auto parseTask : parseFinishedList_)
+        parseTask->trace(trc);
+    for (auto parseTask : parseWaitingOnGC_)
+        parseTask->trace(trc);
 }
 
 void

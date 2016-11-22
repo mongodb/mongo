@@ -51,7 +51,7 @@ RematerializedFrame::RematerializedFrame(JSContext* cx, uint8_t* top, unsigned n
 
     CopyValueToRematerializedFrame op(slots_);
     iter.readFrameArgsAndLocals(cx, op, op, &scopeChain_, &hasCallObj_, &returnValue_,
-                                &argsObj_, &thisArgument_, ReadFrame_Actuals,
+                                &argsObj_, &thisArgument_, &newTarget_, ReadFrame_Actuals,
                                 fallback);
 }
 
@@ -60,7 +60,7 @@ RematerializedFrame::New(JSContext* cx, uint8_t* top, InlineFrameIterator& iter,
                          MaybeReadFallback& fallback)
 {
     unsigned numFormals = iter.isFunctionFrame() ? iter.calleeTemplate()->nargs() : 0;
-    unsigned argSlots = Max(numFormals, iter.numActualArgs()) + iter.isConstructing();
+    unsigned argSlots = Max(numFormals, iter.numActualArgs());
     size_t numBytes = sizeof(RematerializedFrame) +
         (argSlots + iter.script()->nfixed()) * sizeof(Value) -
         sizeof(Value); // 1 Value included in sizeof(RematerializedFrame)
@@ -163,8 +163,8 @@ RematerializedFrame::mark(JSTracer* trc)
         TraceRoot(trc, &argsObj_, "remat ion frame argsobj");
     TraceRoot(trc, &returnValue_, "remat ion frame return value");
     TraceRoot(trc, &thisArgument_, "remat ion frame this");
-    TraceRootRange(trc, numActualArgs_ + isConstructing_ + script_->nfixed(),
-                   slots_, "remat ion frame stack");
+    TraceRoot(trc, &newTarget_, "remat ion frame newTarget");
+    TraceRootRange(trc, numActualArgs_ + script_->nfixed(), slots_, "remat ion frame stack");
 }
 
 void
