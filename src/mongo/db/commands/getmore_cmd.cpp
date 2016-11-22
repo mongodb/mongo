@@ -360,7 +360,10 @@ public:
         CursorId respondWithId = 0;
         CursorResponseBuilder nextBatch(/*isInitialResponse*/ false, &result);
         BSONObj obj;
-        PlanExecutor::ExecState state;
+        // generateBatch() will not initialize 'state' if it exceeds the time limiting generating
+        // the next batch for an awaitData cursor. In this case, 'state' should be
+        // PlanExecutor::ADVANCED, so we do not attempt to get another batch.
+        PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
         long long numResults = 0;
 
         // We report keysExamined and docsExamined to OpDebug for a given getMore operation. To
