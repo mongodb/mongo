@@ -215,9 +215,9 @@ void* MemoryMappedFile::map(const char* filenameIn, unsigned long long& length) 
                          NULL);          // hTempl
         if (fd == INVALID_HANDLE_VALUE) {
             DWORD dosError = GetLastError();
-            log() << "CreateFileW for " << filename << " failed with "
-                  << errnoWithDescription(dosError) << " (file size is " << length << ")"
-                  << " in MemoryMappedFile::map" << endl;
+            severe() << "CreateFileW for " << filename << " failed with "
+                     << errnoWithDescription(dosError) << " (file size is " << length << ")"
+                     << " in MemoryMappedFile::map" << endl;
             return 0;
         }
     }
@@ -234,9 +234,9 @@ void* MemoryMappedFile::map(const char* filenameIn, unsigned long long& length) 
                                        NULL /*lpName*/);
         if (maphandle == NULL) {
             DWORD dosError = GetLastError();
-            log() << "CreateFileMappingW for " << filename << " failed with "
-                  << errnoWithDescription(dosError) << " (file size is " << length << ")"
-                  << " in MemoryMappedFile::map" << endl;
+            severe() << "CreateFileMappingW for " << filename << " failed with "
+                     << errnoWithDescription(dosError) << " (file size is " << length << ")"
+                     << " in MemoryMappedFile::map" << endl;
             close();
             fassertFailed(16225);
         }
@@ -283,10 +283,10 @@ void* MemoryMappedFile::map(const char* filenameIn, unsigned long long& length) 
                 }
 #endif
 
-                log() << "MapViewOfFileEx for " << filename << " at address " << thisAddress
-                      << " failed with " << errnoWithDescription(dosError) << " (file size is "
-                      << length << ")"
-                      << " in MemoryMappedFile::map" << endl;
+                severe() << "MapViewOfFileEx for " << filename << " at address " << thisAddress
+                         << " failed with " << errnoWithDescription(dosError) << " (file size is "
+                         << length << ")"
+                         << " in MemoryMappedFile::map" << endl;
 
                 close();
                 fassertFailed(16166);
@@ -332,9 +332,9 @@ void* MemoryMappedFile::createPrivateMap() {
                 continue;
             }
 
-            log() << "MapViewOfFileEx for " << filename() << " failed with error "
-                  << errnoWithDescription(dosError) << " (file size is " << len << ")"
-                  << " in MemoryMappedFile::createPrivateMap" << endl;
+            severe() << "MapViewOfFileEx for " << filename() << " failed with error "
+                     << errnoWithDescription(dosError) << " (file size is " << len << ")"
+                     << " in MemoryMappedFile::createPrivateMap" << endl;
 
             fassertFailed(16167);
         }
@@ -355,8 +355,9 @@ void* MemoryMappedFile::remapPrivateView(void* oldPrivateAddr) {
 
     if (!UnmapViewOfFile(oldPrivateAddr)) {
         DWORD dosError = GetLastError();
-        log() << "UnMapViewOfFile for " << filename() << " failed with error "
-              << errnoWithDescription(dosError) << " in MemoryMappedFile::remapPrivateView" << endl;
+        severe() << "UnMapViewOfFile for " << filename() << " failed with error "
+                 << errnoWithDescription(dosError) << " in MemoryMappedFile::remapPrivateView"
+                 << endl;
         fassertFailed(16168);
     }
 
@@ -369,9 +370,9 @@ void* MemoryMappedFile::remapPrivateView(void* oldPrivateAddr) {
                         oldPrivateAddr);  // we want the same address we had before
     if (0 == newPrivateView) {
         DWORD dosError = GetLastError();
-        log() << "MapViewOfFileEx for " << filename() << " failed with error "
-              << errnoWithDescription(dosError) << " (file size is " << len << ")"
-              << " in MemoryMappedFile::remapPrivateView" << endl;
+        severe() << "MapViewOfFileEx for " << filename() << " failed with error "
+                 << errnoWithDescription(dosError) << " (file size is " << len << ")"
+                 << " in MemoryMappedFile::remapPrivateView" << endl;
     }
     fassert(16148, newPrivateView == oldPrivateAddr);
     return newPrivateView;

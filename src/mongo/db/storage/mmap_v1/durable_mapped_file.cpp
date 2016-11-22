@@ -247,6 +247,7 @@ bool DurableMappedFile::open(const std::string& fname) {
 
     setPath(fname);
     _view_write = map(fname.c_str());
+    fassert(16333, _view_write);
     return finishOpening();
 }
 
@@ -256,6 +257,7 @@ bool DurableMappedFile::create(const std::string& fname, unsigned long long& len
 
     setPath(fname);
     _view_write = map(fname.c_str(), len);
+    fassert(16332, _view_write);
     return finishOpening();
 }
 
@@ -268,11 +270,8 @@ bool DurableMappedFile::finishOpening() {
 
             _view_private = createPrivateMap();
             if (_view_private == 0) {
-                msgasserted(13636,
-                            str::stream() << "file " << filename() << " open/create failed "
-                                                                      "in createPrivateMap "
-                                                                      "(look in log for "
-                                                                      "more information)");
+                severe() << "file " << filename() << " open/create failed in createPrivateMap";
+                fassertFailed(13636);
             }
             // note that testIntent builds use this, even though it points to view_write then...
             privateViews.add_inlock(_view_private, this);

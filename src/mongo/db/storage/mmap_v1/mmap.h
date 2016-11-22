@@ -217,17 +217,15 @@ public:
 
     virtual void close();
 
-    // Throws exception if file doesn't exist. (dm may2010: not sure if this is always true?)
+    /**
+     * uasserts if file doesn't exist. fasserts on mmap error.
+     */
     void* map(const char* filename);
 
-    /* Creates with length if DNE, otherwise uses existing file length,
-       passed length.
-    */
-    void* map(const char* filename, unsigned long long& length);
-
-    /* Create. Must not exist.
-       @param zero fill file with zeros when true
-    */
+    /**
+     * uasserts if file exists. fasserts on mmap error.
+     * @param zero fill file with zeros when true
+     */
     void* create(const std::string& filename, unsigned long long len, bool zero);
 
     void flush(bool sync);
@@ -242,9 +240,11 @@ public:
     HANDLE getFd() const {
         return fd;
     }
-    /** create a new view with the specified properties.
-        automatically cleaned up upon close/destruction of the MemoryMappedFile object.
-        */
+
+    /**
+     * Creates a new view with the specified properties. Automatically cleaned up upon
+     * close/destruction of the MemoryMappedFile object. Returns nullptr on mmap error.
+     */
     void* createPrivateMap();
 
     virtual uint64_t getUniqueId() const {
@@ -271,7 +271,15 @@ private:
 #endif
 
 protected:
-    /** close the current private view and open a new replacement */
+    /**
+     * Creates with length if DNE, otherwise validates input length. Returns nullptr on mmap
+     * error.
+     */
+    void* map(const char* filename, unsigned long long& length);
+
+    /**
+     * Close the current private view and open a new replacement. Returns nullptr on mmap error.
+     */
     void* remapPrivateView(void* oldPrivateAddr);
 };
 
