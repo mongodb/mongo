@@ -34,6 +34,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/db/repl/sync_source_selector_mock.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/stdx/functional.h"
@@ -65,30 +66,6 @@ public:
 
 private:
     ShouldFailRequestFn _shouldFailRequest;
-};
-
-class SyncSourceSelectorMock : public SyncSourceSelector {
-public:
-    void clearSyncSourceBlacklist() override {}
-    HostAndPort chooseNewSyncSource(const OpTime& ot) override {
-        chooseNewSyncSourceHook();
-        lastOpTimeFetched = ot;
-        return syncSource;
-    }
-    void blacklistSyncSource(const HostAndPort& host, Date_t until) override {
-        blacklistHost = host;
-        blacklistUntil = until;
-    }
-    bool shouldChangeSyncSource(const HostAndPort&, const rpc::ReplSetMetadata&) {
-        return false;
-    }
-
-    HostAndPort syncSource = HostAndPort("host1", 1234);
-    OpTime lastOpTimeFetched;
-    stdx::function<void()> chooseNewSyncSourceHook = []() {};
-
-    HostAndPort blacklistHost;
-    Date_t blacklistUntil;
 };
 
 class SyncSourceResolverTest : public executor::ThreadPoolExecutorTest {
@@ -241,7 +218,7 @@ TEST_F(SyncSourceResolverTest, StartupReturnsIllegalOperationIfAlreadyActive) {
 }
 
 TEST_F(SyncSourceResolverTest, StartupReturnsShutdownInProgressIfResolverIsShuttingDown) {
-    _selector->syncSource = HostAndPort("node1", 12345);
+    _selector->setChooseNewSyncSourceResult_forTest(HostAndPort("node1", 12345));
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(executor::NetworkInterfaceMock::InNetworkGuard(getNet())->hasReadyRequests());
     _resolver->shutdown();
@@ -258,13 +235,13 @@ TEST_F(SyncSourceResolverTest, StartupReturnsShutdownInProgressIfExecutorIsShutd
 
 TEST_F(SyncSourceResolverTest,
        SyncSourceResolverReturnsStatusOkAndAnEmptyHostWhenNoViableHostExists) {
-    _selector->syncSource = HostAndPort();
+    _selector->setChooseNewSyncSourceResult_forTest(HostAndPort());
     ASSERT_OK(_resolver->startup());
 
     // Resolver invokes callback with empty host and becomes inactive immediately.
     ASSERT_FALSE(_resolver->isActive());
     ASSERT_EQUALS(HostAndPort(), unittest::assertGet(_response.syncSourceStatus));
-    ASSERT_EQUALS(lastOpTimeFetched, _selector->lastOpTimeFetched);
+    ASSERT_EQUALS(lastOpTimeFetched, _selector->getChooseNewSyncSourceOpTime_forTest());
 
     // Cannot restart a completed resolver.
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, _resolver->startup());
@@ -273,17 +250,16 @@ TEST_F(SyncSourceResolverTest,
 TEST_F(
     SyncSourceResolverTest,
     SyncSourceResolverReturnsCallbackCanceledIfResolverIsShutdownBeforeReturningEmptySyncSource) {
-    _selector->syncSource = HostAndPort();
-    _selector->chooseNewSyncSourceHook = [this]() { _resolver->shutdown(); };
+    _selector->setChooseNewSyncSourceResult_forTest(HostAndPort());
+    _selector->setChooseNewSyncSourceHook_forTest([this]() { _resolver->shutdown(); });
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _resolver->startup());
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _response.syncSourceStatus);
 }
 
 TEST_F(SyncSourceResolverTest,
        SyncSourceResolverConvertsExceptionToStatusIfChoosingViableSyncSourceThrowsException) {
-    _selector->chooseNewSyncSourceHook = [this]() {
-        uassert(ErrorCodes::InternalError, "", false);
-    };
+    _selector->setChooseNewSyncSourceHook_forTest(
+        [this]() { uassert(ErrorCodes::InternalError, "", false); });
     ASSERT_EQUALS(ErrorCodes::InternalError, _resolver->startup());
     ASSERT_EQUALS(ErrorCodes::InternalError, _response.syncSourceStatus);
 }
@@ -313,7 +289,7 @@ void _scheduleFirstOplogEntryFetcherResponse(executor::NetworkInterfaceMock* net
     ASSERT_BSONOBJ_EQ(BSON("$natural" << 1), request.cmdObj.getObjectField("sort"));
 
     // Change next sync source candidate before delivering scheduled response.
-    selector->syncSource = nextSyncSource;
+    selector->setChooseNewSyncSourceResult_forTest(nextSyncSource);
 
     net->runReadyNetworkOperations();
 }
@@ -330,7 +306,7 @@ void _scheduleFirstOplogEntryFetcherResponse(executor::NetworkInterfaceMock* net
 TEST_F(SyncSourceResolverTest,
        SyncSourceResolverReturnsStatusOkAndTheFoundHostWhenAnEligibleSyncSourceExists) {
     HostAndPort candidate1("node1", 12345);
-    _selector->syncSource = candidate1;
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
 
@@ -345,7 +321,7 @@ TEST_F(SyncSourceResolverTest,
 TEST_F(SyncSourceResolverTest,
        SyncSourceResolverTransitionsToCompleteWhenFinishCallbackThrowsException) {
     HostAndPort candidate1("node1", 12345);
-    _selector->syncSource = candidate1;
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
     _onCompletion = [this](const SyncSourceResolverResponse& response) {
         _response = response;
         uassert(ErrorCodes::InternalError, "", false);
@@ -391,7 +367,7 @@ TEST_F(SyncSourceResolverTest,
        SyncSourceResolverWillTryOtherSourcesWhenTheFirstNodeDoesNotHaveOldEnoughData) {
     HostAndPort candidate1("node1", 12345);
     HostAndPort candidate2("node2", 12345);
-    _selector->syncSource = candidate1;
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
 
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
@@ -400,9 +376,9 @@ TEST_F(SyncSourceResolverTest,
         getNet(), _selector.get(), candidate1, candidate2, Timestamp(200, 2));
 
     ASSERT_TRUE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->blacklistHost);
+    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
     ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kTooStaleBlacklistDuration,
-                  _selector->blacklistUntil);
+                  _selector->getLastBlacklistExpiration_forTest());
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 2));
@@ -417,7 +393,7 @@ TEST_F(SyncSourceResolverTest,
     HostAndPort candidate1("node1", 12345);
     HostAndPort candidate2("node2", 12345);
     HostAndPort candidate3("node3", 12345);
-    _selector->syncSource = candidate1;
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
 
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
@@ -448,7 +424,7 @@ void _scheduleNetworkErrorForFirstNode(executor::NetworkInterfaceMock* net,
     ASSERT_EQUALS(currentSyncSource, request.target);
 
     // Change next sync source candidate before delivering error to callback.
-    selector->syncSource = nextSyncSource;
+    selector->setChooseNewSyncSourceResult_forTest(nextSyncSource);
 
     net->runReadyNetworkOperations();
 }
@@ -457,7 +433,7 @@ TEST_F(SyncSourceResolverTest,
        SyncSourceResolverWillTryOtherSourcesWhenTheFirstNodeHasANetworkError) {
     HostAndPort candidate1("node1", 12345);
     HostAndPort candidate2("node2", 12345);
-    _selector->syncSource = candidate1;
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
 
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
@@ -465,9 +441,9 @@ TEST_F(SyncSourceResolverTest,
     _scheduleNetworkErrorForFirstNode(getNet(), _selector.get(), candidate1, candidate2);
 
     ASSERT_TRUE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->blacklistHost);
+    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
     ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFetcherErrorBlacklistDuration,
-                  _selector->blacklistUntil);
+                  _selector->getLastBlacklistExpiration_forTest());
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 2));
@@ -480,7 +456,7 @@ TEST_F(SyncSourceResolverTest,
 TEST_F(SyncSourceResolverTest,
        SyncSourceResolverReturnsEmptyHostWhenNoViableNodeExistsAfterNetworkErrorOnFirstNode) {
     HostAndPort candidate1("node1", 12345);
-    _selector->syncSource = candidate1;
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
 
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
@@ -488,9 +464,9 @@ TEST_F(SyncSourceResolverTest,
     _scheduleNetworkErrorForFirstNode(getNet(), _selector.get(), candidate1, HostAndPort());
 
     ASSERT_FALSE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->blacklistHost);
+    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
     ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFetcherErrorBlacklistDuration,
-                  _selector->blacklistUntil);
+                  _selector->getLastBlacklistExpiration_forTest());
 
     ASSERT_EQUALS(HostAndPort(), unittest::assertGet(_response.syncSourceStatus));
 }
@@ -499,7 +475,7 @@ TEST_F(SyncSourceResolverTest,
        SyncSourceResolverReturnsScheduleErrorWhenTheSchedulingCommandToSecondNodeFails) {
     HostAndPort candidate1("node1", 12345);
     HostAndPort candidate2("node2", 12345);
-    _selector->syncSource = candidate1;
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
 
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
@@ -511,9 +487,9 @@ TEST_F(SyncSourceResolverTest,
     _scheduleNetworkErrorForFirstNode(getNet(), _selector.get(), candidate1, candidate2);
 
     ASSERT_FALSE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->blacklistHost);
+    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
     ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFetcherErrorBlacklistDuration,
-                  _selector->blacklistUntil);
+                  _selector->getLastBlacklistExpiration_forTest());
 
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _response.syncSourceStatus);
 }
@@ -522,7 +498,7 @@ TEST_F(SyncSourceResolverTest,
        SyncSourceResolverWillTryOtherSourcesWhenTheFirstNodeHasAnEmptyOplog) {
     HostAndPort candidate1("node1", 12345);
     HostAndPort candidate2("node1", 12345);
-    _selector->syncSource = candidate1;
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
 
@@ -530,9 +506,9 @@ TEST_F(SyncSourceResolverTest,
         getNet(), _selector.get(), candidate1, candidate2, std::vector<BSONObj>());
 
     ASSERT_TRUE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->blacklistHost);
+    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
     ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kOplogEmptyBlacklistDuration,
-                  _selector->blacklistUntil);
+                  _selector->getLastBlacklistExpiration_forTest());
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 2));
@@ -546,7 +522,7 @@ TEST_F(SyncSourceResolverTest,
        SyncSourceResolverWillTryOtherSourcesWhenTheFirstNodeHasAnEmptyFirstOplogEntry) {
     HostAndPort candidate1("node1", 12345);
     HostAndPort candidate2("node1", 12345);
-    _selector->syncSource = candidate1;
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
 
@@ -554,9 +530,9 @@ TEST_F(SyncSourceResolverTest,
         getNet(), _selector.get(), candidate1, candidate2, {BSONObj()});
 
     ASSERT_TRUE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->blacklistHost);
+    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
     ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFirstOplogEntryEmptyBlacklistDuration,
-                  _selector->blacklistUntil);
+                  _selector->getLastBlacklistExpiration_forTest());
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 2));
@@ -570,7 +546,7 @@ TEST_F(SyncSourceResolverTest,
        SyncSourceResolverWillTryOtherSourcesWhenFirstNodeContainsOplogEntryWithNullTimestamp) {
     HostAndPort candidate1("node1", 12345);
     HostAndPort candidate2("node1", 12345);
-    _selector->syncSource = candidate1;
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
 
@@ -578,10 +554,10 @@ TEST_F(SyncSourceResolverTest,
         getNet(), _selector.get(), candidate1, candidate2, Timestamp(0, 0));
 
     ASSERT_TRUE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->blacklistHost);
+    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
     ASSERT_EQUALS(getExecutor().now() +
                       SyncSourceResolver::kFirstOplogEntryNullTimestampBlacklistDuration,
-                  _selector->blacklistUntil);
+                  _selector->getLastBlacklistExpiration_forTest());
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 2));
@@ -646,7 +622,7 @@ TEST_F(
     _resolver = _makeResolver(lastOpTimeFetched, requiredOpTime);
 
     HostAndPort candidate1("node1", 12345);
-    _selector->syncSource = candidate1;
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
 
@@ -668,7 +644,7 @@ TEST_F(SyncSourceResolverTest,
 
     HostAndPort candidate1("node1", 12345);
     HostAndPort candidate2("node2", 12345);
-    _selector->syncSource = candidate1;
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
 
@@ -685,9 +661,9 @@ TEST_F(SyncSourceResolverTest,
         {BSON("ts" << requiredOpTime.getTimestamp() << "t" << OpTime::kUninitializedTerm)});
 
     ASSERT_TRUE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->blacklistHost);
+    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
     ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kNoRequiredOpTimeBlacklistDuration,
-                  _selector->blacklistUntil);
+                  _selector->getLastBlacklistExpiration_forTest());
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 0));
@@ -707,7 +683,7 @@ TEST_F(
 
     HostAndPort candidate1("node1", 12345);
     HostAndPort candidate2("node2", 12345);
-    _selector->syncSource = candidate1;
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
 
@@ -719,9 +695,9 @@ TEST_F(
     _scheduleRequiredOpTimeFetcherResponse(getNet(), _selector.get(), candidate1, requiredOpTime);
 
     ASSERT_TRUE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->blacklistHost);
+    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
     ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kNoRequiredOpTimeBlacklistDuration,
-                  _selector->blacklistUntil);
+                  _selector->getLastBlacklistExpiration_forTest());
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 0));
@@ -739,7 +715,7 @@ TEST_F(SyncSourceResolverTest,
 
     HostAndPort candidate1("node1", 12345);
     HostAndPort candidate2("node2", 12345);
-    _selector->syncSource = candidate1;
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
 
@@ -752,9 +728,9 @@ TEST_F(SyncSourceResolverTest,
         getNet(), _selector.get(), candidate1, requiredOpTime, {});
 
     ASSERT_TRUE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->blacklistHost);
+    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
     ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kNoRequiredOpTimeBlacklistDuration,
-                  _selector->blacklistUntil);
+                  _selector->getLastBlacklistExpiration_forTest());
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 0));
@@ -771,7 +747,7 @@ TEST_F(SyncSourceResolverTest,
 
     HostAndPort candidate1("node1", 12345);
     HostAndPort candidate2("node2", 12345);
-    _selector->syncSource = candidate1;
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
 
@@ -788,9 +764,9 @@ TEST_F(SyncSourceResolverTest,
         {BSON("ts" << requiredOpTime.getTimestamp() << "t" << requiredOpTime.getTerm() + 1)});
 
     ASSERT_TRUE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->blacklistHost);
+    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
     ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kNoRequiredOpTimeBlacklistDuration,
-                  _selector->blacklistUntil);
+                  _selector->getLastBlacklistExpiration_forTest());
 
     _scheduleFirstOplogEntryFetcherResponse(
         getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 0));
@@ -810,7 +786,7 @@ TEST_F(SyncSourceResolverTest,
     };
 
     HostAndPort candidate1("node1", 12345);
-    _selector->syncSource = candidate1;
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
 
@@ -828,7 +804,7 @@ TEST_F(
     _resolver = _makeResolver(lastOpTimeFetched, requiredOpTime);
 
     HostAndPort candidate1("node1", 12345);
-    _selector->syncSource = candidate1;
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
 
@@ -851,7 +827,7 @@ TEST_F(
     _resolver = _makeResolver(lastOpTimeFetched, requiredOpTime);
 
     HostAndPort candidate1("node1", 12345);
-    _selector->syncSource = candidate1;
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
 
@@ -873,7 +849,7 @@ TEST_F(
     _resolver = _makeResolver(lastOpTimeFetched, requiredOpTime);
 
     HostAndPort candidate1("node1", 12345);
-    _selector->syncSource = candidate1;
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
 
@@ -883,9 +859,9 @@ TEST_F(
     _scheduleNetworkErrorForFirstNode(getNet(), _selector.get(), candidate1, HostAndPort());
 
     ASSERT_FALSE(_resolver->isActive());
-    ASSERT_EQUALS(candidate1, _selector->blacklistHost);
+    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
     ASSERT_EQUALS(getExecutor().now() + SyncSourceResolver::kFetcherErrorBlacklistDuration,
-                  _selector->blacklistUntil);
+                  _selector->getLastBlacklistExpiration_forTest());
 
     _resolver->join();
     ASSERT_FALSE(_resolver->isActive());

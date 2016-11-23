@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <cstdint>
+#include <iosfwd>
 #include <memory>
 
 #include "mongo/base/status.h"
@@ -41,21 +43,19 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/rollback_checker.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
-
-class QueryFetcher;
-
 namespace repl {
 
 namespace {
+
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 using Event = executor::TaskExecutor::EventHandle;
 using Handle = executor::TaskExecutor::CallbackHandle;
@@ -81,22 +81,8 @@ MONGO_FP_FORWARD_DECLARE(rsSyncApplyStop);
 
 struct InitialSyncState;
 struct MemberState;
-class RollbackChecker;
 class StorageInterface;
 
-
-/** State for decision tree */
-enum class DataReplicatorState {
-    InitialSync,
-    Uninitialized,
-};
-
-
-// Helper to convert enum to a string.
-std::string toString(DataReplicatorState s);
-
-// TBD -- ignore for now
-enum class DataReplicatorScope { ReplicateAll, ReplicateDB, ReplicateCollection };
 
 struct DataReplicatorOptions {
     /** Function to return optime of last operation applied on this node */
@@ -117,18 +103,19 @@ struct DataReplicatorOptions {
     Seconds blacklistSyncSourcePenaltyForNetworkConnectionError{10};
     Minutes blacklistSyncSourcePenaltyForOplogStartMissing{10};
 
+    // DataReplicator waits this long before retrying getApplierBatchCallback() if there are
+    // currently no operations available to apply or if the 'rsSyncApplyStop' failpoint is active.
+    // This default value is based on the duration in BackgroundSync::waitForMore() and
+    // SyncTail::tryPopAndWaitForMore().
+    Milliseconds getApplierBatchCallbackRetryWait{1000};
+
     // Batching settings.
-    size_t replBatchLimitBytes = 512 * 1024 * 1024;
-    size_t replBatchLimitOperations = 5000;
+    std::uint32_t replBatchLimitBytes = 512 * 1024 * 1024;
+    std::uint32_t replBatchLimitOperations = 5000;
 
     // Replication settings
     NamespaceString localOplogNS = NamespaceString("local.oplog.rs");
     NamespaceString remoteOplogNS = NamespaceString("local.oplog.rs");
-
-    // TBD -- ignore below for now
-    DataReplicatorScope scope = DataReplicatorScope::ReplicateAll;
-    std::string scopeNS;
-    BSONObj filterCriteria;
 
     GetMyLastOptimeFn getMyLastOptime;
     SetMyLastOptimeFn setMyLastOptime;
@@ -138,7 +125,7 @@ struct DataReplicatorOptions {
 
     // The oplog fetcher will restart the oplog tailing query this many times on non-cancellation
     // failures.
-    std::size_t oplogFetcherMaxFetcherRestarts = 0;
+    std::uint32_t oplogFetcherMaxFetcherRestarts = 0;
 
     std::string toString() const {
         return str::stream() << "DataReplicatorOptions -- "
@@ -156,11 +143,65 @@ struct DataReplicatorOptions {
  *
  *
  * Entry Points:
- *      -- doInitialSync: Will drop all data and copy to a consistent state of data (via the oplog).
- *      -- startup: Start data replication from existing data.
+ *      -- startup: Start initial sync.
  */
 class DataReplicator {
+    MONGO_DISALLOW_COPYING(DataReplicator);
+
 public:
+    /**
+     * Callback function to report last applied optime (with hash) of initial sync.
+     */
+    typedef stdx::function<void(const StatusWith<OpTimeWithHash>& lastApplied)> OnCompletionFn;
+
+    /**
+     * RAII type that stores the result of a single initial sync attempt.
+     * Only the first result passed to setResultAndCancelRemainingWork_inlock() is saved.
+     * Calls '_onCompletion' on destruction with result.
+     * We use an invariant to ensure that a result has been provided by the caller at destruction.
+     */
+    class OnCompletionGuard {
+        MONGO_DISALLOW_COPYING(OnCompletionGuard);
+
+    public:
+        // Function to invoke DataReplicator::_cancelRemainingWork_inlock().
+        using CancelRemainingWorkInLockFn = stdx::function<void()>;
+
+        OnCompletionGuard(const CancelRemainingWorkInLockFn& cancelRemainingWorkInLock,
+                          const OnCompletionFn& onCompletion);
+        ~OnCompletionGuard();
+
+        /**
+         * Sets result if called for the first time.
+         * Cancels remaining work in DataReplicator.
+         * Requires either a unique_lock or lock_guard to be passed in to ensure that we call
+         * DataReplicator::_cancelRemainingWork_inlock()) while we have a lock on the data
+         * replicator's mutex.
+         */
+        void setResultAndCancelRemainingWork_inlock(const stdx::lock_guard<stdx::mutex>& lock,
+                                                    const StatusWith<OpTimeWithHash>& lastApplied);
+        void setResultAndCancelRemainingWork_inlock(const stdx::unique_lock<stdx::mutex>& lock,
+                                                    const StatusWith<OpTimeWithHash>& lastApplied);
+
+    private:
+        /**
+         * Once we verified that we have the data replicator lock, this function is called by both
+         * versions of setResultAndCancelRemainingWork_inlock() to set the result and cancel any
+         * remaining work in the data replicator.
+         */
+        void _setResultAndCancelRemainingWork_inlock(const StatusWith<OpTimeWithHash>& lastApplied);
+
+        const CancelRemainingWorkInLockFn _cancelRemainingWorkInLock;
+        const OnCompletionFn _onCompletion;
+
+        // _lastAppliedSet and _lastApplied are guarded by the mutex of the DataReplicator instance
+        // that owns this guard object.
+        bool _lastAppliedSet = false;
+        StatusWith<OpTimeWithHash> _lastApplied =
+            Status(ErrorCodes::InternalError,
+                   "This initial sync attempt finished without an explicit result.");
+    };
+
     struct InitialSyncAttemptInfo {
         int durationMillis;
         Status status;
@@ -172,8 +213,8 @@ public:
     };
 
     struct Stats {
-        size_t failedInitialSyncAttempts{0};
-        size_t maxFailedInitialSyncAttempts{0};
+        std::uint32_t failedInitialSyncAttempts{0};
+        std::uint32_t maxFailedInitialSyncAttempts{0};
         Date_t initialSyncStart;
         Date_t initialSyncEnd;
         std::vector<DataReplicator::InitialSyncAttemptInfo> initialSyncAttemptInfos;
@@ -185,42 +226,34 @@ public:
 
     DataReplicator(DataReplicatorOptions opts,
                    std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
-                   StorageInterface* storage);
+                   StorageInterface* storage,
+                   const OnCompletionFn& onCompletion);
 
     virtual ~DataReplicator();
 
-    // Shuts down replication if "start" has been called, and blocks until shutdown has completed.
+    /**
+     * Returns true if an initial sync is currently running or in the process of shutting down.
+     */
+    bool isActive() const;
+
+    /**
+     * Starts initial sync process, with the provided number of attempts
+     */
+    Status startup(OperationContext* txn, std::uint32_t maxAttempts) noexcept;
+
+    /**
+     * Shuts down replication if "start" has been called, and blocks until shutdown has completed.
+     */
     Status shutdown();
 
     /**
-     * Cancels outstanding work and begins shutting down.
+     * Block until inactive.
      */
-    Status scheduleShutdown();
+    void join();
 
     /**
-     * Waits for data replicator to finish shutting down.
-     * Data replicator will go into uninitialized state.
+     * Returns internal state in a loggable format.
      */
-    void waitForShutdown();
-
-    /**
-     *  Does an initial sync, with the provided number of attempts.
-     *
-     *  This should be the first method called after construction (see class comment).
-     */
-    StatusWith<OpTimeWithHash> doInitialSync(OperationContext* txn, std::size_t maxAttempts);
-
-    DataReplicatorState getState() const;
-
-    HostAndPort getSyncSource() const;
-    OpTimeWithHash getLastFetched() const;
-    OpTimeWithHash getLastApplied() const;
-
-    /**
-     * Number of operations in the oplog buffer.
-     */
-    size_t getOplogBufferCount() const;
-
     std::string getDiagnosticString() const;
 
     /**
@@ -229,10 +262,6 @@ public:
      */
     BSONObj getInitialSyncProgress() const;
 
-    // For testing only
-
-    void _resetState_inlock(OperationContext* txn, OpTimeWithHash lastAppliedOpTime);
-
     /**
      * Overrides how executor schedules database work.
      *
@@ -240,14 +269,239 @@ public:
      */
     void setScheduleDbWorkFn_forTest(const CollectionCloner::ScheduleDbWorkFn& scheduleDbWorkFn);
 
-private:
-    // Runs a single initial sync attempt.
-    Status _runInitialSyncAttempt_inlock(OperationContext* txn,
-                                         UniqueLock& lk,
-                                         HostAndPort syncSource);
+    // State transitions:
+    // PreStart --> Running --> ShuttingDown --> Complete
+    // It is possible to skip intermediate states. For example, calling shutdown() when the data
+    // replicator has not started will transition from PreStart directly to Complete.
+    enum class State { kPreStart, kRunning, kShuttingDown, kComplete };
 
-    void _setState(const DataReplicatorState& newState);
-    void _setState_inlock(const DataReplicatorState& newState);
+    /**
+     * Returns current data replicator state.
+     * For testing only.
+     */
+    State getState_forTest() const;
+
+private:
+    /**
+     * Returns true if we are still processing initial sync tasks (_state is either Running or
+     * Shutdown).
+     */
+    bool _isActive_inlock() const;
+
+    /**
+     * Cancels all outstanding work.
+     * Used by shutdown() and CompletionGuard::setResultAndCancelRemainingWork().
+     */
+    void _cancelRemainingWork_inlock();
+
+    /**
+     * Returns true if the data replicator has received a shutdown request (_state is ShuttingDown).
+     */
+    bool _isShuttingDown() const;
+    bool _isShuttingDown_inlock() const;
+
+    /**
+     * Initial sync flowchart:
+     *
+     *     start()
+     *         |
+     *         |
+     *         V
+     *     _setUp_inlock()
+     *         |
+     *         |
+     *         V
+     *    _startInitialSyncAttemptCallback()
+     *         |
+     *         |
+     *         |<-------+
+     *         |        |
+     *         |        | (bad sync source)
+     *         |        |
+     *         V        |
+     *    _chooseSyncSourceCallback()
+     *         |
+     *         |
+     *         | (good sync source found)
+     *         |
+     *         |
+     *         V
+     *    _recreateOplogAndDropReplicatedDatabases()
+     *         |
+     *         |
+     *         V
+     *    _rollbackCheckerResetCallback()
+     *         |
+     *         |
+     *         V
+     *    _lastOplogEntryFetcherCallbackForBeginTimestamp()
+     *         |
+     *         |
+     *         +------------------------------+
+     *         |                              |
+     *         |                              |
+     *         V                              V
+     *    _oplogFetcherCallback()         _databasesClonerCallback
+     *         |                              |
+     *         |                              |
+     *         |                              V
+     *         |                          _lastOplogEntryFetcherCallbackForStopTimestamp()
+     *         |                              |       |
+     *         |                              |       |
+     *         |            (no ops to apply) |       | (have ops to apply)
+     *         |                              |       |
+     *         |                              |       V
+     *         |                              |   _getNextApplierBatchCallback()<-----+
+     *         |                              |       |                       ^       |
+     *         |                              |       |                       |       |
+     *         |                              |       |      (no docs fetched |       |
+     *         |                              |       |       and end ts not  |       |
+     *         |                              |       |       reached)        |       |
+     *         |                              |       |                       |       |
+     *         |                              |       V                       |       |
+     *         |                              |   _multiApplierCallback()-----+       |
+     *         |                              |       |       |                       |
+     *         |                              |       |       |                       |
+     *         |                              |       |       | (docs fetched)        | (end ts not
+     *         |                              |       |       |                       |  reached)
+     *         |                              |       |       V                       |
+     *         |                              |       |   _lastOplogEntryFetcherCallbackAfter-
+     *         |                              |       |       FetchingMissingDocuments()
+     *         |                              |       |       |
+     *         |                              |       |       |
+     *         |                           (reached end timestamp)
+     *         |                              |       |       |
+     *         |                              V       V       V
+     *         |                          _rollbackCheckerCheckForRollbackCallback()
+     *         |                              |
+     *         |                              |
+     *         +------------------------------+
+     *         |
+     *         |
+     *         V
+     *    _finishInitialSyncAttempt()
+     *         |
+     *         |
+     *         V
+     *    _finishCallback()
+     */
+
+    /**
+     * Sets up internal state to begin initial sync.
+     */
+    void _setUp_inlock(OperationContext* txn, std::uint32_t initialSyncMaxAttempts);
+
+    /**
+     * Tears down internal state before reporting final status to caller.
+     */
+    void _tearDown_inlock(OperationContext* txn, const StatusWith<OpTimeWithHash>& lastApplied);
+
+    /**
+     * Callback to start a single initial sync attempt.
+     */
+    void _startInitialSyncAttemptCallback(const executor::TaskExecutor::CallbackArgs& callbackArgs,
+                                          std::uint32_t initialSyncAttempt,
+                                          std::uint32_t initialSyncMaxAttempts);
+
+    /**
+     * Callback to obtain sync source from sync source selector.
+     * For every initial sync attempt, we will try up to 'numInitialSyncConnectAttempts' times (at
+     * an interval of '_opts.syncSourceRetryWait' ms) to obtain a valid sync source before giving up
+     * and returning ErrorCodes::InitialSyncOplogSourceMissing.
+     */
+    void _chooseSyncSourceCallback(const executor::TaskExecutor::CallbackArgs& callbackArgs,
+                                   std::uint32_t chooseSyncSourceAttempt,
+                                   std::uint32_t chooseSyncSourceMaxAttempts,
+                                   std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+
+    /**
+     * This function does the following:
+     *      1.) Drop oplog.
+     *      2.) Drop user databases (replicated dbs).
+     *      3.) Create oplog.
+     */
+    Status _recreateOplogAndDropReplicatedDatabases();
+
+    /**
+     * Callback for rollback checker's first replSetGetRBID command before starting data cloning.
+     */
+    void _rollbackCheckerResetCallback(const RollbackChecker::Result& result,
+                                       std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+
+    /**
+     * Callback for first '_lastOplogEntryFetcher' callback. A successful response lets us
+     * determine the starting point for tailing the oplog using the OplogFetcher as well as
+     * setting a reference point for the state of the sync source's oplog when data cloning
+     * completes.
+     */
+    void _lastOplogEntryFetcherCallbackForBeginTimestamp(
+        const StatusWith<Fetcher::QueryResponse>& result,
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+
+    /**
+     * Callback for oplog fetcher.
+     */
+    void _oplogFetcherCallback(const Status& status,
+                               const OpTimeWithHash& lastFetched,
+                               std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+
+    /**
+     * Callback for DatabasesCloner.
+     */
+    void _databasesClonerCallback(const Status& status,
+                                  std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+
+    /**
+     * Callback for second '_lastOplogEntryFetcher' callback. This is scheduled to obtain the stop
+     * timestamp after DatabasesCloner has completed and enables us to determine if the oplog on
+     * the sync source has advanced since we started cloning the databases.
+     */
+    void _lastOplogEntryFetcherCallbackForStopTimestamp(
+        const StatusWith<Fetcher::QueryResponse>& result,
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+
+    /**
+     * Callback to obtain next batch of operations to apply.
+     */
+    void _getNextApplierBatchCallback(const executor::TaskExecutor::CallbackArgs& callbackArgs,
+                                      std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+
+    /**
+     * Callback for MultiApplier completion.
+     */
+    void _multiApplierCallback(const Status& status,
+                               OpTimeWithHash lastApplied,
+                               std::uint32_t numApplied,
+                               std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+
+    /**
+     * Callback for third '_lastOplogEntryFetcher' callback. This is scheduled after MultiApplier
+     * completed successfully and missing documents were fetched from the sync source while
+     * DataReplicatorExternalState::_multiInitialSyncApply() was processing operations.
+     * This callback will update InitialSyncState::stopTimestamp on success.
+     */
+    void _lastOplogEntryFetcherCallbackAfterFetchingMissingDocuments(
+        const StatusWith<Fetcher::QueryResponse>& result,
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+
+    /**
+     * Callback for rollback checker's last replSetGetRBID command after cloning data and applying
+     * operations.
+     */
+    void _rollbackCheckerCheckForRollbackCallback(
+        const RollbackChecker::Result& result,
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+
+    /**
+     * Reports result of current initial sync attempt. May schedule another initial sync attempt
+     * depending on shutdown state and whether we've exhausted all initial sync retries.
+     */
+    void _finishInitialSyncAttempt(const StatusWith<OpTimeWithHash>& lastApplied);
+
+    /**
+     * Invokes completion callback and transitions state to State::kComplete.
+     */
+    void _finishCallback(StatusWith<OpTimeWithHash> lastApplied);
 
     // Obtains a valid sync source from the sync source selector.
     // Returns error if a sync source cannot be found.
@@ -260,32 +514,81 @@ private:
     void _enqueueDocuments(Fetcher::Documents::const_iterator begin,
                            Fetcher::Documents::const_iterator end,
                            const OplogFetcher::DocumentsInfo& info);
-    void _onOplogFetchFinish(const Status& status, const OpTimeWithHash& lastFetched);
-    void _doNextActions();
-    void _doNextActions_inlock();
 
     BSONObj _getInitialSyncProgress_inlock() const;
 
     StatusWith<Operations> _getNextApplierBatch_inlock();
-    void _onApplyBatchFinish(const Status& status,
-                             OpTimeWithHash lastApplied,
-                             std::size_t numApplied);
 
-    // Called when the DatabasesCloner finishes.
-    void _onDataClonerFinish(const Status& status, HostAndPort syncSource);
-    // Called after _onDataClonerFinish when the new Timestamp is avail, to use for minvalid.
-    void _onApplierReadyStart(const QueryResponseStatus& fetchResult);
-    // Called during _onApplyBatchFinish when we fetched a missing document and must reset minValid.
-    void _onFetchMissingDocument_inlock(OpTimeWithHash lastApplied, std::size_t numApplied);
-    // Schedules a fetcher to get the last oplog entry from the sync source.
-    void _scheduleLastOplogEntryFetcher_inlock(Fetcher::CallbackFn callback);
+    /**
+     * Schedules a fetcher to get the last oplog entry from the sync source.
+     */
+    Status _scheduleLastOplogEntryFetcher_inlock(Fetcher::CallbackFn callback);
 
-    Status _scheduleDoNextActions();
-    Status _scheduleApplyBatch_inlock();
+    /**
+     * Checks the current oplog application progress (begin and end timestamps).
+     * If necessary, schedules a _getNextApplierBatchCallback() task.
+     * If the stop and end timestamps are inconsistent or if there is an issue scheduling the task,
+     * we set the error status in 'onCompletionGuard' and shut down the OplogFetcher.
+     * Passes 'lock' through to completion guard.
+     */
+    void _checkApplierProgressAndScheduleGetNextApplierBatch_inlock(
+        const stdx::lock_guard<stdx::mutex>& lock,
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
-    void _cancelAllHandles_inlock();
-    void _waitOnAndResetAll_inlock(UniqueLock* lk);
-    bool _anyActiveHandles_inlock() const;
+    /**
+     * Schedules a rollback checker to get the rollback ID after data cloning or applying. This
+     * helps us check if a rollback occurred on the sync source.
+     * If we fail to schedule the rollback checker, we set the error status in 'onCompletionGuard'
+     * and shut down the OplogFetcher.
+     * Passes 'lock' through to completion guard.
+     */
+    void _scheduleRollbackCheckerCheckForRollback_inlock(
+        const stdx::lock_guard<stdx::mutex>& lock,
+        std::shared_ptr<OnCompletionGuard> onCompletionGuard);
+
+    /**
+     * Checks the given status (or embedded status inside the callback args) and current data
+     * replicator shutdown state. If the given status is not OK or if we are shutting down, returns
+     * a new error status that should be passed to _finishCallback. The reason in the new error
+     * status will include 'message'.
+     * Otherwise, returns Status::OK().
+     */
+    Status _checkForShutdownAndConvertStatus_inlock(
+        const executor::TaskExecutor::CallbackArgs& callbackArgs, const std::string& message);
+    Status _checkForShutdownAndConvertStatus_inlock(const Status& status,
+                                                    const std::string& message);
+
+    /**
+     * Schedules work to be run by the task executor.
+     * Saves handle if work was successfully scheduled.
+     * Returns scheduleWork status (without the handle).
+     */
+    Status _scheduleWorkAndSaveHandle_inlock(const executor::TaskExecutor::CallbackFn& work,
+                                             executor::TaskExecutor::CallbackHandle* handle,
+                                             const std::string& name);
+    Status _scheduleWorkAtAndSaveHandle_inlock(Date_t when,
+                                               const executor::TaskExecutor::CallbackFn& work,
+                                               executor::TaskExecutor::CallbackHandle* handle,
+                                               const std::string& name);
+
+    /**
+     * Cancels task executor callback handle if not null.
+     */
+    void _cancelHandle_inlock(executor::TaskExecutor::CallbackHandle handle);
+
+    /**
+     * Starts up component and checks data replicator's shutdown state at the same time.
+     * If component's startup() fails, resets 'component' (which is assumed to be a unique_ptr
+     * to the component type).
+     */
+    template <typename Component>
+    Status _startupComponent_inlock(Component& component);
+
+    /**
+     * Shuts down component if not null.
+     */
+    template <typename Component>
+    void _shutdownComponent_inlock(Component& component);
 
     // Counts how many documents have been refetched from the source in the current batch.
     AtomicUInt32 _fetchCount;
@@ -305,34 +608,54 @@ private:
     const DataReplicatorOptions _opts;                                          // (R)
     std::unique_ptr<DataReplicatorExternalState> _dataReplicatorExternalState;  // (R)
     executor::TaskExecutor* _exec;                                              // (R)
-    DataReplicatorState _dataReplicatorState;                                   // (MX)
-    std::unique_ptr<InitialSyncState> _initialSyncState;                        // (M)
-    StorageInterface* _storage;                                                 // (M)
-    std::unique_ptr<OplogFetcher> _oplogFetcher;                                // (S)
-    std::unique_ptr<Fetcher> _lastOplogEntryFetcher;                            // (S)
-    bool _applierPaused = false;                                                // (X)
-    std::unique_ptr<MultiApplier> _applier;                                     // (M)
-    std::unique_ptr<MultiApplier> _shuttingDownApplier;                         // (M)
-    HostAndPort _syncSource;                                                    // (M)
-    OpTimeWithHash _lastFetched;                                                // (MX)
-    OpTimeWithHash _lastApplied;                                                // (MX)
-    std::unique_ptr<OplogBuffer> _oplogBuffer;                                  // (M)
+    StorageInterface* _storage;                                                 // (R)
 
-    // Set to true when shutdown is requested. This flag should be checked by
-    // the data replicator during initial sync so that it can interrupt the
-    // the current operation and gracefully transition to completion with
-    // a shutdown status.
-    bool _inShutdown = false;  // (M)
-    // Set to true when the _onShutdown event is signaled for the first time.
-    // Ensures that we do not signal the shutdown event more than once (which
-    // is disallowed by the task executor.
-    bool _onShutdownSignaled = false;  // (M)
-    // Created when shutdown is requested. Signaled at most once when the data
-    // replicator is determining its next steps between task executor callbacks.
-    Event _onShutdown;  // (M)
+    // This is invoked with the final status of the initial sync. If startup() fails, this callback
+    // is never invoked. The caller gets the last applied optime with hash when the initial sync
+    // completes successfully or an error status.
+    // '_onCompletion' is cleared on completion (in _finishCallback()) in order to release any
+    // resources that might be held by the callback function object.
+    OnCompletionFn _onCompletion;  // (M)
 
+    // Handle to currently scheduled _startInitialSyncAttemptCallback() task.
+    executor::TaskExecutor::CallbackHandle _startInitialSyncAttemptHandle;  // (M)
+
+    // Handle to currently scheduled _chooseSyncSourceCallback() task.
+    executor::TaskExecutor::CallbackHandle _chooseSyncSourceHandle;  // (M)
+
+    // RollbackChecker to get rollback ID before and after each initial sync attempt.
+    std::unique_ptr<RollbackChecker> _rollbackChecker;  // (M)
+
+    // Handle returned from RollbackChecker::reset().
+    RollbackChecker::CallbackHandle _getBaseRollbackIdHandle;  // (M)
+
+    // Handle returned from RollbackChecker::checkForRollback().
+    RollbackChecker::CallbackHandle _getLastRollbackIdHandle;  // (M)
+
+    // Handle to currently scheduled _getNextApplierBatchCallback() task.
+    executor::TaskExecutor::CallbackHandle _getNextApplierBatchHandle;  // (M)
+
+    std::unique_ptr<InitialSyncState> _initialSyncState;  // (M)
+    std::unique_ptr<OplogFetcher> _oplogFetcher;          // (S)
+    std::unique_ptr<Fetcher> _lastOplogEntryFetcher;      // (S)
+    std::unique_ptr<MultiApplier> _applier;               // (M)
+    HostAndPort _syncSource;                              // (M)
+    OpTimeWithHash _lastFetched;                          // (MX)
+    OpTimeWithHash _lastApplied;                          // (MX)
+    std::unique_ptr<OplogBuffer> _oplogBuffer;            // (M)
+
+    // Used to signal changes in _state.
+    mutable stdx::condition_variable _stateCondition;
+
+    // Current data replicator state. See comments for State enum class for details.
+    State _state = State::kPreStart;  // (M)
+
+    // Passed to CollectionCloner via DatabasesCloner.
     CollectionCloner::ScheduleDbWorkFn _scheduleDbWorkFn;  // (M)
-    Stats _stats;                                          // (M)
+
+    // Contains stats on the current initial sync request (includes all attempts).
+    // To access these stats in a user-readable format, use getInitialSyncProgress().
+    Stats _stats;  // (M)
 };
 
 }  // namespace repl

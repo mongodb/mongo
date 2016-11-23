@@ -770,11 +770,25 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='sync_source_selector_mock',
+    source=[
+        'sync_source_selector_mock.cpp',
+    ],
+    LIBDEPS=[
+        'optime',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/rpc/metadata',
+        '$BUILD_DIR/mongo/util/net/hostandport',
+    ],
+)
+
 env.CppUnitTest(
     target='sync_source_resolver_test',
     source='sync_source_resolver_test.cpp',
     LIBDEPS=[
         'sync_source_resolver',
+        'sync_source_selector_mock',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/unittest/task_executor_proxy',
     ],
@@ -1033,6 +1047,7 @@ env.Library(
         'databases_cloner',
         'multiapplier',
         'oplog_buffer_blocking_queue',
+        'oplog_entry',
         'oplog_fetcher',
         'optime',
         'rollback_checker',
@@ -1051,9 +1066,11 @@ env.CppUnitTest(
         'data_replicator',
         'data_replicator_external_state_mock',
         'replication_executor_test_fixture',
+        'sync_source_selector_mock',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/unittest/concurrency',
+        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
     ],
 )
 

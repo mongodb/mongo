@@ -1006,13 +1006,17 @@ TEST_F(CollectionClonerTest, MiddleBatchContainsNoDocuments) {
     ASSERT_FALSE(collectionCloner->isActive());
 }
 
+TEST_F(CollectionClonerTest, CollectionClonerTransitionsToCompleteIfShutdownBeforeStartup) {
+    collectionCloner->shutdown();
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, collectionCloner->startup());
+}
+
 /**
  * Start cloning.
  * Make it fail while copying collection.
- * Restart cloning.
- * Run to completion.
+ * Restarting cloning should fail with ErrorCodes::ShutdownInProgress error.
  */
-TEST_F(CollectionClonerTest, CollectionClonerCanBeRestartedAfterPreviousFailure) {
+TEST_F(CollectionClonerTest, CollectionClonerCannotBeRestartedAfterPreviousFailure) {
     // First cloning attempt - fails while reading documents from source collection.
     unittest::log() << "Starting first collection cloning attempt";
     ASSERT_OK(collectionCloner->startup());
@@ -1054,47 +1058,59 @@ TEST_F(CollectionClonerTest, CollectionClonerCanBeRestartedAfterPreviousFailure)
     ASSERT_FALSE(collectionCloner->isActive());
 
     // Second cloning attempt - run to completion.
-    unittest::log() << "Starting second collection cloning attempt";
+    unittest::log() << "Starting second collection cloning attempt - startup() should fail";
     collectionStats = CollectionMockStats();
     setStatus(getDetectableErrorStatus());
+
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, collectionCloner->startup());
+}
+
+bool sharedCallbackStateDestroyed = false;
+class SharedCallbackState {
+    MONGO_DISALLOW_COPYING(SharedCallbackState);
+
+public:
+    SharedCallbackState() {}
+    ~SharedCallbackState() {
+        sharedCallbackStateDestroyed = true;
+    }
+};
+
+TEST_F(CollectionClonerTest, CollectionClonerResetsOnCompletionCallbackFunctionAfterCompletion) {
+    sharedCallbackStateDestroyed = false;
+    auto sharedCallbackData = std::make_shared<SharedCallbackState>();
+
+    Status result = getDetectableErrorStatus();
+    collectionCloner =
+        stdx::make_unique<CollectionCloner>(&getExecutor(),
+                                            dbWorkThreadPool.get(),
+                                            target,
+                                            nss,
+                                            options,
+                                            [&result, sharedCallbackData](const Status& status) {
+                                                log() << "setting result to " << status;
+                                                result = status;
+                                            },
+                                            storageInterface.get());
 
     ASSERT_OK(collectionCloner->startup());
     ASSERT_TRUE(collectionCloner->isActive());
 
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCountResponse(0));
-        processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
-    }
-    ASSERT_TRUE(collectionCloner->isActive());
+    sharedCallbackData.reset();
+    ASSERT_FALSE(sharedCallbackStateDestroyed);
 
-    collectionCloner->waitForDbWorker();
-    ASSERT_TRUE(collectionCloner->isActive());
-    ASSERT_TRUE(collectionStats.initCalled);
-
+    auto net = getNet();
     {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCursorResponse(1, BSON_ARRAY(BSON("_id" << 1))));
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        auto request =
+            net->scheduleErrorResponse(Status(ErrorCodes::OperationFailed, "count command failed"));
+        ASSERT_EQUALS("count", request.cmdObj.firstElement().fieldNameStringData());
+        net->runReadyNetworkOperations();
     }
 
-    collectionCloner->waitForDbWorker();
-    ASSERT_EQUALS(1, collectionStats.insertCount);
-
-    // Check that the status hasn't changed from the initial value.
-    ASSERT_EQUALS(getDetectableErrorStatus(), getStatus());
-    ASSERT_TRUE(collectionCloner->isActive());
-
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
-        processNetworkResponse(createCursorResponse(0, BSON_ARRAY(BSON("_id" << 2)), "nextBatch"));
-    }
-
-    collectionCloner->waitForDbWorker();
-    ASSERT_EQUALS(2, collectionStats.insertCount);
-    ASSERT_TRUE(collectionStats.commitCalled);
-
-    ASSERT_OK(getStatus());
-    ASSERT_FALSE(collectionCloner->isActive());
+    collectionCloner->join();
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, result);
+    ASSERT_TRUE(sharedCallbackStateDestroyed);
 }
 
 }  // namespace

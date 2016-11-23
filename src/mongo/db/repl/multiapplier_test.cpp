@@ -137,6 +137,21 @@ TEST_F(MultiApplierTest, InvalidConstruction) {
         "callback function cannot be null");
 }
 
+TEST_F(MultiApplierTest, MultiApplierTransitionsDirectlyToCompleteIfShutdownBeforeStarting) {
+    const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
+
+    auto multiApply = [](OperationContext*,
+                         MultiApplier::Operations,
+                         MultiApplier::ApplyOperationFn) -> StatusWith<OpTime> { return OpTime(); };
+    auto callback = [](const Status&) {};
+
+    MultiApplier multiApplier(&getExecutor(), operations, applyOperation, multiApply, callback);
+    ASSERT_EQUALS(MultiApplier::State::kPreStart, multiApplier.getState_forTest());
+
+    multiApplier.shutdown();
+    ASSERT_EQUALS(MultiApplier::State::kComplete, multiApplier.getState_forTest());
+}
+
 TEST_F(MultiApplierTest, MultiApplierInvokesCallbackWithCallbackCanceledStatusUponCancellation) {
     const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
 
@@ -152,17 +167,22 @@ TEST_F(MultiApplierTest, MultiApplierInvokesCallbackWithCallbackCanceledStatusUp
     auto callback = [&](const Status& result) { callbackResult = result; };
 
     MultiApplier multiApplier(&getExecutor(), operations, applyOperation, multiApply, callback);
+    ASSERT_EQUALS(MultiApplier::State::kPreStart, multiApplier.getState_forTest());
     {
         auto net = getNet();
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
 
         // Executor cannot run multiApply callback while we are on the network thread.
         ASSERT_OK(multiApplier.startup());
+        ASSERT_EQUALS(MultiApplier::State::kRunning, multiApplier.getState_forTest());
+
         multiApplier.shutdown();
+        ASSERT_EQUALS(MultiApplier::State::kShuttingDown, multiApplier.getState_forTest());
 
         net->runReadyNetworkOperations();
     }
     multiApplier.join();
+    ASSERT_EQUALS(MultiApplier::State::kComplete, multiApplier.getState_forTest());
 
     ASSERT_FALSE(multiApplyInvoked);
 
@@ -265,6 +285,57 @@ TEST_F(
 
     ASSERT_OK(callbackResult);
     ASSERT_FALSE(callbackTxn);
+}
+
+class SharedCallbackState {
+    MONGO_DISALLOW_COPYING(SharedCallbackState);
+
+public:
+    explicit SharedCallbackState(bool* sharedCallbackStateDestroyed)
+        : _sharedCallbackStateDestroyed(sharedCallbackStateDestroyed) {}
+    ~SharedCallbackState() {
+        *_sharedCallbackStateDestroyed = true;
+    }
+
+private:
+    bool* _sharedCallbackStateDestroyed;
+};
+
+TEST_F(MultiApplierTest, MultiApplierResetsOnCompletionCallbackFunctionPointerUponCompletion) {
+    bool sharedCallbackStateDestroyed = false;
+    auto sharedCallbackData = std::make_shared<SharedCallbackState>(&sharedCallbackStateDestroyed);
+
+    const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
+
+    auto multiApply = [&](OperationContext*,
+                          MultiApplier::Operations operations,
+                          MultiApplier::ApplyOperationFn) -> StatusWith<OpTime> {
+        return operations.back().getOpTime();
+    };
+
+    auto callbackResult = getDetectableErrorStatus();
+
+    MultiApplier multiApplier(
+        &getExecutor(),
+        operations,
+        applyOperation,
+        multiApply,
+        [&callbackResult, sharedCallbackData](const Status& result) { callbackResult = result; });
+
+    sharedCallbackData.reset();
+    ASSERT_FALSE(sharedCallbackStateDestroyed);
+
+    ASSERT_OK(multiApplier.startup());
+    {
+        auto net = getNet();
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        net->runReadyNetworkOperations();
+    }
+    multiApplier.join();
+
+    ASSERT_OK(callbackResult);
+    // Shared state should be destroyed when applier is finished.
+    ASSERT_TRUE(sharedCallbackStateDestroyed);
 }
 
 }  // namespace

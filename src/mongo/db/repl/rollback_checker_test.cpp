@@ -83,13 +83,13 @@ TEST_F(RollbackCheckerTest, InvalidConstruction) {
 TEST_F(RollbackCheckerTest, ShutdownBeforeStart) {
     auto callback = [](const RollbackChecker::Result&) {};
     getReplExecutor().shutdown();
-    ASSERT(!getRollbackChecker()->reset(callback));
-    ASSERT(!getRollbackChecker()->checkForRollback(callback));
+    ASSERT_NOT_OK(getRollbackChecker()->reset(callback).getStatus());
+    ASSERT_NOT_OK(getRollbackChecker()->checkForRollback(callback).getStatus());
 }
 
 TEST_F(RollbackCheckerTest, ShutdownBeforeHasHadRollback) {
     getReplExecutor().shutdown();
-    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, getRollbackChecker()->hasHadRollback());
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, getRollbackChecker()->hasHadRollback());
 }
 
 TEST_F(RollbackCheckerTest, ShutdownBeforeResetSync) {
@@ -99,7 +99,7 @@ TEST_F(RollbackCheckerTest, ShutdownBeforeResetSync) {
 
 TEST_F(RollbackCheckerTest, reset) {
     auto callback = [](const RollbackChecker::Result&) {};
-    auto cbh = getRollbackChecker()->reset(callback);
+    auto cbh = unittest::assertGet(getRollbackChecker()->reset(callback));
     ASSERT(cbh);
 
     auto commandResponse = BSON("ok" << 1 << "rbid" << 3);
@@ -118,7 +118,7 @@ TEST_F(RollbackCheckerTest, RollbackRBID) {
         _hasCalledCallback = true;
     };
     // First set the RBID to 3.
-    auto refreshCBH = getRollbackChecker()->reset(callback);
+    auto refreshCBH = unittest::assertGet(getRollbackChecker()->reset(callback));
     ASSERT(refreshCBH);
     auto commandResponse = BSON("ok" << 1 << "rbid" << 3);
     getNet()->scheduleSuccessfulResponse(commandResponse);
@@ -133,7 +133,7 @@ TEST_F(RollbackCheckerTest, RollbackRBID) {
     }
 
     // Check for rollback
-    auto rbCBH = getRollbackChecker()->checkForRollback(callback);
+    auto rbCBH = unittest::assertGet(getRollbackChecker()->checkForRollback(callback));
     ASSERT(rbCBH);
 
     commandResponse = BSON("ok" << 1 << "rbid" << 4);
@@ -156,7 +156,7 @@ TEST_F(RollbackCheckerTest, NoRollbackRBID) {
         _hasCalledCallback = true;
     };
     // First set the RBID to 3.
-    auto refreshCBH = getRollbackChecker()->reset(callback);
+    auto refreshCBH = unittest::assertGet(getRollbackChecker()->reset(callback));
     ASSERT(refreshCBH);
     auto commandResponse = BSON("ok" << 1 << "rbid" << 3);
     getNet()->scheduleSuccessfulResponse(commandResponse);
@@ -171,7 +171,7 @@ TEST_F(RollbackCheckerTest, NoRollbackRBID) {
     }
 
     // Check for rollback
-    auto rbCBH = getRollbackChecker()->checkForRollback(callback);
+    auto rbCBH = unittest::assertGet(getRollbackChecker()->checkForRollback(callback));
     ASSERT(rbCBH);
 
     commandResponse = BSON("ok" << 1 << "rbid" << 3);

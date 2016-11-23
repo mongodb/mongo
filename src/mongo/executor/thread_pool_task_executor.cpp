@@ -34,6 +34,7 @@
 
 #include <boost/optional.hpp>
 #include <iterator>
+#include <utility>
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/disallow_copying.h"
@@ -505,7 +506,15 @@ void ThreadPoolTaskExecutor::runCallback(std::shared_ptr<CallbackState> cbStateA
                           ? Status({ErrorCodes::CallbackCanceled, "Callback canceled"})
                           : Status::OK());
     invariant(!cbStateArg->isFinished.load());
-    cbStateArg->callback(std::move(args));
+    {
+        // After running callback function, clear 'cbStateArg->callback' to release any resources
+        // that might be held by this function object.
+        // Swap 'cbStateArg->callback' with temporary copy before running callback for exception
+        // safety.
+        TaskExecutor::CallbackFn callback;
+        std::swap(cbStateArg->callback, callback);
+        callback(std::move(args));
+    }
     cbStateArg->isFinished.store(true);
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _poolInProgressQueue.erase(cbStateArg->iter);

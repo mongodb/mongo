@@ -94,7 +94,7 @@ DatabasesCloner::~DatabasesCloner() {
 std::string DatabasesCloner::toString() const {
     LockGuard lk(_mutex);
     return str::stream() << "initial sync --"
-                         << " active:" << _active << " status:" << _status.toString()
+                         << " active:" << _isActive_inlock() << " status:" << _status.toString()
                          << " source:" << _source.toString()
                          << " db cloners completed:" << _stats.databasesCloned
                          << " db count:" << _databaseCloners.size();
@@ -112,6 +112,23 @@ void DatabasesCloner::join() {
 }
 
 void DatabasesCloner::shutdown() {
+    {
+        LockGuard lock(_mutex);
+        switch (_state) {
+            case State::kPreStart:
+                // Transition directly from PreStart to Complete if not started yet.
+                _state = State::kComplete;
+                return;
+            case State::kRunning:
+                _state = State::kShuttingDown;
+                break;
+            case State::kShuttingDown:
+            case State::kComplete:
+                // Nothing to do if we are already in ShuttingDown or Complete state.
+                return;
+        }
+    }
+
     if (auto listDatabaseScheduler = _getListDatabasesScheduler()) {
         listDatabaseScheduler->shutdown();
     }
@@ -120,18 +137,15 @@ void DatabasesCloner::shutdown() {
     for (auto&& cloner : databaseCloners) {
         cloner->shutdown();
     }
-
-    LockGuard lk(_mutex);
-    if (!_active) {
-        return;
-    }
-    _active = false;
-    _setStatus_inlock({ErrorCodes::CallbackCanceled, "Initial Sync Cancelled."});
 }
 
 bool DatabasesCloner::isActive() {
     LockGuard lk(_mutex);
-    return _active;
+    return _isActive_inlock();
+}
+
+bool DatabasesCloner::_isActive_inlock() const {
+    return State::kRunning == _state || State::kShuttingDown == _state;
 }
 
 Status DatabasesCloner::getStatus() {
@@ -167,16 +181,24 @@ void DatabasesCloner::Stats::append(BSONObjBuilder* builder) const {
     }
 }
 
-Status DatabasesCloner::startup() {
-    UniqueLock lk(_mutex);
-    invariant(!_active);
-    _active = true;
+Status DatabasesCloner::startup() noexcept {
+    LockGuard lk(_mutex);
+
+    switch (_state) {
+        case State::kPreStart:
+            _state = State::kRunning;
+            break;
+        case State::kRunning:
+            return Status(ErrorCodes::InternalError, "databases cloner already started");
+        case State::kShuttingDown:
+            return Status(ErrorCodes::ShutdownInProgress, "databases cloner shutting down");
+        case State::kComplete:
+            return Status(ErrorCodes::ShutdownInProgress, "databases cloner completed");
+    }
 
     if (!_status.isOK() && _status.code() != ErrorCodes::NotYetInitialized) {
         return _status;
     }
-
-    _status = Status::OK();
 
     // Schedule listDatabase command which will kick off the database cloner per result db.
     Request listDBsReq(_source,
@@ -192,12 +214,14 @@ Status DatabasesCloner::startup() {
             numInitialSyncListDatabasesAttempts,
             executor::RemoteCommandRequest::kNoTimeout,
             RemoteCommandRetryScheduler::kAllRetriableErrors));
-    auto s = _listDBsScheduler->startup();
-    if (!s.isOK()) {
-        _fail_inlock(&lk, s);
+    _status = _listDBsScheduler->startup();
+
+    if (!_status.isOK()) {
+        _state = State::kComplete;
+        return _status;
     }
 
-    return _status;
+    return Status::OK();
 }
 
 void DatabasesCloner::setScheduleDbWorkFn_forTest(const CollectionCloner::ScheduleDbWorkFn& work) {
@@ -366,34 +390,48 @@ void DatabasesCloner::_onEachDBCloneFinish(const Status& status, const std::stri
 
 void DatabasesCloner::_fail_inlock(UniqueLock* lk, Status status) {
     LOG(3) << "DatabasesCloner::_fail_inlock called";
-    if (!_active) {
+    if (!_isActive_inlock()) {
         return;
     }
 
     _setStatus_inlock(status);
     // TODO: shutdown outstanding work, like any cloners active
+    invariant(_finishFn);
     auto finish = _finishFn;
+    _finishFn = {};
     lk->unlock();
 
     LOG(3) << "DatabasesCloner - calling _finishFn with status: " << _status;
     finish(status);
 
+    // Release any resources that might be held by the '_finishFn' (moved to 'finish') function
+    // object.
+    finish = OnFinishFn();
+
     lk->lock();
-    _active = false;
+    invariant(_state != State::kComplete);
+    _state = State::kComplete;
 }
 
 void DatabasesCloner::_succeed_inlock(UniqueLock* lk) {
     LOG(3) << "DatabasesCloner::_succeed_inlock called";
     const auto status = Status::OK();
     _setStatus_inlock(status);
+    invariant(_finishFn);
     auto finish = _finishFn;
+    _finishFn = OnFinishFn();
     lk->unlock();
 
     LOG(3) << "DatabasesCloner - calling _finishFn with status OK";
     finish(status);
 
+    // Release any resources that might be held by the '_finishFn' (moved to 'finish') function
+    // object.
+    finish = OnFinishFn();
+
     lk->lock();
-    _active = false;
+    invariant(_state != State::kComplete);
+    _state = State::kComplete;
 }
 
 void DatabasesCloner::_setStatus_inlock(Status s) {

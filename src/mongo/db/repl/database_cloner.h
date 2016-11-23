@@ -133,7 +133,7 @@ public:
 
     bool isActive() const override;
 
-    Status startup() override;
+    Status startup() noexcept override;
 
     void shutdown() override;
 
