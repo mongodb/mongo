@@ -61,7 +61,7 @@ public:
     /**
      * Starts cloning by scheduling initial command to be run by the executor.
      */
-    virtual Status startup() = 0;
+    virtual Status startup() noexcept = 0;
 
     /**
      * Cancels current remote command request.

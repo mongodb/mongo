@@ -163,7 +163,7 @@ bool DatabaseCloner::isActive() const {
     return _active;
 }
 
-Status DatabaseCloner::startup() {
+Status DatabaseCloner::startup() noexcept {
     LockGuard lk(_mutex);
 
     if (_active) {

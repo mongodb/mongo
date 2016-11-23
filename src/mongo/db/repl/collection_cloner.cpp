@@ -32,6 +32,8 @@
 
 #include "mongo/db/repl/collection_cloner.h"
 
+#include <utility>
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
@@ -86,7 +88,6 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
       _options(options),
       _onCompletion(onCompletion),
       _storageInterface(storageInterface),
-      _active(false),
       _countScheduler(_executor,
                       RemoteCommandRequest(_source,
                                            _sourceNss.db().toString(),
@@ -178,7 +179,7 @@ std::string CollectionCloner::getDiagnosticString() const {
     output << " source namespace: " << _sourceNss.toString();
     output << " destination namespace: " << _destNss.toString();
     output << " collection options: " << _options.toBSON();
-    output << " active: " << _active;
+    output << " active: " << _isActive_inlock();
     output << " listIndexes fetcher: " << _listIndexesFetcher.getDiagnosticString();
     output << " find fetcher: " << _findFetcher.getDiagnosticString();
     return output;
@@ -186,31 +187,53 @@ std::string CollectionCloner::getDiagnosticString() const {
 
 bool CollectionCloner::isActive() const {
     LockGuard lk(_mutex);
-    return _active;
+    return _isActive_inlock();
 }
 
-Status CollectionCloner::startup() {
+bool CollectionCloner::_isActive_inlock() const {
+    return State::kRunning == _state || State::kShuttingDown == _state;
+}
+
+Status CollectionCloner::startup() noexcept {
     LockGuard lk(_mutex);
     LOG(0) << "CollectionCloner::start called, on ns:" << _destNss;
 
-    if (_active) {
-        return Status(ErrorCodes::IllegalOperation, "collection cloner already started");
+    switch (_state) {
+        case State::kPreStart:
+            _state = State::kRunning;
+            break;
+        case State::kRunning:
+            return Status(ErrorCodes::InternalError, "collection cloner already started");
+        case State::kShuttingDown:
+            return Status(ErrorCodes::ShutdownInProgress, "collection cloner shutting down");
+        case State::kComplete:
+            return Status(ErrorCodes::ShutdownInProgress, "collection cloner completed");
     }
 
     _stats.start = _executor->now();
     Status scheduleResult = _countScheduler.startup();
     if (!scheduleResult.isOK()) {
+        _state = State::kComplete;
         return scheduleResult;
     }
-
-    _active = true;
 
     return Status::OK();
 }
 
 void CollectionCloner::shutdown() {
-    if (!isActive()) {
-        return;
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    switch (_state) {
+        case State::kPreStart:
+            // Transition directly from PreStart to Complete if not started yet.
+            _state = State::kComplete;
+            return;
+        case State::kRunning:
+            _state = State::kShuttingDown;
+            break;
+        case State::kShuttingDown:
+        case State::kComplete:
+            // Nothing to do if we are already in ShuttingDown or Complete state.
+            return;
     }
 
     _countScheduler.shutdown();
@@ -226,7 +249,7 @@ CollectionCloner::Stats CollectionCloner::getStats() const {
 
 void CollectionCloner::join() {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _condition.wait(lk, [this]() { return !_active; });
+    _condition.wait(lk, [this]() { return !_isActive_inlock(); });
 }
 
 void CollectionCloner::waitForDbWorker() {
@@ -520,9 +543,18 @@ void CollectionCloner::_finishCallback(const Status& status) {
     // Copy the status so we can change it below if needed.
     auto finalStatus = status;
     bool callCollectionLoader = false;
-    UniqueLock lk(_mutex);
-    callCollectionLoader = _collLoader.operator bool();
-    lk.unlock();
+
+    decltype(_onCompletion) onCompletion;
+    {
+        LockGuard lk(_mutex);
+        invariant(_state != State::kComplete);
+
+        callCollectionLoader = _collLoader.operator bool();
+
+        invariant(_onCompletion);
+        std::swap(_onCompletion, onCompletion);
+    }
+
     if (callCollectionLoader) {
         if (finalStatus.isOK()) {
             const auto loaderStatus = _collLoader->commit();
@@ -536,11 +568,20 @@ void CollectionCloner::_finishCallback(const Status& status) {
         // This will release the resources held by the loader.
         _collLoader.reset();
     }
-    _onCompletion(finalStatus);
-    lk.lock();
+
+    onCompletion(finalStatus);
+
+    // This will release the resources held by the callback function object. '_onCompletion' is
+    // already cleared at this point and 'onCompletion' is the remaining reference to the callback
+    // function (with any implicitly held resources). To avoid any issues with destruction logic
+    // in the function object's resources accessing this CollectionCloner, we release this function
+    // object outside the lock.
+    onCompletion = {};
+
+    LockGuard lk(_mutex);
     _stats.end = _executor->now();
     _progressMeter.finished();
-    _active = false;
+    _state = State::kComplete;
     _condition.notify_all();
     LOG(1) << "    collection: " << _destNss << ", stats: " << _stats.toString();
 }

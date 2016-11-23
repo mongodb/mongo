@@ -112,7 +112,7 @@ public:
 
     bool isActive() const override;
 
-    Status startup() override;
+    Status startup() noexcept override;
 
     void shutdown() override;
 
@@ -140,6 +140,8 @@ public:
     void setScheduleDbWorkFn_forTest(const ScheduleDbWorkFn& scheduleDbWorkFn);
 
 private:
+    bool _isActive_inlock() const;
+
     /**
      * Read number of documents in collection from count result.
      */
@@ -205,9 +207,8 @@ private:
     NamespaceString _destNss;                           // (R)
     CollectionOptions _options;                         // (R)
     std::unique_ptr<CollectionBulkLoader> _collLoader;  // (M)
-    CallbackFn _onCompletion;             // (R) Invoked once when cloning completes or fails.
+    CallbackFn _onCompletion;             // (M) Invoked once when cloning completes or fails.
     StorageInterface* _storageInterface;  // (R) Not owned by us.
-    bool _active;                         // (M) true when Collection Cloner is started.
     RemoteCommandRetryScheduler _countScheduler;  // (S)
     Fetcher _listIndexesFetcher;                  // (S)
     Fetcher _findFetcher;                         // (S)
@@ -219,6 +220,14 @@ private:
         _scheduleDbWorkFn;         // (RT) Function for scheduling database work using the executor.
     Stats _stats;                  // (M) stats for this instance.
     ProgressMeter _progressMeter;  // (M) progress meter for this instance.
+
+    // State transitions:
+    // PreStart --> Running --> ShuttingDown --> Complete
+    // It is possible to skip intermediate states. For example,
+    // Calling shutdown() when the cloner has not started will transition from PreStart directly
+    // to Complete.
+    enum class State { kPreStart, kRunning, kShuttingDown, kComplete };
+    State _state = State::kPreStart;  // (M)
 };
 
 }  // namespace repl
