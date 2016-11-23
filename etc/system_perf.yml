@@ -36,6 +36,15 @@ post:
         file_location: work/report.json
     - command: shell.exec
       params:
+        working_dir: work
+        script: |
+          source ./dsienv.sh
+          if [ -e $HOME/infrastructure_provisioning/terraform/provisioned.${cluster} ]; then
+            $DSI_PATH/bin/mark_idle.sh
+          fi
+
+    - command: shell.exec
+      params:
         working_dir: src
         script: |
           # removes files from the (local) scons cache when it's over a
@@ -183,7 +192,7 @@ functions:
             echo "No existing resources found"
           fi
     - command: shell.exec
-      # call setup-cluster.sh, in most cases this only updates expire-on tag
+      # call setup-cluster.sh, in most cases this only updates tags
       params:
         working_dir: work
         script: |
