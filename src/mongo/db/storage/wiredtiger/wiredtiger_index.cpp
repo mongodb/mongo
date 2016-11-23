@@ -970,7 +970,7 @@ public:
 
         if (!br.atEof()) {
             severe() << "Unique index cursor seeing multiple records for key "
-                     << redact(curr(kWantKey)->key);
+                     << redact(curr(kWantKey)->key) << " in index " << _idx.indexName();
             fassertFailed(28608);
         }
     }
