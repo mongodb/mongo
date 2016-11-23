@@ -34,6 +34,26 @@ post:
     - command: attach.results
       params:
         file_location: work/report.json
+    - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+          source ./dsienv.sh
+          if [ -e $HOME/infrastructure_provisioning/terraform/provisioned.${cluster} ]; then
+            $DSI_PATH/bin/mark_idle.sh
+          fi
+
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          # removes files from the (local) scons cache when it's over a
+          # threshold, to the $prune_ratio percentage. Ideally override
+          # these default values in the distro config in evergreen.
+
+          if [ -d "${scons_cache_path}" ]; then
+              ${python|python} buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+          fi
     - command: shell.cleanup
 
 functions:
@@ -173,7 +193,7 @@ functions:
             echo "No existing resources found"
           fi
     - command: shell.exec
-      # call setup-cluster.sh, in most cases this only updates expire-on tag
+      # call setup-cluster.sh, in most cases this only updates tags
       params:
         working_dir: work
         script: |
