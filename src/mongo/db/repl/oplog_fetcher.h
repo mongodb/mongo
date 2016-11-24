@@ -29,6 +29,7 @@
 #pragma once
 
 #include <cstddef>
+#include <iosfwd>
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
@@ -190,14 +191,23 @@ public:
      */
     Milliseconds getAwaitDataTimeout_forTest() const;
 
+    // State transitions:
+    // PreStart --> Running --> ShuttingDown --> Complete
+    // It is possible to skip intermediate states. For example,
+    // Calling shutdown() when the cloner has not started will transition from PreStart directly
+    // to Complete.
+    // This enum class is made public for testing.
+    enum class State { kPreStart, kRunning, kShuttingDown, kComplete };
+
     /**
-     * Returns whether the oplog fetcher is in shutdown.
-     *
+     * Returns current oplog fetcher state.
      * For testing only.
      */
-    bool inShutdown_forTest() const;
+    State getState_forTest() const;
 
 private:
+    bool _isActive_inlock() const;
+
     /**
      * Schedules fetcher and updates counters.
      */
@@ -227,7 +237,8 @@ private:
     /**
      * Returns whether the oplog fetcher is in shutdown.
      */
-    bool _isInShutdown() const;
+    bool _isShuttingDown() const;
+    bool _isShuttingDown_inlock() const;
 
     // Protects member data of this OplogFetcher.
     mutable stdx::mutex _mutex;
@@ -246,18 +257,15 @@ private:
     DataReplicatorExternalState* const _dataReplicatorExternalState;
     const EnqueueDocumentsFn _enqueueDocumentsFn;
     const Milliseconds _awaitDataTimeout;
-    const OnShutdownCallbackFn _onShutdownCallbackFn;
+    OnShutdownCallbackFn _onShutdownCallbackFn;
 
     // Used to validate start of first batch of results from the remote oplog
     // tailing query and to keep track of the last known operation consumed via
     // "_enqueueDocumentsFn".
     OpTimeWithHash _lastFetched;
 
-    // _active is true when a fetcher is scheduled to be run by the executor.
-    bool _active = false;
-
-    // _inShutdown is true after shutdown() is called.
-    bool _inShutdown = false;
+    // Current oplog fetcher state. See comments for State enum class for details.
+    State _state = State::kPreStart;
 
     // Fetcher restarts since the last successful oplog query response.
     std::size_t _fetcherRestarts = 0;
@@ -265,6 +273,12 @@ private:
     std::unique_ptr<Fetcher> _fetcher;
     std::unique_ptr<Fetcher> _shuttingDownFetcher;
 };
+
+/**
+ * Insertion operator for OplogFetcher::State. Formats oplog fetcher state for output stream.
+ * For testing only.
+ */
+std::ostream& operator<<(std::ostream& os, const OplogFetcher::State& state);
 
 }  // namespace repl
 }  // namespace mongo

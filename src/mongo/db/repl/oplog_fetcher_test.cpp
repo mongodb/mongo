@@ -302,8 +302,25 @@ TEST_F(OplogFetcherTest, StartupWhenActiveReturnsIllegalOperation) {
     ASSERT_TRUE(oplogFetcher.isActive());
     auto status = oplogFetcher.startup();
     getExecutor().shutdown();
-    ASSERT_EQUALS(ErrorCodes::IllegalOperation, status);
-    ASSERT_STRING_CONTAINS(status.reason(), "oplog fetcher already active");
+    ASSERT_EQUALS(ErrorCodes::InternalError, status);
+    ASSERT_STRING_CONTAINS(status.reason(), "oplog fetcher already started");
+}
+
+TEST_F(OplogFetcherTest, ShutdownAfterStartupTransitionsToShuttingDownState) {
+    OplogFetcher oplogFetcher(&getExecutor(),
+                              lastFetched,
+                              source,
+                              nss,
+                              _createConfig(true),
+                              0,
+                              dataReplicatorExternalState.get(),
+                              enqueueDocumentsFn,
+                              [](Status, OpTimeWithHash) {});
+    ASSERT_OK(oplogFetcher.startup());
+    ASSERT_TRUE(oplogFetcher.isActive());
+    oplogFetcher.shutdown();
+    ASSERT_EQUALS(OplogFetcher::State::kShuttingDown, oplogFetcher.getState_forTest());
+    getExecutor().shutdown();
 }
 
 TEST_F(OplogFetcherTest, StartupWhenShuttingDownReturnsShutdownInProgress) {
@@ -317,6 +334,7 @@ TEST_F(OplogFetcherTest, StartupWhenShuttingDownReturnsShutdownInProgress) {
                               enqueueDocumentsFn,
                               [](Status, OpTimeWithHash) {});
     oplogFetcher.shutdown();
+    ASSERT_EQUALS(OplogFetcher::State::kComplete, oplogFetcher.getState_forTest());
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, oplogFetcher.startup());
 }
 
@@ -446,6 +464,7 @@ TEST_F(OplogFetcherTest, AwaitDataTimeoutShouldBeAConstantUnderProtocolVersion0)
 
 TEST_F(OplogFetcherTest, ShuttingExecutorDownShouldPreventOplogFetcherFromStarting) {
     getExecutor().shutdown();
+
 
     OplogFetcher oplogFetcher(&getExecutor(),
                               lastFetched,
@@ -723,8 +742,10 @@ RemoteCommandRequest OplogFetcherTest::testTwoBatchHandling(bool isV1ElectionPro
                               dataReplicatorExternalState.get(),
                               enqueueDocumentsFn,
                               stdx::ref(shutdownState));
+    ASSERT_EQUALS(OplogFetcher::State::kPreStart, oplogFetcher.getState_forTest());
 
     ASSERT_OK(oplogFetcher.startup());
+    ASSERT_EQUALS(OplogFetcher::State::kRunning, oplogFetcher.getState_forTest());
 
     CursorId cursorId = 22LL;
     auto firstEntry = makeNoopOplogEntry(lastFetched);
@@ -748,10 +769,8 @@ RemoteCommandRequest OplogFetcherTest::testTwoBatchHandling(bool isV1ElectionPro
     ASSERT_BSONOBJ_EQ(thirdEntry, lastEnqueuedDocuments[0]);
     ASSERT_BSONOBJ_EQ(fourthEntry, lastEnqueuedDocuments[1]);
 
-    oplogFetcher.shutdown();
-    ASSERT_TRUE(oplogFetcher.inShutdown_forTest());
-
     oplogFetcher.join();
+    ASSERT_EQUALS(OplogFetcher::State::kComplete, oplogFetcher.getState_forTest());
 
     ASSERT_OK(shutdownState.getStatus());
     ASSERT_EQUALS(OpTimeWithHash(fourthEntry["h"].numberLong(),
@@ -1119,6 +1138,56 @@ TEST_F(OplogFetcherTest, OplogFetcherAbortsWithOriginalResponseErrorOnFailureToS
     // schedule request.
     ASSERT_EQUALS(ErrorCodes::CappedPositionLost, shutdownState->getStatus());
     ASSERT_EQUALS(_getOpTimeWithHash(ops[2]), shutdownState->getLastFetched());
+}
+
+bool sharedCallbackStateDestroyed = false;
+class SharedCallbackState {
+    MONGO_DISALLOW_COPYING(SharedCallbackState);
+
+public:
+    SharedCallbackState() {}
+    ~SharedCallbackState() {
+        sharedCallbackStateDestroyed = true;
+    }
+};
+
+TEST_F(OplogFetcherTest, OplogFetcherResetsOnShutdownCallbackFunctionOnCompletion) {
+    auto sharedCallbackData = std::make_shared<SharedCallbackState>();
+    auto callbackInvoked = false;
+    auto status = getDetectableErrorStatus();
+
+    OplogFetcher oplogFetcher(&getExecutor(),
+                              lastFetched,
+                              source,
+                              nss,
+                              _createConfig(true),
+                              0,
+                              dataReplicatorExternalState.get(),
+                              enqueueDocumentsFn,
+                              [&callbackInvoked, sharedCallbackData, &status](
+                                  const Status& shutdownStatus, const OpTimeWithHash&) {
+                                  status = shutdownStatus, callbackInvoked = true;
+                              });
+    ON_BLOCK_EXIT([this] { getExecutor().shutdown(); });
+
+    ASSERT_FALSE(oplogFetcher.isActive());
+    ASSERT_OK(oplogFetcher.startup());
+    ASSERT_TRUE(oplogFetcher.isActive());
+
+    sharedCallbackData.reset();
+    ASSERT_FALSE(sharedCallbackStateDestroyed);
+
+    processNetworkResponse({ErrorCodes::OperationFailed, "oplog tailing query failed"}, false);
+
+    oplogFetcher.join();
+
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
+
+    // Oplog fetcher should reset 'OplogFetcher::_onShutdownCallbackFn' after running callback
+    // function before becoming inactive.
+    // This ensures that we release resources associated with 'OplogFetcher::_onShutdownCallbackFn'.
+    ASSERT_TRUE(callbackInvoked);
+    ASSERT_TRUE(sharedCallbackStateDestroyed);
 }
 
 }  // namespace
