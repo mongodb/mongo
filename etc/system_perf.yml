@@ -55,7 +55,6 @@ functions:
           mkdir src
           mkdir work
           mkdir bin
-          mkdir keys
           pwd
           ls
     - command: manifest.load
@@ -71,13 +70,61 @@ functions:
         directory: src
     - command: shell.exec
       params:
-        silent: true
+        working_dir: work
         script: |
-          # generate aws private key file
-          echo "${terraform_secret}" > secret
-          chmod 400 secret
-          echo "${ec2_pem}" > keys/aws.pem
-          chmod 400 keys/aws.pem
+          cat > bootstrap.yml <<EOF
+          cluster_type: ${cluster}
+          platform: ${platform}
+          setup: ${setup}
+          storageEngine: ${storageEngine}
+          test: ${test}
+          production: true
+          EOF
+
+          cat > runtime.yml <<EOF
+          # evergreen default expansions
+          is_patch: ${is_patch}
+          task_id: ${task_id}
+          task_name: ${task_name}
+          execution: ${execution}
+          build_id: ${build_id}
+          build_variant: ${build_variant}
+          version_id: ${version_id}
+          workdir: ${workdir}
+          revision: ${revision}
+          project: ${project}
+          branch_name: ${branch_name}
+
+          # sys-perf expansions
+          # Shouldn't be needed: testList: ${testList}
+          ext: ${ext}
+          script_flags : ${script_flags}
+          dsi_rev: ${dsi_rev}
+          compare_task: ${compare_task}
+          workloads_rev: ${workloads_rev}
+          YCSB_rev: ${YCSB_rev}
+
+          # compositions of expansions
+          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz"
+          EOF
+    - command: shell.exec
+      params:
+        silent: true
+        working_dir: work
+        script: |
+          # AWS ssh secret key
+          echo "${ec2_pem}" > aws_ssh_key.pem
+          chmod 400 aws_ssh_key.pem
+
+          cat > runtime_secret.yml <<EOF
+          # Note that inside system_perf.yml we have ${aws_key} & ${aws_secret}, which are used for
+          # Evergreen resources. The below are used for dsi resources, and are NOT the same!
+          aws_access_key: "${terraform_key}"
+          aws_secret_key: "${terraform_secret}"
+          perf_jira_user: "${perf_jira_user}"
+          perf_jira_pw: "${perf_jira_pw}"
+          EOF
+          chmod 400 runtime_secret.yml
     - command: shell.exec
       params:
         working_dir: work
@@ -87,7 +134,7 @@ functions:
           virtualenv ./venv
           source ./venv/bin/activate
           pip install -r ../src/dsi/dsi/requirements.txt
-          python ../src/dsi/dsi/bin/setup_work_env.py --cluster-type ${cluster} --aws-key-name ${terraform_key} --ssh-keyfile-path ../keys/aws.pem --aws-secret-file ../secret --mongo-download-url https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz --production
+          python ../src/dsi/dsi/bin/setup_work_env.py --production
           ls
           pwd
     - command: shell.exec
@@ -184,7 +231,7 @@ functions:
           source ./dsienv.sh
           source ./venv/bin/activate
           cp mongodb_setup.${setup}.${storageEngine}.yml mongodb_setup.yml
-          $DSI_PATH/bin/mongodb_setup.py --mongodb-binary-archive https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz --config && echo "${cluster} MongoDB Cluster STARTED."
+          $DSI_PATH/bin/mongodb_setup.py && echo "${cluster} MongoDB Cluster STARTED."
 
   "run test":
     - command: shell.exec
