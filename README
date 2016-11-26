@@ -1,6 +1,6 @@
 MongoDB README
 
-Welcome to MongoDB!
+Welcome to MongoDB 3.4!
 
 COMPONENTS
 
@@ -12,10 +12,11 @@ UTILITIES
 
   mongodump         - MongoDB dump tool - for backups, snapshots, etc.
   mongorestore      - MongoDB restore a dump
-  mongoexport       - Export a single collection to test (JSON, CSV)
+  mongoexport       - Export a single collection to JSON or CSV
   mongoimport       - Import from JSON or CSV
   mongofiles        - Utility for putting and getting files from MongoDB GridFS
   mongostat         - Show performance statistics
+  mongoreplay       - Workload capture and analysis tool
 
 BUILDING
 
@@ -33,7 +34,7 @@ RUNNING
     $ ./mongod
     $
     $ # The mongo javascript shell connects to localhost and test database by default:
-    $ ./mongo 
+    $ ./mongo
     > help
 
 DRIVERS
@@ -49,7 +50,7 @@ PACKAGING
 DOCUMENTATION
 
   http://www.mongodb.org/
- 
+
 CLOUD MANAGED MONGODB
 
   http://cloud.mongodb.com/
@@ -57,16 +58,10 @@ CLOUD MANAGED MONGODB
 MAIL LISTS AND IRC
 
   http://dochub.mongodb.org/core/community
-  
+
 LEARN MONGODB
 
   http://university.mongodb.com/
-
-32 BIT BUILD NOTES
-
-  MongoDB uses memory mapped files.  If built as a 32 bit executable, you will
-  not be able to work with large (multi-gigabyte) databases.  However, 32 bit
-  builds work fine with small development databases.
 
 LICENSE
 
