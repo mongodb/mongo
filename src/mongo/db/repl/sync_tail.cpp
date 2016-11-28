@@ -358,20 +358,24 @@ Status SyncTail::syncApply(OperationContext* txn,
 
             auto resetLocks = [&](LockMode mode) {
                 collectionLock.reset();
+                // Warning: We must reset the pointer to nullptr first, in order to ensure that we
+                // drop the DB lock before acquiring
+                // the upgraded one.
+                dbLock.reset();
                 dbLock.reset(new Lock::DBLock(txn->lockState(), dbName, mode));
                 collectionLock.reset(new Lock::CollectionLock(txn->lockState(), ns, mode));
             };
 
             resetLocks(MODE_IX);
             if (!dbHolder().get(txn, dbName)) {
-                // need to create database, try again
+                // Need to create database, so reset lock to stronger mode.
                 resetLocks(MODE_X);
                 ctx.reset(new OldClientContext(txn, ns));
             } else {
                 ctx.reset(new OldClientContext(txn, ns));
                 if (!ctx->db()->getCollection(ns)) {
-                    // uh, oh, we need to create collection
-                    // try again
+                    // Need to implicitly create collection.  This occurs for 'u' opTypes,
+                    // but not for 'i' nor 'd'.
                     ctx.reset();
                     resetLocks(MODE_X);
                     ctx.reset(new OldClientContext(txn, ns));
