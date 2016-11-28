@@ -157,9 +157,16 @@ Array.shuffle = function(arr) {
     return arr;
 };
 
-Array.tojson = function(a, indent, nolint) {
+Array.tojson = function(a, indent, nolint, depth) {
     if (!Array.isArray(a)) {
         throw new Error("The first argument to Array.tojson must be an array");
+    }
+
+    if (typeof depth !== 'number') {
+        depth = 0;
+    }
+    if (depth > tojson.MAX_DEPTH) {
+        return "[Array]";
     }
 
     var elementSeparator = nolint ? " " : "\n";
@@ -180,7 +187,7 @@ Array.tojson = function(a, indent, nolint) {
         indent += "\t";
 
     for (var i = 0; i < a.length; i++) {
-        s += indent + tojson(a[i], indent, nolint);
+        s += indent + tojson(a[i], indent, nolint, depth + 1);
         if (i < a.length - 1) {
             s += "," + elementSeparator;
         }
@@ -591,7 +598,7 @@ tojsononeline = function(x) {
     return tojson(x, " ", true);
 };
 
-tojson = function(x, indent, nolint) {
+tojson = function(x, indent, nolint, depth) {
     if (x === null)
         return "null";
 
@@ -600,6 +607,10 @@ tojson = function(x, indent, nolint) {
 
     if (!indent)
         indent = "";
+
+    if (typeof depth !== 'number') {
+        depth = 0;
+    }
 
     switch (typeof x) {
         case "string": {
@@ -647,7 +658,7 @@ tojson = function(x, indent, nolint) {
         case "boolean":
             return "" + x;
         case "object": {
-            var s = tojsonObject(x, indent, nolint);
+            var s = tojsonObject(x, indent, nolint, depth);
             if ((nolint == null || nolint == true) && s.length < 80 &&
                 (indent == null || indent.length == 0)) {
                 s = s.replace(/[\t\r\n]+/gm, " ");
@@ -663,8 +674,12 @@ tojson = function(x, indent, nolint) {
     }
 
 };
+tojson.MAX_DEPTH = 100;
 
-tojsonObject = function(x, indent, nolint) {
+tojsonObject = function(x, indent, nolint, depth) {
+    if (typeof depth !== 'number') {
+        depth = 0;
+    }
     var lineEnding = nolint ? " " : "\n";
     var tabSpace = nolint ? "" : "\t";
     assert.eq((typeof x), "object", "tojsonObject needs object, not [" + (typeof x) + "]");
@@ -673,12 +688,12 @@ tojsonObject = function(x, indent, nolint) {
         indent = "";
 
     if (typeof(x.tojson) == "function" && x.tojson != tojson) {
-        return x.tojson(indent, nolint);
+        return x.tojson(indent, nolint, depth);
     }
 
     if (x.constructor && typeof(x.constructor.tojson) == "function" &&
         x.constructor.tojson != tojson) {
-        return x.constructor.tojson(x, indent, nolint);
+        return x.constructor.tojson(x, indent, nolint, depth);
     }
 
     if (x instanceof Error) {
@@ -689,7 +704,11 @@ tojsonObject = function(x, indent, nolint) {
         x.toString();
     } catch (e) {
         // toString not callable
-        return "[object]";
+        return "[Object]";
+    }
+
+    if (depth > tojson.MAX_DEPTH) {
+        return "[Object]";
     }
 
     var s = "{" + lineEnding;
@@ -710,7 +729,7 @@ tojsonObject = function(x, indent, nolint) {
         if (typeof DBCollection != 'undefined' && val == DBCollection.prototype)
             continue;
 
-        fieldStrings.push(indent + "\"" + k + "\" : " + tojson(val, indent, nolint));
+        fieldStrings.push(indent + "\"" + k + "\" : " + tojson(val, indent, nolint, depth + 1));
     }
 
     if (fieldStrings.length > 0) {
