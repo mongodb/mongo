@@ -57,6 +57,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/initial_sync_common.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -569,6 +570,7 @@ Status Cloner::createCollectionsForDb(
         auto options = params.collectionInfo["options"].Obj();
         const NamespaceString nss(dbName, params.collectionName);
 
+        uassertStatusOK(userAllowedCreateNS(dbName, params.collectionName));
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             txn->checkForInterrupt();
             WriteUnitOfWork wunit(txn);
