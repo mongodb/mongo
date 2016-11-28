@@ -158,14 +158,20 @@ bool SyncTail::syncApply(OperationContext* txn, const BSONObj& op, bool convertU
                 // ahead and grab one here. suboptimal. :-(
                 globalWriteLock.reset(new Lock::GlobalWrite(txn->lockState()));
             } else if (isIndexBuild) {
+                // Warning: We must reset the pointer to nullptr first, in order to ensure that we
+                // drop the DB lock before acquiring the upgraded one.
+                dbLock.reset();
                 dbLock.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X));
             } else if (isCrudOpType(opType)) {
+                // Warning: We must reset the pointer to nullptr first, in order to ensure that we
+                // drop the DB lock before acquiring the upgraded one.
+                dbLock.reset();
                 LockMode mode = createCollection ? MODE_X : MODE_IX;
                 dbLock.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), mode));
                 collectionLock.reset(new Lock::CollectionLock(txn->lockState(), ns, mode));
 
                 if (!createCollection && !dbHolder().get(txn, nsToDatabaseSubstring(ns))) {
-                    // need to create database, try again
+                    // Need to create database, so reset lock to stronger mode.
                     continue;
                 }
             } else {
@@ -177,8 +183,8 @@ bool SyncTail::syncApply(OperationContext* txn, const BSONObj& op, bool convertU
 
             if (createCollection == 0 && !isIndexBuild && isCrudOpType(opType) &&
                 ctx.db()->getCollection(ns) == NULL) {
-                // uh, oh, we need to create collection
-                // try again
+                // Need to implicitly create collection.  This occurs for 'u' opTypes,
+                // but not for 'i' nor 'd'.
                 continue;
             }
 
