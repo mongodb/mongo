@@ -52,6 +52,7 @@
     var testDB = primary.getDB('testdb');
     var coll = testDB[name];
     var dummy_doc = {"dummy_key": "dummy_val"};
+    var timeout = 5 * 60 * 1000;
 
     //
     // Block writes to all secondaries
@@ -63,7 +64,7 @@
     // Write to the primary and attempt stepdown
     //
     jsTestLog("Issuing a write to the primary(" + primary.host + ") with write_concern:1");
-    assert.writeOK(coll.insert(dummy_doc, {writeConcern: {w: 1}}));
+    assert.writeOK(coll.insert(dummy_doc, {writeConcern: {w: 1, wtimeout: timeout}}));
 
     jsTestLog("Trying to step down primary with only 1 node out of 5 caught up.");
     assertStepDownFailsWithExceededTimeLimit(primary);
@@ -76,7 +77,7 @@
     restartServerReplication(secondaryA);
 
     jsTestLog("Issuing a write to the primary with write_concern:2");
-    assert.writeOK(coll.insert(dummy_doc, {writeConcern: {w: 2}}));
+    assert.writeOK(coll.insert(dummy_doc, {writeConcern: {w: 2, wtimeout: timeout}}));
 
     jsTestLog("Trying to step down primary with only 2 nodes out of 5 caught up.");
     assertStepDownFailsWithExceededTimeLimit(primary);
@@ -89,7 +90,7 @@
     restartServerReplication(secondaryB);
 
     jsTestLog("Issuing a write to the primary with write_concern:3");
-    assert.writeOK(coll.insert(dummy_doc, {writeConcern: {w: 3}}));
+    assert.writeOK(coll.insert(dummy_doc, {writeConcern: {w: 3, wtimeout: timeout}}));
 
     jsTestLog("Trying to step down primary with 3 nodes out of 5 caught up.");
     assertStepDownSucceeds(primary);
