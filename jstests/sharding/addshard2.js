@@ -1,3 +1,7 @@
+/**
+ * Tests adding standalones and replica sets as shards under a variety of configurations (setName,
+ * valid and invalid hosts, shardName matching or not matching a setName, etc).
+ */
 (function() {
 
     var addShardRes;
@@ -173,30 +177,9 @@
     addShardRes = st.s.adminCommand({addShard: rst.getURL()});
     assertAddShardSucceeded(addShardRes);
     assert.writeOK(st.s.getDB('test').foo.insert({x: 1}));
+    removeShardWithName(addShardRes.shardAdded);
 
     rst.stopSet();
-
-    // 5. Test adding a --configsvr replica set.
-
-    var configRS = new ReplSetTest({nodes: 1});
-    configRS.startSet({configsvr: '', storageEngine: 'wiredTiger'});
-    configRS.initiate();
-
-    jsTest.log("Adding a config server replica set without a specified shardName should fail.");
-    addShardRes = st.s.adminCommand({addShard: configRS.getURL()});
-    assertAddShardFailed(addShardRes);
-
-    jsTest.log(
-        "Adding a config server replica set  with a shardName that matches the set's name should fail.");
-    addShardRes = st.s.adminCommand({addShard: configRS.getURL(), name: configRS.name});
-    assertAddShardFailed(addShardRes, configRS.name);
-
-    jsTest.log(
-        "Adding a config server replica set even with a non-'config' shardName should fail.");
-    addShardRes = st.s.adminCommand({addShard: configRS.getURL(), name: "nonConfig"});
-    assertAddShardFailed(addShardRes, "nonConfig");
-
-    configRS.stopSet();
 
     st.stop();
 

@@ -9,8 +9,6 @@ selector:
     - jstests/sharding/printShardingStatus.js
     # Behavior change to addShard
     - jstests/sharding/addshard_idempotent.js
-    # Temporarily blacklisted (see SERVER-26615).
-    - jstests/sharding/addshard2.js
 
 executor:
   js_test:
