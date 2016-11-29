@@ -50,6 +50,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/fail_point_service.h"
@@ -78,6 +79,35 @@ struct CollectionCloneInfo {
     CollectionMockStats stats;
     CollectionBulkLoaderMock* loader = nullptr;
     Status status{ErrorCodes::NotYetInitialized, ""};
+};
+
+class TaskExecutorMock : public unittest::TaskExecutorProxy {
+public:
+    using ShouldFailRequestFn = stdx::function<bool(const executor::RemoteCommandRequest&)>;
+
+    TaskExecutorMock(executor::TaskExecutor* executor, ShouldFailRequestFn shouldFailRequest)
+        : unittest::TaskExecutorProxy(executor), _shouldFailRequest(shouldFailRequest) {}
+
+    StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, const CallbackFn& work) {
+        if (shouldFailScheduleWorkAt) {
+            return Status(ErrorCodes::OperationFailed,
+                          str::stream() << "failed to schedule work at " << when.toString());
+        }
+        return getExecutor()->scheduleWorkAt(when, work);
+    }
+
+    StatusWith<CallbackHandle> scheduleRemoteCommand(const executor::RemoteCommandRequest& request,
+                                                     const RemoteCommandCallbackFn& cb) override {
+        if (_shouldFailRequest(request)) {
+            return Status(ErrorCodes::OperationFailed, "failed to schedule remote command");
+        }
+        return getExecutor()->scheduleRemoteCommand(request, cb);
+    }
+
+    bool shouldFailScheduleWorkAt = false;
+
+private:
+    ShouldFailRequestFn _shouldFailRequest;
 };
 
 class DataReplicatorTest : public executor::ThreadPoolExecutorTest, public SyncSourceSelector {
@@ -246,6 +276,12 @@ protected:
 
         launchExecutorThread();
 
+        _shouldFailRequest = [](const executor::RemoteCommandRequest&) { return false; };
+        _executorProxy = stdx::make_unique<TaskExecutorMock>(
+            &getExecutor(), [this](const executor::RemoteCommandRequest& request) {
+                return _shouldFailRequest(request);
+            });
+
         _myLastOpTime = OpTime({3, 0}, 1);
 
         DataReplicatorOptions options;
@@ -264,7 +300,7 @@ protected:
         };
 
         auto dataReplicatorExternalState = stdx::make_unique<DataReplicatorExternalStateMock>();
-        dataReplicatorExternalState->taskExecutor = &getExecutor();
+        dataReplicatorExternalState->taskExecutor = _executorProxy.get();
         dataReplicatorExternalState->dbWorkThreadPool = &getDbWorkThreadPool();
         dataReplicatorExternalState->currentTerm = 1LL;
         dataReplicatorExternalState->lastCommittedOpTime = _myLastOpTime;
@@ -336,6 +372,8 @@ protected:
         }
     }
 
+    TaskExecutorMock::ShouldFailRequestFn _shouldFailRequest;
+    std::unique_ptr<TaskExecutorMock> _executorProxy;
 
     DataReplicatorOptions::SetMyLastOptimeFn _setMyLastOptime;
     OpTime _myLastOpTime;
@@ -928,6 +966,21 @@ TEST_F(InitialSyncTest, FailOnRollback) {
 }
 
 TEST_F(InitialSyncTest, DataReplicatorPassesThroughRollbackCheckerScheduleError) {
+    // Make the second replSetGetRBID command fail. Allow all other requests to be scheduled.
+    executor::RemoteCommandRequest request;
+    bool first = true;
+    _shouldFailRequest = [&first, &request](const executor::RemoteCommandRequest& requestToSend) {
+        if ("replSetGetRBID" == requestToSend.cmdObj.firstElement().fieldNameStringData()) {
+            if (first) {
+                first = false;
+                return false;
+            }
+            request = requestToSend;
+            return true;
+        }
+        return false;
+    };
+
     const Responses responses =
         {
             // get rollback id
@@ -977,7 +1030,7 @@ TEST_F(InitialSyncTest, DataReplicatorPassesThroughRollbackCheckerScheduleError)
                       << OplogEntry::kOplogVersion
                       << ", op:'i', o:{_id:1, c:1}}]}}")},
             // Response to replSetGetRBID request is left out so that we can cancel the request by
-            // shutting the executor down.
+            // rejecting the executor::TaskExecutor::scheduleRemoteCommand() request.
         };
 
     startSync(1);
@@ -985,7 +1038,7 @@ TEST_F(InitialSyncTest, DataReplicatorPassesThroughRollbackCheckerScheduleError)
     setResponses(responses);
     playResponses();
     getExecutor().shutdown();
-    verifySync(getNet(), ErrorCodes::ShutdownInProgress);
+    verifySync(getNet(), ErrorCodes::OperationFailed);
 }
 
 TEST_F(InitialSyncTest, DataReplicatorPassesThroughOplogFetcherFailure) {

@@ -1069,6 +1069,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         '$BUILD_DIR/mongo/unittest/concurrency',
+        '$BUILD_DIR/mongo/unittest/task_executor_proxy',
     ],
 )
 
