@@ -985,7 +985,7 @@ TEST_F(InitialSyncTest, DataReplicatorPassesThroughRollbackCheckerScheduleError)
     setResponses(responses);
     playResponses();
     getExecutor().shutdown();
-    verifySync(getNet(), ErrorCodes::CallbackCanceled);
+    verifySync(getNet(), ErrorCodes::ShutdownInProgress);
 }
 
 TEST_F(InitialSyncTest, DataReplicatorPassesThroughOplogFetcherFailure) {
