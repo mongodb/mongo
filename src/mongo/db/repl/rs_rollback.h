@@ -28,14 +28,10 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/stdx/functional.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -59,7 +55,7 @@ class RollbackSource;
  * - undo operations by fetching all documents affected, then replaying
  *   the sync source's oplog until we reach the time in the oplog when we fetched the last
  *   document.
- * This function can throw std::exception on failures.
+ * This function can throw exceptions on failures.
  * This function runs a command on the sync source to detect if the sync source rolls back
  * while our rollback is in progress.
  *
@@ -70,18 +66,13 @@ class RollbackSource;
  *            supports fetching documents and copying collections.
  * @param replCoord Used to track the rollback ID and to change the follower state
  *
- * Failures: Most failures are returned as a status but some failures throw an std::exception.
+ * If requiredRBID is supplied, we error if the upstream node has a different RBID (ie it rolled
+ * back) after fetching any information from it.
+ *
+ * Failures: If a Status with code UnrecoverableRollbackError is returned, the caller must exit
+ * fatally. All other errors should be considered recoverable regardless of whether reported as a
+ * status or exception.
  */
-
-using SleepSecondsFn = stdx::function<void(Seconds)>;
-
-Status syncRollback(OperationContext* txn,
-                    const OplogInterface& localOplog,
-                    const RollbackSource& rollbackSource,
-                    boost::optional<int> requiredRBID,
-                    ReplicationCoordinator* replCoord,
-                    const SleepSecondsFn& sleepSecondsFn);
-
 Status syncRollback(OperationContext* txn,
                     const OplogInterface& localOplog,
                     const RollbackSource& rollbackSource,
@@ -132,6 +123,20 @@ struct FixUpInfo {
     void removeAllDocsToRefetchFor(const std::string& collection);
     void removeRedundantOperations();
 };
+
+// Indicates that rollback cannot complete and the server must abort.
+class RSFatalException : public std::exception {
+public:
+    RSFatalException(std::string m = "replica set fatal exception") : msg(m) {}
+    virtual const char* what() const throw() {
+        return msg.c_str();
+    }
+
+private:
+    std::string msg;
+};
+
+Status updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInfo, const BSONObj& ourObj);
 }  // namespace rollback_internal
 }  // namespace repl
 }  // namespace mongo

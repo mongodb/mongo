@@ -238,6 +238,8 @@ void BackgroundSync::_runProducer() {
         return;
     }
 
+    invariant(!state.rollback());
+
     // We need to wait until initial sync has started.
     if (_replCoord->getMyLastAppliedOpTime().isNull()) {
         sleepsecs(1);
@@ -620,47 +622,86 @@ void BackgroundSync::_rollback(OperationContext* txn,
                                const HostAndPort& source,
                                boost::optional<int> requiredRBID,
                                stdx::function<DBClientBase*()> getConnection) {
-    // Abort only when syncRollback detects we are in a unrecoverable state.
-    // In other cases, we log the message contained in the error status and retry later.
-    auto status = syncRollback(txn,
-                               OplogInterfaceLocal(txn, rsOplogName),
-                               RollbackSourceImpl(getConnection, source, rsOplogName),
-                               requiredRBID,
-                               _replCoord);
-    if (status.isOK()) {
-        // At this point we are about to leave rollback.  Before we do, wait for any writes done
-        // as part of rollback to be durable, and then do any necessary checks that we didn't
-        // wind up rolling back something illegal.  We must wait for the rollback to be durable
-        // so that if we wind up shutting down uncleanly in response to something we rolled back
-        // we know that we won't wind up right back in the same situation when we start back up
-        // because the rollback wasn't durable.
-        txn->recoveryUnit()->waitUntilDurable();
+    // Set state to ROLLBACK while we are in this function. This prevents serving reads, even from
+    // the oplog. This can fail if we are elected PRIMARY, in which case we better not do any
+    // rolling back. If we successfully enter ROLLBACK we will only exit this function fatally or
+    // after transitioning to RECOVERING. We always transition to RECOVERING regardless of success
+    // or (recoverable) failure since we may be in an inconsistent state. If rollback failed before
+    // writing anything, SyncTail will quickly take us to SECONDARY since are are still at our
+    // original MinValid, which is fine because we may choose a sync source that doesn't require
+    // rollback. If it failed after we wrote to MinValid, then we will pick a sync source that will
+    // cause us to roll back to the same common point, which is fine. If we succeeded, we will be
+    // consistent as soon as we apply up to/through MinValid and SyncTail will make us SECONDARY
+    // then.
+    {
+        log() << "rollback 0";
+        Lock::GlobalWrite globalWrite(txn->lockState());
+        if (!_replCoord->setFollowerMode(MemberState::RS_ROLLBACK)) {
+            log() << "Cannot transition from " << _replCoord->getMemberState().toString() << " to "
+                  << MemberState(MemberState::RS_ROLLBACK).toString();
+            return;
+        }
+    }
 
-        // If we detected that we rolled back the shardIdentity document as part of this rollback
-        // then we must shut down to clear the in-memory ShardingState associated with the
-        // shardIdentity document.
-        if (ShardIdentityRollbackNotifier::get(txn)->didRollbackHappen()) {
-            severe()
-                << "shardIdentity document rollback detected.  Shutting down to clear "
-                   "in-memory sharding state.  Restarting this process should safely return it "
-                   "to a healthy state";
-            fassertFailedNoTrace(40276);
+    try {
+        auto status = syncRollback(txn,
+                                   OplogInterfaceLocal(txn, rsOplogName),
+                                   RollbackSourceImpl(getConnection, source, rsOplogName),
+                                   requiredRBID,
+                                   _replCoord);
+
+        // Abort only when syncRollback detects we are in a unrecoverable state.
+        // WARNING: these statuses sometimes have location codes which are lost with uassertStatusOK
+        // so we need to check here first.
+        if (ErrorCodes::UnrecoverableRollbackError == status.code()) {
+            severe() << "Unable to complete rollback. A full resync may be needed: "
+                     << redact(status);
+            fassertFailedNoTrace(28723);
         }
 
-        // It is now safe to clear the ROLLBACK state, which may result in the applier thread
-        // transitioning to SECONDARY.  This is safe because the applier thread has now reloaded
-        // the new rollback minValid from the database.
-        if (!_replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
-            warning() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING)
-                      << "; expected to be in state " << MemberState(MemberState::RS_ROLLBACK)
-                      << " but found self in " << _replCoord->getMemberState();
-        }
-        return;
+        // In other cases, we log the message contained in the error status and retry later.
+        uassertStatusOK(status);
+    } catch (const DBException& ex) {
+        // UnrecoverableRollbackError should only come from a returned status which is handled
+        // above.
+        invariant(ex.getCode() != ErrorCodes::UnrecoverableRollbackError);
+
+        warning() << "rollback cannot complete at this time (retrying later): " << redact(ex)
+                  << " appliedThrough=" << _replCoord->getMyLastAppliedOpTime()
+                  << " minvalid=" << StorageInterface::get(txn)->getMinValid(txn);
+
+        // Sleep a bit to allow upstream node to coalesce, if that was the cause of the failure. If
+        // we failed in a way that will keep failing, but wasn't flagged as a fatal failure, this
+        // will also prevent us from hot-looping and putting too much load on upstream nodes.
+        sleepsecs(5);  // 5 seconds was chosen as a completely arbitrary amount of time.
+    } catch (...) {
+        std::terminate();
     }
-    if (ErrorCodes::UnrecoverableRollbackError == status.code()) {
-        fassertNoTrace(28723, status);
+
+    // At this point we are about to leave rollback.  Before we do, wait for any writes done
+    // as part of rollback to be durable, and then do any necessary checks that we didn't
+    // wind up rolling back something illegal.  We must wait for the rollback to be durable
+    // so that if we wind up shutting down uncleanly in response to something we rolled back
+    // we know that we won't wind up right back in the same situation when we start back up
+    // because the rollback wasn't durable.
+    txn->recoveryUnit()->waitUntilDurable();
+
+    // If we detected that we rolled back the shardIdentity document as part of this rollback
+    // then we must shut down to clear the in-memory ShardingState associated with the
+    // shardIdentity document.
+    if (ShardIdentityRollbackNotifier::get(txn)->didRollbackHappen()) {
+        severe() << "shardIdentity document rollback detected.  Shutting down to clear "
+                    "in-memory sharding state.  Restarting this process should safely return it "
+                    "to a healthy state";
+        fassertFailedNoTrace(40276);
     }
-    warning() << "rollback cannot proceed at this time (retrying later): " << redact(status);
+
+    if (!_replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
+        severe() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING)
+                 << "; expected to be in state " << MemberState(MemberState::RS_ROLLBACK)
+                 << " but found self in " << _replCoord->getMemberState();
+        fassertFailedNoTrace(40364);
+    }
 }
 
 HostAndPort BackgroundSync::getSyncTarget() const {
