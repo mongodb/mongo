@@ -2376,9 +2376,6 @@ def doConfigure(myenv):
         # Explicitly enable GNU build id's if the linker supports it.
         AddToLINKFLAGSIfSupported(myenv, '-Wl,--build-id')
 
-        # Explicitly use the new gnu hash section if the linker offers it.
-        AddToLINKFLAGSIfSupported(myenv, '-Wl,--hash-style=gnu')
-
         # Disallow an executable stack. Also, issue a warning if any files are found that would
         # cause the stack to become executable if the noexecstack flag was not in play, so that we
         # can find them and fix them. We do this here after we check for ld.gold because the
