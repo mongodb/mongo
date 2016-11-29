@@ -98,6 +98,7 @@ struct StorageGlobalParams {
     // via an fsync operation.
     // Do not set this value on production systems.
     // In almost every situation, you should use the default setting.
+    static const double kMaxSyncdelaySecs;
     AtomicDouble syncdelay{60.0};  // seconds between fsyncs
 
     bool readOnly = false;

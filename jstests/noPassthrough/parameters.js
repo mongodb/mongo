@@ -35,6 +35,8 @@ setAndCheckParameter(dbConn, "traceExceptions", 1, true);
 setAndCheckParameter(dbConn, "traceExceptions", 0, false);
 setAndCheckParameter(dbConn, "traceExceptions", "foo", true);
 setAndCheckParameter(dbConn, "traceExceptions", "", true);
+setAndCheckParameter(dbConn, "syncdelay", 0);
+setAndCheckParameter(dbConn, "syncdelay", 8000);
 
 function ensureSetParameterFailure(dbConn, parameterName, newValue) {
     jsTest.log("Test setting parameter: " + parameterName + " to invalid value: " + newValue);
@@ -53,6 +55,8 @@ ensureSetParameterFailure(dbConn, "journalCommitInterval", "0.5");
 ensureSetParameterFailure(dbConn, "journalCommitInterval", 0.5);
 ensureSetParameterFailure(dbConn, "journalCommitInterval", 1000);
 ensureSetParameterFailure(dbConn, "journalCommitInterval", 0);
+ensureSetParameterFailure(dbConn, "syncdelay", 10 * 1000 * 1000);
+ensureSetParameterFailure(dbConn, "syncdelay", -10 * 1000 * 1000);
 
 MongoRunner.stopMongod(dbConn.port);
 
