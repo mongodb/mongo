@@ -246,6 +246,10 @@ void MozJSImplScope::_gcCallback(JSRuntime* rt, JSGCStatus status, void* data) {
 }
 
 MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
+    // While we're initializing the runtime/scope, calling MozJSImplScope::getThreadScope() should
+    // return a nullptr.
+    kCurrentScope = nullptr;
+
     /**
      * The maximum amount of memory to be given out per thread to mozilla. We
      * manage this by trapping all calls to malloc, free, etc. and keeping track of
