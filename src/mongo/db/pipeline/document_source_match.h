@@ -126,16 +126,16 @@ public:
     static BSONObj getObjectForMatch(const Document& input, const std::set<std::string>& fields);
 
     /**
-     * Should be called _only_ on a MatchExpression  that is a predicate on 'path', or subfields  of
-     * 'path'. It is also invalid to call this method on a $match including a $elemMatch on 'path',
-     * for example: {$match: {'path': {$elemMatch: {'subfield': 3}}}}
-     *
-     * Returns a new DocumentSourceMatch that, if executed on the subdocument at 'path', is
-     * equivalent to 'expression'.
+     * Returns a new DocumentSourceMatch with a MatchExpression that, if executed on the
+     * sub-document at 'path', is equivalent to 'expression'.
      *
      * For example, if the original expression is {$and: [{'a.b': {$gt: 0}}, {'a.d': {$eq: 3}}]},
      * the new $match will have the expression {$and: [{b: {$gt: 0}}, {d: {$eq: 3}}]} after
      * descending on the path 'a'.
+     *
+     * Should be called _only_ on a MatchExpression that is a predicate on 'path', or subfields of
+     * 'path'. It is also invalid to call this method on an expression including a $elemMatch on
+     * 'path', for example: {'path': {$elemMatch: {'subfield': 3}}}
      */
     static boost::intrusive_ptr<DocumentSourceMatch> descendMatchOnPath(
         MatchExpression* matchExpr,
