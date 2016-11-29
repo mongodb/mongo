@@ -45,6 +45,7 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/db/repl/sync_source_selector_mock.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
@@ -79,28 +80,6 @@ struct CollectionCloneInfo {
     Status status{ErrorCodes::NotYetInitialized, ""};
 };
 
-class SyncSourceSelectorMock : public SyncSourceSelector {
-    MONGO_DISALLOW_COPYING(SyncSourceSelectorMock);
-
-public:
-    SyncSourceSelectorMock(const HostAndPort& syncSource) : _syncSource(syncSource) {}
-    void clearSyncSourceBlacklist() override {}
-    HostAndPort chooseNewSyncSource(const OpTime& ot) override {
-        HostAndPort result = _syncSource;
-        return result;
-    }
-    void blacklistSyncSource(const HostAndPort& host, Date_t until) override {
-        _blacklistedSource = host;
-    }
-    bool shouldChangeSyncSource(const HostAndPort& currentSource,
-                                const rpc::ReplSetMetadata& metadata) override {
-        return false;
-    }
-
-    HostAndPort _syncSource;
-    HostAndPort _blacklistedSource;
-};
-
 class DataReplicatorTest : public executor::ThreadPoolExecutorTest, public SyncSourceSelector {
 public:
     DataReplicatorTest() {}
@@ -113,7 +92,7 @@ public:
     void reset() {
         _setMyLastOptime = [this](const OpTime& opTime) { _myLastOpTime = opTime; };
         _myLastOpTime = OpTime();
-        _syncSourceSelector.reset(new SyncSourceSelectorMock(HostAndPort("localhost", -1)));
+        _syncSourceSelector = stdx::make_unique<SyncSourceSelectorMock>();
     }
 
     // SyncSourceSelector
