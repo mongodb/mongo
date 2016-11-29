@@ -436,5 +436,47 @@ TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportFieldsModifiedByAbs
     ASSERT_EQ(1U, modifiedPaths.paths.count("arrIndex"));
 }
 
+TEST_F(DocumentSourceGraphLookUpTest, GraphLookupWithComparisonExpressionForStartWith) {
+    auto expCtx = getExpCtx();
+
+    auto inputMock = DocumentSourceMock::create(Document({{"_id", 0}, {"a", 1}, {"b", 2}}));
+
+    NamespaceString fromNs("test", "foreign");
+    expCtx->resolvedNamespaces[fromNs.coll()] = {fromNs, std::vector<BSONObj>{}};
+    std::deque<DocumentSource::GetNextResult> fromContents{Document{{"_id", 0}, {"to", true}},
+                                                           Document{{"_id", 1}, {"to", false}}};
+
+    auto graphLookupStage = DocumentSourceGraphLookUp::create(
+        expCtx,
+        fromNs,
+        "results",
+        "from",
+        "to",
+        ExpressionCompare::create(ExpressionCompare::GT,
+                                  ExpressionFieldPath::create("a"),
+                                  ExpressionFieldPath::create("b")),
+        boost::none,
+        boost::none,
+        boost::none,
+        boost::none);
+
+    graphLookupStage->setSource(inputMock.get());
+    graphLookupStage->injectMongodInterface(
+        std::make_shared<MockMongodImplementation>(std::move(fromContents)));
+
+    auto next = graphLookupStage->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+
+    // The 'startWith' expression evaluates to false, so we expect the 'results' array to contain
+    // just one document.
+    auto actualResult = next.releaseDocument();
+    Document expectedResult{
+        {"_id", 0},
+        {"a", 1},
+        {"b", 2},
+        {"results", std::vector<Value>{Value{Document{{"_id", 1}, {"to", false}}}}}};
+    ASSERT_DOCUMENT_EQ(actualResult, expectedResult);
+}
+
 }  // namespace
 }  // namespace mongo

@@ -461,6 +461,8 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array, bool
 }
 
 void DocumentSourceGraphLookUp::doInjectExpressionContext() {
+    _startWith->injectExpressionContext(pExpCtx);
+
     auto it = pExpCtx->resolvedNamespaces.find(_from.coll());
     invariant(it != pExpCtx->resolvedNamespaces.end());
     const auto& resolvedNamespace = it->second;

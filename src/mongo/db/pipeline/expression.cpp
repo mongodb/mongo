@@ -710,6 +710,15 @@ intrusive_ptr<Expression> ExpressionCompare::parse(BSONElement bsonExpr,
 
 ExpressionCompare::ExpressionCompare(CmpOp theCmpOp) : cmpOp(theCmpOp) {}
 
+boost::intrusive_ptr<ExpressionCompare> ExpressionCompare::create(
+    CmpOp cmpOp,
+    const boost::intrusive_ptr<Expression>& exprLeft,
+    const boost::intrusive_ptr<Expression>& exprRight) {
+    boost::intrusive_ptr<ExpressionCompare> expr = new ExpressionCompare(cmpOp);
+    expr->vpOperand = {exprLeft, exprRight};
+    return expr;
+}
+
 namespace {
 // Lookup table for truth value returns
 struct CmpLookup {
