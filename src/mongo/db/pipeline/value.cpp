@@ -242,13 +242,22 @@ Value::Value(const BSONArray& arr) : _storage(Array) {
     _storage.putVector(vec.get());
 }
 
-Value::Value(const vector<BSONObj>& arr) : _storage(Array) {
-    intrusive_ptr<RCVector> vec(new RCVector);
-    vec->vec.reserve(arr.size());
-    for (auto&& obj : arr) {
-        vec->vec.push_back(Value(obj));
+Value::Value(const vector<BSONObj>& vec) : _storage(Array) {
+    intrusive_ptr<RCVector> storageVec(new RCVector);
+    storageVec->vec.reserve(vec.size());
+    for (auto&& obj : vec) {
+        storageVec->vec.push_back(Value(obj));
     }
-    _storage.putVector(vec.get());
+    _storage.putVector(storageVec.get());
+}
+
+Value::Value(const vector<Document>& vec) : _storage(Array) {
+    intrusive_ptr<RCVector> storageVec(new RCVector);
+    storageVec->vec.reserve(vec.size());
+    for (auto&& obj : vec) {
+        storageVec->vec.push_back(Value(obj));
+    }
+    _storage.putVector(storageVec.get());
 }
 
 Value Value::createIntOrLong(long long longValue) {
