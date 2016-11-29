@@ -351,8 +351,15 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 		cache->pages_evicted = cache->pages_evict;
 #ifdef HAVE_DIAGNOSTIC
 		__wt_epoch(session, &cache->stuck_ts);
-	} else {
-		/* After being stuck for 5 minutes, give up. */
+	} else if (!F_ISSET(conn, WT_CONN_IN_MEMORY)) {
+		/*
+		 * After being stuck for 5 minutes, give up.
+		 *
+		 * We don't do this check for in-memory workloads because
+		 * application threads are not blocked by the cache being full.
+		 * If the cache becomes full of clean pages, we can be
+		 * servicing reads while the cache appears stuck to eviction.
+		 */
 		__wt_epoch(session, &now);
 		if (WT_TIMEDIFF_SEC(now, cache->stuck_ts) > 300) {
 			ret = ETIMEDOUT;

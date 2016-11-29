@@ -408,11 +408,7 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Update pages and bytes evicted. */
 	(void)__wt_atomic_add64(&cache->bytes_evict, page->memory_footprint);
-
-	if (F_ISSET(session, WT_SESSION_IN_SPLIT))
-		(void)__wt_atomic_subv64(&cache->pages_inmem, 1);
-	else
-		(void)__wt_atomic_addv64(&cache->pages_evict, 1);
+	(void)__wt_atomic_addv64(&cache->pages_evict, 1);
 }
 
 /*

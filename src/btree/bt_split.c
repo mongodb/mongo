@@ -2264,16 +2264,9 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi)
 	 *
 	 * Pages with unresolved changes are not marked clean during
 	 * reconciliation, do it now.
-	 *
-	 * The page is not being completely evicted: instead it is being split.
-	 * Don't increment the count of pages evicted, which we use to decide
-	 * whether eviction is making progress.  Repeatedly splitting a page
-	 * isn't progress.
 	 */
 	__wt_page_modify_clear(session, page);
-	F_SET(session, WT_SESSION_IN_SPLIT);
 	__wt_ref_out(session, ref);
-	F_CLR(session, WT_SESSION_IN_SPLIT);
 
 	/* Swap the new page into place. */
 	ref->page = new->page;
