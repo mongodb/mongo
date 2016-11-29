@@ -83,7 +83,7 @@ public:
 
     ~DatabasesCloner();
 
-    Status startup();
+    Status startup() noexcept;
     bool isActive();
     void join();
     void shutdown();
@@ -105,6 +105,8 @@ public:
     void setScheduleDbWorkFn_forTest(const CollectionCloner::ScheduleDbWorkFn& scheduleDbWorkFn);
 
 private:
+    bool _isActive_inlock() const;
+
     /**
      * Returns a copy of the database cloners.
      */
@@ -146,16 +148,23 @@ private:
     executor::TaskExecutor* _exec;                      // (R) executor to schedule things with
     OldThreadPool* _dbWorkThreadPool;  // (R) db worker thread pool for collection cloning.
     const HostAndPort _source;         // (R) The source to use.
-    bool _active = false;              // (M) false until we start, and true until finished.
     CollectionCloner::ScheduleDbWorkFn _scheduleDbWorkFn;  // (M)
 
     const IncludeDbFilterFn _includeDbFn;  // (R) function which decides which dbs are cloned.
-    const OnFinishFn _finishFn;            // (R) function called when finished.
+    OnFinishFn _finishFn;                  // (M) function called when finished.
     StorageInterface* _storage;            // (R)
 
     std::unique_ptr<RemoteCommandRetryScheduler> _listDBsScheduler;  // (M) scheduler for listDBs.
     std::vector<std::shared_ptr<DatabaseCloner>> _databaseCloners;   // (M) database cloners by name
     Stats _stats;                                                    // (M)
+
+    // State transitions:
+    // PreStart --> Running --> ShuttingDown --> Complete
+    // It is possible to skip intermediate states. For example,
+    // Calling shutdown() when the cloner has not started will transition from PreStart directly
+    // to Complete.
+    enum class State { kPreStart, kRunning, kShuttingDown, kComplete };
+    State _state = State::kPreStart;
 };
 
 

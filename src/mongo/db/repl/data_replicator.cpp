@@ -523,7 +523,11 @@ Status DataReplicator::_runInitialSyncAttempt_inlock(OperationContext* txn,
         }
     }
 
-    cloner->startup();  // When the cloner is done applier starts.
+    auto clonerStartupStatus = cloner->startup();  // When the cloner is done applier starts.
+    if (!clonerStartupStatus.isOK()) {
+        return clonerStartupStatus;
+    }
+
     _exec->waitForEvent(initialSyncFinishEvent);
 
     log() << "Initial sync attempt finishing up.";

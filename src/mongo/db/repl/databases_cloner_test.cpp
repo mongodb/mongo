@@ -46,6 +46,7 @@
 #include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/scopeguard.h"
 
 namespace {
 using namespace mongo;
@@ -388,6 +389,67 @@ TEST_F(DBsClonerTest, InvalidConstruction) {
         "finishFn must be provided.");
 }
 
+TEST_F(DBsClonerTest, StartupReturnsListDatabasesScheduleErrorButDoesNotInvokeCompletionCallback) {
+    Status result = getDetectableErrorStatus();
+    Status expectedResult{ErrorCodes::BadValue, "foo"};
+    DatabasesCloner cloner{&getStorage(),
+                           &getExecutor(),
+                           &getDbWorkThreadPool(),
+                           HostAndPort{"local:1234"},
+                           [](const BSONObj&) { return true; },
+                           [&result](const Status& status) {
+                               log() << "setting result to " << status;
+                               result = status;
+                           }};
+
+    getExecutor().shutdown();
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, cloner.startup());
+    ASSERT_FALSE(cloner.isActive());
+
+    ASSERT_EQUALS(getDetectableErrorStatus(), result);
+}
+
+TEST_F(DBsClonerTest, StartupReturnsShuttingDownInProgressAfterShutdownIsCalled) {
+    Status result = getDetectableErrorStatus();
+    Status expectedResult{ErrorCodes::BadValue, "foo"};
+    DatabasesCloner cloner{&getStorage(),
+                           &getExecutor(),
+                           &getDbWorkThreadPool(),
+                           HostAndPort{"local:1234"},
+                           [](const BSONObj&) { return true; },
+                           [&result](const Status& status) {
+                               log() << "setting result to " << status;
+                               result = status;
+                           }};
+    ON_BLOCK_EXIT([this] { getExecutor().shutdown(); });
+
+    cloner.shutdown();
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, cloner.startup());
+    ASSERT_FALSE(cloner.isActive());
+
+    ASSERT_EQUALS(getDetectableErrorStatus(), result);
+}
+
+TEST_F(DBsClonerTest, StartupReturnsInternalErrorAfterSuccessfulStartup) {
+    Status result = getDetectableErrorStatus();
+    Status expectedResult{ErrorCodes::BadValue, "foo"};
+    DatabasesCloner cloner{&getStorage(),
+                           &getExecutor(),
+                           &getDbWorkThreadPool(),
+                           HostAndPort{"local:1234"},
+                           [](const BSONObj&) { return true; },
+                           [&result](const Status& status) {
+                               log() << "setting result to " << status;
+                               result = status;
+                           }};
+    ON_BLOCK_EXIT([this] { getExecutor().shutdown(); });
+
+    ASSERT_OK(cloner.startup());
+
+    ASSERT_EQUALS(ErrorCodes::InternalError, cloner.startup());
+    ASSERT_TRUE(cloner.isActive());
+}
+
 TEST_F(DBsClonerTest, FailsOnListDatabases) {
     Status result{Status::OK()};
     Status expectedResult{ErrorCodes::BadValue, "foo"};
@@ -408,6 +470,104 @@ TEST_F(DBsClonerTest, FailsOnListDatabases) {
     executor::NetworkInterfaceMock::InNetworkGuard guard(net);
     processNetworkResponse("listDatabases", expectedResult);
     ASSERT_EQ(result, expectedResult);
+}
+
+TEST_F(DBsClonerTest, DatabasesClonerReturnsCallbackCanceledIfShutdownDuringListDatabasesCommand) {
+    Status result{Status::OK()};
+    DatabasesCloner cloner{&getStorage(),
+                           &getExecutor(),
+                           &getDbWorkThreadPool(),
+                           HostAndPort{"local:1234"},
+                           [](const BSONObj&) { return true; },
+                           [&result](const Status& status) {
+                               log() << "setting result to " << status;
+                               result = status;
+                           }};
+
+    ASSERT_OK(cloner.startup());
+    ASSERT_TRUE(cloner.isActive());
+
+    cloner.shutdown();
+    executor::NetworkInterfaceMock::InNetworkGuard(getNet())->runReadyNetworkOperations();
+
+    cloner.join();
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, result);
+}
+
+bool sharedCallbackStateDestroyed = false;
+class SharedCallbackState {
+    MONGO_DISALLOW_COPYING(SharedCallbackState);
+
+public:
+    SharedCallbackState() {}
+    ~SharedCallbackState() {
+        sharedCallbackStateDestroyed = true;
+    }
+};
+
+TEST_F(DBsClonerTest, DatabasesClonerResetsOnFinishCallbackFunctionAfterCompletionDueToFailure) {
+    sharedCallbackStateDestroyed = false;
+    auto sharedCallbackData = std::make_shared<SharedCallbackState>();
+
+    Status result = getDetectableErrorStatus();
+    DatabasesCloner cloner{&getStorage(),
+                           &getExecutor(),
+                           &getDbWorkThreadPool(),
+                           HostAndPort{"local:1234"},
+                           [](const BSONObj&) { return true; },
+                           [&result, sharedCallbackData](const Status& status) {
+                               log() << "setting result to " << status;
+                               result = status;
+                           }};
+
+    ASSERT_OK(cloner.startup());
+    ASSERT_TRUE(cloner.isActive());
+
+    sharedCallbackData.reset();
+    ASSERT_FALSE(sharedCallbackStateDestroyed);
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        processNetworkResponse("listDatabases",
+                               Status(ErrorCodes::OperationFailed, "listDatabases failed"));
+    }
+
+    cloner.join();
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, result);
+    ASSERT_TRUE(sharedCallbackStateDestroyed);
+}
+
+TEST_F(DBsClonerTest, DatabasesClonerResetsOnFinishCallbackFunctionAfterCompletionDueToSuccess) {
+    sharedCallbackStateDestroyed = false;
+    auto sharedCallbackData = std::make_shared<SharedCallbackState>();
+
+    Status result = getDetectableErrorStatus();
+    DatabasesCloner cloner{&getStorage(),
+                           &getExecutor(),
+                           &getDbWorkThreadPool(),
+                           HostAndPort{"local:1234"},
+                           [](const BSONObj&) { return true; },
+                           [&result, sharedCallbackData](const Status& status) {
+                               log() << "setting result to " << status;
+                               result = status;
+                           }};
+
+    ASSERT_OK(cloner.startup());
+    ASSERT_TRUE(cloner.isActive());
+
+    sharedCallbackData.reset();
+    ASSERT_FALSE(sharedCallbackStateDestroyed);
+
+    auto net = getNet();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        processNetworkResponse("listDatabases", fromjson("{ok:1, databases:[]}"));  // listDatabases
+    }
+
+    cloner.join();
+    ASSERT_OK(result);
+    ASSERT_TRUE(sharedCallbackStateDestroyed);
 }
 
 TEST_F(DBsClonerTest, FailsOnListCollectionsOnOnlyDatabase) {
