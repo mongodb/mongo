@@ -385,7 +385,7 @@ MONGO_INITIALIZER(SetupOpenSSL)(InitializerContext*) {
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL"))(InitializerContext*) {
     stdx::lock_guard<SimpleMutex> lck(sslManagerMtx);
-    if (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled) {
+    if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         theSSLManager = new SSLManager(sslGlobalParams, isSSLServer);
     }
     return Status::OK();

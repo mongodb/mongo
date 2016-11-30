@@ -91,6 +91,10 @@ public:
         _threads.emplace_back(&DummyServiceEntryPoint::run, this, std::move(session));
     }
 
+    void setReplyDelay(Milliseconds delay) {
+        _replyDelay = delay;
+    }
+
 private:
     void run(transport::SessionHandle session) {
         Message inMessage;
@@ -117,6 +121,10 @@ private:
 
         response.header().setResponseToMsgId(inMessage.header().getId());
 
+        if (_replyDelay.count() > 0) {
+            log() << "Delaying response for " << _replyDelay;
+            sleepFor(_replyDelay);
+        }
         if (!session->sinkMessage(response).wait().isOK()) {
             return;
         }
@@ -128,6 +136,7 @@ private:
     virtual void commandRequestHook(const rpc::RequestInterface* request) const {}
 
     std::vector<stdx::thread> _threads;
+    Milliseconds _replyDelay{0};
 };
 
 // TODO: Take this out and make it as a reusable class in a header file. The only
@@ -261,6 +270,10 @@ protected:
         ASSERT_NOT_EQUALS(a, b);
     }
 
+    void setReplyDelay(Milliseconds delay) {
+        _dummyServiceEntryPoint->setReplyDelay(delay);
+    }
+
     /**
      * Tries to grab a series of connections from the pool, perform checks on
      * them, then put them back into the globalConnPool. After that, it checks these
@@ -372,6 +385,42 @@ TEST_F(DummyServerFixture, BasicScopedDbConnection) {
 
     conn2.done();
     conn3.done();
+}
+
+TEST_F(DummyServerFixture, ScopedDbConnectionWithTimeout) {
+    auto delay = Milliseconds{8000};
+    auto uri_sw = MongoURI::parse("mongodb://" + TARGET_HOST + "/?socketTimeoutMS=4000");
+    ASSERT_OK(uri_sw.getStatus());
+    auto uri = uri_sw.getValue();
+    Date_t start, end;
+    const auto uriTimeout = Seconds{4};
+    const auto overrideTimeout = Seconds{1};
+
+    ScopedDbConnection conn1(TARGET_HOST);
+
+    setReplyDelay(delay);
+
+    log() << "Testing ConnectionString timeouts";
+    start = Date_t::now();
+    ASSERT_THROWS(ScopedDbConnection conn2(TARGET_HOST, overrideTimeout.count()), SocketException);
+    end = Date_t::now();
+    ASSERT_GTE(end - start, overrideTimeout);
+    ASSERT_LT(end - start, uriTimeout);
+
+    log() << "Testing MongoURI with explicit timeout";
+    start = Date_t::now();
+    ASSERT_THROWS(ScopedDbConnection conn4(uri, overrideTimeout.count()), UserException);
+    end = Date_t::now();
+    ASSERT_GTE(end - start, overrideTimeout);
+    ASSERT_LT(end - start, uriTimeout);
+
+    log() << "Testing MongoURI doesn't timeout";
+    start = Date_t::now();
+    ScopedDbConnection conn5(uri);
+    end = Date_t::now();
+    ASSERT_GREATER_THAN(end - start, uriTimeout);
+
+    setReplyDelay(Milliseconds{0});
 }
 
 TEST_F(DummyServerFixture, InvalidateBadConnInPool) {

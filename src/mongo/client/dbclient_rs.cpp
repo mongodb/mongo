@@ -147,8 +147,12 @@ DBClientReplicaSet::DBClientReplicaSet(const string& name,
       _applicationName(applicationName.toString()),
       _so_timeout(so_timeout),
       _uri(std::move(uri)) {
-    _rsm =
-        ReplicaSetMonitor::createIfNeeded(name, set<HostAndPort>(servers.begin(), servers.end()));
+    if (uri.isValid()) {
+        _rsm = ReplicaSetMonitor::createIfNeeded(_uri);
+    } else {
+        _rsm = ReplicaSetMonitor::createIfNeeded(name,
+                                                 set<HostAndPort>(servers.begin(), servers.end()));
+    }
 }
 
 DBClientReplicaSet::~DBClientReplicaSet() {
@@ -305,17 +309,24 @@ DBClientConnection* DBClientReplicaSet::checkMaster() {
 
     _masterHost = h;
 
-    ConnectionString connStr(_masterHost);
+    MongoURI masterUri;
+    if (!_uri.isValid())
+        masterUri = MongoURI(ConnectionString(_masterHost));
+    else
+        masterUri = _uri.cloneURIForServer(_masterHost);
 
     string errmsg;
     DBClientConnection* newConn = NULL;
+    boost::optional<double> socketTimeout;
+    if (_so_timeout > 0.0)
+        socketTimeout = _so_timeout;
 
     try {
         // Needs to perform a dynamic_cast because we need to set the replSet
         // callback. We should eventually not need this after we remove the
         // callback.
         newConn = dynamic_cast<DBClientConnection*>(
-            connStr.connect(_applicationName, errmsg, _so_timeout));
+            masterUri.connect(_applicationName, errmsg, socketTimeout));
     } catch (const AssertionException& ex) {
         errmsg = ex.toString();
     }
