@@ -52,7 +52,7 @@
     var ttlPasses = testDB.serverStatus().metrics.ttl.passes;
     assert.commandWorked(testDB.adminCommand({setParameter: 1, ttlMonitorEnabled: true}));
 
-    var timeoutSeconds = 5;
+    var timeoutSeconds = 60;
     assert.soon(
         function checkIfTTLMonitorRan() {
             // The 'ttl.passes' metric is incremented when the TTL monitor starts processing the
