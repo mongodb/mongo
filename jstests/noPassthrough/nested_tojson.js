@@ -11,7 +11,7 @@
             cur = cur[i];
         }
         cur['a'] = 'foo';
-        return doc
+        return doc;
     };
 
     const nestarr = (depth) => {
