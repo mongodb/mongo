@@ -32,6 +32,11 @@
 
 namespace mongo {
 
+enum class LogFileStatus {
+    kNeedToRotateLogFile,
+    kNoLogFileToRotate,
+};
+
 /**
  * Sets up handlers for signals and other events like terminate and new_handler.
  *
@@ -45,7 +50,7 @@ void setupSignalHandlers();
  * This must be the first thread started from the main thread. Call this immediately after
  * initializeServerGlobalState().
  */
-void startSignalProcessingThread();
+void startSignalProcessingThread(LogFileStatus rotate = LogFileStatus::kNeedToRotateLogFile);
 
 /*
  * Uninstall the Control-C handler

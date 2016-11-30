@@ -160,7 +160,7 @@ void eventProcessingThread() {
 // ensure the db and log mutexes aren't held. Because this is run in a different thread, it does
 // not need to be safe to call in signal context.
 sigset_t asyncSignals;
-void signalProcessingThread() {
+void signalProcessingThread(LogFileStatus rotate) {
     setThreadName("signalProcessingThread");
 
     while (true) {
@@ -171,7 +171,9 @@ void signalProcessingThread() {
             case SIGUSR1:
                 // log rotate signal
                 fassert(16782, rotateLogs(serverGlobalParams.logRenameOnRotate));
-                logProcessDetailsForLogRotate();
+                if (rotate == LogFileStatus::kNeedToRotateLogFile) {
+                    logProcessDetailsForLogRotate();
+                }
                 break;
             default:
                 // interrupt/terminate signal
@@ -203,14 +205,14 @@ void setupSignalHandlers() {
 #endif
 }
 
-void startSignalProcessingThread() {
+void startSignalProcessingThread(LogFileStatus rotate) {
 #ifdef _WIN32
     stdx::thread(eventProcessingThread).detach();
 #else
     // Mask signals in the current (only) thread. All new threads will inherit this mask.
     invariant(pthread_sigmask(SIG_SETMASK, &asyncSignals, 0) == 0);
     // Spawn a thread to capture the signals we just masked off.
-    stdx::thread(signalProcessingThread).detach();
+    stdx::thread(signalProcessingThread, rotate).detach();
 #endif
 }
 

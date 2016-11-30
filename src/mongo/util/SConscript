@@ -429,13 +429,10 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/log_process_details",
         "$BUILD_DIR/mongo/db/service_context",
         "$BUILD_DIR/mongo/db/server_options_core",
     ],
-    LIBDEPS_TAGS=[
-        # Depends on logProcessDetailsForLogRotate and exitCleanly
-        'incomplete',
-    ]
 )
 
 env.CppUnitTest(

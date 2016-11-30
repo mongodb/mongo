@@ -189,11 +189,6 @@ void killOps() {
         !shellGlobalParams.autoKillOp);
 }
 
-// Stubs for signal_handlers.cpp
-namespace mongo {
-void logProcessDetailsForLogRotate() {}
-}
-
 void quitNicely(int sig) {
     shutdown(EXIT_CLEAN);
 }
