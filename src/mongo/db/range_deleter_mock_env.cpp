@@ -28,10 +28,6 @@
 
 #include "mongo/db/range_deleter_mock_env.h"
 
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_noop.h"
-#include "mongo/stdx/memory.h"
-
 namespace mongo {
 
 using std::set;
@@ -52,9 +48,7 @@ bool DeletedRangeCmp::operator()(const DeletedRange& lhs, const DeletedRange& rh
 }
 
 RangeDeleterMockEnv::RangeDeleterMockEnv()
-    : _pauseDelete(false), _pausedCount(0), _getCursorsCallCount(0) {
-    setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
-}
+    : _pauseDelete(false), _pausedCount(0), _getCursorsCallCount(0) {}
 
 void RangeDeleterMockEnv::addCursorId(StringData ns, CursorId id) {
     stdx::lock_guard<stdx::mutex> sl(_cursorMapMutex);
