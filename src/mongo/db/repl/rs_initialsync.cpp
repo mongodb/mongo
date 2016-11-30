@@ -102,7 +102,8 @@ void truncateAndResetOplog(OperationContext* txn,
     // We must clear the sync source blacklist after calling stop()
     // because the bgsync thread, while running, may update the blacklist.
     replCoord->resetMyLastOpTimes();
-    bgsync->stop();
+    bgsync->stop(true);
+    bgsync->startProducerIfStopped();
     bgsync->clearBuffer(txn);
 
     replCoord->clearSyncSourceBlacklist();

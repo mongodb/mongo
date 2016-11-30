@@ -812,12 +812,18 @@ void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource
     }
 }
 
-void ReplicationCoordinatorExternalStateImpl::signalApplierToCancelFetcher() {
+void ReplicationCoordinatorExternalStateImpl::stopProducer() {
     LockGuard lk(_threadMutex);
-    if (!_bgSync) {
-        return;
+    if (_bgSync) {
+        _bgSync->stop(false);
     }
-    _bgSync->cancelFetcher();
+}
+
+void ReplicationCoordinatorExternalStateImpl::startProducerIfStopped() {
+    LockGuard lk(_threadMutex);
+    if (_bgSync) {
+        _bgSync->startProducerIfStopped();
+    }
 }
 
 void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationContext* txn) {
