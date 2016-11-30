@@ -34,6 +34,9 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+
+namespace {
+
 using std::string;
 using std::vector;
 
@@ -199,4 +202,6 @@ public:
     }
 };
 SuiteInstance<All> myall;
+
+}  // namespace
 }  // namespace mongo

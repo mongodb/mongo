@@ -1998,7 +1998,7 @@ class setswitchint : public Base {
              BSON("_id" << 1 << "x" << 1));
     }
 };
-};
+}  // namespace basic
 
 
 class All : public Suite {

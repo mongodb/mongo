@@ -465,4 +465,4 @@ public:
         add<stdtimed_mutexspeed>();
     }
 } myall;
-}
+}  // namespace PerfTests

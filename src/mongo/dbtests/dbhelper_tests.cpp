@@ -42,6 +42,8 @@
 
 namespace mongo {
 
+namespace {
+
 using std::unique_ptr;
 using std::set;
 
@@ -115,4 +117,5 @@ public:
     }
 } myall;
 
-}  // namespace RemoveTests
+}  // namespace
+}  // namespace mongo

@@ -583,4 +583,4 @@ public:
 };
 
 SuiteInstance<All> myall;
-}
+}  // namespace ThreadedTests

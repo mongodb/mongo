@@ -298,4 +298,4 @@ SuiteInstance<All> myall;
     } myall;
 
 #endif
-}
+}  // namespace MMapTests

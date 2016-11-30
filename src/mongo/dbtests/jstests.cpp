@@ -2513,4 +2513,4 @@ public:
 
 SuiteInstance<All> myall;
 
-}  // namespace JavaJSTests
+}  // namespace JSTests

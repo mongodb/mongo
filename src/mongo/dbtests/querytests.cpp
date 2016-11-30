@@ -1715,7 +1715,7 @@ public:
         ASSERT_BSONOBJ_EQ(BSON("x" << 1), QUERY("$query" << BSON("x" << 1)).getFilter());
     }
 };
-}
+}  // namespace queryobjecttests
 
 class OrderingTest {
 public:

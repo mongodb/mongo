@@ -124,4 +124,4 @@ public:
 };
 
 SuiteInstance<All> myall;
-}
+}  // namespace

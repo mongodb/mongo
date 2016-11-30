@@ -162,7 +162,7 @@ FieldCompareResult compareDottedFieldNames(const string& l, const string& r, con
     verify(0);
     return SAME;  // will never get here
 }
-}
+}  // namespace mongo
 
 namespace JsobjTests {
 
