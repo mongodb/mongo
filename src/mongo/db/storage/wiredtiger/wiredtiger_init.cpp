@@ -76,9 +76,11 @@ public:
             if (ret == 0 && fs_stats.f_type == EXT4_SUPER_MAGIC) {
                 log() << startupWarningsLog;
                 log() << "** WARNING: Using the XFS filesystem is strongly recommended with the "
-                         "WiredTiger storage engine";
-                log() << "See "
-                         "http://dochub.mongodb.org/core/prodnotes-filesystem";
+                         "WiredTiger storage engine"
+                      << startupWarningsLog;
+                log() << "**          See "
+                         "http://dochub.mongodb.org/core/prodnotes-filesystem"
+                      << startupWarningsLog;
             }
         }
 #endif
