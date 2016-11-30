@@ -52,6 +52,10 @@ class RecoveryUnit {
 public:
     virtual ~RecoveryUnit() {}
 
+    /**
+     * A storage engine may elect to append state information to the passed BSONObjBuilder.  This
+     * function is not currently called by any MongoDB command, but may in the future.
+     */
     virtual void reportState(BSONObjBuilder* b) const {}
 
     /**

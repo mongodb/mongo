@@ -146,7 +146,6 @@
             }
         },
         currentOp: {skip: isUnrelated},
-        currentOpCtx: {skip: isUnrelated},
         dataSize: {
             command: {dataSize: "test.view"},
             expectFailure: true,

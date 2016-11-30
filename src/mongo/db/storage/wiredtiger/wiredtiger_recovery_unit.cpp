@@ -65,15 +65,6 @@ WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
     _abort();
 }
 
-void WiredTigerRecoveryUnit::reportState(BSONObjBuilder* b) const {
-    b->append("wt_inUnitOfWork", _inUnitOfWork);
-    b->append("wt_active", _active);
-    b->append("wt_everStartedWrite", _everStartedWrite);
-    b->appendNumber("wt_mySnapshotId", static_cast<long long>(_mySnapshotId));
-    if (_active)
-        b->append("wt_millisSinceCommit", _timer.millis());
-}
-
 void WiredTigerRecoveryUnit::prepareForCreateSnapshot(OperationContext* opCtx) {
     invariant(!_active);  // Can't already be in a WT transaction.
     invariant(!_inUnitOfWork);
@@ -245,7 +236,6 @@ void WiredTigerRecoveryUnit::_txnOpen(OperationContext* opCtx) {
     }
 
     LOG(3) << "WT begin_transaction for snapshot id " << _mySnapshotId;
-    _timer.reset();
     _active = true;
 }
 

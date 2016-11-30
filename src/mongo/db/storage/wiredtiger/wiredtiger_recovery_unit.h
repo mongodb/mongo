@@ -42,7 +42,6 @@
 #include "mongo/db/storage/snapshot_name.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/util/concurrency/ticketholder.h"
-#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -53,8 +52,6 @@ public:
     WiredTigerRecoveryUnit(WiredTigerSessionCache* sc);
 
     virtual ~WiredTigerRecoveryUnit();
-
-    virtual void reportState(BSONObjBuilder* b) const;
 
     void beginUnitOfWork(OperationContext* opCtx) final;
     void commitUnitOfWork() final;
@@ -136,7 +133,6 @@ private:
     bool _active;
     uint64_t _mySnapshotId;
     bool _everStartedWrite;
-    Timer _timer;
     RecordId _oplogReadTill;
     bool _readFromMajorityCommittedSnapshot = false;
     SnapshotName _majorityCommittedSnapshot = SnapshotName::min();
