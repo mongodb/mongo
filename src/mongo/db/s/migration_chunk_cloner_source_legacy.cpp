@@ -140,7 +140,6 @@ public:
         switch (_op) {
             case 'd': {
                 stdx::lock_guard<stdx::mutex> sl(_cloner->_mutex);
-                invariant(_cloner->_state != MigrationChunkClonerSourceLegacy::kDone);
                 _cloner->_deleted.push_back(_idObj);
                 _cloner->_memoryUsed += _idObj.firstElement().size() + 5;
             } break;
@@ -148,7 +147,6 @@ public:
             case 'i':
             case 'u': {
                 stdx::lock_guard<stdx::mutex> sl(_cloner->_mutex);
-                invariant(_cloner->_state != MigrationChunkClonerSourceLegacy::kDone);
                 _cloner->_reload.push_back(_idObj);
                 _cloner->_memoryUsed += _idObj.firstElement().size() + 5;
             } break;
@@ -180,8 +178,6 @@ MigrationChunkClonerSourceLegacy::MigrationChunkClonerSourceLegacy(MoveChunkRequ
 MigrationChunkClonerSourceLegacy::~MigrationChunkClonerSourceLegacy() {
     invariant(_state == kDone);
     invariant(!_deleteNotifyExec);
-    invariant(_reload.empty());
-    invariant(_deleted.empty());
 }
 
 Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* txn) {
@@ -316,9 +312,6 @@ Status MigrationChunkClonerSourceLegacy::commitClone(OperationContext* txn) {
     auto responseStatus =
         _callRecipient(createRequestWithSessionId(kRecvChunkCommit, _args.getNss(), _sessionId));
     if (responseStatus.isOK()) {
-        invariant(_reload.empty());
-        invariant(_deleted.empty());
-
         _cleanup(txn);
         return Status::OK();
     }
