@@ -1934,6 +1934,50 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: jsCore_small_oplog_rs_initsync
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core_small_oplog_rs_initsync --storageEngine=mmapv1
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: jsCore_small_oplog_rs_initsync_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core_small_oplog_rs_initsync --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: jsCore_small_oplog_rs_resync
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core_small_oplog_rs_resync --storageEngine=mmapv1
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: jsCore_small_oplog_rs_resync_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core_small_oplog_rs_resync --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: jsCore_small_oplog_rs_initsync_static
   depends_on:
   - name: jsCore
@@ -4752,6 +4796,12 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
     distros:
     - windows-64-vs2015-large
+  - name: jsCore_small_oplog_rs_initsync
+    distros:
+    - windows-64-vs2015-large
+  - name: jsCore_small_oplog_rs_initsync_WT
+    distros:
+    - windows-64-vs2015-large
   - name: jsCore_small_oplog_rs_initsync_static
     distros:
     - windows-64-vs2015-large
@@ -5482,6 +5532,12 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
     distros:
     - rhel62-large
+  - name: jsCore_small_oplog_rs_initsync
+    distros:
+    - rhel62-large
+  - name: jsCore_small_oplog_rs_initsync_WT
+    distros:
+    - rhel62-large
   - name: jsCore_small_oplog_rs_initsync_static
     distros:
     - rhel62-large
@@ -5712,10 +5768,22 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
     distros:
     - rhel62-large
+  - name: jsCore_small_oplog_rs_initsync
+    distros:
+    - rhel62-large
+  - name: jsCore_small_oplog_rs_initsync_WT
+    distros:
+    - rhel62-large
   - name: jsCore_small_oplog_rs_initsync_static
     distros:
     - rhel62-large
   - name: jsCore_small_oplog_rs_initsync_static_WT
+    distros:
+    - rhel62-large
+  - name: jsCore_small_oplog_rs_resync_static
+    distros:
+    - rhel62-large
+  - name: jsCore_small_oplog_rs_resync_static_WT
     distros:
     - rhel62-large
   - name: mmap
@@ -8109,6 +8177,8 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  - name: jsCore_small_oplog_rs_initsync
+  - name: jsCore_small_oplog_rs_initsync_WT
   - name: jsCore_small_oplog_rs_initsync_static
   - name: jsCore_small_oplog_rs_initsync_static_WT
   - name: jsCore_small_oplog_rs_resync_static
@@ -8284,6 +8354,8 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  - name: jsCore_small_oplog_rs_initsync
+  - name: jsCore_small_oplog_rs_initsync_WT
   - name: jsCore_small_oplog_rs_initsync_static
   - name: jsCore_small_oplog_rs_initsync_static_WT
   - name: jsCore_small_oplog_rs_resync_static
@@ -8553,6 +8625,12 @@ buildvariants:
     distros:
     - rhel62-large
   - name: jsCore_small_oplog_rs_WT
+    distros:
+    - rhel62-large
+  - name: jsCore_small_oplog_rs_initsync
+    distros:
+    - rhel62-large
+  - name: jsCore_small_oplog_rs_initsync_WT
     distros:
     - rhel62-large
   - name: jsCore_small_oplog_rs_initsync_static
