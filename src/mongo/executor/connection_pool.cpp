@@ -112,7 +112,7 @@ private:
 
     void fulfillRequests(stdx::unique_lock<stdx::mutex>& lk);
 
-    void spawnConnections(stdx::unique_lock<stdx::mutex>& lk, const HostAndPort& hostAndPort);
+    void spawnConnections(stdx::unique_lock<stdx::mutex>& lk);
 
     void shutdown();
 
@@ -137,6 +137,7 @@ private:
     Date_t _requestTimerExpiration;
     size_t _generation;
     bool _inFulfillRequests;
+    bool _inSpawnConnections;
 
     size_t _created;
 
@@ -244,6 +245,7 @@ ConnectionPool::SpecificPool::SpecificPool(ConnectionPool* parent, const HostAnd
       _requestTimer(parent->_factory->makeTimer()),
       _generation(0),
       _inFulfillRequests(false),
+      _inSpawnConnections(false),
       _created(0),
       _state(State::kRunning) {}
 
@@ -268,18 +270,17 @@ void ConnectionPool::SpecificPool::getConnection(const HostAndPort& hostAndPort,
                                                  Milliseconds timeout,
                                                  stdx::unique_lock<stdx::mutex> lk,
                                                  GetConnectionCallback cb) {
-    // We need some logic here to handle kNoTimeout, which is defined as -1 Milliseconds. If we just
-    // added the timeout, we would get a time 1MS in the past, which would immediately timeout - the
-    // exact opposite of what we want.
-    auto expiration = (timeout == RemoteCommandRequest::kNoTimeout)
-        ? RemoteCommandRequest::kNoExpirationDate
-        : _parent->_factory->now() + timeout;
+    if (timeout < Milliseconds(0) || timeout > _parent->_options.refreshTimeout) {
+        timeout = _parent->_options.refreshTimeout;
+    }
+
+    const auto expiration = _parent->_factory->now() + timeout;
 
     _requests.push(make_pair(expiration, std::move(cb)));
 
     updateStateInLock();
 
-    spawnConnections(lk, hostAndPort);
+    spawnConnections(lk);
     fulfillRequests(lk);
 }
 
@@ -339,6 +340,14 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
                              // pool
                              if (status.isOK()) {
                                  addToReady(lk, std::move(conn));
+                                 return;
+                             }
+
+                             // If we've exceeded the time limit, start a new connect, rather than
+                             // failing all operations.  We do this because the various callers have
+                             // their own time limit which is unrelated to our internal one.
+                             if (status.code() == ErrorCodes::ExceededTimeLimit) {
+                                 spawnConnections(lk);
                                  return;
                              }
 
@@ -456,7 +465,7 @@ void ConnectionPool::SpecificPool::fulfillRequests(stdx::unique_lock<stdx::mutex
             if (_readyPool.empty()) {
                 log() << "after drop, pool was empty, going to spawn some connections";
                 // Spawn some more connections to the bad host if we're all out.
-                spawnConnections(lk, conn->getHostAndPort());
+                spawnConnections(lk);
             }
 
             // Drop the bad connection.
@@ -486,8 +495,15 @@ void ConnectionPool::SpecificPool::fulfillRequests(stdx::unique_lock<stdx::mutex
 
 // spawn enough connections to satisfy open requests and minpool, while
 // honoring maxpool
-void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mutex>& lk,
-                                                    const HostAndPort& hostAndPort) {
+void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mutex>& lk) {
+    // If some other thread (possibly this thread) is spawning connections,
+    // don't keep padding the callstack.
+    if (_inSpawnConnections)
+        return;
+
+    _inSpawnConnections = true;
+    auto guard = MakeGuard([&] { _inSpawnConnections = false; });
+
     // We want minConnections <= outstanding requests <= maxConnections
     auto target = [&] {
         return std::max(
@@ -500,7 +516,7 @@ void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mute
         std::unique_ptr<ConnectionPool::ConnectionInterface> handle;
         try {
             // make a new connection and put it in processing
-            handle = _parent->_factory->makeConnection(hostAndPort, _generation);
+            handle = _parent->_factory->makeConnection(_hostAndPort, _generation);
         } catch (std::system_error& e) {
             severe() << "Failed to construct a new connection object: " << e.what();
             fassertFailed(40336);
@@ -526,6 +542,11 @@ void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mute
                                // connection lapse
                            } else if (status.isOK()) {
                                addToReady(lk, std::move(conn));
+                           } else if (status.code() == ErrorCodes::ExceededTimeLimit) {
+                               // If we've exceeded the time limit, restart the connect, rather than
+                               // failing all operations.  We do this because the various callers
+                               // have their own time limit which is unrelated to our internal one.
+                               spawnConnections(lk);
                            } else {
                                // If the setup failed, cascade the failure edge
                                processFailure(status, std::move(lk));
