@@ -269,6 +269,20 @@ DBClientBase* DBConnectionPool::get(const string& host, double socketTimeout) {
     return _finishCreate(host, socketTimeout, c);
 }
 
+DBClientBase* DBConnectionPool::get(const MongoURI& uri, double socketTimeout) {
+    std::unique_ptr<DBClientBase> c(_get(uri.toString(), socketTimeout));
+    if (c) {
+        onHandedOut(c.get());
+        return c.release();
+    }
+
+    string errmsg;
+    c = std::unique_ptr<DBClientBase>(uri.connect(StringData(), errmsg, socketTimeout));
+    uassert(40356, _name + ": connect failed " + uri.toString() + " : " + errmsg, c);
+
+    return _finishCreate(uri.toString(), socketTimeout, c.release());
+}
+
 int DBConnectionPool::getNumAvailableConns(const string& host, double socketTimeout) const {
     stdx::lock_guard<stdx::mutex> L(_mutex);
     auto it = _pools.find(PoolKey(host, socketTimeout));
@@ -474,6 +488,13 @@ ScopedDbConnection::ScopedDbConnection(const std::string& host, double socketTim
 ScopedDbConnection::ScopedDbConnection(const ConnectionString& host, double socketTimeout)
     : _host(host.toString()),
       _conn(globalConnPool.get(host, socketTimeout)),
+      _socketTimeout(socketTimeout) {
+    _setSocketTimeout();
+}
+
+ScopedDbConnection::ScopedDbConnection(const MongoURI& uri, double socketTimeout)
+    : _host(uri.toString()),
+      _conn(globalConnPool.get(uri, socketTimeout)),
       _socketTimeout(socketTimeout) {
     _setSocketTimeout();
 }

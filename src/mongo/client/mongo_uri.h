@@ -72,7 +72,9 @@ public:
 
     static StatusWith<MongoURI> parse(const std::string& url);
 
-    DBClientBase* connect(StringData applicationName, std::string& errmsg) const;
+    DBClientBase* connect(StringData applicationName,
+                          std::string& errmsg,
+                          boost::optional<double> socketTimeoutSecs = boost::none) const;
 
     const std::string& getUser() const {
         return _user;
@@ -104,6 +106,14 @@ public:
 
     const std::vector<HostAndPort>& getServers() const {
         return _connectString.getServers();
+    }
+
+    // If you are trying to clone a URI (including its options/auth information) for a single
+    // server (say a member of a replica-set), you can pass in its HostAndPort information to
+    // get a new URI with the same info, except type() will be MASTER and getServers() will
+    // be the single host you pass in.
+    MongoURI cloneURIForServer(const HostAndPort& hostAndPort) const {
+        return MongoURI(ConnectionString(hostAndPort), _user, _password, _database, _options);
     }
 
     ConnectionString::ConnectionType type() const {

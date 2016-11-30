@@ -35,6 +35,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
+#include "mongo/client/mongo_uri.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/functional.h"
@@ -67,6 +68,8 @@ public:
      * seeds must not be empty.
      */
     ReplicaSetMonitor(StringData name, const std::set<HostAndPort>& seeds);
+
+    ReplicaSetMonitor(const MongoURI& uri);
 
     /**
      * Schedules the initial refresh task into task executor.
@@ -174,6 +177,8 @@ public:
      */
     static std::shared_ptr<ReplicaSetMonitor> createIfNeeded(const std::string& name,
                                                              const std::set<HostAndPort>& servers);
+
+    static std::shared_ptr<ReplicaSetMonitor> createIfNeeded(const MongoURI& uri);
 
     /**
      * gets a cached Monitor per name. If the monitor is not found and createFromSeed is false,

@@ -77,6 +77,24 @@ TEST(ReplicaSetMonitor, InitialState) {
     }
 }
 
+TEST(ReplicaSetMonitor, InitialStateMongoURI) {
+    auto uri = MongoURI::parse("mongodb://a,b,c/?replicaSet=name");
+    ASSERT_OK(uri.getStatus());
+    SetStatePtr state = std::make_shared<SetState>(uri.getValue());
+    ASSERT_EQUALS(state->name, "name");
+    ASSERT(state->seedNodes == basicSeedsSet);
+    ASSERT(state->lastSeenMaster.empty());
+    ASSERT_EQUALS(state->nodes.size(), basicSeeds.size());
+    for (size_t i = 0; i < basicSeeds.size(); i++) {
+        Node* node = state->findNode(basicSeeds[i]);
+        ASSERT(node);
+        ASSERT_EQUALS(node->host.toString(), basicSeeds[i].toString());
+        ASSERT(!node->isUp);
+        ASSERT(!node->isMaster);
+        ASSERT(node->tags.isEmpty());
+    }
+}
+
 TEST(ReplicaSetMonitor, IsMasterBadParse) {
     BSONObj ismaster = BSON("hosts" << BSON_ARRAY("mongo.example:badport"));
     IsMasterReply imr(HostAndPort("mongo.example:27017"), -1, ismaster);

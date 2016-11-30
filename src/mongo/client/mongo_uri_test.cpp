@@ -335,4 +335,26 @@ TEST(MongoURI, ValidButBadURIsFailToConnect) {
     ASSERT_EQ(dbclient, static_cast<decltype(dbclient)>(nullptr));
 }
 
+TEST(MongoURI, CloneURIForServer) {
+    auto sw_uri = MongoURI::parse(
+        "mongodb://localhost:27017,localhost:27018,localhost:27019/admin?replicaSet=rs1&ssl=true");
+    ASSERT_OK(sw_uri.getStatus());
+
+    auto uri = sw_uri.getValue();
+    ASSERT_EQ(uri.type(), kSet);
+    ASSERT_EQ(uri.getSetName(), "rs1");
+    ASSERT_EQ(uri.getServers().size(), static_cast<std::size_t>(3));
+
+    auto& uriOptions = uri.getOptions();
+    ASSERT_EQ(uriOptions.at("ssl"), "true");
+
+    auto clonedURI = uri.cloneURIForServer(mongo::HostAndPort{"localhost:27020"});
+
+    ASSERT_EQ(clonedURI.type(), kMaster);
+    ASSERT_TRUE(clonedURI.getSetName().empty());
+    ASSERT_EQ(clonedURI.getServers().size(), static_cast<std::size_t>(1));
+    auto& clonedURIOptions = clonedURI.getOptions();
+    ASSERT_EQ(clonedURIOptions.at("ssl"), "true");
+}
+
 }  // namespace
