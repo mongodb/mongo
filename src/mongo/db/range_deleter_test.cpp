@@ -30,15 +30,14 @@
 
 #include <string>
 
-#include "mongo/db/field_parser.h"
 #include "mongo/db/range_deleter.h"
 #include "mongo/db/range_deleter_mock_env.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/write_concern_options.h"
+#include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/future.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
@@ -48,8 +47,6 @@ namespace {
 
 using std::string;
 
-OperationContext* const noTxn = NULL;  // MockEnv doesn't need txn XXX SERVER-13931
-
 // The range deleter cursor close wait interval increases exponentially from 5 milliseconds to an
 // upper bound of 500 msec. Three seconds should be enough time for changes in the cursors set to be
 // noticed.
@@ -57,8 +54,27 @@ const Seconds MAX_IMMEDIATE_DELETE_WAIT(3);
 
 const mongo::repl::ReplSettings replSettings = {};
 
+class RangeDeleterTestFixture : public unittest::Test {
+public:
+    RangeDeleterTestFixture()
+        : _client(_serviceContext.makeClient("TestClient")),
+          _opCtx(_client->makeOperationContext()) {}
+
+protected:
+    OperationContext* opCtx() const {
+        return _opCtx.get();
+    }
+
+private:
+    ServiceContextNoop _serviceContext;
+    ServiceContext::UniqueClient _client;
+    ServiceContext::UniqueOperationContext _opCtx;
+};
+
+using QueuedDelete = RangeDeleterTestFixture;
+
 // Should not be able to queue deletes if deleter workers were not started.
-TEST(QueueDelete, CantAfterStop) {
+TEST_F(QueuedDelete, CantAfterStop) {
     RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
     RangeDeleter deleter(env);
 
@@ -72,7 +88,7 @@ TEST(QueueDelete, CantAfterStop) {
 
     string errMsg;
     ASSERT_FALSE(
-        deleter.queueDelete(noTxn,
+        deleter.queueDelete(opCtx(),
                             RangeDeleterOptions(KeyRange(
                                 "test.user", BSON("x" << 120), BSON("x" << 200), BSON("x" << 1))),
                             NULL /* notifier not needed */,
@@ -83,7 +99,7 @@ TEST(QueueDelete, CantAfterStop) {
 
 // Should not start delete if the set of cursors that were open when the
 // delete was queued is still open.
-TEST(QueuedDelete, ShouldWaitCursor) {
+TEST_F(QueuedDelete, ShouldWaitCursor) {
     const string ns("test.user");
 
     RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
@@ -104,7 +120,7 @@ TEST(QueuedDelete, ShouldWaitCursor) {
     deleterOptions.waitForOpenCursors = true;
 
     ASSERT_TRUE(
-        deleter.queueDelete(noTxn, deleterOptions, &doneSignal, NULL /* errMsg not needed */));
+        deleter.queueDelete(opCtx(), deleterOptions, &doneSignal, NULL /* errMsg not needed */));
 
     env->waitForNthGetCursor(1u);
 
@@ -115,7 +131,7 @@ TEST(QueuedDelete, ShouldWaitCursor) {
     env->addCursorId(ns, 200);
     env->removeCursorId(ns, 345);
 
-    doneSignal.get(noTxn);
+    doneSignal.get(opCtx());
 
     ASSERT_TRUE(env->deleteOccured());
     const DeletedRange deletedChunk(env->getLastDelete());
@@ -128,7 +144,7 @@ TEST(QueuedDelete, ShouldWaitCursor) {
 }
 
 // Should terminate when stop is requested.
-TEST(QueuedDelete, StopWhileWaitingCursor) {
+TEST_F(QueuedDelete, StopWhileWaitingCursor) {
     const string ns("test.user");
 
     RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
@@ -148,7 +164,7 @@ TEST(QueuedDelete, StopWhileWaitingCursor) {
         KeyRange(ns, BSON("x" << 0), BSON("x" << 10), BSON("x" << 1)));
     deleterOptions.waitForOpenCursors = true;
     ASSERT_TRUE(
-        deleter.queueDelete(noTxn, deleterOptions, &doneSignal, NULL /* errMsg not needed */));
+        deleter.queueDelete(opCtx(), deleterOptions, &doneSignal, NULL /* errMsg not needed */));
 
 
     env->waitForNthGetCursor(1u);
@@ -157,9 +173,11 @@ TEST(QueuedDelete, StopWhileWaitingCursor) {
     ASSERT_FALSE(env->deleteOccured());
 }
 
-// Should not start delete if the set of cursors that were open when the
-// deleteNow method is called is still open.
-TEST(ImmediateDelete, ShouldWaitCursor) {
+using ImmediateDelete = RangeDeleterTestFixture;
+
+// Should not start delete if the set of cursors that were open when the deleteNow method is called
+// is still open.
+TEST_F(ImmediateDelete, ShouldWaitCursor) {
     const string ns("test.user");
 
     RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
@@ -180,7 +198,7 @@ TEST(ImmediateDelete, ShouldWaitCursor) {
     deleterOption.waitForOpenCursors = true;
 
     stdx::packaged_task<bool()> deleterTask(
-        [&] { return deleter.deleteNow(noTxn, deleterOption, &errMsg); });
+        [&] { return deleter.deleteNow(opCtx(), deleterOption, &errMsg); });
     stdx::future<bool> deleterFuture = deleterTask.get_future();
     stdx::thread deleterThread(std::move(deleterTask));
 
@@ -215,7 +233,7 @@ TEST(ImmediateDelete, ShouldWaitCursor) {
 }
 
 // Should terminate when stop is requested.
-TEST(ImmediateDelete, StopWhileWaitingCursor) {
+TEST_F(ImmediateDelete, StopWhileWaitingCursor) {
     const string ns("test.user");
 
     RangeDeleterMockEnv* env = new RangeDeleterMockEnv();
@@ -236,7 +254,7 @@ TEST(ImmediateDelete, StopWhileWaitingCursor) {
     deleterOption.waitForOpenCursors = true;
 
     stdx::packaged_task<bool()> deleterTask(
-        [&] { return deleter.deleteNow(noTxn, deleterOption, &errMsg); });
+        [&] { return deleter.deleteNow(opCtx(), deleterOption, &errMsg); });
     stdx::future<bool> deleterFuture = deleterTask.get_future();
     stdx::thread deleterThread(std::move(deleterTask));
 
@@ -259,12 +277,13 @@ TEST(ImmediateDelete, StopWhileWaitingCursor) {
     ASSERT_FALSE(env->deleteOccured());
 }
 
-// Tests the interaction of multiple deletes queued with different states.
-// Starts by adding a new delete task, waits for the worker to work on it,
-// and then adds 2 more task, one of which is ready to be deleted, while the
-// other one is waiting for an open cursor. The test then makes sure that the
-// deletes are performed in the right order.
-TEST(MixedDeletes, MultipleDeletes) {
+using MixedDeletes = RangeDeleterTestFixture;
+
+// Tests the interaction of multiple deletes queued with different states. Starts by adding a new
+// delete task, waits for the worker to work on it, and then adds 2 more task, one of which is ready
+// to be deleted, while the other one is waiting for an open cursor. The test then makes sure that
+// the deletes are performed in the right order.
+TEST_F(MixedDeletes, MultipleDeletes) {
     const string blockedNS("foo.bar");
     const string ns("test.user");
 
@@ -286,7 +305,7 @@ TEST(MixedDeletes, MultipleDeletes) {
         KeyRange(ns, BSON("x" << 10), BSON("x" << 20), BSON("x" << 1)));
     deleterOption1.waitForOpenCursors = true;
     ASSERT_TRUE(
-        deleter.queueDelete(noTxn, deleterOption1, &doneSignal1, NULL /* don't care errMsg */));
+        deleter.queueDelete(opCtx(), deleterOption1, &doneSignal1, NULL /* don't care errMsg */));
 
     env->waitForNthPausedDelete(1u);
 
@@ -298,14 +317,14 @@ TEST(MixedDeletes, MultipleDeletes) {
         KeyRange(blockedNS, BSON("x" << 20), BSON("x" << 30), BSON("x" << 1)));
     deleterOption2.waitForOpenCursors = true;
     ASSERT_TRUE(
-        deleter.queueDelete(noTxn, deleterOption2, &doneSignal2, NULL /* don't care errMsg */));
+        deleter.queueDelete(opCtx(), deleterOption2, &doneSignal2, NULL /* don't care errMsg */));
 
     Notification<void> doneSignal3;
     RangeDeleterOptions deleterOption3(
         KeyRange(ns, BSON("x" << 30), BSON("x" << 40), BSON("x" << 1)));
     deleterOption3.waitForOpenCursors = true;
     ASSERT_TRUE(
-        deleter.queueDelete(noTxn, deleterOption3, &doneSignal3, NULL /* don't care errMsg */));
+        deleter.queueDelete(opCtx(), deleterOption3, &doneSignal3, NULL /* don't care errMsg */));
 
     // Now, the setup is:
     // { x: 10 } => { x: 20 } in progress.
@@ -319,7 +338,7 @@ TEST(MixedDeletes, MultipleDeletes) {
 
     // Let the first delete proceed.
     env->resumeOneDelete();
-    doneSignal1.get(noTxn);
+    doneSignal1.get(opCtx());
 
     ASSERT_TRUE(env->deleteOccured());
 
@@ -334,7 +353,7 @@ TEST(MixedDeletes, MultipleDeletes) {
 
     // Let the second delete proceed.
     env->resumeOneDelete();
-    doneSignal3.get(noTxn);
+    doneSignal3.get(opCtx());
 
     DeletedRange deleted2(env->getLastDelete());
 
@@ -349,7 +368,7 @@ TEST(MixedDeletes, MultipleDeletes) {
     env->removeCursorId(blockedNS, 345);
     // Let the last delete proceed.
     env->resumeOneDelete();
-    doneSignal2.get(noTxn);
+    doneSignal2.get(opCtx());
 
     DeletedRange deleted3(env->getLastDelete());
 
