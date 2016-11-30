@@ -2379,8 +2379,9 @@ def doConfigure(myenv):
         # Explicitly use the new gnu hash section if the linker offers it.
         AddToLINKFLAGSIfSupported(myenv, '-Wl,--hash-style=gnu')
 
-        # Try to have the linker tell us about ODR violations
-        AddToLINKFLAGSIfSupported(myenv, '-Wl,--detect-odr-violations')
+        # Try to have the linker tell us about ODR violations. Don't use this on UBSAN (see SERVER-27229) for now.
+        if not has_option('sanitize') or not 'undefined' in get_option('sanitize'):
+            AddToLINKFLAGSIfSupported(myenv, '-Wl,--detect-odr-violations')
 
         # Disallow an executable stack. Also, issue a warning if any files are found that would
         # cause the stack to become executable if the noexecstack flag was not in play, so that we
