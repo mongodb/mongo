@@ -333,11 +333,13 @@ static ExitCode runMongosServer() {
     return waitForShutdown();
 }
 
+namespace {
 MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {
     mongo::forkServerOrDie();
     return Status::OK();
 }
+}  // namespace
 
 // We set the featureCompatibilityVersion to 3.4 in the mongos so that BSON validation always uses
 // BSONVersion::kLatest.

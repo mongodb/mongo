@@ -96,7 +96,6 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
-#include "mongo/db/service_context_d.h"
 #include "mongo/db/service_entry_point_mongod.h"
 #include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/db/stats/counters.h"
@@ -778,11 +777,13 @@ int main(int argc, char* argv[], char** envp) {
 }
 #endif
 
+namespace {
 MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
 (InitializerContext* context) {
     mongo::forkServerOrDie();
     return Status::OK();
 }
+}  // namespace
 
 /*
  * This function should contain the startup "actions" that we take based on the startup config.  It
