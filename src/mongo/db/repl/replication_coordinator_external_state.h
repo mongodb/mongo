@@ -255,9 +255,14 @@ public:
     virtual void signalApplierToChooseNewSyncSource() = 0;
 
     /**
-     * Notifies the bgsync to cancel the current oplog fetcher.
+     * Notifies the bgsync to stop fetching data.
      */
-    virtual void signalApplierToCancelFetcher() = 0;
+    virtual void stopProducer() = 0;
+
+    /**
+     * Start bgsync's producer if it's stopped.
+     */
+    virtual void startProducerIfStopped() = 0;
 
     /**
      * Drops all snapshots and clears the "committed" snapshot.

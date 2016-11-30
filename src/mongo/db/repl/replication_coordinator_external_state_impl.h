@@ -94,7 +94,8 @@ public:
     virtual void killAllUserOperations(OperationContext* txn);
     virtual void shardingOnStepDownHook();
     virtual void signalApplierToChooseNewSyncSource();
-    virtual void signalApplierToCancelFetcher();
+    virtual void stopProducer();
+    virtual void startProducerIfStopped();
     void dropAllSnapshots() final;
     void updateCommittedSnapshot(SnapshotName newCommitPoint) final;
     void createSnapshot(OperationContext* txn, SnapshotName name) final;

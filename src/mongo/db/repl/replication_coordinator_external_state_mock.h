@@ -87,7 +87,8 @@ public:
     virtual void killAllUserOperations(OperationContext* txn);
     virtual void shardingOnStepDownHook();
     virtual void signalApplierToChooseNewSyncSource();
-    virtual void signalApplierToCancelFetcher();
+    virtual void stopProducer();
+    virtual void startProducerIfStopped();
     virtual void dropAllSnapshots();
     virtual void updateCommittedSnapshot(SnapshotName newCommitPoint);
     virtual void createSnapshot(OperationContext* txn, SnapshotName name);
@@ -161,11 +162,6 @@ public:
     void setStoreLocalLastVoteDocumentToHang(bool hang);
 
     /**
-     * Returns true if applier was signaled to cancel fetcher.
-     */
-    bool isApplierSignaledToCancelFetcher() const;
-
-    /**
      * Returns true if startThreads() has been called.
      */
     bool threadsStarted() const;
@@ -211,7 +207,6 @@ private:
     stdx::condition_variable _shouldHangLastVoteCondVar;
     bool _storeLocalConfigDocumentShouldHang;
     bool _storeLocalLastVoteDocumentShouldHang;
-    bool _isApplierSignaledToCancelFetcher;
     bool _connectionsClosed;
     HostAndPort _clientHostAndPort;
     bool _threadsStarted;

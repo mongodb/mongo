@@ -85,6 +85,7 @@ void RSDataSync::_run() {
 
         const MemberState memberState = _replCoord->getMemberState();
 
+        // TODO(siyuan) Control the behavior using applier state.
         // An arbiter can never transition to any other state, and doesn't replicate, ever
         if (memberState.arbiter()) {
             break;
@@ -97,8 +98,7 @@ void RSDataSync::_run() {
         }
 
         try {
-            if (memberState.primary() && !_replCoord->isWaitingForApplierToDrain() &&
-                !_replCoord->isCatchingUp()) {
+            if (_replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Stopped) {
                 sleepsecs(1);
                 continue;
             }

@@ -134,9 +134,7 @@ BackgroundSync::BackgroundSync(
     std::unique_ptr<OplogBuffer> oplogBuffer)
     : _oplogBuffer(std::move(oplogBuffer)),
       _replCoord(getGlobalReplicationCoordinator()),
-      _replicationCoordinatorExternalState(replicationCoordinatorExternalState),
-      _lastOpTimeFetched(Timestamp(std::numeric_limits<int>::max(), 0),
-                         std::numeric_limits<long long>::max()) {
+      _replicationCoordinatorExternalState(replicationCoordinatorExternalState) {
     // Update "repl.buffer.maxSizeBytes" server status metric to reflect the current oplog buffer's
     // max size.
     bufferMaxSizeGauge.increment(_oplogBuffer->getMaxSize() - bufferMaxSizeGauge.get());
@@ -156,7 +154,7 @@ void BackgroundSync::shutdown(OperationContext* txn) {
     // ensures that it won't add anything. It will also unblock the OpApplier pipeline if it is
     // waiting for an operation to be past the slaveDelay point.
     clearBuffer(txn);
-    _stopped = true;
+    _state = ProducerState::Stopped;
 
     if (_syncSourceResolver) {
         _syncSourceResolver->shutdown();
@@ -201,48 +199,24 @@ void BackgroundSync::_run() {
             fassertFailed(28546);
         }
     }
-    stop();
-}
-
-void BackgroundSync::_signalNoNewDataForApplier(OperationContext* txn) {
-    // Signal to consumers that we have entered the stopped state
-    // if the signal isn't already in the queue.
-    const boost::optional<BSONObj> lastObjectPushed = _oplogBuffer->lastObjectPushed(txn);
-    if (!lastObjectPushed || !lastObjectPushed->isEmpty()) {
-        const BSONObj sentinelDoc;
-        _oplogBuffer->pushEvenIfFull(txn, sentinelDoc);
-        bufferCountGauge.increment();
-        bufferSizeGauge.increment(sentinelDoc.objsize());
-    }
+    stop(true);
 }
 
 void BackgroundSync::_runProducer() {
-    const MemberState state = _replCoord->getMemberState();
-    // Stop when the state changes to primary.
-    //
-    // TODO(siyuan) Drain mode should imply we're the primary. Fix this condition and the one below
-    // after fixing step-down during drain mode.
-    if (!_replCoord->isCatchingUp() &&
-        (_replCoord->isWaitingForApplierToDrain() || state.primary())) {
-        if (!isStopped()) {
-            stop();
-        }
-        if (_replCoord->isWaitingForApplierToDrain()) {
-            auto txn = cc().makeOperationContext();
-            _signalNoNewDataForApplier(txn.get());
-        }
+    if (getState() == ProducerState::Stopped) {
         sleepsecs(1);
         return;
     }
 
     // TODO(spencer): Use a condition variable to await loading a config.
-    if (state.startup()) {
+    // TODO(siyuan): Control bgsync with producer state.
+    if (_replCoord->getMemberState().startup()) {
         // Wait for a config to be loaded
         sleepsecs(1);
         return;
     }
 
-    invariant(!state.rollback());
+    invariant(!_replCoord->getMemberState().rollback());
 
     // We need to wait until initial sync has started.
     if (_replCoord->getMyLastAppliedOpTime().isNull()) {
@@ -252,7 +226,7 @@ void BackgroundSync::_runProducer() {
     // we want to start when we're no longer primary
     // start() also loads _lastOpTimeFetched, which we know is set from the "if"
     auto txn = cc().makeOperationContext();
-    if (isStopped()) {
+    if (getState() == ProducerState::Starting) {
         start(txn.get());
     }
 
@@ -287,12 +261,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
             return;
         }
 
-        if (!_replCoord->isCatchingUp() &&
-            (_replCoord->isWaitingForApplierToDrain() || _replCoord->getMemberState().primary())) {
-            return;
-        }
-
-        if (_inShutdown_inlock()) {
+        if (_state != ProducerState::Running) {
             return;
         }
     }
@@ -334,7 +303,8 @@ void BackgroundSync::_produce(OperationContext* txn) {
 
     if (syncSourceResp.syncSourceStatus == ErrorCodes::OplogStartMissing) {
         // All (accessible) sync sources were too stale.
-        if (_replCoord->isCatchingUp()) {
+        // TODO: End catchup mode early if we are too stale.
+        if (_replCoord->getMemberState().primary()) {
             warning() << "Too stale to catch up.";
             log() << "Our newest OpTime : " << lastOpTimeFetched;
             log() << "Earliest OpTime available is " << syncSourceResp.earliestOpTimeSeen
@@ -374,14 +344,15 @@ void BackgroundSync::_produce(OperationContext* txn) {
     long long lastHashFetched;
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
-        if (_stopped) {
+        if (_state != ProducerState::Running) {
             return;
         }
         lastOpTimeFetched = _lastOpTimeFetched;
         lastHashFetched = _lastFetchedHash;
-        if (!_replCoord->isCatchingUp()) {
-            _replCoord->signalUpstreamUpdater();
-        }
+    }
+
+    if (!_replCoord->getMemberState().primary()) {
+        _replCoord->signalUpstreamUpdater();
     }
 
     // Set the applied point if unset. This is most likely the first time we've established a sync
@@ -441,7 +412,10 @@ void BackgroundSync::_produce(OperationContext* txn) {
 
     // If the background sync is stopped after the fetcher is started, we need to
     // re-evaluate our sync source and oplog common point.
-    if (isStopped()) {
+    if (getState() != ProducerState::Running) {
+        log() << "Replication producer stopped after oplog fetcher finished returning a batch from "
+                 "our sync source.  Abandoning this batch of oplog entries and re-evaluating our "
+                 "sync source.";
         return;
     }
 
@@ -455,7 +429,8 @@ void BackgroundSync::_produce(OperationContext* txn) {
         return;
     } else if (fetcherReturnStatus.code() == ErrorCodes::OplogStartMissing ||
                fetcherReturnStatus.code() == ErrorCodes::RemoteOplogStale) {
-        if (_replCoord->isCatchingUp()) {
+        if (_replCoord->getMemberState().primary()) {
+            // TODO: Abort catchup mode early if rollback detected.
             warning() << "Rollback situation detected in catch-up mode; catch-up mode will end.";
             sleepsecs(1);
             return;
@@ -481,6 +456,9 @@ void BackgroundSync::_produce(OperationContext* txn) {
 
         log() << "Starting rollback due to " << redact(fetcherReturnStatus);
 
+        // TODO: change this to call into the Applier directly to block until the applier is
+        // drained.
+        //
         // Wait till all buffered oplog entries have drained and been applied.
         auto lastApplied = _replCoord->getMyLastAppliedOpTime();
         if (lastApplied != lastOpTimeFetched) {
@@ -488,14 +466,16 @@ void BackgroundSync::_produce(OperationContext* txn) {
                   << lastOpTimeFetched << " to be applied before starting rollback.";
             while (lastOpTimeFetched > (lastApplied = _replCoord->getMyLastAppliedOpTime())) {
                 sleepmillis(10);
-                if (isStopped() || inShutdown()) {
+                if (getState() != ProducerState::Running) {
                     return;
                 }
             }
         }
 
         _rollback(txn, source, syncSourceResp.rbid, getConnection);
-        stop();
+        // Reset the producer to clear the sync source and the last optime fetched.
+        stop(true);
+        startProducerIfStopped();
     } else if (fetcherReturnStatus == ErrorCodes::InvalidBSON) {
         Seconds blacklistDuration(60);
         warning() << "Fetcher got invalid BSON while querying oplog. Blacklisting sync source "
@@ -571,7 +551,7 @@ Status BackgroundSync::_enqueueDocuments(Fetcher::Documents::const_iterator begi
         // buffer between the time we check _inShutdown and the point where we finish writing to the
         // buffer.
         stdx::unique_lock<stdx::mutex> lock(_mutex);
-        if (_inShutdown) {
+        if (_state != ProducerState::Running) {
             return Status::OK();
         }
 
@@ -734,20 +714,20 @@ void BackgroundSync::clearSyncTarget() {
     _syncSourceHost = HostAndPort();
 }
 
-void BackgroundSync::cancelFetcher() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    if (_oplogFetcher) {
-        _oplogFetcher->shutdown();
-    }
-}
-
-void BackgroundSync::stop() {
+void BackgroundSync::stop(bool resetLastFetchedOptime) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
-    _stopped = true;
+    _state = ProducerState::Stopped;
     _syncSourceHost = HostAndPort();
-    _lastOpTimeFetched = OpTime();
-    _lastFetchedHash = 0;
+    if (resetLastFetchedOptime) {
+        invariant(_oplogBuffer->isEmpty());
+        _lastOpTimeFetched = OpTime();
+        _lastFetchedHash = 0;
+    }
+
+    if (_syncSourceResolver) {
+        _syncSourceResolver->shutdown();
+    }
 
     if (_oplogFetcher) {
         _oplogFetcher->shutdown();
@@ -755,22 +735,31 @@ void BackgroundSync::stop() {
 }
 
 void BackgroundSync::start(OperationContext* txn) {
-    massert(16235, "going to start syncing, but buffer is not empty", _oplogBuffer->isEmpty());
+    OpTimeWithHash lastAppliedOpTimeWithHash;
+    do {
+        lastAppliedOpTimeWithHash = _readLastAppliedOpTimeWithHash(txn);
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        // Double check the state after acquiring the mutex.
+        if (_state != ProducerState::Starting) {
+            return;
+        }
+        // If a node steps down during drain mode, then the buffer may not be empty at the beginning
+        // of secondary state.
+        if (!_oplogBuffer->isEmpty()) {
+            log() << "going to start syncing, but buffer is not empty";
+        }
+        _state = ProducerState::Running;
 
-    long long lastFetchedHash = _readLastAppliedHash(txn);
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _stopped = false;
-
-    // reset _last fields with current oplog data
-    _lastOpTimeFetched = _replCoord->getMyLastAppliedOpTime();
-    _lastFetchedHash = lastFetchedHash;
+        // When a node steps down during drain mode, the last fetched optime would be newer than
+        // the last applied.
+        if (_lastOpTimeFetched <= lastAppliedOpTimeWithHash.opTime) {
+            _lastOpTimeFetched = lastAppliedOpTimeWithHash.opTime;
+            _lastFetchedHash = lastAppliedOpTimeWithHash.value;
+        }
+        // Reload the last applied optime from disk if it has been changed.
+    } while (lastAppliedOpTimeWithHash.opTime != _replCoord->getMyLastAppliedOpTime());
 
     LOG(1) << "bgsync fetch queue set to: " << _lastOpTimeFetched << " " << _lastFetchedHash;
-}
-
-bool BackgroundSync::isStopped() const {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _stopped;
 }
 
 void BackgroundSync::clearBuffer(OperationContext* txn) {
@@ -781,7 +770,7 @@ void BackgroundSync::clearBuffer(OperationContext* txn) {
     bufferSizeGauge.decrement(size);
 }
 
-long long BackgroundSync::_readLastAppliedHash(OperationContext* txn) {
+OpTimeWithHash BackgroundSync::_readLastAppliedOpTimeWithHash(OperationContext* txn) {
     BSONObj oplogEntry;
     try {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
@@ -791,7 +780,7 @@ long long BackgroundSync::_readLastAppliedHash(OperationContext* txn) {
             if (!success) {
                 // This can happen when we are to do an initial sync.  lastHash will be set
                 // after the initial sync is complete.
-                return 0;
+                return OpTimeWithHash(0);
             }
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "readLastAppliedHash", rsOplogName);
@@ -807,29 +796,13 @@ long long BackgroundSync::_readLastAppliedHash(OperationContext* txn) {
                  << redact(status);
         fassertFailed(18902);
     }
-    return hash;
+    OplogEntry parsedEntry(oplogEntry);
+    return OpTimeWithHash(hash, parsedEntry.getOpTime());
 }
 
 bool BackgroundSync::shouldStopFetching() const {
-    if (inShutdown()) {
-        LOG(2) << "Stopping oplog fetcher due to shutdown.";
-        return true;
-    }
-
-    // If we are transitioning to primary state, we need to stop fetching in order to go into
-    // bgsync-stop mode.
-    if (_replCoord->isWaitingForApplierToDrain()) {
-        LOG(2) << "Stopping oplog fetcher because we are waiting for the applier to drain.";
-        return true;
-    }
-
-    if (_replCoord->getMemberState().primary() && !_replCoord->isCatchingUp()) {
-        LOG(2) << "Stopping oplog fetcher because we are primary.";
-        return true;
-    }
-
     // Check if we have been stopped.
-    if (isStopped()) {
+    if (getState() != ProducerState::Running) {
         LOG(2) << "Stopping oplog fetcher due to stop request.";
         return true;
     }
@@ -849,6 +822,20 @@ void BackgroundSync::pushTestOpToBuffer(OperationContext* txn, const BSONObj& op
     bufferCountGauge.increment();
     bufferSizeGauge.increment(op.objsize());
 }
+
+BackgroundSync::ProducerState BackgroundSync::getState() const {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _state;
+}
+
+void BackgroundSync::startProducerIfStopped() {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    // Let producer run if it's already running.
+    if (_state == ProducerState::Stopped) {
+        _state = ProducerState::Starting;
+    }
+}
+
 
 }  // namespace repl
 }  // namespace mongo

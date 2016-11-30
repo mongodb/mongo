@@ -174,11 +174,10 @@ public:
 
     virtual bool setFollowerMode(const MemberState& newState) override;
 
-    virtual bool isWaitingForApplierToDrain() override;
+    virtual ApplierState getApplierState() override;
 
-    virtual bool isCatchingUp() override;
-
-    virtual void signalDrainComplete(OperationContext* txn) override;
+    virtual void signalDrainComplete(OperationContext* txn,
+                                     long long termWhenBufferIsEmpty) override;
 
     virtual Status waitForDrainFinish(Milliseconds timeout) override;
 
@@ -1134,10 +1133,8 @@ private:
                                       long long originalTerm);
     /**
      * Finish catch-up mode and start drain mode.
-     * If "startToDrain" is true, the node enters drain mode. Otherwise, it goes back to secondary
-     * mode.
      */
-    void _finishCatchUpOplog_inlock(bool startToDrain);
+    void _finishCatchingUpOplog_inlock();
 
     /**
      * Waits for the config state to leave kConfigStartingUp, which indicates that start() has
@@ -1247,11 +1244,7 @@ private:
     // Used to signal threads waiting for changes to _memberState.
     stdx::condition_variable _drainFinishedCond;  // (M)
 
-    // True if we are waiting for the applier to finish draining.
-    bool _isWaitingForDrainToComplete;  // (M)
-
-    // True if we are waiting for oplog catch-up to finish.
-    bool _isCatchingUp = false;  // (M)
+    ReplicationCoordinator::ApplierState _applierState = ApplierState::Running;  // (M)
 
     // Used to signal threads waiting for changes to _rsConfigState.
     stdx::condition_variable _rsConfigStateChange;  // (M)

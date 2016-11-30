@@ -322,7 +322,6 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _externalState(std::move(externalState)),
       _inShutdown(false),
       _memberState(MemberState::RS_STARTUP),
-      _isWaitingForDrainToComplete(false),
       _rsConfigState(kConfigPreStart),
       _selfIndex(-1),
       _sleptLastElection(false),
@@ -884,18 +883,13 @@ void ReplicationCoordinatorImpl::_setFollowerModeFinish(
     _replExecutor.signalEvent(finishedSettingFollowerMode);
 }
 
-bool ReplicationCoordinatorImpl::isWaitingForApplierToDrain() {
+ReplicationCoordinator::ApplierState ReplicationCoordinatorImpl::getApplierState() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _isWaitingForDrainToComplete;
+    return _applierState;
 }
 
-bool ReplicationCoordinatorImpl::isCatchingUp() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    return _isCatchingUp;
-}
-
-
-void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
+void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn,
+                                                     long long termWhenBufferIsEmpty) {
     // This logic is a little complicated in order to avoid acquiring the global exclusive lock
     // unnecessarily.  This is important because the applier may call signalDrainComplete()
     // whenever it wants, not only when the ReplicationCoordinator is expecting it.
@@ -905,7 +899,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
     // 2.) Otherwise, release the mutex while acquiring the global exclusive lock,
     //     since that might take a while (NB there's a deadlock cycle otherwise, too).
     // 3.) Re-check to see if we've somehow left drain mode.  If we have not, clear
-    //     _isWaitingForDrainToComplete, set the flag allowing non-local database writes and
+    //     producer and applier's states, set the flag allowing non-local database writes and
     //     drop the mutex.  At this point, no writes can occur from other threads, due to the
     //     global exclusive lock.
     // 4.) Drop all temp collections, and log the drops to the oplog.
@@ -915,16 +909,15 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
     //
     // Because replicatable writes are forbidden while in drain mode, and we don't exit drain
     // mode until we have the global exclusive lock, which forbids all other threads from making
-    // writes, we know that from the time that _isWaitingForDrainToComplete is set in
-    // _performPostMemberStateUpdateAction(kActionWinElection) until this method returns, no
-    // external writes will be processed.  This is important so that a new temp collection isn't
-    // introduced on the new primary before we drop all the temp collections.
+    // writes, we know that from the time that _canAcceptNonLocalWrites is set until
+    // this method returns, no external writes will be processed.  This is important so that a new
+    // temp collection isn't introduced on the new primary before we drop all the temp collections.
 
     // When we go to drop all temp collections, we must replicate the drops.
     invariant(txn->writesAreReplicated());
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    if (!_isWaitingForDrainToComplete) {
+    if (_applierState != ApplierState::Draining) {
         return;
     }
     lk.unlock();
@@ -950,19 +943,14 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
     Lock::GlobalWrite globalWriteLock(txn->lockState());
     lk.lock();
 
-    if (!_isWaitingForDrainToComplete) {
+    // Exit drain mode when the buffer is empty in the current term and we're in Draining mode.
+    if (_applierState != ApplierState::Draining || termWhenBufferIsEmpty != _cachedTerm) {
         return;
     }
-    invariant(!_isCatchingUp);
-    _isWaitingForDrainToComplete = false;
+    _applierState = ApplierState::Stopped;
     _drainFinishedCond.notify_all();
 
-    if (!_getMemberState_inlock().primary()) {
-        // We must have decided not to transition to primary while waiting for the applier to drain.
-        // Skip the rest of this function since it should only be done when really transitioning.
-        return;
-    }
-
+    invariant(_getMemberState_inlock().primary());
     invariant(!_canAcceptNonLocalWrites);
     _canAcceptNonLocalWrites = true;
 
@@ -984,7 +972,7 @@ Status ReplicationCoordinatorImpl::waitForDrainFinish(Milliseconds timeout) {
     }
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    auto pred = [this]() { return !_isCatchingUp && !_isWaitingForDrainToComplete; };
+    auto pred = [this]() { return _applierState != ApplierState::Draining; };
     if (!_drainFinishedCond.wait_for(lk, timeout.toSystemDuration(), pred)) {
         return Status(ErrorCodes::ExceededTimeLimit,
                       "Timed out waiting to finish draining applier buffer");
@@ -2071,15 +2059,15 @@ void ReplicationCoordinatorImpl::fillIsMasterForReplSet(IsMasterResponse* respon
         _topCoord->fillIsMasterForReplSet(response);
     }
 
-    OpTime lastOpTime = getMyLastAppliedOpTime();
+    LockGuard lock(_mutex);
+    OpTime lastOpTime = _getMyLastAppliedOpTime_inlock();
     response->setLastWrite(lastOpTime, lastOpTime.getTimestamp().getSecs());
     if (_currentCommittedSnapshot) {
         OpTime majorityOpTime = _currentCommittedSnapshot->opTime;
         response->setLastMajorityWrite(majorityOpTime, majorityOpTime.getTimestamp().getSecs());
     }
-
-    if (isWaitingForApplierToDrain() || isCatchingUp()) {
-        // Report that we are secondary to ismaster callers until drain completes.
+    // Report that we are secondary to ismaster callers until drain completes.
+    if (response->isMaster() && !_canAcceptNonLocalWrites) {
         response->setIsMaster(false);
         response->setIsSecondary(true);
     }
@@ -2577,14 +2565,18 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
         _replicationWaiterList.signalAndRemoveAll_inlock();
         // Wake up the optime waiter that is waiting for primary catch-up to finish.
         _opTimeWaiterList.signalAndRemoveAll_inlock();
-        // _isCatchingUp and _isWaitingForDrainToComplete could be cleaned up asynchronously
-        // by freshness scan.
         _canAcceptNonLocalWrites = false;
         _stepDownPending = false;
         serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.store(false);
         result = kActionCloseAllConnections;
     } else {
         result = kActionFollowerModeStateChange;
+    }
+
+    // Enable replication producer and applier on stepdown.
+    if (_memberState.primary()) {
+        _applierState = ApplierState::Running;
+        _externalState->startProducerIfStopped();
     }
 
     if (_memberState.secondary() && !newState.primary()) {
@@ -2681,9 +2673,6 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
 
             auto ts = LogicalClock::get(getServiceContext())->reserveTicks(1).asTimestamp();
             _topCoord->processWinElection(_electionId, ts);
-            invariant(!_isCatchingUp);
-            invariant(!_isWaitingForDrainToComplete);
-            _isCatchingUp = true;
             const PostMemberStateUpdateAction nextAction =
                 _updateMemberStateFromTopologyCoordinator_inlock();
             invariant(nextAction != kActionWinElection);
@@ -2695,7 +2684,7 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             if (isV1ElectionProtocol()) {
                 _scanOpTimeForCatchUp_inlock();
             } else {
-                _finishCatchUpOplog_inlock(true);
+                _finishCatchingUpOplog_inlock();
             }
             break;
         }
@@ -2716,7 +2705,7 @@ void ReplicationCoordinatorImpl::_scanOpTimeForCatchUp_inlock() {
     auto evhStatus =
         scanner->start(&_replExecutor, _rsConfig, _selfIndex, _rsConfig.getCatchUpTimeoutPeriod());
     if (evhStatus == ErrorCodes::ShutdownInProgress) {
-        _finishCatchUpOplog_inlock(true);
+        _finishCatchingUpOplog_inlock();
         return;
     }
     fassertStatusOK(40254, evhStatus.getStatus());
@@ -2725,7 +2714,7 @@ void ReplicationCoordinatorImpl::_scanOpTimeForCatchUp_inlock() {
         evhStatus.getValue(), [this, scanner, scanStartTime, term](const CallbackArgs& cbData) {
             LockGuard lk(_mutex);
             if (cbData.status == ErrorCodes::CallbackCanceled) {
-                _finishCatchUpOplog_inlock(true);
+                _finishCatchingUpOplog_inlock();
                 return;
             }
             auto totalTimeout = _rsConfig.getCatchUpTimeoutPeriod();
@@ -2741,9 +2730,9 @@ void ReplicationCoordinatorImpl::_catchUpOplogToLatest_inlock(const FreshnessSca
     // Term is also checked in case the catchup timeout is so long that the node becomes primary
     // again.
     if (!_memberState.primary() || originalTerm != _cachedTerm) {
+        // If the node steps down during the catch-up, we don't go into drain mode.
         log() << "Stopped transition to primary of term " << originalTerm
               << " because I've already stepped down.";
-        _finishCatchUpOplog_inlock(false);
         return;
     }
 
@@ -2754,7 +2743,7 @@ void ReplicationCoordinatorImpl::_catchUpOplogToLatest_inlock(const FreshnessSca
         log() << "Could not access any nodes within timeout when checking for "
               << "additional ops to apply before finishing transition to primary. "
               << "Will move forward with becoming primary anyway.";
-        _finishCatchUpOplog_inlock(true);
+        _finishCatchingUpOplog_inlock();
         return;
     }
 
@@ -2763,7 +2752,7 @@ void ReplicationCoordinatorImpl::_catchUpOplogToLatest_inlock(const FreshnessSca
     if (freshnessInfo.opTime <= _getMyLastAppliedOpTime_inlock()) {
         log() << "My optime is most up-to-date, skipping catch-up "
               << "and completing transition to primary.";
-        _finishCatchUpOplog_inlock(true);
+        _finishCatchingUpOplog_inlock();
         return;
     }
 
@@ -2776,7 +2765,7 @@ void ReplicationCoordinatorImpl::_catchUpOplogToLatest_inlock(const FreshnessSca
             log() << "Finished catch-up oplog after becoming primary.";
         }
 
-        _finishCatchUpOplog_inlock(true);
+        _finishCatchingUpOplog_inlock();
     };
     auto waiterInfo = std::make_shared<WaiterInfo>(freshnessInfo.opTime, finishCB);
 
@@ -2791,18 +2780,9 @@ void ReplicationCoordinatorImpl::_catchUpOplogToLatest_inlock(const FreshnessSca
     _replExecutor.scheduleWorkAt(_replExecutor.now() + timeout, timeoutCB);
 }
 
-void ReplicationCoordinatorImpl::_finishCatchUpOplog_inlock(bool startToDrain) {
-    invariant(_isCatchingUp);
-    _isCatchingUp = false;
-    // If the node steps down during the catch-up, we don't go into drain mode.
-    if (startToDrain) {
-        invariant(!_isWaitingForDrainToComplete);
-        _isWaitingForDrainToComplete = true;
-        // Signal applier in executor to avoid the deadlock with bgsync's mutex that is required to
-        // cancel fetcher.
-        _replExecutor.scheduleWork(
-            _wrapAsCallbackFn([this]() { _externalState->signalApplierToCancelFetcher(); }));
-    }
+void ReplicationCoordinatorImpl::_finishCatchingUpOplog_inlock() {
+    _applierState = ApplierState::Draining;
+    _externalState->stopProducer();
 }
 
 Status ReplicationCoordinatorImpl::processReplSetGetRBID(BSONObjBuilder* resultObj) {
@@ -3079,7 +3059,8 @@ HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource(const OpTime& lastOp
     LockGuard topoLock(_topoMutex);
 
     HostAndPort oldSyncSource = _topCoord->getSyncSourceAddress();
-    auto chainingPreference = isCatchingUp()
+    // Always allow chaining while in catchup and drain mode.
+    auto chainingPreference = getMemberState().primary()
         ? TopologyCoordinator::ChainingPreference::kAllowChaining
         : TopologyCoordinator::ChainingPreference::kUseConfiguration;
     HostAndPort newSyncSource =

@@ -58,11 +58,28 @@ class BackgroundSync {
     MONGO_DISALLOW_COPYING(BackgroundSync);
 
 public:
+    /**
+     *   Stopped -> Starting -> Running
+     *      ^          |            |
+     *      |__________|____________|
+     *
+     * In normal cases: Stopped -> Starting -> Running -> Stopped.
+     * It is also possible to transition directly from Starting to Stopped.
+     *
+     * We need a separate Starting state since part of the startup process involves reading from
+     * disk and we want to do that disk I/O in the bgsync thread, rather than whatever thread calls
+     * start().
+     */
+    enum class ProducerState { Starting, Running, Stopped };
+
     BackgroundSync(ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
                    std::unique_ptr<OplogBuffer> oplogBuffer);
 
     // stop syncing (when this node becomes a primary, e.g.)
-    void stop();
+    // During stepdown, the last fetched optime is not reset in order to keep track of the lastest
+    // optime in the buffer. However, the last fetched optime has to be reset after initial sync or
+    // rollback.
+    void stop(bool resetLastFetchedOptime);
 
     /**
      * Starts oplog buffer, task executor and producer thread, in that order.
@@ -85,8 +102,6 @@ public:
      */
     bool inShutdown() const;
 
-    bool isStopped() const;
-
     // starts the sync target notifying thread
     void notifierThread();
 
@@ -106,11 +121,6 @@ public:
     void clearBuffer(OperationContext* txn);
 
     /**
-     * Cancel existing find/getMore commands on the sync source's oplog collection.
-     */
-    void cancelFetcher();
-
-    /**
      * Returns true if any of the following is true:
      * 1) We are shutting down;
      * 2) We are primary;
@@ -119,7 +129,11 @@ public:
      */
     bool shouldStopFetching() const;
 
-    // Testing related stuff
+    ProducerState getState() const;
+    // Starts the producer if it's stopped. Otherwise, let it keep running.
+    void startProducerIfStopped();
+
+    // Adds a fake oplog entry to buffer. Used for testing only.
     void pushTestOpToBuffer(OperationContext* txn, const BSONObj& op);
 
 private:
@@ -135,14 +149,6 @@ private:
     // Production thread inner loop.
     void _runProducer();
     void _produce(OperationContext* txn);
-
-    /**
-     * Signals to the applier that we have no new data,
-     * and are in sync with the applier at this point.
-     *
-     * NOTE: Used after rollback and during draining to transition to Primary role;
-     */
-    void _signalNoNewDataForApplier(OperationContext* txn);
 
     /**
      * Checks current background sync state before pushing operations into blocking queue and
@@ -167,7 +173,7 @@ private:
     // restart syncing
     void start(OperationContext* txn);
 
-    long long _readLastAppliedHash(OperationContext* txn);
+    OpTimeWithHash _readLastAppliedOpTimeWithHash(OperationContext* txn);
 
     // Production thread
     std::unique_ptr<OplogBuffer> _oplogBuffer;
@@ -179,6 +185,8 @@ private:
     ReplicationCoordinatorExternalState* _replicationCoordinatorExternalState;
 
     // _mutex protects all of the class variables declared below.
+    //
+    // Never hold bgsync mutex when trying to acquire the ReplicationCoordinator mutex.
     mutable stdx::mutex _mutex;
 
     OpTime _lastOpTimeFetched;
@@ -193,8 +201,7 @@ private:
     // Set to true if shutdown() has been called.
     bool _inShutdown = false;
 
-    // if producer thread should not be running
-    bool _stopped = true;
+    ProducerState _state = ProducerState::Starting;
 
     HostAndPort _syncSourceHost;
 

@@ -210,15 +210,11 @@ bool ReplicationCoordinatorMock::setFollowerMode(const MemberState& newState) {
     return true;
 }
 
-bool ReplicationCoordinatorMock::isWaitingForApplierToDrain() {
-    return false;
+ReplicationCoordinator::ApplierState ReplicationCoordinatorMock::getApplierState() {
+    return ApplierState::Running;
 }
 
-bool ReplicationCoordinatorMock::isCatchingUp() {
-    return false;
-}
-
-void ReplicationCoordinatorMock::signalDrainComplete(OperationContext*) {}
+void ReplicationCoordinatorMock::signalDrainComplete(OperationContext*, long long) {}
 
 Status ReplicationCoordinatorMock::waitForDrainFinish(Milliseconds timeout) {
     invariant(false);

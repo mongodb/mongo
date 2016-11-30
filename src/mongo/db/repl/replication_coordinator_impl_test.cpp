@@ -113,10 +113,10 @@ void runSingleNodeElection(ServiceContext::UniqueOperationContext txn,
     net->exitNetwork();
 
 
-    ASSERT(replCoord->isWaitingForApplierToDrain());
+    ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
     ASSERT(replCoord->getMemberState().primary()) << replCoord->getMemberState().toString();
 
-    replCoord->signalDrainComplete(txn.get());
+    replCoord->signalDrainComplete(txn.get(), replCoord->getTerm());
 }
 
 /**
@@ -709,8 +709,6 @@ TEST_F(ReplCoordTest, NodeReturnsOkWhenRunningAwaitReplicationAgainstPrimaryWith
     ReplicationCoordinator::StatusAndDuration statusAndDur =
         getReplCoord()->awaitReplication(txn.get(), time, writeConcern);
     ASSERT_OK(statusAndDur.status);
-
-    ASSERT_TRUE(getExternalState()->isApplierSignaledToCancelFetcher());
 }
 
 TEST_F(ReplCoordTest,
@@ -5067,13 +5065,13 @@ TEST_F(ReplCoordTest, WaitForDrainFinish) {
     auto timeout = Milliseconds(1);
     ASSERT_OK(replCoord->waitForMemberState(MemberState::RS_PRIMARY, timeout));
 
-    ASSERT_TRUE(replCoord->isWaitingForApplierToDrain());
+    ASSERT(replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Draining);
     ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, replCoord->waitForDrainFinish(timeout));
 
     ASSERT_EQUALS(ErrorCodes::BadValue, replCoord->waitForDrainFinish(Milliseconds(-1)));
 
     const auto txn = makeOperationContext();
-    replCoord->signalDrainComplete(txn.get());
+    replCoord->signalDrainComplete(txn.get(), replCoord->getTerm());
     ASSERT_OK(replCoord->waitForDrainFinish(timeout));
 
     // Zero timeout is fine.

@@ -128,11 +128,9 @@ public:
 
     virtual bool setFollowerMode(const MemberState& newState);
 
-    virtual bool isWaitingForApplierToDrain();
+    virtual ApplierState getApplierState();
 
-    virtual bool isCatchingUp();
-
-    virtual void signalDrainComplete(OperationContext*);
+    virtual void signalDrainComplete(OperationContext*, long long);
 
     virtual Status waitForDrainFinish(Milliseconds timeout) override;
 

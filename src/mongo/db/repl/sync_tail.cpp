@@ -723,17 +723,6 @@ private:
             while (!_syncTail->tryPopAndWaitForMore(&txn, &ops, batchLimits)) {
             }
 
-            // For pausing replication in tests.
-            while (MONGO_FAIL_POINT(rsSyncApplyStop)) {
-                // Tests should not trigger clean shutdown while that failpoint is active. If we
-                // think we need this, we need to think hard about what the behavior should be.
-                if (_syncTail->_networkQueue->inShutdown()) {
-                    severe() << "Turn off rsSyncApplyStop before attempting clean shutdown";
-                    fassertFailedNoTrace(40304);
-                }
-                sleepmillis(10);
-            }
-
             if (ops.empty() && !ops.mustShutdown()) {
                 continue;  // Don't emit empty batches.
             }
@@ -774,8 +763,20 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord) {
             : new ApplyBatchFinalizer(replCoord)};
 
     while (true) {  // Exits on message from OpQueueBatcher.
+        // For pausing replication in tests.
+        while (MONGO_FAIL_POINT(rsSyncApplyStop)) {
+            // Tests should not trigger clean shutdown while that failpoint is active. If we
+            // think we need this, we need to think hard about what the behavior should be.
+            if (_networkQueue->inShutdown()) {
+                severe() << "Turn off rsSyncApplyStop before attempting clean shutdown";
+                fassertFailedNoTrace(40304);
+            }
+            sleepmillis(10);
+        }
+
         tryToGoLiveAsASecondary(&txn, replCoord);
 
+        long long termWhenBufferIsEmpty = replCoord->getTerm();
         // Blocks up to a second waiting for a batch to be ready to apply. If one doesn't become
         // ready in time, we'll loop again so we can do the above checks periodically.
         OpQueue ops = batcher.getNextBatch(Seconds(1));
@@ -783,17 +784,12 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord) {
             if (ops.mustShutdown()) {
                 return;
             }
-            continue;  // Try again.
-        }
-
-        if (ops.front().raw.isEmpty()) {
-            // This means that the network thread has coalesced and we have processed all of its
-            // data.
-            invariant(ops.getCount() == 1);
-            if (replCoord->isWaitingForApplierToDrain()) {
-                replCoord->signalDrainComplete(&txn);
+            if (MONGO_FAIL_POINT(rsSyncApplyStop)) {
+                continue;
             }
-            continue;  // This wasn't a real op. Don't try to apply it.
+            // Signal drain complete if we're in Draining state and the buffer is empty.
+            replCoord->signalDrainComplete(&txn, termWhenBufferIsEmpty);
+            continue;  // Try again.
         }
 
         // Extract some info from ops that we'll need after releasing the batch below.
@@ -861,6 +857,12 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* txn,
         // processed.
         if (!ops->empty() && (ops->getBytes() + size_t(op.objsize())) > limits.bytes) {
             return true;  // Return before wasting time parsing the op.
+        }
+
+        // Don't consume the op if we are told to stop.
+        if (MONGO_FAIL_POINT(rsSyncApplyStop)) {
+            sleepmillis(10);
+            return true;
         }
 
         ops->emplace_back(std::move(op));  // Parses the op in-place.
@@ -1265,8 +1267,7 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
     Lock::ParallelBatchWriterMode pbwm(txn->lockState());
 
     auto replCoord = ReplicationCoordinator::get(txn);
-    if (replCoord->getMemberState().primary() && !replCoord->isWaitingForApplierToDrain() &&
-        !replCoord->isCatchingUp()) {
+    if (replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Stopped) {
         severe() << "attempting to replicate ops while primary";
         return {ErrorCodes::CannotApplyOplogWhilePrimary,
                 "attempting to replicate ops while primary"};
