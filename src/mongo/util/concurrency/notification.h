@@ -30,6 +30,7 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/db/operation_context.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
@@ -37,8 +38,6 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
-class OperationContext;
 
 /**
  * Allows waiting for a result returned from an asynchronous operation.
@@ -68,7 +67,9 @@ public:
      * If the wait is interrupted, throws an exception.
      */
     T& get(OperationContext* txn) {
-        return get();
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        txn->waitForConditionOrInterrupt(_condVar, lock, [this]() -> bool { return !!_value; });
+        return _value.get();
     }
 
     /**
