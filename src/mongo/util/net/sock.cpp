@@ -33,12 +33,16 @@
 
 #include "mongo/util/net/sock.h"
 
+#include <algorithm>
+
 #if !defined(_WIN32)
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <poll.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>
@@ -70,6 +74,38 @@ using std::stringstream;
 using std::vector;
 
 MONGO_FP_DECLARE(throwSockExcep);
+
+namespace {
+
+// Provides a cross-platform function for setting a file descriptor/socket to non-blocking mode.
+bool setBlock(int fd, bool block) {
+#ifdef _WIN32
+    u_long ioMode = block ? 0 : 1;
+    return (NO_ERROR == ::ioctlsocket(fd, FIONBIO, &ioMode));
+#else
+    int flags = fcntl(fd, F_GETFL, fd);
+    if (block) {
+        return (-1 != fcntl(fd, F_SETFL, (flags & ~O_NONBLOCK)));
+    } else {
+        return (-1 != fcntl(fd, F_SETFL, (flags | O_NONBLOCK)));
+    }
+#endif
+}
+
+void networkWarnWithDescription(const Socket& socket, StringData call, int errorCode = -1) {
+#ifdef _WIN32
+    if (errorCode == -1) {
+        errorCode = WSAGetLastError();
+    }
+#endif
+    auto ewd = errnoWithDescription(errorCode);
+    warning() << "Failed to connect to " << socket.remoteAddr().getAddr() << ":"
+              << socket.remoteAddr().getPort() << ", in(" << call << "), reason: " << ewd;
+}
+
+const double kMaxConnectTimeoutMS = 5000;
+
+}  // namespace
 
 static bool ipv6 = false;
 void enableIPv6(bool state) {
@@ -334,77 +370,96 @@ std::string Socket::getSNIServerName() const {
 }
 #endif
 
-class ConnectBG : public BackgroundJob {
-public:
-    ConnectBG(int sock, SockAddr remote) : _sock(sock), _remote(remote) {}
-
-    void run() {
-#if defined(_WIN32)
-        if ((_res = _connect()) == SOCKET_ERROR) {
-            _errnoWithDescription = errnoWithDescription();
-        }
-#else
-        while ((_res = _connect()) == -1) {
-            const int error = errno;
-            if (error != EINTR) {
-                _errnoWithDescription = errnoWithDescription(error);
-                break;
-            }
-        }
-#endif
-    }
-
-    std::string name() const {
-        return "ConnectBG";
-    }
-    std::string getErrnoWithDescription() const {
-        return _errnoWithDescription;
-    }
-    int inError() const {
-        return _res;
-    }
-
-private:
-    int _connect() const {
-        return ::connect(_sock, _remote.raw(), _remote.addressSize);
-    }
-
-    int _sock;
-    int _res;
-    SockAddr _remote;
-    std::string _errnoWithDescription;
-};
-
 bool Socket::connect(SockAddr& remote) {
     _remote = remote;
 
-    _fd = socket(remote.getType(), SOCK_STREAM, 0);
+    _fd = ::socket(remote.getType(), SOCK_STREAM, 0);
     if (_fd == INVALID_SOCKET) {
-        LOG(_logLevel) << "ERROR: connect invalid socket " << errnoWithDescription();
+        networkWarnWithDescription(*this, "socket");
+        return false;
+    }
+
+    if (!setBlock(_fd, false)) {
+        networkWarnWithDescription(*this, "set socket to non-blocking mode");
+        return false;
+    }
+
+    const Milliseconds connectTimeoutMillis(static_cast<int64_t>(
+        _timeout > 0 ? std::min(kMaxConnectTimeoutMS, _timeout) : kMaxConnectTimeoutMS));
+    const Date_t expiration = Date_t::now() + connectTimeoutMillis;
+
+    bool connectSucceeded = ::connect(_fd, _remote.raw(), _remote.addressSize) == 0;
+
+    if (!connectSucceeded) {
+#ifdef _WIN32
+        if (WSAGetLastError() != WSAEWOULDBLOCK) {
+            networkWarnWithDescription(*this, "connect");
+            return false;
+        }
+#else
+        if (errno != EINTR && errno != EINPROGRESS) {
+            networkWarnWithDescription(*this, "connect");
+            return false;
+        }
+#endif
+
+        pollfd pfd;
+        pfd.fd = _fd;
+        pfd.events = POLLOUT;
+
+        while (true) {
+            const auto timeout = std::max(Milliseconds(0), expiration - Date_t::now());
+
+            int pollReturn = socketPoll(&pfd, 1, timeout.count());
+#ifdef _WIN32
+            if (pollReturn == SOCKET_ERROR) {
+                networkWarnWithDescription(*this, "poll");
+                return false;
+            }
+#else
+            if (pollReturn == -1) {
+                if (errno != EINTR) {
+                    networkWarnWithDescription(*this, "poll");
+                    return false;
+                }
+
+                // EINTR in poll, try again
+                continue;
+            }
+#endif
+            // No activity for the full duration of the timeout.
+            if (pollReturn == 0) {
+                warning() << "Failed to connect to " << _remote.getAddr() << ":"
+                          << _remote.getPort() << " after " << connectTimeoutMillis
+                          << " milliseconds, giving up.";
+                return false;
+            }
+
+            // We had a result, see if there's an error on the socket.
+            int optVal;
+            socklen_t optLen = sizeof(optVal);
+            if (::getsockopt(
+                    _fd, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&optVal), &optLen) == -1) {
+                networkWarnWithDescription(*this, "getsockopt");
+                return false;
+            }
+            if (optVal != 0) {
+                networkWarnWithDescription(*this, "checking socket for error after poll", optVal);
+                return false;
+            }
+
+            // We had activity and we don't have errors on the socket, we're connected.
+            break;
+        }
+    }
+
+    if (!setBlock(_fd, true)) {
+        networkWarnWithDescription(*this, "could not set socket to blocking mode");
         return false;
     }
 
     if (_timeout > 0) {
         setTimeout(_timeout);
-    }
-
-    static const unsigned int connectTimeoutMillis = 5000;
-    ConnectBG bg(_fd, remote);
-    bg.go();
-    if (bg.wait(connectTimeoutMillis)) {
-        if (bg.inError()) {
-            warning() << "Failed to connect to " << _remote.getAddr() << ":" << _remote.getPort()
-                      << ", reason: " << bg.getErrnoWithDescription();
-            close();
-            return false;
-        }
-    } else {
-        // time out the connect
-        close();
-        bg.wait();  // so bg stays in scope until bg thread terminates
-        warning() << "Failed to connect to " << _remote.getAddr() << ":" << _remote.getPort()
-                  << " after " << connectTimeoutMillis << " milliseconds, giving up.";
-        return false;
     }
 
     if (remote.getType() != AF_UNIX)
