@@ -993,16 +993,10 @@ int compareElementValues(const BSONElement& l,
             if (cmp)
                 return cmp;
 
-            return l.codeWScopeObject().woCompare(
-                // woCompare parameters: r, ordering, considerFieldName, comparator.
-                // r: the BSONObj to compare with.
-                // ordering: the sort directions for each key.
-                // considerFieldName: whether field names should be considered in comparison.
-                // comparator: used for all string comparisons, if non-null.
-                r.codeWScopeObject(),
-                BSONObj(),
-                true,
-                comparator);
+            // When comparing the scope object, we should consider field names. Special string
+            // comparison semantics do not apply to strings nested inside the CodeWScope scope
+            // object, so we do not pass through the string comparator.
+            return l.codeWScopeObject().woCompare(r.codeWScopeObject(), BSONObj(), true);
         }
         default:
             verify(false);

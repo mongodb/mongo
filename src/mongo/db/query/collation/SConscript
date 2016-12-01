@@ -49,6 +49,16 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target="collation_bson_comparison_test",
+    source=[
+        "collation_bson_comparison_test.cpp",
+    ],
+    LIBDEPS=[
+        "collator_interface_mock",
+    ],
+)
+
+env.CppUnitTest(
     target="collation_index_key_test",
     source=[
         "collation_index_key_test.cpp",
