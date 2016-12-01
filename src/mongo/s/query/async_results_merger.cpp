@@ -473,6 +473,12 @@ void AsyncResultsMerger::handleBatchResponse(
             remote.docBuffer.push(result);
             remote.cursorId = 0;
             remote.status = Status::OK();
+
+            if (!_params.sort.isEmpty()) {
+                // Push the index of this remote to the merge queue so that the resolved view is
+                // visible to nextReadySorted().
+                _mergeQueue.push(remoteIndex);
+            }
             return;
         }
 
