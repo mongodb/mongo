@@ -24,4 +24,14 @@
         ]
     }));
     assert.eq(t.count({x: 1}), 1);
+
+    // Operations on non-existent databases cannot be atomic.
+    var newDBName = "apply_ops_atomicity";
+    var newDB = db.getSiblingDB(newDBName);
+    assert.commandWorked(newDB.dropDatabase());
+    // Do an update on a non-existent database, since only 'u' ops can implicitly create
+    // collections.
+    assert.commandWorked(newDB.runCommand(
+        {applyOps: [{op: "u", ns: newDBName + ".foo", o: {_id: 5, x: 17}, o2: {_id: 5, x: 16}}]}));
+
 })();
