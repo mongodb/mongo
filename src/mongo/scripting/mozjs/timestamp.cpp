@@ -53,7 +53,7 @@ const char* const TimestampInfo::className = "Timestamp";
 namespace {
 // Checks that argument 'idx' of 'args' is a number in the range of an unsigned 32-bit integer,
 // or uasserts a complaint about an invalid value for 'name'.
-double getTimestampArg(JSContext* cx, JS::CallArgs args, int idx, std::string name) {
+double getTimestampArg(JSContext* cx, JS::CallArgs args, int idx, const std::string& name) {
     int64_t maxArgVal = std::numeric_limits<uint32_t>::max();
     if (!args.get(idx).isNumber())
         uasserted(ErrorCodes::BadValue, str::stream() << name << " must be a number");

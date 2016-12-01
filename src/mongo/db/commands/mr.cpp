@@ -1641,16 +1641,16 @@ public:
             }
         } catch (SendStaleConfigException& e) {
             log() << "mr detected stale config, should retry" << redact(e);
-            throw e;
+            throw;
         }
         // TODO:  The error handling code for queries is v. fragile,
         // *requires* rethrow AssertionExceptions - should probably fix.
         catch (AssertionException& e) {
             log() << "mr failed, removing collection" << redact(e);
-            throw e;
+            throw;
         } catch (std::exception& e) {
             log() << "mr failed, removing collection" << causedBy(e);
-            throw e;
+            throw;
         } catch (...) {
             log() << "mr failed for unknown reason, removing collection";
             throw;
