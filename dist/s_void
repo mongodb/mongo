@@ -5,7 +5,8 @@ trap 'rm -f $t' 0 1 2 3 13 15
 
 cd ..
 
-# Turn a C file into a line per function that returns an int.
+# Parse a C file, discarding functions that don't return an int, and formatting
+# the remaining functions as a single line.
 file_parse()
 {
 	sed -n \
@@ -109,7 +110,7 @@ func_ok()
 }
 
 # Complain about functions which return an "int" but which don't return except
-# at the end of the function. This script is a kluge and isn't run by default.
+# at the end of the function.
 for f in `find bench ext src test -name '*.[ci]'`; do
 	if expr "$f" : '.*/windows_shim.c' > /dev/null; then
 		continue
