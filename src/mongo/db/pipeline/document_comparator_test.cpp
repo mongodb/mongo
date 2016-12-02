@@ -197,5 +197,23 @@ TEST(DocumentComparatorTest, HashingCodeWScopeShouldNotRespectCollation) {
     ASSERT_NE(seed1, seed2);
 }
 
+TEST(DocumentComparatorTest, ComparingCodeShouldNotRespectCollation) {
+    const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const DocumentComparator comparator(&collator);
+    const Document doc1{{"a", BSONCode("js code")}};
+    const Document doc2{{"a", BSONCode("other js code")}};
+    ASSERT_TRUE(comparator.evaluate(doc1 != doc2));
+}
+
+TEST(DocumentComparatorTest, HashingCodeShouldNotRespectCollation) {
+    const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const Document doc1{{"a", BSONCode("js code")}};
+    const Document doc2{{"a", BSONCode("other js code")}};
+    size_t seed1, seed2 = 0;
+    doc1.hash_combine(seed1, &collator);
+    doc2.hash_combine(seed2, &collator);
+    ASSERT_NE(seed1, seed2);
+}
+
 }  // namespace
 }  // namespace mongo

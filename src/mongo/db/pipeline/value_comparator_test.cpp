@@ -295,5 +295,21 @@ TEST(ValueComparatorTest, HashingCodeWScopeShouldNotRespectCollation) {
     ASSERT_NE(comparator.hash(val1), comparator.hash(val2));
 }
 
+TEST(ValueComparatorTest, ComparingCodeShouldNotRespectCollation) {
+    const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const ValueComparator comparator(&collator);
+    const Value val1{BSONCode("js code")};
+    const Value val2{BSONCode("other js code")};
+    ASSERT_TRUE(comparator.evaluate(val1 != val2));
+}
+
+TEST(ValueComparatorTest, HashingCodeShouldNotRespectCollation) {
+    const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const ValueComparator comparator(&collator);
+    const Value val1{BSONCode("js code")};
+    const Value val2{BSONCode("other js code")};
+    ASSERT_NE(comparator.hash(val1), comparator.hash(val2));
+}
+
 }  // namespace
 }  // namespace mongo
