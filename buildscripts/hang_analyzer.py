@@ -289,6 +289,7 @@ class GDBDumper(object):
             "set pagination off",
             "attach %d" % pid,
             "info sharedlibrary",
+            "info threads", # Dump a simple list of commands to get the thread name
             "thread apply all bt",
             "gcore dump_" + process_name + "." + str(pid) + "." + self.get_dump_ext() if take_dump else "",
             "set confirm off",
