@@ -16,7 +16,7 @@ executor:
     hooks:
     - class: ValidateCollections
     - class: CleanEveryN
-      n: 20
+      n: 1
     fixture:
       class: MongoDFixture
       mongod_options:

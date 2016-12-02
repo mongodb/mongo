@@ -1602,7 +1602,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=disk
-      run_multiple_jobs: true
+      run_multiple_jobs: false
 
 - <<: *task_template
   name: durability
