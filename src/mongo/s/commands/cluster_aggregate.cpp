@@ -54,6 +54,7 @@
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/commands/sharded_command_processing.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/cluster_query_knobs.h"
 #include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
@@ -253,7 +254,7 @@ Status ClusterAggregate::runAggregate(OperationContext* txn,
     // Run merging command on random shard, unless a stage needs the primary shard. Need to use
     // ShardConnection so that the merging mongod is sent the config servers on connection init.
     auto& prng = txn->getClient()->getPrng();
-    const auto& mergingShardId = needPrimaryShardMerger
+    const auto& mergingShardId = (needPrimaryShardMerger || internalQueryAlwaysMergeOnPrimaryShard)
         ? conf->getPrimaryId()
         : shardResults[prng.nextInt32(shardResults.size())].shardTargetId;
     const auto mergingShard = uassertStatusOK(grid.shardRegistry()->getShard(txn, mergingShardId));
