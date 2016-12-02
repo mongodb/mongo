@@ -435,7 +435,7 @@ void syncFixUp(OperationContext* txn,
                 Database* db = dbHolder().openDb(txn, nss.db().toString());
                 invariant(db);
                 WriteUnitOfWork wunit(txn);
-                db->dropCollection(txn, ns);
+                fassertStatusOK(40359, db->dropCollectionEvenIfSystem(txn, nss));
                 wunit.commit();
             }
 
@@ -585,7 +585,7 @@ void syncFixUp(OperationContext* txn,
                 throw RSFatalException();
             }
 
-            db->dropCollection(txn, *it);
+            fassertStatusOK(40360, db->dropCollectionEvenIfSystem(txn, nss));
             wunit.commit();
         }
     }
@@ -752,7 +752,8 @@ void syncFixUp(OperationContext* txn,
                                 if (!infoResult.isOK()) {
                                     // we should drop
                                     WriteUnitOfWork wunit(txn);
-                                    ctx.db()->dropCollection(txn, doc.ns);
+                                    fassertStatusOK(40361,
+                                                    ctx.db()->dropCollectionEvenIfSystem(txn, nss));
                                     wunit.commit();
                                 }
                             } catch (const DBException& ex) {

@@ -343,14 +343,8 @@ Status Database::dropView(OperationContext* txn, StringData fullns) {
 }
 
 Status Database::dropCollection(OperationContext* txn, StringData fullns) {
-    invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
-
-    LOG(1) << "dropCollection: " << fullns;
-    massertNamespaceNotIndex(fullns, "dropCollection");
-
-    Collection* collection = getCollection(fullns);
-    if (!collection) {
-        // collection doesn't exist
+    if (!getCollection(fullns)) {
+        // Collection doesn't exist so don't bother validating if it can be dropped.
         return Status::OK();
     }
 
@@ -364,14 +358,30 @@ Status Database::dropCollection(OperationContext* txn, StringData fullns) {
                     return Status(ErrorCodes::IllegalOperation,
                                   "turn off profiling before dropping system.profile collection");
             } else if (!nss.isSystemDotViews()) {
-                return Status(ErrorCodes::IllegalOperation, "can't drop system ns");
+                return Status(ErrorCodes::IllegalOperation,
+                              str::stream() << "can't drop system collection " << fullns);
             }
         }
     }
 
+    return dropCollectionEvenIfSystem(txn, nss);
+}
+
+Status Database::dropCollectionEvenIfSystem(OperationContext* txn, const NamespaceString& fullns) {
+    invariant(txn->lockState()->isDbLockedForMode(name(), MODE_X));
+
+    LOG(1) << "dropCollection: " << fullns;
+
+    Collection* collection = getCollection(fullns);
+    if (!collection) {
+        return Status::OK();  // Post condition already met.
+    }
+
+    massertNamespaceNotIndex(fullns.toString(), "dropCollection");
+
     BackgroundOperation::assertNoBgOpInProgForNs(fullns);
 
-    audit::logDropCollection(&cc(), fullns);
+    audit::logDropCollection(&cc(), fullns.toString());
 
     Status s = collection->getIndexCatalog()->dropAllIndexes(txn, true);
     if (!s.isOK()) {
@@ -383,13 +393,13 @@ Status Database::dropCollection(OperationContext* txn, StringData fullns) {
     verify(collection->_details->getTotalIndexCount(txn) == 0);
     LOG(1) << "\t dropIndexes done";
 
-    Top::get(txn->getClient()->getServiceContext()).collectionDropped(fullns);
+    Top::get(txn->getClient()->getServiceContext()).collectionDropped(fullns.toString());
 
     // We want to destroy the Collection object before telling the StorageEngine to destroy the
     // RecordStore.
-    _clearCollectionCache(txn, fullns, "collection dropped");
+    _clearCollectionCache(txn, fullns.toString(), "collection dropped");
 
-    s = _dbEntry->dropCollection(txn, fullns);
+    s = _dbEntry->dropCollection(txn, fullns.toString());
 
     if (!s.isOK())
         return s;
@@ -406,7 +416,7 @@ Status Database::dropCollection(OperationContext* txn, StringData fullns) {
         }
     }
 
-    getGlobalServiceContext()->getOpObserver()->onDropCollection(txn, nss);
+    getGlobalServiceContext()->getOpObserver()->onDropCollection(txn, fullns);
 
     return Status::OK();
 }
