@@ -62,10 +62,13 @@ static ServerStatusMetricField<Counter64> gleWtimeoutsDisplay("getLastError.wtim
 
 MONGO_FP_DECLARE(hangBeforeWaitingForWriteConcern);
 
+bool commandSpecifiesWriteConcern(const BSONObj& cmdObj) {
+    return cmdObj.hasField(WriteConcernOptions::kWriteConcernField);
+}
+
 StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* txn,
                                                     const BSONObj& cmdObj,
-                                                    const std::string& dbName,
-                                                    const bool supportsWriteConcern) {
+                                                    const std::string& dbName) {
     // The default write concern if empty is {w:1}. Specifying {w:0} is/was allowed, but is
     // interpreted identically to {w:1}.
     auto wcResult = WriteConcernOptions::extractWCFromCommand(
@@ -84,16 +87,11 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* txn,
             writeConcern = {
                 WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, Seconds(30)};
         }
-    } else if (supportsWriteConcern) {
-        // If it supports writeConcern and does not use the default, validate the writeConcern.
+    } else {
         Status wcStatus = validateWriteConcern(txn, writeConcern, dbName);
         if (!wcStatus.isOK()) {
             return wcStatus;
         }
-    } else {
-        // This command doesn't do writes so it should not be passed a writeConcern. If we did not
-        // use the default writeConcern, one was provided when it shouldn't have been by the user.
-        return {ErrorCodes::InvalidOptions, "Command does not support writeConcern"};
     }
 
     return writeConcern;
