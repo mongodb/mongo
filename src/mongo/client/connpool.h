@@ -77,7 +77,7 @@ public:
     /**
      * Returns the maximum number of connections stored in the pool
      */
-    int getMaxPoolSize() {
+    int getMaxPoolSize() const {
         return _maxPoolSize;
     }
 
@@ -204,7 +204,7 @@ public:
      * This setting only applies to new host connection pools, previously-pooled host pools are
      * unaffected.
      */
-    int getMaxPoolSize() {
+    int getMaxPoolSize() const {
         return _maxPoolSize;
     }
 
