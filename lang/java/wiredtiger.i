@@ -609,8 +609,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
    swigCPtr = cPtr;
    keyFormat = getKey_format();
    valueFormat = getValue_format();
-   keyPacker = new PackOutputStream(keyFormat);
-   valuePacker = new PackOutputStream(valueFormat);
+   keyPacker = new PackOutputStream(keyFormat, _java_raw());
+   valuePacker = new PackOutputStream(valueFormat, _java_raw());
    wiredtigerJNI.AsyncOp__java_init(swigCPtr, this, this);
  }
 
@@ -1232,8 +1232,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
    swigCPtr = cPtr;
    keyFormat = getKey_format();
    valueFormat = getValue_format();
-   keyPacker = new PackOutputStream(keyFormat);
-   valuePacker = new PackOutputStream(valueFormat);
+   keyPacker = new PackOutputStream(keyFormat, _java_raw());
+   valuePacker = new PackOutputStream(valueFormat, _java_raw());
    wiredtigerJNI.Cursor__java_init(swigCPtr, this, this);
  }
 

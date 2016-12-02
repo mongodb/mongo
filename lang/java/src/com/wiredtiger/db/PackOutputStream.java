@@ -42,6 +42,7 @@ public class PackOutputStream {
     protected PackFormatInputStream format;
     protected ByteArrayOutputStream packed;
     protected byte[] intBuf;
+    protected boolean isRaw;
 
     /**
      * Constructor.
@@ -49,10 +50,11 @@ public class PackOutputStream {
      * \param format A String that contains the WiredTiger format that
      *               defines the layout of this packed value.
      */
-    public PackOutputStream(String format) {
-        this.format = new PackFormatInputStream(format, false);
-        intBuf = new byte[MAX_INT_BYTES];
-        packed = new ByteArrayOutputStream(100);
+    public PackOutputStream(String format, boolean isRaw) {
+        this.format = new PackFormatInputStream(format, isRaw);
+        this.intBuf = new byte[MAX_INT_BYTES];
+        this.packed = new ByteArrayOutputStream(100);
+        this.isRaw = isRaw;
     }
 
     /**
@@ -111,7 +113,9 @@ public class PackOutputStream {
     throws WiredTigerPackingException {
         int padBytes = 0;
 
-        format.checkType('U', false);
+        if (!isRaw) {
+            format.checkType('U', false);
+        }
         boolean havesize = format.hasLength();
         char type = format.getType();
         if (havesize) {
