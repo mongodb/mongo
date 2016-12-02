@@ -3092,7 +3092,7 @@ modules:
 - name: rocksdb
   repo: git@github.com:mongodb-partners/mongo-rocks.git
   prefix: src/mongo/db/modules
-  branch: master
+  branch: v3.4
 
 #######################################
 #            Buildvariants            #
