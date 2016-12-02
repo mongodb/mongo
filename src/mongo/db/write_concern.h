@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -42,14 +43,18 @@ class OpTime;
 }
 
 /**
+ * Returns true if 'cmdObj' has a 'writeConcern' field.
+ */
+bool commandSpecifiesWriteConcern(const BSONObj& cmdObj);
+
+/**
  * Attempts to extract a writeConcern from cmdObj.
  * Verifies that the writeConcern is of type Object (BSON type) and
  * that the resulting writeConcern is valid for this particular host.
  */
 StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* txn,
                                                     const BSONObj& cmdObj,
-                                                    const std::string& dbName,
-                                                    const bool supportsWriteConcern);
+                                                    const std::string& dbName);
 
 /**
  * Verifies that a WriteConcern is valid for this particular host and database.

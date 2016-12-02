@@ -1521,19 +1521,30 @@ bool Command::run(OperationContext* txn,
         replyBuilder->setMetadata(rpc::makeEmptyMetadata());
         return result;
     }
-    auto wcResult = extractWriteConcern(txn, cmd, db, supportsWriteConcern(cmd));
-    if (!wcResult.isOK()) {
-        auto result = appendCommandStatus(inPlaceReplyBob, wcResult.getStatus());
-        inPlaceReplyBob.doneFast();
-        replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-        return result;
-    }
+
     std::string errmsg;
     bool result;
     if (!supportsWriteConcern(cmd)) {
+        if (commandSpecifiesWriteConcern(cmd)) {
+            auto result = appendCommandStatus(
+                inPlaceReplyBob,
+                {ErrorCodes::InvalidOptions, "Command does not support writeConcern"});
+            inPlaceReplyBob.doneFast();
+            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+            return result;
+        }
+
         // TODO: remove queryOptions parameter from command's run method.
         result = run(txn, db, cmd, 0, errmsg, inPlaceReplyBob);
     } else {
+        auto wcResult = extractWriteConcern(txn, cmd, db);
+        if (!wcResult.isOK()) {
+            auto result = appendCommandStatus(inPlaceReplyBob, wcResult.getStatus());
+            inPlaceReplyBob.doneFast();
+            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+            return result;
+        }
+
         // Change the write concern while running the command.
         const auto oldWC = txn->getWriteConcern();
         ON_BLOCK_EXIT([&] { txn->setWriteConcern(oldWC); });
