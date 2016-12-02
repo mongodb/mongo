@@ -773,6 +773,19 @@ StatusWith<string> ShardingCatalogManagerImpl::addShard(
         return existingShard.getValue()->getName();
     }
 
+    // Force a reload of the ShardRegistry to ensure that, in case this addShard is to re-add a
+    // replica set that has recently been removed, we have detached the ReplicaSetMonitor for the
+    // set with that setName from the ReplicaSetMonitorManager and will create a new
+    // ReplicaSetMonitor when targeting the set below.
+    // Note: This is necessary because as of 3.4, removeShard is performed by mongos (unlike
+    // addShard), so the ShardRegistry is not synchronously reloaded on the config server when a
+    // shard is removed.
+    if (!Grid::get(txn)->shardRegistry()->reload(txn)) {
+        // If the first reload joined an existing one, call reload again to ensure the reload is
+        // fresh.
+        Grid::get(txn)->shardRegistry()->reload(txn);
+    }
+
     // TODO: Don't create a detached Shard object, create a detached RemoteCommandTargeter instead.
     const std::shared_ptr<Shard> shard{
         Grid::get(txn)->shardRegistry()->createConnection(shardConnectionString)};
