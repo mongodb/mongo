@@ -6,6 +6,7 @@ env.Library(
     target="cluster_query",
     source=[
         "cluster_find.cpp",
+        "cluster_query_knobs.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands',
