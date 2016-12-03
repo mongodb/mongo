@@ -45,7 +45,7 @@ if 'enterprise' in env['MONGO_MODULES']:
   msi_edition = 'Enterprise'
   msi_flavor = '2008R2Plus'
   msi_platform = 'x64'
-  upgrade_code = '7C0EF607-3C54-4365-98F4-259C15502BC5'
+  upgrade_code = '822C75A4-40BA-456B-91D3-C339155F0F90'
 # Community
 else:
   if has_option('ssl'):
@@ -55,18 +55,18 @@ else:
   if env['TARGET_ARCH'] == 'i386':
     msi_platform = 'x86'
     msi_flavor = ''
-    upgrade_code = '5308B51A-A882-47BF-917A-E506A990DA3C'
+    upgrade_code = '480C63DF-8F9F-46BE-BD24-F16E9E992F4D'
   else:
     msi_platform = 'x64'
     if env.get('WIN_VERSION_MIN') == 'ws08r2' or env.get('WIN_VERSION_MIN') == 'win7':
       msi_flavor = '2008R2Plus'
       if msi_edition == 'SSL':
-        upgrade_code = 'B4C6C314-4E88-4C1F-B708-0E7935DAE299'
+        upgrade_code = 'FDAA2775-060E-4C54-9C19-A84197F3070D'
       else:
-        upgrade_code = '3E874911-94EF-4E21-867F-32209F084449'
+        upgrade_code = '7BCCBD4E-AC8A-48BC-9922-E9EBB158A060'
     else:
       msi_flavor = 'Legacy'
-      upgrade_code = '9295A251-1B1F-45FB-96FF-35B57E490613'
+      upgrade_code = '3433D310-B4A0-4E5B-BB38-34FC140F06F1'
 
 if 'msi' in BUILD_TARGETS and msi_edition == 'SSL' and msi_flavor != '2008R2Plus':
   print "Building the MongoDB SSL MSI is only supported on Windows 2008 R2+ or Windows 7+ platforms."
@@ -98,11 +98,11 @@ major_version = "%s.%s" % (mv[0], mv[1])
 #    It allows upgrade from 3.2.0 to 3.2.1 in place instead of side-by-side.
 # 3. Update the check for the next major release below so we bump the GUIDs in the future.
 #
-if float(major_version) > 3.4:
+if float(major_version) > 3.6:
     # If you are troubleshooting this error, see the comment above
-    env.FatalError("The upgrade codes are out of date for this release. Please\n" +
-    "replace the existing GUIDs listed in this file with new GUIDs so" +
-    "side-by-side installation of major versions (i.e. 3.2, and 3.4) is" +
+    env.FatalError("The upgrade codes are out of date for this release. Please \n" +
+    "replace the existing GUIDs listed in this file with new GUIDs so " +
+    "side-by-side installation of major versions (i.e. 3.2, and 3.4) is " +
     "supported.")
 
 # Currently, we are planning to key the same upgrade code for each
