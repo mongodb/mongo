@@ -86,8 +86,8 @@ from packing import pack, unpack
 	if (*$1 != NULL) {
 		PY_CALLBACK *pcb;
 
-		if (__wt_calloc_def((WT_SESSION_IMPL *)(*$1), 1, &pcb) != 0)
-			SWIG_exception_fail(SWIG_MemoryError, "WT calloc failed");
+		if ((pcb = calloc(1, sizeof(PY_CALLBACK))) == NULL)
+			SWIG_exception_fail(SWIG_MemoryError, "calloc failed");
 		else {
 			Py_XINCREF($result);
 			pcb->pyobj = $result;
@@ -109,8 +109,8 @@ from packing import pack, unpack
 		PyObject_SetAttrString($result, "value_format",
 		    PyString_InternFromString((*$1)->value_format));
 
-		if (__wt_calloc_def((WT_ASYNC_OP_IMPL *)(*$1), 1, &pcb) != 0)
-			SWIG_exception_fail(SWIG_MemoryError, "WT calloc failed");
+		if ((pcb = calloc(1, sizeof(PY_CALLBACK))) == NULL)
+			SWIG_exception_fail(SWIG_MemoryError, "calloc failed");
 		else {
 			pcb->pyobj = $result;
 			Py_XINCREF(pcb->pyobj);
@@ -141,8 +141,8 @@ from packing import pack, unpack
 		PyObject_SetAttrString($result, "value_format",
 		    PyString_InternFromString((*$1)->value_format));
 
-		if (__wt_calloc_def((WT_SESSION_IMPL *)(*$1)->session, 1, &pcb) != 0)
-			SWIG_exception_fail(SWIG_MemoryError, "WT calloc failed");
+		if ((pcb = calloc(1, sizeof(PY_CALLBACK))) == NULL)
+			SWIG_exception_fail(SWIG_MemoryError, "calloc failed");
 		else {
 			Py_XINCREF($result);
 			pcb->pyobj = $result;
@@ -1070,7 +1070,7 @@ sessionCloseHandler(WT_SESSION *session_arg)
 	session->lang_private = NULL;
 	if (pcb != NULL)
 		ret = pythonClose(pcb);
-	__wt_free(session, pcb);
+	free(pcb);
 
 	return (ret);
 }
@@ -1087,7 +1087,7 @@ cursorCloseHandler(WT_CURSOR *cursor)
 	cursor->lang_private = NULL;
 	if (pcb != NULL)
 		ret = pythonClose(pcb);
-	__wt_free((WT_SESSION_IMPL *)cursor->session, pcb);
+	free(pcb);
 
 	return (ret);
 }
@@ -1102,7 +1102,7 @@ sessionFreeHandler(WT_SESSION *session_arg)
 	session = (WT_SESSION_IMPL *)session_arg;
 	pcb = (PY_CALLBACK *)session->lang_private;
 	session->lang_private = NULL;
-	__wt_free(session, pcb);
+	free(pcb);
 	return (0);
 }
 
@@ -1114,7 +1114,7 @@ cursorFreeHandler(WT_CURSOR *cursor)
 
 	pcb = (PY_CALLBACK *)cursor->lang_private;
 	cursor->lang_private = NULL;
-	__wt_free((WT_SESSION_IMPL *)cursor->session, pcb);
+	free(pcb);
 	return (0);
 }
 
@@ -1191,7 +1191,7 @@ err:		__wt_err(session, ret, "python async callback error");
 		if ((t_ret = pythonClose(pcb) != 0) && ret == 0)
 			ret = t_ret;
 	}
-	__wt_free(session, pcb);
+	free(pcb);
 
 	if (ret == 0 && (opret == 0 || opret == WT_NOTFOUND))
 		return (0);

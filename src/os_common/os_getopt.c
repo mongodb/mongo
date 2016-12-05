@@ -79,6 +79,7 @@ char	*__wt_optarg;		/* argument associated with option */
 int
 __wt_getopt(
     const char *progname, int nargc, char * const *nargv, const char *ostr)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	static const char *place = EMSG;	/* option letter processing */
 	const char *oli;			/* option letter list index */
