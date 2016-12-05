@@ -37,21 +37,24 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
+namespace {
 
 using std::unique_ptr;
 using std::string;
 
-namespace {
+stdx::function<std::unique_ptr<KVHarnessHelper>()> basicFactory =
+    []() -> std::unique_ptr<KVHarnessHelper> { fassertFailed(40355); };
+
 class MyOperationContext : public OperationContextNoop {
 public:
     MyOperationContext(KVEngine* engine) : OperationContextNoop(engine->newRecoveryUnit()) {}
 };
 
 const std::unique_ptr<ClockSource> clock = stdx::make_unique<ClockSourceMock>();
-}
 
 TEST(KVEngineTestHarness, SimpleRS1) {
     unique_ptr<KVHarnessHelper> helper(KVHarnessHelper::create());
@@ -405,4 +408,15 @@ TEST(KVCatalogTest, DirectoryPerAndSplit1) {
         uow.commit();
     }
 }
-}
+
+}  // namespace
+
+std::unique_ptr<KVHarnessHelper> KVHarnessHelper::create() {
+    return basicFactory();
+};
+
+void KVHarnessHelper::registerFactory(stdx::function<std::unique_ptr<KVHarnessHelper>()> factory) {
+    basicFactory = std::move(factory);
+};
+
+}  // namespace mongo

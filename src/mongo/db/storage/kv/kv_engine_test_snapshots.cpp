@@ -168,7 +168,7 @@ public:
     }
 
     void setUp() override {
-        helper.reset(KVHarnessHelper::create());
+        helper = KVHarnessHelper::create();
         engine = helper->getEngine();
         snapshotManager = helper->getEngine()->getSnapshotManager();
 

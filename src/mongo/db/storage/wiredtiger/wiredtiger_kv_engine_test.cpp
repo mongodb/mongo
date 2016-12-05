@@ -33,6 +33,7 @@
 
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 
+#include "mongo/base/init.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/stdx/memory.h"
@@ -40,6 +41,7 @@
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
+namespace {
 
 class WiredTigerKVHarnessHelper : public KVHarnessHelper {
 public:
@@ -69,7 +71,14 @@ private:
     std::unique_ptr<WiredTigerKVEngine> _engine;
 };
 
-KVHarnessHelper* KVHarnessHelper::create() {
-    return new WiredTigerKVHarnessHelper();
+std::unique_ptr<KVHarnessHelper> makeHelper() {
+    return stdx::make_unique<WiredTigerKVHarnessHelper>();
 }
+
+MONGO_INITIALIZER(RegisterKVHarnessFactory)(InitializerContext*) {
+    KVHarnessHelper::registerFactory(makeHelper);
+    return Status::OK();
 }
+
+}  // namespace
+}  // namespace mongo
