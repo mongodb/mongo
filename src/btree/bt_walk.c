@@ -48,13 +48,13 @@ retry:	WT_INTL_INDEX_GET(session, ref->home, pindex);
 	while (++i < pindex->entries)
 		if (pindex->index[i] == ref) {
 			*pindexp = pindex;
-			*slotp = ref->pindex_hint = i;
+			*slotp = i;
 			return;
 		}
 	for (i = 0; i < pindex->entries; ++i)
 		if (pindex->index[i] == ref) {
 			*pindexp = pindex;
-			*slotp = ref->pindex_hint = i;
+			*slotp = i;
 			return;
 		}
 
