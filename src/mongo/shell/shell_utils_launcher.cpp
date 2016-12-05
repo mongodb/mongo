@@ -260,24 +260,29 @@ void ProgramOutputMultiplexer::clear() {
 }
 
 ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env) {
-    verify(!args.isEmpty());
+    uassert(ErrorCodes::FailedToParse,
+            "cannot pass an empty argument to ProgramRunner",
+            !args.isEmpty());
 
     string program(args.firstElement().valuestrsafe());
-    verify(!program.empty());
+    uassert(ErrorCodes::FailedToParse,
+            "invalid program name passed to ProgramRunner",
+            !program.empty());
     boost::filesystem::path programPath = findProgram(program);
+    boost::filesystem::path programName = programPath.stem();
 
     string prefix("mongod-");
-    bool isMongodProgram =
-        string("mongod") == program || program.compare(0, prefix.size(), prefix) == 0;
+    bool isMongodProgram = string("mongod") == programName ||
+        programName.string().compare(0, prefix.size(), prefix) == 0;
     prefix = "mongos-";
-    bool isMongosProgram =
-        string("mongos") == program || program.compare(0, prefix.size(), prefix) == 0;
+    bool isMongosProgram = string("mongos") == programName ||
+        programName.string().compare(0, prefix.size(), prefix) == 0;
 
     if (isMongodProgram) {
         _name = "d";
     } else if (isMongosProgram) {
         _name = "s";
-    } else if (program == "mongobridge") {
+    } else if (programName == "mongobridge") {
         _name = "b";
     } else {
         _name = "sh";
@@ -356,7 +361,7 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env) {
         ++environEntry;
     }
 #endif
-    bool needsPort = isMongodProgram || isMongosProgram || (program == "mongobridge");
+    bool needsPort = isMongodProgram || isMongosProgram || (programName == "mongobridge");
     if (!needsPort) {
         _port = -1;
     }
@@ -474,6 +479,11 @@ boost::filesystem::path ProgramRunner::findProgram(const string& prog) {
         p = prog + ".exe";
     }
 #endif
+
+    // The file could exist if it is specified as a full path.
+    if (p.is_absolute() && boost::filesystem::exists(p)) {
+        return p;
+    }
 
     // Check if the binary exists in the current working directory
     boost::filesystem::path t = boost::filesystem::current_path() / p;

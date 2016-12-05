@@ -210,7 +210,8 @@ allocatePorts = function(numPorts) {
 };
 
 function startParallelShell(jsCode, port, noConnect) {
-    var args = ["mongo"];
+    var shellPath = MongoRunner.mongoShellPath;
+    var args = [shellPath];
 
     if (typeof db == "object") {
         var hostAndPort = db.getMongo().host.split(':');

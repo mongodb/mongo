@@ -70,6 +70,10 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     MongoRunner.dataDir = "/data/db";
     MongoRunner.dataPath = "/data/db/";
 
+    MongoRunner.mongodPath = "mongod";
+    MongoRunner.mongosPath = "mongos";
+    MongoRunner.mongoShellPath = "mongo";
+
     MongoRunner.VersionSub = function(pattern, version) {
         this.pattern = pattern;
         this.version = version;
@@ -722,7 +726,8 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                 resetDbpath(opts.dbpath);
             }
 
-            opts = MongoRunner.arrOptions("mongod", opts);
+            var mongodProgram = MongoRunner.mongodPath;
+            opts = MongoRunner.arrOptions(mongodProgram, opts);
         }
 
         var mongod = MongoRunner._startWithArgs(opts, env, waitForConnect);
@@ -759,8 +764,8 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             runId = opts.runId;
             waitForConnect = opts.waitForConnect;
             env = opts.env;
-
-            opts = MongoRunner.arrOptions("mongos", opts);
+            var mongosProgram = MongoRunner.mongosPath;
+            opts = MongoRunner.arrOptions(mongosProgram, opts);
         }
 
         var mongos = MongoRunner._startWithArgs(opts, env, waitForConnect);
