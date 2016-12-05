@@ -184,7 +184,7 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
         raise NotImplementedError("_append_logs must be implemented by _BaseBuildloggerHandler"
                                   " subclasses")
 
-    def flush_with_lock(self, close_called):
+    def _flush_buffer_with_lock(self, buf, close_called):
         """
         Ensures all logging output has been flushed to the buildlogger
         server.
@@ -194,7 +194,7 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
         called.
         """
 
-        self.retry_buffer.extend(self.buffer)
+        self.retry_buffer.extend(buf)
 
         if self._append_logs(self.retry_buffer):
             self.retry_buffer = []
@@ -208,8 +208,6 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
                 #       _fallback_buildlogger_handler().
                 loggers._BUILDLOGGER_FALLBACK.info(message)
             self.retry_buffer = []
-
-        self.buffer = []
 
 
 class BuildloggerTestHandler(_BaseBuildloggerHandler):

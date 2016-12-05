@@ -1,10 +1,10 @@
 """
 Alternative to the threading.Timer class.
 
-Enables a timer to be restarted without needing to construct a new thread
-each time. This is necessary to execute periodic actions, e.g. flushing
-log messages to buildlogger, while avoiding errors related to "can't start
-new thread" that would otherwise occur on Windows.
+Enables a timer to be restarted without needing to construct a new
+thread each time. This is necessary to execute periodic actions, e.g.
+flushing log messages to buildlogger, while avoiding errors related to
+"can't start new thread" that would otherwise occur on Windows.
 """
 
 from __future__ import absolute_import
@@ -32,8 +32,8 @@ class AlarmClock(threading.Thread):
         self.args = args if args is not None else []
         self.kwargs = kwargs if kwargs is not None else {}
 
-        self.lock = threading.Lock()
-        self.cond = threading.Condition(self.lock)
+        self.__lock = threading.Lock()
+        self.__cond = threading.Condition(self.__lock)
 
         self.snoozed = False  # canceled for one execution
         self.dismissed = False  # canceled for all time
@@ -44,9 +44,9 @@ class AlarmClock(threading.Thread):
         Disables the timer.
         """
 
-        with self.lock:
+        with self.__lock:
             self.dismissed = True
-            self.cond.notify_all()
+            self.__cond.notify_all()
 
         self.join()  # Tidy up the started thread.
 
@@ -54,24 +54,25 @@ class AlarmClock(threading.Thread):
 
     def snooze(self):
         """
-        Skips the next execution of 'func' if it has not already started.
+        Skips the next execution of 'func' if it has not already
+        started.
         """
 
-        with self.lock:
+        with self.__lock:
             if self.dismissed:
                 raise ValueError("Timer cannot be snoozed if it has been dismissed")
 
             self.snoozed = True
             self.restarted = False
-            self.cond.notify_all()
+            self.__cond.notify_all()
 
     def reset(self):
         """
-        Restarts the timer, causing it to wait 'interval' seconds before calling
-        'func' again.
+        Restarts the timer, causing it to wait 'interval' seconds before
+        calling 'func' again.
         """
 
-        with self.lock:
+        with self.__lock:
             if self.dismissed:
                 raise ValueError("Timer cannot be reset if it has been dismissed")
 
@@ -79,26 +80,43 @@ class AlarmClock(threading.Thread):
                 raise ValueError("Timer cannot be reset if it has not been snoozed")
 
             self.restarted = True
-            self.cond.notify_all()
+            self.__cond.notify_all()
+
+    def trigger(self):
+        """
+        Signals the timer, causing 'func' to execute sooner than waiting
+        for 'interval' seconds to pass.
+        """
+
+        with self.__lock:
+            if self.dismissed:
+                raise ValueError("Timer cannot be triggered if it has been dismissed")
+
+            if self.snoozed:
+                raise ValueError("Timer cannot be triggered if it has been snoozed")
+
+            self.__cond.notify_all()
 
     def run(self):
         """
-        Repeatedly calls 'func' with a delay of 'interval' seconds between executions.
+        Repeatedly calls 'func' with a delay of 'interval' seconds
+        between executions.
 
-        If the timer is snoozed before 'func' is called, then it waits to be reset.
-        After it has been reset, the timer will again wait 'interval' seconds and
-        then try to call 'func'.
+        If the timer is snoozed before 'func' is called, then it waits
+        to be reset.  After it has been reset, the timer will again wait
+        'interval' seconds and then try to call 'func'.
 
-        If the timer is dismissed, then no subsequent executions of 'func' are made.
+        If the timer is dismissed, then no subsequent executions of
+        'func' are made.
         """
 
         while True:
-            with self.lock:
+            with self.__lock:
                 if self.dismissed:
                     return
 
                 # Wait for the specified amount of time.
-                self.cond.wait(self.interval)
+                self.__cond.wait(self.interval)
 
                 if self.dismissed:
                     return
@@ -106,7 +124,7 @@ class AlarmClock(threading.Thread):
                 # If the timer was snoozed, then it should wait to be reset.
                 if self.snoozed:
                     while not self.restarted:
-                        self.cond.wait()
+                        self.__cond.wait()
 
                         if self.dismissed:
                             return
@@ -120,6 +138,6 @@ class AlarmClock(threading.Thread):
             self.func(*self.args, **self.kwargs)
 
             # Reacquire the lock.
-            with self.lock:
+            with self.__lock:
                 # Ignore snoozes that took place while the function was being executed.
                 self.snoozed = False
