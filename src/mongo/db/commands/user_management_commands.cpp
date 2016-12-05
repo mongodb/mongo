@@ -2218,19 +2218,19 @@ public:
                 rolesArrayBuilder.append(rolesDocs[i]);
             }
             result.append("roles", rolesArrayBuilder.arr());
-        }
-
-        BSONObj roleDetails;
-        status = getGlobalAuthorizationManager()->getRolesDescription(
-            txn, args.roleNames, args.privilegeFormat, &roleDetails);
-        if (!status.isOK()) {
-            return appendCommandStatus(result, status);
-        }
-
-        if (args.privilegeFormat == PrivilegeFormat::kShowAsUserFragment) {
-            result.append("userFragment", roleDetails);
         } else {
-            result.append("roles", BSONArray(roleDetails));
+            BSONObj roleDetails;
+            status = getGlobalAuthorizationManager()->getRolesDescription(
+                txn, args.roleNames, args.privilegeFormat, &roleDetails);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+
+            if (args.privilegeFormat == PrivilegeFormat::kShowAsUserFragment) {
+                result.append("userFragment", roleDetails);
+            } else {
+                result.append("roles", BSONArray(roleDetails));
+            }
         }
 
         return true;
