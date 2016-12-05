@@ -29,6 +29,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/s/type_shard_identity.h"
