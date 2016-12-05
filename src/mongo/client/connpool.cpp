@@ -62,15 +62,12 @@ PoolForHost::~PoolForHost() {
 }
 
 void PoolForHost::clear() {
-    while (!_pool.empty()) {
-        StoredConnection sc = _pool.top();
-        delete sc.conn;
-        _pool.pop();
-    }
+    _pool = decltype(_pool){};
 }
 
-void PoolForHost::done(DBConnectionPool* pool, DBClientBase* c) {
-    bool isFailed = c->isFailed();
+void PoolForHost::done(DBConnectionPool* pool, DBClientBase* c_raw) {
+    std::unique_ptr<DBClientBase> c{c_raw};
+    const bool isFailed = c->isFailed();
 
     --_checkedOut;
 
@@ -88,11 +85,10 @@ void PoolForHost::done(DBConnectionPool* pool, DBClientBase* c) {
     if (isFailed || isBroken ||
         // We have a pool size that we need to enforce
         (_maxPoolSize >= 0 && static_cast<int>(_pool.size()) >= _maxPoolSize)) {
-        pool->onDestroy(c);
-        delete c;
+        pool->onDestroy(c.get());
     } else {
         // The connection is probably fine, save for later
-        _pool.push(c);
+        _pool.push(std::move(c));
     }
 }
 
@@ -114,57 +110,50 @@ bool PoolForHost::isBadSocketCreationTime(uint64_t microSec) {
 
 DBClientBase* PoolForHost::get(DBConnectionPool* pool, double socketTimeout) {
     while (!_pool.empty()) {
-        StoredConnection sc = _pool.top();
+        auto sc = std::move(_pool.top());
         _pool.pop();
 
         if (!sc.ok()) {
             _badConns++;
-            pool->onDestroy(sc.conn);
-            delete sc.conn;
+            pool->onDestroy(sc.conn.get());
             continue;
         }
 
         verify(sc.conn->getSoTimeout() == socketTimeout);
 
         ++_checkedOut;
-        return sc.conn;
+        return sc.conn.release();
     }
 
-    return NULL;
+    return nullptr;
 }
 
 void PoolForHost::flush() {
-    while (!_pool.empty()) {
-        StoredConnection c = _pool.top();
-        _pool.pop();
-        delete c.conn;
-    }
+    clear();
 }
 
 void PoolForHost::getStaleConnections(vector<DBClientBase*>& stale) {
     vector<StoredConnection> all;
     while (!_pool.empty()) {
-        StoredConnection c = _pool.top();
+        StoredConnection c = std::move(_pool.top());
         _pool.pop();
 
         if (c.ok()) {
-            all.push_back(c);
+            all.push_back(std::move(c));
         } else {
             _badConns++;
-            stale.push_back(c.conn);
+            stale.emplace_back(c.conn.release());
         }
     }
 
-    for (size_t i = 0; i < all.size(); i++) {
-        _pool.push(all[i]);
+    for (auto& conn : all) {
+        _pool.push(std::move(conn));
     }
 }
 
 
-PoolForHost::StoredConnection::StoredConnection(DBClientBase* c) {
-    conn = c;
-    when = time(0);
-}
+PoolForHost::StoredConnection::StoredConnection(std::unique_ptr<DBClientBase> c)
+    : conn(std::move(c)), when(time(nullptr)) {}
 
 bool PoolForHost::StoredConnection::ok() {
     // Poke the connection to see if we're still ok

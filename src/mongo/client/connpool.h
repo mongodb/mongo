@@ -139,11 +139,11 @@ public:
 
 private:
     struct StoredConnection {
-        StoredConnection(DBClientBase* c);
+        StoredConnection(std::unique_ptr<DBClientBase> c);
 
         bool ok();
 
-        DBClientBase* conn;
+        std::unique_ptr<DBClientBase> conn;
         time_t when;
     };
 
