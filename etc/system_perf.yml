@@ -496,6 +496,44 @@ tasks:
     - func: "make test log artifact"
     - func: "analyze"
 
+- name: secondary_performance_WT
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "wiredTiger"
+        setup: "replica-2node"
+    - func: "run test"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "benchRun"
+        testList: "secondary_performance"
+    - func: "make test log artifact"
+    - func: "analyze"
+
+- name: secondary_performance_MMAPv1
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "mmapv1"
+        setup: "replica-2node"
+    - func: "run test"
+      vars:
+        storageEngine: "mmapv1"
+        test: "benchRun"
+        testList: "secondary_performance"
+    - func: "make test log artifact"
+    - func: "analyze"
+
 - name: industry_benchmarks_WT_oplog_comp
   depends_on:
     - name: industry_benchmarks_WT
@@ -743,6 +781,8 @@ buildvariants:
     - name: core_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: core_workloads_MMAPv1
+    - name: secondary_performance_WT
+    - name: secondary_performance_MMAPv1
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
