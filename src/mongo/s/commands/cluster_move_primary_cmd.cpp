@@ -93,7 +93,11 @@ public:
     }
 
     virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
-        return cmdObj.firstElement().str();
+        const auto nsElt = cmdObj.firstElement();
+        uassert(ErrorCodes::InvalidNamespace,
+                "'movePrimary' must be of type String",
+                nsElt.type() == BSONType::String);
+        return nsElt.str();
     }
 
     virtual bool run(OperationContext* txn,
@@ -104,10 +108,10 @@ public:
                      BSONObjBuilder& result) {
         const string dbname = parseNs("", cmdObj);
 
-        if (dbname.empty() || !nsIsDbOnly(dbname)) {
-            errmsg = "invalid db name specified: " + dbname;
-            return false;
-        }
+        uassert(
+            ErrorCodes::InvalidNamespace,
+            str::stream() << "invalid db name specified: " << dbname,
+            NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
 
         if (dbname == "admin" || dbname == "config" || dbname == "local") {
             errmsg = "can't move primary for " + dbname + " database";
@@ -124,7 +128,11 @@ public:
 
         shared_ptr<DBConfig> config = status.getValue();
 
-        const string to = cmdObj["to"].valuestrsafe();
+        const auto toElt = cmdObj["to"];
+        uassert(ErrorCodes::TypeMismatch,
+                "'to' must be of type String",
+                toElt.type() == BSONType::String);
+        const std::string to = toElt.str();
         if (!to.size()) {
             errmsg = "you have to specify where you want to move it";
             return false;

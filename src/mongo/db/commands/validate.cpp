@@ -87,9 +87,8 @@ public:
             return true;
         }
 
-        string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
+        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
 
-        NamespaceString ns_string(ns);
         const bool full = cmdObj["full"].trueValue();
         const bool scanData = cmdObj["scandata"].trueValue();
 
@@ -101,20 +100,20 @@ public:
             level = kValidateRecordStore;
         }
 
-        if (!ns_string.isNormal() && full) {
+        if (!nss.isNormal() && full) {
             errmsg = "Can only run full validate on a regular collection";
             return false;
         }
 
         if (!serverGlobalParams.quiet) {
-            LOG(0) << "CMD: validate " << ns;
+            LOG(0) << "CMD: validate " << nss.ns();
         }
 
-        AutoGetDb ctx(txn, ns_string.db(), MODE_IX);
-        Lock::CollectionLock collLk(txn->lockState(), ns_string.ns(), MODE_X);
-        Collection* collection = ctx.getDb() ? ctx.getDb()->getCollection(ns_string) : NULL;
+        AutoGetDb ctx(txn, nss.db(), MODE_IX);
+        Lock::CollectionLock collLk(txn->lockState(), nss.ns(), MODE_X);
+        Collection* collection = ctx.getDb() ? ctx.getDb()->getCollection(nss) : NULL;
         if (!collection) {
-            if (ctx.getDb() && ctx.getDb()->getViewCatalog()->lookup(txn, ns_string.ns())) {
+            if (ctx.getDb() && ctx.getDb()->getViewCatalog()->lookup(txn, nss.ns())) {
                 errmsg = "Cannot validate a view";
                 return appendCommandStatus(result, {ErrorCodes::CommandNotSupportedOnView, errmsg});
             }
@@ -123,7 +122,7 @@ public:
             return false;
         }
 
-        result.append("ns", ns);
+        result.append("ns", nss.ns());
 
         ValidateResults results;
         Status status = collection->validate(txn, level, &results, &result);

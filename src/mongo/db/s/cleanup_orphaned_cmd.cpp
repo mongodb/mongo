@@ -214,15 +214,10 @@ public:
             return false;
         }
 
-        if (ns == "") {
-            errmsg = "no collection name specified";
-            return false;
-        }
-
-        if (!NamespaceString(ns).isValid()) {
-            errmsg = "invalid namespace";
-            return false;
-        }
+        const NamespaceString nss(ns);
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid namespace: " << nss.ns(),
+                nss.isValid());
 
         BSONObj startingFromKey;
         if (!FieldParser::extract(cmdObj, startingFromKeyField, &startingFromKey, &errmsg)) {
@@ -243,7 +238,7 @@ public:
         }
 
         ChunkVersion shardVersion;
-        Status status = shardingState->refreshMetadataNow(txn, NamespaceString(ns), &shardVersion);
+        Status status = shardingState->refreshMetadataNow(txn, nss, &shardVersion);
         if (!status.isOK()) {
             if (status.code() == ErrorCodes::RemoteChangeDetected) {
                 warning() << "Shard version in transition detected while refreshing "
@@ -255,8 +250,8 @@ public:
         }
 
         BSONObj stoppedAtKey;
-        CleanupResult cleanupResult = cleanupOrphanedData(
-            txn, NamespaceString(ns), startingFromKey, writeConcern, &stoppedAtKey, &errmsg);
+        CleanupResult cleanupResult =
+            cleanupOrphanedData(txn, nss, startingFromKey, writeConcern, &stoppedAtKey, &errmsg);
 
         if (cleanupResult == CleanupResult_Error) {
             return false;

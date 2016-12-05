@@ -96,7 +96,7 @@ public:
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) final {
-        NamespaceString nss(parseNs(dbname, cmdObj));
+        const NamespaceString nss(parseNs(dbname, cmdObj));
         auto hasTerm = cmdObj.hasField(kTermField);
         return AuthorizationSession::get(client)->checkAuthForFind(nss, hasTerm);
     }
@@ -107,13 +107,7 @@ public:
                    ExplainCommon::Verbosity verbosity,
                    const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                    BSONObjBuilder* out) const final {
-        const string fullns = parseNs(dbname, cmdObj);
-        const NamespaceString nss(fullns);
-        if (!nss.isValid()) {
-            return {ErrorCodes::InvalidNamespace,
-                    str::stream() << "Invalid collection name: " << nss.ns()};
-        }
-
+        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
         // Parse the command BSON to a QueryRequest.
         bool isExplain = true;
         auto qr = QueryRequest::makeFromFindCommand(std::move(nss), cmdObj, isExplain);
@@ -160,12 +154,7 @@ public:
         // We count find command as a query op.
         globalOpCounters.gotQuery();
 
-        const NamespaceString nss(parseNs(dbname, cmdObj));
-        if (!nss.isValid()) {
-            return appendCommandStatus(result,
-                                       {ErrorCodes::InvalidNamespace,
-                                        str::stream() << "Invalid collection name: " << nss.ns()});
-        }
+        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
 
         const bool isExplain = false;
         auto qr = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);

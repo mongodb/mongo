@@ -124,7 +124,7 @@ public:
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) override {
-        NamespaceString nss(parseNs(dbname, cmdObj));
+        const NamespaceString nss(parseNs(dbname, cmdObj));
         auto hasTerm = cmdObj.hasField(kTermField);
         return AuthorizationSession::get(client)->checkAuthForFind(nss, hasTerm);
     }

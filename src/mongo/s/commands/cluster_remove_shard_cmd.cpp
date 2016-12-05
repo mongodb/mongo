@@ -85,7 +85,11 @@ public:
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
-        const string target = cmdObj.firstElement().valuestrsafe();
+        uassert(ErrorCodes::TypeMismatch,
+                str::stream() << "Field '" << cmdObj.firstElement().fieldName()
+                              << "' must be of type String",
+                cmdObj.firstElement().type() == BSONType::String);
+        const string target = cmdObj.firstElement().str();
 
         const auto shardStatus = grid.shardRegistry()->getShard(txn, ShardId(target));
         if (!shardStatus.isOK()) {

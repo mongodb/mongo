@@ -29,7 +29,7 @@
     // Collections that start with 'system.' that are not special to MongoDB fail with a different
     // error code.
     assert.commandFailedWithCode(viewsDB.runCommand({create: "system.foo", viewOn: "collection"}),
-                                 ErrorCodes.BadValue,
+                                 ErrorCodes.InvalidNamespace,
                                  "Created an illegal view named 'system.foo'");
 
     // Create a collection for test purposes.
@@ -79,8 +79,8 @@
     assert.commandFailed(viewsDB.runCommand({create: "", viewOn: "collection", pipeline: pipe}));
     assert.commandFailedWithCode(
         viewsDB.runCommand({create: "system.local.new", viewOn: "collection", pipeline: pipe}),
-        ErrorCodes.BadValue);
+        ErrorCodes.InvalidNamespace);
     assert.commandFailedWithCode(
         viewsDB.runCommand({create: "dollar$", viewOn: "collection", pipeline: pipe}),
-        ErrorCodes.BadValue);
+        ErrorCodes.InvalidNamespace);
 }());

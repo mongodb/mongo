@@ -109,7 +109,11 @@ public:
 
         auto scopedCM = uassertStatusOK(ScopedChunkManager::refreshAndGet(txn, nss));
 
-        const string toString = cmdObj["to"].valuestrsafe();
+        const auto toElt = cmdObj["to"];
+        uassert(ErrorCodes::TypeMismatch,
+                "'to' must be of type String",
+                toElt.type() == BSONType::String);
+        const std::string toString = toElt.str();
         if (!toString.size()) {
             errmsg = "you have to specify where you want to move the chunk";
             return false;

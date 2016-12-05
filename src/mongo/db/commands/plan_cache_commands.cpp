@@ -115,8 +115,8 @@ bool PlanCacheCommand::run(OperationContext* txn,
                            int options,
                            string& errmsg,
                            BSONObjBuilder& result) {
-    string ns = parseNs(dbname, cmdObj);
-    Status status = runPlanCacheCommand(txn, ns, cmdObj, &result);
+    const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
+    Status status = runPlanCacheCommand(txn, nss.ns(), cmdObj, &result);
     return appendCommandStatus(result, status);
 }
 

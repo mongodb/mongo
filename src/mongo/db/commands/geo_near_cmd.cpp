@@ -110,7 +110,7 @@ public:
             return false;
         }
 
-        const NamespaceString nss(parseNs(dbname, cmdObj));
+        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
         AutoGetCollectionForRead ctx(txn, nss);
 
         Collection* collection = ctx.getCollection();

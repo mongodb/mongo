@@ -90,6 +90,9 @@ void parseWriteCommand(StringData dbName,
             // The key is the command name and the value is the collection name
             checkBSONType(String, field);
             op->ns = NamespaceString(dbName, field.valueStringData());
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Invalid namespace: " << op->ns.ns(),
+                    op->ns.isValid());
             firstElement = false;
             continue;
         }

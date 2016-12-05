@@ -999,7 +999,8 @@ StatusWith<unique_ptr<PlanExecutor>> getExecutorGroup(OperationContext* txn,
         unique_ptr<PlanStage> root =
             make_unique<GroupStage>(txn, request, ws.get(), new EOFStage(txn));
 
-        return PlanExecutor::make(txn, std::move(ws), std::move(root), request.ns, yieldPolicy);
+        return PlanExecutor::make(
+            txn, std::move(ws), std::move(root), request.ns.ns(), yieldPolicy);
     }
 
     const NamespaceString nss(request.ns);

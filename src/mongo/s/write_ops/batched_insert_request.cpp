@@ -120,6 +120,9 @@ bool BatchedInsertRequest::parseBSON(StringData dbName, const BSONObj& source, s
             if (fieldState == FieldParser::FIELD_INVALID)
                 return false;
             _ns = NamespaceString(dbName, temp);
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Invalid namespace: " << _ns.ns(),
+                    _ns.isValid());
             _isNSSet = fieldState == FieldParser::FIELD_SET;
         } else if (documents() == sourceEl.fieldName()) {
             FieldParser::FieldState fieldState =

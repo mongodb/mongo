@@ -279,7 +279,14 @@ void JSReducer::_reduce(const BSONList& tuples, BSONObj& key, int& endSizeEstima
 
 Config::Config(const string& _dbname, const BSONObj& cmdObj) {
     dbname = _dbname;
-    ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
+    uassert(ErrorCodes::TypeMismatch,
+            str::stream() << "'mapReduce' must be of type String",
+            cmdObj.firstElement().type() == BSONType::String);
+    const NamespaceString nss(dbname, cmdObj.firstElement().valueStringData());
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Invalid namespace: " << nss.ns(),
+            nss.isValid());
+    ns = nss.ns();
 
     verbose = cmdObj["verbose"].trueValue();
     jsMode = cmdObj["jsMode"].trueValue();
@@ -306,9 +313,12 @@ Config::Config(const string& _dbname, const BSONObj& cmdObj) {
     }
 
     if (outputOptions.outType != INMEMORY) {  // setup temp collection name
-        tempNamespace = str::stream()
-            << (outputOptions.outDB.empty() ? dbname : outputOptions.outDB) << ".tmp.mr."
-            << cmdObj.firstElement().String() << "_" << JOB_NUMBER.fetchAndAdd(1);
+        tempNamespace =
+            NamespaceString(outputOptions.outDB.empty() ? dbname : outputOptions.outDB,
+                            str::stream() << "tmp.mr." << cmdObj.firstElement().valueStringData()
+                                          << "_"
+                                          << JOB_NUMBER.fetchAndAdd(1))
+                .ns();
         incLong = tempNamespace + "_inc";
     }
 
@@ -1723,13 +1733,19 @@ public:
         ShardedConnectionInfo::addHook();
 
         // legacy name
-        string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
+        const auto shardedOutputCollectionElt = cmdObj["shardedOutputCollection"];
+        uassert(ErrorCodes::InvalidNamespace,
+                "'shardedOutputCollection' must be of type String",
+                shardedOutputCollectionElt.type() == BSONType::String);
+        const std::string shardedOutputCollection = shardedOutputCollectionElt.str();
         verify(shardedOutputCollection.size() > 0);
-        string inputNS;
+
+        std::string inputNS;
         if (cmdObj["inputDB"].type() == String) {
-            inputNS = cmdObj["inputDB"].String() + "." + shardedOutputCollection;
+            inputNS =
+                NamespaceString(cmdObj["inputDB"].valueStringData(), shardedOutputCollection).ns();
         } else {
-            inputNS = dbname + "." + shardedOutputCollection;
+            inputNS = NamespaceString(dbname, shardedOutputCollection).ns();
         }
 
         CurOp* curOp = CurOp::get(txn);

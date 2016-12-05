@@ -150,7 +150,6 @@ public:
             // Disable the last error object for the duration of the write
             LastError::Disabled disableLastError(cmdLastError);
 
-            // TODO: if we do namespace parsing, push this to the type
             if (!request.parseBSON(dbname, cmdObj, &errmsg) || !request.isValid(&errmsg)) {
                 // Batch parse failure
                 response.setOk(false);

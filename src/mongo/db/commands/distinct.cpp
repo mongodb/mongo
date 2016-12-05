@@ -117,8 +117,7 @@ public:
                            ExplainCommon::Verbosity verbosity,
                            const rpc::ServerSelectionMetadata&,
                            BSONObjBuilder* out) const {
-        const string ns = parseNs(dbname, cmdObj);
-        const NamespaceString nss(ns);
+        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
 
         const ExtensionsCallbackReal extensionsCallback(txn, &nss);
         auto parsedDistinct = ParsedDistinct::parse(txn, nss, cmdObj, extensionsCallback, true);
@@ -134,7 +133,7 @@ public:
                           "http://dochub.mongodb.org/core/3.4-feature-compatibility.");
         }
 
-        AutoGetCollectionOrViewForRead ctx(txn, ns);
+        AutoGetCollectionOrViewForRead ctx(txn, nss);
         Collection* collection = ctx.getCollection();
 
         if (ctx.getView()) {
@@ -151,7 +150,7 @@ public:
         }
 
         auto executor = getExecutorDistinct(
-            txn, collection, ns, &parsedDistinct.getValue(), PlanExecutor::YIELD_AUTO);
+            txn, collection, nss.ns(), &parsedDistinct.getValue(), PlanExecutor::YIELD_AUTO);
         if (!executor.isOK()) {
             return executor.getStatus();
         }
@@ -166,8 +165,7 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const string ns = parseNs(dbname, cmdObj);
-        const NamespaceString nss(ns);
+        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
 
         const ExtensionsCallbackReal extensionsCallback(txn, &nss);
         auto parsedDistinct = ParsedDistinct::parse(txn, nss, cmdObj, extensionsCallback, false);
@@ -185,7 +183,7 @@ public:
                        "http://dochub.mongodb.org/core/3.4-feature-compatibility."));
         }
 
-        AutoGetCollectionOrViewForRead ctx(txn, ns);
+        AutoGetCollectionOrViewForRead ctx(txn, nss);
         Collection* collection = ctx.getCollection();
 
         if (ctx.getView()) {
@@ -214,7 +212,7 @@ public:
         }
 
         auto executor = getExecutorDistinct(
-            txn, collection, ns, &parsedDistinct.getValue(), PlanExecutor::YIELD_AUTO);
+            txn, collection, nss.ns(), &parsedDistinct.getValue(), PlanExecutor::YIELD_AUTO);
         if (!executor.isOK()) {
             return appendCommandStatus(result, executor.getStatus());
         }

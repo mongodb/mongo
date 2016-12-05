@@ -142,7 +142,7 @@ Status userAllowedWriteNS(const NamespaceString& ns) {
 
 Status userAllowedWriteNS(StringData db, StringData coll) {
     if (coll == "system.profile") {
-        return Status(ErrorCodes::BadValue,
+        return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "cannot write to '" << db << ".system.profile'");
     }
     return userAllowedCreateNS(db, coll);
@@ -152,19 +152,19 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
     // validity checking
 
     if (db.size() == 0)
-        return Status(ErrorCodes::BadValue, "db cannot be blank");
+        return Status(ErrorCodes::InvalidNamespace, "db cannot be blank");
 
     if (!NamespaceString::validDBName(db, NamespaceString::DollarInDbNameBehavior::Allow))
-        return Status(ErrorCodes::BadValue, "invalid db name");
+        return Status(ErrorCodes::InvalidNamespace, "invalid db name");
 
     if (coll.size() == 0)
-        return Status(ErrorCodes::BadValue, "collection cannot be blank");
+        return Status(ErrorCodes::InvalidNamespace, "collection cannot be blank");
 
     if (!NamespaceString::validCollectionName(coll))
-        return Status(ErrorCodes::BadValue, "invalid collection name");
+        return Status(ErrorCodes::InvalidNamespace, "invalid collection name");
 
     if (db.size() + 1 /* dot */ + coll.size() > NamespaceString::MaxNsCollectionLen)
-        return Status(ErrorCodes::BadValue,
+        return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "fully qualified namespace " << db << '.' << coll
                                     << " is too long "
                                     << "(max is "
@@ -174,7 +174,7 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
     // check spceial areas
 
     if (db == "system")
-        return Status(ErrorCodes::BadValue, "cannot use 'system' database");
+        return Status(ErrorCodes::InvalidNamespace, "cannot use 'system' database");
 
 
     if (coll.startsWith("system.")) {
@@ -202,7 +202,7 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
             if (coll == "system.replset")
                 return Status::OK();
         }
-        return Status(ErrorCodes::BadValue,
+        return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "cannot write to '" << db << "." << coll << "'");
     }
 

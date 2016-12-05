@@ -129,7 +129,7 @@ public:
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return GetMoreRequest::parseNs(dbname, cmdObj);
+        return GetMoreRequest::parseNs(dbname, cmdObj).ns();
     }
 
     Status checkAuthForCommand(Client* client,

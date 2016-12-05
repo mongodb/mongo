@@ -234,14 +234,14 @@ public:
                              const string& dbName,
                              BSONObj& cmdObj,
                              vector<ShardId>& shardIds) {
-        const string fullns = dbName + '.' + cmdObj.firstElement().valuestrsafe();
+        const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
         auto status = Grid::get(txn)->catalogCache()->getDatabase(txn, dbName);
         uassertStatusOK(status.getStatus());
 
         shared_ptr<DBConfig> conf = status.getValue();
 
-        if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
+        if (!conf->isShardingEnabled() || !conf->isSharded(nss.ns())) {
             shardIds.push_back(conf->getPrimaryId());
         } else {
             Grid::get(txn)->shardRegistry()->getAllShardIds(&shardIds);
@@ -259,10 +259,10 @@ public:
                      int options,
                      string& errmsg,
                      BSONObjBuilder& result) {
-        const string fullns = parseNs(dbName, cmdObj);
+        const NamespaceString nss(parseNs(dbName, cmdObj));
 
         auto conf = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, dbName));
-        if (!conf->isSharded(fullns)) {
+        if (!conf->isSharded(nss.ns())) {
             return passthrough(txn, conf.get(), cmdObj, options, result);
         }
 
@@ -427,7 +427,7 @@ public:
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
-        NamespaceString nss(parseNs(dbname, cmdObj));
+        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
         return AuthorizationSession::get(client)->checkAuthForCollMod(nss, cmdObj);
     }
 
@@ -458,7 +458,7 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& output) {
-        const NamespaceString nss = parseNsCollectionRequired(dbName, cmdObj);
+        const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
         auto conf = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, dbName));
         if (!conf->isShardingEnabled() || !conf->isSharded(nss.ns())) {
@@ -514,7 +514,7 @@ public:
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
-        NamespaceString nss(parseNs(dbname, cmdObj));
+        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
         return AuthorizationSession::get(client)->checkAuthForCreate(nss, cmdObj);
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -567,20 +567,20 @@ public:
             return appendCommandStatus(result, status.getStatus());
         }
 
-        const NamespaceString fullns = parseNsCollectionRequired(dbName, cmdObj);
+        const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
-        log() << "DROP: " << fullns;
+        log() << "DROP: " << nss.ns();
 
         const auto& db = status.getValue();
-        if (!db->isShardingEnabled() || !db->isSharded(fullns.ns())) {
+        if (!db->isShardingEnabled() || !db->isSharded(nss.ns())) {
             log() << "\tdrop going to do passthrough";
             return passthrough(txn, db.get(), cmdObj, result);
         }
 
-        uassertStatusOK(Grid::get(txn)->catalogClient(txn)->dropCollection(txn, fullns));
+        uassertStatusOK(Grid::get(txn)->catalogClient(txn)->dropCollection(txn, nss));
 
         // Force a full reload next time the just dropped namespace is accessed
-        db->invalidateNs(fullns.ns());
+        db->invalidateNs(nss.ns());
 
         return true;
     }
@@ -606,17 +606,34 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        const string fullnsFrom = cmdObj.firstElement().valuestrsafe();
-        const string dbNameFrom = nsToDatabase(fullnsFrom);
+        const auto fullNsFromElt = cmdObj.firstElement();
+        uassert(ErrorCodes::InvalidNamespace,
+                "'renameCollection' must be of type String",
+                fullNsFromElt.type() == BSONType::String);
+        const NamespaceString fullnsFrom(fullNsFromElt.valueStringData());
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid source namespace: " << fullnsFrom.ns(),
+                fullnsFrom.isValid());
+        const string dbNameFrom = fullnsFrom.db().toString();
+
         auto confFrom =
             uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, dbNameFrom));
 
-        const string fullnsTo = cmdObj["to"].valuestrsafe();
-        const string dbNameTo = nsToDatabase(fullnsTo);
+        const auto fullnsToElt = cmdObj["to"];
+        uassert(ErrorCodes::InvalidNamespace,
+                "'to' must be of type String",
+                fullnsToElt.type() == BSONType::String);
+        const NamespaceString fullnsTo(fullnsToElt.valueStringData());
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid target namespace: " << fullnsTo.ns(),
+                fullnsTo.isValid());
+        const string dbNameTo = fullnsTo.db().toString();
         auto confTo = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, dbNameTo));
 
-        uassert(13138, "You can't rename a sharded collection", !confFrom->isSharded(fullnsFrom));
-        uassert(13139, "You can't rename to a sharded collection", !confTo->isSharded(fullnsTo));
+        uassert(
+            13138, "You can't rename a sharded collection", !confFrom->isSharded(fullnsFrom.ns()));
+        uassert(
+            13139, "You can't rename to a sharded collection", !confTo->isSharded(fullnsTo.ns()));
 
         auto shardTo = confTo->getPrimaryId();
         auto shardFrom = confFrom->getPrimaryId();
@@ -650,10 +667,13 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        const string todb = cmdObj.getStringField("todb");
-        uassert(ErrorCodes::EmptyFieldName, "missing todb argument", !todb.empty());
+        const auto todbElt = cmdObj["todb"];
         uassert(ErrorCodes::InvalidNamespace,
-                "invalid todb argument",
+                "'todb' must be of type String",
+                todbElt.type() == BSONType::String);
+        const std::string todb = todbElt.str();
+        uassert(ErrorCodes::InvalidNamespace,
+                "Invalid todb argument",
                 NamespaceString::validDBName(todb, NamespaceString::DollarInDbNameBehavior::Allow));
 
         auto scopedToDb = uassertStatusOK(ScopedShardDatabase::getOrCreate(txn, todb));
@@ -665,8 +685,15 @@ public:
         if (!fromhost.empty()) {
             return adminPassthrough(txn, scopedToDb.db(), cmdObj, result);
         } else {
-            const string fromdb = cmdObj.getStringField("fromdb");
-            uassert(13399, "need a fromdb argument", !fromdb.empty());
+            const auto fromDbElt = cmdObj["fromdb"];
+            uassert(ErrorCodes::InvalidNamespace,
+                    "'fromdb' must be of type String",
+                    fromDbElt.type() == BSONType::String);
+            const std::string fromdb = fromDbElt.str();
+            uassert(ErrorCodes::InvalidNamespace,
+                    "invalid fromdb argument",
+                    NamespaceString::validDBName(fromdb,
+                                                 NamespaceString::DollarInDbNameBehavior::Allow));
 
             shared_ptr<DBConfig> confFrom =
                 uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, fromdb));
@@ -714,10 +741,10 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        const string fullns = parseNs(dbName, cmdObj);
+        const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
         auto conf = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, dbName));
-        if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
+        if (!conf->isShardingEnabled() || !conf->isSharded(nss.ns())) {
             result.appendBool("sharded", false);
             result.append("primary", conf->getPrimaryId().toString());
 
@@ -726,7 +753,7 @@ public:
 
         result.appendBool("sharded", true);
 
-        shared_ptr<ChunkManager> cm = conf->getChunkManager(txn, fullns);
+        shared_ptr<ChunkManager> cm = conf->getChunkManager(txn, nss.ns());
         massert(12594, "how could chunk manager be null!", cm);
 
         BSONObjBuilder shardStats;
@@ -840,7 +867,7 @@ public:
             unscaledCollSize += shardAvgObjSize * shardObjCount;
         }
 
-        result.append("ns", fullns);
+        result.append("ns", nss.ns());
 
         for (map<string, long long>::iterator i = counts.begin(); i != counts.end(); ++i)
             result.appendNumber(i->first, i->second);
@@ -973,6 +1000,10 @@ public:
         return true;
     }
 
+    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+        return parseNsCollectionRequired(dbname, cmdObj).ns();
+    }
+
 } convertToCappedCmd;
 
 class GroupCmd : public NotAllowedOnShardedCollectionCmd {
@@ -994,8 +1025,16 @@ public:
         return true;
     }
 
-    virtual std::string parseNs(const std::string& dbName, const BSONObj& cmdObj) const {
-        return dbName + "." + cmdObj.firstElement().embeddedObjectUserCheck()["ns"].valuestrsafe();
+    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+        const auto nsElt = cmdObj.firstElement().embeddedObjectUserCheck()["ns"];
+        uassert(ErrorCodes::InvalidNamespace,
+                "'ns' must be of type String",
+                nsElt.type() == BSONType::String);
+        const NamespaceString nss(dbname, nsElt.valueStringData());
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid namespace: " << nss.ns(),
+                nss.isValid());
+        return nss.ns();
     }
 
     Status explain(OperationContext* txn,
@@ -1141,15 +1180,15 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const string fullns = parseNs(dbName, cmdObj);
+        const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
         auto status = Grid::get(txn)->catalogCache()->getDatabase(txn, dbName);
         if (!status.isOK()) {
-            return appendEmptyResultSet(result, status.getStatus(), fullns);
+            return appendEmptyResultSet(result, status.getStatus(), nss.ns());
         }
 
         shared_ptr<DBConfig> conf = status.getValue();
-        if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
+        if (!conf->isShardingEnabled() || !conf->isSharded(nss.ns())) {
 
             if (passthrough(txn, conf.get(), cmdObj, options, result)) {
                 return true;
@@ -1191,13 +1230,13 @@ public:
             return false;
         }
 
-        shared_ptr<ChunkManager> cm = conf->getChunkManager(txn, fullns);
+        shared_ptr<ChunkManager> cm = conf->getChunkManager(txn, nss.ns());
         massert(10420, "how could chunk manager be null!", cm);
 
         BSONObj query = getQuery(cmdObj);
         auto queryCollation = getCollation(cmdObj);
         if (!queryCollation.isOK()) {
-            return appendEmptyResultSet(result, queryCollation.getStatus(), fullns);
+            return appendEmptyResultSet(result, queryCollation.getStatus(), nss.ns());
         }
 
         // Construct collator for deduping.
@@ -1206,7 +1245,7 @@ public:
             auto statusWithCollator = CollatorFactoryInterface::get(txn->getServiceContext())
                                           ->makeFromBSON(queryCollation.getValue());
             if (!statusWithCollator.isOK()) {
-                return appendEmptyResultSet(result, statusWithCollator.getStatus(), fullns);
+                return appendEmptyResultSet(result, statusWithCollator.getStatus(), nss.ns());
             }
             collator = std::move(statusWithCollator.getValue());
         }
@@ -1227,7 +1266,7 @@ public:
                 continue;
             }
 
-            ShardConnection conn(shardStatus.getValue()->getConnString(), fullns);
+            ShardConnection conn(shardStatus.getValue()->getConnString(), nss.ns());
             BSONObj res;
             bool ok = conn->runCommand(conf->name(), cmdObj, res, options);
             conn.done();
@@ -1262,7 +1301,7 @@ public:
                    ExplainCommon::Verbosity verbosity,
                    const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                    BSONObjBuilder* out) const {
-        const NamespaceString nss = parseNsCollectionRequired(dbname, cmdObj);
+        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
 
         // Extract the targeting query.
         BSONObj targetingQuery;
@@ -1349,7 +1388,13 @@ public:
     }
 
     virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
-        std::string collectionName = cmdObj.getStringField("root");
+        std::string collectionName;
+        if (const auto rootElt = cmdObj["root"]) {
+            uassert(ErrorCodes::InvalidNamespace,
+                    "'root' must be of type String",
+                    rootElt.type() == BSONType::String);
+            collectionName = rootElt.str();
+        }
         if (collectionName.empty())
             collectionName = "fs";
         collectionName += ".chunks";
@@ -1372,14 +1417,14 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        const string fullns = parseNs(dbName, cmdObj);
+        const NamespaceString nss(parseNs(dbName, cmdObj));
 
         auto conf = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, dbName));
-        if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
+        if (!conf->isShardingEnabled() || !conf->isSharded(nss.ns())) {
             return passthrough(txn, conf.get(), cmdObj, result);
         }
 
-        shared_ptr<ChunkManager> cm = conf->getChunkManager(txn, fullns);
+        shared_ptr<ChunkManager> cm = conf->getChunkManager(txn, nss.ns());
         massert(13091, "how could chunk manager be null!", cm);
         if (SimpleBSONObjComparator::kInstance.evaluate(cm->getShardKeyPattern().toBSON() ==
                                                         BSON("files_id" << 1))) {
@@ -1387,7 +1432,7 @@ public:
 
             vector<Strategy::CommandResult> results;
             Strategy::commandOp(
-                txn, dbName, cmdObj, 0, fullns, finder, CollationSpec::kSimpleSpec, &results);
+                txn, dbName, cmdObj, 0, nss.ns(), finder, CollationSpec::kSimpleSpec, &results);
             verify(results.size() == 1);  // querying on shard key so should only talk to one shard
             BSONObj res = results.begin()->result;
 
@@ -1424,7 +1469,7 @@ public:
                                         dbName,
                                         shardCmd,
                                         0,
-                                        fullns,
+                                        nss.ns(),
                                         finder,
                                         CollationSpec::kSimpleSpec,
                                         &results);
@@ -1513,20 +1558,20 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-        const string fullns = parseNs(dbName, cmdObj);
+        const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
         auto conf = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, dbName));
-        if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
+        if (!conf->isShardingEnabled() || !conf->isSharded(nss.ns())) {
             return passthrough(txn, conf.get(), cmdObj, options, result);
         }
 
-        shared_ptr<ChunkManager> cm = conf->getChunkManager(txn, fullns);
+        shared_ptr<ChunkManager> cm = conf->getChunkManager(txn, nss.ns());
         massert(13500, "how could chunk manager be null!", cm);
 
         BSONObj query = getQuery(cmdObj);
         auto collation = getCollation(cmdObj);
         if (!collation.isOK()) {
-            return appendEmptyResultSet(result, collation.getStatus(), fullns);
+            return appendEmptyResultSet(result, collation.getStatus(), nss.ns());
         }
         set<ShardId> shardIds;
         cm->getShardIdsForQuery(txn, query, collation.getValue(), &shardIds);
@@ -1588,7 +1633,7 @@ public:
             // TODO: maybe shrink results if size() > limit
         }
 
-        result.append("ns", fullns);
+        result.append("ns", nss.ns());
         result.append("near", nearStr);
 
         int outCount = 0;
@@ -1758,7 +1803,8 @@ public:
 
         // Check for the listIndexes ActionType on the database, or find on system.indexes for pre
         // 3.0 systems.
-        NamespaceString ns(parseNs(dbname, cmdObj));
+        const NamespaceString ns(parseNsCollectionRequired(dbname, cmdObj));
+
         if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns),
                                                            ActionType::listIndexes) ||
             authzSession->isAuthorizedForActionsOnResource(

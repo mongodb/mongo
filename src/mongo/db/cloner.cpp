@@ -461,7 +461,7 @@ bool Cloner::copyCollection(OperationContext* txn,
 
             uassert(ErrorCodes::CommandNotSupportedOnView,
                     str::stream() << "copyCollection not supported for views. ns: "
-                                  << col["name"].valuestrsafe(),
+                                  << col["name"].valueStringData(),
                     !(status.isOK() && namespaceType == "view"));
         }
 

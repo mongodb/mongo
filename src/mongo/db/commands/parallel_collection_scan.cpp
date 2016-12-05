@@ -90,7 +90,7 @@ public:
                      int options,
                      string& errmsg,
                      BSONObjBuilder& result) {
-        const NamespaceString ns(parseNs(dbname, cmdObj));
+        const NamespaceString ns(parseNsCollectionRequired(dbname, cmdObj));
 
         AutoGetCollectionForRead ctx(txn, ns.ns());
 

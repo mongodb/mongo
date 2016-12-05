@@ -48,14 +48,17 @@ Status createCollection(OperationContext* txn,
 
     // Extract ns from first cmdObj element.
     BSONElement firstElt = it.next();
-    uassert(15888, "must pass name of collection to create", firstElt.valuestrsafe()[0] != '\0');
+    uassert(ErrorCodes::TypeMismatch,
+            str::stream() << "Expected first element to be of type String in: " << cmdObj,
+            firstElt.type() == BSONType::String);
+    uassert(15888, "must pass name of collection to create", !firstElt.valueStringData().empty());
 
-    Status status = userAllowedCreateNS(dbName, firstElt.valuestr());
+    Status status = userAllowedCreateNS(dbName, firstElt.valueStringData());
     if (!status.isOK()) {
         return status;
     }
 
-    NamespaceString nss(dbName, firstElt.valuestrsafe());
+    const NamespaceString nss(dbName, firstElt.valueStringData());
 
     // Build options object from remaining cmdObj elements.
     BSONObjBuilder optionsBuilder;

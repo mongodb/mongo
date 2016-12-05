@@ -68,7 +68,7 @@ public:
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) final {
-        NamespaceString nss(parseNs(dbname, cmdObj));
+        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
         return AuthorizationSession::get(client)->checkAuthForAggregate(nss, cmdObj);
     }
 
@@ -78,8 +78,7 @@ public:
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
-        const std::string fullns = parseNs(dbname, cmdObj);
-        const NamespaceString nss(fullns);
+        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
 
         ClusterAggregate::Namespaces nsStruct;
         nsStruct.requestedNss = nss;

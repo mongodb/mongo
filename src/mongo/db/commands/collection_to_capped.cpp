@@ -72,12 +72,17 @@ public:
         targetActions.addAction(ActionType::insert);
         targetActions.addAction(ActionType::createIndex);
         targetActions.addAction(ActionType::convertToCapped);
-        std::string collection = cmdObj.getStringField("toCollection");
-        uassert(16708, "bad 'toCollection' value", !collection.empty());
 
-        out->push_back(
-            Privilege(ResourcePattern::forExactNamespace(NamespaceString(dbname, collection)),
-                      targetActions));
+        const auto nssElt = cmdObj["toCollection"];
+        uassert(ErrorCodes::TypeMismatch,
+                "'toCollection' must be of type String",
+                nssElt.type() == BSONType::String);
+        const NamespaceString nss(dbname, nssElt.valueStringData());
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid target namespace: " << nss.ns(),
+                nss.isValid());
+
+        out->push_back(Privilege(ResourcePattern::forExactNamespace(nss), targetActions));
     }
     bool run(OperationContext* txn,
              const string& dbname,
@@ -85,12 +90,30 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        string from = jsobj.getStringField("cloneCollectionAsCapped");
-        string to = jsobj.getStringField("toCollection");
+        const auto fromElt = jsobj["cloneCollectionAsCapped"];
+        const auto toElt = jsobj["toCollection"];
+
+        uassert(ErrorCodes::TypeMismatch,
+                "'cloneCollectionAsCapped' must be of type String",
+                fromElt.type() == BSONType::String);
+        uassert(ErrorCodes::TypeMismatch,
+                "'toCollection' must be of type String",
+                toElt.type() == BSONType::String);
+
+        const StringData from(fromElt.valueStringData());
+        const StringData to(toElt.valueStringData());
+
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid source collection name: " << from,
+                NamespaceString::validCollectionName(from));
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid target collection name: " << to,
+                NamespaceString::validCollectionName(to));
+
         double size = jsobj.getField("size").number();
         bool temp = jsobj.getField("temp").trueValue();
 
-        if (from.empty() || to.empty() || size == 0) {
+        if (size == 0) {
             errmsg = "invalid command spec";
             return false;
         }
@@ -116,7 +139,8 @@ public:
                        str::stream() << "database " << dbname << " not found"));
         }
 
-        Status status = cloneCollectionAsCapped(txn, db, from, to, size, temp);
+        Status status =
+            cloneCollectionAsCapped(txn, db, from.toString(), to.toString(), size, temp);
         return appendCommandStatus(result, status);
     }
 } cmdCloneCollectionAsCapped;
@@ -152,16 +176,15 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        string shortSource = jsobj.getStringField("convertToCapped");
+        const NamespaceString nss(parseNsCollectionRequired(dbname, jsobj));
         double size = jsobj.getField("size").number();
 
-        if (shortSource.empty() || size == 0) {
+        if (size == 0) {
             errmsg = "invalid command spec";
             return false;
         }
 
-        return appendCommandStatus(
-            result, convertToCapped(txn, NamespaceString(dbname, shortSource), size));
+        return appendCommandStatus(result, convertToCapped(txn, nss, size));
     }
 
 } cmdConvertToCapped;

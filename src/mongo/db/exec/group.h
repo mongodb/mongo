@@ -30,6 +30,7 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/scripting/engine.h"
 
 namespace mongo {
@@ -41,7 +42,7 @@ class Collection;
  */
 struct GroupRequest {
     // Namespace to operate on (e.g. "foo.bar").
-    std::string ns;
+    NamespaceString ns;
 
     // A predicate describing the set of documents to group.
     BSONObj query;

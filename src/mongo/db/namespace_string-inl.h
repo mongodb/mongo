@@ -122,14 +122,17 @@ inline NamespaceString::NamespaceString() : _ns(), _dotIndex(0) {}
 inline NamespaceString::NamespaceString(StringData nsIn) {
     _ns = nsIn.toString();  // copy to our buffer
     _dotIndex = _ns.find('.');
+    uassert(ErrorCodes::InvalidNamespace,
+            "namespaces cannot have embedded null characters",
+            _ns.find('\0') == std::string::npos);
 }
 
 inline NamespaceString::NamespaceString(StringData dbName, StringData collectionName)
     : _ns(dbName.size() + collectionName.size() + 1, '\0') {
-    uassert(17235,
+    uassert(ErrorCodes::InvalidNamespace,
             "'.' is an invalid character in a database name",
             dbName.find('.') == std::string::npos);
-    uassert(17246,
+    uassert(ErrorCodes::InvalidNamespace,
             "Collection names cannot start with '.'",
             collectionName.empty() || collectionName[0] != '.');
     std::string::iterator it = std::copy(dbName.begin(), dbName.end(), _ns.begin());
@@ -139,7 +142,7 @@ inline NamespaceString::NamespaceString(StringData dbName, StringData collection
     _dotIndex = dbName.size();
     dassert(it == _ns.end());
     dassert(_ns[_dotIndex] == '.');
-    uassert(17295,
+    uassert(ErrorCodes::InvalidNamespace,
             "namespaces cannot have embedded null characters",
             _ns.find('\0') == std::string::npos);
 }

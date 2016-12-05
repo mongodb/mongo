@@ -106,13 +106,13 @@ string Command::parseNs(const string& dbname, const BSONObj& cmdObj) const {
     if (first.type() != mongo::String)
         return dbname;
 
-    return str::stream() << dbname << '.' << cmdObj.firstElement().valuestr();
+    return str::stream() << dbname << '.' << cmdObj.firstElement().valueStringData();
 }
 
 ResourcePattern Command::parseResourcePattern(const std::string& dbname,
                                               const BSONObj& cmdObj) const {
-    std::string ns = parseNs(dbname, cmdObj);
-    if (ns.find('.') == std::string::npos) {
+    const std::string ns = parseNs(dbname, cmdObj);
+    if (!NamespaceString::validCollectionComponent(ns)) {
         return ResourcePattern::forDatabaseName(ns);
     }
     return ResourcePattern::forExactNamespace(NamespaceString(ns));

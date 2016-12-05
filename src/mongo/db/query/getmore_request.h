@@ -69,7 +69,7 @@ struct GetMoreRequest {
      */
     BSONObj toBSON() const;
 
-    static std::string parseNs(const std::string& dbname, const BSONObj& cmdObj);
+    static NamespaceString parseNs(const std::string& dbname, const BSONObj& cmdObj);
 
     const NamespaceString nss;
     const CursorId cursorid;

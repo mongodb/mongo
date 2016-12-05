@@ -118,7 +118,7 @@ Status parseCursorResponse(const BSONObj& obj,
                                     << "' field must be a string: "
                                     << obj);
     }
-    NamespaceString tempNss(namespaceElement.valuestrsafe());
+    const NamespaceString tempNss(namespaceElement.valueStringData());
     if (!tempNss.isValid()) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "'" << kCursorFieldName << "." << kNamespaceFieldName

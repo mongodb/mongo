@@ -15,8 +15,7 @@
     var db2 = rst.getPrimary().getDB("db2");
 
     var res = db1.adminCommand({copydb: 1, fromdb: db1._name, todb: db2._name});
-    var badValueCode = 2;
-    assert.commandFailedWithCode(res, badValueCode);
+    assert.commandFailedWithCode(res, ErrorCodes.InvalidNamespace);
     assert.gt(res["errmsg"].indexOf("cannot write to 'db2.system.replset'"), -1);
     rst.awaitReplication();
 })();
