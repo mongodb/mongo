@@ -186,6 +186,10 @@ ClientCursorPin::ClientCursorPin(ClientCursorPin&& other) : _cursor(other._curso
 }
 
 ClientCursorPin& ClientCursorPin::operator=(ClientCursorPin&& other) {
+    if (this == &other) {
+        return *this;
+    }
+
     // The pinned cursor is being transferred to us from another pin. The 'other' pin must have a
     // pinned cursor, and we must not have a cursor.
     invariant(!_cursor);
