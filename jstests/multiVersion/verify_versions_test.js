@@ -20,7 +20,7 @@
 
     // The current version is in the 3.4 series. This has to be changed very time we bump
     // the major version pair, but it provides a useful test of assumptions.
-    assertBinVersionsEqual("3.4", version());
+    assertBinVersionsEqual("3.5", version());
 
     // "latest" is the same version as the shell, "last-stable" is not.
     assertBinVersionsEqual("latest", version());

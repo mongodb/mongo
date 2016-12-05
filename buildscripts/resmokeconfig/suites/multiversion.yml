@@ -8,6 +8,9 @@ selector:
     - jstests/multiVersion/transitioning_to_and_from_WT.js
     # TODO: SERVER-21578
     - jstests/multiVersion/balancer_multiVersion_detect.js
+    # SERVER-27107 Update these tests to work with the 3.4->3.6 upgrade path.
+    - jstests/multiVersion/add_shard_mixed_version.js
+    - jstests/multiVersion/new_mongos_old_mongod_wire_version_clash.js
 
 # Multiversion tests start their own mongod's.
 executor:
