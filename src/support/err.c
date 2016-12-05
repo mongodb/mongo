@@ -304,6 +304,7 @@ void
 __wt_err(WT_SESSION_IMPL *session, int error, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((cold))
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	va_list ap;
 

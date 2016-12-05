@@ -23,7 +23,7 @@ extern const char *__wt_path_separator(void) WT_GCC_FUNC_DECL_ATTRIBUTE((visibil
 extern bool __wt_has_priv(void) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern void __wt_stream_set_line_buffer(FILE *fp) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
 extern void __wt_stream_set_no_buffer(FILE *fp) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
-extern void __wt_sleep(uint64_t seconds, uint64_t micro_seconds) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
+extern void __wt_sleep(uint64_t seconds, uint64_t micro_seconds) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
 extern int __wt_thread_create(WT_SESSION_IMPL *session, wt_thread_t *tidret, WT_THREAD_CALLBACK(*func)(void *), void *arg) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern void __wt_thread_id(char *buf, size_t buflen) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));

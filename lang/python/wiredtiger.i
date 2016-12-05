@@ -366,11 +366,7 @@ retry:
 		SWIG_ERROR_IF_NOT_SET(result);
 	else if (result == EBUSY) {
 		SWIG_PYTHON_THREAD_BEGIN_ALLOW;
-%#if defined(_MSC_VER)
-		(void)Sleep(10);			/* ms */
-%#else
-		(void)usleep(10000);			/* us */
-%#endif
+		__wt_sleep(0, 10000);
 		SWIG_PYTHON_THREAD_END_ALLOW;
 		goto retry;
 	}
@@ -1153,8 +1149,6 @@ pythonAsyncCallback(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int opret,
 	PY_CALLBACK *pcb;
 	PyObject *arglist, *notify_method, *pyresult;
 	WT_ASYNC_OP_IMPL *op;
-	WT_EXTENSION_API *wt_api;
-	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
 
 	/*
@@ -1185,12 +1179,7 @@ pythonAsyncCallback(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int opret,
 	if (0) {
 		if (ret == 0)
 			ret = EINVAL;
-err:		wt_session = (WT_SESSION *)session;
-		wt_api = wt_session->
-		    connection->get_extension_api(wt_session->connection);
-		(void)wt_api->err_printf(wt_api, wt_session,
-		    "python async callback error: %s",
-		    wt_api->strerror(wt_api, wt_session, ret));
+err:		__wt_err(session, ret, "python async callback error");
 	}
 	Py_XDECREF(pyresult);
 	Py_XDECREF(notify_method);
