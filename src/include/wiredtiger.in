@@ -1641,6 +1641,10 @@ struct __wt_session {
 	 * including the specified name., a string; default empty.}
 	 * @config{
 	 * ),,}
+	 * @config{include_updates, make updates from the current transaction
+	 * visible to users of the named snapshot.  Transactions started with
+	 * such a named snapshot are restricted to being read-only., a boolean
+	 * flag; default \c false.}
 	 * @config{name, specify a name for the snapshot., a string; default
 	 * empty.}
 	 * @configend

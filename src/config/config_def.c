@@ -371,6 +371,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_snapshot[] = {
 	{ "drop", "category",
 	    NULL, NULL,
 	    confchk_WT_SESSION_snapshot_drop_subconfigs, 4 },
+	{ "include_updates", "boolean", NULL, NULL, NULL, 0 },
 	{ "name", "string", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
@@ -1142,8 +1143,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_WT_SESSION_salvage, 1
 	},
 	{ "WT_SESSION.snapshot",
-	  "drop=(all=false,before=,names=,to=),name=",
-	  confchk_WT_SESSION_snapshot, 2
+	  "drop=(all=false,before=,names=,to=),include_updates=false,name=",
+	  confchk_WT_SESSION_snapshot, 3
 	},
 	{ "WT_SESSION.strerror",
 	  "",

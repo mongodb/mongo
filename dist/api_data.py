@@ -1119,6 +1119,10 @@ methods = {
         Config('to', '', r'''
             drop all snapshots up to and including the specified name'''),
     ]),
+    Config('include_updates', 'false', r'''
+        make updates from the current transaction visible to users of the
+        named snapshot.  Transactions started with such a named snapshot are
+        restricted to being read-only''', type='boolean'),
     Config('name', '', r'''specify a name for the snapshot'''),
 ]),
 

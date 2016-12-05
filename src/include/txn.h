@@ -62,7 +62,7 @@ struct __wt_named_snapshot {
 
 	TAILQ_ENTRY(__wt_named_snapshot) q;
 
-	uint64_t pinned_id, snap_min, snap_max;
+	uint64_t id, pinned_id, snap_min, snap_max;
 	uint64_t *snapshot;
 	uint32_t snapshot_count;
 };
