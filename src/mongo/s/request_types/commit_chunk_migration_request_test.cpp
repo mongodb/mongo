@@ -55,23 +55,23 @@ const char kConfigSvrCommitChunkMigration[] = "_configsvrCommitChunkMigration";
 TEST(CommitChunkMigrationRequest, WithControlChunk) {
     BSONObjBuilder builder;
 
-    ChunkType migratedChunkType;
-    migratedChunkType.setMin(kKey0);
-    migratedChunkType.setMax(kKey1);
-
-    ChunkType controlChunkTypeTemp;
-    controlChunkTypeTemp.setMin(kKey2);
-    controlChunkTypeTemp.setMax(kKey3);
-    boost::optional<ChunkType> controlChunkType = std::move(controlChunkTypeTemp);
-
     ChunkVersion fromShardCollectionVersion(1, 2, OID::gen());
+
+    ChunkType migratedChunk;
+    migratedChunk.setMin(kKey0);
+    migratedChunk.setMax(kKey1);
+
+    ChunkType controlChunk;
+    controlChunk.setMin(kKey2);
+    controlChunk.setMax(kKey3);
+    boost::optional<ChunkType> controlChunkOpt = controlChunk;
 
     CommitChunkMigrationRequest::appendAsCommand(&builder,
                                                  kNamespaceString,
                                                  kShardId0,
                                                  kShardId1,
-                                                 migratedChunkType,
-                                                 controlChunkType,
+                                                 migratedChunk,
+                                                 controlChunkOpt,
                                                  fromShardCollectionVersion,
                                                  kShardHasDistributedLock);
 
@@ -83,21 +83,21 @@ TEST(CommitChunkMigrationRequest, WithControlChunk) {
     ASSERT_EQ(kNamespaceString, request.getNss());
     ASSERT_EQ(kShardId0, request.getFromShard());
     ASSERT_EQ(kShardId1, request.getToShard());
-    ASSERT_BSONOBJ_EQ(kKey0, request.getMigratedChunkRange().getMin());
-    ASSERT_BSONOBJ_EQ(kKey1, request.getMigratedChunkRange().getMax());
-    ASSERT(request.hasControlChunkRange());
-    ASSERT_BSONOBJ_EQ(kKey2, request.getControlChunkRange().getMin());
-    ASSERT_BSONOBJ_EQ(kKey3, request.getControlChunkRange().getMax());
-    ASSERT_EQ(fromShardCollectionVersion, request.getFromShardCollectionVersion());
+    ASSERT_BSONOBJ_EQ(kKey0, request.getMigratedChunk().getMin());
+    ASSERT_BSONOBJ_EQ(kKey1, request.getMigratedChunk().getMax());
+    ASSERT(request.getControlChunk());
+    ASSERT_BSONOBJ_EQ(kKey2, request.getControlChunk()->getMin());
+    ASSERT_BSONOBJ_EQ(kKey3, request.getControlChunk()->getMax());
+    ASSERT_EQ(fromShardCollectionVersion.epoch(), request.getCollectionEpoch());
     ASSERT_EQ(kShardHasDistributedLock, request.shardHasDistributedLock());
 }
 
 TEST(CommitChunkMigrationRequest, WithoutControlChunk) {
     BSONObjBuilder builder;
 
-    ChunkType migratedChunkType;
-    migratedChunkType.setMin(kKey0);
-    migratedChunkType.setMax(kKey1);
+    ChunkType migratedChunk;
+    migratedChunk.setMin(kKey0);
+    migratedChunk.setMax(kKey1);
 
     ChunkVersion fromShardCollectionVersion(1, 2, OID::gen());
 
@@ -105,7 +105,7 @@ TEST(CommitChunkMigrationRequest, WithoutControlChunk) {
                                                  kNamespaceString,
                                                  kShardId0,
                                                  kShardId1,
-                                                 migratedChunkType,
+                                                 migratedChunk,
                                                  boost::none,
                                                  fromShardCollectionVersion,
                                                  kShardHasDistributedLock);
@@ -118,10 +118,10 @@ TEST(CommitChunkMigrationRequest, WithoutControlChunk) {
     ASSERT_EQ(kNamespaceString, request.getNss());
     ASSERT_EQ(kShardId0, request.getFromShard());
     ASSERT_EQ(kShardId1, request.getToShard());
-    ASSERT_BSONOBJ_EQ(kKey0, request.getMigratedChunkRange().getMin());
-    ASSERT_BSONOBJ_EQ(kKey1, request.getMigratedChunkRange().getMax());
-    ASSERT(!request.hasControlChunkRange());
-    ASSERT_EQ(fromShardCollectionVersion, request.getFromShardCollectionVersion());
+    ASSERT_BSONOBJ_EQ(kKey0, request.getMigratedChunk().getMin());
+    ASSERT_BSONOBJ_EQ(kKey1, request.getMigratedChunk().getMax());
+    ASSERT(!request.getControlChunk());
+    ASSERT_EQ(fromShardCollectionVersion.epoch(), request.getCollectionEpoch());
     ASSERT_EQ(kShardHasDistributedLock, request.shardHasDistributedLock());
 }
 

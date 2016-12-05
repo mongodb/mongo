@@ -28,6 +28,9 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
@@ -81,6 +84,14 @@ public:
                             const OID& requestEpoch,
                             const std::vector<BSONObj>& chunkBoundaries,
                             const std::string& shardName) override;
+
+    StatusWith<BSONObj> commitChunkMigration(OperationContext* txn,
+                                             const NamespaceString& nss,
+                                             const ChunkType& migratedChunk,
+                                             const boost::optional<ChunkType>& controlChunk,
+                                             const OID& collectionEpoch,
+                                             const ShardId& fromShard,
+                                             const ShardId& toShard) override;
 
     void appendConnectionStats(executor::ConnectionPoolStats* stats) override;
 
