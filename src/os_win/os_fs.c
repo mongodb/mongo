@@ -521,9 +521,15 @@ __win_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 	    FLD_ISSET(conn->txn_logsync, WT_LOG_DSYNC))
 		f |= FILE_FLAG_WRITE_THROUGH;
 
-	/* Disable read-ahead on trees: it slows down random read workloads. */
-	if (file_type == WT_FS_OPEN_FILE_TYPE_DATA)
+	/* If the user indicated a random workload, disable read-ahead. */
+	if (file_type == WT_FS_OPEN_FILE_TYPE_DATA &&
+	    LF_ISSET(WT_FS_OPEN_ACCESS_RAND))
 		f |= FILE_FLAG_RANDOM_ACCESS;
+
+	/* If the user indicated a sequential workload, set that. */
+	if (file_type == WT_FS_OPEN_FILE_TYPE_DATA &&
+	    LF_ISSET(WT_FS_OPEN_ACCESS_SEQ))
+		f |= FILE_FLAG_SEQUENTIAL_SCAN;
 
 	win_fh->filehandle = CreateFileW(name_wide->data, desired_access,
 	    FILE_SHARE_READ | FILE_SHARE_WRITE,

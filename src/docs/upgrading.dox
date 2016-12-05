@@ -17,6 +17,15 @@ how much work is done at the beginning of a checkpoint to make the critical
 section of checkpoints complete more quickly.
 </dd>
 
+<dt>Change to default fadvise setting for data files</dt>
+<dd>
+The default behavior for data files was to advise the file system to optimize
+for random access on POSIX and Windows platforms. The default is now to not
+advise about access patterns. There is a new \c access_pattern_hint
+configuration string available to WT_SESSION::create that can be used
+to configure the old default behavior.
+</dd>
+
 <dt>Checkpoint server created checkpoint names</dt>
 <dd>
 The ::wiredtiger_open checkpoint configuration no longer supports the
