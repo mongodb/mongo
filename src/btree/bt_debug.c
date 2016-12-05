@@ -77,7 +77,7 @@ static inline int
 __debug_hex_byte(WT_DBG *ds, uint8_t v)
 {
 	return (ds->f(
-	    ds, "#%c%c", __wt_hex[(v & 0xf0) >> 4], __wt_hex[v & 0x0f]));
+	    ds, "#%c%c", __wt_hex((v & 0xf0) >> 4), __wt_hex(v & 0x0f)));
 }
 
 /*

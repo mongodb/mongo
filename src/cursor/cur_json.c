@@ -357,8 +357,8 @@ __wt_json_unpack_char(u_char ch, u_char *buf, size_t bufsz, bool force_unicode)
 		*buf++ = 'u';
 		*buf++ = '0';
 		*buf++ = '0';
-		*buf++ = __wt_hex[(ch & 0xf0) >> 4];
-		*buf++ = __wt_hex[ch & 0x0f];
+		*buf++ = __wt_hex((ch & 0xf0) >> 4);
+		*buf++ = __wt_hex(ch & 0x0f);
 	}
 	return (6);
 }
