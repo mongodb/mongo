@@ -39,7 +39,6 @@ env.CppUnitTest(
         'resolved_view_test.cpp',
         'view_catalog_test.cpp',
         'view_definition_test.cpp',
-        'view_test_crutch.cpp'
     ],
     LIBDEPS=[
         'views',
@@ -47,6 +46,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/s/is_mongos',
         '$BUILD_DIR/mongo/unittest/unittest',
     ],
 )

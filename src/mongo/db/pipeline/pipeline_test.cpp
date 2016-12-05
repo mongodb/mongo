@@ -46,12 +46,6 @@
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/dbtests/dbtests.h"
 
-namespace mongo {
-bool isMongos() {
-    return false;
-}
-}
-
 namespace PipelineTests {
 
 using boost::intrusive_ptr;

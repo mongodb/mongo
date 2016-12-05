@@ -50,11 +50,6 @@ namespace mongo {
 using std::deque;
 using std::vector;
 
-// Crutch.
-bool isMongos() {
-    return false;
-}
-
 namespace {
 
 using std::deque;

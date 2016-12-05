@@ -818,12 +818,4 @@ void ShardingState::_initializeRangeDeleterTaskExecutor() {
 executor::ThreadPoolTaskExecutor* ShardingState::getRangeDeleterTaskExecutor() {
     return _rangeDeleterTaskExecutor.get();
 }
-
-/**
- * Global free function.
- */
-bool isMongos() {
-    return false;
-}
-
 }  // namespace mongo

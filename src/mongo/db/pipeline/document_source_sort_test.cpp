@@ -49,11 +49,6 @@
 
 namespace mongo {
 
-// Crutch.
-bool isMongos() {
-    return false;
-}
-
 namespace {
 
 using boost::intrusive_ptr;

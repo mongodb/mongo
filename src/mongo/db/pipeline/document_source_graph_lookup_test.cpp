@@ -43,11 +43,6 @@
 
 namespace mongo {
 
-// Crutch.
-bool isMongos() {
-    return false;
-}
-
 namespace {
 
 // This provides access to getExpCtx(), but we'll use a different name for this test suite.

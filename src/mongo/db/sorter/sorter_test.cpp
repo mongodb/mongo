@@ -52,12 +52,6 @@ using namespace mongo::sorter;
 using std::make_shared;
 using std::pair;
 
-// Stub to avoid including the server_options library
-// TODO: This should go away once we can do these checks at compile time
-bool isMongos() {
-    return false;
-}
-
 // Stub to avoid including the server environment library.
 MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
     setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());

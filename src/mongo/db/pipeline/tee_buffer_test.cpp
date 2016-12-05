@@ -37,12 +37,6 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-
-// Crutch.
-bool isMongos() {
-    return false;
-}
-
 namespace {
 
 TEST(TeeBufferTest, ShouldRequireAtLeastOneConsumer) {

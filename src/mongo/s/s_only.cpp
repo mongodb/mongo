@@ -56,10 +56,6 @@ namespace mongo {
 using std::string;
 using std::stringstream;
 
-bool isMongos() {
-    return true;
-}
-
 /**
  * When this callback is run, we record a shard that we've used for useful work in an operation to
  * be read later by getLastError()
