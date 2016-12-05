@@ -14,7 +14,6 @@
  */
 void
 __wt_sleep(uint64_t seconds, uint64_t micro_seconds)
-    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	struct timeval t;
 

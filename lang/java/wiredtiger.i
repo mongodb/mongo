@@ -362,7 +362,7 @@ javaClose(JNIEnv *env, WT_SESSION *session, JAVA_CALLBACK *jcb, jfieldID *pfid)
 
 	(*env)->SetLongField(env, jcb->jobj, fid, 0L);
 	(*env)->DeleteGlobalRef(env, jcb->jobj);
-	__wt_free(jcb->session, jcb);
+	free(jcb);
 	return (0);
 }
 
@@ -427,6 +427,8 @@ javaAsyncHandler(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int opret,
 	jobject jcallback;
 	JNIEnv *jenv;
 	WT_ASYNC_OP_IMPL *op;
+	WT_EXTENSION_API *wt_api;
+	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
 
 	WT_UNUSED(cb);
@@ -511,7 +513,12 @@ javaAsyncHandler(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *asyncop, int opret,
 		(*jenv)->ExceptionClear(jenv);
 	}
 	if (0) {
-err:		__wt_err(session, ret, "Java async callback error");
+err:		wt_session = (WT_SESSION *)session;
+		wt_api = wt_session->
+		    connection->get_extension_api(wt_session->connection);
+		(void)wt_api->err_printf(wt_api, wt_session,
+		    "Java async callback error: %s",
+		    wt_api->strerror(wt_api, wt_session, ret));
 	}
 
 	/* Invalidate the AsyncOp, further use throws NullPointerException. */
@@ -1945,7 +1952,7 @@ WT_CONNECTION *wiredtiger_open_wrap(JNIEnv *jenv, const char *home, const char *
 		goto err;
 
 	connimpl = (WT_CONNECTION_IMPL *)conn;
-	if ((ret = __wt_calloc_def(connimpl->default_session, 1, &jcb)) != 0)
+	if ((jcb = calloc(1, sizeof(JAVA_CALLBACK))) == NULL)
 		goto err;
 
 	jcb->jnienv = jenv;
@@ -1970,7 +1977,7 @@ err:	if (ret != 0)
 			goto err;
 
 		connimpl = (WT_CONNECTION_IMPL *)$self;
-		if ((ret = __wt_calloc_def(connimpl->default_session, 1, &jcb)) != 0)
+		if ((jcb = calloc(1, sizeof(JAVA_CALLBACK))) == NULL)
 			goto err;
 
 		jcb->jnienv = jenv;
@@ -1999,7 +2006,7 @@ err:		if (ret != 0)
 			goto err;
 
 		sessionimpl = (WT_SESSION_IMPL *)session;
-		if ((ret = __wt_calloc_def(sessionimpl, 1, &jcb)) != 0)
+		if ((jcb = calloc(1, sizeof(JAVA_CALLBACK))) == NULL)
 			goto err;
 
 		jcb->jnienv = jenv;
@@ -2020,8 +2027,7 @@ err:		if (ret != 0)
 		if ((ret = $self->open_cursor($self, uri, to_dup, config, &cursor)) != 0)
 			goto err;
 
-		if ((ret = __wt_calloc_def((WT_SESSION_IMPL *)cursor->session,
-			    1, &jcb)) != 0)
+		if ((jcb = calloc(1, sizeof(JAVA_CALLBACK))) == NULL)
 			goto err;
 
 		if ((cursor->flags & WT_CURSTD_RAW) != 0)

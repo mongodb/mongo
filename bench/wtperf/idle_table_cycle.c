@@ -83,7 +83,7 @@ cycle_idle_tables(void *arg)
 		snprintf(uri, sizeof(uri),
 		    "%s_cycle%07d", wtperf->uris[0], cycle_count);
 		/* Don't busy cycle in this loop. */
-		__wt_sleep(1, 0);
+		(void)sleep(1);
 
 		/* Setup a start timer. */
 		__wt_epoch(NULL, &start);
@@ -126,7 +126,7 @@ cycle_idle_tables(void *arg)
 		 */
 		while ((ret = session->drop(
 		    session, uri, "force,checkpoint_wait=false")) == EBUSY)
-			__wt_sleep(1, 0);
+			(void)sleep(1);
 
 		if (ret != 0 && ret != EBUSY) {
 			lprintf(wtperf, ret, 0,
