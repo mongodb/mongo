@@ -178,9 +178,9 @@ public:
          * DataReplicator::_cancelRemainingWork_inlock()) while we have a lock on the data
          * replicator's mutex.
          */
-        void setResultAndCancelRemainingWork_inlock(const std::lock_guard<std::mutex>& lock,
+        void setResultAndCancelRemainingWork_inlock(const stdx::lock_guard<stdx::mutex>& lock,
                                                     const StatusWith<OpTimeWithHash>& lastApplied);
-        void setResultAndCancelRemainingWork_inlock(const std::unique_lock<std::mutex>& lock,
+        void setResultAndCancelRemainingWork_inlock(const stdx::unique_lock<stdx::mutex>& lock,
                                                     const StatusWith<OpTimeWithHash>& lastApplied);
 
     private:
@@ -532,7 +532,7 @@ private:
      * Passes 'lock' through to completion guard.
      */
     void _checkApplierProgressAndScheduleGetNextApplierBatch_inlock(
-        const std::lock_guard<std::mutex>& lock,
+        const stdx::lock_guard<stdx::mutex>& lock,
         std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
@@ -543,7 +543,7 @@ private:
      * Passes 'lock' through to completion guard.
      */
     void _scheduleRollbackCheckerCheckForRollback_inlock(
-        const std::lock_guard<std::mutex>& lock,
+        const stdx::lock_guard<stdx::mutex>& lock,
         std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**

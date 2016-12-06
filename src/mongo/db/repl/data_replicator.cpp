@@ -1199,7 +1199,8 @@ Status DataReplicator::_scheduleLastOplogEntryFetcher_inlock(Fetcher::CallbackFn
 }
 
 void DataReplicator::_checkApplierProgressAndScheduleGetNextApplierBatch_inlock(
-    const std::lock_guard<std::mutex>& lock, std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
+    const stdx::lock_guard<stdx::mutex>& lock,
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
     // We should check our current state because shutdown() could have been called before
     // we re-acquired the lock.
     if (_isShuttingDown_inlock()) {
@@ -1253,7 +1254,8 @@ void DataReplicator::_checkApplierProgressAndScheduleGetNextApplierBatch_inlock(
 }
 
 void DataReplicator::_scheduleRollbackCheckerCheckForRollback_inlock(
-    const std::lock_guard<std::mutex>& lock, std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
+    const stdx::lock_guard<stdx::mutex>& lock,
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
     // We should check our current state because shutdown() could have been called before
     // we re-acquired the lock.
     if (_isShuttingDown_inlock()) {
@@ -1512,12 +1514,12 @@ DataReplicator::OnCompletionGuard::~OnCompletionGuard() {
 }
 
 void DataReplicator::OnCompletionGuard::setResultAndCancelRemainingWork_inlock(
-    const std::lock_guard<std::mutex>&, const StatusWith<OpTimeWithHash>& lastApplied) {
+    const stdx::lock_guard<stdx::mutex>&, const StatusWith<OpTimeWithHash>& lastApplied) {
     _setResultAndCancelRemainingWork_inlock(lastApplied);
 }
 
 void DataReplicator::OnCompletionGuard::setResultAndCancelRemainingWork_inlock(
-    const std::unique_lock<std::mutex>& lock, const StatusWith<OpTimeWithHash>& lastApplied) {
+    const stdx::unique_lock<stdx::mutex>& lock, const StatusWith<OpTimeWithHash>& lastApplied) {
     invariant(lock.owns_lock());
     _setResultAndCancelRemainingWork_inlock(lastApplied);
 }
