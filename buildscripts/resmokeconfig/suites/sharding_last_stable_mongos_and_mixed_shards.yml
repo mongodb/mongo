@@ -86,6 +86,7 @@ selector:
     - jstests/sharding/explain_cmd_invalid_namespace.js
     # $graphLookup is not supported in versions <= 3.2
     - jstests/sharding/read_committed_lookup.js
+    - jstests/sharding/balancer_shell_commands.js
 
 executor:
   js_test:
