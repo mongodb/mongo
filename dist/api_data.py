@@ -855,9 +855,10 @@ methods = {
 
 'WT_SESSION.drop' : Method([
     Config('checkpoint_wait', 'true', r'''
-        wait for the checkpoint lock, if \c checkpoint_wait=false, perform
-        the drop operation without taking a lock, returning EBUSY if the
-        operation conflicts with a running checkpoint''',
+        wait for concurrent checkpoints to complete before attempting the drop
+        operation. If \c checkpoint_wait=false, attempt the drop operation
+        without waiting, returning EBUSY if the operation conflicts with a
+        running checkpoint''',
         type='boolean', undoc=True),
     Config('force', 'false', r'''
         return success if the object does not exist''',

@@ -511,7 +511,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
 			__wt_writeunlock(session, dhandle->rwlock);
 
-			WT_WITH_SCHEMA_LOCK(session, ret,
+			WT_WITH_SCHEMA_LOCK(session,
 			    WT_WITH_HANDLE_LIST_LOCK(session,
 				ret = __wt_session_get_btree(
 				session, uri, checkpoint, cfg, flags)));

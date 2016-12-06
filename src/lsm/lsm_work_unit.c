@@ -172,7 +172,7 @@ __wt_lsm_work_switch(
 	*entryp = NULL;
 
 	if (entry->lsm_tree->need_switch) {
-		WT_WITH_SCHEMA_LOCK(session, ret,
+		WT_WITH_SCHEMA_LOCK(session,
 		    ret = __wt_lsm_tree_switch(session, entry->lsm_tree));
 		/* Failing to complete the switch is fine */
 		if (ret == EBUSY) {
@@ -346,8 +346,8 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	 * time, and our checkpoint operation should be very quick.
 	 */
 	WT_ERR(__wt_meta_track_on(session));
-	WT_WITH_CHECKPOINT_LOCK(session, ret,
-	    WT_WITH_SCHEMA_LOCK(session, ret,
+	WT_WITH_CHECKPOINT_LOCK(session,
+	    WT_WITH_SCHEMA_LOCK(session,
 		ret = __wt_schema_worker(
 		session, chunk->uri, __wt_checkpoint, NULL, NULL, 0)));
 	WT_TRET(__wt_meta_track_off(session, false, ret != 0));
@@ -526,7 +526,7 @@ __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 	 * results in the hot backup lock being taken when it updates the
 	 * metadata (which would be too late to prevent our drop).
 	 */
-	WT_WITH_SCHEMA_LOCK(session, ret,
+	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_drop(session, uri, drop_cfg));
 
 	if (ret == 0)

@@ -1276,7 +1276,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	 * where the previous log file ends.
 	 */
 	if (!F_ISSET(conn, WT_CONN_READONLY)) {
-		WT_WITH_SLOT_LOCK(session, log, ret,
+		WT_WITH_SLOT_LOCK(session, log,
 		    ret = __log_newfile(session, true, NULL));
 		WT_ERR(ret);
 	}

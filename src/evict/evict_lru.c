@@ -271,7 +271,7 @@ __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 	 * can be closed.
 	 */
 	if (thread->id == 0) {
-		WT_WITH_PASS_LOCK(session, ret,
+		WT_WITH_PASS_LOCK(session,
 		    ret = __evict_clear_all_walks(session));
 		WT_ERR(ret);
 		/*
@@ -774,7 +774,7 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
 	(void)__wt_atomic_addv32(&cache->pass_intr, 1);
 
 	/* Clear any existing LRU eviction walk for the file. */
-	WT_WITH_PASS_LOCK(session, ret,
+	WT_WITH_PASS_LOCK(session,
 	    ret = __evict_clear_walk(session, true));
 	(void)__wt_atomic_subv32(&cache->pass_intr, 1);
 	WT_ERR(ret);
