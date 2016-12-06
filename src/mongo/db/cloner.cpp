@@ -423,7 +423,8 @@ void Cloner::copyIndexes(OperationContext* txn,
         const string targetSystemIndexesCollectionName = to_collection.getSystemIndexesCollection();
         const char* createIndexNs = targetSystemIndexesCollectionName.c_str();
         for (auto&& infoObj : indexInfoObjs) {
-            getGlobalServiceContext()->getOpObserver()->onCreateIndex(txn, createIndexNs, infoObj);
+            getGlobalServiceContext()->getOpObserver()->onCreateIndex(
+                txn, createIndexNs, infoObj, false);
         }
     }
     wunit.commit();

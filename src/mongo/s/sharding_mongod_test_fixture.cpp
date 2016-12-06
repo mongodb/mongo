@@ -40,7 +40,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer.h"
+#include "mongo/db/op_observer_impl.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/oplog.h"
@@ -124,7 +124,7 @@ void ShardingMongodTestFixture::setUp() {
 
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoordPtr));
 
-    serviceContext->setOpObserver(stdx::make_unique<OpObserver>());
+    serviceContext->setOpObserver(stdx::make_unique<OpObserverImpl>());
     repl::setOplogCollectionName();
     repl::createOplog(_opCtx.get());
 }

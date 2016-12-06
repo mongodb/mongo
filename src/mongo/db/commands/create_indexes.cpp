@@ -392,10 +392,8 @@ public:
 
             for (auto&& infoObj : indexInfoObjs) {
                 std::string systemIndexes = ns.getSystemIndexesCollection();
-                auto opObserver = getGlobalServiceContext()->getOpObserver();
-                if (opObserver) {
-                    opObserver->onCreateIndex(txn, systemIndexes, infoObj);
-                }
+                getGlobalServiceContext()->getOpObserver()->onCreateIndex(
+                    txn, systemIndexes, infoObj, false);
             }
 
             wunit.commit();

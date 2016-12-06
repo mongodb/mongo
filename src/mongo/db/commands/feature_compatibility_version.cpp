@@ -227,7 +227,7 @@ void FeatureCompatibilityVersion::set(OperationContext* txn, StringData version)
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 WriteUnitOfWork wuow(txn);
                 getGlobalServiceContext()->getOpObserver()->onCreateIndex(
-                    txn, autoDB.getDb()->getSystemIndexesName(), k32IncompatibleIndexSpec);
+                    txn, autoDB.getDb()->getSystemIndexesName(), k32IncompatibleIndexSpec, false);
                 wuow.commit();
             }
             MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "FeatureCompatibilityVersion::set", nss.ns());
