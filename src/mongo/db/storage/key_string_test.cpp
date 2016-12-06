@@ -47,6 +47,7 @@
 #include "mongo/db/storage/key_string.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/future.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
@@ -382,39 +383,47 @@ TEST_F(KeyStringTest, LotsOfNumbers2) {
 }
 
 TEST_F(KeyStringTest, LotsOfNumbers3) {
-    const auto V1 = KeyString::Version::V1;
-    Decimal128::RoundingPrecision roundingPrecisions[]{Decimal128::kRoundTo15Digits,
-                                                       Decimal128::kRoundTo34Digits};
-    Decimal128::RoundingMode roundingModes[]{Decimal128::kRoundTowardNegative,
-                                             Decimal128::kRoundTowardPositive};
+    std::vector<stdx::future<void>> futures;
 
-    for (double i = -1100; i < 1100; i++) {
-        for (double j = 0; j < 52; j++) {
-            for (double k = 0; k < 8; k++) {
-                double x = pow(2, i);
-                double y = pow(2, i - j);
-                double z = pow(2, i - 53 + k);
-                double bin = x + y - z;
+    for (double k = 0; k < 8; k++) {
+        futures.push_back(stdx::async(stdx::launch::async, [k, this] {
 
-                // In general NaNs don't roundtrip as we only store a single NaN, see the NaNs test.
-                if (std::isnan(bin))
-                    continue;
+            for (double i = -1100; i < 1100; i++) {
+                for (double j = 0; j < 52; j++) {
+                    const auto V1 = KeyString::Version::V1;
+                    Decimal128::RoundingPrecision roundingPrecisions[]{
+                        Decimal128::kRoundTo15Digits, Decimal128::kRoundTo34Digits};
+                    Decimal128::RoundingMode roundingModes[]{Decimal128::kRoundTowardNegative,
+                                                             Decimal128::kRoundTowardPositive};
+                    double x = pow(2, i);
+                    double y = pow(2, i - j);
+                    double z = pow(2, i - 53 + k);
+                    double bin = x + y - z;
 
-                ROUNDTRIP(version, BSON("" << bin));
-                ROUNDTRIP(version, BSON("" << -bin));
+                    // In general NaNs don't roundtrip as we only store a single NaN, see the NaNs
+                    // test.
+                    if (std::isnan(bin))
+                        continue;
 
-                if (version < V1)
-                    continue;
+                    ROUNDTRIP(version, BSON("" << bin));
+                    ROUNDTRIP(version, BSON("" << -bin));
 
-                for (auto precision : roundingPrecisions) {
-                    for (auto mode : roundingModes) {
-                        Decimal128 rounded = Decimal128(bin, precision, mode);
-                        ROUNDTRIP(V1, BSON("" << rounded));
-                        ROUNDTRIP(V1, BSON("" << rounded.negate()));
+                    if (version < V1)
+                        continue;
+
+                    for (auto precision : roundingPrecisions) {
+                        for (auto mode : roundingModes) {
+                            Decimal128 rounded = Decimal128(bin, precision, mode);
+                            ROUNDTRIP(V1, BSON("" << rounded));
+                            ROUNDTRIP(V1, BSON("" << rounded.negate()));
+                        }
                     }
                 }
             }
-        }
+        }));
+    }
+    for (auto&& future : futures) {
+        future.get();
     }
 }
 
@@ -757,69 +766,78 @@ void testPermutation(KeyString::Version version,
     // Since KeyStrings are compared using memcmp we can assume it provides a total ordering such
     // that there won't be cases where (a < b && b < c && !(a < c)). This test still needs to ensure
     // that it provides the *correct* total ordering.
+    std::vector<stdx::future<void>> futures;
     for (size_t k = 0; k < orderings.size(); k++) {
-        BSONObj orderObj = orderings[k];
-        Ordering ordering = Ordering::make(orderObj);
-        if (debug)
-            log() << "ordering: " << orderObj;
-
-        std::vector<BSONObj> elements = elementsOrig;
-        BSONObjComparator bsonCmp(orderObj,
-                                  BSONObjComparator::FieldNamesMode::kConsider,
-                                  &SimpleStringDataComparator::kInstance);
-        std::stable_sort(elements.begin(), elements.end(), bsonCmp.makeLessThan());
-
-        for (size_t i = 0; i < elements.size(); i++) {
-            const BSONObj& o1 = elements[i];
-            if (debug)
-                log() << "\to1: " << o1;
-            ROUNDTRIP_ORDER(version, o1, ordering);
-
-            KeyString k1(version, o1, ordering);
-
-            KeyString l1(version, BSON("l" << o1.firstElement()), ordering);  // kLess
-            KeyString g1(version, BSON("g" << o1.firstElement()), ordering);  // kGreater
-            ASSERT_LT(l1, k1);
-            ASSERT_GT(g1, k1);
-
-            if (i + 1 < elements.size()) {
-                const BSONObj& o2 = elements[i + 1];
+        futures.push_back(
+            stdx::async(stdx::launch::async, [k, version, elementsOrig, orderings, debug] {
+                BSONObj orderObj = orderings[k];
+                Ordering ordering = Ordering::make(orderObj);
                 if (debug)
-                    log() << "\t\t o2: " << o2;
-                KeyString k2(version, o2, ordering);
-                KeyString g2(version, BSON("g" << o2.firstElement()), ordering);
-                KeyString l2(version, BSON("l" << o2.firstElement()), ordering);
+                    log() << "ordering: " << orderObj;
 
-                int bsonCmp = o1.woCompare(o2, ordering);
-                invariant(bsonCmp <= 0);  // We should be sorted...
+                std::vector<BSONObj> elements = elementsOrig;
+                BSONObjComparator bsonCmp(orderObj,
+                                          BSONObjComparator::FieldNamesMode::kConsider,
+                                          &SimpleStringDataComparator::kInstance);
+                std::stable_sort(elements.begin(), elements.end(), bsonCmp.makeLessThan());
 
-                if (bsonCmp == 0) {
-                    ASSERT_EQ(k1, k2);
-                } else {
-                    ASSERT_LT(k1, k2);
+                for (size_t i = 0; i < elements.size(); i++) {
+                    const BSONObj& o1 = elements[i];
+                    if (debug)
+                        log() << "\to1: " << o1;
+                    ROUNDTRIP_ORDER(version, o1, ordering);
+
+                    KeyString k1(version, o1, ordering);
+
+                    KeyString l1(version, BSON("l" << o1.firstElement()), ordering);  // kLess
+                    KeyString g1(version, BSON("g" << o1.firstElement()), ordering);  // kGreater
+                    ASSERT_LT(l1, k1);
+                    ASSERT_GT(g1, k1);
+
+                    if (i + 1 < elements.size()) {
+                        const BSONObj& o2 = elements[i + 1];
+                        if (debug)
+                            log() << "\t\t o2: " << o2;
+                        KeyString k2(version, o2, ordering);
+                        KeyString g2(version, BSON("g" << o2.firstElement()), ordering);
+                        KeyString l2(version, BSON("l" << o2.firstElement()), ordering);
+
+                        int bsonCmp = o1.woCompare(o2, ordering);
+                        invariant(bsonCmp <= 0);  // We should be sorted...
+
+                        if (bsonCmp == 0) {
+                            ASSERT_EQ(k1, k2);
+                        } else {
+                            ASSERT_LT(k1, k2);
+                        }
+
+                        // Test the query encodings using kLess and kGreater
+                        int firstElementComp = o1.firstElement().woCompare(o2.firstElement());
+                        if (ordering.descending(1))
+                            firstElementComp = -firstElementComp;
+
+                        invariant(firstElementComp <= 0);
+
+                        if (firstElementComp == 0) {
+                            // If they share a first element then l1/g1 should equal l2/g2 and l1
+                            // should
+                            // be
+                            // less than both and g1 should be greater than both.
+                            ASSERT_EQ(l1, l2);
+                            ASSERT_EQ(g1, g2);
+                            ASSERT_LT(l1, k2);
+                            ASSERT_GT(g1, k2);
+                        } else {
+                            // k1 is less than k2. Less(k2) and Greater(k1) should be between them.
+                            ASSERT_LT(g1, k2);
+                            ASSERT_GT(l2, k1);
+                        }
+                    }
                 }
-
-                // Test the query encodings using kLess and kGreater
-                int firstElementComp = o1.firstElement().woCompare(o2.firstElement());
-                if (ordering.descending(1))
-                    firstElementComp = -firstElementComp;
-
-                invariant(firstElementComp <= 0);
-
-                if (firstElementComp == 0) {
-                    // If they share a first element then l1/g1 should equal l2/g2 and l1 should be
-                    // less than both and g1 should be greater than both.
-                    ASSERT_EQ(l1, l2);
-                    ASSERT_EQ(g1, g2);
-                    ASSERT_LT(l1, k2);
-                    ASSERT_GT(g1, k2);
-                } else {
-                    // k1 is less than k2. Less(k2) and Greater(k1) should be between them.
-                    ASSERT_LT(g1, k2);
-                    ASSERT_GT(l2, k1);
-                }
-            }
-        }
+            }));
+    }
+    for (auto&& future : futures) {
+        future.get();
     }
 }
 
