@@ -103,6 +103,17 @@
             ErrorCodes.Unauthorized,
             "modified a view to read an unreadable collection via $graphLookup in a $facet");
 
+        // When auth is enabled, users must specify both "viewOn" and "pipeline" when running
+        // collMod on a view; specifying only one or the other is not allowed. Without both the
+        // "viewOn" and "pipeline" specified, authorization checks cannot determine if the users
+        // have the necessary privileges.
+        assert.commandFailedWithCode(viewsDB.runCommand({collMod: "view", pipeline: []}),
+                                     ErrorCodes.InvalidOptions,
+                                     "modified a view without having to specify 'viewOn'");
+        assert.commandFailedWithCode(viewsDB.runCommand({collMod: "view", viewOn: "other"}),
+                                     ErrorCodes.InvalidOptions,
+                                     "modified a view without having to specify 'pipeline'");
+
         // Performing a find on a readable view returns a cursor that allows us to perform a getMore
         // even if the underlying collection is unreadable.
         // TODO(SERVER-24771): getMore does not work yet for sharded clusters

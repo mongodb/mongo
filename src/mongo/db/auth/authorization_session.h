@@ -191,13 +191,6 @@ public:
     // supplied in 'cmdObj'.
     Status checkAuthForCollMod(const NamespaceString& ns, const BSONObj& cmdObj);
 
-    // Checks if this connection has the privileges necessary to create or modify the view 'ns'.
-    // Call this function after verifying that the user has the 'createCollection' or 'collMod'
-    // action, respectively.
-    //
-    // 'cmdObj' must have a String field named 'viewOn'.
-    Status checkAuthForCreateOrModifyView(const NamespaceString& ns, const BSONObj& cmdObj);
-
     // Checks if this connection has the privileges necessary to grant the given privilege
     // to a role.
     Status checkAuthorizedToGrantPrivilege(const Privilege& privilege);
