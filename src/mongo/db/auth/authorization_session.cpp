@@ -60,6 +60,25 @@ using std::vector;
 
 namespace {
 const std::string ADMIN_DBNAME = "admin";
+
+// Checks if this connection has the privileges necessary to create or modify the view 'viewNs'
+// to be a view on 'viewOnNs' with pipeline 'viewPipeline'. Call this function after verifying
+// that the user has the 'createCollection' or 'collMod' action, respectively.
+Status checkAuthForCreateOrModifyView(AuthorizationSession* authzSession,
+                                      const NamespaceString& viewNs,
+                                      const NamespaceString& viewOnNs,
+                                      const BSONObj& viewPipeline) {
+    // It's safe to allow a user to create or modify a view if they can't read it anyway.
+    if (!authzSession->isAuthorizedForActionsOnNamespace(viewNs, ActionType::find)) {
+        return Status::OK();
+    }
+
+    // This check ignores some invalid pipeline specifications. For example, if a user specifies a
+    // view definition with an invalid specification like {$lookup: "blah"}, the authorization check
+    // will succeed but the pipeline will fail to parse later in Command::run().
+    return authzSession->checkAuthForAggregate(
+        viewOnNs, BSON("aggregate" << viewOnNs.coll() << "pipeline" << viewPipeline));
+}
 }  // namespace
 
 AuthorizationSession::AuthorizationSession(std::unique_ptr<AuthzSessionExternalState> externalState)
@@ -445,7 +464,13 @@ Status AuthorizationSession::checkAuthForCreate(const NamespaceString& ns, const
         if (!hasCreateCollectionAction) {
             return Status(ErrorCodes::Unauthorized, "unauthorized");
         }
-        return checkAuthForCreateOrModifyView(ns, cmdObj);
+
+        // Parse the viewOn namespace and the pipeline. If no pipeline was specified, use the empty
+        // pipeline.
+        NamespaceString viewOnNs(ns.db(), cmdObj["viewOn"].checkAndGetStringData());
+        auto pipeline =
+            cmdObj.hasField("pipeline") ? BSONArray(cmdObj["pipeline"].Obj()) : BSONArray();
+        return checkAuthForCreateOrModifyView(this, ns, viewOnNs, pipeline);
     }
 
     // To create a regular collection, ActionType::createCollection or ActionType::insert are
@@ -462,34 +487,24 @@ Status AuthorizationSession::checkAuthForCollMod(const NamespaceString& ns, cons
         return Status(ErrorCodes::Unauthorized, "unauthorized");
     }
 
-    // Check for additional required privileges if attempting to modify a view.
-    if (cmdObj["viewOn"] || cmdObj["pipeline"]) {
-        return checkAuthForCreateOrModifyView(ns, cmdObj);
+    // Check for additional required privileges if attempting to modify a view. When auth is
+    // enabled, users must specify both "viewOn" and "pipeline" together. This prevents a user from
+    // exposing more information in the original underlying namespace by only changing "pipeline",
+    // or looking up more information via the original pipeline by only changing "viewOn".
+    const bool hasViewOn = cmdObj.hasField("viewOn");
+    const bool hasPipeline = cmdObj.hasField("pipeline");
+    if (hasViewOn != hasPipeline) {
+        return Status(
+            ErrorCodes::InvalidOptions,
+            "Must specify both 'viewOn' and 'pipeline' when modifying a view and auth is enabled");
+    }
+    if (hasViewOn) {
+        NamespaceString viewOnNs(ns.db(), cmdObj["viewOn"].checkAndGetStringData());
+        auto viewPipeline = BSONArray(cmdObj["pipeline"].Obj());
+        return checkAuthForCreateOrModifyView(this, ns, viewOnNs, viewPipeline);
     }
 
     return Status::OK();
-}
-
-Status AuthorizationSession::checkAuthForCreateOrModifyView(const NamespaceString& ns,
-                                                            const BSONObj& cmdObj) {
-    // It's safe to allow a user to create or modify a view if they can't read it anyway.
-    if (!isAuthorizedForActionsOnNamespace(ns, ActionType::find)) {
-        return Status::OK();
-    }
-
-    // The user can read the view they're trying to create/modify, so we must ensure that they also
-    // have the find action on all namespaces in "viewOn" and "pipeline". If "pipeline" is not
-    // specified, default to the empty pipeline.
-    auto viewPipeline =
-        cmdObj.hasField("pipeline") ? BSONArray(cmdObj["pipeline"].Obj()) : BSONArray();
-
-
-    // This check ignores some invalid pipeline specifications. For example, if a user specifies a
-    // view definition with an invalid specification like {$lookup: "blah"}, the authorization check
-    // will succeed but the pipeline will fail to parse later in Command::run().
-    NamespaceString viewOnNss(ns.db(), cmdObj["viewOn"].checkAndGetStringData());
-    return checkAuthForAggregate(
-        viewOnNss, BSON("aggregate" << viewOnNss.coll() << "pipeline" << viewPipeline));
 }
 
 Status AuthorizationSession::checkAuthorizedToGrantPrivilege(const Privilege& privilege) {
