@@ -50,6 +50,17 @@ public class PackOutputStream {
      * \param format A String that contains the WiredTiger format that
      *               defines the layout of this packed value.
      */
+    public PackOutputStream(String format) {
+        this(format, false);
+    }
+
+    /**
+     * Constructor.
+     *
+     * \param format A String that contains the WiredTiger format that
+     *               defines the layout of this packed value.
+     * \param isRaw The stream is opened raw.
+     */
     public PackOutputStream(String format, boolean isRaw) {
         this.format = new PackFormatInputStream(format, isRaw);
         this.intBuf = new byte[MAX_INT_BYTES];
