@@ -8,6 +8,10 @@ User=mongod
 Group=mongod
 Environment="OPTIONS=--quiet -f /etc/mongod.conf"
 ExecStart=/usr/bin/mongod $OPTIONS run
+ExecStartPre=/usr/bin/mkdir -p /var/run/mongodb
+ExecStartPre=/usr/bin/chown mongod:mongod /var/run/mongodb
+ExecStartPre=/usr/bin/chmod 0755 /var/run/mongodb
+PermissionsStartOnly=true
 PIDFile=/var/run/mongodb/mongod.pid
 # file size
 LimitFSIZE=infinity
