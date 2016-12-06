@@ -120,9 +120,6 @@ class ReplicaSetFixture(interface.ReplFixture):
 
         if self.replset_config_options.get("configsvr", False):
             initiate_cmd_obj["replSetInitiate"]["configsvr"] = True
-        if "protocolVersion" in self.replset_config_options:
-            protocol_version = self.replset_config_options["protocolVersion"]
-            initiate_cmd_obj["replSetInitiate"]["protocolVersion"] = protocol_version
         if self.replset_config_options.get("settings"):
             replset_settings = self.replset_config_options["settings"]
             initiate_cmd_obj["replSetInitiate"]["settings"] = replset_settings
