@@ -45,6 +45,7 @@
 #endif
 
 #include "mongo/base/init.h"
+#include "mongo/config.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
