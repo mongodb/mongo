@@ -2629,6 +2629,34 @@ def doConfigure(myenv):
     conf = Configure(myenv, custom_tests = {
         'CheckBoostMinVersion': CheckBoostMinVersion,
     })
+
+    # pthread_setname_np was added in GLIBC 2.12, and Solaris 11.3
+    if posix_system:
+        myenv = conf.Finish()
+
+        def CheckPThreadSetNameNP(context):
+            compile_test_body = textwrap.dedent("""
+            #define _GNU_SOURCE
+            #include <pthread.h>
+
+            int main() {
+                pthread_setname_np(pthread_self(), "test");
+                return 0;
+            }
+            """)
+
+            context.Message("Checking if pthread_setname_np is supported... ")
+            result = context.TryCompile(compile_test_body, ".c")
+            context.Result(result)
+            return result
+
+        conf = Configure(myenv, custom_tests = {
+            'CheckPThreadSetNameNP': CheckPThreadSetNameNP,
+        })
+
+        if conf.CheckPThreadSetNameNP():
+            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP")
+
     libdeps.setup_conftests(conf)
 
     def addOpenSslLibraryToDistArchive(file_name):
