@@ -365,19 +365,17 @@ TEST_F(FetcherTest, ScheduleButShutdown) {
     auto net = getNet();
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-        assertRemoteCommandNameEquals("find", net->scheduleSuccessfulResponse(BSON("ok" << 1)));
-        // Network interface should not deliver mock response to callback
-        // until runReadyNetworkOperations() is called.
+        auto noi = net->getNextReadyRequest();
+        assertRemoteCommandNameEquals("find", noi->getRequest());
+        net->blackHole(noi);
     }
 
     ASSERT_TRUE(fetcher->isActive());
-    getExecutor().shutdown();
     ASSERT_EQUALS(Fetcher::State::kRunning, fetcher->getState_forTest());
 
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-        net->runReadyNetworkOperations();
-    }
+    getExecutor().shutdown();
+
+    fetcher->join();
     ASSERT_FALSE(fetcher->isActive());
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status.code());
