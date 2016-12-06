@@ -42,6 +42,7 @@
 #include "mongo/db/storage/snapshot_name.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -136,6 +137,7 @@ private:
     RecordId _oplogReadTill;
     bool _readFromMajorityCommittedSnapshot = false;
     SnapshotName _majorityCommittedSnapshot = SnapshotName::min();
+    std::unique_ptr<Timer> _timer;
 
     typedef OwnedPointerVector<Change> Changes;
     Changes _changes;
