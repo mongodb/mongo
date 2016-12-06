@@ -39,6 +39,10 @@
 #if defined(__APPLE__)
 #include <sys/proc_info.h>
 #endif
+#if defined(__linux__)
+#include <sys/syscall.h>
+#include <sys/types.h>
+#endif
 
 #include "mongo/base/init.h"
 #include "mongo/platform/atomic_word.h"
@@ -115,21 +119,26 @@ void setThreadName(StringData name) {
         log() << "Ignoring error from setting thread name: " << errnoWithDescription(error);
     }
 #elif defined(__linux__) && defined(MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP)
-    // Maximum thread name length supported on Linux is 16 including the null terminator. Ideally
-    // we use short and descriptive thread names that fit: this helps for log readibility as well.
-    // Since several components set verbose thread names with a uniqifier at the end, we do a split
-    // truncation of "first7bytes.last7bytes".
-    int error = 0;
-    if (threadName->size() > 15) {
-        std::string shortName =
-            threadName->substr(0, 7) + '.' + threadName->substr(threadName->size() - 7);
-        error = pthread_setname_np(pthread_self(), shortName.c_str());
-    } else {
-        error = pthread_setname_np(pthread_self(), threadName->c_str());
-    }
+    // Do not set thread name on the main() thread. Setting the name on main thread breaks
+    // pgrep/pkill since these programs base this name on /proc/*/status which displays the thread
+    // name, not the executable name.
+    if (getpid() != syscall(SYS_gettid)) {
+        //  Maximum thread name length supported on Linux is 16 including the null terminator.
+        //  Ideally we use short and descriptive thread names that fit: this helps for log
+        //  readibility as well. Still, as the limit is so low and a few current names exceed the
+        //  limit, it's best to shorten long names.
+        int error = 0;
+        if (threadName->size() > 15) {
+            std::string shortName =
+                threadName->substr(0, 7) + '.' + threadName->substr(threadName->size() - 7);
+            error = pthread_setname_np(pthread_self(), shortName.c_str());
+        } else {
+            error = pthread_setname_np(pthread_self(), threadName->c_str());
+        }
 
-    if (error) {
-        log() << "Ignoring error from setting thread name: " << errnoWithDescription(error);
+        if (error) {
+            log() << "Ignoring error from setting thread name: " << errnoWithDescription(error);
+        }
     }
 #endif
 }
