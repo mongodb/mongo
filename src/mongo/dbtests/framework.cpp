@@ -39,6 +39,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/op_observer_noop.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
@@ -89,6 +90,7 @@ int runDbTests(int argc, char** argv) {
 
     checked_cast<ServiceContextMongoD*>(globalServiceContext)->createLockFile();
     globalServiceContext->initializeGlobalStorageEngine();
+    globalServiceContext->setOpObserver(stdx::make_unique<OpObserverNoop>());
 
     int ret = unittest::Suite::run(frameworkGlobalParams.suites,
                                    frameworkGlobalParams.filter,

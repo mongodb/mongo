@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2008-2014 MongoDB Inc.
+*    Copyright (C) 2016 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/op_observer.h"
+#include "mongo/db/op_observer_impl.h"
 
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -45,12 +45,10 @@
 
 namespace mongo {
 
-using std::vector;
-
-void OpObserver::onCreateIndex(OperationContext* txn,
-                               const std::string& ns,
-                               BSONObj indexDoc,
-                               bool fromMigrate) {
+void OpObserverImpl::onCreateIndex(OperationContext* txn,
+                                   const std::string& ns,
+                                   BSONObj indexDoc,
+                                   bool fromMigrate) {
     repl::logOp(txn, "i", ns.c_str(), indexDoc, nullptr, fromMigrate);
     AuthorizationManager::get(txn->getServiceContext())
         ->logOp(txn, "i", ns.c_str(), indexDoc, nullptr);
@@ -63,11 +61,11 @@ void OpObserver::onCreateIndex(OperationContext* txn,
     logOpForDbHash(txn, ns.c_str());
 }
 
-void OpObserver::onInserts(OperationContext* txn,
-                           const NamespaceString& nss,
-                           vector<BSONObj>::const_iterator begin,
-                           vector<BSONObj>::const_iterator end,
-                           bool fromMigrate) {
+void OpObserverImpl::onInserts(OperationContext* txn,
+                               const NamespaceString& nss,
+                               std::vector<BSONObj>::const_iterator begin,
+                               std::vector<BSONObj>::const_iterator end,
+                               bool fromMigrate) {
     repl::logOps(txn, "i", nss, begin, end, fromMigrate);
 
     auto css = CollectionShardingState::get(txn, nss.ns());
@@ -95,7 +93,7 @@ void OpObserver::onInserts(OperationContext* txn,
     }
 }
 
-void OpObserver::onUpdate(OperationContext* txn, const OplogUpdateEntryArgs& args) {
+void OpObserverImpl::onUpdate(OperationContext* txn, const OplogUpdateEntryArgs& args) {
     // Do not log a no-op operation; see SERVER-21738
     if (args.update.isEmpty()) {
         return;
@@ -125,9 +123,9 @@ void OpObserver::onUpdate(OperationContext* txn, const OplogUpdateEntryArgs& arg
     }
 }
 
-CollectionShardingState::DeleteState OpObserver::aboutToDelete(OperationContext* txn,
-                                                               const NamespaceString& ns,
-                                                               const BSONObj& doc) {
+CollectionShardingState::DeleteState OpObserverImpl::aboutToDelete(OperationContext* txn,
+                                                                   const NamespaceString& ns,
+                                                                   const BSONObj& doc) {
     CollectionShardingState::DeleteState deleteState;
     BSONElement idElement = doc["_id"];
     if (!idElement.eoo()) {
@@ -140,10 +138,10 @@ CollectionShardingState::DeleteState OpObserver::aboutToDelete(OperationContext*
     return deleteState;
 }
 
-void OpObserver::onDelete(OperationContext* txn,
-                          const NamespaceString& ns,
-                          CollectionShardingState::DeleteState deleteState,
-                          bool fromMigrate) {
+void OpObserverImpl::onDelete(OperationContext* txn,
+                              const NamespaceString& ns,
+                              CollectionShardingState::DeleteState deleteState,
+                              bool fromMigrate) {
     if (deleteState.idDoc.isEmpty())
         return;
 
@@ -168,14 +166,14 @@ void OpObserver::onDelete(OperationContext* txn,
     }
 }
 
-void OpObserver::onOpMessage(OperationContext* txn, const BSONObj& msgObj) {
+void OpObserverImpl::onOpMessage(OperationContext* txn, const BSONObj& msgObj) {
     repl::logOp(txn, "n", "", msgObj, nullptr, false);
 }
 
-void OpObserver::onCreateCollection(OperationContext* txn,
-                                    const NamespaceString& collectionName,
-                                    const CollectionOptions& options,
-                                    const BSONObj& idIndex) {
+void OpObserverImpl::onCreateCollection(OperationContext* txn,
+                                        const NamespaceString& collectionName,
+                                        const CollectionOptions& options,
+                                        const BSONObj& idIndex) {
     std::string dbName = collectionName.db().toString() + ".$cmd";
     BSONObjBuilder b;
     b.append("create", collectionName.coll().toString());
@@ -202,9 +200,9 @@ void OpObserver::onCreateCollection(OperationContext* txn,
     logOpForDbHash(txn, dbName.c_str());
 }
 
-void OpObserver::onCollMod(OperationContext* txn,
-                           const std::string& dbName,
-                           const BSONObj& collModCmd) {
+void OpObserverImpl::onCollMod(OperationContext* txn,
+                               const std::string& dbName,
+                               const BSONObj& collModCmd) {
     BSONElement first = collModCmd.firstElement();
     std::string coll = first.valuestr();
 
@@ -217,7 +215,7 @@ void OpObserver::onCollMod(OperationContext* txn,
     logOpForDbHash(txn, dbName.c_str());
 }
 
-void OpObserver::onDropDatabase(OperationContext* txn, const std::string& dbName) {
+void OpObserverImpl::onDropDatabase(OperationContext* txn, const std::string& dbName) {
     BSONObj cmdObj = BSON("dropDatabase" << 1);
 
     repl::logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
@@ -226,7 +224,8 @@ void OpObserver::onDropDatabase(OperationContext* txn, const std::string& dbName
     logOpForDbHash(txn, dbName.c_str());
 }
 
-void OpObserver::onDropCollection(OperationContext* txn, const NamespaceString& collectionName) {
+void OpObserverImpl::onDropCollection(OperationContext* txn,
+                                      const NamespaceString& collectionName) {
     std::string dbName = collectionName.db().toString() + ".$cmd";
     BSONObj cmdObj = BSON("drop" << collectionName.coll().toString());
 
@@ -247,20 +246,20 @@ void OpObserver::onDropCollection(OperationContext* txn, const NamespaceString& 
     logOpForDbHash(txn, dbName.c_str());
 }
 
-void OpObserver::onDropIndex(OperationContext* txn,
-                             const std::string& dbName,
-                             const BSONObj& idxDescriptor) {
+void OpObserverImpl::onDropIndex(OperationContext* txn,
+                                 const std::string& dbName,
+                                 const BSONObj& idxDescriptor) {
     repl::logOp(txn, "c", dbName.c_str(), idxDescriptor, nullptr, false);
 
     getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), idxDescriptor, nullptr);
     logOpForDbHash(txn, dbName.c_str());
 }
 
-void OpObserver::onRenameCollection(OperationContext* txn,
-                                    const NamespaceString& fromCollection,
-                                    const NamespaceString& toCollection,
-                                    bool dropTarget,
-                                    bool stayTemp) {
+void OpObserverImpl::onRenameCollection(OperationContext* txn,
+                                        const NamespaceString& fromCollection,
+                                        const NamespaceString& toCollection,
+                                        bool dropTarget,
+                                        bool stayTemp) {
     std::string dbName = fromCollection.db().toString() + ".$cmd";
     BSONObj cmdObj =
         BSON("renameCollection" << fromCollection.ns() << "to" << toCollection.ns() << "stayTemp"
@@ -279,18 +278,18 @@ void OpObserver::onRenameCollection(OperationContext* txn,
     logOpForDbHash(txn, dbName.c_str());
 }
 
-void OpObserver::onApplyOps(OperationContext* txn,
-                            const std::string& dbName,
-                            const BSONObj& applyOpCmd) {
+void OpObserverImpl::onApplyOps(OperationContext* txn,
+                                const std::string& dbName,
+                                const BSONObj& applyOpCmd) {
     repl::logOp(txn, "c", dbName.c_str(), applyOpCmd, nullptr, false);
 
     getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), applyOpCmd, nullptr);
     logOpForDbHash(txn, dbName.c_str());
 }
 
-void OpObserver::onConvertToCapped(OperationContext* txn,
-                                   const NamespaceString& collectionName,
-                                   double size) {
+void OpObserverImpl::onConvertToCapped(OperationContext* txn,
+                                       const NamespaceString& collectionName,
+                                       double size) {
     std::string dbName = collectionName.db().toString() + ".$cmd";
     BSONObj cmdObj = BSON("convertToCapped" << collectionName.coll() << "size" << size);
 
@@ -303,7 +302,7 @@ void OpObserver::onConvertToCapped(OperationContext* txn,
     logOpForDbHash(txn, dbName.c_str());
 }
 
-void OpObserver::onEmptyCapped(OperationContext* txn, const NamespaceString& collectionName) {
+void OpObserverImpl::onEmptyCapped(OperationContext* txn, const NamespaceString& collectionName) {
     std::string dbName = collectionName.db().toString() + ".$cmd";
     BSONObj cmdObj = BSON("emptycapped" << collectionName.coll());
 

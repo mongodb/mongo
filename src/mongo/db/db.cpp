@@ -74,7 +74,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/mongod_options.h"
-#include "mongo/db/op_observer.h"
+#include "mongo/db/op_observer_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
@@ -427,7 +427,7 @@ ExitCode _initAndListen(int listenPort) {
     auto globalServiceContext = getGlobalServiceContext();
 
     globalServiceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
-    globalServiceContext->setOpObserver(stdx::make_unique<OpObserver>());
+    globalServiceContext->setOpObserver(stdx::make_unique<OpObserverImpl>());
 
     DBDirectClientFactory::get(globalServiceContext)
         .registerImplementation([](OperationContext* txn) {

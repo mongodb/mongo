@@ -37,10 +37,12 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/op_observer_noop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/scopeguard.h"
 
@@ -58,6 +60,7 @@ void ServiceContextMongoDTest::setUp() {
         storageGlobalParams.engineSetByUser = true;
         checked_cast<ServiceContextMongoD*>(getGlobalServiceContext())->createLockFile();
         serviceContext->initializeGlobalStorageEngine();
+        serviceContext->setOpObserver(stdx::make_unique<OpObserverNoop>());
     }
 }
 

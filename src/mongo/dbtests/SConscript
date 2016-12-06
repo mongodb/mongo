@@ -22,6 +22,7 @@ env.Library(
         'framework_options_init.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/op_observer_noop',
         '$BUILD_DIR/mongo/db/s/sharding',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/unittest/unittest',

@@ -635,7 +635,7 @@ serverOnlyFiles = [
     "index_rebuilder.cpp",
     "instance.cpp",
     "introspect.cpp",
-    "op_observer.cpp",
+    "op_observer_impl.cpp",
     "operation_context_impl.cpp",
     "prefetch.cpp",
     "range_deleter_db_env.cpp",
@@ -740,11 +740,21 @@ env.Library(
 )
 
 env.Library(
+    target= 'op_observer_noop',
+    source= [
+        'op_observer_noop.cpp',
+    ],
+    LIBDEPS= [
+    ],
+)
+
+env.Library(
     target= 'service_context_d_test_fixture',
     source= [
         'service_context_d_test_fixture.cpp',
     ],
     LIBDEPS= [
+        'op_observer_noop',
         '$BUILD_DIR/mongo/db/serveronly',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/unittest/unittest',

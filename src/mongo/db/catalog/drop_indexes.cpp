@@ -165,9 +165,8 @@ Status dropIndexes(OperationContext* txn,
             return status;
         }
 
-        auto opObserver = getGlobalServiceContext()->getOpObserver();
-        if (opObserver)
-            opObserver->onDropIndex(txn, dbName.toString() + ".$cmd", idxDescriptor);
+        getGlobalServiceContext()->getOpObserver()->onDropIndex(
+            txn, dbName.toString() + ".$cmd", idxDescriptor);
 
         wunit.commit();
     }

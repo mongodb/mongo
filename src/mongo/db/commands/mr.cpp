@@ -510,7 +510,7 @@ void State::prepTempCollection() {
             }
             // Log the createIndex operation.
             string logNs = nsToDatabase(_config.tempNamespace) + ".system.indexes";
-            getGlobalServiceContext()->getOpObserver()->onCreateIndex(_txn, logNs, *it);
+            getGlobalServiceContext()->getOpObserver()->onCreateIndex(_txn, logNs, *it, false);
         }
         wuow.commit();
     }

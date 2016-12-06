@@ -41,6 +41,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"
+#include "mongo/db/op_observer_impl.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
@@ -77,7 +78,7 @@ public:
         replSettings.setMaster(true);
         setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
 
-        getGlobalServiceContext()->setOpObserver(stdx::make_unique<OpObserver>());
+        getGlobalServiceContext()->setOpObserver(stdx::make_unique<OpObserverImpl>());
 
         setOplogCollectionName();
         createOplog(&_txn);
