@@ -123,14 +123,12 @@ class CleanEveryN(CustomBehavior):
                              self.tests_run)
             self.tests_run = 0
 
-            teardown_success = self.fixture.teardown()
+            if not self.fixture.teardown():
+                raise errors.ServerFailure("%s did not exit cleanly" % (self.fixture))
+
             self.logger.info("Starting the fixture back up again...")
             self.fixture.setup()
             self.fixture.await_ready()
-
-            # Raise this after calling setup in case --continueOnFailure was specified.
-            if not teardown_success:
-                raise errors.TestFailure("%s did not exit cleanly" % (self.fixture))
 
 
 class JsCustomBehavior(CustomBehavior):
@@ -212,13 +210,12 @@ class BackgroundInitialSync(JsCustomBehavior):
                     raise errors.TestFailure(err.args[0])
             else:
                 # Tear down and restart the initial sync node to start initial sync again.
-                teardown_success = sync_node.teardown()
+                if not sync_node.teardown():
+                    raise errors.ServerFailure("%s did not exit cleanly" % (sync_node))
 
                 self.fixture.logger.info("Starting the initial sync node back up again...")
                 sync_node.setup()
                 sync_node.await_ready()
-                if not teardown_success:
-                    raise errors.TestFailure("%s did not exit cleanly" % (sync_node))
 
         # If it's been 'n' tests so far, wait for the initial sync node to finish syncing.
         if self.tests_run >= self.n:
@@ -318,7 +315,6 @@ class IntermediateInitialSync(JsCustomBehavior):
         sync_node_conn = utils.new_mongo_client(port=sync_node.port)
         description = "{0} after running '{1}'".format(self.description, test.short_name())
 
-        teardown_success = True
         if self.use_resync:
             self.fixture.logger.info("Calling resync on initial sync node...")
             cmd = bson.SON([("resync", 1)])
@@ -329,7 +325,8 @@ class IntermediateInitialSync(JsCustomBehavior):
                 test_report.addFailure(self.hook_test_case, sys.exc_info())
                 raise errors.TestFailure(err.args[0])
         else:
-            teardown_success = sync_node.teardown()
+            if not sync_node.teardown():
+                raise errors.ServerFailure("%s did not exit cleanly" % (sync_node))
 
             self.fixture.logger.info("Starting the initial sync node back up again...")
             sync_node.setup()
@@ -350,8 +347,6 @@ class IntermediateInitialSync(JsCustomBehavior):
         # Run data validation and dbhash checking.
         JsCustomBehavior.after_test(self, test, test_report)
 
-        if not teardown_success:
-            raise errors.TestFailure("%s did not exit cleanly" % (sync_node))
 
 class ValidateCollections(JsCustomBehavior):
     """
