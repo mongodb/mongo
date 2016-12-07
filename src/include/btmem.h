@@ -723,7 +723,7 @@ struct __wt_ref {
 	 * up our slot in the page's index structure.
 	 */
 	WT_PAGE * volatile home;	/* Reference page */
-	uint32_t pindex_hint;		/* Reference page index hint */
+	volatile uint32_t pindex_hint;	/* Reference page index hint */
 
 #define	WT_REF_DISK	0		/* Page is on disk */
 #define	WT_REF_DELETED	1		/* Page is on disk, but deleted */
