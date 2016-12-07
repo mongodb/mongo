@@ -101,11 +101,6 @@ ConnectionString ShardRegistry::getConfigServerConnectionString() const {
     return getConfigShard()->getConnString();
 }
 
-void ShardRegistry::rebuildConfigShard() {
-    _data.rebuildConfigShard(_shardFactory.get());
-    invariant(_data.getConfigShard());
-}
-
 StatusWith<shared_ptr<Shard>> ShardRegistry::getShard(OperationContext* txn,
                                                       const ShardId& shardId) {
     // If we know about the shard, return it.
@@ -177,6 +172,8 @@ void ShardRegistry::updateReplSetHosts(const ConnectionString& newConnString) {
     invariant(newConnString.type() == ConnectionString::SET ||
               newConnString.type() == ConnectionString::CUSTOM);  // For dbtests
 
+    // to prevent update config shard connection string during init
+    stdx::unique_lock<stdx::mutex> lock(_reloadMutex);
     _data.rebuildShardIfExists(newConnString, _shardFactory.get());
 }
 
@@ -441,14 +438,6 @@ void ShardRegistryData::shardIdSetDifference(std::set<ShardId>& diff) const {
             diff.erase(res);
         }
     }
-}
-
-void ShardRegistryData::rebuildConfigShard(ShardFactory* factory) {
-    stdx::unique_lock<stdx::mutex> rebuildConfigShardLock(_mutex);
-
-    ConnectionString configConnString = _configShard->originalConnString();
-
-    _rebuildShard_inlock(configConnString, factory);
 }
 
 void ShardRegistryData::rebuildShardIfExists(const ConnectionString& newConnString,
