@@ -1,10 +1,7 @@
-// Confirms proper behavior when reading from a view that is based on a sharded collection.
-// TODO SERVER-24762: Add tests that confirm appropriate error when performing view query:
-//       a) directly against non-primary shard
-//       b) directly against primary shard primary
-//       c) directly against primary shard secondary
-// TODO SERVER-24762: Add explain shell helper tests.
-
+/**
+ * Tests for expected behavior when querying a view that is based on a sharded collection.
+ * @tags: [requires_find_command]
+ */
 (function() {
     "use strict";
 
@@ -85,4 +82,5 @@
     assert.commandFailedWithCode(db.adminCommand({getShardVersion: view.getFullName()}),
                                  ErrorCodes.NamespaceNotSharded);
 
+    st.stop();
 })();

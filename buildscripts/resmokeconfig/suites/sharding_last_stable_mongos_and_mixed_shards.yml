@@ -85,6 +85,9 @@ selector:
     # $graphLookup is not supported in versions <= 3.2
     - jstests/sharding/read_committed_lookup.js
     - jstests/sharding/balancer_shell_commands.js
+    # TODO (SERVER-27379): Cannot create views when featureCompatibilityVersion is 3.2.
+    # Unblacklist when the featureCompatibilityVersion is 3.4 or higher.
+    - jstests/sharding/views.js
 
 executor:
   js_test:

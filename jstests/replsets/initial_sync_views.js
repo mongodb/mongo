@@ -1,6 +1,5 @@
 /**
  * Test initial sync with views present.
- * @tags: [requires_persistence]
  */
 
 (function() {

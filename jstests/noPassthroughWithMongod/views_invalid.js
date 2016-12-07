@@ -1,5 +1,7 @@
 (function() {
-    let dbname = 'views_invalid';
+    "use strict";
+
+    const dbname = 'views_invalid';
     let invalidDB = db.getSiblingDB(dbname);
 
     // Wait for the invalid view definition to be replicated to any secondaries and then drop the

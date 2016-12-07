@@ -1675,6 +1675,7 @@ tasks:
     vars:
       resmoke_args: --suites=gle_auth --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=mmapv1
       run_multiple_jobs: true
+      task_excluded_tags: requires_find_command
 
 - <<: *task_template
   name: gle_auth_WT
@@ -1684,6 +1685,7 @@ tasks:
     vars:
       resmoke_args: --suites=gle_auth --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger
       run_multiple_jobs: true
+      task_excluded_tags: requires_find_command
 
 - <<: *task_template
   name: gle_auth_write_cmd
@@ -1711,6 +1713,7 @@ tasks:
     vars:
       resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=mmapv1
       run_multiple_jobs: true
+      task_excluded_tags: requires_find_command
 
 - <<: *task_template
   name: gle_auth_basics_passthrough_WT
@@ -1720,6 +1723,7 @@ tasks:
     vars:
       resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger
       run_multiple_jobs: true
+      task_excluded_tags: requires_find_command
 
 - <<: *task_template
   name: gle_auth_basics_passthrough_write_cmd
@@ -1784,6 +1788,7 @@ tasks:
     vars:
       resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=mmapv1
       run_multiple_jobs: true
+      task_excluded_tags: requires_find_command
 
 - <<: *task_template
   name: sharding_gle_auth_basics_passthrough_WT
@@ -1795,6 +1800,7 @@ tasks:
     vars:
       resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger
       run_multiple_jobs: true
+      task_excluded_tags: requires_find_command
 
 - <<: *task_template
   name: sharding_gle_auth_basics_passthrough_write_cmd
@@ -2295,6 +2301,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=parallel --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=mmapv1
+      task_excluded_tags: requires_find_command
 
 - <<: *task_template
   name: parallel_compatibility_WT
@@ -2305,6 +2312,7 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=parallel --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=wiredTiger
+      task_excluded_tags: requires_find_command
 
 - <<: *task_template
   name: concurrency
@@ -2545,6 +2553,7 @@ tasks:
     vars:
       resmoke_args: --suites=sharding --shellReadMode=legacy --storageEngine=wiredTiger
       run_multiple_jobs: true
+      task_excluded_tags: requires_find_command
 
 - <<: *task_template
   name: sharding_auth
@@ -2699,42 +2708,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=read_only_sharded --storageEngine=wiredTiger
-      run_multiple_jobs: true
-
-- <<: *task_template
-  name: views
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=views --storageEngine=mmapv1
-      run_multiple_jobs: true
-
-- <<: *task_template
-  name: views_WT
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=views --storageEngine=wiredTiger
-      run_multiple_jobs: true
-
-- <<: *task_template
-  name: views_rs
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=views_rs --storageEngine=mmapv1
-      run_multiple_jobs: true
-
-- <<: *task_template
-  name: views_rs_WT
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=views_rs --storageEngine=wiredTiger
       run_multiple_jobs: true
 
 - name: package
@@ -3367,10 +3340,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
   - name: push
 
 - name: linux-64-repeated-execution
@@ -3507,10 +3476,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
 
 - name: linux-64-duroff
   display_name: Linux (No Journal)
@@ -3579,10 +3544,6 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: tool
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
 
 - name: linux-64-lsm
   stepback: false
@@ -3638,8 +3599,6 @@ buildvariants:
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: tool_WT
   - name: unittests
-  - name: views_WT
-  - name: views_rs_WT
 
 - name: ubuntu1204
   display_name: SSL Ubuntu 12.04
@@ -3754,10 +3713,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
   - name: package
     distros:
     - ubuntu1604-packer
@@ -3885,10 +3840,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
   - name: package
     distros:
     - ubuntu1604-packer
@@ -4007,10 +3958,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
   - name: package
     distros:
     - ubuntu1604-packer
@@ -4427,10 +4374,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
   - name: package
     distros:
     - ubuntu1604-packer
@@ -4552,10 +4495,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
   - name: package
     distros:
     - ubuntu1604-packer
@@ -4914,10 +4853,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
 
 - name: enterprise-windows-64
   display_name: "* Enterprise Windows"
@@ -4979,10 +4914,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
   - name: push
     distros:
     - rhel70-small
@@ -5265,10 +5196,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
   - name: push
     distros:
     - rhel70-small
@@ -5409,10 +5336,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
 
 - name: enterprise-osx-107
   display_name: Enterprise OS X 10.7
@@ -5458,10 +5381,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
   - name: push
     distros:
     - rhel70-small
@@ -5685,10 +5604,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
   - name: package
     distros:
     - ubuntu1604-packer
@@ -5907,10 +5822,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
 
 - name: enterprise-rhel-70-64-bit
   display_name: Enterprise RHEL 7.0
@@ -6085,10 +5996,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
   - name: package
     distros:
     - ubuntu1604-packer
@@ -6224,10 +6131,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
   - name: package
     distros:
     - ubuntu1604-packer
@@ -6365,8 +6268,6 @@ buildvariants:
   # - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views_WT
-  - name: views_rs_WT
   - name: push
     distros:
     - rhel70-small
@@ -6502,8 +6403,6 @@ buildvariants:
   # - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views_WT
-  - name: views_rs_WT
   - name: push
     distros:
     - rhel70-small
@@ -6980,10 +6879,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
   - name: package
     distros:
     - ubuntu1604-packer
@@ -7247,10 +7142,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
   - name: package
     distros:
     - ubuntu1604-packer
@@ -7341,10 +7232,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
   - name: push
     distros:
     - rhel70-small
@@ -7584,10 +7471,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
   - name: package
     distros:
     - ubuntu1604-packer
@@ -7709,10 +7592,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
   - name: package
     distros:
     - ubuntu1604-packer
@@ -7809,8 +7688,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: unittests
-  - name: views_WT
-  - name: views_rs_WT
 
 - name: linux-64-ephemeralForTest
   display_name: Linux (ephemeralForTest)
@@ -7887,8 +7764,6 @@ buildvariants:
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: tool
   - name: unittests
-  - name: views_WT
-  - name: views_rs_WT
 
 - name: enterprise-rhel-71-ppc64le-inmem
   display_name: Enterprise RHEL 7.1 PPC64LE (inMemory) DEBUG
@@ -7968,7 +7843,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: unittests
-  - name: views
 
 - name: enterprise-rhel-72-s390x-inmem
   display_name: Enterprise RHEL 7.2 s390x (inMemory) DEBUG
@@ -8055,7 +7929,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: unittests
-  - name: views
 
 - name: ubuntu1404-rocksdb
   display_name: Ubuntu 14.04 (RocksDB)
@@ -8125,7 +7998,6 @@ buildvariants:
   - name: serial_run
   - name: sharding_jscore_passthrough
   - name: unittests
-  - name: views
 
 ###########################################
 #     Experimental buildvariants          #
@@ -8272,9 +8144,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs_WT
 
 - name: ubuntu1604-asan
   display_name: ~ ASAN SSL Ubuntu 16.04
@@ -8447,9 +8316,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs_WT
 
 - name: enterprise-ubuntu-dynamic-1604-64-bit
   display_name: "* Shared Library Enterprise Ubuntu 16.04"
@@ -8599,10 +8465,6 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
-  - name: views
-  - name: views_WT
-  - name: views_rs
-  - name: views_rs_WT
 
 - name: ubuntu1404-jepsen
   display_name: ~ Jepsen Ubuntu 14.04
