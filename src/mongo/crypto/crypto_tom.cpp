@@ -29,6 +29,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/config.h"
+#include "mongo/crypto/crypto.h"
+#include "mongo/util/assert_util.h"
 
 #ifdef MONGO_CONFIG_SSL
 #error This file should not be included if compiling with SSL support
@@ -41,33 +43,26 @@ namespace crypto {
 /*
  * Computes a SHA-1 hash of 'input'.
  */
-bool sha1(const unsigned char* input, const size_t inputLen, unsigned char* output) {
-    hash_state hashState;
-    if (sha1_init(&hashState) != CRYPT_OK) {
-        return false;
-    }
-    if (sha1_process(&hashState, input, inputLen) != CRYPT_OK) {
-        return false;
-    }
-    if (sha1_done(&hashState, output) != CRYPT_OK) {
-        return false;
-    }
+SHA1Hash sha1(const unsigned char* input, const size_t inputLen) {
+    SHA1Hash output;
 
-    return true;
+    hash_state hashState;
+    fassert(40381,
+            sha1_init(&hashState) == CRYPT_OK &&
+                sha1_process(&hashState, input, inputLen) == CRYPT_OK &&
+                sha1_done(&hashState, output.data()) == CRYPT_OK);
+    return output;
 }
 
 /*
  * Computes a HMAC SHA-1 keyed hash of 'input' using the key 'key'
  */
-bool hmacSha1(const unsigned char* key,
-              const size_t keyLen,
-              const unsigned char* input,
-              const size_t inputLen,
-              unsigned char* output,
-              unsigned int* outputLen) {
-    if (!key || !input || !output) {
-        return false;
-    }
+SHA1Hash hmacSha1(const unsigned char* key,
+                  const size_t keyLen,
+                  const unsigned char* input,
+                  const size_t inputLen) {
+    invariant(key && input);
+    SHA1Hash output;
 
     static int hashId = -1;
     if (hashId == -1) {
@@ -76,12 +71,10 @@ bool hmacSha1(const unsigned char* key,
     }
 
     unsigned long sha1HashLen = 20;
-    if (hmac_memory(hashId, key, keyLen, input, inputLen, output, &sha1HashLen) != CRYPT_OK) {
-        return false;
-    }
-
-    *outputLen = sha1HashLen;
-    return true;
+    fassert(40382,
+            hmac_memory(hashId, key, keyLen, input, inputLen, output.data(), &sha1HashLen) ==
+                CRYPT_OK);
+    return output;
 }
 
 }  // namespace crypto

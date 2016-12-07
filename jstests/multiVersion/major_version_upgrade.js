@@ -48,6 +48,12 @@
     for (let i = 0; i < versions.length; i++) {
         let version = versions[i];
         let latestOptions = Object.extend({binVersion: version.binVersion}, defaultOptions);
+        var changedAuthMechanism = false;
+        if (TestData.authMechanism === "SCRAM-SHA-1" && version.binVersion === "2.6") {
+            TestData.authMechanism = undefined;
+            DB.prototype._defaultAuthenticationMechanism = "MONGODB-CR";
+            changedAuthMechanism = true;
+        }
 
         // Start a mongod with specified version.
         let conn = MongoRunner.runMongod(latestOptions);
@@ -88,6 +94,12 @@
 
         // Shutdown the current mongod.
         MongoRunner.stopMongod(conn);
+
+        if (version.binVersion === "2.6" && changedAuthMechanism) {
+            TestData.authMechanism = "SCRAM-SHA-1";
+            DB.prototype._defaultAuthenticationMechanism = "SCRAM-SHA-1";
+            changedAuthMechanisms = false;
+        }
     }
 
     // Replica Sets
@@ -97,6 +109,12 @@
         n2: {binVersion: versions[0].binVersion},
         n3: {binVersion: versions[0].binVersion},
     };
+    var changedAuthMechanisms = false;
+    if (TestData.authMechanism === "SCRAM-SHA-1" && versions[0].binVersion === "2.6") {
+        TestData.authMechanism = undefined;
+        DB.prototype._defaultAuthenticationMechanism = "MONGODB-CR";
+        changedAuthMechanism = true;
+    }
 
     let rst = new ReplSetTest({nodes});
 
@@ -112,6 +130,11 @@
     for (let i = 0; i < versions.length; i++) {
         let version = versions[i];
         rst.upgradeSet({binVersion: version.binVersion});
+        if (version.binVersion != "2.6" && changedAuthMechanism) {
+            TestData.authMechanism = "SCRAM-SHA-1";
+            DB.prototype._defaultAuthenticationMechanism = "SCRAM-SHA-1";
+            changedAuthMechanisms = false;
+        }
 
         // Connect to the primary to ensure that the test can insert and create indices.
         let conn = rst.getPrimary();

@@ -31,12 +31,11 @@
 
 namespace mongo {
 namespace {
-const int digestLen = 20;
 
 // SHA-1 test vectors from http://csrc.nist.gov/groups/ST/toolkit/documents/Examples/SHA_All.pdf
 const struct {
     const char* msg;
-    unsigned char hash[digestLen];
+    SHA1Hash hash;
 } sha1Tests[] = {{"abc", {0xa9, 0x99, 0x3e, 0x36, 0x47, 0x06, 0x81, 0x6a, 0xba, 0x3e,
                           0x25, 0x71, 0x78, 0x50, 0xc2, 0x6c, 0x9c, 0xd0, 0xd8, 0x9d}},
 
@@ -45,15 +44,12 @@ const struct {
                    0x4A, 0xA1, 0xF9, 0x51, 0x29, 0xE5, 0xE5, 0x46, 0x70, 0xF1}}};
 
 TEST(CryptoVectors, SHA1) {
-    unsigned char sha1Result[digestLen];
     size_t numTests = sizeof(sha1Tests) / sizeof(sha1Tests[0]);
     for (size_t i = 0; i < numTests; i++) {
-        ASSERT(crypto::sha1(reinterpret_cast<const unsigned char*>(sha1Tests[i].msg),
-                            strlen(sha1Tests[i].msg),
-                            sha1Result))
+        SHA1Hash result = crypto::sha1(reinterpret_cast<const unsigned char*>(sha1Tests[i].msg),
+                                       strlen(sha1Tests[i].msg));
+        ASSERT(0 == memcmp(sha1Tests[i].hash.data(), result.data(), result.size()))
             << "Failed SHA1 iteration " << i;
-        ASSERT(0 == memcmp(sha1Tests[i].hash, sha1Result, digestLen)) << "Failed SHA1 iteration "
-                                                                      << i;
     }
 }
 
@@ -65,7 +61,7 @@ const struct {
     int keyLen;
     unsigned char data[maxDataSize];
     int dataLen;
-    unsigned char hash[digestLen];
+    SHA1Hash hash;
 } hmacSha1Tests[] = {
     // RFC test case 1
     {{0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b, 0x0b,
@@ -117,19 +113,13 @@ const struct {
       0x56, 0x37, 0xce, 0x8a, 0x3b, 0x55, 0xed, 0x40, 0x21, 0x12}}};
 
 TEST(CryptoVectors, HMACSHA1) {
-    unsigned char hmacSha1Result[digestLen];
-    unsigned int hashLen = digestLen;
-
     size_t numTests = sizeof(hmacSha1Tests) / sizeof(hmacSha1Tests[0]);
     for (size_t i = 0; i < numTests; i++) {
-        ASSERT(crypto::hmacSha1(hmacSha1Tests[i].key,
-                                hmacSha1Tests[i].keyLen,
-                                hmacSha1Tests[i].data,
-                                hmacSha1Tests[i].dataLen,
-                                hmacSha1Result,
-                                &hashLen))
-            << "Failed HMAC-SHA1 iteration " << i;
-        ASSERT(0 == memcmp(hmacSha1Tests[i].hash, hmacSha1Result, digestLen))
+        SHA1Hash result = crypto::hmacSha1(hmacSha1Tests[i].key,
+                                           hmacSha1Tests[i].keyLen,
+                                           hmacSha1Tests[i].data,
+                                           hmacSha1Tests[i].dataLen);
+        ASSERT(0 == memcmp(hmacSha1Tests[i].hash.data(), result.data(), result.size()))
             << "Failed HMAC-SHA1 iteration " << i;
     }
 }

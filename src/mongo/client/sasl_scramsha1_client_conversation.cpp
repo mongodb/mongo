@@ -34,6 +34,7 @@
 
 #include "mongo/base/parse_number.h"
 #include "mongo/client/sasl_client_session.h"
+#include "mongo/client/scram_sha1_client_cache.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/mongoutils/str.h"
@@ -46,13 +47,12 @@ using std::unique_ptr;
 using std::string;
 
 SaslSCRAMSHA1ClientConversation::SaslSCRAMSHA1ClientConversation(
-    SaslClientSession* saslClientSession)
-    : SaslClientConversation(saslClientSession), _step(0), _authMessage(""), _clientNonce("") {}
-
-SaslSCRAMSHA1ClientConversation::~SaslSCRAMSHA1ClientConversation() {
-    // clear the _saltedPassword memory
-    memset(_saltedPassword, 0, scram::hashSize);
-}
+    SaslClientSession* saslClientSession, SCRAMSHA1ClientCache* clientCache)
+    : SaslClientConversation(saslClientSession),
+      _step(0),
+      _authMessage(),
+      _clientCache(clientCache),
+      _clientNonce() {}
 
 StatusWith<bool> SaslSCRAMSHA1ClientConversation::step(StringData inputData,
                                                        std::string* outputData) {
@@ -159,7 +159,7 @@ StatusWith<bool> SaslSCRAMSHA1ClientConversation::_secondStep(const std::vector<
     }
 
     std::string salt = input[1].substr(2);
-    int iterationCount;
+    size_t iterationCount;
 
     Status status = parseNumberFromStringWithBase(input[2].substr(2), 10, &iterationCount);
     if (status != Status::OK()) {
@@ -179,14 +179,30 @@ StatusWith<bool> SaslSCRAMSHA1ClientConversation::_secondStep(const std::vector<
         return StatusWith<bool>(ex.toStatus());
     }
 
-    scram::generateSaltedPassword(
-        _saslClientSession->getParameter(SaslClientSession::parameterPassword),
-        reinterpret_cast<const unsigned char*>(decodedSalt.c_str()),
-        decodedSalt.size(),
-        iterationCount,
-        _saltedPassword);
+    scram::SCRAMPresecrets presecrets(
+        _saslClientSession->getParameter(SaslClientSession::parameterPassword).toString(),
+        std::vector<std::uint8_t>(decodedSalt.begin(), decodedSalt.end()),
+        iterationCount);
 
-    std::string clientProof = scram::generateClientProof(_saltedPassword, _authMessage);
+    StatusWith<HostAndPort> targetHost = HostAndPort::parse(
+        _saslClientSession->getParameter(SaslClientSession::parameterServiceHostAndPort));
+
+    if (targetHost.isOK()) {
+        auto cachedSecrets = _clientCache->getCachedSecrets(targetHost.getValue(), presecrets);
+
+        if (cachedSecrets) {
+            _credentials = *cachedSecrets;
+        } else {
+            _credentials = scram::generateSecrets(presecrets);
+
+            _clientCache->setCachedSecrets(
+                std::move(targetHost.getValue()), std::move(presecrets), _credentials);
+        }
+    } else {
+        _credentials = scram::generateSecrets(presecrets);
+    }
+
+    std::string clientProof = scram::generateClientProof(_credentials, _authMessage);
 
     StringBuilder sb;
     sb << "c=biws,r=" << nonce << ",p=" << clientProof;
@@ -227,7 +243,7 @@ StatusWith<bool> SaslSCRAMSHA1ClientConversation::_thirdStep(const std::vector<s
     }
 
     bool validServerSignature =
-        scram::verifyServerSignature(_saltedPassword, _authMessage, input[0].substr(2));
+        scram::verifyServerSignature(_credentials, _authMessage, input[0].substr(2));
 
     if (!validServerSignature) {
         *outputData = "e=Invalid server signature";

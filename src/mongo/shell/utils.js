@@ -284,7 +284,15 @@ jsTest.authenticateNodes = function(nodes) {
     assert.soonNoExcept(function() {
         for (var i = 0; i < nodes.length; i++) {
             // Don't try to authenticate to arbiters
-            res = nodes[i].getDB("admin").runCommand({replSetGetStatus: 1});
+            try {
+                res = nodes[i].getDB("admin").runCommand({replSetGetStatus: 1});
+            } catch (e) {
+                // ReplicaSet tests which don't use auth are allowed to have nodes crash during
+                // startup. To allow tests which use to behavior to work with auth,
+                // attempting authentication against a dead node should be non-fatal.
+                print("Caught exception getting replSetStatus while authenticating: " + e);
+                continue;
+            }
             if (res.myState == 7) {
                 continue;
             }

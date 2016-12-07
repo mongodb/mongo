@@ -241,7 +241,7 @@ bool isFailedAuthOk(const AuthResponse& response) {
 
 void auth(RunCommandHook runCommand,
           const BSONObj& params,
-          StringData hostname,
+          const HostAndPort& hostname,
           StringData clientName,
           AuthCompletionHandler handler) {
     std::string mechanism;
@@ -285,7 +285,7 @@ void auth(RunCommandHook runCommand,
 
 void asyncAuth(RunCommandHook runCommand,
                const BSONObj& params,
-               StringData hostname,
+               const HostAndPort& hostname,
                StringData clientName,
                AuthCompletionHandler handler) {
     auth(runCommand, params, hostname, clientName, std::move(handler));
@@ -294,7 +294,7 @@ void asyncAuth(RunCommandHook runCommand,
 }  // namespace
 
 void authenticateClient(const BSONObj& params,
-                        StringData hostname,
+                        const HostAndPort& hostname,
                         StringData clientName,
                         RunCommandHook runCommand,
                         AuthCompletionHandler handler) {

@@ -2075,6 +2075,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: multiversion_auth
+  commands:
+  - func: "do setup"
+  - func: "do multiversion setup"
+  - func: "run tests"
+    vars:
+      task_path_suffix: /data/multiversion
+      resmoke_args: --suites=multiversion_auth --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: multiversion_WT
   commands:
   - func: "do setup"
@@ -3299,6 +3310,7 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_auth
   - name: multiversion_WT
   - name: multiversion_multistorage_engine
   - name: noPassthrough
@@ -4739,6 +4751,7 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_auth
   - name: multiversion_WT
   - name: multiversion_multistorage_engine
   - name: noPassthrough
@@ -5573,6 +5586,7 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_auth
   - name: multiversion_WT
   - name: multiversion_multistorage_engine
   - name: noPassthrough
@@ -5796,6 +5810,7 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_auth
   - name: multiversion_WT
   - name: multiversion_multistorage_engine
   - name: noPassthrough
@@ -8341,6 +8356,7 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_auth
   - name: multiversion_WT
   - name: multiversion_multistorage_engine
   - name: noPassthrough
@@ -8516,6 +8532,7 @@ buildvariants:
   - name: mmap
   - name: mongosTest
   - name: multiversion
+  - name: multiversion_auth
   - name: multiversion_WT
   - name: multiversion_multistorage_engine
   - name: noPassthrough

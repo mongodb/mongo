@@ -29,6 +29,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/config.h"
+#include "mongo/crypto/crypto.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 
 #ifndef MONGO_CONFIG_SSL
@@ -44,32 +46,30 @@ namespace crypto {
 /*
  * Computes a SHA-1 hash of 'input'.
  */
-bool sha1(const unsigned char* input, const size_t inputLen, unsigned char* output) {
+SHA1Hash sha1(const unsigned char* input, const size_t inputLen) {
+    SHA1Hash output;
+
     EVP_MD_CTX digestCtx;
     EVP_MD_CTX_init(&digestCtx);
     ON_BLOCK_EXIT(EVP_MD_CTX_cleanup, &digestCtx);
 
-    if (1 != EVP_DigestInit_ex(&digestCtx, EVP_sha1(), NULL)) {
-        return false;
-    }
-
-    if (1 != EVP_DigestUpdate(&digestCtx, input, inputLen)) {
-        return false;
-    }
-
-    return (1 == EVP_DigestFinal_ex(&digestCtx, output, NULL));
+    fassert(40379,
+            EVP_DigestInit_ex(&digestCtx, EVP_sha1(), NULL) == 1 &&
+                EVP_DigestUpdate(&digestCtx, input, inputLen) == 1 &&
+                EVP_DigestFinal_ex(&digestCtx, output.data(), NULL) == 1);
+    return output;
 }
 
 /*
  * Computes a HMAC SHA-1 keyed hash of 'input' using the key 'key'
  */
-bool hmacSha1(const unsigned char* key,
-              const size_t keyLen,
-              const unsigned char* input,
-              const size_t inputLen,
-              unsigned char* output,
-              unsigned int* outputLen) {
-    return HMAC(EVP_sha1(), key, keyLen, input, inputLen, output, outputLen);
+SHA1Hash hmacSha1(const unsigned char* key,
+                  const size_t keyLen,
+                  const unsigned char* input,
+                  const size_t inputLen) {
+    SHA1Hash output;
+    fassert(40380, HMAC(EVP_sha1(), key, keyLen, input, inputLen, output.data(), NULL) != NULL);
+    return output;
 }
 
 }  // namespace crypto
