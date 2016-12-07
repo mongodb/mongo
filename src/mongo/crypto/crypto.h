@@ -28,24 +28,26 @@
 
 #pragma once
 
+#include <array>
 #include <cstddef>
 
 namespace mongo {
+// Storage container for a SHA1 hash
+using SHA1Hash = std::array<std::uint8_t, 20>;
+
 namespace crypto {
 /*
  * Computes a SHA-1 hash of 'input'.
  */
-bool sha1(const unsigned char* input, const size_t inputLen, unsigned char* output);
+SHA1Hash sha1(const unsigned char* input, const size_t inputLen);
 
 /*
  * Computes a HMAC SHA-1 keyed hash of 'input' using the key 'key'
  */
-bool hmacSha1(const unsigned char* key,
-              const size_t keyLen,
-              const unsigned char* input,
-              const size_t inputLen,
-              unsigned char* output,
-              unsigned int* outputLen);
+SHA1Hash hmacSha1(const unsigned char* key,
+                  const size_t keyLen,
+                  const unsigned char* input,
+                  const size_t inputLen);
 
 }  // namespace crypto
 }  // namespace mongo

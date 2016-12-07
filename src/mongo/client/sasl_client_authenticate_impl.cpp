@@ -116,7 +116,7 @@ Status extractPassword(const BSONObj& saslParameters,
  * Returns Status::OK() on success.
  */
 Status configureSession(SaslClientSession* session,
-                        StringData hostname,
+                        const HostAndPort& hostname,
                         StringData targetDatabase,
                         const BSONObj& saslParameters) {
     std::string mechanism;
@@ -134,10 +134,11 @@ Status configureSession(SaslClientSession* session,
     session->setParameter(SaslClientSession::parameterServiceName, value);
 
     status = bsonExtractStringFieldWithDefault(
-        saslParameters, saslCommandServiceHostnameFieldName, hostname, &value);
+        saslParameters, saslCommandServiceHostnameFieldName, hostname.host(), &value);
     if (!status.isOK())
         return status;
     session->setParameter(SaslClientSession::parameterServiceHostname, value);
+    session->setParameter(SaslClientSession::parameterServiceHostAndPort, hostname.toString());
 
     status = bsonExtractStringField(saslParameters, saslCommandUserFieldName, &value);
     if (!status.isOK())
@@ -247,7 +248,7 @@ void asyncSaslConversation(auth::RunCommandHook runCommand,
  * "client".
  */
 void saslClientAuthenticateImpl(auth::RunCommandHook runCommand,
-                                StringData hostname,
+                                const HostAndPort& hostname,
                                 const BSONObj& saslParameters,
                                 auth::AuthCompletionHandler handler) {
     int saslLogLevel = getSaslClientLogLevel(saslParameters);

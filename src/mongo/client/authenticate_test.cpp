@@ -179,29 +179,31 @@ public:
 
 TEST_F(AuthClientTest, MongoCR) {
     auto params = loadMongoCRConversation();
-    auth::authenticateClient(std::move(params), "", "", _runCommandCallback);
+    auth::authenticateClient(std::move(params), HostAndPort(), "", _runCommandCallback);
 }
 
 TEST_F(AuthClientTest, asyncMongoCR) {
     auto params = loadMongoCRConversation();
-    auth::authenticateClient(
-        std::move(params), "", "", _runCommandCallback, [this](auth::AuthResponse response) {
-            ASSERT(response.isOK());
-        });
+    auth::authenticateClient(std::move(params),
+                             HostAndPort(),
+                             "",
+                             _runCommandCallback,
+                             [this](auth::AuthResponse response) { ASSERT(response.isOK()); });
 }
 
 #ifdef MONGO_CONFIG_SSL
 TEST_F(AuthClientTest, X509) {
     auto params = loadX509Conversation();
-    auth::authenticateClient(std::move(params), "", _username, _runCommandCallback);
+    auth::authenticateClient(std::move(params), HostAndPort(), _username, _runCommandCallback);
 }
 
 TEST_F(AuthClientTest, asyncX509) {
     auto params = loadX509Conversation();
-    auth::authenticateClient(
-        std::move(params), "", _username, _runCommandCallback, [this](auth::AuthResponse response) {
-            ASSERT(response.isOK());
-        });
+    auth::authenticateClient(std::move(params),
+                             HostAndPort(),
+                             _username,
+                             _runCommandCallback,
+                             [this](auth::AuthResponse response) { ASSERT(response.isOK()); });
 }
 #endif
 
