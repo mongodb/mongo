@@ -103,19 +103,24 @@ env.CppUnitTest(
     ],
 )
 
-env.Library(
+
+zlibEnv = env.Clone()
+zlibEnv.InjectThirdPartyIncludePaths(libraries=['zlib'])
+zlibEnv.Library(
     target='message_compressor',
     source=[
         'message_compressor_manager.cpp',
         'message_compressor_metrics.cpp',
         'message_compressor_registry.cpp',
         'message_compressor_snappy.cpp',
+        'message_compressor_zlib.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/decorable',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         '$BUILD_DIR/third_party/shim_snappy',
+        '$BUILD_DIR/third_party/shim_zlib',
     ]
 )
 

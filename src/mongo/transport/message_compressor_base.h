@@ -39,6 +39,7 @@ namespace mongo {
 enum class MessageCompressor : uint8_t {
     kNoop = 0,
     kSnappy = 1,
+    kZlib = 2,
     kExtended = 255,
 };
 
@@ -52,7 +53,7 @@ public:
     virtual ~MessageCompressorBase() = default;
 
     /*
-     * Returns the name for subclass compressors (e.g. "snappy" or "noop")
+     * Returns the name for subclass compressors (e.g. "snappy", "zlib", or "noop")
      */
     const std::string& getName() const {
         return _name;
