@@ -544,7 +544,8 @@ void IndexAccessMethod::getKeys(const BSONObj& obj,
                                 GetKeysMode mode,
                                 BSONObjSet* keys,
                                 MultikeyPaths* multikeyPaths) const {
-    static stdx::unordered_set<int> whiteList{// Btree
+    static stdx::unordered_set<int> whiteList{ErrorCodes::CannotBuildIndexKeys,
+                                              // Btree
                                               ErrorCodes::KeyTooLong,
                                               ErrorCodes::CannotIndexParallelArrays,
                                               // FTS
