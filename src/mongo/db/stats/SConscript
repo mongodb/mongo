@@ -66,9 +66,29 @@ env.Library(
 )
 
 env.Library(
+    target='fill_locker_info',
+    source=[
+        'fill_locker_info.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager'
+    ],
+)
+
+env.CppUnitTest(
+    target='fill_locker_info_test',
+    source=[
+        'fill_locker_info_test.cpp',
+    ],
+    LIBDEPS=[
+        'fill_locker_info',
+    ],
+)
+
+env.Library(
     target='serveronly',
     source=[
-        "fill_locker_info.cpp",
         "latency_server_status_section.cpp",
         "lock_server_status_section.cpp",
         "range_deleter_server_status.cpp",
@@ -79,6 +99,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/commands/core',
         '$BUILD_DIR/mongo/db/range_deleter',
+        'fill_locker_info',
         'top',
     ],
     LIBDEPS_TAGS=[
