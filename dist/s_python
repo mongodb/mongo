@@ -17,10 +17,10 @@ test -s $t && {
 	echo '[tab] characters appear in Python scripts:'
 	cat $t
 }
-# Check Python coding standards: check for trailing semi-colons.
+# Check Python coding standards: check for uncommented trailing semi-colons.
 # Don't check too widely, there are third-party tools that fail this test as
 # well as scripts in this directory that output C code, and so fail the test.
-egrep ';$' `find lang test -name '*.py'`> $t
+egrep '^[^#]*;$' `find lang test -name '*.py'`> $t
 test -s $t && {
 	echo 'trailing semi-colons in selected Python code:'
 	cat $t
