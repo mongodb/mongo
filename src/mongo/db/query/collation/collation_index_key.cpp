@@ -137,13 +137,6 @@ void translate(BSONObj obj, const CollatorInterface* collator, BufBuilder* out) 
 }
 }
 
-// TODO SERVER-24674: We may want to check that objects and arrays actually do contain strings
-// before returning true.
-bool CollationIndexKey::shouldUseCollationIndexKey(BSONElement elt,
-                                                   const CollatorInterface* collator) {
-    return collator && isCollatableType(elt.type());
-}
-
 void CollationIndexKey::collationAwareIndexKeyAppend(BSONElement elt,
                                                      const CollatorInterface* collator,
                                                      BSONObjBuilder* out) {

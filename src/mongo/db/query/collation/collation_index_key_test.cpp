@@ -39,31 +39,25 @@ namespace {
 
 using namespace mongo;
 
-TEST(CollationIndexKeyTest, ShouldUseCollationIndexKeyFalseWithNullCollator) {
+TEST(CollationIndexKeyTest, IsCollatableTypeShouldBeTrueForString) {
     BSONObj obj = BSON("foo"
                        << "string");
-    ASSERT_FALSE(CollationIndexKey::shouldUseCollationIndexKey(obj.firstElement(), nullptr));
+    ASSERT_TRUE(CollationIndexKey::isCollatableType(obj.firstElement().type()));
 }
 
-TEST(CollationIndexKeyTest, ShouldUseCollationIndexKeyTrueWithObjectElement) {
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    BSONObj obj = BSON("foo" << BSON("bar"
-                                     << "string"));
-    ASSERT_TRUE(CollationIndexKey::shouldUseCollationIndexKey(obj.firstElement(), &collator));
+TEST(CollationIndexKeyTest, IsCollatableTypeShouldBeTrueForObject) {
+    BSONObj obj = BSON("foo" << BSON("bar" << 99));
+    ASSERT_TRUE(CollationIndexKey::isCollatableType(obj.firstElement().type()));
 }
 
-TEST(CollationIndexKeyTest, ShouldUseCollationIndexKeyTrueWithArrayElement) {
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    BSONObj obj = BSON("foo" << BSON_ARRAY("one"
-                                           << "two"));
-    ASSERT_TRUE(CollationIndexKey::shouldUseCollationIndexKey(obj.firstElement(), &collator));
+TEST(CollationIndexKeyTest, IsCollatableTypeShouldBeTrueForArray) {
+    BSONObj obj = BSON("foo" << BSON_ARRAY(98 << 99));
+    ASSERT_TRUE(CollationIndexKey::isCollatableType(obj.firstElement().type()));
 }
 
-TEST(CollationIndexKeyTest, ShouldUseCollationIndexKeyTrueWithStringElement) {
-    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    BSONObj obj = BSON("foo"
-                       << "string");
-    ASSERT_TRUE(CollationIndexKey::shouldUseCollationIndexKey(obj.firstElement(), &collator));
+TEST(CollationIndexKeyTest, IsCollatableTypeShouldBeFalseForNumber) {
+    BSONObj obj = BSON("foo" << 99);
+    ASSERT_FALSE(CollationIndexKey::isCollatableType(obj.firstElement().type()));
 }
 
 TEST(CollationIndexKeyTest, CollationAwareAppendCorrectlyAppendsElementWithNullCollator) {
