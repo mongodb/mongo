@@ -53,7 +53,6 @@
 namespace mongo {
 
 using std::shared_ptr;
-using std::unique_ptr;
 using std::string;
 
 namespace {
@@ -108,26 +107,7 @@ public:
 
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        std::shared_ptr<DBConfig> config;
-
-        {
-            auto status = grid.catalogCache()->getDatabase(txn, nss.db().toString());
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status.getStatus());
-            }
-
-            config = status.getValue();
-        }
-
-        if (!config->isSharded(nss.ns())) {
-            config->reload(txn);
-
-            if (!config->isSharded(nss.ns())) {
-                return appendCommandStatus(result,
-                                           Status(ErrorCodes::NamespaceNotSharded,
-                                                  "ns [" + nss.ns() + " is not sharded."));
-            }
-        }
+        auto scopedCM = uassertStatusOK(ScopedChunkManager::refreshAndGet(txn, nss));
 
         const string toString = cmdObj["to"].valuestrsafe();
         if (!toString.size()) {
@@ -135,7 +115,7 @@ public:
             return false;
         }
 
-        const auto toStatus = grid.shardRegistry()->getShard(txn, toString);
+        const auto toStatus = Grid::get(txn)->shardRegistry()->getShard(txn, toString);
         if (!toStatus.isOK()) {
             string msg(str::stream() << "Could not move chunk in '" << nss.ns() << "' to shard '"
                                      << toString
@@ -143,6 +123,7 @@ public:
             log() << msg;
             return appendCommandStatus(result, Status(ErrorCodes::ShardNotFound, msg));
         }
+
         const auto to = toStatus.getValue();
 
         // so far, chunk size serves test purposes; it may or may not become a supported parameter
@@ -160,43 +141,35 @@ public:
             return false;
         }
 
-        // This refreshes the chunk metadata if stale
-        auto scopedCM = uassertStatusOK(ScopedChunkManager::getExisting(txn, nss));
-        ChunkManager* const info = scopedCM.cm();
+        auto const cm = scopedCM.cm();
 
         shared_ptr<Chunk> chunk;
 
         if (!find.isEmpty()) {
-            StatusWith<BSONObj> status =
-                info->getShardKeyPattern().extractShardKeyFromQuery(txn, find);
-
-            // Bad query
-            if (!status.isOK())
-                return appendCommandStatus(result, status.getStatus());
-
-            BSONObj shardKey = status.getValue();
-
+            // find
+            BSONObj shardKey =
+                uassertStatusOK(cm->getShardKeyPattern().extractShardKeyFromQuery(txn, find));
             if (shardKey.isEmpty()) {
                 errmsg = str::stream() << "no shard key found in chunk query " << find;
                 return false;
             }
 
-            chunk = info->findIntersectingChunkWithSimpleCollation(txn, shardKey);
+            chunk = cm->findIntersectingChunkWithSimpleCollation(txn, shardKey);
         } else {
-            // Bounds
-            if (!info->getShardKeyPattern().isShardKey(bounds[0].Obj()) ||
-                !info->getShardKeyPattern().isShardKey(bounds[1].Obj())) {
+            // bounds
+            if (!cm->getShardKeyPattern().isShardKey(bounds[0].Obj()) ||
+                !cm->getShardKeyPattern().isShardKey(bounds[1].Obj())) {
                 errmsg = str::stream() << "shard key bounds "
                                        << "[" << bounds[0].Obj() << "," << bounds[1].Obj() << ")"
                                        << " are not valid for shard key pattern "
-                                       << info->getShardKeyPattern().toBSON();
+                                       << cm->getShardKeyPattern().toBSON();
                 return false;
             }
 
-            BSONObj minKey = info->getShardKeyPattern().normalizeShardKey(bounds[0].Obj());
-            BSONObj maxKey = info->getShardKeyPattern().normalizeShardKey(bounds[1].Obj());
+            BSONObj minKey = cm->getShardKeyPattern().normalizeShardKey(bounds[0].Obj());
+            BSONObj maxKey = cm->getShardKeyPattern().normalizeShardKey(bounds[1].Obj());
 
-            chunk = info->findIntersectingChunkWithSimpleCollation(txn, minKey);
+            chunk = cm->findIntersectingChunkWithSimpleCollation(txn, minKey);
 
             if (chunk->getMin().woCompare(minKey) != 0 || chunk->getMax().woCompare(maxKey) != 0) {
                 errmsg = str::stream() << "no chunk found with the shard key bounds "
@@ -213,7 +186,7 @@ public:
         chunkType.setMin(chunk->getMin());
         chunkType.setMax(chunk->getMax());
         chunkType.setShard(chunk->getShardId());
-        chunkType.setVersion(info->getVersion());
+        chunkType.setVersion(cm->getVersion());
 
         uassertStatusOK(configsvr_client::moveChunk(txn,
                                                     chunkType,
@@ -222,8 +195,9 @@ public:
                                                     secondaryThrottle,
                                                     cmdObj["_waitForDelete"].trueValue()));
 
-        // Make sure the chunk manager is updated with the migrated chunk
-        info->reload(txn);
+        // Proactively refresh the chunk manager. Not strictly necessary, but this way it's
+        // immediately up-to-date the next time it's used.
+        cm->reload(txn);
 
         result.append("millis", t.millis());
         return true;

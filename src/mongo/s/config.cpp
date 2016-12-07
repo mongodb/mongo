@@ -286,8 +286,10 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
             _loadIfNeeded(txn, currentReloadIteration);
         }
 
-        CollectionInfo& ci = _collections[ns];
-        uassert(10181, str::stream() << "not sharded:" << ns, ci.isSharded());
+        const CollectionInfo& ci = _collections[ns];
+        uassert(ErrorCodes::NamespaceNotSharded,
+                str::stream() << "Collection is not sharded: " << ns,
+                ci.isSharded());
 
         invariant(!ci.key().isEmpty());
 
