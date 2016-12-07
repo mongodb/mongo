@@ -76,9 +76,9 @@ public:
 private:
     void run(Seconds waitTime, NoopWriteFn noopWrite) {
         Client::initThread("NoopWriter");
-        const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
-        OperationContext& txn = *txnPtr;
         while (true) {
+            const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
+            OperationContext& txn = *txnPtr;
             {
                 stdx::unique_lock<stdx::mutex> lk(_mutex);
                 _cv.wait_for(lk, waitTime.toSystemDuration(), [&] { return _inShutdown; });
