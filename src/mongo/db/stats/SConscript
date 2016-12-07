@@ -54,3 +54,24 @@ env.Library(
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
     ],
 )
+
+env.Library(
+    target='fill_locker_info',
+    source=[
+        'fill_locker_info.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager'
+    ],
+)
+
+env.CppUnitTest(
+    target='fill_locker_info_test',
+    source=[
+        'fill_locker_info_test.cpp',
+    ],
+    LIBDEPS=[
+        'fill_locker_info',
+    ],
+)

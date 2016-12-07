@@ -149,7 +149,6 @@ if (typeof _threadInject != "undefined") {
             // this has a chance to see the message
             "connections_opened.js",  // counts connections, globally
             "opcounters_write_cmd.js",
-            "currentop.js",                   // SERVER-8673, plus rwlock yielding issues
             "set_param1.js",                  // changes global state
             "geo_update_btree2.js",           // SERVER-11132 test disables table scans
             "update_setOnInsert.js",          // SERVER-9982
@@ -168,8 +167,9 @@ if (typeof _threadInject != "undefined") {
 
         // some tests can't be run in parallel with each other
         var serialTestsArr = [
+            // These tests use fsyncLock.
             parallelFilesDir + "/fsync.js",
-            parallelFilesDir + "/auth1.js",
+            parallelFilesDir + "/currentop.js",
 
             // These tests expect the profiler to be on or off at specific points
             // during the test run.

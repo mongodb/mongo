@@ -30,11 +30,13 @@
 
 #include "mongo/platform/basic.h"
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
 #include "mongo/config.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
@@ -361,5 +363,85 @@ TEST(Locker, PerformanceLocker) {
 }
 
 #endif  // MONGO_CONFIG_DEBUG_BUILD
+namespace {
+/**
+ * Helper function to determine if 'lockerInfo' contains a lock with ResourceId 'resourceId' and
+ * lock mode 'mode' within 'lockerInfo.locks'.
+ */
+bool lockerInfoContainsLock(const Locker::LockerInfo& lockerInfo,
+                            const ResourceId& resourceId,
+                            const LockMode& mode) {
+    return (1U == std::count_if(lockerInfo.locks.begin(),
+                                lockerInfo.locks.end(),
+                                [&resourceId, &mode](const Locker::OneLock& lock) {
+                                    return lock.resourceId == resourceId && lock.mode == mode;
+                                }));
+}
+}  // namespace
+
+TEST(LockerImpl, GetLockerInfoShouldReportHeldLocks) {
+    const ResourceId globalId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
+    const ResourceId dbId(RESOURCE_DATABASE, std::string("TestDB"));
+    const ResourceId collectionId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
+
+    // Take an exclusive lock on the collection.
+    DefaultLockerImpl locker;
+    ASSERT_EQ(LOCK_OK, locker.lockGlobal(MODE_IX));
+    ASSERT_EQ(LOCK_OK, locker.lock(dbId, MODE_IX));
+    ASSERT_EQ(LOCK_OK, locker.lock(collectionId, MODE_X));
+
+    // Assert it shows up in the output of getLockerInfo().
+    Locker::LockerInfo lockerInfo;
+    locker.getLockerInfo(&lockerInfo);
+
+    ASSERT(lockerInfoContainsLock(lockerInfo, globalId, MODE_IX));
+    ASSERT(lockerInfoContainsLock(lockerInfo, dbId, MODE_IX));
+    ASSERT(lockerInfoContainsLock(lockerInfo, collectionId, MODE_X));
+    ASSERT_EQ(3U, lockerInfo.locks.size());
+
+    ASSERT(locker.unlockAll());
+}
+
+TEST(LockerImpl, GetLockerInfoShouldReportPendingLocks) {
+    const ResourceId globalId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
+    const ResourceId dbId(RESOURCE_DATABASE, std::string("TestDB"));
+    const ResourceId collectionId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
+
+    // Take an exclusive lock on the collection.
+    DefaultLockerImpl successfulLocker;
+    ASSERT_EQ(LOCK_OK, successfulLocker.lockGlobal(MODE_IX));
+    ASSERT_EQ(LOCK_OK, successfulLocker.lock(dbId, MODE_IX));
+    ASSERT_EQ(LOCK_OK, successfulLocker.lock(collectionId, MODE_X));
+
+    // Now attempt to get conflicting locks.
+    DefaultLockerImpl conflictingLocker;
+    ASSERT_EQ(LOCK_OK, conflictingLocker.lockGlobal(MODE_IS));
+    ASSERT_EQ(LOCK_OK, conflictingLocker.lock(dbId, MODE_IS));
+    ASSERT_EQ(LOCK_WAITING, conflictingLocker.lockBegin(collectionId, MODE_IS));
+
+    // Assert the held locks show up in the output of getLockerInfo().
+    Locker::LockerInfo lockerInfo;
+    conflictingLocker.getLockerInfo(&lockerInfo);
+    ASSERT(lockerInfoContainsLock(lockerInfo, globalId, MODE_IS));
+    ASSERT(lockerInfoContainsLock(lockerInfo, dbId, MODE_IS));
+    ASSERT(lockerInfoContainsLock(lockerInfo, collectionId, MODE_IS));
+    ASSERT_EQ(3U, lockerInfo.locks.size());
+
+    // Assert it reports that it is waiting for the collection lock.
+    ASSERT_EQ(collectionId, lockerInfo.waitingResource);
+
+    // Make sure it no longer reports waiting once unlocked.
+    ASSERT(successfulLocker.unlockAll());
+
+    const unsigned timeoutMs = 0;
+    const bool checkDeadlock = false;
+    ASSERT_EQ(LOCK_OK,
+              conflictingLocker.lockComplete(collectionId, MODE_IS, timeoutMs, checkDeadlock));
+
+    conflictingLocker.getLockerInfo(&lockerInfo);
+    ASSERT_FALSE(lockerInfo.waitingResource.isValid());
+
+    ASSERT(conflictingLocker.unlockAll());
+}
 
 }  // namespace mongo
