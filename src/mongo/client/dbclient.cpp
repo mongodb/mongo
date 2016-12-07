@@ -536,7 +536,7 @@ void DBClientWithCommands::_auth(const BSONObj& params) {
 
     auth::authenticateClient(
         params,
-        HostAndPort(getServerAddress()).host(),
+        HostAndPort(getServerAddress()),
         clientName,
         [this](RemoteCommandRequest request, auth::AuthCompletionHandler handler) {
             BSONObj info;

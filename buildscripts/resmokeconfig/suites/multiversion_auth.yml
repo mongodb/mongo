@@ -1,0 +1,37 @@
+# Section that is ignored by resmoke.py.
+config_variables:
+- &keyFile jstests/libs/authTestsKey
+- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+
+selector:
+  js_test:
+    roots:
+    - jstests/multiVersion/*.js
+    exclude_files:
+      # Needs extra work to support MONGODB-CR
+      - jstests/multiVersion/upgrade_cluster_v5_to_v6.js
+      # Uses threads which don't propagate jsTest() information
+      - jstests/multiVersion/mixed_storage_version_replication.js
+      # Uses ToolTest, which doesn't start servers with keyFile
+      - jstests/multiVersion/transitioning_to_and_from_WT.js
+      # TODO: SERVER-21578
+      - jstests/multiVersion/balancer_multiVersion_detect.js
+
+# Multiversion tests start their own mongod's.
+executor:
+  js_test:
+    config:
+      shell_options:
+        global_vars:
+          TestData:
+            auth: true
+            authMechanism: SCRAM-SHA-1
+            keyFile: *keyFile
+            keyFileData: *keyFileData
+        authenticationDatabase: local
+        authenticationMechanism: SCRAM-SHA-1
+        password: *keyFileData
+        username: __system
+        nodb: ''
+        readMode: legacy
+        writeMode: legacy

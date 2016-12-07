@@ -68,7 +68,7 @@ class BSONObj;
  * returned.
  */
 extern void (*saslClientAuthenticate)(auth::RunCommandHook runCommand,
-                                      StringData hostname,
+                                      const HostAndPort& hostname,
                                       const BSONObj& saslParameters,
                                       auth::AuthCompletionHandler handler);
 

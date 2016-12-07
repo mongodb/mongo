@@ -237,7 +237,7 @@ void authX509(RunCommandHook runCommand,
 
 void auth(RunCommandHook runCommand,
           const BSONObj& params,
-          StringData hostname,
+          const HostAndPort& hostname,
           StringData clientName,
           AuthCompletionHandler handler) {
     std::string mechanism;
@@ -273,7 +273,7 @@ bool needsFallback(const AuthResponse& response) {
 
 void asyncAuth(RunCommandHook runCommand,
                const BSONObj& params,
-               StringData hostname,
+               const HostAndPort& hostname,
                StringData clientName,
                AuthCompletionHandler handler) {
     auth(runCommand,
@@ -297,7 +297,7 @@ void asyncAuth(RunCommandHook runCommand,
 }  // namespace
 
 void authenticateClient(const BSONObj& params,
-                        StringData hostname,
+                        const HostAndPort& hostname,
                         StringData clientName,
                         RunCommandHook runCommand,
                         AuthCompletionHandler handler) {

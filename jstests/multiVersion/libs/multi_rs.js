@@ -45,6 +45,7 @@ ReplSetTest.prototype.upgradeNode = function(node, opts, user, pwd) {
     if (user != undefined) {
         assert.eq(1, node.getDB("admin").auth(user, pwd));
     }
+    jsTest.authenticate(node);
 
     var isMaster = node.getDB('admin').runCommand({isMaster: 1});
 

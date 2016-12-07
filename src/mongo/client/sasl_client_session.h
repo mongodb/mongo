@@ -63,6 +63,7 @@ public:
     enum Parameter {
         parameterServiceName = 0,
         parameterServiceHostname,
+        parameterServiceHostAndPort,
         parameterMechanism,
         parameterUser,
         parameterPassword,

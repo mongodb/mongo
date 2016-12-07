@@ -84,6 +84,10 @@ var getResult = function(mongo, name) {
  * Overrides the parallel shell code in mongo
  */
 function startParallelShell(jsCode, port) {
+    if (TestData) {
+        jsCode = "TestData = " + tojson(TestData) + ";" + jsCode;
+    }
+
     var x;
     if (port) {
         x = startMongoProgramNoConnect("mongo", "--port", port, "--eval", jsCode);

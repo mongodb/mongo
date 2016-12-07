@@ -182,8 +182,7 @@ void NetworkInterfaceASIO::_authenticate(AsyncOp* op) {
     };
 
     auto params = getInternalUserAuthParamsWithFallback();
-    auth::authenticateClient(
-        params, op->request().target.host(), clientName, runCommandHook, authHook);
+    auth::authenticateClient(params, op->request().target, clientName, runCommandHook, authHook);
 }
 
 }  // namespace executor

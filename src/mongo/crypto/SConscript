@@ -8,16 +8,29 @@ env.SConscript(
     ],
 )
 
-env.Library('crypto_tom',
-           ['crypto_tom.cpp'],
-           LIBDEPS=['tom/tomcrypt'])
+env.Library(
+    target='crypto_tom',
+    source=[
+        'crypto_tom.cpp'
+    ],
+    LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+            'tom/tomcrypt'
+    ])
 
 env.Library('crypto_openssl',
-           ['crypto_openssl.cpp'])
+    source=[
+        'crypto_openssl.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ])
 
 env.Library('scramauth',
             ['mechanism_scram.cpp'],
             LIBDEPS=['$BUILD_DIR/mongo/base',
+                     '$BUILD_DIR/mongo/base/secure_allocator',
+                     '$BUILD_DIR/mongo/util/secure_zero_memory',
                      'crypto_${MONGO_CRYPTO}'])
 
 env.CppUnitTest('crypto_test',

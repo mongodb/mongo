@@ -80,18 +80,16 @@ StatusWith<bool> SaslPLAINServerConversation::step(StringData inputData, std::st
         }
     } else {
         // Handle schemaVersion28SCRAM (SCRAM only mode)
-        unsigned char storedKey[scram::hashSize];
-        unsigned char serverKey[scram::hashSize];
-
-        scram::generateSecrets(
+        std::string decodedSalt = base64::decode(creds.scram.salt);
+        scram::SCRAMSecrets secrets = scram::generateSecrets(scram::SCRAMPresecrets(
             authDigest,
-            reinterpret_cast<const unsigned char*>(base64::decode(creds.scram.salt).c_str()),
-            16,
-            creds.scram.iterationCount,
-            storedKey,
-            serverKey);
+            std::vector<std::uint8_t>(reinterpret_cast<const std::uint8_t*>(decodedSalt.c_str()),
+                                      reinterpret_cast<const std::uint8_t*>(decodedSalt.c_str()) +
+                                          16),
+            creds.scram.iterationCount));
         if (creds.scram.storedKey !=
-            base64::encode(reinterpret_cast<const char*>(storedKey), scram::hashSize)) {
+            base64::encode(reinterpret_cast<const char*>(secrets.storedKey->data()),
+                           secrets.storedKey->size())) {
             return StatusWith<bool>(ErrorCodes::AuthenticationFailed,
                                     mongoutils::str::stream() << "Incorrect user name or password");
         }

@@ -39,7 +39,7 @@ namespace mongo {
 using namespace mongoutils;
 
 void (*saslClientAuthenticate)(auth::RunCommandHook runCommand,
-                               StringData hostname,
+                               const HostAndPort& hostname,
                                const BSONObj& saslParameters,
                                auth::AuthCompletionHandler handler) = nullptr;
 
