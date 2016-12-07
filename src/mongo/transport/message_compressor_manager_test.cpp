@@ -33,6 +33,8 @@
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/message_compressor_noop.h"
 #include "mongo/transport/message_compressor_registry.h"
+#include "mongo/transport/message_compressor_snappy.h"
+#include "mongo/transport/message_compressor_zlib.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/message.h"
 
@@ -179,7 +181,12 @@ TEST(NoopMessageCompressor, Fidelity) {
 
 TEST(SnappyMessageCompressor, Fidelity) {
     auto testMessage = buildMessage();
-    checkFidelity(testMessage, stdx::make_unique<NoopMessageCompressor>());
+    checkFidelity(testMessage, stdx::make_unique<SnappyMessageCompressor>());
+}
+
+TEST(ZlibMessageCompressor, Fidelity) {
+    auto testMessage = buildMessage();
+    checkFidelity(testMessage, stdx::make_unique<ZlibMessageCompressor>());
 }
 
 }  // namespace mongo
