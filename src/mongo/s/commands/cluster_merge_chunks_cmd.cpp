@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -17,13 +17,13 @@
  *    code of portions of this program with the OpenSSL library under certain
  *    conditions as described in each individual source file and distribute
  *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the GNU Affero General Public License in all respects
- *    for all of the code used other than as permitted herein. If you modify
- *    file(s) with this exception, you may extend this exception to your
- *    version of the file(s), but you are not obligated to do so. If you do not
- *    wish to do so, delete this exception statement from your version. If you
- *    delete this exception statement from all source files in the program,
- *    then also delete it in the license file.
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
  */
 
 #include "mongo/platform/basic.h"
@@ -42,6 +42,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_raii.h"
 
 namespace mongo {
 
@@ -105,9 +106,8 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         const NamespaceString nss(parseNs(dbname, cmdObj));
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << nss.ns() << " is not a valid namespace",
-                nss.isValid());
+
+        auto scopedCM = uassertStatusOK(ScopedChunkManager::refreshAndGet(txn, nss));
 
         vector<BSONObj> bounds;
         if (!FieldParser::extract(cmdObj, boundsField, &bounds, &errmsg)) {
@@ -137,47 +137,28 @@ public:
             return false;
         }
 
-        auto status = grid.catalogCache()->getDatabase(txn, nss.db().toString());
-        if (!status.isOK()) {
-            return appendCommandStatus(result, status.getStatus());
-        }
+        auto const cm = scopedCM.cm();
 
-        std::shared_ptr<DBConfig> config = status.getValue();
-        if (!config->isSharded(nss.ns())) {
-            return appendCommandStatus(
-                result,
-                Status(ErrorCodes::NamespaceNotSharded, "ns [" + nss.ns() + " is not sharded."));
-        }
-
-        // This refreshes the chunk metadata if stale.
-        shared_ptr<ChunkManager> manager = config->getChunkManagerIfExists(txn, nss.ns(), true);
-        if (!manager) {
-            return appendCommandStatus(
-                result,
-                Status(ErrorCodes::NamespaceNotSharded, "ns [" + nss.ns() + " is not sharded."));
-        }
-
-        if (!manager->getShardKeyPattern().isShardKey(minKey) ||
-            !manager->getShardKeyPattern().isShardKey(maxKey)) {
+        if (!cm->getShardKeyPattern().isShardKey(minKey) ||
+            !cm->getShardKeyPattern().isShardKey(maxKey)) {
             errmsg = stream() << "shard key bounds "
                               << "[" << minKey << "," << maxKey << ")"
                               << " are not valid for shard key pattern "
-                              << manager->getShardKeyPattern().toBSON();
+                              << cm->getShardKeyPattern().toBSON();
             return false;
         }
 
-        minKey = manager->getShardKeyPattern().normalizeShardKey(minKey);
-        maxKey = manager->getShardKeyPattern().normalizeShardKey(maxKey);
+        minKey = cm->getShardKeyPattern().normalizeShardKey(minKey);
+        maxKey = cm->getShardKeyPattern().normalizeShardKey(maxKey);
 
-        shared_ptr<Chunk> firstChunk =
-            manager->findIntersectingChunkWithSimpleCollation(txn, minKey);
-        verify(firstChunk);
+        shared_ptr<Chunk> firstChunk = cm->findIntersectingChunkWithSimpleCollation(txn, minKey);
 
         BSONObjBuilder remoteCmdObjB;
         remoteCmdObjB.append(cmdObj[ClusterMergeChunksCommand::nsField()]);
         remoteCmdObjB.append(cmdObj[ClusterMergeChunksCommand::boundsField()]);
-        remoteCmdObjB.append(ClusterMergeChunksCommand::configField(),
-                             grid.shardRegistry()->getConfigServerConnectionString().toString());
+        remoteCmdObjB.append(
+            ClusterMergeChunksCommand::configField(),
+            Grid::get(txn)->shardRegistry()->getConfigServerConnectionString().toString());
         remoteCmdObjB.append(ClusterMergeChunksCommand::shardNameField(), firstChunk->getShardId());
 
 
@@ -185,7 +166,8 @@ public:
 
         // Throws, but handled at level above.  Don't want to rewrap to preserve exception
         // formatting.
-        const auto shardStatus = grid.shardRegistry()->getShard(txn, firstChunk->getShardId());
+        const auto shardStatus =
+            Grid::get(txn)->shardRegistry()->getShard(txn, firstChunk->getShardId());
         if (!shardStatus.isOK()) {
             return appendCommandStatus(
                 result,

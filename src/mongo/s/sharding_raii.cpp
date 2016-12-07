@@ -83,8 +83,8 @@ ScopedChunkManager::ScopedChunkManager(ScopedShardDatabase db, std::shared_ptr<C
 
 ScopedChunkManager::~ScopedChunkManager() = default;
 
-StatusWith<ScopedChunkManager> ScopedChunkManager::getExisting(OperationContext* txn,
-                                                               const NamespaceString& nss) {
+StatusWith<ScopedChunkManager> ScopedChunkManager::refreshAndGet(OperationContext* txn,
+                                                                 const NamespaceString& nss) {
     auto scopedDbStatus = ScopedShardDatabase::getExisting(txn, nss.db());
     if (!scopedDbStatus.isOK()) {
         return scopedDbStatus.getStatus();

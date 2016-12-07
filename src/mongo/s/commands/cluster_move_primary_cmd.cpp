@@ -115,7 +115,7 @@ public:
         }
 
         // Flush all cached information. This can't be perfect, but it's better than nothing.
-        grid.catalogCache()->invalidate(dbname);
+        Grid::get(txn)->catalogCache()->invalidate(dbname);
 
         auto status = grid.catalogCache()->getDatabase(txn, dbname);
         if (!status.isOK()) {
@@ -209,6 +209,7 @@ public:
             errmsg = "clone failed";
             return false;
         }
+
         bool hasWCError = false;
         if (auto wcErrorElem = cloneRes["writeConcernError"]) {
             appendWriteConcernErrorToCmdResponse(toShard->getId(), wcErrorElem, result);
@@ -220,7 +221,9 @@ public:
         ScopedDbConnection fromconn(fromShard->getConnString());
 
         config->setPrimary(txn, toShard->getId());
-        config->reload(txn);
+
+        // Ensure the next attempt to retrieve the database will do a full reload
+        Grid::get(txn)->catalogCache()->invalidate(dbname);
 
         if (shardedColls.empty()) {
             // TODO: Collections can be created in the meantime, and we should handle in the future.

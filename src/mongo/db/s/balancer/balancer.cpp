@@ -549,7 +549,7 @@ Status Balancer::_enforceTagRanges(OperationContext* txn) {
     }
 
     for (const auto& splitInfo : chunksToSplitStatus.getValue()) {
-        auto scopedCMStatus = ScopedChunkManager::getExisting(txn, splitInfo.nss);
+        auto scopedCMStatus = ScopedChunkManager::refreshAndGet(txn, splitInfo.nss);
         if (!scopedCMStatus.isOK()) {
             return scopedCMStatus.getStatus();
         }
@@ -630,7 +630,7 @@ int Balancer::_moveChunks(OperationContext* txn,
 void Balancer::_splitOrMarkJumbo(OperationContext* txn,
                                  const NamespaceString& nss,
                                  const BSONObj& minKey) {
-    auto scopedChunkManager = uassertStatusOK(ScopedChunkManager::getExisting(txn, nss));
+    auto scopedChunkManager = uassertStatusOK(ScopedChunkManager::refreshAndGet(txn, nss));
     ChunkManager* const chunkManager = scopedChunkManager.cm();
 
     auto chunk = chunkManager->findIntersectingChunkWithSimpleCollation(txn, minKey);

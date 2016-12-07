@@ -252,7 +252,7 @@ Status MigrationManager::executeManualMigration(
                   waitForDelete)
             ->get();
 
-    auto scopedCMStatus = ScopedChunkManager::getExisting(txn, NamespaceString(migrateInfo.ns));
+    auto scopedCMStatus = ScopedChunkManager::refreshAndGet(txn, NamespaceString(migrateInfo.ns));
     if (!scopedCMStatus.isOK()) {
         return scopedCMStatus.getStatus();
     }
@@ -395,7 +395,7 @@ void MigrationManager::finishRecovery(OperationContext* txn,
         auto& migrateInfos = nssAndMigrateInfos.second;
         invariant(!migrateInfos.empty());
 
-        auto scopedCMStatus = ScopedChunkManager::getExisting(txn, nss);
+        auto scopedCMStatus = ScopedChunkManager::refreshAndGet(txn, nss);
         if (!scopedCMStatus.isOK()) {
             // This shouldn't happen because the collection was intact and sharded when the previous
             // config primary was active and the dist locks have been held by the balancer
@@ -529,7 +529,7 @@ shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule(
 
     // Sanity checks that the chunk being migrated is actually valid. These will be repeated at the
     // shard as well, but doing them here saves an extra network call, which might otherwise fail.
-    auto statusWithScopedChunkManager = ScopedChunkManager::getExisting(txn, nss);
+    auto statusWithScopedChunkManager = ScopedChunkManager::refreshAndGet(txn, nss);
     if (!statusWithScopedChunkManager.isOK()) {
         return std::make_shared<Notification<RemoteCommandResponse>>(
             std::move(statusWithScopedChunkManager.getStatus()));
