@@ -109,6 +109,14 @@ void translateElement(StringData fieldName,
             ctxStack->emplace(element.Obj().begin(), &out->subarrayStart(fieldName));
             return;
         }
+        case BSONType::Symbol: {
+            uasserted(ErrorCodes::CannotBuildIndexKeys,
+                      str::stream()
+                          << "Cannot index type Symbol with a collation. Failed to index element: "
+                          << element
+                          << ". Index collation: "
+                          << collator->getSpec().toBSON());
+        }
         default:
             out->appendAs(element, fieldName);
     }
