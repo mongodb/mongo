@@ -1,9 +1,6 @@
 /**
  * Tests that views properly reject queries in legacy read mode, and reject writes performed in
  * legacy write mode. Also confirms that legacy killCursors execution is successful.
- *
- * TODO(SERVER-25641): If the views test suite is moved under core, we can get rid of this test
- * after ensuring that it is included in a legacy passthrough suite.
  */
 (function() {
     "use strict";
@@ -66,4 +63,6 @@
         viewsDB.view.find({x: 1}).toArray();
     });
     assert.eq(res.code, ErrorCodes.CommandNotSupportedOnView, tojson(res));
+
+    MongoRunner.stopMongod(conn);
 }());

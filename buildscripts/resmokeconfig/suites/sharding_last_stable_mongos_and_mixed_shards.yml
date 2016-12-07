@@ -92,6 +92,9 @@ selector:
     - jstests/sharding/linearizable_read_concern.js
     # Last stable 3.2 doesn't have the fix for SERVER-28447
     - jstests/sharding/migration_critical_section_concurrency.js
+    # TODO (SERVER-27379): Cannot create views when featureCompatibilityVersion is 3.2.
+    # Unblacklist when the featureCompatibilityVersion is 3.4 or higher.
+    - jstests/sharding/views.js
 
 executor:
   js_test:
