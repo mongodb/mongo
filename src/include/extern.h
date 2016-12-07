@@ -542,7 +542,7 @@ extern int __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page, const uin
 extern void __wt_ovfl_txnc_free(WT_SESSION_IMPL *session, WT_PAGE *page) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_ovfl_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_ovfl_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
-extern int __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, uint32_t flags) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
+extern int __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage, uint32_t flags, bool *lookaside_retryp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern uint32_t __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_bulk_init(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_bulk_wrapup(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));

@@ -44,7 +44,8 @@ typedef struct {
 	uint64_t max_txn;
 
 	/* Track if all updates were skipped. */
-	bool all_skipped;
+	uint64_t update_cnt;
+	uint64_t update_skip_cnt;
 
 	/*
 	 * When we can't mark the page clean (for example, checkpoint found some
@@ -349,8 +350,8 @@ static void __rec_dictionary_reset(WT_RECONCILE *);
  *	Reconcile an in-memory page into its on-disk format, and write it.
  */
 int
-__wt_reconcile(WT_SESSION_IMPL *session,
-    WT_REF *ref, WT_SALVAGE_COOKIE *salvage, uint32_t flags)
+__wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref,
+    WT_SALVAGE_COOKIE *salvage, uint32_t flags, bool *lookaside_retryp)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -360,6 +361,8 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 
 	page = ref->page;
 	mod = page->modify;
+	if (lookaside_retryp != NULL)
+		*lookaside_retryp = false;
 
 	__wt_verbose(session,
 	    WT_VERB_RECONCILE, "%s", __wt_page_type_string(page->type));
@@ -437,6 +440,14 @@ __wt_reconcile(WT_SESSION_IMPL *session,
 
 	/* Release the reconciliation lock. */
 	__wt_writeunlock(session, &page->page_lock);
+
+	/*
+	 * If our caller can configure lookaside table reconciliation, flag if
+	 * that's worth trying. The lookaside table doesn't help if we skipped
+	 * updates, it can only help with older readers preventing eviction.
+	 */
+	if (lookaside_retryp != NULL && r->update_cnt == r->update_skip_cnt)
+		*lookaside_retryp = true;
 
 	/* Update statistics. */
 	WT_STAT_CONN_INCR(session, rec_pages);
@@ -545,6 +556,9 @@ __rec_las_checkpoint_test(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 static int
 __rec_write_check_complete(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
+	WT_BOUNDARY *bnd;
+	size_t i;
+
 	/*
 	 * If we have used the lookaside table, check for a lookaside table and
 	 * checkpoint collision.
@@ -553,14 +567,18 @@ __rec_write_check_complete(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		return (EBUSY);
 
 	/*
-	 * If we are doing eviction and restoring updates, there is only one
-	 * block and all update were skipped, no progress has been made and
-	 * there is no point swapping the new page into place.
+	 * If we are doing update/restore based eviction, confirm part of the
+	 * page is being discarded, or at least 10% of the updates won't have
+	 * to be re-instantiated. Otherwise, it isn't progress, don't bother.
 	 */
-	if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE) && r->all_skipped &&
-	    r->bnd_next == 1 && r->bnd[0].supd != NULL)
-		return (EBUSY);
-
+	if (F_ISSET(r, WT_EVICT_UPDATE_RESTORE)) {
+		for (bnd = r->bnd, i = 0; i < r->bnd_entries; ++bnd, ++i)
+			if (bnd->supd == NULL)
+				break;
+		if (i == r->bnd_entries &&
+		    r->update_cnt / 10 >= r->update_skip_cnt)
+			return (EBUSY);
+	}
 	return (0);
 }
 
@@ -724,7 +742,7 @@ __rec_root_write(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * Fake up a reference structure, and write the next root page.
 	 */
 	__wt_root_ref_init(&fake_ref, next, page->type == WT_PAGE_COL_INT);
-	return (__wt_reconcile(session, &fake_ref, NULL, flags));
+	return (__wt_reconcile(session, &fake_ref, NULL, flags, NULL));
 
 err:	__wt_page_out(session, &next);
 	return (ret);
@@ -866,7 +884,7 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	r->max_txn = WT_TXN_NONE;
 
 	/* Track if all updates were skipped. */
-	r->all_skipped = true;
+	r->update_cnt = r->update_skip_cnt = 0;
 
 	/* Track if the page can be marked clean. */
 	r->leave_dirty = false;
@@ -1109,6 +1127,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	} else
 		upd_list = ins->upd;
 
+	++r->update_cnt;
 	for (skipped = false,
 	    max_txn = WT_TXN_NONE, min_txn = UINT64_MAX,
 	    upd = upd_list; upd != NULL; upd = upd->next) {
@@ -1199,7 +1218,12 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		    txnid != S2C(session)->txn_global.checkpoint_txnid ||
 		    WT_SESSION_IS_CHECKPOINT(session));
 #endif
-		r->all_skipped = false;
+
+		/*
+		 * Track how many update chains we saw vs. how many update
+		 * chains had an entry we skipped.
+		 */
+		++r->update_skip_cnt;
 		return (0);
 	}
 

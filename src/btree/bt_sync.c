@@ -136,8 +136,8 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 					__wt_txn_get_snapshot(session);
 				leaf_bytes += page->memory_footprint;
 				++leaf_pages;
-				WT_ERR(__wt_reconcile(
-				    session, walk, NULL, WT_CHECKPOINTING));
+				WT_ERR(__wt_reconcile(session,
+				    walk, NULL, WT_CHECKPOINTING, NULL));
 			}
 		}
 		break;
@@ -233,7 +233,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 				++leaf_pages;
 			}
 			WT_ERR(__wt_reconcile(
-			    session, walk, NULL, WT_CHECKPOINTING));
+			    session, walk, NULL, WT_CHECKPOINTING, NULL));
 		}
 		break;
 	case WT_SYNC_CLOSE:

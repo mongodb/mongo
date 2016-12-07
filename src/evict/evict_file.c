@@ -57,7 +57,8 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		 * error, retrying later.
 		 */
 		if (syncop == WT_SYNC_CLOSE && __wt_page_is_modified(page))
-			WT_ERR(__wt_reconcile(session, ref, NULL, WT_EVICTING));
+			WT_ERR(__wt_reconcile(
+			    session, ref, NULL, WT_EVICTING, NULL));
 
 		/*
 		 * We can't evict the page just returned to us (it marks our

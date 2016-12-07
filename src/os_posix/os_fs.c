@@ -687,8 +687,7 @@ __posix_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 			advise_flag = POSIX_FADV_RANDOM;
 		if (LF_ISSET(WT_FS_OPEN_ACCESS_SEQ))
 			advise_flag = POSIX_FADV_SEQUENTIAL;
-		WT_SYSCALL(
-		    posix_fadvise(pfh->fd, 0, 0, advise_flag), ret);
+		WT_SYSCALL(posix_fadvise(pfh->fd, 0, 0, advise_flag), ret);
 		if (ret != 0)
 			WT_ERR_MSG(session, ret,
 			    "%s: handle-open: posix_fadvise", name);
