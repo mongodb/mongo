@@ -244,8 +244,6 @@ public:
     virtual bool isWriteLocked() const;
     virtual bool isReadLocked() const;
 
-    virtual void assertEmptyAndReset();
-
     virtual bool hasLockPending() const {
         return getWaitingResource().isValid();
     }
