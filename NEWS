@@ -201,7 +201,7 @@ Other noteworthy changes since the previous release:
 * WT-2769	Update documentation to reflect correct limits of memory_page_max
 * WT-2770	Add statistics tracking schema operations
 * WT-2772	Adjust log.wtperf config. Remove unneeded config entries
-* WT-2773	Ensure that search_near in an index find's exact matches
+* WT-2773	Ensure that search_near in an index finds exact matches
 * WT-2774	Minor cleanups/improvements
 * WT-2778	Enhance output formatting when running Python test suite
 * WT-2779	Fix large pages getting generated with raw compression
