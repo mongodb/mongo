@@ -33,6 +33,7 @@
 
 #include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/concurrency/lock_stats.h"
+#include "mongo/stdx/thread.h"
 
 namespace mongo {
 
@@ -81,6 +82,12 @@ public:
     virtual ClientState getClientState() const = 0;
 
     virtual LockerId getId() const = 0;
+
+    /**
+     * Get a platform-specific thread identifier of the thread which owns the this locker for
+     * tracing purposes.
+     */
+    virtual stdx::thread::id getThreadId() const = 0;
 
     /**
      * This should be the first method invoked for a particular Locker object. It acquires the

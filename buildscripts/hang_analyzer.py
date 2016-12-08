@@ -291,6 +291,7 @@ class GDBDumper(object):
             "info sharedlibrary",
             "thread apply all bt",
             "gcore dump_" + process_name + "." + str(pid) + "." + self.get_dump_ext() if take_dump else "",
+            "mongodb-analyze",
             "set confirm off",
             "quit",
             ]

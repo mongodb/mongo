@@ -53,6 +53,10 @@ public:
         invariant(false);
     }
 
+    stdx::thread::id getThreadId() const override {
+        invariant(false);
+    }
+
     virtual LockResult lockGlobal(LockMode mode, unsigned timeoutMs) {
         invariant(false);
     }

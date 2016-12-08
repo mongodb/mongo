@@ -32,6 +32,8 @@
 
 #include "mongo/db/concurrency/lock_manager.h"
 
+#include <sstream>
+
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -895,8 +897,11 @@ void LockManager::_dumpBucket(const LockBucket* bucket) const {
         sb << "GRANTED:\n";
         for (const LockRequest* iter = lock->grantedList._front; iter != nullptr;
              iter = iter->next) {
+            std::stringstream threadId;
+            threadId << iter->locker->getThreadId();
             sb << '\t' << "LockRequest " << iter->locker->getId() << " @ " << iter->locker << ": "
                << "Mode = " << modeName(iter->mode) << "; "
+               << "Thread = " << threadId.str() << "; "
                << "ConvertMode = " << modeName(iter->convertMode) << "; "
                << "EnqueueAtFront = " << iter->enqueueAtFront << "; "
                << "CompatibleFirst = " << iter->compatibleFirst << "; " << '\n';
@@ -905,8 +910,11 @@ void LockManager::_dumpBucket(const LockBucket* bucket) const {
         sb << "PENDING:\n";
         for (const LockRequest* iter = lock->conflictList._front; iter != nullptr;
              iter = iter->next) {
+            std::stringstream threadId;
+            threadId << iter->locker->getThreadId();
             sb << '\t' << "LockRequest " << iter->locker->getId() << " @ " << iter->locker << ": "
                << "Mode = " << modeName(iter->mode) << "; "
+               << "Thread = " << threadId.str() << "; "
                << "ConvertMode = " << modeName(iter->convertMode) << "; "
                << "EnqueueAtFront = " << iter->enqueueAtFront << "; "
                << "CompatibleFirst = " << iter->compatibleFirst << "; " << '\n';
