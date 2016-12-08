@@ -233,15 +233,30 @@ func (exp *MongoExport) getCursor() (*mgo.Iter, *mgo.Session, error) {
 		}
 	}
 
-	flags := 0
-	if len(query) == 0 && exp.InputOpts != nil &&
-		exp.InputOpts.ForceTableScan != true && exp.InputOpts.Sort == "" {
-		flags = flags | db.Snapshot
-	}
-
 	session, err := exp.SessionProvider.GetSession()
 	if err != nil {
 		return nil, nil, err
+	}
+	collection := session.DB(exp.ToolOptions.Namespace.DB).C(exp.ToolOptions.Namespace.Collection)
+
+	// figure out if we're exporting a view
+	isView := false
+	opts, err := db.GetCollectionOptions(collection)
+	if err != nil {
+		return nil, nil, err
+	}
+	if opts != nil {
+		viewOn, _ := bsonutil.FindValueByKey("viewOn", opts)
+		if viewOn != nil {
+			isView = true
+		}
+	}
+
+	flags := 0
+	// don't snapshot if we've been asked not to,
+	// or if we cannot because  we are querying, sorting, or if the collection is a view
+	if !exp.InputOpts.ForceTableScan && len(query) == 0 && exp.InputOpts != nil && exp.InputOpts.Sort == "" && !isView {
+		flags = flags | db.Snapshot
 	}
 
 	skip := 0
@@ -265,9 +280,7 @@ func (exp *MongoExport) getCursor() (*mgo.Iter, *mgo.Session, error) {
 	}
 
 	// build the query
-	q := session.DB(exp.ToolOptions.Namespace.DB).
-		C(exp.ToolOptions.Namespace.Collection).Find(query).Sort(sortFields...).
-		Skip(skip).Limit(limit)
+	q := collection.Find(query).Sort(sortFields...).Skip(skip).Limit(limit)
 
 	if len(exp.OutputOpts.Fields) > 0 {
 		q.Select(makeFieldSelector(exp.OutputOpts.Fields))

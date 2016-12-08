@@ -18,8 +18,8 @@ const TruncateLength = 350
 // StatOptions stores settings for the mongoreplay subcommands which have stat
 // output
 type StatOptions struct {
-	Collect    string `long:"collect" description:"Stat collection format; 'format' option uses the --format string" choice:"json" choice:"format" choice:"none" default:"format"`
 	Buffered   bool   `hidden:"yes"`
+	BufferSize int    `long:"stats-buffer-size" description:"the size (in events) of the stat collector buffer" default:"1024"`
 	Report     string `long:"report" description:"Write report on execution to given output path"`
 	NoTruncate bool   `long:"no-truncate" description:"Disable truncation of large payload data in log output"`
 	Format     string `long:"format" description:"Format for terminal output, %-escaped. Arguments are provided immediately after the escape, surrounded in curly braces. Supported escapes are:\n	%n namespace\n%l latency\n%t time (optional arg -- specify date layout, e.g. '%t{3:04PM}')\n%T op type\n%c command\n%o number of connections\n%i request ID\n%q request (optional arg -- dot-delimited field within the JSON structure, e.g. '%q{command_args.documents}')\n%r response (optional arg -- same as %q)\n%Q{<arg>} conditionally show <arg> on presence of request data\n%R{<arg>} conditionally show <arg> on presence of response data\nANSI escape sequences, start/end:\n%B/%b bold\n%U/%u underline\n%S/%s standout\n%F/%f text color (required arg -- word or number, 8-color)\n%K/%k background color (required arg -- same as %F/%f)\n" default:"%F{blue}%t%f %F{cyan}(Connection: %o:%i)%f %F{yellow}%l%f %F{red}%T %c%f %F{white}%n%f %F{green}%Q{Request:}%f%q %F{green}%R{Response:}%f%r"`
@@ -34,6 +34,7 @@ type StatCollector struct {
 	sync.Once
 	done       chan struct{}
 	statStream chan *OpStat
+	statStreamSize int
 	StatGenerator
 	StatRecorder
 	noop bool
@@ -50,11 +51,11 @@ func (statColl *StatCollector) Close() error {
 	return statColl.StatRecorder.Close()
 }
 
-func newStatCollector(opts StatOptions, isPairedMode bool, isComparative bool) (*StatCollector, error) {
+func newStatCollector(opts StatOptions, collectFormat string, isPairedMode bool, isComparative bool) (*StatCollector, error) {
 	if opts.Buffered {
-		opts.Collect = "buffered"
+		collectFormat = "buffered"
 	}
-	if opts.Collect == "none" {
+	if collectFormat == "none" {
 		return &StatCollector{noop: true}, nil
 	}
 
@@ -84,7 +85,7 @@ func newStatCollector(opts StatOptions, isPairedMode bool, isComparative bool) (
 	}
 
 	var statRec StatRecorder
-	switch opts.Collect {
+	switch collectFormat {
 	case "json":
 		statRec = &JSONStatRecorder{
 			out: o,
@@ -101,9 +102,14 @@ func newStatCollector(opts StatOptions, isPairedMode bool, isComparative bool) (
 		}
 	}
 
+	if opts.BufferSize < 1 {
+		opts.BufferSize = 1
+	}
+
 	return &StatCollector{
-		StatGenerator: statGen,
-		StatRecorder:  statRec,
+		StatGenerator:  statGen,
+		StatRecorder:   statRec,
+		statStreamSize: opts.BufferSize,
 	}, nil
 }
 
@@ -145,7 +151,7 @@ func (statColl *StatCollector) Collect(op *RecordedOp, replayedOp Op, reply Repl
 		return
 	}
 	statColl.Do(func() {
-		statColl.statStream = make(chan *OpStat, 1024)
+		statColl.statStream = make(chan *OpStat, statColl.statStreamSize)
 		statColl.done = make(chan struct{})
 		go func() {
 			for stat := range statColl.statStream {

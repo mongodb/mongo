@@ -21,6 +21,7 @@ type PlayCommand struct {
 	QueueTime    int     `long:"queueTime" description:"don't queue ops much further in the future than this number of seconds" default:"15"`
 	NoPreprocess bool    `long:"no-preprocess" description:"don't preprocess the input file to premap data such as mongo cursorIDs"`
 	Gzip         bool    `long:"gzip" description:"decompress gzipped input"`
+	Collect      string  `long:"collect" description:"Stat collection format; 'format' option uses the --format string" choice:"json" choice:"format" choice:"none" default:"none"`
 }
 
 const queueGranularity = 1000
@@ -179,7 +180,7 @@ func (play *PlayCommand) Execute(args []string) error {
 	}
 	play.GlobalOpts.SetLogging()
 
-	statColl, err := newStatCollector(play.StatOptions, true, true)
+	statColl, err := newStatCollector(play.StatOptions, play.Collect, true, true)
 	if err != nil {
 		return err
 	}

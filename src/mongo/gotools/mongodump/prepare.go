@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/archive"
-	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/log"
@@ -301,21 +300,9 @@ func (dump *MongoDump) CreateCollectionIntent(dbName, colName string) error {
 	}
 	defer session.Close()
 
-	opts, err := db.GetCollectionOptions(session.DB(dbName).C(colName))
+	intent.Options, err = db.GetCollectionOptions(session.DB(dbName).C(colName))
 	if err != nil {
 		return fmt.Errorf("error getting collection options: %v", err)
-	}
-
-	intent.Options = nil
-	if opts != nil {
-		optsInterface, _ := bsonutil.FindValueByKey("options", opts)
-		if optsInterface != nil {
-			if optsD, ok := optsInterface.(bson.D); ok {
-				intent.Options = &optsD
-			} else {
-				return fmt.Errorf("Failed to parse collection options as bson.D")
-			}
-		}
 	}
 
 	dump.manager.Put(intent)

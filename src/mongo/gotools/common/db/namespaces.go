@@ -129,6 +129,7 @@ func GetCollectionOptions(coll *mgo.Collection) (*bson.D, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer iter.Close()
 	comparisonName := coll.Name
 	if useFullName {
 		comparisonName = coll.FullName
@@ -143,17 +144,23 @@ func GetCollectionOptions(coll *mgo.Collection) (*bson.D, error) {
 		if nameStr, ok := name.(string); ok {
 			if nameStr == comparisonName {
 				// we've found the collection we're looking for
-				return collInfo, nil
+				break
 			}
 		} else {
 			collInfo = nil
 			continue
 		}
 	}
-	err = iter.Err()
-	if err != nil {
-		return nil, err
+
+	if collInfo != nil {
+		optsInterface, _ := bsonutil.FindValueByKey("options", collInfo)
+		if optsInterface != nil {
+			optsD, ok := optsInterface.(bson.D)
+			if !ok {
+				return nil, fmt.Errorf("Cannot unmarshal collection options for collection %v.%v", coll.Database, coll.Name)
+			}
+			return &optsD, nil
+		}
 	}
-	// The given collection was not found, but no error encountered.
-	return nil, nil
+	return nil, iter.Err()
 }
