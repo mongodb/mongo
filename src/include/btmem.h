@@ -444,9 +444,6 @@ struct __wt_page {
 		/*
 		 * Internal pages (both column- and row-store).
 		 *
-		 * The page record number is only used by column-store, but it's
-		 * simpler having only one kind of internal page.
-		 *
 		 * In-memory internal pages have an array of pointers to child
 		 * structures, maintained in collated order.  When a page is
 		 * read into memory, the initial list of children is stored in

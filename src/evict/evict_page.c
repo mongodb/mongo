@@ -37,7 +37,7 @@ __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * Check for a hazard pointer indicating another thread is using the
 	 * page, meaning the page cannot be evicted.
 	 */
-	if (__wt_page_hazard_check(session, ref->page) == NULL)
+	if (__wt_page_hazard_check(session, ref) == NULL)
 		return (0);
 
 	WT_STAT_DATA_INCR(session, cache_eviction_hazard);
@@ -66,7 +66,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * between.
 	 */
 	locked = __wt_atomic_casv32(&ref->state, WT_REF_MEM, WT_REF_LOCKED);
-	if ((ret = __wt_hazard_clear(session, page)) != 0 || !locked) {
+	if ((ret = __wt_hazard_clear(session, ref)) != 0 || !locked) {
 		if (locked)
 			ref->state = WT_REF_MEM;
 		return (ret == 0 ? EBUSY : ret);

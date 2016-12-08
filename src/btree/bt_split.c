@@ -513,7 +513,7 @@ __split_ref_step2(
 		    __split_verify_intl_key_order(session, child));
 #endif
 
-		WT_ERR(__wt_hazard_clear(session, child));
+		WT_ERR(__wt_hazard_clear(session, ref));
 	}
 
 	return (0);
@@ -1331,7 +1331,7 @@ __split_internal_unlock(WT_SESSION_IMPL *session, WT_PAGE *parent, bool hazard)
 	WT_DECL_RET;
 
 	if (hazard)
-		ret = __wt_hazard_clear(session, parent);
+		ret = __wt_hazard_clear(session, parent->pg_intl_parent_ref);
 
 	__wt_writeunlock(session, &parent->page_lock);
 	return (ret);

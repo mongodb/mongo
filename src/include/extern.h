@@ -652,9 +652,9 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
  , const char *file, int line
 #endif
  ) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
-extern int __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
+extern int __wt_hazard_clear(WT_SESSION_IMPL *session, WT_REF *ref) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern void __wt_hazard_close(WT_SESSION_IMPL *session) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
-extern u_int __wt_hazard_count(WT_SESSION_IMPL *session, WT_PAGE *page) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
+extern u_int __wt_hazard_count(WT_SESSION_IMPL *session, WT_REF *ref) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern void __wt_fill_hex(const uint8_t *src, size_t src_max, uint8_t *dest, size_t dest_max, size_t *lenp) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_raw_to_hex( WT_SESSION_IMPL *session, const uint8_t *from, size_t size, WT_ITEM *to) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_raw_to_esc_hex( WT_SESSION_IMPL *session, const uint8_t *from, size_t size, WT_ITEM *to) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));

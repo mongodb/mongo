@@ -23,7 +23,7 @@ struct __wt_data_handle_cache {
  *	A hazard pointer.
  */
 struct __wt_hazard {
-	WT_PAGE *page;			/* Page address */
+	WT_REF *ref;			/* Page reference */
 #ifdef HAVE_DIAGNOSTIC
 	const char *file;		/* File/line where hazard acquired */
 	int	    line;
