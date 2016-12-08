@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/transport/message_compressor_registry.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
 
@@ -69,6 +70,9 @@ struct CompressionHeader {
         return sizeof(originalOpCode) + sizeof(uncompressedSize) + sizeof(compressorId);
     }
 };
+
+const transport::Session::Decoration<MessageCompressorManager> getForSession =
+    transport::Session::declareDecoration<MessageCompressorManager>();
 }  // namespace
 
 MessageCompressorManager::MessageCompressorManager()
@@ -244,6 +248,11 @@ void MessageCompressorManager::serverNegotiate(const BSONObj& input, BSONObjBuil
         }
         sub.doneFast();
     }
+}
+
+MessageCompressorManager& MessageCompressorManager::forSession(
+    const transport::SessionHandle& session) {
+    return getForSession(session.get());
 }
 
 }  // namespace mongo

@@ -161,7 +161,8 @@ Status AuthzManagerExternalStateLocal::getUserDescription(OperationContext* txn,
     } else {
         // We are able to artifically construct the external user from the request
         BSONArrayBuilder userRoles;
-        for (const RoleName& role : txn->getClient()->session()->getX509PeerInfo().roles) {
+        auto& sslPeerInfo = SSLPeerInfo::forSession(txn->getClient()->session());
+        for (const RoleName& role : sslPeerInfo.roles) {
             userRoles << BSON("role" << role.getRole() << "db" << role.getDB());
         }
         *result = BSON("_id" << userName.getUser() << "user" << userName.getUser() << "db"

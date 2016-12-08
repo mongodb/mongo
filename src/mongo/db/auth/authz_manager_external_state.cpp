@@ -42,10 +42,11 @@ AuthzManagerExternalState::~AuthzManagerExternalState() = default;
 
 bool AuthzManagerExternalState::shouldUseRolesFromConnection(OperationContext* txn,
                                                              const UserName& userName) {
-    return txn && txn->getClient() && txn->getClient()->session() &&
-        txn->getClient()->session()->getX509PeerInfo().subjectName == userName.getUser() &&
-        userName.getDB() == "$external" &&
-        !txn->getClient()->session()->getX509PeerInfo().roles.empty();
+    if (!txn || !txn->getClient() || !txn->getClient()->session())
+        return false;
+    auto& sslPeerInfo = SSLPeerInfo::forSession(txn->getClient()->session());
+    return sslPeerInfo.subjectName == userName.getUser() && userName.getDB() == "$external" &&
+        !sslPeerInfo.roles.empty();
 }
 
 

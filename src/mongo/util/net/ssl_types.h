@@ -31,6 +31,7 @@
 
 #include "mongo/db/auth/role_name.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/transport/session.h"
 
 namespace mongo {
 
@@ -45,6 +46,8 @@ struct SSLPeerInfo {
 
     std::string subjectName;
     stdx::unordered_set<RoleName> roles;
+
+    static SSLPeerInfo& forSession(const transport::SessionHandle& session);
 };
 
 }  // namespace mongo

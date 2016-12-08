@@ -109,7 +109,6 @@ public:
             Date_t expiration = transport::Ticket::kNoExpirationDate) override;
         Status wait(transport::Ticket&& ticket) override;
         void asyncWait(transport::Ticket&& ticket, TicketCallback callback) override;
-        SSLPeerInfo getX509PeerInfo(const transport::ConstSessionHandle& session) const override;
 
         Stats sessionStats() override;
         void end(const transport::SessionHandle& session) override;

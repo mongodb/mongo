@@ -31,17 +31,14 @@
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/session_id.h"
 #include "mongo/transport/ticket.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
-struct SSLPeerInfo;
-
 namespace transport {
 
 class TransportLayer;
@@ -54,7 +51,7 @@ using ConstSessionHandle = std::shared_ptr<const Session>;
  * This type contains data needed to associate Messages with connections
  * (on the transport side) and Messages with Client objects (on the database side).
  */
-class Session : public std::enable_shared_from_this<Session> {
+class Session : public std::enable_shared_from_this<Session>, public Decorable<Session> {
     MONGO_DISALLOW_COPYING(Session);
 
 public:
@@ -107,11 +104,6 @@ public:
                                Date_t expiration = Ticket::kNoExpirationDate);
 
     /**
-     * Return the X509 peer information for this connection (SSL only).
-     */
-    virtual SSLPeerInfo getX509PeerInfo() const;
-
-    /**
      * Return the remote host for this session.
      */
     virtual const HostAndPort& remote() const = 0;
@@ -132,11 +124,6 @@ public:
      */
     virtual TagMask getTags() const;
 
-    /**
-     * Get the compressor manager for this session.
-     */
-    virtual MessageCompressorManager& getCompressorManager();
-
 protected:
     /**
      * Construct a new session.
@@ -147,7 +134,6 @@ private:
     const Id _id;
 
     TagMask _tags;
-    MessageCompressorManager _messageCompressorManager;
 };
 
 }  // namespace transport

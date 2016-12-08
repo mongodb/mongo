@@ -89,15 +89,6 @@ void TransportLayerMock::asyncWait(Ticket&& ticket, TicketCallback callback) {
     callback(Status::OK());
 }
 
-SSLPeerInfo TransportLayerMock::getX509PeerInfo(const ConstSessionHandle& session) const {
-    return _sessions.at(session->id()).peerInfo;
-}
-
-
-void TransportLayerMock::setX509PeerInfo(const SessionHandle& session, SSLPeerInfo peerInfo) {
-    _sessions[session->id()].peerInfo = std::move(peerInfo);
-}
-
 TransportLayer::Stats TransportLayerMock::sessionStats() {
     return Stats();
 }

@@ -31,6 +31,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/transport/message_compressor_base.h"
+#include "mongo/transport/session.h"
 
 #include <vector>
 
@@ -112,6 +113,8 @@ public:
      * it can decompress any message without negotiation.
      */
     StatusWith<Message> decompressMessage(const Message& msg);
+
+    static MessageCompressorManager& forSession(const transport::SessionHandle& session);
 
 private:
     std::vector<MessageCompressorBase*> _negotiated;

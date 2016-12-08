@@ -121,7 +121,8 @@ public:
         if (parameter)
             parameter->append(txn, result, "automationServiceDescriptor");
 
-        txn->getClient()->session()->getCompressorManager().serverNegotiate(cmdObj, &result);
+        MessageCompressorManager::forSession(txn->getClient()->session())
+            .serverNegotiate(cmdObj, &result);
 
         return true;
     }

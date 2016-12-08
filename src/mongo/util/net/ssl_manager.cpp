@@ -45,6 +45,7 @@
 #include "mongo/config.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
@@ -54,6 +55,7 @@
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl_expiration.h"
 #include "mongo/util/net/ssl_options.h"
+#include "mongo/util/net/ssl_types.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/text.h"
 
@@ -71,6 +73,16 @@
 #endif
 
 namespace mongo {
+namespace {
+
+const transport::Session::Decoration<SSLPeerInfo> peerInfoForSession =
+    transport::Session::declareDecoration<SSLPeerInfo>();
+
+}  // namespace
+
+SSLPeerInfo& SSLPeerInfo::forSession(const transport::SessionHandle& session) {
+    return peerInfoForSession(session.get());
+}
 
 SSLParams sslGlobalParams;
 
@@ -354,6 +366,7 @@ void setupFIPS() {
     fassertFailedNoTrace(17089);
 #endif
 }
+
 }  // namespace
 
 // Global variable indicating if this is a server or a client instance

@@ -79,8 +79,6 @@ public:
     Status wait(Ticket&& ticket) override;
     void asyncWait(Ticket&& ticket, TicketCallback callback) override;
 
-    SSLPeerInfo getX509PeerInfo(const ConstSessionHandle& session) const override;
-
     Stats sessionStats() override;
 
     void end(const SessionHandle& session) override;
@@ -168,8 +166,6 @@ private:
         TransportLayerLegacy* _tl;
 
         TagMask _tags;
-
-        MessageCompressorManager _messageCompressorManager;
 
         std::unique_ptr<Connection> _connection;
 

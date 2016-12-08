@@ -55,6 +55,11 @@
 namespace mongo {
 namespace {
 
+void setX509PeerInfo(const transport::SessionHandle& session, SSLPeerInfo info) {
+    auto& sslPeerInfo = SSLPeerInfo::forSession(session);
+    sslPeerInfo = info;
+}
+
 using std::vector;
 
 TEST(RoleParsingTest, BuildRoleBSON) {
@@ -245,7 +250,7 @@ TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
     ServiceContextNoop serviceContext;
     transport::TransportLayerMock transportLayer{};
     transport::SessionHandle session = transportLayer.createSession();
-    transportLayer.setX509PeerInfo(
+    setX509PeerInfo(
         session,
         SSLPeerInfo("CN=mongodb.com", {RoleName("read", "test"), RoleName("readWrite", "test")}));
     ServiceContext::UniqueClient client = serviceContext.makeClient("testClient", session);
@@ -279,7 +284,7 @@ TEST_F(AuthorizationManagerTest, testLocalX509AuthorizationInvalidUser) {
     ServiceContextNoop serviceContext;
     transport::TransportLayerMock transportLayer{};
     transport::SessionHandle session = transportLayer.createSession();
-    transportLayer.setX509PeerInfo(
+    setX509PeerInfo(
         session,
         SSLPeerInfo("CN=mongodb.com", {RoleName("read", "test"), RoleName("write", "test")}));
     ServiceContext::UniqueClient client = serviceContext.makeClient("testClient", session);
@@ -294,7 +299,7 @@ TEST_F(AuthorizationManagerTest, testLocalX509AuthenticationNoAuthorization) {
     ServiceContextNoop serviceContext;
     transport::TransportLayerMock transportLayer{};
     transport::SessionHandle session = transportLayer.createSession();
-    transportLayer.setX509PeerInfo(session, {});
+    setX509PeerInfo(session, {});
     ServiceContext::UniqueClient client = serviceContext.makeClient("testClient", session);
     ServiceContext::UniqueOperationContext txn = client->makeOperationContext();
 

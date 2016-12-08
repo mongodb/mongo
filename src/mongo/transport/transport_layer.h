@@ -148,12 +148,6 @@ public:
     virtual void asyncWait(Ticket&& ticket, TicketCallback callback) = 0;
 
     /**
-     * Return the stored X509 peer information for this session. If the session does not
-     * exist in this TransportLayer, returns a default constructed object.
-     */
-    virtual SSLPeerInfo getX509PeerInfo(const ConstSessionHandle& session) const = 0;
-
-    /**
      * Returns the number of sessions currently open in the transport layer.
      */
     virtual Stats sessionStats() = 0;

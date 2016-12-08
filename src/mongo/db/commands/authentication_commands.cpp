@@ -167,10 +167,9 @@ bool CmdAuthenticate::run(OperationContext* txn,
         mechanism = "MONGODB-CR";
     }
     UserName user;
+    auto& sslPeerInfo = SSLPeerInfo::forSession(txn->getClient()->session());
     if (mechanism == "MONGODB-X509" && !cmdObj.hasField("user")) {
-        Client* client = txn->getClient();
-        auto clientName = client->session()->getX509PeerInfo().subjectName;
-        user = UserName(clientName, dbname);
+        user = UserName(sslPeerInfo.subjectName, dbname);
     } else {
         user = UserName(cmdObj.getStringField("user"), dbname);
     }
@@ -322,7 +321,7 @@ Status CmdAuthenticate::_authenticateX509(OperationContext* txn,
 
     Client* client = Client::getCurrent();
     AuthorizationSession* authorizationSession = AuthorizationSession::get(client);
-    auto clientName = client->session()->getX509PeerInfo().subjectName;
+    auto clientName = SSLPeerInfo::forSession(client->session()).subjectName;
 
     if (!getSSLManager()->getSSLConfiguration().hasCA) {
         return Status(ErrorCodes::AuthenticationFailed,

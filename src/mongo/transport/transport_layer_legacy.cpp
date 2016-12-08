@@ -41,11 +41,13 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/socket_exception.h"
+#include "mongo/util/net/ssl_types.h"
 
 namespace mongo {
 namespace transport {
@@ -142,7 +144,7 @@ TransportLayerLegacy::~TransportLayerLegacy() = default;
 Ticket TransportLayerLegacy::sourceMessage(const SessionHandle& session,
                                            Message* message,
                                            Date_t expiration) {
-    auto& compressorMgr = session->getCompressorManager();
+    auto& compressorMgr = MessageCompressorManager::forSession(session);
     auto sourceCb = [message, &compressorMgr](AbstractMessagingPort* amp) -> Status {
         if (!amp->recv(*message)) {
             return {ErrorCodes::HostUnreachable, "Recv failed"};
@@ -165,11 +167,6 @@ Ticket TransportLayerLegacy::sourceMessage(const SessionHandle& session,
         stdx::make_unique<LegacyTicket>(std::move(legacySession), expiration, std::move(sourceCb)));
 }
 
-SSLPeerInfo TransportLayerLegacy::getX509PeerInfo(const ConstSessionHandle& session) const {
-    auto legacySession = checked_pointer_cast<const LegacySession>(session);
-    return legacySession->conn()->sslPeerInfo.value_or(SSLPeerInfo());
-}
-
 TransportLayer::Stats TransportLayerLegacy::sessionStats() {
     Stats stats;
     {
@@ -186,7 +183,7 @@ TransportLayer::Stats TransportLayerLegacy::sessionStats() {
 Ticket TransportLayerLegacy::sinkMessage(const SessionHandle& session,
                                          const Message& message,
                                          Date_t expiration) {
-    auto& compressorMgr = session->getCompressorManager();
+    auto& compressorMgr = MessageCompressorManager::forSession(session);
     auto sinkCb = [&message, &compressorMgr](AbstractMessagingPort* amp) -> Status {
         try {
             networkCounter.hitLogical(0, message.size());
@@ -315,10 +312,11 @@ Status TransportLayerLegacy::_runTicket(Ticket ticket) {
 
 #ifdef MONGO_CONFIG_SSL
     // If we didn't have an X509 subject name, see if we have one now
-    if (!conn->sslPeerInfo) {
+    auto& sslPeerInfo = SSLPeerInfo::forSession(legacyTicket->getSession());
+    if (sslPeerInfo.subjectName.empty()) {
         auto info = conn->amp->getX509PeerInfo();
-        if (info.subjectName != "") {
-            conn->sslPeerInfo = info;
+        if (!info.subjectName.empty()) {
+            sslPeerInfo = info;
         }
     }
 #endif

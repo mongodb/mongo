@@ -64,10 +64,6 @@ void TransportLayerManager::asyncWait(Ticket&& ticket, TicketCallback callback) 
     return getTicketTransportLayer(ticket)->asyncWait(std::move(ticket), std::move(callback));
 }
 
-SSLPeerInfo TransportLayerManager::getX509PeerInfo(const ConstSessionHandle& session) const {
-    return session->getX509PeerInfo();
-}
-
 template <typename Callable>
 void TransportLayerManager::_foreach(Callable&& cb) {
     {

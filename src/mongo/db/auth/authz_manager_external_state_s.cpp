@@ -156,7 +156,8 @@ Status AuthzManagerExternalStateMongos::getUserDescription(OperationContext* txn
         // Obtain privilege information from the config servers for all roles acquired from the X509
         // certificate.
         BSONArrayBuilder userRolesBuilder;
-        for (const RoleName& role : txn->getClient()->session()->getX509PeerInfo().roles) {
+        auto& sslPeerInfo = SSLPeerInfo::forSession(txn->getClient()->session());
+        for (const RoleName& role : sslPeerInfo.roles) {
             userRolesBuilder.append(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
                                          << role.getRole()
                                          << AuthorizationManager::ROLE_DB_FIELD_NAME
