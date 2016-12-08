@@ -45,7 +45,6 @@
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/request_interface.h"
-#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
@@ -55,14 +54,6 @@ namespace mongo {
 
 using std::string;
 using std::stringstream;
-
-/**
- * When this callback is run, we record a shard that we've used for useful work in an operation to
- * be read later by getLastError()
- */
-void usingAShardConnection(const std::string& addr) {
-    ClusterLastErrorInfo::get(cc()).addShardHost(addr);
-}
 
 // called into by the web server. For now we just translate the parameters
 // to their old style equivalents.

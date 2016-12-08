@@ -84,6 +84,4 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(MongoDLocalShardingInfo, ("SetGlobalEnviron
 
 }  // namespace
 
-void usingAShardConnection(const string& addr) {}
-
 }  // namespace mongo

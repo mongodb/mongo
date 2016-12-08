@@ -41,7 +41,9 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/version_manager.h"
+#include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/is_mongos.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -401,9 +403,6 @@ thread_specific_ptr<ClientConnections> ClientConnections::_perThread;
 // The global connection pool
 DBConnectionPool shardConnectionPool;
 
-// Different between mongos and mongod
-void usingAShardConnection(const string& addr);
-
 ShardConnection::ShardConnection(const ConnectionString& connectionString,
                                  const string& ns,
                                  std::shared_ptr<ChunkManager> manager)
@@ -415,8 +414,13 @@ ShardConnection::ShardConnection(const ConnectionString& connectionString,
         invariant(_manager->getns() == _ns);
     }
 
-    _conn = ClientConnections::threadInstance()->get(_cs.toString(), _ns);
-    usingAShardConnection(_cs.toString());
+    auto csString = _cs.toString();
+    _conn = ClientConnections::threadInstance()->get(csString, _ns);
+    if (isMongos()) {
+        // In mongos, we record this connection as having been used for useful work to provide
+        // useful information in getLastError.
+        ClusterLastErrorInfo::get(cc()).addShardHost(csString);
+    }
 }
 
 ShardConnection::~ShardConnection() {

@@ -19,6 +19,8 @@ env.Library(
         '$BUILD_DIR/mongo/executor/connection_pool_stats',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/rpc/metadata',
+        '$BUILD_DIR/mongo/s/cluster_last_error_info',
+        '$BUILD_DIR/mongo/s/is_mongos',
         'shard_interface',
     ],
     LIBDEPS_TAGS=[
