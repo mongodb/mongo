@@ -35,8 +35,6 @@ namespace mongo {
 
 class OperationContextImpl final : public OperationContext {
 public:
-    virtual ~OperationContextImpl();
-
     virtual ProgressMeter* setMessage_inlock(const char* msg,
                                              const std::string& name,
                                              unsigned long long progressMeterTotal,

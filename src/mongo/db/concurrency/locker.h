@@ -309,13 +309,6 @@ public:
     virtual bool isReadLocked() const = 0;
 
     /**
-     * Asserts that the Locker is effectively not in use and resets the locking statistics.
-     * This means, there should be no locks on it, no WUOW, etc, so it would be safe to call
-     * the destructor or reuse the Locker.
-     */
-    virtual void assertEmptyAndReset() = 0;
-
-    /**
      * Pending means we are currently trying to get a lock (could be the parallel batch writer
      * lock).
      */
