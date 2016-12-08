@@ -35,7 +35,7 @@ assert.commandWorked(m.getDB("local").runCommand({godinsert: "oplog.$main", obj:
 rt.stop(true);
 m = rt.start(true, null, true);
 
-assert.eq(op.ts.t, lastop().ts.t);
+assert.eq(op.ts.t, lastop().ts.t, tojson({lastop: lastop()}));
 am().save({});
 assert.eq(op.ts.t, lastop().ts.t);
 assert.eq(op.ts.i + 1, lastop().ts.i);
