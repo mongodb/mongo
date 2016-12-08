@@ -285,18 +285,25 @@ class GDBDumper(object):
 
         call([dbg, "--version"])
 
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        print("dir %s" % script_dir);
+        gdb_dir = os.path.join(script_dir, "gdb")
+        printers_script = os.path.join(gdb_dir, "mongo.py")
+
         cmds = [
             "set pagination off",
             "attach %d" % pid,
             "info sharedlibrary",
             "info threads", # Dump a simple list of commands to get the thread name
+            "set python print-stack full",
+            "source " + printers_script,
             "thread apply all bt",
             "gcore dump_" + process_name + "." + str(pid) + "." + self.get_dump_ext() if take_dump else "",
             "set confirm off",
             "quit",
             ]
 
-        call([dbg, "--quiet"] + list( itertools.chain.from_iterable([['-ex', b] for b in cmds])))
+        call([dbg, "--quiet", "--nx"] + list( itertools.chain.from_iterable([['-ex', b] for b in cmds])))
 
         stream.write("INFO: Done analyzing process\n")
 
