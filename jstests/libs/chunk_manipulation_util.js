@@ -101,7 +101,8 @@ function configureMoveChunkFailPoint(shardConnection, stepNumber, mode) {
     assert(stepNumber >= 1);
     assert(stepNumber <= 6);
     var admin = shardConnection.getDB('admin');
-    admin.runCommand({configureFailPoint: 'moveChunkHangAtStep' + stepNumber, mode: mode});
+    assert.commandWorked(
+        admin.runCommand({configureFailPoint: 'moveChunkHangAtStep' + stepNumber, mode: mode}));
 }
 
 //
@@ -166,7 +167,8 @@ function configureMigrateFailPoint(shardConnection, stepNumber, mode) {
     assert(stepNumber >= 1);
     assert(stepNumber <= 5);
     var admin = shardConnection.getDB('admin');
-    admin.runCommand({configureFailPoint: 'migrateThreadHangAtStep' + stepNumber, mode: mode});
+    assert.commandWorked(
+        admin.runCommand({configureFailPoint: 'migrateThreadHangAtStep' + stepNumber, mode: mode}));
 }
 
 //
