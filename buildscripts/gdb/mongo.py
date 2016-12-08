@@ -360,7 +360,7 @@ class MongoDBHelp(gdb.Command):
         gdb.Command.__init__(self, "mongodb-help", gdb.COMMAND_DATA)
 
     def invoke(self, arg, _from_tty):
-        print("Command - Description" % (key, mongo_commands[key]))
+        print("Command - Description")
         for key in mongo_commands:
             print("%s - %s" % (key, mongo_commands[key]))
 
