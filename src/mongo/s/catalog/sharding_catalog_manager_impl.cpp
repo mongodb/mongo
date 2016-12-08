@@ -303,7 +303,11 @@ BSONArray buildMergeChunksApplyOpsPrecond(const std::vector<ChunkType>& chunksTo
 
 ShardingCatalogManagerImpl::ShardingCatalogManagerImpl(
     ShardingCatalogClient* catalogClient, std::unique_ptr<executor::TaskExecutor> addShardExecutor)
-    : _catalogClient(catalogClient), _executorForAddShard(std::move(addShardExecutor)) {}
+    : _catalogClient(catalogClient),
+      _executorForAddShard(std::move(addShardExecutor)),
+      _kZoneOpLock("zoneOpLock"),
+      _kChunkOpLock("chunkOpLock"),
+      _kShardMembershipLock("shardMembershipLock") {}
 
 ShardingCatalogManagerImpl::~ShardingCatalogManagerImpl() = default;
 

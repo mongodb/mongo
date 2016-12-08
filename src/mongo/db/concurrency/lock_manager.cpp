@@ -36,6 +36,7 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -1123,6 +1124,9 @@ ResourceId::ResourceId(ResourceType type, uint64_t hashId) : _fullHash(fullHash(
 std::string ResourceId::toString() const {
     StringBuilder ss;
     ss << "{" << _fullHash << ": " << resourceTypeName(getType()) << ", " << getHashId();
+    if (getType() == RESOURCE_MUTEX) {
+        ss << ", " << Lock::ResourceMutex::getName(*this);
+    }
 
 #ifdef MONGO_CONFIG_DEBUG_BUILD
     ss << ", " << _nsCopy;

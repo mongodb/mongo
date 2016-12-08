@@ -33,10 +33,13 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 
 #include <string>
+#include <vector>
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -57,10 +60,72 @@ Lock::TempRelease::~TempRelease() {
 }
 
 namespace {
-AtomicWord<uint64_t> lastResourceMutexHash{0};
+
+/**
+ * ResourceMutexes can be constructed during initialization, thus the code must ensure the vector
+ * of labels is constructed before items are added to it. This factory encapsulates all members
+ * that need to be initialized before first use. A pointer is allocated to an instance of this
+ * factory and the first call will construct an instance.
+ */
+class ResourceIdFactory {
+public:
+    static ResourceId newResourceIdForMutex(std::string resourceLabel) {
+        ensureInitialized();
+        return resourceIdFactory->_newResourceIdForMutex(std::move(resourceLabel));
+    }
+
+    static std::string nameForId(ResourceId resourceId) {
+        stdx::lock_guard<stdx::mutex> lk(resourceIdFactory->labelsMutex);
+        return resourceIdFactory->labels.at(resourceId.getHashId());
+    }
+
+    /**
+     * Must be called in a single-threaded context (e.g: program initialization) before the factory
+     * is safe to use in a multi-threaded context.
+     */
+    static void ensureInitialized() {
+        if (!resourceIdFactory) {
+            resourceIdFactory = stdx::make_unique<ResourceIdFactory>();
+        }
+    }
+
+private:
+    ResourceId _newResourceIdForMutex(std::string resourceLabel) {
+        stdx::lock_guard<stdx::mutex> lk(labelsMutex);
+        invariant(nextId == labels.size());
+        labels.push_back(std::move(resourceLabel));
+
+        return ResourceId(RESOURCE_MUTEX, nextId++);
+    }
+
+    static std::unique_ptr<ResourceIdFactory> resourceIdFactory;
+
+    std::uint64_t nextId = 0;
+    std::vector<std::string> labels;
+    stdx::mutex labelsMutex;
+};
+
+std::unique_ptr<ResourceIdFactory> ResourceIdFactory::resourceIdFactory;
+
+/**
+ * Guarantees `ResourceIdFactory::ensureInitialized` is called at least once during initialization.
+ */
+struct ResourceIdFactoryInitializer {
+    ResourceIdFactoryInitializer() {
+        ResourceIdFactory::ensureInitialized();
+    }
+} resourceIdFactoryInitializer;
+
 }  // namespace
 
-Lock::ResourceMutex::ResourceMutex() : _rid(RESOURCE_MUTEX, lastResourceMutexHash.fetchAndAdd(1)) {}
+
+Lock::ResourceMutex::ResourceMutex(std::string resourceLabel)
+    : _rid(ResourceIdFactory::newResourceIdForMutex(std::move(resourceLabel))) {}
+
+std::string Lock::ResourceMutex::getName(ResourceId resourceId) {
+    invariant(resourceId.getType() == RESOURCE_MUTEX);
+    return ResourceIdFactory::nameForId(resourceId);
+}
 
 Lock::GlobalLock::GlobalLock(Locker* locker, LockMode lockMode, unsigned timeoutMs)
     : GlobalLock(locker, lockMode, EnqueueOnly()) {

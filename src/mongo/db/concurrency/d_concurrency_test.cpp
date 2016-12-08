@@ -116,7 +116,7 @@ void perfTest(stdx::function<void(int threadNr)> fn, int maxThreads) {
 }
 
 TEST(DConcurrency, ResourceMutex) {
-    Lock::ResourceMutex mtx;
+    Lock::ResourceMutex mtx("testMutex");
     DefaultLockerImpl locker1;
     DefaultLockerImpl locker2;
     DefaultLockerImpl locker3;
@@ -642,6 +642,14 @@ TEST(DConcurrency, StressPartitioned) {
     }
 }
 
+TEST(DConcurrency, ResourceMutexLabels) {
+    Lock::ResourceMutex mutex("label");
+    ASSERT(mutex.getName() == "label");
+    Lock::ResourceMutex mutex2("label2");
+    ASSERT(mutex2.getName() == "label2");
+}
+
+
 // These tests exercise single- and multi-threaded performance of uncontended lock acquisition. It
 // is neither practical nor useful to run them on debug builds.
 
@@ -651,13 +659,13 @@ TEST(Locker, PerformanceStdMutex) {
 }
 
 TEST(Locker, PerformanceResourceMutexShared) {
-    Lock::ResourceMutex mtx;
+    Lock::ResourceMutex mtx("testMutex");
     std::array<DefaultLockerImpl, kMaxPerfThreads> locker;
     perfTest([&](int threadId) { Lock::SharedLock lk(&locker[threadId], mtx); }, kMaxPerfThreads);
 }
 
 TEST(Locker, PerformanceResourceMutexExclusive) {
-    Lock::ResourceMutex mtx;
+    Lock::ResourceMutex mtx("testMutex");
     std::array<DefaultLockerImpl, kMaxPerfThreads> locker;
     perfTest([&](int threadId) { Lock::ExclusiveLock lk(&locker[threadId], mtx); },
              kMaxPerfThreads);

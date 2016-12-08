@@ -111,7 +111,13 @@ public:
      */
     class ResourceMutex {
     public:
-        ResourceMutex();
+        ResourceMutex(std::string resourceLabel);
+
+        std::string getName() const {
+            return getName(_rid);
+        };
+
+        static std::string getName(ResourceId resourceId);
 
     private:
         friend class Lock::SharedLock;
