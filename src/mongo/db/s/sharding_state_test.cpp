@@ -30,15 +30,21 @@
 
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/s/catalog/dist_lock_manager_mock.h"
+#include "mongo/s/catalog/sharding_catalog_client_impl.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/sharding_mongod_test_fixture.h"
 
@@ -54,11 +60,42 @@ public:
         return &_shardingState;
     }
 
+    std::string shardName() const {
+        return _shardName.toString();
+    }
+
+    void setupCollectionMetadata(const NamespaceString& nss,
+                                 const OID& epoch,
+                                 const std::vector<BSONObj>& initChunks) {
+        auto future = launchAsync([this, &nss] {
+            ChunkVersion latestShardVersion;
+            Client::initThreadIfNotAlready();
+            ASSERT_OK(
+                shardingState()->refreshMetadataNow(operationContext(), nss, &latestShardVersion));
+        });
+
+        ChunkVersion initVersion(1, 0, epoch);
+        onFindCommand([&nss, &initVersion](const RemoteCommandRequest&) {
+            CollectionType coll;
+            coll.setNs(nss);
+            coll.setUpdatedAt(Date_t());
+            coll.setEpoch(initVersion.epoch());
+            coll.setKeyPattern(BSON("x" << 1));
+            return std::vector<BSONObj>{coll.toBSON()};
+        });
+
+        onFindCommand([&initChunks](const RemoteCommandRequest&) { return initChunks; });
+
+        future.timed_get(kFutureTimeout);
+    }
+
 protected:
     // Used to write to set up local collections before exercising server logic.
     std::unique_ptr<DBDirectClient> _dbDirectClient;
 
     void setUp() override {
+        _shardName = ShardId("a");
+
         serverGlobalParams.clusterRole = ClusterRole::None;
         ShardingMongodTestFixture::setUp();
 
@@ -76,6 +113,7 @@ protected:
             auto configTargeter =
                 RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter());
             configTargeter->setConnectionStringReturnValue(configConnStr);
+            configTargeter->setFindHostReturnValue(configConnStr.getServers()[0]);
 
             return Status::OK();
         });
@@ -96,20 +134,32 @@ protected:
         ShardingMongodTestFixture::tearDown();
     }
 
+    std::unique_ptr<DistLockManager> makeDistLockManager(
+        std::unique_ptr<DistLockCatalog> distLockCatalog) override {
+        return stdx::make_unique<DistLockManagerMock>(nullptr);
+    }
+
+    std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
+        std::unique_ptr<DistLockManager> distLockManager) override {
+        invariant(distLockManager);
+        return stdx::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
+    }
+
 private:
     ShardingState _shardingState;
+    ShardId _shardName;
 };
 
 TEST_F(ShardingStateTest, ValidShardIdentitySucceeds) {
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity.setShardName("a");
+    shardIdentity.setShardName(shardName());
     shardIdentity.setClusterId(OID::gen());
 
     ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
     ASSERT_TRUE(shardingState()->enabled());
-    ASSERT_EQ("a", shardingState()->getShardName());
+    ASSERT_EQ(shardName(), shardingState()->getShardName());
     ASSERT_EQ("config/a:1,b:2", shardingState()->getConfigServer(operationContext()).toString());
 }
 
@@ -117,7 +167,7 @@ TEST_F(ShardingStateTest, InitWhilePreviouslyInErrorStateWillStayInErrorState) {
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity.setShardName("a");
+    shardIdentity.setShardName(shardName());
     shardIdentity.setClusterId(OID::gen());
 
     shardingState()->setGlobalInitMethodForTest(
@@ -152,7 +202,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithMatchingShardIdentitySucceeds) {
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity.setShardName("a");
+    shardIdentity.setShardName(shardName());
     shardIdentity.setClusterId(clusterID);
 
     ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
@@ -160,7 +210,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithMatchingShardIdentitySucceeds) {
     ShardIdentityType shardIdentity2;
     shardIdentity2.setConfigsvrConnString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity2.setShardName("a");
+    shardIdentity2.setShardName(shardName());
     shardIdentity2.setClusterId(clusterID);
 
     shardingState()->setGlobalInitMethodForTest(
@@ -171,7 +221,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithMatchingShardIdentitySucceeds) {
     ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity2));
 
     ASSERT_TRUE(shardingState()->enabled());
-    ASSERT_EQ("a", shardingState()->getShardName());
+    ASSERT_EQ(shardName(), shardingState()->getShardName());
     ASSERT_EQ("config/a:1,b:2", shardingState()->getConfigServer(operationContext()).toString());
 }
 
@@ -180,7 +230,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithSameReplSetNameSucceeds) {
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity.setShardName("a");
+    shardIdentity.setShardName(shardName());
     shardIdentity.setClusterId(clusterID);
 
     ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
@@ -188,7 +238,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithSameReplSetNameSucceeds) {
     ShardIdentityType shardIdentity2;
     shardIdentity2.setConfigsvrConnString(
         ConnectionString(ConnectionString::SET, "b:2,c:3", "config"));
-    shardIdentity2.setShardName("a");
+    shardIdentity2.setShardName(shardName());
     shardIdentity2.setClusterId(clusterID);
 
     shardingState()->setGlobalInitMethodForTest(
@@ -199,7 +249,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithSameReplSetNameSucceeds) {
     ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity2));
 
     ASSERT_TRUE(shardingState()->enabled());
-    ASSERT_EQ("a", shardingState()->getShardName());
+    ASSERT_EQ(shardName(), shardingState()->getShardName());
     ASSERT_EQ("config/a:1,b:2", shardingState()->getConfigServer(operationContext()).toString());
 }
 
@@ -208,7 +258,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentReplSetNameFails) {
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity.setShardName("a");
+    shardIdentity.setShardName(shardName());
     shardIdentity.setClusterId(clusterID);
 
     ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
@@ -216,7 +266,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentReplSetNameFails) {
     ShardIdentityType shardIdentity2;
     shardIdentity2.setConfigsvrConnString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "configRS"));
-    shardIdentity2.setShardName("a");
+    shardIdentity2.setShardName(shardName());
     shardIdentity2.setClusterId(clusterID);
 
     shardingState()->setGlobalInitMethodForTest(
@@ -228,7 +278,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentReplSetNameFails) {
     ASSERT_EQ(ErrorCodes::InconsistentShardIdentity, status);
 
     ASSERT_TRUE(shardingState()->enabled());
-    ASSERT_EQ("a", shardingState()->getShardName());
+    ASSERT_EQ(shardName(), shardingState()->getShardName());
     ASSERT_EQ("config/a:1,b:2", shardingState()->getConfigServer(operationContext()).toString());
 }
 
@@ -237,7 +287,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentShardNameFails) {
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity.setShardName("a");
+    shardIdentity.setShardName(shardName());
     shardIdentity.setClusterId(clusterID);
 
     ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
@@ -257,7 +307,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentShardNameFails) {
     ASSERT_EQ(ErrorCodes::InconsistentShardIdentity, status);
 
     ASSERT_TRUE(shardingState()->enabled());
-    ASSERT_EQ("a", shardingState()->getShardName());
+    ASSERT_EQ(shardName(), shardingState()->getShardName());
     ASSERT_EQ("config/a:1,b:2", shardingState()->getConfigServer(operationContext()).toString());
 }
 
@@ -265,7 +315,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentClusterIdFails) {
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity.setShardName("a");
+    shardIdentity.setShardName(shardName());
     shardIdentity.setClusterId(OID::gen());
 
     ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
@@ -273,7 +323,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentClusterIdFails) {
     ShardIdentityType shardIdentity2;
     shardIdentity2.setConfigsvrConnString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity2.setShardName("a");
+    shardIdentity2.setShardName(shardName());
     shardIdentity2.setClusterId(OID::gen());
 
     shardingState()->setGlobalInitMethodForTest(
@@ -285,7 +335,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithDifferentClusterIdFails) {
     ASSERT_EQ(ErrorCodes::InconsistentShardIdentity, status);
 
     ASSERT_TRUE(shardingState()->enabled());
-    ASSERT_EQ("a", shardingState()->getShardName());
+    ASSERT_EQ(shardName(), shardingState()->getShardName());
     ASSERT_EQ("config/a:1,b:2", shardingState()->getConfigServer(operationContext()).toString());
 }
 
@@ -327,7 +377,7 @@ TEST_F(ShardingStateTest,
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity.setShardName("a");
+    shardIdentity.setShardName(shardName());
     shardIdentity.setClusterId(OID::gen());
     ASSERT_OK(shardIdentity.validate());
     serverGlobalParams.overrideShardIdentity = shardIdentity.toBSON();
@@ -375,7 +425,7 @@ TEST_F(ShardingStateTest,
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity.setShardName("a");
+    shardIdentity.setShardName(shardName());
     shardIdentity.setClusterId(OID::gen());
     ASSERT_OK(shardIdentity.validate());
     serverGlobalParams.overrideShardIdentity = shardIdentity.toBSON();
@@ -415,7 +465,7 @@ TEST_F(ShardingStateTest,
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity.setShardName("a");
+    shardIdentity.setShardName(shardName());
     shardIdentity.setClusterId(OID::gen());
     ASSERT_OK(shardIdentity.validate());
     serverGlobalParams.overrideShardIdentity = shardIdentity.toBSON();
@@ -485,7 +535,7 @@ TEST_F(ShardingStateTest,
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity.setShardName("a");
+    shardIdentity.setShardName(shardName());
     shardIdentity.setClusterId(OID::gen());
     ASSERT_OK(shardIdentity.validate());
     BSONObj validShardIdentity = shardIdentity.toBSON();
@@ -545,7 +595,7 @@ TEST_F(ShardingStateTest,
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnString(
         ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
-    shardIdentity.setShardName("a");
+    shardIdentity.setShardName(shardName());
     shardIdentity.setClusterId(OID::gen());
     ASSERT_OK(shardIdentity.validate());
     BSONObj validShardIdentity = shardIdentity.toBSON();
@@ -558,6 +608,294 @@ TEST_F(ShardingStateTest,
         shardingState()->initializeShardingAwarenessIfNeeded(operationContext());
     ASSERT_OK(swShardingInitialized);
     ASSERT_FALSE(swShardingInitialized.getValue());
+}
+
+TEST_F(ShardingStateTest, MetadataRefreshShouldUseDiffQuery) {
+    ShardIdentityType shardIdentity;
+    shardIdentity.setConfigsvrConnString(
+        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+    shardIdentity.setShardName(shardName());
+    shardIdentity.setClusterId(OID::gen());
+
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
+
+    const NamespaceString nss("test.user");
+    const OID initEpoch(OID::gen());
+
+    {
+        ChunkType chunk;
+        chunk.setNS(nss.ns());
+        chunk.setMin(BSON("x" << 0));
+        chunk.setMax(BSON("x" << 10));
+        chunk.setShard(ShardId(shardName()));
+        chunk.setVersion(ChunkVersion(2, 0, initEpoch));
+        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toBSON()});
+    }
+
+    const ChunkVersion newVersion(3, 0, initEpoch);
+    auto future = launchAsync([&] {
+        Client::initThreadIfNotAlready();
+        ASSERT_OK(shardingState()->onStaleShardVersion(operationContext(), nss, newVersion));
+    });
+
+    onFindCommand([&nss, &initEpoch](const RemoteCommandRequest&) {
+        CollectionType coll;
+        coll.setNs(nss);
+        coll.setUpdatedAt(Date_t());
+        coll.setEpoch(initEpoch);
+        coll.setKeyPattern(BSON("x" << 1));
+        return std::vector<BSONObj>{coll.toBSON()};
+    });
+
+    onFindCommand([this, &nss, &initEpoch](const RemoteCommandRequest& request) {
+        auto diffQueryStatus = QueryRequest::makeFromFindCommand(nss, request.cmdObj, false);
+        ASSERT_OK(diffQueryStatus.getStatus());
+
+        auto diffQuery = std::move(diffQueryStatus.getValue());
+        ASSERT_BSONOBJ_EQ(BSON("ns" << nss.ns() << "lastmod" << BSON("$gte" << Timestamp(2, 0))),
+                          diffQuery->getFilter());
+
+        ChunkType chunk;
+        chunk.setNS(nss.ns());
+        chunk.setMin(BSON("x" << 10));
+        chunk.setMax(BSON("x" << 20));
+        chunk.setShard(ShardId(shardName()));
+        chunk.setVersion(ChunkVersion(3, 10, initEpoch));
+        return std::vector<BSONObj>{chunk.toBSON()};
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+/**
+ * Test where the epoch changed right before the chunk diff query.
+ */
+TEST_F(ShardingStateTest, MetadataRefreshShouldUseFullQueryOnEpochMismatch) {
+    ShardIdentityType shardIdentity;
+    shardIdentity.setConfigsvrConnString(
+        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+    shardIdentity.setShardName(shardName());
+    shardIdentity.setClusterId(OID::gen());
+
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
+
+    const NamespaceString nss("test.user");
+    const OID initEpoch(OID::gen());
+
+    {
+        ChunkType chunk;
+        chunk.setNS(nss.ns());
+        chunk.setMin(BSON("x" << 0));
+        chunk.setMax(BSON("x" << 10));
+        chunk.setShard(ShardId(shardName()));
+        chunk.setVersion(ChunkVersion(2, 0, initEpoch));
+        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toBSON()});
+    }
+
+
+    auto future = launchAsync([&] {
+        Client::initThreadIfNotAlready();
+        ASSERT_OK(shardingState()->onStaleShardVersion(
+            operationContext(), nss, ChunkVersion(3, 0, initEpoch)));
+    });
+
+    onFindCommand([&nss, &initEpoch](const RemoteCommandRequest&) {
+        CollectionType coll;
+        coll.setNs(nss);
+        coll.setUpdatedAt(Date_t());
+        coll.setEpoch(initEpoch);
+        coll.setKeyPattern(BSON("x" << 1));
+        return std::vector<BSONObj>{coll.toBSON()};
+    });
+
+    // Now when the diff query is performed, it will get chunks with a different epoch.
+    const ChunkVersion newVersion(3, 0, OID::gen());
+    onFindCommand([this, &nss, &newVersion](const RemoteCommandRequest& request) {
+        auto diffQueryStatus = QueryRequest::makeFromFindCommand(nss, request.cmdObj, false);
+        ASSERT_OK(diffQueryStatus.getStatus());
+
+        auto diffQuery = std::move(diffQueryStatus.getValue());
+        ASSERT_BSONOBJ_EQ(BSON("ns" << nss.ns() << "lastmod" << BSON("$gte" << Timestamp(2, 0))),
+                          diffQuery->getFilter());
+
+        ChunkType chunk;
+        chunk.setNS(nss.ns());
+        chunk.setMin(BSON("x" << 10));
+        chunk.setMax(BSON("x" << 20));
+        chunk.setShard(ShardId(shardName()));
+        chunk.setVersion(ChunkVersion(3, 10, newVersion.epoch()));
+        return std::vector<BSONObj>{chunk.toBSON()};
+    });
+
+    // Retry the refresh again. Now doing a full reload.
+
+    onFindCommand([&nss, &newVersion](const RemoteCommandRequest&) {
+        CollectionType coll;
+        coll.setNs(nss);
+        coll.setUpdatedAt(Date_t());
+        coll.setEpoch(newVersion.epoch());
+        coll.setKeyPattern(BSON("x" << 1));
+        return std::vector<BSONObj>{coll.toBSON()};
+    });
+
+    onFindCommand([this, &nss, &newVersion](const RemoteCommandRequest& request) {
+        auto diffQueryStatus = QueryRequest::makeFromFindCommand(nss, request.cmdObj, false);
+        ASSERT_OK(diffQueryStatus.getStatus());
+
+        auto diffQuery = std::move(diffQueryStatus.getValue());
+        ASSERT_BSONOBJ_EQ(BSON("ns" << nss.ns() << "lastmod" << BSON("$gte" << Timestamp(0, 0))),
+                          diffQuery->getFilter());
+
+        ChunkType chunk;
+        chunk.setNS(nss.ns());
+        chunk.setMin(BSON("x" << 10));
+        chunk.setMax(BSON("x" << 20));
+        chunk.setShard(ShardId(shardName()));
+        chunk.setVersion(ChunkVersion(3, 10, newVersion.epoch()));
+        return std::vector<BSONObj>{chunk.toBSON()};
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(ShardingStateTest, FullMetadataOnEpochMismatchShouldStopAfterMaxRetries) {
+    ShardIdentityType shardIdentity;
+    shardIdentity.setConfigsvrConnString(
+        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+    shardIdentity.setShardName(shardName());
+    shardIdentity.setClusterId(OID::gen());
+
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
+
+    const NamespaceString nss("test.user");
+    const OID initEpoch(OID::gen());
+
+    {
+        ChunkType chunk;
+        chunk.setNS(nss.ns());
+        chunk.setMin(BSON("x" << 0));
+        chunk.setMax(BSON("x" << 10));
+        chunk.setShard(ShardId(shardName()));
+        chunk.setVersion(ChunkVersion(2, 0, initEpoch));
+        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toBSON()});
+    }
+
+
+    auto future = launchAsync([&] {
+        Client::initThreadIfNotAlready();
+        auto status = shardingState()->onStaleShardVersion(
+            operationContext(), nss, ChunkVersion(3, 0, initEpoch));
+        ASSERT_EQ(ErrorCodes::RemoteChangeDetected, status);
+    });
+
+    OID lastEpoch(initEpoch);
+    OID nextEpoch(OID::gen());
+    for (int tries = 0; tries < 3; tries++) {
+        onFindCommand([&nss, &lastEpoch](const RemoteCommandRequest&) {
+            CollectionType coll;
+            coll.setNs(nss);
+            coll.setUpdatedAt(Date_t());
+            coll.setEpoch(lastEpoch);
+            coll.setKeyPattern(BSON("x" << 1));
+            return std::vector<BSONObj>{coll.toBSON()};
+        });
+
+        onFindCommand([this, &nss, &nextEpoch, tries](const RemoteCommandRequest& request) {
+            auto diffQueryStatus = QueryRequest::makeFromFindCommand(nss, request.cmdObj, false);
+            ASSERT_OK(diffQueryStatus.getStatus());
+
+            auto diffQuery = std::move(diffQueryStatus.getValue());
+            Timestamp expectedLastMod = (tries == 0) ? Timestamp(2, 0) : Timestamp(0, 0);
+            ASSERT_BSONOBJ_EQ(
+                BSON("ns" << nss.ns() << "lastmod" << BSON("$gte" << expectedLastMod)),
+                diffQuery->getFilter());
+
+            ChunkType chunk;
+            chunk.setNS(nss.ns());
+            chunk.setMin(BSON("x" << 10));
+            chunk.setMax(BSON("x" << 20));
+            chunk.setShard(ShardId(shardName()));
+            chunk.setVersion(ChunkVersion(3, 10, nextEpoch));
+            return std::vector<BSONObj>{chunk.toBSON()};
+        });
+
+        lastEpoch = nextEpoch;
+        nextEpoch = OID::gen();
+    }
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(ShardingStateTest, MetadataRefreshShouldBeOkWhenCollectionWasDropped) {
+    ShardIdentityType shardIdentity;
+    shardIdentity.setConfigsvrConnString(
+        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+    shardIdentity.setShardName(shardName());
+    shardIdentity.setClusterId(OID::gen());
+
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
+
+    const NamespaceString nss("test.user");
+    const OID initEpoch(OID::gen());
+
+    {
+        ChunkType chunk;
+        chunk.setNS(nss.ns());
+        chunk.setMin(BSON("x" << 0));
+        chunk.setMax(BSON("x" << 10));
+        chunk.setShard(ShardId(shardName()));
+        chunk.setVersion(ChunkVersion(2, 0, initEpoch));
+        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toBSON()});
+    }
+
+    const ChunkVersion newVersion(3, 0, initEpoch);
+    auto future = launchAsync([&] {
+        Client::initThreadIfNotAlready();
+        ASSERT_OK(shardingState()->onStaleShardVersion(operationContext(), nss, newVersion));
+    });
+
+    onFindCommand([&nss, &initEpoch](const RemoteCommandRequest&) {
+        CollectionType coll;
+        coll.setNs(nss);
+        coll.setUpdatedAt(Date_t());
+        coll.setEpoch(initEpoch);
+        coll.setKeyPattern(BSON("x" << 1));
+        coll.setDropped(true);
+        return std::vector<BSONObj>{coll.toBSON()};
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(ShardingStateTest, MetadataRefreshShouldNotRetryOtherTypesOfError) {
+    ShardIdentityType shardIdentity;
+    shardIdentity.setConfigsvrConnString(
+        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+    shardIdentity.setShardName(shardName());
+    shardIdentity.setClusterId(OID::gen());
+
+    ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
+
+    const NamespaceString nss("test.user");
+    const OID initEpoch(OID::gen());
+
+    {
+        ChunkType chunk;
+        chunk.setNS(nss.ns());
+        chunk.setMin(BSON("x" << 0));
+        chunk.setMax(BSON("x" << 10));
+        chunk.setShard(ShardId(shardName()));
+        chunk.setVersion(ChunkVersion(2, 0, initEpoch));
+        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toBSON()});
+    }
+
+    auto configTargeter =
+        RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter());
+    configTargeter->setFindHostReturnValue({ErrorCodes::HostNotFound, "host erased by test"});
+
+    auto status = shardingState()->onStaleShardVersion(
+        operationContext(), nss, ChunkVersion(3, 0, initEpoch));
+    ASSERT_EQ(ErrorCodes::HostNotFound, status);
 }
 
 }  // namespace

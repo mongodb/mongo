@@ -210,6 +210,9 @@ env.CppUnitTest(
         'sharding_state_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/query_request',
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_mock',
         '$BUILD_DIR/mongo/s/sharding_mongod_test_fixture',
     ],
