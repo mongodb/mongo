@@ -374,7 +374,11 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
 
 ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
 
-void ReplicationCoordinatorImpl::waitForStartUpComplete() {
+void ReplicationCoordinatorImpl::waitForStartUpComplete_forTest() {
+    _waitForStartUpComplete();
+}
+
+void ReplicationCoordinatorImpl::_waitForStartUpComplete() {
     CallbackHandle handle;
     {
         stdx::unique_lock<stdx::mutex> lk(_mutex);
@@ -725,7 +729,7 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* txn) {
     // Used to shut down outside of the lock.
     std::shared_ptr<DataReplicator> drCopy;
     {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         fassert(28533, !_inShutdown);
         _inShutdown = true;
         if (_rsConfigState == kConfigPreStart) {
@@ -734,7 +738,13 @@ void ReplicationCoordinatorImpl::shutdown(OperationContext* txn) {
                          "replication system";
             return;
         }
-        fassert(18823, _rsConfigState != kConfigStartingUp);
+        if (_rsConfigState == kConfigStartingUp) {
+            // Wait until we are finished starting up, so that we can cleanly shut everything down.
+            lk.unlock();
+            _waitForStartUpComplete();
+            lk.lock();
+            fassert(18823, _rsConfigState != kConfigStartingUp);
+        }
         _replicationWaiterList.signalAndRemoveAll_inlock();
         _opTimeWaiterList.signalAndRemoveAll_inlock();
         _currentCommittedSnapshotCond.notify_all();
