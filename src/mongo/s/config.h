@@ -34,14 +34,13 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/util/concurrency/mutex.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
 class ChunkManager;
 class CollectionType;
 class DatabaseType;
-class DBConfig;
 class OperationContext;
 
 struct CollectionInfo {
@@ -129,11 +128,6 @@ public:
     void enableSharding(OperationContext* txn);
 
     /**
-       @return true if there was sharding info to remove
-     */
-    bool removeSharding(OperationContext* txn, const std::string& ns);
-
-    /**
      * @return whether or not the 'ns' collection is partitioned
      */
     bool isSharded(const std::string& ns);
@@ -163,19 +157,12 @@ public:
     bool load(OperationContext* txn);
     bool reload(OperationContext* txn);
 
-    bool dropDatabase(OperationContext*, std::string& errmsg);
-
     void getAllShardIds(std::set<ShardId>* shardIds);
     void getAllShardedCollections(std::set<std::string>& namespaces);
 
 protected:
     typedef std::map<std::string, CollectionInfo> CollectionInfoMap;
     typedef AtomicUInt64::WordType Counter;
-
-    bool _dropShardedCollections(OperationContext* txn,
-                                 int& num,
-                                 std::set<ShardId>& shardIds,
-                                 std::string& errmsg);
 
     /**
      * Returns true if it is successful at loading the DBConfig, false if the database is not found,

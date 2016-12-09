@@ -63,6 +63,9 @@ public:
     // Namespace for the local database
     static constexpr StringData kLocalDb = "local"_sd;
 
+    // Namespace for the sharding config database
+    static constexpr StringData kConfigDb = "config"_sd;
+
     // Name for the system views collection
     static constexpr StringData kSystemDotViewsCollectionName = "system.views"_sd;
 
