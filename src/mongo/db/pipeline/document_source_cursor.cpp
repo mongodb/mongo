@@ -87,8 +87,7 @@ void DocumentSourceCursor::loadBatch() {
 
     // We have already validated the sharding version when we constructed the PlanExecutor
     // so we shouldn't check it again.
-    const NamespaceString nss(_ns);
-    AutoGetCollectionForRead autoColl(pExpCtx->opCtx, nss);
+    AutoGetCollectionForRead autoColl(pExpCtx->opCtx, _nss);
 
     _exec->restoreState();
 
@@ -192,8 +191,7 @@ Value DocumentSourceCursor::serialize(bool explain) const {
     // Get planner-level explain info from the underlying PlanExecutor.
     BSONObjBuilder explainBuilder;
     {
-        const NamespaceString nss(_ns);
-        AutoGetCollectionForRead autoColl(pExpCtx->opCtx, nss);
+        AutoGetCollectionForRead autoColl(pExpCtx->opCtx, _nss);
 
         massert(17392, "No _exec. Were we disposed before explained?", _exec);
 
@@ -247,7 +245,7 @@ DocumentSourceCursor::DocumentSourceCursor(const string& ns,
                                            const intrusive_ptr<ExpressionContext>& pCtx)
     : DocumentSource(pCtx),
       _docsAddedToBatches(0),
-      _ns(ns),
+      _nss(ns),
       _exec(std::move(exec)),
       _outputSorts(_exec->getOutputSorts()) {
     recordPlanSummaryStr();
