@@ -99,6 +99,9 @@ const char kPartialResultsField[] = "allowPartialResults";
 const char kTermField[] = "term";
 const char kOptionsField[] = "options";
 
+// Field names for sorting options.
+const char kNaturalSortField[] = "$natural";
+
 }  // namespace
 
 const char QueryRequest::kFindCommandName[] = "find";
@@ -586,7 +589,7 @@ Status QueryRequest::validate() const {
 
     if (_tailable) {
         // Tailable cursors cannot have any sort other than {$natural: 1}.
-        const BSONObj expectedSort = BSON("$natural" << 1);
+        const BSONObj expectedSort = BSON(kNaturalSortField << 1);
         if (!_sort.isEmpty() &&
             SimpleBSONObjComparator::kInstance.evaluate(_sort != expectedSort)) {
             return Status(ErrorCodes::BadValue,
@@ -980,6 +983,11 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
     if (_ntoreturn) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Cannot convert to an aggregation if ntoreturn is set."};
+    }
+    if (_sort[kNaturalSortField]) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Sort option " << kNaturalSortField
+                              << " not supported in aggregation."};
     }
     // The aggregation command normally does not support the 'singleBatch' option, but we make a
     // special exception if 'limit' is set to 1.
