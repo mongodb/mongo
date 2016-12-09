@@ -149,8 +149,6 @@ public:
                                                           bool reload = false,
                                                           bool forceReload = false);
 
-    void setPrimary(OperationContext* txn, const ShardId& newPrimaryId);
-
     /**
      * Returns true if it is successful at loading the DBConfig, false if the database is not found,
      * and throws on all other errors.

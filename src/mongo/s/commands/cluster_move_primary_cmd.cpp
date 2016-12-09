@@ -45,6 +45,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/type_database.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/sharded_command_processing.h"
 #include "mongo/s/config.h"
@@ -224,14 +225,23 @@ public:
             hasWCError = true;
         }
 
+        // Update the new primary in the config server metadata
+        {
+            DatabaseType dbt;
+            dbt.setName(dbname);
+            dbt.setPrimary(toShard->getId());
+            dbt.setSharded(config->isShardingEnabled());
+
+            uassertStatusOK(Grid::get(txn)->catalogClient(txn)->updateDatabase(txn, dbname, dbt));
+        }
+
+        // Ensure the next attempt to retrieve the database or any of its collections will do a full
+        // reload
+        Grid::get(txn)->catalogCache()->invalidate(dbname);
+
         const string oldPrimary = fromShard->getConnString().toString();
 
         ScopedDbConnection fromconn(fromShard->getConnString());
-
-        config->setPrimary(txn, toShard->getId());
-
-        // Ensure the next attempt to retrieve the database will do a full reload
-        Grid::get(txn)->catalogCache()->invalidate(dbname);
 
         if (shardedColls.empty()) {
             // TODO: Collections can be created in the meantime, and we should handle in the future.
@@ -261,7 +271,6 @@ public:
             warning() << "movePrimary legacy mongod behavior detected. "
                       << "User must manually remove unsharded collections in database " << dbname
                       << " on " << oldPrimary;
-
         } else {
             // We moved some unsharded collections, but not all
             BSONObjIterator it(cloneRes["clonedColls"].Obj());
