@@ -52,11 +52,14 @@ using namespace mongo::sorter;
 using std::make_shared;
 using std::pair;
 
+namespace {
+
 // Stub to avoid including the server environment library.
 MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
     setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
     return Status::OK();
 }
+}  // namespace
 
 //
 // Sorter framework testing utilities

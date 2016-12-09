@@ -45,8 +45,11 @@ bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
     return NamespaceString::oplog(ns);
 }
 
+namespace {
+
 MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
     setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
     return Status::OK();
 }
+}  // namespace
 }  // namespace mongo

@@ -55,6 +55,7 @@
 #include "mongo/util/system_tick_source.h"
 
 namespace mongo {
+namespace {
 
 MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
     setGlobalServiceContext(stdx::make_unique<ServiceContextMongoD>());
@@ -65,6 +66,7 @@ MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
     service->setPreciseClockSource(stdx::make_unique<SystemClockSource>());
     return Status::OK();
 }
+}  // namespace
 
 ServiceContextMongoD::ServiceContextMongoD() = default;
 
