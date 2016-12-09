@@ -1405,7 +1405,10 @@ public:
         // be done under the lock.
         ON_BLOCK_EXIT([txn, &config, &rangePreserver] {
             if (rangePreserver) {
-                AutoGetCollectionForRead ctx(txn, config.ns);
+                // Be sure not to use AutoGetCollectionForRead here, since that has side-effects
+                // other than lock acquisition.
+                ScopedTransaction scopedTxn(txn, MODE_IS);
+                AutoGetCollection ctx(txn, NamespaceString(config.ns), MODE_IS);
                 rangePreserver.reset();
             }
         });
@@ -1623,6 +1626,14 @@ public:
             // final reduce
             state.finalReduce(txn, curOp, pm);
             reduceTime += rt.micros();
+
+            // Ensure the profile shows the source namespace. If the output was not inline, the
+            // active namespace will be the temporary collection we inserted into.
+            {
+                stdx::lock_guard<Client> lk(*txn->getClient());
+                curOp->setNS_inlock(config.ns);
+            }
+
             countsBuilder.appendNumber("reduce", state.numReduces());
             timingBuilder.appendNumber("reduceTime", reduceTime / 1000);
             timingBuilder.append("mode", state.jsMode() ? "js" : "mixed");
