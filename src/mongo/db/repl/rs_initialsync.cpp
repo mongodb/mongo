@@ -352,7 +352,7 @@ Status _initialSync(OperationContext* txn, BackgroundSync* bgsync) {
                 params.idIndexSpec = idIndex.Obj();
             } else {
                 const NamespaceString nss(options.fromDB, params.collectionName);
-                auto indexSpecs = r.conn()->getIndexSpecs(nss.ns());
+                auto indexSpecs = r.conn()->getIndexSpecs(nss.ns(), QueryOption_SlaveOk);
                 params.idIndexSpec = Cloner::getIdIndexSpec(indexSpecs);
             }
 
