@@ -126,6 +126,7 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/fast_clock_source_factory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
@@ -511,6 +512,8 @@ void _initWireSpec() {
     spec.isInternalClient = true;
 }
 
+MONGO_FP_DECLARE(shutdownAtStartup);
+
 ExitCode _initAndListen(int listenPort) {
     Client::initThread("initandlisten");
 
@@ -815,6 +818,10 @@ ExitCode _initAndListen(int listenPort) {
     }
 #endif
 
+    if (MONGO_FAIL_POINT(shutdownAtStartup)) {
+        log() << "starting clean exit via failpoint";
+        exitCleanly(EXIT_CLEAN);
+    }
     return waitForShutdown();
 }
 

@@ -154,7 +154,7 @@ void ReplCoordTest::start() {
 
     const auto txn = makeOperationContext();
     _repl->startup(txn.get());
-    _repl->waitForStartUpComplete();
+    _repl->waitForStartUpComplete_forTest();
     _callShutdown = true;
 }
 
