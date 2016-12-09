@@ -167,8 +167,8 @@ function configureMigrateFailPoint(shardConnection, stepNumber, mode) {
     assert(stepNumber >= 1);
     assert(stepNumber <= 5);
     var admin = shardConnection.getDB('admin');
-    assert.commandWorked(
-        admin.runCommand({configureFailPoint: 'migrateThreadHangAtStep' + stepNumber, mode: mode}));
+    assert.commandWorked(admin.runCommand(
+        {configureFailPoint: 'migrateThreadHangAtStep' + stepNumber, mode: mode}));
 }
 
 //
