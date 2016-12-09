@@ -128,8 +128,6 @@ public:
      */
     void markNSNotSharded(const std::string& ns);
 
-    void enableSharding(OperationContext* txn);
-
     /**
      * @return whether or not the 'ns' collection is partitioned
      */
