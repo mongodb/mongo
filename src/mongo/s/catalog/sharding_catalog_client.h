@@ -93,6 +93,7 @@ class ShardingCatalogClient {
     MONGO_DISALLOW_COPYING(ShardingCatalogClient);
 
 public:
+    // Constant to use for configuration data majority writes
     static const WriteConcernOptions kMajorityWriteConcern;
 
     virtual ~ShardingCatalogClient() = default;

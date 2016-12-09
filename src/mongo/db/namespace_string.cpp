@@ -104,6 +104,7 @@ bool legalClientSystemNS(StringData ns) {
 
 constexpr StringData NamespaceString::kAdminDb;
 constexpr StringData NamespaceString::kLocalDb;
+constexpr StringData NamespaceString::kConfigDb;
 constexpr StringData NamespaceString::kSystemDotViewsCollectionName;
 
 const NamespaceString NamespaceString::kConfigCollectionNamespace(kConfigCollection);

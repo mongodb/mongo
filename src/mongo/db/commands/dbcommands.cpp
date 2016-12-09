@@ -188,7 +188,8 @@ public:
              string& errmsg,
              BSONObjBuilder& result) {
         // disallow dropping the config database
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer && (dbname == "config")) {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+            (dbname == NamespaceString::kConfigDb)) {
             return appendCommandStatus(result,
                                        Status(ErrorCodes::IllegalOperation,
                                               "Cannot drop 'config' database if mongod started "
@@ -197,7 +198,7 @@ public:
 
         if ((repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
              repl::ReplicationCoordinator::modeNone) &&
-            (dbname == "local")) {
+            (dbname == NamespaceString::kLocalDb)) {
             return appendCommandStatus(result,
                                        Status(ErrorCodes::IllegalOperation,
                                               "Cannot drop 'local' database while replication "

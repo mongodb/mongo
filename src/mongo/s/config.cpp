@@ -32,12 +32,10 @@
 
 #include "mongo/s/config.h"
 
-#include "mongo/client/connpool.h"
 #include "mongo/db/client.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/write_concern.h"
-#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -174,32 +172,6 @@ void DBConfig::enableSharding(OperationContext* txn) {
 
     _shardingEnabled = true;
     _save(txn);
-}
-
-bool DBConfig::removeSharding(OperationContext* txn, const string& ns) {
-    stdx::lock_guard<stdx::mutex> lk(_lock);
-
-    if (!_shardingEnabled) {
-        warning() << "could not remove sharding for collection " << ns
-                  << ", sharding not enabled for db";
-        return false;
-    }
-
-    CollectionInfoMap::iterator i = _collections.find(ns);
-
-    if (i == _collections.end())
-        return false;
-
-    CollectionInfo& ci = _collections[ns];
-    if (!ci.isSharded()) {
-        warning() << "could not remove sharding for collection " << ns
-                  << ", no sharding information found";
-        return false;
-    }
-
-    ci.unshard();
-    _save(txn, false, true);
-    return true;
 }
 
 // Handles weird logic related to getting *either* a chunk manager *or* the collection primary
@@ -537,154 +509,6 @@ bool DBConfig::reload(OperationContext* txn) {
     }
 
     return successful;
-}
-
-bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
-    /**
-     * 1) update config server
-     * 2) drop and reset sharded collections
-     * 3) drop and reset primary
-     * 4) drop everywhere to clean up loose ends
-     */
-
-    log() << "DBConfig::dropDatabase: " << _name;
-    grid.catalogClient(txn)->logChange(
-        txn, "dropDatabase.start", _name, BSONObj(), ShardingCatalogClient::kMajorityWriteConcern);
-
-    // 1
-    grid.catalogCache()->invalidate(_name);
-
-    Status result = grid.catalogClient(txn)->removeConfigDocuments(
-        txn,
-        DatabaseType::ConfigNS,
-        BSON(DatabaseType::name(_name)),
-        ShardingCatalogClient::kMajorityWriteConcern);
-    if (!result.isOK()) {
-        errmsg = result.reason();
-        log() << "could not drop '" << _name << "': " << errmsg;
-        return false;
-    }
-
-    LOG(1) << "\t removed entry from config server for: " << _name;
-
-    set<ShardId> shardIds;
-
-    // 2
-    while (true) {
-        int num = 0;
-        if (!_dropShardedCollections(txn, num, shardIds, errmsg)) {
-            return 0;
-        }
-
-        log() << "   DBConfig::dropDatabase: " << _name << " dropped sharded collections: " << num;
-
-        if (num == 0) {
-            break;
-        }
-    }
-
-    // 3
-    {
-        const auto shard = uassertStatusOK(grid.shardRegistry()->getShard(txn, _primaryId));
-
-        ScopedDbConnection conn(shard->getConnString(), 30.0);
-        BSONObj res;
-        if (!conn->dropDatabase(_name, txn->getWriteConcern(), &res)) {
-            errmsg = res.toString() + " at " + _primaryId.toString();
-            return 0;
-        }
-        conn.done();
-        if (auto wcErrorElem = res["writeConcernError"]) {
-            auto wcError = wcErrorElem.Obj();
-            if (auto errMsgElem = wcError["errmsg"]) {
-                errmsg = errMsgElem.str() + " at " + _primaryId.toString();
-                return false;
-            }
-        }
-    }
-
-    // 4
-    for (const ShardId& shardId : shardIds) {
-        const auto shardStatus = grid.shardRegistry()->getShard(txn, shardId);
-        if (!shardStatus.isOK()) {
-            continue;
-        }
-
-        ScopedDbConnection conn(shardStatus.getValue()->getConnString(), 30.0);
-        BSONObj res;
-        if (!conn->dropDatabase(_name, txn->getWriteConcern(), &res)) {
-            errmsg = res.toString() + " at " + shardId.toString();
-            return 0;
-        }
-        conn.done();
-        if (auto wcErrorElem = res["writeConcernError"]) {
-            auto wcError = wcErrorElem.Obj();
-            if (auto errMsgElem = wcError["errmsg"]) {
-                errmsg = errMsgElem.str() + " at " + shardId.toString();
-                return false;
-            }
-        }
-    }
-
-    LOG(1) << "\t dropped primary db for: " << _name;
-
-    grid.catalogClient(txn)->logChange(
-        txn, "dropDatabase", _name, BSONObj(), ShardingCatalogClient::kMajorityWriteConcern);
-
-    return true;
-}
-
-bool DBConfig::_dropShardedCollections(OperationContext* txn,
-                                       int& num,
-                                       set<ShardId>& shardIds,
-                                       string& errmsg) {
-    num = 0;
-    set<std::string> seen;
-    while (true) {
-        std::string aCollection;
-        {
-            stdx::lock_guard<stdx::mutex> lk(_lock);
-
-            CollectionInfoMap::iterator i = _collections.begin();
-            for (; i != _collections.end(); ++i) {
-                if (i->second.isSharded()) {
-                    break;
-                }
-            }
-
-            if (i == _collections.end()) {
-                break;
-            }
-
-            aCollection = i->first;
-            if (seen.count(aCollection)) {
-                errmsg = "seen a collection twice!";
-                return false;
-            }
-
-            seen.insert(aCollection);
-            LOG(1) << "\t dropping sharded collection: " << aCollection;
-
-            i->second.getCM()->getAllShardIds(&shardIds);
-        }
-        // drop lock before network activity
-
-        uassertStatusOK(grid.catalogClient(txn)->dropCollection(txn, NamespaceString(aCollection)));
-
-        // We should warn, but it's not a fatal error if someone else reloaded the db/coll as
-        // unsharded in the meantime
-        if (!removeSharding(txn, aCollection)) {
-            warning() << "collection " << aCollection
-                      << " was reloaded as unsharded before drop completed"
-                      << " during drop of all collections";
-        }
-
-        num++;
-        uassert(10184, "_dropShardedCollections too many collections - bailing", num < 100000);
-        LOG(2) << "\t\t dropped " << num << " so far";
-    }
-
-    return true;
 }
 
 void DBConfig::getAllShardIds(set<ShardId>* shardIds) {
