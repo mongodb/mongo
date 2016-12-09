@@ -1,4 +1,3 @@
-
 # Print the full stack trace on python exceptions to aid debugging
 set python print-stack full
 
