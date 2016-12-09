@@ -161,19 +161,6 @@ void DBConfig::markNSNotSharded(const std::string& ns) {
     }
 }
 
-void DBConfig::enableSharding(OperationContext* txn) {
-    invariant(_name != "config");
-
-    stdx::lock_guard<stdx::mutex> lk(_lock);
-
-    if (_shardingEnabled) {
-        return;
-    }
-
-    _shardingEnabled = true;
-    _save(txn);
-}
-
 // Handles weird logic related to getting *either* a chunk manager *or* the collection primary
 // shard
 void DBConfig::getChunkManagerOrPrimary(OperationContext* txn,

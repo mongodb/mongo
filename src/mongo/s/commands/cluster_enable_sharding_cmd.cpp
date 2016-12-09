@@ -105,15 +105,13 @@ public:
             return false;
         }
 
-        Status status = grid.catalogClient(txn)->enableSharding(txn, dbname);
-        if (status.isOK()) {
-            audit::logEnableSharding(Client::getCurrent(), dbname);
-        }
+        uassertStatusOK(Grid::get(txn)->catalogClient(txn)->enableSharding(txn, dbname));
+        audit::logEnableSharding(Client::getCurrent(), dbname);
 
         // Make sure to force update of any stale metadata
-        grid.catalogCache()->invalidate(dbname);
+        Grid::get(txn)->catalogCache()->invalidate(dbname);
 
-        return appendCommandStatus(result, status);
+        return true;
     }
 
 } enableShardingCmd;

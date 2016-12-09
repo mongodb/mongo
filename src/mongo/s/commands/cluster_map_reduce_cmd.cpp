@@ -232,7 +232,7 @@ public:
         }
 
         // Ensure the input database exists
-        auto status = grid.catalogCache()->getDatabase(txn, dbname);
+        auto status = Grid::get(txn)->catalogCache()->getDatabase(txn, dbname);
         if (!status.isOK()) {
             return appendCommandStatus(result, status.getStatus());
         }
@@ -290,8 +290,8 @@ public:
         if (!shardedInput && !shardedOutput && !customOutDB) {
             LOG(1) << "simple MR, just passthrough";
 
-            const auto shard =
-                uassertStatusOK(grid.shardRegistry()->getShard(txn, confIn->getPrimaryId()));
+            const auto shard = uassertStatusOK(
+                Grid::get(txn)->shardRegistry()->getShard(txn, confIn->getPrimaryId()));
 
             ShardConnection conn(shard->getConnString(), "");
 
@@ -351,7 +351,7 @@ public:
                 string server;
                 {
                     const auto shard = uassertStatusOK(
-                        grid.shardRegistry()->getShard(txn, mrResult.shardTargetId));
+                        Grid::get(txn)->shardRegistry()->getShard(txn, mrResult.shardTargetId));
                     server = shard->getConnString().toString();
                 }
                 servers.insert(server);
@@ -444,8 +444,8 @@ public:
         bool hasWCError = false;
 
         if (!shardedOutput) {
-            const auto shard =
-                uassertStatusOK(grid.shardRegistry()->getShard(txn, confOut->getPrimaryId()));
+            const auto shard = uassertStatusOK(
+                Grid::get(txn)->shardRegistry()->getShard(txn, confOut->getPrimaryId()));
 
             LOG(1) << "MR with single shard output, NS=" << outputCollNss.ns()
                    << " primary=" << shard->toString();
@@ -470,8 +470,21 @@ public:
 
             // Create the sharded collection if needed
             if (!confOut->isSharded(outputCollNss.ns())) {
-                // Enable sharding on db
-                confOut->enableSharding(txn);
+                // Enable sharding on the output db
+                Status status = Grid::get(txn)->catalogClient(txn)->enableSharding(
+                    txn, outputCollNss.db().toString());
+
+                // If the database has sharding already enabled, we can ignore the error
+                if (status.isOK()) {
+                    // Invalidate the output database so it gets reloaded on the next fetch attempt
+                    Grid::get(txn)->catalogCache()->invalidate(outputCollNss.db().toString());
+                } else if (status != ErrorCodes::AlreadyInitialized) {
+                    uassertStatusOK(status);
+                }
+
+                confOut.reset();
+                confOut = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(
+                    txn, outputCollNss.db().toString()));
 
                 // Shard collection according to split points
                 vector<BSONObj> sortedSplitPts;
@@ -498,28 +511,25 @@ public:
                 // representing the simple binary comparison collation.
                 BSONObj defaultCollation;
 
-                Status status = grid.catalogClient(txn)->shardCollection(txn,
-                                                                         outputCollNss.ns(),
-                                                                         sortKeyPattern,
-                                                                         defaultCollation,
-                                                                         true,
-                                                                         sortedSplitPts,
-                                                                         outShardIds);
-                if (!status.isOK()) {
-                    return appendCommandStatus(result, status);
-                }
+                uassertStatusOK(
+                    Grid::get(txn)->catalogClient(txn)->shardCollection(txn,
+                                                                        outputCollNss.ns(),
+                                                                        sortKeyPattern,
+                                                                        defaultCollation,
+                                                                        true,
+                                                                        sortedSplitPts,
+                                                                        outShardIds));
 
                 // Make sure the cached metadata for the collection knows that we are now sharded
-                confOut = uassertStatusOK(
-                    grid.catalogCache()->getDatabase(txn, outputCollNss.db().toString()));
-                confOut->getChunkManager(txn, outputCollNss.ns(), true /* force */);
+                confOut->getChunkManager(txn, outputCollNss.ns(), true /* reload */);
             }
 
             auto chunkSizes = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<int>();
             {
                 // Take distributed lock to prevent split / migration.
-                auto scopedDistLock = grid.catalogClient(txn)->getDistLockManager()->lock(
-                    txn, outputCollNss.ns(), "mr-post-process", kNoDistLockTimeout);
+                auto scopedDistLock =
+                    Grid::get(txn)->catalogClient(txn)->getDistLockManager()->lock(
+                        txn, outputCollNss.ns(), "mr-post-process", kNoDistLockTimeout);
                 if (!scopedDistLock.isOK()) {
                     return appendCommandStatus(result, scopedDistLock.getStatus());
                 }
@@ -550,7 +560,7 @@ public:
                     string server;
                     {
                         const auto shard = uassertStatusOK(
-                            grid.shardRegistry()->getShard(txn, mrResult.shardTargetId));
+                            Grid::get(txn)->shardRegistry()->getShard(txn, mrResult.shardTargetId));
                         server = shard->getConnString().toString();
                     }
                     singleResult = mrResult.result;

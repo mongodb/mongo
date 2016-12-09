@@ -320,7 +320,11 @@ StatusWith<ShardId> ShardingCatalogClientImpl::_selectShardForNewDatabase(
 Status ShardingCatalogClientImpl::enableSharding(OperationContext* txn, const std::string& dbName) {
     invariant(nsIsDbOnly(dbName));
 
-    DatabaseType db;
+    if (dbName == NamespaceString::kConfigDb || dbName == NamespaceString::kAdminDb) {
+        return {
+            ErrorCodes::IllegalOperation,
+            str::stream() << "Enabling sharding on system configuration databases is not allowed"};
+    }
 
     // Lock the database globally to prevent conflicts with simultaneous database
     // creation/modification.
@@ -331,6 +335,8 @@ Status ShardingCatalogClientImpl::enableSharding(OperationContext* txn, const st
     }
 
     // Check for case sensitivity violations
+    DatabaseType db;
+
     Status status = _checkDbDoesNotExist(txn, dbName, &db);
     if (status.isOK()) {
         // Database does not exist, create a new entry
