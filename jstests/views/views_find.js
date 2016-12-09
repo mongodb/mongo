@@ -59,6 +59,8 @@
     assertFindResultEq(
         {find: "identityView", limit: 1, batchSize: 1, sort: {_id: 1}, projection: {_id: 1}},
         [{_id: "New York"}]);
+    assert.commandFailedWithCode(viewsDB.runCommand({find: "identityView", sort: {$natural: 1}}),
+                                 ErrorCodes.InvalidPipelineOperator);
 
     // Negative batch size and limit should fail.
     assert.commandFailed(viewsDB.runCommand({find: "identityView", batchSize: -1}));
