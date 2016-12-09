@@ -249,17 +249,21 @@ struct __wt_lsm_tree {
 	int64_t lsm_merge_throttle;
 
 	/*
-	 * The tree is open for business. This used to be a flag, but it is
-	 * susceptible to races.
+	 * Following fields used to be flags but are susceptible to races.
+	 * Don't merge them with flags.
 	 */
-	bool active;
+	bool active;			/* The tree is open for business */
+	bool aggressive_timer_enabled;	/* Timer for merge aggression enabled */
+	bool need_switch;		/* New chunk needs creating */
 
-#define	WT_LSM_TREE_AGGRESSIVE_TIMER	0x01	/* Timer for merge aggression */
-#define	WT_LSM_TREE_COMPACTING		0x02	/* Tree being compacted */
-#define	WT_LSM_TREE_MERGES		0x04	/* Tree should run merges */
-#define	WT_LSM_TREE_NEED_SWITCH		0x08	/* New chunk needs creating */
-#define	WT_LSM_TREE_OPEN		0x10	/* The tree is open */
-#define	WT_LSM_TREE_THROTTLE		0x20	/* Throttle updates */
+	/*
+	 * flags here are not protected for concurrent access, don't put
+	 * anything here that is susceptible to races.
+	 */
+#define	WT_LSM_TREE_COMPACTING		0x01	/* Tree being compacted */
+#define	WT_LSM_TREE_MERGES		0x02	/* Tree should run merges */
+#define	WT_LSM_TREE_OPEN		0x04	/* The tree is open */
+#define	WT_LSM_TREE_THROTTLE		0x08	/* Throttle updates */
 	uint32_t flags;
 };
 

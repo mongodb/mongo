@@ -425,8 +425,6 @@ __wt_log_extract_lognum(
 {
 	const char *p;
 
-	WT_UNUSED(session);
-
 	if (id == NULL || name == NULL)
 		return (WT_ERROR);
 	if ((p = strrchr(name, '.')) == NULL ||

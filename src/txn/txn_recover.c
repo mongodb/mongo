@@ -248,8 +248,6 @@ static int
 __txn_commit_apply(
     WT_RECOVERY *r, WT_LSN *lsnp, const uint8_t **pp, const uint8_t *end)
 {
-	WT_UNUSED(lsnp);
-
 	/* The logging subsystem zero-pads records. */
 	while (*pp < end && **pp)
 		WT_RET(__txn_op_apply(r, lsnp, pp, end));

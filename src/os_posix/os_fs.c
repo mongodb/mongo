@@ -746,8 +746,6 @@ __posix_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session)
 {
 	WT_SESSION_IMPL *session;
 
-	WT_UNUSED(file_system);
-
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	__wt_free(session, file_system);

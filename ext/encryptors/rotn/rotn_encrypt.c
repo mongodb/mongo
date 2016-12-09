@@ -76,7 +76,7 @@ typedef struct {
 	u_char *shift_forw;		/* Encrypt shift data from secretkey */
 	u_char *shift_back;		/* Decrypt shift data from secretkey */
 	size_t shift_len;		/* Length of shift* byte arrays */
-	int force_error;		/* Force a decrypt error for testing */
+	bool force_error;		/* Force a decrypt error for testing */
 
 } ROTN_ENCRYPTOR;
 /*! [WT_ENCRYPTOR initialization structure] */
@@ -429,43 +429,19 @@ rotn_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
 static int
 rotn_configure(ROTN_ENCRYPTOR *rotn_encryptor, WT_CONFIG_ARG *config)
 {
-	WT_CONFIG_ITEM k, v;
-	WT_CONFIG_PARSER *config_parser;
+	WT_CONFIG_ITEM v;
 	WT_EXTENSION_API *wt_api;	/* Extension API */
-	int ret, t_ret;
+	int ret;
 
 	wt_api = rotn_encryptor->wt_api;
 
 	/* Get the configuration string. */
-	if ((ret = wt_api->config_get(wt_api, NULL, config, "config", &v)) != 0)
-		return (rotn_error(rotn_encryptor, NULL, ret,
-		    "WT_EXTENSION_API.config_get"));
-
-	/* Step through the list of configuration options. */
-	if ((ret = wt_api->config_parser_open(
-	    wt_api, NULL, v.str, v.len, &config_parser)) != 0)
-		return (rotn_error(rotn_encryptor, NULL, ret,
-		    "WT_EXTENSION_API.config_parser_open"));
-
-	while ((ret = config_parser->next(config_parser, &k, &v)) == 0) {
-		if (strncmp("rotn_force_error", k.str, k.len) == 0 &&
-		    strlen("rotn_force_error") == k.len) {
-			rotn_encryptor->force_error = v.val == 0 ? 0 : 1;
-			continue;
-		} else {
-			if ((ret = config_parser->close(config_parser)) != 0)
-				return (rotn_error(rotn_encryptor,
-				    NULL, ret, "WT_CONFIG_PARSER.close"));
-			return (rotn_error(rotn_encryptor, NULL, EINVAL,
-			    "unknown config key"));
-		}
-	}
-	if ((t_ret = config_parser->close(config_parser)) != 0)
-		return (rotn_error(rotn_encryptor, NULL, t_ret,
-		    "WT_CONFIG_PARSER.close"));
-	if (ret != WT_NOTFOUND)
-		return (rotn_error(rotn_encryptor, NULL, ret,
-		    "WT_CONFIG_PARSER.next"));
+	if ((ret = wt_api->config_get(
+	    wt_api, NULL, config, "rotn_force_error", &v)) == 0)
+		rotn_encryptor->force_error = v.val != 0;
+	else if (ret != WT_NOTFOUND)
+		return (rotn_error(rotn_encryptor, NULL, EINVAL,
+		    "error parsing config"));
 
 	return (0);
 }
