@@ -232,8 +232,7 @@ static int
 zstd_init_config(
     WT_CONNECTION *connection, WT_CONFIG_ARG *config, int *compression_levelp)
 {
-	WT_CONFIG_ITEM k, v;
-	WT_CONFIG_PARSER *config_parser;
+	WT_CONFIG_ITEM v;
 	WT_EXTENSION_API *wt_api;
 	int ret;
 
@@ -246,38 +245,16 @@ zstd_init_config(
 	 * level; review the configuration.
 	 */
 	wt_api = connection->get_extension_api(connection);
-	if ((ret =
-	    wt_api->config_get(wt_api, NULL, config, "config", &v)) != 0) {
+	if ((ret = wt_api->config_get(
+	    wt_api, NULL, config, "compression_level", &v)) == 0)
+		*compression_levelp = (int)v.val;
+	else if (ret != WT_NOTFOUND) {
 		(void)wt_api->err_printf(wt_api, NULL,
-		    "WT_EXTENSION_API.config_get: zstd configure: %s",
+		    "zstd_init_config: %s",
 		    wt_api->strerror(wt_api, NULL, ret));
 		return (ret);
 	}
-	if ((ret = wt_api->config_parser_open(
-	    wt_api, NULL, v.str, v.len, &config_parser)) != 0) {
-		(void)wt_api->err_printf(wt_api, NULL,
-		    "WT_EXTENSION_API.config_parser_open: zstd configure: %s",
-		    wt_api->strerror(wt_api, NULL, ret));
-		return (ret);
-	}
-	while ((ret = config_parser->next(config_parser, &k, &v)) == 0)
-		if (strlen("compression_level") == k.len &&
-		    strncmp("compression_level", k.str, k.len) == 0) {
-			*compression_levelp = (int)v.val;
-			continue;
-		}
-	if (ret != WT_NOTFOUND) {
-		(void)wt_api->err_printf(wt_api, NULL,
-		    "WT_CONFIG_PARSER.next: zstd configure: %s",
-		    wt_api->strerror(wt_api, NULL, ret));
-		return (ret);
-	}
-	if ((ret = config_parser->close(config_parser)) != 0) {
-		(void)wt_api->err_printf(wt_api, NULL,
-		    "WT_CONFIG_PARSER.close: zstd configure: %s",
-		    wt_api->strerror(wt_api, NULL, ret));
-		return (ret);
-	}
+
 	return (0);
 }
 

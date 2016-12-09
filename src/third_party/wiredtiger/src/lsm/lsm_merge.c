@@ -46,7 +46,7 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
 static void
 __lsm_merge_aggressive_clear(WT_LSM_TREE *lsm_tree)
 {
-	F_CLR(lsm_tree, WT_LSM_TREE_AGGRESSIVE_TIMER);
+	lsm_tree->aggressive_timer_enabled = false;
 	lsm_tree->merge_aggressiveness = 0;
 }
 
@@ -85,12 +85,12 @@ __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	}
 
 	/*
-	 * Start the timer if it isn't running. Use a flag to define whether
+	 * Start the timer if it isn't running. Use a bool to define whether
 	 * the timer is running - since clearing and checking a special
 	 * timer value isn't simple.
 	 */
-	if (!F_ISSET(lsm_tree, WT_LSM_TREE_AGGRESSIVE_TIMER)) {
-		F_SET(lsm_tree, WT_LSM_TREE_AGGRESSIVE_TIMER);
+	if (!lsm_tree->aggressive_timer_enabled) {
+		lsm_tree->aggressive_timer_enabled = true;
 		__wt_epoch(session, &lsm_tree->merge_aggressive_ts);
 	}
 

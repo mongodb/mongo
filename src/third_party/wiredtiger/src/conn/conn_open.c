@@ -95,7 +95,8 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	for (;;) {
 		WT_TRET(__wt_txn_update_oldest(session,
 		    WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
-		if (txn_global->oldest_id == txn_global->current)
+		if (txn_global->oldest_id == txn_global->current &&
+		    txn_global->metadata_pinned == txn_global->current)
 			break;
 		__wt_yield();
 	}

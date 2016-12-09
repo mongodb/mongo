@@ -49,8 +49,11 @@
 	WT_ASSERT((s), (s)->txn.forced_iso > 0);                        \
 	(s)->txn.forced_iso--;						\
 	WT_ASSERT((s), txn_state->id == saved_state.id &&		\
+	    (txn_state->metadata_pinned == saved_state.metadata_pinned ||\
+	    saved_state.metadata_pinned == WT_TXN_NONE) &&		\
 	    (txn_state->pinned_id == saved_state.pinned_id ||		\
 	    saved_state.pinned_id == WT_TXN_NONE));			\
+	txn_state->metadata_pinned = saved_state.metadata_pinned;	\
 	txn_state->pinned_id = saved_state.pinned_id;			\
 } while (0)
 
@@ -67,6 +70,7 @@ struct __wt_named_snapshot {
 struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_txn_state {
 	volatile uint64_t id;
 	volatile uint64_t pinned_id;
+	volatile uint64_t metadata_pinned;
 };
 
 struct __wt_txn_global {
@@ -94,11 +98,17 @@ struct __wt_txn_global {
 	 * for a long time so we keep them out of regular visibility checks.
 	 * Eviction and checkpoint operations know when they need to be aware
 	 * of checkpoint transactions.
+	 *
+	 * We rely on the fact that (a) the only table a checkpoint updates is
+	 * the metadata; and (b) once checkpoint has finished reading a table,
+	 * it won't revisit it.
 	 */
 	volatile uint32_t checkpoint_id;	/* Checkpoint's session ID */
-	volatile uint64_t checkpoint_gen;
-	volatile uint64_t checkpoint_pinned;
+	volatile uint64_t checkpoint_gen;	/* Checkpoint generation */
+	volatile uint64_t checkpoint_pinned;	/* Oldest ID for checkpoint */
 	volatile uint64_t checkpoint_txnid;	/* Checkpoint's txn ID */
+
+	volatile uint64_t metadata_pinned;	/* Oldest ID for metadata */
 
 	/* Named snapshot state. */
 	WT_RWLOCK *nsnap_rwlock;

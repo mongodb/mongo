@@ -190,9 +190,8 @@ file_config = format_meta + [
         WiredTiger to consume memory over the configured cache limit''',
         type='boolean'),
     Config('internal_key_truncate', 'true', r'''
-        configure internal key truncation, discarding unnecessary
-        trailing bytes on internal keys (ignored for custom
-        collators)''',
+        configure internal key truncation, discarding unnecessary trailing
+        bytes on internal keys (ignored for custom collators)''',
         type='boolean'),
     Config('internal_page_max', '4KB', r'''
         the maximum page size for internal nodes, in bytes; the size
@@ -637,6 +636,12 @@ wiredtiger_open_statistics_log_configuration = [
 ]
 
 session_config = [
+    Config('ignore_cache_size', 'false', r'''
+        when set, operations performed by this session ignore the cache size
+        and are not blocked when the cache is full.  Note that use of this
+        option for operations that create cache pressure can starve ordinary
+        sessions that obey the cache size.''',
+        type='boolean'),
     Config('isolation', 'read-committed', r'''
         the default isolation level for operations in this session''',
         choices=['read-uncommitted', 'read-committed', 'snapshot']),
@@ -652,6 +657,11 @@ wiredtiger_open_common =\
         should be used (4KB on Linux systems when direct I/O is configured,
         zero elsewhere)''',
         min='-1', max='1MB'),
+    Config('builtin_extension_config', '', r'''
+        A structure where the keys are the names of builtin extensions and the
+        values are passed to WT_CONNECTION::load_extension as the \c config
+        parameter (for example,
+        <code>builtin_extension_config={zlib={compression_level=3}}</code>)'''),
     Config('checkpoint_sync', 'true', r'''
         flush files to stable storage when closing or writing
         checkpoints''',

@@ -168,7 +168,6 @@ __wt_block_salvage_valid(WT_SESSION_IMPL *session,
 	wt_off_t offset;
 	uint32_t size, checksum;
 
-	WT_UNUSED(session);
 	WT_UNUSED(addr_size);
 
 	/*

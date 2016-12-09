@@ -736,7 +736,7 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	if (!first_switch &&
 	    (last_chunk = lsm_tree->chunk[nchunks - 1]) != NULL &&
 	    !F_ISSET(last_chunk, WT_LSM_CHUNK_ONDISK) &&
-	    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
+	    !lsm_tree->need_switch)
 		goto err;
 
 	/* Update the throttle time. */
@@ -759,7 +759,7 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_ERR(__wt_lsm_tree_setup_chunk(session, lsm_tree, chunk));
 
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
-	F_CLR(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
+	lsm_tree->need_switch = false;
 	++lsm_tree->dsk_gen;
 
 	lsm_tree->modified = true;

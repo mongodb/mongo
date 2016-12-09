@@ -711,7 +711,7 @@ __wt_config_getones(WT_SESSION_IMPL *session,
 /*
  * __wt_config_getones_none --
  *	Get the value for a given string key from a single config string.
- * Treat "none" as empty.
+ *	Treat "none" as empty.
  */
 int
 __wt_config_getones_none(WT_SESSION_IMPL *session,

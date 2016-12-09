@@ -53,7 +53,6 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	WT_DECL_RET;
 	uint8_t *endp;
 
-	WT_UNUSED(addr_size);
 	ci = NULL;
 
 	/*
