@@ -389,6 +389,7 @@ TEST_F(DummyServerFixture, BasicScopedDbConnection) {
 
 TEST_F(DummyServerFixture, ScopedDbConnectionWithTimeout) {
     auto delay = Milliseconds{8000};
+    auto gracePeriod = Milliseconds{100};
     auto uri_sw = MongoURI::parse("mongodb://" + TARGET_HOST + "/?socketTimeoutMS=4000");
     ASSERT_OK(uri_sw.getStatus());
     auto uri = uri_sw.getValue();
@@ -404,21 +405,23 @@ TEST_F(DummyServerFixture, ScopedDbConnectionWithTimeout) {
     start = Date_t::now();
     ASSERT_THROWS(ScopedDbConnection conn2(TARGET_HOST, overrideTimeout.count()), SocketException);
     end = Date_t::now();
-    ASSERT_GTE(end - start, overrideTimeout);
+    // We add 100 milliseconds here because on some platforms the connection might timeout after
+    // 997ms instead of >= 1000ms.
+    ASSERT_GTE((end - start) + gracePeriod, overrideTimeout);
     ASSERT_LT(end - start, uriTimeout);
 
     log() << "Testing MongoURI with explicit timeout";
     start = Date_t::now();
     ASSERT_THROWS(ScopedDbConnection conn4(uri, overrideTimeout.count()), UserException);
     end = Date_t::now();
-    ASSERT_GTE(end - start, overrideTimeout);
+    ASSERT_GTE((end - start) + gracePeriod, overrideTimeout);
     ASSERT_LT(end - start, uriTimeout);
 
     log() << "Testing MongoURI doesn't timeout";
     start = Date_t::now();
     ScopedDbConnection conn5(uri);
     end = Date_t::now();
-    ASSERT_GREATER_THAN(end - start, uriTimeout);
+    ASSERT_GREATER_THAN((end - start) + gracePeriod, uriTimeout);
 
     setReplyDelay(Milliseconds{0});
 }
