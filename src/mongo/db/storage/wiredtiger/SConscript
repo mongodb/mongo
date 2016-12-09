@@ -64,11 +64,6 @@ if wiredtiger:
             '$BUILD_DIR/third_party/shim_snappy',
             '$BUILD_DIR/third_party/shim_zlib',
             ],
-        LIBDEPS_TAGS=[
-            # References WiredTigerKVEngine::initRsOplogBackgroundThread which does not have
-            # a unique definition.
-            'incomplete',
-        ],
         )
 
     wtEnv.Library(

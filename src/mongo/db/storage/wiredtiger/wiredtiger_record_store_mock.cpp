@@ -39,13 +39,16 @@
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
+namespace {
 
-// static
-bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
+bool initRsOplogBackgroundThread(StringData ns) {
     return NamespaceString::oplog(ns);
 }
 
-namespace {
+MONGO_INITIALIZER(SetInitRsOplogBackgroundThreadCallback)(InitializerContext* context) {
+    WiredTigerKVEngine::setInitRsOplogBackgroundThreadCallback(initRsOplogBackgroundThread);
+    return Status::OK();
+}
 
 MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
     setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());

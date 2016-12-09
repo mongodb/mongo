@@ -175,6 +175,9 @@ TicketHolder openReadTransaction(128);
 TicketServerParameter openReadTransactionParam(&openReadTransaction,
                                                "wiredTigerConcurrentReadTransactions");
 
+stdx::function<bool(StringData)> initRsOplogBackgroundThreadCallback = [](StringData) -> bool {
+    fassertFailed(40358);
+};
 }  // namespace
 
 WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
@@ -719,5 +722,14 @@ void WiredTigerKVEngine::_checkIdentPath(StringData ident) {
 
 void WiredTigerKVEngine::setJournalListener(JournalListener* jl) {
     return _sessionCache->setJournalListener(jl);
+}
+
+void WiredTigerKVEngine::setInitRsOplogBackgroundThreadCallback(
+    stdx::function<bool(StringData)> cb) {
+    initRsOplogBackgroundThreadCallback = std::move(cb);
+}
+
+bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
+    return initRsOplogBackgroundThreadCallback(ns);
 }
 }
