@@ -751,16 +751,32 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="rw_concern_d",
+    source=[
+        "read_concern.cpp",
+        "write_concern.cpp",
+    ],
+    LIBDEPS=[
+        "concurrency/lock_manager",
+        "curop",
+        "repl/read_concern_args",
+        "repl/repl_coordinator_impl",
+        "repl/repl_coordinator_interface",
+        "stats/timer_stats",
+        "storage/storage_options",
+    ],
+)
+
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [
     "instance.cpp",
-    "read_concern.cpp",
     "repair_database.cpp",
     "s/sharding_connection_hook_for_mongod.cpp",
     "storage/storage_init.cpp",
     "ttl.cpp",
-    "write_concern.cpp",
+
 ]
 
 serveronlyLibdeps = [
@@ -834,6 +850,7 @@ serveronlyLibdeps = [
     "repl/sync_tail",
     "repl/topology_coordinator_impl",
     "run_commands",
+    "rw_concern_d",
     "s/commands",
     "s/metadata",
     "s/sharding",
