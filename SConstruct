@@ -1283,7 +1283,7 @@ if link_model.startswith("dynamic"):
                 return []
             env['LIBDEPS_TAG_EXPANSIONS'].append(libdeps_tags_expand_incomplete)
     else:
-        env.AppendUnique(SHLINKFLAGS=["-Wl,--no-as-needed"])
+        env.AppendUnique(LINKFLAGS=["-Wl,--no-as-needed"])
 
         # Using zdefs doesn't work at all with the sanitizers
         if not has_option('sanitize'):
