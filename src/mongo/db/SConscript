@@ -675,10 +675,23 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="cloner",
+    source=[
+        "cloner.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+        "catalog/catalog",
+        "dbdirectclient",
+        "ops/write_ops",
+        "repl/isself",
+    ],
+)
+
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [
-    "cloner.cpp",
     "curop_metrics.cpp",
     "index_builder.cpp",
     "index_legacy.cpp",
@@ -720,6 +733,7 @@ serveronlyLibdeps = [
     "catalog/document_validation",
     "catalog/index_key_validate",
     "clientcursor",
+    "cloner",
     "commands/killcursors_common",
     "commands/dcommands",
     "collection_index_usage_tracker",
