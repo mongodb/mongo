@@ -780,11 +780,23 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="ttl_d",
+    source=[
+        "ttl.cpp",
+    ],
+    LIBDEPS=[
+        "catalog/catalog",
+        "commands/dcommands",
+        "db_raii",
+        "ttl_collection_cache",
+    ],
+)
+
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [
     "instance.cpp",
-    "ttl.cpp",
 ]
 
 serveronlyLibdeps = [
@@ -876,6 +888,7 @@ serveronlyLibdeps = [
     "storage/storage_engine_metadata",
     "storage/storage_init_d",
     "storage/storage_options",
+    "ttl_d",
     "update_index_data",
     "views/views_mongod",
 ]
