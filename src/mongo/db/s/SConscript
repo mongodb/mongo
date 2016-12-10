@@ -60,6 +60,7 @@ env.Library(
         'operation_sharding_state.cpp',
         'shard_identity_rollback_notifier.cpp',
         'sharded_connection_info.cpp',
+        'sharding_connection_hook_for_mongod.cpp',
         'sharding_initialization_mongod.cpp',
         'sharding_state.cpp',
         'sharding_state_recovery.cpp',

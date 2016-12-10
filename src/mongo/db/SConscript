@@ -784,7 +784,6 @@ env.Library(
 # libs.
 serverOnlyFiles = [
     "instance.cpp",
-    "s/sharding_connection_hook_for_mongod.cpp",
     "storage/storage_init.cpp",
     "ttl.cpp",
 ]
