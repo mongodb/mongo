@@ -714,11 +714,21 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="introspect",
+    source=[
+        "introspect.cpp",
+    ],
+    LIBDEPS=[
+        "catalog/catalog",
+        "db_raii",
+    ],
+)
+
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [
     "instance.cpp",
-    "introspect.cpp",
     "prefetch.cpp",
     "range_deleter_db_env.cpp",
     "range_deleter_service.cpp",
@@ -774,6 +784,7 @@ serveronlyLibdeps = [
     "index/index_descriptor",
     "index/index_access_methods",
     "index_d",
+    "introspect",
     "matcher/expressions_mongod_only",
     "op_observer_d",
     "ops/write_ops",
