@@ -725,11 +725,22 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="prefetch",
+    source=[
+        "prefetch.cpp",
+    ],
+    LIBDEPS=[
+        "catalog/catalog",
+        "dbhelpers",
+        "index/index_access_methods",
+    ],
+)
+
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [
     "instance.cpp",
-    "prefetch.cpp",
     "range_deleter_db_env.cpp",
     "range_deleter_service.cpp",
     "read_concern.cpp",
@@ -792,6 +803,7 @@ serveronlyLibdeps = [
     "ops/write_ops_parsers",
     "pipeline/aggregation",
     "pipeline/serveronly",
+    "prefetch",
     "query/query",
     "range_deleter",
     "repl/bgsync",
