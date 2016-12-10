@@ -784,7 +784,6 @@ env.Library(
 # libs.
 serverOnlyFiles = [
     "instance.cpp",
-    "storage/storage_init.cpp",
     "ttl.cpp",
 ]
 
@@ -875,6 +874,7 @@ serveronlyLibdeps = [
     "storage/mmap_v1/storage_mmapv1",
     "storage/storage_engine_lock_file",
     "storage/storage_engine_metadata",
+    "storage/storage_init_d",
     "storage/storage_options",
     "update_index_data",
     "views/views_mongod",
