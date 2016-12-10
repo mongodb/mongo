@@ -652,10 +652,19 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="background",
+    source=[
+        "background.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+    ],
+)
+
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [
-    "background.cpp",
     "clientcursor.cpp",
     "cloner.cpp",
     "curop_metrics.cpp",
@@ -693,6 +702,7 @@ serveronlyLibdeps = [
     "$BUILD_DIR/third_party/shim_snappy",
     '$BUILD_DIR/mongo/db/ttl_collection_cache',
     "auth/authmongod",
+    "background",
     "catalog/catalog",
     "catalog/collection_options",
     "catalog/document_validation",
