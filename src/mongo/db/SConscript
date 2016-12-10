@@ -623,6 +623,22 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="service_context_d",
+    source=[
+        "operation_context_impl.cpp",
+        "service_context_d.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'concurrency/lock_manager',
+        'curop',
+        'storage/storage_engine_lock_file',
+        'storage/storage_engine_metadata',
+        'storage/storage_options',
+    ],
+)
+
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [
@@ -636,14 +652,12 @@ serverOnlyFiles = [
     "instance.cpp",
     "introspect.cpp",
     "op_observer_impl.cpp",
-    "operation_context_impl.cpp",
     "prefetch.cpp",
     "range_deleter_db_env.cpp",
     "range_deleter_service.cpp",
     "read_concern.cpp",
     "repair_database.cpp",
     "s/sharding_connection_hook_for_mongod.cpp",
-    "service_context_d.cpp",
     "storage/storage_init.cpp",
     "ttl.cpp",
     "write_concern.cpp",
@@ -714,6 +728,7 @@ serveronlyLibdeps = [
     "s/commands",
     "s/metadata",
     "s/sharding",
+    "service_context_d",
     "startup_warnings_mongod",
     "stats/counters",
     "stats/serveronly",
