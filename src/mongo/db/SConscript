@@ -768,15 +768,25 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="repair_database",
+    source=[
+        "repair_database.cpp",
+    ],
+    LIBDEPS=[
+        "background",
+        "catalog/catalog",
+        "catalog/index_key_validate",
+    ],
+)
+
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [
     "instance.cpp",
-    "repair_database.cpp",
     "s/sharding_connection_hook_for_mongod.cpp",
     "storage/storage_init.cpp",
     "ttl.cpp",
-
 ]
 
 serveronlyLibdeps = [
@@ -835,6 +845,7 @@ serveronlyLibdeps = [
     "query/query",
     "range_deleter",
     "range_deleter_d",
+    "repair_database",
     "repl/bgsync",
     "repl/initial_sync_common",
     "repl/oplog_buffer_collection",
