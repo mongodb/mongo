@@ -700,12 +700,23 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="index_d",
+    source=[
+        "index_builder.cpp",
+        "index_legacy.cpp",
+        "index_rebuilder.cpp",
+    ],
+    LIBDEPS=[
+        "catalog/catalog",
+        "db_raii",
+        "index/index_access_methods",
+    ],
+)
+
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [
-    "index_builder.cpp",
-    "index_legacy.cpp",
-    "index_rebuilder.cpp",
     "instance.cpp",
     "introspect.cpp",
     "prefetch.cpp",
@@ -762,6 +773,7 @@ serveronlyLibdeps = [
     "global_timestamp",
     "index/index_descriptor",
     "index/index_access_methods",
+    "index_d",
     "matcher/expressions_mongod_only",
     "op_observer_d",
     "ops/write_ops",
