@@ -689,10 +689,20 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="curop_metrics",
+    source=[
+        "curop_metrics.cpp",
+    ],
+    LIBDEPS=[
+        "commands/server_status_core",
+        "curop",
+    ],
+)
+
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [
-    "curop_metrics.cpp",
     "index_builder.cpp",
     "index_legacy.cpp",
     "index_rebuilder.cpp",
@@ -741,6 +751,7 @@ serveronlyLibdeps = [
     "concurrency/lock_manager",
     "concurrency/write_conflict_exception",
     "curop",
+    "curop_metrics",
     "dbdirectclient",
     "dbhelpers",
     "db_raii",
