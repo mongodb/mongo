@@ -737,12 +737,24 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="range_deleter_d",
+    source=[
+        "range_deleter_db_env.cpp",
+        "range_deleter_service.cpp",
+    ],
+    LIBDEPS=[
+        "catalog/catalog",
+        "dbhelpers",
+        "db_raii",
+        "range_deleter",
+    ],
+)
+
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [
     "instance.cpp",
-    "range_deleter_db_env.cpp",
-    "range_deleter_service.cpp",
     "read_concern.cpp",
     "repair_database.cpp",
     "s/sharding_connection_hook_for_mongod.cpp",
@@ -806,6 +818,7 @@ serveronlyLibdeps = [
     "prefetch",
     "query/query",
     "range_deleter",
+    "range_deleter_d",
     "repl/bgsync",
     "repl/initial_sync_common",
     "repl/oplog_buffer_collection",
