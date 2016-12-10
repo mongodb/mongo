@@ -639,6 +639,19 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="op_observer_d",
+    source=[
+        "op_observer_impl.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'commands/dcommands',
+        'repl/serveronly',
+        'views/views_mongod',
+    ],
+)
+
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [
@@ -651,7 +664,6 @@ serverOnlyFiles = [
     "index_rebuilder.cpp",
     "instance.cpp",
     "introspect.cpp",
-    "op_observer_impl.cpp",
     "prefetch.cpp",
     "range_deleter_db_env.cpp",
     "range_deleter_service.cpp",
@@ -703,6 +715,7 @@ serveronlyLibdeps = [
     "index/index_descriptor",
     "index/index_access_methods",
     "matcher/expressions_mongod_only",
+    "op_observer_d",
     "ops/write_ops",
     "ops/update_driver",
     "ops/write_ops_parsers",

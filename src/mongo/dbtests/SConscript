@@ -114,6 +114,7 @@ dbtest = env.Program(
         "$BUILD_DIR/mongo/bson/mutable/mutable_bson_test_utils",
         "$BUILD_DIR/mongo/db/auth/authmocks",
         "$BUILD_DIR/mongo/db/bson/dotted_path_support",
+        "$BUILD_DIR/mongo/db/op_observer_d",
         "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
         "$BUILD_DIR/mongo/db/query/query",
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
