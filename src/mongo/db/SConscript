@@ -825,9 +825,20 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="authz_manager_external_state_factory_d",
+    source=[
+        "authz_manager_external_state_factory_d.cpp",
+    ],
+    LIBDEPS=[
+        'auth/authmongod',
+    ],
+)
+
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [
+    # DO NOT ADD ADDITIONAL FILES TO THIS LIST
     "instance.cpp",
 ]
 
@@ -850,6 +861,7 @@ serveronlyLibdeps = [
     '$BUILD_DIR/mongo/db/ttl_collection_cache',
     "assemble_response",
     "auth/authmongod",
+    "authz_manager_external_state_factory_d",
     "background",
     "catalog/catalog",
     "catalog/collection_options",

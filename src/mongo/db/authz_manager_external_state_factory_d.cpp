@@ -26,8 +26,27 @@
  *    it in the license file.
  */
 
-// DO NOT ADD SYMBOLS TO THIS FILE
-//
-// This file exists to create a library that in turn exists only to aggregate other library
-// dependencies. As such, it should not export any symbols of its own, or depend directly on any
-// symbols defined in other libraries.
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/base/init.h"
+#include "mongo/db/auth/authz_manager_external_state_d.h"
+#include "mongo/stdx/memory.h"
+
+namespace mongo {
+using std::unique_ptr;
+
+namespace {
+
+unique_ptr<AuthzManagerExternalState> createAuthzManagerExternalStateMongod() {
+    return stdx::make_unique<AuthzManagerExternalStateMongod>();
+}
+
+MONGO_INITIALIZER(CreateAuthorizationExternalStateFactory)(InitializerContext* context) {
+    AuthzManagerExternalState::create = &createAuthzManagerExternalStateMongod;
+    return Status::OK();
+}
+
+}  // namespace
+}  // namespace mongo

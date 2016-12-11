@@ -70,7 +70,6 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/index_rebuilder.h"
 #include "mongo/db/initialize_server_global_state.h"
-#include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/json.h"
 #include "mongo/db/log_process_details.h"
@@ -909,22 +908,6 @@ MONGO_INITIALIZER_GENERAL(setSSLManagerType, MONGO_NO_PREREQUISITES, ("SSLManage
 }
 #endif
 
-#if defined(_WIN32)
-namespace mongo {
-// the hook for mongoAbort
-extern void (*reportEventToSystem)(const char* msg);
-static void reportEventToSystemImpl(const char* msg) {
-    static ::HANDLE hEventLog = RegisterEventSource(NULL, TEXT("mongod"));
-    if (hEventLog) {
-        std::wstring s = toNativeString(msg);
-        LPCTSTR txt = s.c_str();
-        BOOL ok = ReportEvent(hEventLog, EVENTLOG_ERROR_TYPE, 0, 0, NULL, 1, 0, &txt, 0);
-        wassert(ok);
-    }
-}
-}  // namespace mongo
-#endif  // if defined(_WIN32)
-
 #if !defined(__has_feature)
 #define __has_feature(x) 0
 #endif
@@ -1054,13 +1037,7 @@ static int mongoDbMain(int argc, char* argv[], char** envp) {
 
     registerShutdownTask(shutdownTask);
 
-#if defined(_WIN32)
-    mongo::reportEventToSystem = &mongo::reportEventToSystemImpl;
-#endif
-
     setupSignalHandlers();
-
-    dbExecCommand = argv[0];
 
     srand(static_cast<unsigned>(curTimeMicros64()));
 
