@@ -606,7 +606,7 @@ env.Library(
         'lasterror',
     ],
     LIBDEPS_TAGS=[
-        # Depends on assembleResponse, defined in instance.cpp below.
+        # Circularity with assembleResponse, defined in assemble_response, below.
         'incomplete',
     ],
 )
@@ -803,6 +803,25 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="assemble_response",
+    source=[
+        "assemble_response.cpp",
+    ],
+    LIBDEPS=[
+        "commands/dcommands",
+        "curop",
+        "curop_metrics",
+        "diag_log",
+        "introspect",
+        "lasterror",
+        "ops/write_ops",
+        "ops/write_ops_parsers",
+        "run_commands",
+        "storage/storage_options",
+    ],
+)
+
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [
@@ -826,6 +845,7 @@ serveronlyLibdeps = [
     "$BUILD_DIR/mongo/db/storage/mmap_v1/file_allocator",
     "$BUILD_DIR/third_party/shim_snappy",
     '$BUILD_DIR/mongo/db/ttl_collection_cache',
+    "assemble_response",
     "auth/authmongod",
     "background",
     "catalog/catalog",

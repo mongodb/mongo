@@ -43,6 +43,7 @@
 #include "mongo/util/text.h"
 #include "mongo/util/thread_safe_string.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 namespace BasicTests {
 

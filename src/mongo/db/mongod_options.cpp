@@ -41,7 +41,6 @@
 #include "mongo/config.h"
 #include "mongo/db/db.h"
 #include "mongo/db/diag_log.h"
-#include "mongo/db/instance.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_helpers.h"

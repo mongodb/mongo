@@ -32,9 +32,10 @@
 
 #include "mongo/db/dbdirectclient.h"
 
+#include "mongo/db/assemble_response.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/instance.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/wire_version.h"
@@ -124,7 +125,7 @@ bool DBDirectClient::call(Message& toSend, Message& response, bool assertOk, str
 
     DbResponse dbResponse;
     CurOp curOp(_txn);
-    assembleResponse(_txn, toSend, dbResponse, dummyHost);
+    assembleResponse(_txn, toSend, dbResponse, kHostAndPortForDirectClient);
     verify(!dbResponse.response.empty());
     response = std::move(dbResponse.response);
 
@@ -137,7 +138,7 @@ void DBDirectClient::say(Message& toSend, bool isRetry, string* actualServer) {
 
     DbResponse dbResponse;
     CurOp curOp(_txn);
-    assembleResponse(_txn, toSend, dbResponse, dummyHost);
+    assembleResponse(_txn, toSend, dbResponse, kHostAndPortForDirectClient);
 }
 
 unique_ptr<DBClientCursor> DBDirectClient::query(const string& ns,
@@ -150,8 +151,6 @@ unique_ptr<DBClientCursor> DBDirectClient::query(const string& ns,
     return DBClientBase::query(
         ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions, batchSize);
 }
-
-const HostAndPort DBDirectClient::dummyHost("0.0.0.0", 0);
 
 unsigned long long DBDirectClient::count(
     const string& ns, const BSONObj& query, int options, int limit, int skip) {

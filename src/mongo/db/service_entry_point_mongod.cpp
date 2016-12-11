@@ -34,9 +34,9 @@
 
 #include <vector>
 
+#include "mongo/db/assemble_response.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
-#include "mongo/db/instance.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point_utils.h"
 #include "mongo/transport/session.h"

@@ -39,7 +39,6 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/skip.h"
-#include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/stdx/memory.h"

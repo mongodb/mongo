@@ -33,6 +33,7 @@
 #include <boost/filesystem/operations.hpp>
 #include <iostream>
 
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/mmap_v1/data_file.h"

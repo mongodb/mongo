@@ -49,6 +49,7 @@
 #include "mongo/util/embedded_builder.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stringutils.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 

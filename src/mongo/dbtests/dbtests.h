@@ -31,8 +31,6 @@
 
 #pragma once
 
-
-#include "mongo/db/instance.h"
 #include "mongo/unittest/unittest.h"
 
 using namespace mongo;

@@ -1,6 +1,3 @@
-// instance.h : Global state functions.
-//
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -31,12 +28,21 @@
 
 #pragma once
 
-#include <string>
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
-extern std::string dbExecCommand;
+struct DbResponse;
+class Message;
+class OperationContext;
 
-void maybeCreatePidFile();
+// Pass this as the 'client' argument to assembleResponse
+// to indicate that the call is on behalf of a DBDirectClient.
+extern const HostAndPort kHostAndPortForDirectClient;
+
+void assembleResponse(OperationContext* txn,
+                      Message& m,
+                      DbResponse& dbresponse,
+                      const HostAndPort& client);
 
 }  // namespace mongo

@@ -49,8 +49,6 @@ class OperationContext;
  */
 class DBDirectClient : public DBClientBase {
 public:
-    static const HostAndPort dummyHost;
-
     DBDirectClient(OperationContext* txn);
 
     using DBClientBase::query;
