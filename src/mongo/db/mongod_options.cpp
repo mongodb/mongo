@@ -40,6 +40,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/config.h"
 #include "mongo/db/db.h"
+#include "mongo/db/diag_log.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_options.h"
@@ -59,8 +60,6 @@ using std::endl;
 using std::string;
 
 MongodGlobalParams mongodGlobalParams;
-
-extern DiagLog _diaglog;
 
 Status addMongodOptions(moe::OptionSection* options) {
     moe::OptionSection general_options("General options");

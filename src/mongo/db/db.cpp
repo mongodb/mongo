@@ -64,6 +64,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/dbwebserver.h"
+#include "mongo/db/diag_log.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/ftdc/ftdc_mongod.h"
 #include "mongo/db/index_names.h"

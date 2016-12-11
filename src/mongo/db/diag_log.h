@@ -1,6 +1,3 @@
-// instance.h : Global state functions.
-//
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -31,21 +28,38 @@
 
 #pragma once
 
-#include "mongo/client/dbclientinterface.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/dbmessage.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/storage/storage_options.h"
+#include <iosfwd>
+
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
-extern std::string dbExecCommand;
+/** a high level recording of operations to the database - sometimes used for diagnostics
+    and debugging.
+    */
+class DiagLog {
+    std::ofstream* f;  // note this is never freed
+                       /* 0 = off; 1 = writes, 2 = reads, 3 = both
+                          7 = log a few reads, and all writes.
+                       */
+    int level;
+    stdx::mutex mutex;
+    void openFile();
 
-void assembleResponse(OperationContext* txn,
-                      Message& m,
-                      DbResponse& dbresponse,
-                      const HostAndPort& client);
+public:
+    DiagLog();
+    int getLevel() const {
+        return level;
+    }
+    /**
+     * @return old
+     */
+    int setLevel(int newLevel);
+    void flush();
+    void writeop(char* data, int len);
+    void readop(char* data, int len);
+};
 
-void maybeCreatePidFile();
+extern DiagLog _diaglog;
 
 }  // namespace mongo

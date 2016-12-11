@@ -52,6 +52,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/diag_log.h"
 #include "mongo/db/ftdc/ftdc_mongod.h"
 #include "mongo/db/global_timestamp.h"
 #include "mongo/db/instance.h"
@@ -715,66 +716,5 @@ void assembleResponse(OperationContext* txn,
 
     recordCurOpMetrics(txn);
 }
-
-// ----- BEGIN Diaglog -----
-DiagLog::DiagLog() : f(0), level(0) {}
-
-void DiagLog::openFile() {
-    verify(f == 0);
-    stringstream ss;
-    ss << storageGlobalParams.dbpath << "/diaglog." << hex << time(0);
-    string name = ss.str();
-    f = new ofstream(name.c_str(), ios::out | ios::binary);
-    if (!f->good()) {
-        str::stream msg;
-        msg << "diagLogging couldn't open " << name;
-        log() << msg.ss.str();
-        uasserted(ErrorCodes::FileStreamFailed, msg.ss.str());
-    } else {
-        log() << "diagLogging using file " << name;
-    }
-}
-
-int DiagLog::setLevel(int newLevel) {
-    stdx::lock_guard<stdx::mutex> lk(mutex);
-    int old = level;
-    log() << "diagLogging level=" << newLevel;
-    if (f == 0) {
-        openFile();
-    }
-    level = newLevel;  // must be done AFTER f is set
-    return old;
-}
-
-void DiagLog::flush() {
-    if (level) {
-        log() << "flushing diag log";
-        stdx::lock_guard<stdx::mutex> lk(mutex);
-        f->flush();
-    }
-}
-
-void DiagLog::writeop(char* data, int len) {
-    if (level & 1) {
-        stdx::lock_guard<stdx::mutex> lk(mutex);
-        f->write(data, len);
-    }
-}
-
-void DiagLog::readop(char* data, int len) {
-    if (level & 2) {
-        bool log = (level & 4) == 0;
-        OCCASIONALLY log = true;
-        if (log) {
-            stdx::lock_guard<stdx::mutex> lk(mutex);
-            verify(f);
-            f->write(data, len);
-        }
-    }
-}
-
-DiagLog _diaglog;
-
-// ----- END Diaglog -----
 
 }  // namespace mongo

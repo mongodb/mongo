@@ -793,6 +793,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="diag_log",
+    source=[
+        "diag_log.cpp",
+    ],
+    LIBDEPS=[
+        "storage/storage_options",
+    ],
+)
+
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [
@@ -835,6 +845,7 @@ serveronlyLibdeps = [
     "dbdirectclient",
     "dbhelpers",
     "db_raii",
+    "diag_log",
     "exec/exec",
     "exec/working_set",
     "fts/ftsmongod",
