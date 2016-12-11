@@ -443,9 +443,12 @@ env.Library(
         "mongod_options.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/serveronly',
         '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
+        'diag_log',
+        'repl/repl_settings',
         'server_options',
+        "storage/mmap_v1/storage_mmapv1",
+        'storage/storage_options',
     ],
 )
 
