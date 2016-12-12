@@ -46,6 +46,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
@@ -226,7 +227,7 @@ public:
 
         // Verify the contents of the resulting collection.
         {
-            AutoGetCollectionForRead ctx(&_txn, nss.ns());
+            AutoGetCollectionForRead ctx(&_txn, nss);
             Collection* collection = ctx.getCollection();
 
             vector<BSONObj> objs;
@@ -335,7 +336,7 @@ public:
 
         // Check the contents of the collection.
         {
-            AutoGetCollectionForRead ctx(&_txn, nss.ns());
+            AutoGetCollectionForRead ctx(&_txn, nss);
             Collection* collection = ctx.getCollection();
 
             vector<BSONObj> objs;

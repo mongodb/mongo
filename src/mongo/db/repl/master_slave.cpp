@@ -57,6 +57,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/internal_plans.h"
@@ -1455,7 +1456,7 @@ void pretouchOperation(OperationContext* txn, const BSONObj& op) {
             BSONObjBuilder b;
             b.append(_id);
             BSONObj result;
-            AutoGetCollectionForRead ctx(txn, ns);
+            AutoGetCollectionForRead ctx(txn, NamespaceString(ns));
             if (Helpers::findById(txn, ctx.getDb(), ns, b.done(), result)) {
                 _dummy_z += result.objsize();  // touch
             }

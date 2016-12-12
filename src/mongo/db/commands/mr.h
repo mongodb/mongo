@@ -37,6 +37,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/scripting/engine.h"
 
@@ -195,7 +196,7 @@ public:
     Config(const std::string& _dbname, const BSONObj& cmdObj);
 
     std::string dbname;
-    std::string ns;
+    NamespaceString nss;
 
     // options
     bool verbose;
@@ -219,8 +220,8 @@ public:
     BSONObj scopeSetup;
 
     // output tables
-    std::string incLong;
-    std::string tempNamespace;
+    NamespaceString incLong;
+    NamespaceString tempNamespace;
 
     enum OutputType {
         REPLACE,  // atomically replace the collection
@@ -231,7 +232,7 @@ public:
     struct OutputOptions {
         std::string outDB;
         std::string collectionName;
-        std::string finalNamespace;
+        NamespaceString finalNamespace;
         // if true, no lock during output operation
         bool outNonAtomic;
         OutputType outType;
@@ -333,7 +334,7 @@ public:
     /**
      * inserts with correct replication semantics
      */
-    void insert(const std::string& ns, const BSONObj& o);
+    void insert(const NamespaceString& nss, const BSONObj& o);
 
     // ------ simple accessors -----
 
@@ -372,7 +373,7 @@ public:
     void switchMode(bool jsMode);
     void bailFromJS();
 
-    static Collection* getCollectionOrUassert(Database* db, StringData ns);
+    static Collection* getCollectionOrUassert(Database* db, const NamespaceString& nss);
 
     const Config& _config;
     DBDirectClient _db;

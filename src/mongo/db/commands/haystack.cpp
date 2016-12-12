@@ -43,6 +43,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_common.h"
 
 /**
@@ -102,7 +103,7 @@ public:
              BSONObjBuilder& result) {
         const NamespaceString nss = parseNsCollectionRequired(dbname, cmdObj);
 
-        AutoGetCollectionForRead ctx(txn, nss.ns());
+        AutoGetCollectionForRead ctx(txn, nss);
 
         Collection* collection = ctx.getCollection();
         if (!collection) {

@@ -96,8 +96,11 @@ void _testConfigParseOutputOptions(const std::string& dbname,
     _compareOutputOptionField(dbname, cmdObjStr, "outDb", outputOptions.outDB, expectedOutDb);
     _compareOutputOptionField(
         dbname, cmdObjStr, "collectionName", outputOptions.collectionName, expectedCollectionName);
-    _compareOutputOptionField(
-        dbname, cmdObjStr, "finalNamespace", outputOptions.finalNamespace, expectedFinalNamespace);
+    _compareOutputOptionField(dbname,
+                              cmdObjStr,
+                              "finalNamespace",
+                              outputOptions.finalNamespace.ns(),
+                              expectedFinalNamespace);
     _compareOutputOptionField(
         dbname, cmdObjStr, "outNonAtomic", outputOptions.outNonAtomic, expectedOutNonAtomic);
     _compareOutputOptionField(dbname,

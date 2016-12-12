@@ -44,6 +44,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -165,7 +166,7 @@ public:
     }
 
     size_t numCursors() {
-        AutoGetCollectionForRead ctx(&_txn, nss.ns());
+        AutoGetCollectionForRead ctx(&_txn, nss);
         Collection* collection = ctx.getCollection();
         if (!collection)
             return 0;
@@ -174,7 +175,7 @@ public:
 
     void registerExec(PlanExecutor* exec) {
         // TODO: This is not correct (create collection under S-lock)
-        AutoGetCollectionForRead ctx(&_txn, nss.ns());
+        AutoGetCollectionForRead ctx(&_txn, nss);
         WriteUnitOfWork wunit(&_txn);
         Collection* collection = ctx.getDb()->getOrCreateCollection(&_txn, nss.ns());
         collection->getCursorManager()->registerExecutor(exec);
@@ -183,7 +184,7 @@ public:
 
     void deregisterExec(PlanExecutor* exec) {
         // TODO: This is not correct (create collection under S-lock)
-        AutoGetCollectionForRead ctx(&_txn, nss.ns());
+        AutoGetCollectionForRead ctx(&_txn, nss);
         WriteUnitOfWork wunit(&_txn);
         Collection* collection = ctx.getDb()->getOrCreateCollection(&_txn, nss.ns());
         collection->getCursorManager()->deregisterExecutor(exec);
@@ -505,7 +506,7 @@ public:
         }
 
         {
-            AutoGetCollectionForRead ctx(&_txn, nss.ns());
+            AutoGetCollectionForRead ctx(&_txn, nss);
             Collection* collection = ctx.getCollection();
 
             BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");

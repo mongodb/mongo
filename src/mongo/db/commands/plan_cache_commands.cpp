@@ -43,6 +43,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/util/log.h"
@@ -226,7 +227,7 @@ Status PlanCacheListQueryShapes::runPlanCacheCommand(OperationContext* txn,
                                                      BSONObj& cmdObj,
                                                      BSONObjBuilder* bob) {
     // This is a read lock. The query cache is owned by the collection.
-    AutoGetCollectionForRead ctx(txn, ns);
+    AutoGetCollectionForRead ctx(txn, NamespaceString(ns));
 
     PlanCache* planCache;
     Status status = getPlanCache(txn, ctx.getCollection(), ns, &planCache);
@@ -278,7 +279,7 @@ Status PlanCacheClear::runPlanCacheCommand(OperationContext* txn,
                                            BSONObj& cmdObj,
                                            BSONObjBuilder* bob) {
     // This is a read lock. The query cache is owned by the collection.
-    AutoGetCollectionForRead ctx(txn, ns);
+    AutoGetCollectionForRead ctx(txn, NamespaceString(ns));
 
     PlanCache* planCache;
     Status status = getPlanCache(txn, ctx.getCollection(), ns, &planCache);
@@ -354,7 +355,7 @@ Status PlanCacheListPlans::runPlanCacheCommand(OperationContext* txn,
                                                const std::string& ns,
                                                BSONObj& cmdObj,
                                                BSONObjBuilder* bob) {
-    AutoGetCollectionForRead ctx(txn, ns);
+    AutoGetCollectionForRead ctx(txn, NamespaceString(ns));
 
     PlanCache* planCache;
     Status status = getPlanCache(txn, ctx.getCollection(), ns, &planCache);

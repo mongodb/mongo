@@ -44,6 +44,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
@@ -103,7 +104,7 @@ public:
      * Does NOT take ownership of 'cq'.  Caller DOES NOT own the returned QuerySolution*.
      */
     QuerySolution* pickBestPlan(CanonicalQuery* cq) {
-        AutoGetCollectionForRead ctx(&_txn, nss.ns());
+        AutoGetCollectionForRead ctx(&_txn, nss);
         Collection* collection = ctx.getCollection();
 
         QueryPlannerParams plannerParams;

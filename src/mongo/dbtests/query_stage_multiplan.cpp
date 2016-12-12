@@ -42,6 +42,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -132,7 +133,7 @@ public:
 
         addIndex(BSON("foo" << 1));
 
-        AutoGetCollectionForRead ctx(&_txn, nss.ns());
+        AutoGetCollectionForRead ctx(&_txn, nss);
         const Collection* coll = ctx.getCollection();
 
         // Plan 0: IXScan over foo == 7
@@ -225,7 +226,7 @@ public:
         addIndex(BSON("a" << 1));
         addIndex(BSON("b" << 1));
 
-        AutoGetCollectionForRead ctx(&_txn, nss.ns());
+        AutoGetCollectionForRead ctx(&_txn, nss);
         Collection* collection = ctx.getCollection();
 
         // Query for both 'a' and 'b' and sort on 'b'.
@@ -333,7 +334,7 @@ public:
             secondPlan->pushBack(PlanStage::NEED_TIME);
         }
 
-        AutoGetCollectionForRead ctx(&_txn, nss.ns());
+        AutoGetCollectionForRead ctx(&_txn, nss);
 
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(BSON("x" << 1));
@@ -408,7 +409,7 @@ public:
         addIndex(BSON("foo" << 1));
         addIndex(BSON("foo" << -1 << "bar" << 1));
 
-        AutoGetCollectionForRead ctx(&_txn, nss.ns());
+        AutoGetCollectionForRead ctx(&_txn, nss);
         Collection* coll = ctx.getCollection();
 
         // Create the executor (Matching all documents).

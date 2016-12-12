@@ -43,6 +43,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/dbtests/dbtests.h"
@@ -55,6 +56,8 @@ using std::unique_ptr;
 using std::vector;
 using stdx::make_unique;
 
+static const NamespaceString nss{"unittests.QueryStageCollectionScan"};
+
 //
 // Stage-specific tests.
 //
@@ -62,26 +65,26 @@ using stdx::make_unique;
 class QueryStageCollectionScanBase {
 public:
     QueryStageCollectionScanBase() : _client(&_txn) {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_txn, nss.ns());
 
         for (int i = 0; i < numObj(); ++i) {
             BSONObjBuilder bob;
             bob.append("foo", i);
-            _client.insert(ns(), bob.obj());
+            _client.insert(nss.ns(), bob.obj());
         }
     }
 
     virtual ~QueryStageCollectionScanBase() {
-        OldClientWriteContext ctx(&_txn, ns());
-        _client.dropCollection(ns());
+        OldClientWriteContext ctx(&_txn, nss.ns());
+        _client.dropCollection(nss.ns());
     }
 
     void remove(const BSONObj& obj) {
-        _client.remove(ns(), obj);
+        _client.remove(nss.ns(), obj);
     }
 
     int countResults(CollectionScanParams::Direction direction, const BSONObj& filterObj) {
-        AutoGetCollectionForRead ctx(&_txn, ns());
+        AutoGetCollectionForRead ctx(&_txn, nss);
 
         // Configure the scan.
         CollectionScanParams params;
@@ -140,10 +143,6 @@ public:
 
     static int numObj() {
         return 50;
-    }
-
-    static const char* ns() {
-        return "unittests.QueryStageCollectionScan";
     }
 
 protected:
@@ -207,7 +206,7 @@ public:
 class QueryStageCollscanObjectsInOrderForward : public QueryStageCollectionScanBase {
 public:
     void run() {
-        AutoGetCollectionForRead ctx(&_txn, ns());
+        AutoGetCollectionForRead ctx(&_txn, nss);
 
         // Configure the scan.
         CollectionScanParams params;
@@ -243,7 +242,7 @@ public:
 class QueryStageCollscanObjectsInOrderBackward : public QueryStageCollectionScanBase {
 public:
     void run() {
-        AutoGetCollectionForRead ctx(&_txn, ns());
+        AutoGetCollectionForRead ctx(&_txn, nss);
 
         CollectionScanParams params;
         params.collection = ctx.getCollection();
@@ -277,7 +276,7 @@ public:
 class QueryStageCollscanInvalidateUpcomingObject : public QueryStageCollectionScanBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_txn, nss.ns());
 
         Collection* coll = ctx.getCollection();
 
@@ -343,7 +342,7 @@ public:
 class QueryStageCollscanInvalidateUpcomingObjectBackward : public QueryStageCollectionScanBase {
 public:
     void run() {
-        OldClientWriteContext ctx(&_txn, ns());
+        OldClientWriteContext ctx(&_txn, nss.ns());
         Collection* coll = ctx.getCollection();
 
         // Get the RecordIds that would be returned by an in-order scan.

@@ -166,10 +166,6 @@ class AutoGetCollectionForRead {
     MONGO_DISALLOW_COPYING(AutoGetCollectionForRead);
 
 public:
-    AutoGetCollectionForRead(OperationContext* txn, const std::string& ns)
-        : AutoGetCollectionForRead(
-              txn, NamespaceString(ns), AutoGetCollection::ViewMode::kViewsForbidden) {}
-
     AutoGetCollectionForRead(OperationContext* txn, const NamespaceString& nss)
         : AutoGetCollectionForRead(txn, nss, AutoGetCollection::ViewMode::kViewsForbidden) {}
 
@@ -211,9 +207,6 @@ class AutoGetCollectionOrViewForRead final : public AutoGetCollectionForRead {
     MONGO_DISALLOW_COPYING(AutoGetCollectionOrViewForRead);
 
 public:
-    AutoGetCollectionOrViewForRead(OperationContext* txn, const std::string& ns)
-        : AutoGetCollectionOrViewForRead(txn, NamespaceString(ns)) {}
-
     AutoGetCollectionOrViewForRead(OperationContext* txn, const NamespaceString& nss);
 
     ViewDefinition* getView() const {

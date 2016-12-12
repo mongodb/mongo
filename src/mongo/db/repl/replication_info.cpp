@@ -40,6 +40,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/master_slave.h"
@@ -93,10 +94,10 @@ void appendReplicationInfo(OperationContext* txn, BSONObjBuilder& result, int le
         int n = 0;
         list<BSONObj> src;
         {
-            const char* localSources = "local.sources";
+            const NamespaceString localSources{"local.sources"};
             AutoGetCollectionForRead ctx(txn, localSources);
             unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
-                txn, localSources, ctx.getCollection(), PlanExecutor::YIELD_MANUAL));
+                txn, localSources.ns(), ctx.getCollection(), PlanExecutor::YIELD_MANUAL));
             BSONObj obj;
             PlanExecutor::ExecState state;
             while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {

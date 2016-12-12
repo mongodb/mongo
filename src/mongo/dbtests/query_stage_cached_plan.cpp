@@ -39,6 +39,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_cache.h"
@@ -115,7 +116,7 @@ protected:
 class QueryStageCachedPlanFailure : public QueryStageCachedPlanBase {
 public:
     void run() {
-        AutoGetCollectionForRead ctx(&_txn, nss.ns());
+        AutoGetCollectionForRead ctx(&_txn, nss);
         Collection* collection = ctx.getCollection();
         ASSERT(collection);
 
@@ -183,7 +184,7 @@ public:
 class QueryStageCachedPlanHitMaxWorks : public QueryStageCachedPlanBase {
 public:
     void run() {
-        AutoGetCollectionForRead ctx(&_txn, nss.ns());
+        AutoGetCollectionForRead ctx(&_txn, nss);
         Collection* collection = ctx.getCollection();
         ASSERT(collection);
 

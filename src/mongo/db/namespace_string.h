@@ -146,6 +146,10 @@ public:
         return _ns.size();
     }
 
+    bool isEmpty() const {
+        return _ns.empty();
+    }
+
     struct Hasher {
         size_t operator()(const NamespaceString& nss) const {
             return std::hash<std::string>()(nss._ns);

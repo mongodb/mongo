@@ -93,7 +93,7 @@ Config::OutputOptions Config::parseOutputOptions(const std::string& dbname, cons
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid 'out' namespace: " << nss.ns(),
                 nss.isValid());
-        outputOptions.finalNamespace = nss.ns();
+        outputOptions.finalNamespace = std::move(nss);
     }
 
     return outputOptions;

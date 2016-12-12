@@ -892,7 +892,7 @@ public:
         BSONObj keyPattern = jsobj.getObjectField("keyPattern");
         bool estimate = jsobj["estimate"].trueValue();
 
-        AutoGetCollectionForRead ctx(txn, ns);
+        AutoGetCollectionForRead ctx(txn, NamespaceString(ns));
 
         Collection* collection = ctx.getCollection();
         long long numRecords = 0;

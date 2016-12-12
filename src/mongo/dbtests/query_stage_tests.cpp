@@ -39,6 +39,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/stdx/memory.h"
@@ -78,7 +79,7 @@ public:
     }
 
     int countResults(const IndexScanParams& params, BSONObj filterObj = BSONObj()) {
-        AutoGetCollectionForRead ctx(&_txn, ns());
+        AutoGetCollectionForRead ctx(&_txn, NamespaceString(ns()));
 
         const CollatorInterface* collator = nullptr;
         StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
@@ -116,7 +117,7 @@ public:
     }
 
     IndexDescriptor* getIndex(const BSONObj& obj) {
-        AutoGetCollectionForRead ctx(&_txn, ns());
+        AutoGetCollectionForRead ctx(&_txn, NamespaceString(ns()));
         Collection* collection = ctx.getCollection();
         std::vector<IndexDescriptor*> indexes;
         collection->getIndexCatalog()->findIndexesByKeyPattern(&_txn, obj, false, &indexes);

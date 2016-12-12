@@ -47,6 +47,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/log.h"
 
@@ -164,7 +165,7 @@ Status ListFilters::runIndexFilterCommand(OperationContext* txn,
                                           BSONObj& cmdObj,
                                           BSONObjBuilder* bob) {
     // This is a read lock. The query settings is owned by the collection.
-    AutoGetCollectionForRead ctx(txn, ns);
+    AutoGetCollectionForRead ctx(txn, NamespaceString(ns));
 
     QuerySettings* querySettings;
     PlanCache* unused;
@@ -232,7 +233,7 @@ Status ClearFilters::runIndexFilterCommand(OperationContext* txn,
                                            BSONObj& cmdObj,
                                            BSONObjBuilder* bob) {
     // This is a read lock. The query settings is owned by the collection.
-    AutoGetCollectionForRead ctx(txn, ns);
+    AutoGetCollectionForRead ctx(txn, NamespaceString(ns));
 
     QuerySettings* querySettings;
     PlanCache* planCache;

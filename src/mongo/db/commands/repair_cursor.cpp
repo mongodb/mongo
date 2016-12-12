@@ -38,6 +38,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/multi_iterator.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/cursor_response.h"
 
 namespace mongo {
@@ -74,7 +75,7 @@ public:
                      BSONObjBuilder& result) {
         NamespaceString ns(parseNs(dbname, cmdObj));
 
-        AutoGetCollectionForRead ctx(txn, ns.ns());
+        AutoGetCollectionForRead ctx(txn, ns);
 
         Collection* collection = ctx.getCollection();
         if (!collection) {

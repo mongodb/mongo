@@ -44,6 +44,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/oplog_interface_mock.h"
@@ -875,7 +876,7 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
     ASSERT_EQUALS(1U, rollbackSource.searchedIds.count(3));
     ASSERT_EQUALS(1U, rollbackSource.searchedIds.count(4));
 
-    AutoGetCollectionForRead acr(_txn.get(), "test.t");
+    AutoGetCollectionForRead acr(_txn.get(), NamespaceString("test.t"));
     BSONObj result;
     ASSERT(Helpers::findOne(_txn.get(), acr.getCollection(), BSON("_id" << 1), result));
     ASSERT_EQUALS(1, result["v"].numberInt()) << result;

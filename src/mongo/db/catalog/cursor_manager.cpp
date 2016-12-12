@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/service_context.h"
@@ -264,9 +265,7 @@ std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* txn, int milli
     // For each collection, time out its cursors under the collection lock (to prevent the
     // collection from going away during the erase).
     for (unsigned i = 0; i < todo.size(); i++) {
-        const std::string& ns = todo[i];
-
-        AutoGetCollectionOrViewForRead ctx(txn, ns);
+        AutoGetCollectionOrViewForRead ctx(txn, NamespaceString(todo[i]));
         if (!ctx.getDb()) {
             continue;
         }

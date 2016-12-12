@@ -44,6 +44,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
@@ -206,7 +207,7 @@ RecordId Helpers::findById(OperationContext* txn, Collection* collection, const 
 }
 
 bool Helpers::getSingleton(OperationContext* txn, const char* ns, BSONObj& result) {
-    AutoGetCollectionForRead ctx(txn, ns);
+    AutoGetCollectionForRead ctx(txn, NamespaceString(ns));
     unique_ptr<PlanExecutor> exec(
         InternalPlanner::collectionScan(txn, ns, ctx.getCollection(), PlanExecutor::YIELD_MANUAL));
     PlanExecutor::ExecState state = exec->getNext(&result, NULL);
@@ -225,7 +226,7 @@ bool Helpers::getSingleton(OperationContext* txn, const char* ns, BSONObj& resul
 }
 
 bool Helpers::getLast(OperationContext* txn, const char* ns, BSONObj& result) {
-    AutoGetCollectionForRead autoColl(txn, ns);
+    AutoGetCollectionForRead autoColl(txn, NamespaceString(ns));
     unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
         txn, ns, autoColl.getCollection(), PlanExecutor::YIELD_MANUAL, InternalPlanner::BACKWARD));
     PlanExecutor::ExecState state = exec->getNext(&result, NULL);
@@ -301,7 +302,7 @@ long long Helpers::removeRange(OperationContext* txn,
                                bool fromMigrate,
                                bool onlyRemoveOrphanedDocs) {
     Timer rangeRemoveTimer;
-    const string& ns = range.ns;
+    const NamespaceString nss(range.ns);
 
     // The IndexChunk has a keyPattern that may apply to more than one index - we need to
     // select the index and get the full index keyPattern here.
@@ -310,12 +311,12 @@ long long Helpers::removeRange(OperationContext* txn,
     BSONObj max;
 
     {
-        AutoGetCollectionForRead ctx(txn, ns);
+        AutoGetCollectionForRead ctx(txn, nss);
         Collection* collection = ctx.getCollection();
         if (!collection) {
             warning(LogComponent::kSharding)
                 << "collection deleted before cleaning data over range of type " << range.keyPattern
-                << " in " << ns << endl;
+                << " in " << nss.ns() << endl;
             return -1;
         }
 
@@ -328,7 +329,7 @@ long long Helpers::removeRange(OperationContext* txn,
                                                                      false);  // requireSingleKey
         if (!idx) {
             warning(LogComponent::kSharding) << "no index found to clean data over range of type "
-                                             << range.keyPattern << " in " << ns << endl;
+                                             << range.keyPattern << " in " << nss.ns() << endl;
             return -1;
         }
 
@@ -348,7 +349,7 @@ long long Helpers::removeRange(OperationContext* txn,
 
 
     MONGO_LOG_COMPONENT(1, LogComponent::kSharding)
-        << "begin removal of " << min << " to " << max << " in " << ns
+        << "begin removal of " << min << " to " << max << " in " << nss.ns()
         << " with write concern: " << writeConcern.toBSON() << endl;
 
     long long numDeleted = 0;
@@ -358,7 +359,7 @@ long long Helpers::removeRange(OperationContext* txn,
     while (1) {
         // Scoping for write lock.
         {
-            AutoGetCollection ctx(txn, NamespaceString(ns), MODE_IX, MODE_IX);
+            AutoGetCollection ctx(txn, nss, MODE_IX, MODE_IX);
             Collection* collection = ctx.getCollection();
             if (!collection)
                 break;
@@ -367,7 +368,7 @@ long long Helpers::removeRange(OperationContext* txn,
 
             if (!desc) {
                 warning(LogComponent::kSharding) << "shard key index '" << indexName << "' on '"
-                                                 << ns << "' was dropped";
+                                                 << nss.ns() << "' was dropped";
                 return -1;
             }
 
@@ -395,7 +396,7 @@ long long Helpers::removeRange(OperationContext* txn,
             if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
                 warning(LogComponent::kSharding)
                     << PlanExecutor::statestr(state) << " - cursor error while trying to delete "
-                    << min << " to " << max << " in " << ns << ": "
+                    << min << " to " << max << " in " << nss.ns() << ": "
                     << WorkingSetCommon::toStatusString(obj)
                     << ", stats: " << Explain::getWinningPlanStats(exec.get()) << endl;
                 break;
@@ -417,7 +418,7 @@ long long Helpers::removeRange(OperationContext* txn,
                 bool docIsOrphan;
 
                 // In write lock, so will be the most up-to-date version
-                auto metadataNow = CollectionShardingState::get(txn, ns)->getMetadata();
+                auto metadataNow = CollectionShardingState::get(txn, nss.ns())->getMetadata();
                 if (metadataNow) {
                     ShardKeyPattern kp(metadataNow->getKeyPattern());
                     BSONObj key = kp.extractShardKeyFromDoc(obj);
@@ -431,16 +432,15 @@ long long Helpers::removeRange(OperationContext* txn,
                     warning(LogComponent::kSharding)
                         << "aborting migration cleanup for chunk " << min << " to " << max
                         << (metadataNow ? (string) " at document " + obj.toString() : "")
-                        << ", collection " << ns << " has changed " << endl;
+                        << ", collection " << nss.ns() << " has changed " << endl;
                     break;
                 }
             }
 
-            NamespaceString nss(ns);
             if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss)) {
                 warning() << "stepped down from primary while deleting chunk; "
-                          << "orphaning data in " << ns << " in range [" << redact(min) << ", "
-                          << redact(max) << ")";
+                          << "orphaning data in " << nss.ns() << " in range [" << redact(min)
+                          << ", " << redact(max) << ")";
                 return numDeleted;
             }
 
@@ -478,7 +478,7 @@ long long Helpers::removeRange(OperationContext* txn,
             << durationCount<Milliseconds>(millisWaitingForReplication) << "ms" << endl;
 
     MONGO_LOG_COMPONENT(1, LogComponent::kSharding) << "end removal of " << min << " to " << max
-                                                    << " in " << ns << " (took "
+                                                    << " in " << nss.ns() << " (took "
                                                     << rangeRemoveTimer.millis() << "ms)" << endl;
 
     return numDeleted;

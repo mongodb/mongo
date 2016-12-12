@@ -43,6 +43,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
@@ -330,7 +331,7 @@ public:
 
         // Check that the cursor has been removed.
         {
-            AutoGetCollectionForRead ctx(&_txn, ns);
+            AutoGetCollectionForRead ctx(&_txn, NamespaceString(ns));
             ASSERT(0 == ctx.getCollection()->getCursorManager()->numCursors());
         }
 
@@ -378,7 +379,7 @@ public:
 
         // Check that the cursor still exists
         {
-            AutoGetCollectionForRead ctx(&_txn, ns);
+            AutoGetCollectionForRead ctx(&_txn, NamespaceString(ns));
             ASSERT(1 == ctx.getCollection()->getCursorManager()->numCursors());
             ASSERT_OK(ctx.getCollection()->getCursorManager()->pinCursor(cursorId).getStatus());
         }
@@ -1243,7 +1244,7 @@ public:
     }
 
     size_t numCursorsOpen() {
-        AutoGetCollectionForRead ctx(&_txn, _ns);
+        AutoGetCollectionForRead ctx(&_txn, NamespaceString(_ns));
         Collection* collection = ctx.getCollection();
         if (!collection)
             return 0;
@@ -1645,7 +1646,7 @@ public:
 
         ClientCursor* clientCursor = 0;
         {
-            AutoGetCollectionForRead ctx(&_txn, ns());
+            AutoGetCollectionForRead ctx(&_txn, NamespaceString(ns()));
             auto clientCursorPin =
                 unittest::assertGet(ctx.getCollection()->getCursorManager()->pinCursor(cursorId));
             clientCursor = clientCursorPin.getCursor();

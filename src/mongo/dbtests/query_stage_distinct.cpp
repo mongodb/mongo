@@ -37,6 +37,7 @@
 #include "mongo/db/exec/distinct_scan.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/json.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/dbtests/dbtests.h"
@@ -47,20 +48,22 @@
 
 namespace QueryStageDistinct {
 
+static const NamespaceString nss{"unittests.QueryStageDistinct"};
+
 class DistinctBase {
 public:
     DistinctBase() : _client(&_txn) {}
 
     virtual ~DistinctBase() {
-        _client.dropCollection(ns());
+        _client.dropCollection(nss.ns());
     }
 
     void addIndex(const BSONObj& obj) {
-        ASSERT_OK(dbtests::createIndex(&_txn, ns(), obj));
+        ASSERT_OK(dbtests::createIndex(&_txn, nss.ns(), obj));
     }
 
     void insert(const BSONObj& obj) {
-        _client.insert(ns(), obj);
+        _client.insert(nss.ns(), obj);
     }
 
     /**
@@ -88,10 +91,6 @@ public:
         ASSERT_TRUE(keyElt.isNumber());
 
         return keyElt.numberInt();
-    }
-
-    static const char* ns() {
-        return "unittests.QueryStageDistinct";
     }
 
 protected:
@@ -122,7 +121,7 @@ public:
         // Make an index on a:1
         addIndex(BSON("a" << 1));
 
-        AutoGetCollectionForRead ctx(&_txn, ns());
+        AutoGetCollectionForRead ctx(&_txn, nss);
         Collection* coll = ctx.getCollection();
 
         // Set up the distinct stage.
@@ -189,7 +188,7 @@ public:
         // Make an index on a:1
         addIndex(BSON("a" << 1));
 
-        AutoGetCollectionForRead ctx(&_txn, ns());
+        AutoGetCollectionForRead ctx(&_txn, nss);
         Collection* coll = ctx.getCollection();
 
         // Set up the distinct stage.
@@ -258,7 +257,7 @@ public:
 
         addIndex(BSON("a" << 1 << "b" << 1));
 
-        AutoGetCollectionForRead ctx(&_txn, ns());
+        AutoGetCollectionForRead ctx(&_txn, nss);
         Collection* coll = ctx.getCollection();
 
         std::vector<IndexDescriptor*> indices;

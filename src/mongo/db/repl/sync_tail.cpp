@@ -419,7 +419,7 @@ void prefetchOp(const BSONObj& op) {
             // for multiple prefetches if they are for the same database.
             const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
             OperationContext& txn = *txnPtr;
-            AutoGetCollectionForRead ctx(&txn, ns);
+            AutoGetCollectionForRead ctx(&txn, NamespaceString(ns));
             Database* db = ctx.getDb();
             if (db) {
                 prefetchPagesForReplicatedOp(&txn, db, op);
