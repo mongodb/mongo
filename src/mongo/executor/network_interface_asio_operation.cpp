@@ -191,12 +191,19 @@ NetworkInterfaceASIO::AsyncCommand* NetworkInterfaceASIO::AsyncOp::command() {
     return _command.get_ptr();
 }
 
-void NetworkInterfaceASIO::AsyncOp::finish(const ResponseStatus& rs) {
+void NetworkInterfaceASIO::AsyncOp::finish(ResponseStatus&& rs) {
     // We never hold the access lock when we call finish from NetworkInterfaceASIO.
     _transitionToState(AsyncOp::State::kFinished);
 
     LOG(2) << "Request " << _request.id << " finished with response: "
            << redact(rs.isOK() ? rs.data.toString() : rs.status.toString());
+
+    // Our own internally generated time outs have a different error code to allow us to retry
+    // internal timeouts.  But the outside world (and our tests) still expect the one true
+    // ExceededTimeLimit, so we convert back here so they get what they expect.
+    if (!rs.isOK() && rs.status.code() == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
+        rs.status = Status(ErrorCodes::ExceededTimeLimit, rs.status.reason());
+    }
 
     // Calling the completion handler may invalidate state in this op, so do it last.
     _onFinish(rs);
