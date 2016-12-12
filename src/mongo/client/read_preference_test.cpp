@@ -32,20 +32,17 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 
-namespace mongo {
 namespace {
 
-using unittest::assertGet;
+using namespace mongo;
 
-const Seconds minMaxStalenessSeconds(
-    durationCount<Seconds>(ReadPreferenceSetting::kMinimalMaxStalenessValue));
+static const Seconds kMinMaxStaleness = ReadPreferenceSetting::kMinimalMaxStalenessValue;
 
 void checkParse(const BSONObj& rpsObj, const ReadPreferenceSetting& expected) {
-    const auto rps = assertGet(ReadPreferenceSetting::fromBSON(rpsObj));
-    if (!rps.equals(expected)) {
-        FAIL(str::stream() << "Expected " << expected.toString() << " does not match actual "
-                           << rps.toString());
-    }
+    const auto swRps = ReadPreferenceSetting::fromBSON(rpsObj);
+    ASSERT_OK(swRps.getStatus());
+    const auto rps = swRps.getValue();
+    ASSERT_TRUE(rps.equals(expected));
 }
 
 TEST(ReadPreferenceSetting, ParseValid) {
@@ -72,26 +69,14 @@ TEST(ReadPreferenceSetting, ParseValid) {
     checkParse(BSON("mode"
                     << "secondary"
                     << "maxStalenessSeconds"
-                    << minMaxStalenessSeconds.count()),
-               ReadPreferenceSetting(ReadPreference::SecondaryOnly, minMaxStalenessSeconds));
+                    << kMinMaxStaleness.count()),
+               ReadPreferenceSetting(ReadPreference::SecondaryOnly, kMinMaxStaleness));
 
     checkParse(BSON("mode"
                     << "secondary"
                     << "maxStalenessSeconds"
                     << 0),
-               ReadPreferenceSetting(ReadPreference::SecondaryOnly, Milliseconds(0)));
-
-    checkParse(BSON("mode"
-                    << "secondary"
-                    << "maxStalenessSeconds"
-                    << 61LL),
-               ReadPreferenceSetting(ReadPreference::SecondaryOnly, Milliseconds(61000)));
-
-    checkParse(BSON("mode"
-                    << "secondary"
-                    << "maxStalenessSeconds"
-                    << 63.46),
-               ReadPreferenceSetting(ReadPreference::SecondaryOnly, Milliseconds(63460)));
+               ReadPreferenceSetting(ReadPreference::SecondaryOnly, Seconds(0)));
 
     checkParse(BSON("mode"
                     << "secondary"
@@ -99,11 +84,11 @@ TEST(ReadPreferenceSetting, ParseValid) {
                     << BSON_ARRAY(BSON("dc"
                                        << "ny"))
                     << "maxStalenessSeconds"
-                    << minMaxStalenessSeconds.count()),
+                    << kMinMaxStaleness.count()),
                ReadPreferenceSetting(ReadPreference::SecondaryOnly,
                                      TagSet(BSON_ARRAY(BSON("dc"
                                                             << "ny"))),
-                                     minMaxStalenessSeconds));
+                                     kMinMaxStaleness));
 }
 
 void checkParseFails(const BSONObj& rpsObj) {
@@ -122,14 +107,14 @@ TEST(ReadPreferenceSetting, NonEquality) {
                                          << "ca")
                                     << BSON("foo"
                                             << "bar")));
-    auto rps = ReadPreferenceSetting(ReadPreference::Nearest, tagSet, minMaxStalenessSeconds);
+    auto rps = ReadPreferenceSetting(ReadPreference::Nearest, tagSet, kMinMaxStaleness);
 
-    auto unexpected1 = ReadPreferenceSetting(
-        ReadPreference::Nearest, TagSet::primaryOnly(), minMaxStalenessSeconds);
+    auto unexpected1 =
+        ReadPreferenceSetting(ReadPreference::Nearest, TagSet::primaryOnly(), kMinMaxStaleness);
     ASSERT_FALSE(rps.equals(unexpected1));
 
     auto unexpected2 = ReadPreferenceSetting(
-        ReadPreference::Nearest, tagSet, Seconds(minMaxStalenessSeconds.count() + 1));
+        ReadPreference::Nearest, tagSet, Seconds(kMinMaxStaleness.count() + 1));
     ASSERT_FALSE(rps.equals(unexpected2));
 }
 
@@ -155,43 +140,41 @@ TEST(ReadPreferenceSetting, ParseInvalid) {
                          << "bad"));
 
     // maxStalenessSeconds is negative
-    checkParseFailsWithError(BSON("mode"
-                                  << "secondary"
-                                  << "maxStalenessSeconds"
-                                  << -1),
-                             ErrorCodes::BadValue);
+    checkParseFails(BSON("mode"
+                         << "secondary"
+                         << "maxStalenessSeconds"
+                         << -1));
 
     // maxStalenessSeconds is NaN
-    checkParseFailsWithError(BSON("mode"
-                                  << "secondary"
-                                  << "maxStalenessSeconds"
-                                  << "ONE"),
-                             ErrorCodes::TypeMismatch);
+    checkParseFails(BSON("mode"
+                         << "secondary"
+                         << "maxStalenessSeconds"
+                         << "ONE"));
 
     // maxStalenessSeconds and primary
     checkParseFails(BSON("mode"
                          << "primary"
                          << "maxStalenessSeconds"
-                         << minMaxStalenessSeconds.count()));
+                         << kMinMaxStaleness.count()));
 
     // maxStalenessSeconds is less than min
     checkParseFailsWithError(BSON("mode"
                                   << "primary"
                                   << "maxStalenessSeconds"
-                                  << minMaxStalenessSeconds.count() - 1),
+                                  << Seconds(kMinMaxStaleness.count() - 1).count()),
                              ErrorCodes::MaxStalenessOutOfRange);
 
-    // maxStalenessSeconds is greater than max type value for milliseconds
-    checkParseFailsWithError(BSON("mode"
-                                  << "secondary"
-                                  << "maxStalenessSeconds"
-                                  << Milliseconds::max().count()),
-                             ErrorCodes::MaxStalenessOutOfRange);
+    // maxStalenessSeconds is greater than max
+    checkParseFails(BSON("mode"
+                         << "secondary"
+                         << "maxStalenessSeconds"
+                         << Seconds::max().count()));
 }
 
 void checkRoundtrip(const ReadPreferenceSetting& rps) {
-    auto parsed = assertGet(ReadPreferenceSetting::fromBSON(rps.toBSON()));
-    ASSERT_TRUE(parsed.equals(rps));
+    auto parsed = ReadPreferenceSetting::fromBSON(rps.toBSON());
+    ASSERT_OK(parsed.getStatus());
+    ASSERT_TRUE(parsed.getValue().equals(rps));
 }
 
 TEST(ReadPreferenceSetting, Roundtrip) {
@@ -215,15 +198,7 @@ TEST(ReadPreferenceSetting, Roundtrip) {
                                                                 << "ca")
                                                            << BSON("foo"
                                                                    << "bar"))),
-                                         minMaxStalenessSeconds));
-
-    checkRoundtrip(ReadPreferenceSetting(ReadPreference::Nearest,
-                                         TagSet(BSON_ARRAY(BSON("dc"
-                                                                << "ca")
-                                                           << BSON("foo"
-                                                                   << "bar"))),
-                                         Milliseconds(63246)));
+                                         kMinMaxStaleness));
 }
 
 }  // namespace
-}  // namespace mongo

@@ -1333,8 +1333,7 @@ TEST(ReplicaSetMonitor, MaxStalenessMSMatch) {
     Refresher refresher(state);
     repl::OpTime opTime{Timestamp{10, 10}, 10};
 
-    const ReadPreferenceSetting secondary(
-        ReadPreference::SecondaryOnly, TagSet(), Milliseconds(100000));
+    const ReadPreferenceSetting secondary(ReadPreference::SecondaryOnly, TagSet(), Seconds(100));
     BSONArray hosts = BSON_ARRAY("a"
                                  << "b"
                                  << "c");
@@ -1739,7 +1738,7 @@ TEST(ReplicaSetMonitor, MaxStalenessMSZeroNoLastWrite) {
     SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
     Refresher refresher(state);
 
-    const ReadPreferenceSetting secondary(ReadPreference::SecondaryOnly, TagSet(), Milliseconds(0));
+    const ReadPreferenceSetting secondary(ReadPreference::SecondaryOnly, TagSet(), Seconds(0));
     BSONArray hosts = BSON_ARRAY("a"
                                  << "b"
                                  << "c");
