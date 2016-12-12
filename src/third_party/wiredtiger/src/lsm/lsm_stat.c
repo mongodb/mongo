@@ -178,7 +178,7 @@ __wt_curstat_lsm_init(
 	 * Grab the schema lock because we will be locking the LSM tree and we
 	 * may need to open some files.
 	 */
-	WT_WITH_SCHEMA_LOCK(session, ret,
+	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __curstat_lsm_init(session, uri, cst));
 
 	return (ret);

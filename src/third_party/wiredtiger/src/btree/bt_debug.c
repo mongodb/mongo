@@ -77,7 +77,7 @@ static inline int
 __debug_hex_byte(WT_DBG *ds, uint8_t v)
 {
 	return (ds->f(
-	    ds, "#%c%c", __wt_hex[(v & 0xf0) >> 4], __wt_hex[v & 0x0f]));
+	    ds, "#%c%c", __wt_hex((v & 0xf0) >> 4), __wt_hex(v & 0x0f)));
 }
 
 /*
@@ -1003,37 +1003,37 @@ __debug_ref(WT_DBG *ds, WT_REF *ref)
 	WT_SESSION_IMPL *session;
 	size_t addr_size;
 	const uint8_t *addr;
+	const char *state;
 
 	session = ds->session;
 
-	WT_RET(ds->f(ds, "\t"));
 	switch (ref->state) {
 	case WT_REF_DISK:
-		WT_RET(ds->f(ds, "disk"));
+		state = "disk";
 		break;
 	case WT_REF_DELETED:
-		WT_RET(ds->f(ds, "deleted"));
+		state = "deleted";
 		break;
 	case WT_REF_LOCKED:
-		WT_RET(ds->f(ds, "locked %p", (void *)ref->page));
+		state = "locked";
 		break;
 	case WT_REF_MEM:
-		WT_RET(ds->f(ds, "memory %p", (void *)ref->page));
+		state = "memory";
 		break;
 	case WT_REF_READING:
-		WT_RET(ds->f(ds, "reading"));
+		state = "reading";
 		break;
 	case WT_REF_SPLIT:
-		WT_RET(ds->f(ds, "split"));
+		state = "split";
 		break;
 	default:
-		WT_RET(ds->f(ds, "INVALID"));
+		state = "INVALID";
 		break;
 	}
 
 	__wt_ref_info(ref, &addr, &addr_size, NULL);
-	return (ds->f(ds, " %s\n",
-	    __wt_addr_string(session, addr, addr_size, ds->tmp)));
+	return (ds->f(ds, "\t" "%p %s %s\n", (void *)ref,
+	    state, __wt_addr_string(session, addr, addr_size, ds->tmp)));
 }
 
 /*

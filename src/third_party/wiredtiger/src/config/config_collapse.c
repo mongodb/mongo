@@ -372,6 +372,7 @@ __config_merge_cmp(const void *a, const void *b)
 int
 __wt_config_merge(WT_SESSION_IMPL *session,
     const char **cfg, const char *cfg_strip, const char **config_ret)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_CONFIG_MERGE merge;
 	WT_DECL_RET;

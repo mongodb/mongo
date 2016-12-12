@@ -995,6 +995,13 @@ struct __wt_session {
 	 * \c "table:stock". For a description of URI formats
 	 * see @ref data_sources.
 	 * @configstart{WT_SESSION.create, see dist/api_data.py}
+	 * @config{access_pattern_hint, It is recommended that workloads that
+	 * consist primarily of updates and/or point queries specify \c random.
+	 * Workloads that do many cursor scans through large ranges of data
+	 * specify \c sequential and other workloads specify \c none.  The
+	 * option leads to an advisory call to an appropriate operating system
+	 * API where available., a string\, chosen from the following options:
+	 * \c "none"\, \c "random"\, \c "sequential"; default \c none.}
 	 * @config{allocation_size, the file unit allocation size\, in bytes\,
 	 * must a power-of-two; smaller values decrease the file space required
 	 * by overflow items\, and the default value of 4KB is a good choice
@@ -1641,6 +1648,10 @@ struct __wt_session {
 	 * including the specified name., a string; default empty.}
 	 * @config{
 	 * ),,}
+	 * @config{include_updates, make updates from the current transaction
+	 * visible to users of the named snapshot.  Transactions started with
+	 * such a named snapshot are restricted to being read-only., a boolean
+	 * flag; default \c false.}
 	 * @config{name, specify a name for the snapshot., a string; default
 	 * empty.}
 	 * @configend
@@ -3730,21 +3741,25 @@ typedef enum {
 	WT_FS_OPEN_FILE_TYPE_REGULAR	/*!< open a regular file */
 } WT_FS_OPEN_FILE_TYPE;
 
+/*! WT_FILE_SYSTEM::open_file flags: random access pattern */
+#define	WT_FS_OPEN_ACCESS_RAND	0x001
+/*! WT_FILE_SYSTEM::open_file flags: sequential access pattern */
+#define	WT_FS_OPEN_ACCESS_SEQ	0x002
 /*! WT_FILE_SYSTEM::open_file flags: create if does not exist */
-#define	WT_FS_OPEN_CREATE	0x001
+#define	WT_FS_OPEN_CREATE	0x004
 /*! WT_FILE_SYSTEM::open_file flags: direct I/O requested */
-#define	WT_FS_OPEN_DIRECTIO	0x002
+#define	WT_FS_OPEN_DIRECTIO	0x008
 /*! WT_FILE_SYSTEM::open_file flags: file creation must be durable */
-#define	WT_FS_OPEN_DURABLE	0x004
+#define	WT_FS_OPEN_DURABLE	0x010
 /*!
  * WT_FILE_SYSTEM::open_file flags: return EBUSY if exclusive use not available
  */
-#define	WT_FS_OPEN_EXCLUSIVE	0x008
+#define	WT_FS_OPEN_EXCLUSIVE	0x020
 #ifndef DOXYGEN
-#define	WT_FS_OPEN_FIXED	0x010	/* Path not home relative (internal) */
+#define	WT_FS_OPEN_FIXED	0x040	/* Path not home relative (internal) */
 #endif
 /*! WT_FILE_SYSTEM::open_file flags: open is read-only */
-#define	WT_FS_OPEN_READONLY	0x020
+#define	WT_FS_OPEN_READONLY	0x080
 
 /*!
  * WT_FILE_SYSTEM::remove or WT_FILE_SYSTEM::rename flags: the remove or rename

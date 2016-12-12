@@ -30,6 +30,7 @@
  */
 int
 __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	void *p;
 
@@ -282,6 +283,7 @@ __wt_strndup(WT_SESSION_IMPL *session, const void *str, size_t len, void *retp)
  */
 void
 __wt_free_int(WT_SESSION_IMPL *session, const void *p_arg)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	void *p;
 

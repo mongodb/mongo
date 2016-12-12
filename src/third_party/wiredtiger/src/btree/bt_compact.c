@@ -90,15 +90,14 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
  *	Compact a file.
  */
 int
-__wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_compact(WT_SESSION_IMPL *session)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_REF *ref;
+	u_int i;
 	bool skip;
-
-	WT_UNUSED(cfg);
 
 	btree = S2BT(session);
 	bm = btree->bm;
@@ -129,7 +128,13 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	__wt_spin_lock(session, &btree->flush_lock);
 
 	/* Walk the tree reviewing pages to see if they should be re-written. */
-	for (;;) {
+	for (i = 0;;) {
+		/* Periodically check if we've run out of time. */
+		if (++i > 100) {
+			WT_ERR(__wt_session_compact_check_timeout(session));
+			i = 0;
+		}
+
 		/*
 		 * Pages read for compaction aren't "useful"; don't update the
 		 * read generation of pages already in memory, and if a page is

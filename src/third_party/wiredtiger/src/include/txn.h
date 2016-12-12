@@ -62,7 +62,7 @@ struct __wt_named_snapshot {
 
 	TAILQ_ENTRY(__wt_named_snapshot) q;
 
-	uint64_t pinned_id, snap_min, snap_max;
+	uint64_t id, pinned_id, snap_min, snap_max;
 	uint64_t *snapshot;
 	uint32_t snapshot_count;
 };
@@ -103,6 +103,7 @@ struct __wt_txn_global {
 	 * the metadata; and (b) once checkpoint has finished reading a table,
 	 * it won't revisit it.
 	 */
+	volatile bool	  checkpoint_running;	/* Checkpoint running */
 	volatile uint32_t checkpoint_id;	/* Checkpoint's session ID */
 	volatile uint64_t checkpoint_gen;	/* Checkpoint generation */
 	volatile uint64_t checkpoint_pinned;	/* Oldest ID for checkpoint */

@@ -95,29 +95,30 @@ struct __wt_table {
 } while (0)
 
 /*
- * WT_WITH_LOCK --
- *	Acquire a lock, perform an operation, drop the lock.
+ * WT_WITH_LOCK_NOWAIT --
+ *	Acquire a lock if available, perform an operation, drop the lock.
  */
-#define	WT_WITH_LOCK(session, ret, lock, flag, op) do {			\
+#define	WT_WITH_LOCK_NOWAIT(session, ret, lock, flag, op) do {		\
 	ret = 0;							\
-	if (!F_ISSET(session, (flag)) &&				\
-	    F_ISSET(session, WT_SESSION_LOCK_NO_WAIT)) {		\
-		if ((ret = __wt_spin_trylock(session, lock)) == 0) {	\
-			F_SET(session, (flag));				\
-			op;						\
-			F_CLR(session, (flag));				\
-			__wt_spin_unlock(session, lock);		\
-		}							\
-	} else								\
-		WT_WITH_LOCK_WAIT(session, lock, flag, op);		\
+	if (F_ISSET(session, (flag))) {					\
+		op;							\
+	} else if ((ret = __wt_spin_trylock(session, lock)) == 0) {	\
+		F_SET(session, (flag));					\
+		op;							\
+		F_CLR(session, (flag));					\
+		__wt_spin_unlock(session, lock);			\
+	}								\
 } while (0)
 
 /*
- * WT_WITH_CHECKPOINT_LOCK --
+ * WT_WITH_CHECKPOINT_LOCK, WT_WITH_CHECKPOINT_LOCK_NOWAIT --
  *	Acquire the checkpoint lock, perform an operation, drop the lock.
  */
-#define	WT_WITH_CHECKPOINT_LOCK(session, ret, op)			\
-	WT_WITH_LOCK(session, ret,					\
+#define	WT_WITH_CHECKPOINT_LOCK(session, op)				\
+	WT_WITH_LOCK_WAIT(session,					\
+	    &S2C(session)->checkpoint_lock, WT_SESSION_LOCKED_CHECKPOINT, op)
+#define	WT_WITH_CHECKPOINT_LOCK_NOWAIT(session, ret, op)		\
+	WT_WITH_LOCK_NOWAIT(session, ret,				\
 	    &S2C(session)->checkpoint_lock, WT_SESSION_LOCKED_CHECKPOINT, op)
 
 /*
@@ -136,34 +137,49 @@ struct __wt_table {
  * WT_WITH_METADATA_LOCK --
  *	Acquire the metadata lock, perform an operation, drop the lock.
  */
-#define	WT_WITH_METADATA_LOCK(session, ret, op)				\
-	WT_WITH_LOCK(session, ret,					\
+#define	WT_WITH_METADATA_LOCK(session, op)				\
+	WT_WITH_LOCK_WAIT(session,					\
 	    &S2C(session)->metadata_lock, WT_SESSION_LOCKED_METADATA, op)
 
 /*
- * WT_WITH_SCHEMA_LOCK --
+ * WT_WITH_SCHEMA_LOCK, WT_WITH_SCHEMA_LOCK_NOWAIT --
  *	Acquire the schema lock, perform an operation, drop the lock.
  *	Check that we are not already holding some other lock: the schema lock
  *	must be taken first.
  */
-#define	WT_WITH_SCHEMA_LOCK(session, ret, op) do {			\
+#define	WT_WITH_SCHEMA_LOCK(session, op) do {				\
 	WT_ASSERT(session,						\
 	    F_ISSET(session, WT_SESSION_LOCKED_SCHEMA) ||		\
 	    !F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST |		\
 	    WT_SESSION_NO_SCHEMA_LOCK | WT_SESSION_LOCKED_TABLE));	\
-	WT_WITH_LOCK(session, ret,					\
+	WT_WITH_LOCK_WAIT(session,					\
+	    &S2C(session)->schema_lock, WT_SESSION_LOCKED_SCHEMA, op);	\
+} while (0)
+#define	WT_WITH_SCHEMA_LOCK_NOWAIT(session, ret, op) do {		\
+	WT_ASSERT(session,						\
+	    F_ISSET(session, WT_SESSION_LOCKED_SCHEMA) ||		\
+	    !F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST |		\
+	    WT_SESSION_NO_SCHEMA_LOCK | WT_SESSION_LOCKED_TABLE));	\
+	WT_WITH_LOCK_NOWAIT(session, ret,				\
 	    &S2C(session)->schema_lock, WT_SESSION_LOCKED_SCHEMA, op);	\
 } while (0)
 
 /*
- * WT_WITH_TABLE_LOCK --
+ * WT_WITH_TABLE_LOCK, WT_WITH_TABLE_LOCK_NOWAIT --
  *	Acquire the table lock, perform an operation, drop the lock.
  */
-#define	WT_WITH_TABLE_LOCK(session, ret, op) do {			\
+#define	WT_WITH_TABLE_LOCK(session, op) do {				\
 	WT_ASSERT(session,						\
 	    F_ISSET(session, WT_SESSION_LOCKED_TABLE) ||		\
 	    !F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));		\
-	WT_WITH_LOCK(session, ret,					\
+	WT_WITH_LOCK_WAIT(session,					\
+	    &S2C(session)->table_lock, WT_SESSION_LOCKED_TABLE, op);	\
+} while (0)
+#define	WT_WITH_TABLE_LOCK_NOWAIT(session, ret, op) do {		\
+	WT_ASSERT(session,						\
+	    F_ISSET(session, WT_SESSION_LOCKED_TABLE) ||		\
+	    !F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST));		\
+	WT_WITH_LOCK_NOWAIT(session, ret,				\
 	    &S2C(session)->table_lock, WT_SESSION_LOCKED_TABLE, op);	\
 } while (0)
 

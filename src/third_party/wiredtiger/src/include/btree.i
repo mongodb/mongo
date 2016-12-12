@@ -408,11 +408,7 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Update pages and bytes evicted. */
 	(void)__wt_atomic_add64(&cache->bytes_evict, page->memory_footprint);
-
-	if (F_ISSET(session, WT_SESSION_IN_SPLIT))
-		(void)__wt_atomic_subv64(&cache->pages_inmem, 1);
-	else
-		(void)__wt_atomic_addv64(&cache->pages_evict, 1);
+	(void)__wt_atomic_addv64(&cache->pages_evict, 1);
 }
 
 /*
@@ -1359,7 +1355,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	    F_ISSET(session, WT_SESSION_NO_EVICTION) ||
 	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 	    !__wt_page_can_evict(session, ref, NULL))
-		return (__wt_hazard_clear(session, page));
+		return (__wt_hazard_clear(session, ref));
 
 	WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));
 	return (0);
@@ -1445,7 +1441,7 @@ __wt_page_swap_func(
  *	Return if there's a hazard pointer to the page in the system.
  */
 static inline WT_HAZARD *
-__wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_page_hazard_check(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
@@ -1476,7 +1472,7 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 		}
 		for (hp = s->hazard; hp < s->hazard + hazard_size; ++hp) {
 			++j;
-			if (hp->page == page) {
+			if (hp->ref == ref) {
 				WT_STAT_CONN_INCRV(session,
 				    cache_hazard_walks, j);
 				return (hp);

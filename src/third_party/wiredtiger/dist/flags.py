@@ -114,8 +114,6 @@ flags = {
     'session' : [
         'SESSION_CAN_WAIT',
         'SESSION_INTERNAL',
-        'SESSION_IN_SPLIT',
-        'SESSION_LOCK_NO_WAIT',
         'SESSION_LOCKED_CHECKPOINT',
         'SESSION_LOCKED_HANDLE_LIST',
         'SESSION_LOCKED_METADATA',

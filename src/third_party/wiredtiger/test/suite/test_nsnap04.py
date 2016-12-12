@@ -38,14 +38,18 @@ class test_nsnap04(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablename
     nrows_per_itr = 10
 
-    def check_named_snapshot(self, snapshot, expected):
+    def check_named_snapshot(self, snapshot, expected, skip_snapshot=False):
         new_session = self.conn.open_session()
         c = new_session.open_cursor(self.uri)
-        new_session.begin_transaction("snapshot=" + str(snapshot))
+        if skip_snapshot:
+            new_session.begin_transaction()
+        else:
+            new_session.begin_transaction("snapshot=" + str(snapshot))
         count = 0
         for row in c:
             count += 1
         new_session.commit_transaction()
+        new_session.close()
         # print "Checking snapshot %d, expect %d, found %d" % (snapshot, expected, count)
         self.assertEqual(count, expected)
 
@@ -79,6 +83,35 @@ class test_nsnap04(wttest.WiredTigerTestCase, suite_subprocess):
         # Update the named snapshot
         self.session.snapshot("name=0")
         self.check_named_snapshot(0, 2 * self.nrows_per_itr)
+
+    def test_include_updates(self):
+        # Populate a table
+        end = start = 0
+        SimpleDataSet(self, self.uri, 0, key_format='i').populate()
+
+        snapshots = []
+        c = self.session.open_cursor(self.uri)
+        for i in xrange(self.nrows_per_itr):
+            c[i] = "some value"
+
+        self.session.begin_transaction("isolation=snapshot")
+        count = 0
+        for row in c:
+            count += 1
+        self.session.snapshot("name=0,include_updates=true")
+
+        self.check_named_snapshot(0, self.nrows_per_itr)
+
+        # Insert some more content using the active session.
+        for i in xrange(self.nrows_per_itr):
+            c[self.nrows_per_itr + i] = "some value"
+
+        self.check_named_snapshot(0, 2 * self.nrows_per_itr)
+        # Ensure transactions not tracking the snapshot don't see the updates
+        self.check_named_snapshot(0, self.nrows_per_itr, skip_snapshot=True)
+        self.session.commit_transaction()
+        # Ensure content is visible to non-snapshot transactions after commit
+        self.check_named_snapshot(0, 2 * self.nrows_per_itr, skip_snapshot=True)
 
 if __name__ == '__main__':
     wttest.run()

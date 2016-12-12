@@ -59,7 +59,7 @@ class test_inmem01(wttest.WiredTigerTestCase):
         ds = SimpleDataSet(self, self.uri, 10000000, key_format=self.keyfmt,
             value_format=self.valuefmt, config=self.table_config)
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
-            lambda:ds.populate(), msg)
+            ds.populate, msg)
 
         # Figure out the last key we successfully inserted, and check all
         # previous inserts are still there.
@@ -77,7 +77,7 @@ class test_inmem01(wttest.WiredTigerTestCase):
         ds = SimpleDataSet(self, self.uri, 10000000, key_format=self.keyfmt,
             value_format=self.valuefmt, config=self.table_config)
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
-            lambda:ds.populate(), msg)
+            ds.populate, msg)
 
         # Now that the database contains as much data as will fit into
         # the configured cache, verify removes succeed.
@@ -93,7 +93,7 @@ class test_inmem01(wttest.WiredTigerTestCase):
         ds = SimpleDataSet(self, self.uri, 10000000, key_format=self.keyfmt,
             value_format=self.valuefmt, config=self.table_config)
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
-            lambda:ds.populate(), msg)
+            ds.populate, msg)
 
         cursor = self.session.open_cursor(self.uri, None)
         cursor.prev()
@@ -119,6 +119,51 @@ class test_inmem01(wttest.WiredTigerTestCase):
             inserted = True
             break
         self.assertTrue(inserted)
+
+    # Custom "keep filling" helper
+    def fill(self, cursor, ds, start, end):
+        for i in xrange(start + 1, end + 1):
+            cursor[ds.key(i)] = ds.value(i)
+
+    # Keep adding data to the cache until it becomes really full, make sure
+    # that reads aren't blocked.
+    @wttest.longtest("Try to wedge an in-memory cache")
+    def test_wedge(self):
+        # Try to really wedge the cache full
+        ds = SimpleDataSet(self, self.uri, 0, key_format=self.keyfmt,
+            value_format=self.valuefmt, config=self.table_config)
+        ds.populate()
+        cursor = self.session.open_cursor(self.uri, None)
+
+        run = 0
+        start, last_key = -1000, 0
+        while last_key - start > 100:
+            msg = '/WT_CACHE_FULL.*/'
+            start = last_key
+            self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
+                lambda: self.fill(cursor, ds, start, 10000000), msg)
+            cursor.reset()
+            sleep(1)
+
+            # Figure out the last key we successfully inserted, and check all
+            # previous inserts are still there.
+            cursor.prev()
+            last_key = int(cursor.get_key())
+            run += 1
+            self.pr('Finished iteration ' + str(run) + ', last_key = ' + str(last_key))
+
+        self.pr('Checking ' + str(last_key) + ' keys')
+        ds = SimpleDataSet(self, self.uri, last_key, key_format=self.keyfmt,
+            value_format=self.valuefmt, config=self.table_config)
+
+        # This test is *much* slower for fixed-length column stores: we fit
+        # many more records into the cache, so don't do as many passes through
+        # the data.
+        checks = 10 if self.valuefmt.endswith('t') else 100
+        for run in xrange(checks):
+            ds.check()
+            self.pr('Finished check ' + str(run))
+            sleep(1)
 
 if __name__ == '__main__':
     wttest.run()

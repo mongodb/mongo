@@ -14,6 +14,7 @@
  */
 int
 __wt_getenv(WT_SESSION_IMPL *session, const char *variable, const char **envp)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	const char *temp;
 
