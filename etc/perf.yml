@@ -13,6 +13,16 @@ post:
     - command: attach.results
       params:
         file_location: src/report.json
+    - command: s3.put
+      params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            local_file: src/mongod.log
+            remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/mongod-${build_id}.log
+            bucket: mciuploads
+            permissions: public-read
+            content_type: ${content_type|text/plain}
+            display_name: mongod.log
     - command: shell.exec
       params:
         silent: true
@@ -97,7 +107,15 @@ functions:
           sleep 5
           # if we started a replset, initiate it and wait for it to become primary
           ./mongo --eval "if(db.isMaster().isreplicaset){rs.initiate(); assert.soon(function(){return db.isMaster().ismaster}, 'no primary')}"
-          echo "MONGOD STARTED."
+
+          # benchRun() authenticates against the admin db, with a user that must has admin access.
+          # Note: This is possibly a legacy requirement from times when it would call serverStatus.
+          # Btw, when mongod is started without --auth, these should be harmless no-ops
+          ./mongo --eval "db.createUser({user: 'admin', pwd: 'password', roles:\
+                         [ { role: 'userAdminAnyDatabase', db: 'admin' },\
+                           {role: 'readWriteAnyDatabase', db: 'admin' } ] })"\
+                           admin
+            echo "MONGOD STARTED."
   "compare":
     - command: json.get
       params:
@@ -203,17 +221,7 @@ functions:
           cd perf
           #  give mongod a few seconds to start up so that we can connect.
           sleep 5
-          ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t ${threads} --trialCount 5 -f testcases/*.js --readCmd ${readCmd} --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/mongod.log
-        remote_file: ${project}/${version_id}/${revision}/mongod-${task_id}.log
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|text/html}
-        display_name: mongod.log
+          ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t ${threads} --trialCount 5 -f testcases/*.js --readCmd ${readCmd} --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed --username admin --password password
     - command: "json.send"
       params:
         name: "perf"
@@ -601,7 +609,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy --ssl
     mongod_exec_wrapper: &exec_wrapper "numactl --physcpubind=4,5,6,7 -i 1"
     perf_exec_wrapper: &perf_wrapper "numactl --physcpubind=1,2,3 -i 0"
-    mongod_flags: "--storageEngine=inMemory --logpath ./mongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false  --inMemorySizeGB 16"
+    mongod_flags: "--storageEngine=inMemory --logpath ./mongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false  --inMemorySizeGB 16 --auth"
     use_scons_cache: true
     project: &project perf
   run_on:
@@ -627,7 +635,7 @@ buildvariants:
   expansions:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false"
+    mongod_flags: "--storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false --auth"
     project: *project
   run_on:
   - "centos6-perf"
@@ -649,7 +657,7 @@ buildvariants:
   expansions:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--replSet=test --storageEngine=inMemory  --logpath ./mongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --inMemorySizeGB 16 --oplogSize 10000 --setParameter diagnosticDataCollectionEnabled=false "
+    mongod_flags: "--replSet=test --storageEngine=inMemory  --logpath ./mongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --inMemorySizeGB 16 --oplogSize 10000 --setParameter diagnosticDataCollectionEnabled=false --auth"
     project: *project
   run_on:
   - "centos6-perf"
@@ -665,7 +673,7 @@ buildvariants:
   expansions:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --oplogSize 100000 --setParameter diagnosticDataCollectionEnabled=false"
+    mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --oplogSize 100000 --setParameter diagnosticDataCollectionEnabled=false --auth"
     project: *project
   run_on:
   - "centos6-perf"
