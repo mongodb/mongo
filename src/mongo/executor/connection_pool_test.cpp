@@ -66,7 +66,7 @@ private:
  * another.
  */
 TEST_F(ConnectionPoolTest, SameConn) {
-    ConnectionPool pool(stdx::make_unique<PoolImpl>());
+    ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool");
 
     // Grab and stash an id for the first request
     size_t conn1Id = 0;
@@ -98,7 +98,7 @@ TEST_F(ConnectionPoolTest, SameConn) {
  * Verify that a failed connection isn't returned to the pool
  */
 TEST_F(ConnectionPoolTest, FailedConnDifferentConn) {
-    ConnectionPool pool(stdx::make_unique<PoolImpl>());
+    ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool");
 
     // Grab the first connection and indicate that it failed
     size_t conn1Id = 0;
@@ -131,7 +131,7 @@ TEST_F(ConnectionPoolTest, FailedConnDifferentConn) {
  * connections.
  */
 TEST_F(ConnectionPoolTest, DifferentHostDifferentConn) {
-    ConnectionPool pool(stdx::make_unique<PoolImpl>());
+    ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool");
 
     // Conn 1 from port 30000
     size_t conn1Id = 0;
@@ -163,7 +163,7 @@ TEST_F(ConnectionPoolTest, DifferentHostDifferentConn) {
  * Verify that not returning handle's to the pool spins up new connections.
  */
 TEST_F(ConnectionPoolTest, DifferentConnWithoutReturn) {
-    ConnectionPool pool(stdx::make_unique<PoolImpl>());
+    ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool");
 
     // Get the first connection, move it out rather than letting it return
     ConnectionPool::ConnectionHandle conn1;
@@ -199,7 +199,7 @@ TEST_F(ConnectionPoolTest, DifferentConnWithoutReturn) {
  * Note that the lack of pushSetup() calls delays the get.
  */
 TEST_F(ConnectionPoolTest, TimeoutOnSetup) {
-    ConnectionPool pool(stdx::make_unique<PoolImpl>());
+    ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool");
 
     bool notOk = false;
 
@@ -234,7 +234,7 @@ TEST_F(ConnectionPoolTest, refreshHappens) {
 
     ConnectionPool::Options options;
     options.refreshRequirement = Milliseconds(1000);
-    ConnectionPool pool(stdx::make_unique<PoolImpl>(), options);
+    ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool", options);
 
     auto now = Date_t::now();
 
@@ -270,7 +270,7 @@ TEST_F(ConnectionPoolTest, refreshTimeoutHappens) {
     ConnectionPool::Options options;
     options.refreshRequirement = Milliseconds(1000);
     options.refreshTimeout = Milliseconds(2000);
-    ConnectionPool pool(stdx::make_unique<PoolImpl>(), options);
+    ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool", options);
 
     auto now = Date_t::now();
 
@@ -308,13 +308,14 @@ TEST_F(ConnectionPoolTest, refreshTimeoutHappens) {
     // see if that pans out. In this case, we'll get a failure on timeout.
     ConnectionImpl::pushSetup(Status::OK());
     pool.get(HostAndPort(),
-             Milliseconds(10000),
+             Milliseconds(1000),
              [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
                  ASSERT(!swConn.isOK());
 
                  reachedA = true;
              });
     ASSERT(!reachedA);
+    PoolImpl::setNow(now + Milliseconds(3000));
 
     // Let the refresh timeout
     PoolImpl::setNow(now + Milliseconds(4000));
@@ -338,7 +339,7 @@ TEST_F(ConnectionPoolTest, refreshTimeoutHappens) {
  * Verify that requests are served in expiration order, not insertion order
  */
 TEST_F(ConnectionPoolTest, requestsServedByUrgency) {
-    ConnectionPool pool(stdx::make_unique<PoolImpl>());
+    ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool");
 
     bool reachedA = false;
     bool reachedB = false;
@@ -385,7 +386,7 @@ TEST_F(ConnectionPoolTest, maxPoolRespected) {
     ConnectionPool::Options options;
     options.minConnections = 1;
     options.maxConnections = 2;
-    ConnectionPool pool(stdx::make_unique<PoolImpl>(), options);
+    ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool", options);
 
     ConnectionPool::ConnectionHandle conn1;
     ConnectionPool::ConnectionHandle conn2;
@@ -445,7 +446,7 @@ TEST_F(ConnectionPoolTest, minPoolRespected) {
     options.maxConnections = 3;
     options.refreshRequirement = Milliseconds(1000);
     options.refreshTimeout = Milliseconds(2000);
-    ConnectionPool pool(stdx::make_unique<PoolImpl>(), options);
+    ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool", options);
 
     auto now = Date_t::now();
 
@@ -554,7 +555,7 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappens) {
     options.refreshRequirement = Milliseconds(5000);
     options.refreshTimeout = Milliseconds(5000);
     options.hostTimeout = Milliseconds(1000);
-    ConnectionPool pool(stdx::make_unique<PoolImpl>(), options);
+    ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool", options);
 
     auto now = Date_t::now();
 
@@ -603,7 +604,7 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappensMoreGetsDelay) {
     options.refreshRequirement = Milliseconds(5000);
     options.refreshTimeout = Milliseconds(5000);
     options.hostTimeout = Milliseconds(1000);
-    ConnectionPool pool(stdx::make_unique<PoolImpl>(), options);
+    ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool", options);
 
     auto now = Date_t::now();
 
@@ -665,7 +666,7 @@ TEST_F(ConnectionPoolTest, hostTimeoutHappensCheckoutDelays) {
     options.refreshRequirement = Milliseconds(5000);
     options.refreshTimeout = Milliseconds(5000);
     options.hostTimeout = Milliseconds(1000);
-    ConnectionPool pool(stdx::make_unique<PoolImpl>(), options);
+    ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool", options);
 
     auto now = Date_t::now();
 
@@ -745,7 +746,7 @@ TEST_F(ConnectionPoolTest, dropConnections) {
     options.maxConnections = 1;
     options.refreshRequirement = Seconds(1);
     options.refreshTimeout = Seconds(2);
-    ConnectionPool pool(stdx::make_unique<PoolImpl>(), options);
+    ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool", options);
 
     auto now = Date_t::now();
     PoolImpl::setNow(now);
@@ -828,6 +829,100 @@ TEST_F(ConnectionPoolTest, dropConnections) {
              });
 
     ASSERT(reachedB);
+}
+
+/**
+ * Verify that timeouts during setup don't prematurely time out unrelated requests
+ */
+TEST_F(ConnectionPoolTest, SetupTimeoutsDontTimeoutUnrelatedRequests) {
+    ConnectionPool::Options options;
+
+    options.maxConnections = 1;
+    options.refreshTimeout = Seconds(2);
+    ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool", options);
+
+    auto now = Date_t::now();
+    PoolImpl::setNow(now);
+
+    boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> conn1;
+    pool.get(HostAndPort(), Seconds(10), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+        conn1 = std::move(swConn);
+    });
+
+    // initially we haven't called our callback
+    ASSERT(!conn1);
+
+    PoolImpl::setNow(now + Seconds(1));
+
+    // Still haven't fired on conn1
+    ASSERT(!conn1);
+
+    // Get conn2 (which should have an extra second before the timeout)
+    boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> conn2;
+    pool.get(HostAndPort(), Seconds(10), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+        conn2 = std::move(swConn);
+    });
+
+    PoolImpl::setNow(now + Seconds(2));
+
+    ASSERT(conn1);
+    ASSERT(!conn1->isOK());
+    ASSERT(conn1->getStatus().code() == ErrorCodes::ExceededTimeLimit);
+
+    ASSERT(!conn2);
+}
+
+/**
+ * Verify that timeouts during refresh don't prematurely time out unrelated requests
+ */
+TEST_F(ConnectionPoolTest, RefreshTimeoutsDontTimeoutRequests) {
+    ConnectionPool::Options options;
+
+    options.maxConnections = 1;
+    options.refreshTimeout = Seconds(2);
+    options.refreshRequirement = Seconds(3);
+    ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool", options);
+
+    auto now = Date_t::now();
+    PoolImpl::setNow(now);
+
+    // Successfully get a new connection
+    size_t conn1Id = 0;
+    ConnectionImpl::pushSetup(Status::OK());
+    pool.get(HostAndPort(), Seconds(1), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+        conn1Id = CONN2ID(swConn);
+        doneWith(swConn.getValue());
+    });
+    ASSERT(conn1Id);
+
+    // Force it into refresh
+    PoolImpl::setNow(now + Seconds(3));
+
+    boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> conn1;
+    pool.get(HostAndPort(), Seconds(10), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+        conn1 = std::move(swConn);
+    });
+
+    // initially we haven't called our callback
+    ASSERT(!conn1);
+
+    // 1 second later we've triggered a refresh and still haven't called the callback
+    PoolImpl::setNow(now + Seconds(4));
+    ASSERT(!conn1);
+
+    // Get conn2 (which should have an extra second before the timeout)
+    boost::optional<StatusWith<ConnectionPool::ConnectionHandle>> conn2;
+    pool.get(HostAndPort(), Seconds(10), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+        conn2 = std::move(swConn);
+    });
+
+    PoolImpl::setNow(now + Seconds(5));
+
+    ASSERT(conn1);
+    ASSERT(!conn1->isOK());
+    ASSERT(conn1->getStatus().code() == ErrorCodes::ExceededTimeLimit);
+
+    ASSERT(!conn2);
 }
 
 }  // namespace connection_pool_test_details

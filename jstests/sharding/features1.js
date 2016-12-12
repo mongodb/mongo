@@ -94,7 +94,7 @@
         db.eval(function() {
             return db.foo2.findOne().a;
         });
-    }, null, "eval 2");
+    }, [], "eval 2");
 
     assert.eq(1,
               db.eval(function() {
@@ -105,7 +105,7 @@
         db.eval(function() {
             return db.foo2.count();
         });
-    }, null, "eval 4");
+    }, [], "eval 4");
 
     // ----- "eval" new command name SERVER-5588 -----
     var result;
@@ -235,8 +235,8 @@
     // --- listDatabases ---
 
     r = db.getMongo().getDBs();
-    assert.eq(2, r.databases.length, tojson(r));
-    assert.eq("number", typeof(r.totalSize), "listDatabases 2 : " + tojson(r));
+    assert.eq(3, r.databases.length, tojson(r));
+    assert.eq("number", typeof(r.totalSize), "listDatabases 3 : " + tojson(r));
 
     s.stop();
 

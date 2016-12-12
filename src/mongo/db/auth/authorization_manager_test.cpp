@@ -244,9 +244,9 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
 TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
     ServiceContextNoop serviceContext;
     transport::TransportLayerMock transportLayer{};
-    transport::Session* session = transportLayer.createSession();
+    transport::SessionHandle session = transportLayer.createSession();
     transportLayer.setX509PeerInfo(
-        *session,
+        session,
         SSLPeerInfo("CN=mongodb.com", {RoleName("read", "test"), RoleName("readWrite", "test")}));
     ServiceContext::UniqueClient client = serviceContext.makeClient("testClient", session);
     ServiceContext::UniqueOperationContext txn = client->makeOperationContext();
@@ -256,10 +256,10 @@ TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
         authzManager->acquireUser(txn.get(), UserName("CN=mongodb.com", "$external"), &x509User));
     ASSERT(x509User->isValid());
 
-    std::unordered_set<RoleName> expectedRoles{RoleName("read", "test"),
-                                               RoleName("readWrite", "test")};
+    stdx::unordered_set<RoleName> expectedRoles{RoleName("read", "test"),
+                                                RoleName("readWrite", "test")};
     RoleNameIterator roles = x509User->getRoles();
-    std::unordered_set<RoleName> acquiredRoles;
+    stdx::unordered_set<RoleName> acquiredRoles;
     while (roles.more()) {
         acquiredRoles.insert(roles.next());
     }
@@ -278,9 +278,9 @@ TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
 TEST_F(AuthorizationManagerTest, testLocalX509AuthorizationInvalidUser) {
     ServiceContextNoop serviceContext;
     transport::TransportLayerMock transportLayer{};
-    transport::Session* session = transportLayer.createSession();
+    transport::SessionHandle session = transportLayer.createSession();
     transportLayer.setX509PeerInfo(
-        *session,
+        session,
         SSLPeerInfo("CN=mongodb.com", {RoleName("read", "test"), RoleName("write", "test")}));
     ServiceContext::UniqueClient client = serviceContext.makeClient("testClient", session);
     ServiceContext::UniqueOperationContext txn = client->makeOperationContext();
@@ -293,8 +293,8 @@ TEST_F(AuthorizationManagerTest, testLocalX509AuthorizationInvalidUser) {
 TEST_F(AuthorizationManagerTest, testLocalX509AuthenticationNoAuthorization) {
     ServiceContextNoop serviceContext;
     transport::TransportLayerMock transportLayer{};
-    transport::Session* session = transportLayer.createSession();
-    transportLayer.setX509PeerInfo(*session, {});
+    transport::SessionHandle session = transportLayer.createSession();
+    transportLayer.setX509PeerInfo(session, {});
     ServiceContext::UniqueClient client = serviceContext.makeClient("testClient", session);
     ServiceContext::UniqueOperationContext txn = client->makeOperationContext();
 

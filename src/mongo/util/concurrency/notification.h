@@ -30,6 +30,7 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/db/operation_context.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
@@ -38,19 +39,25 @@
 
 namespace mongo {
 
-class OperationContext;
-
 /**
  * Allows waiting for a result returned from an asynchronous operation.
  */
 template <class T>
 class Notification {
 public:
+    Notification() = default;
+
+    /**
+     * Creates a notification object, which has already been set. Calls to any of the getters will
+     * return immediately.
+     */
+    explicit Notification(T value) : _value(value) {}
+
     /**
      * Returns true if the notification has been set (i.e., the call to get/waitFor would not
      * block).
      */
-    explicit operator bool() const {
+    explicit operator bool() {
         stdx::unique_lock<stdx::mutex> lock(_mutex);
         return !!_value;
     }
@@ -60,7 +67,9 @@ public:
      * If the wait is interrupted, throws an exception.
      */
     T& get(OperationContext* txn) {
-        return get();
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        txn->waitForConditionOrInterrupt(_condVar, lock, [this]() -> bool { return !!_value; });
+        return _value.get();
     }
 
     /**
@@ -100,8 +109,8 @@ public:
     }
 
 private:
-    mutable stdx::mutex _mutex;
-    mutable stdx::condition_variable _condVar;
+    stdx::mutex _mutex;
+    stdx::condition_variable _condVar;
 
     // Protected by mutex and only moves from not-set to set once
     boost::optional<T> _value{boost::none};
@@ -110,7 +119,7 @@ private:
 template <>
 class Notification<void> {
 public:
-    explicit operator bool() const {
+    explicit operator bool() {
         return _notification.operator bool();
     }
 

@@ -688,7 +688,7 @@ ByAllocationStack::report(CountBase& countBase, MutableHandleValue report)
 
 #ifdef DEBUG
     // Check that nothing rehashes our table while we hold pointers into it.
-    uint32_t generation = count.table.generation();
+    Generation generation = count.table.generation();
 #endif
 
     // Build a vector of pointers to entries; sort by total; and then use

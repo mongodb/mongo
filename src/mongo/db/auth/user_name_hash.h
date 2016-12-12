@@ -33,7 +33,7 @@
 #include "mongo/platform/hash_namespace.h"
 
 
-// Define hash function for UserNames so they can be keys in std::unordered_map
+// Define hash function for UserNames so they can be keys in stdx::unordered_map
 MONGO_HASH_NAMESPACE_START
 template <>
 struct hash<mongo::UserName> {

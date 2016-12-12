@@ -54,8 +54,6 @@ public:
 
     virtual ~WiredTigerRecoveryUnit();
 
-    virtual void reportState(BSONObjBuilder* b) const;
-
     void beginUnitOfWork(OperationContext* opCtx) final;
     void commitUnitOfWork() final;
     void abortUnitOfWork() final;
@@ -136,10 +134,10 @@ private:
     bool _active;
     uint64_t _mySnapshotId;
     bool _everStartedWrite;
-    Timer _timer;
     RecordId _oplogReadTill;
     bool _readFromMajorityCommittedSnapshot = false;
     SnapshotName _majorityCommittedSnapshot = SnapshotName::min();
+    std::unique_ptr<Timer> _timer;
 
     typedef OwnedPointerVector<Change> Changes;
     Changes _changes;

@@ -128,7 +128,6 @@ class test_encrypt06(wttest.WiredTigerTestCase):
         else:
             return ',encryption=(name=' + name + args + ')'
 
-
     def match_string_in_file(self, fname, match):
         with open(fname, 'rb') as f:
             return (f.read().find(match) != -1)
@@ -222,7 +221,6 @@ class test_encrypt06(wttest.WiredTigerTestCase):
                          not self.match_string_in_rundir(txt0))
         self.assertEqual(self.expected_encryption(self.encrypt1),
                          not self.match_string_in_rundir(txt1))
-
 
 if __name__ == '__main__':
     wttest.run()

@@ -26,6 +26,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/unittest/unittest.h"
 
@@ -747,42 +748,60 @@ TEST(LockManager, CompatibleFirstGrantAlreadyQueued) {
     LockManager lockMgr;
     const ResourceId resId(RESOURCE_GLOBAL, 0);
 
-    // This tests the following behavior:
-    //   Lock held in X, queue: S IX IS, where S is compatibleFirst.
-    //   Once X unlocks both the S and IS requests should proceed.
+    // This tests the following behaviors (alternatives indicated with '|'):
+    //   Lock held in X, queue: S X|IX IS, where S is compatibleFirst.
+    //   Once X unlocks|downgrades both the S and IS requests should proceed.
 
-    MMAPV1LockerImpl locker1;
-    LockRequestCombo request1(&locker1);
 
-    MMAPV1LockerImpl locker2;
-    LockRequestCombo request2(&locker2);
-    request2.compatibleFirst = true;
+    enum UnblockMethod { kDowngrading, kUnlocking };
+    LockMode conflictingModes[2] = {MODE_IX, MODE_X};
+    UnblockMethod unblockMethods[2] = {kDowngrading, kUnlocking};
 
-    MMAPV1LockerImpl locker3;
-    LockRequestCombo request3(&locker3);
+    for (LockMode writerMode : conflictingModes) {
+        for (UnblockMethod unblockMethod : unblockMethods) {
+            MMAPV1LockerImpl locker1;
+            LockRequestCombo request1(&locker1);
 
-    MMAPV1LockerImpl locker4;
-    LockRequestCombo request4(&locker4);
+            MMAPV1LockerImpl locker2;
+            LockRequestCombo request2(&locker2);
+            request2.compatibleFirst = true;
 
-    // Hold the lock in X and establish the S IX IS queue.
-    ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_X));
-    ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request2, MODE_S));
-    ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request3, MODE_IX));
-    ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request4, MODE_IS));
+            MMAPV1LockerImpl locker3;
+            LockRequestCombo request3(&locker3);
 
-    // Now unlock, so all readers should be able to proceed, while the IX remains queued.
-    ASSERT(lockMgr.unlock(&request1));
-    ASSERT(request2.lastResult == LOCK_OK);
-    ASSERT(request3.lastResult == LOCK_INVALID);
-    ASSERT(request4.lastResult == LOCK_OK);
+            MMAPV1LockerImpl locker4;
+            LockRequestCombo request4(&locker4);
 
-    // Now unlock the S lock, and the IX succeeds as well.
-    ASSERT(lockMgr.unlock(&request2));
-    ASSERT(request3.lastResult == LOCK_OK);
+            // Hold the lock in X and establish the S IX|X IS queue.
+            ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_X));
+            ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request2, MODE_S));
+            ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request3, writerMode));
+            ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request4, MODE_IS));
 
-    // Unlock remaining
-    ASSERT(lockMgr.unlock(&request4));
-    ASSERT(lockMgr.unlock(&request3));
+            // Now unlock the initial X, so all readers should be able to proceed, while the writer
+            // remains queued.
+            if (unblockMethod == kUnlocking) {
+                ASSERT(lockMgr.unlock(&request1));
+            } else {
+                invariant(unblockMethod == kDowngrading);
+                lockMgr.downgrade(&request1, MODE_S);
+            }
+            ASSERT(request2.lastResult == LOCK_OK);
+            ASSERT(request3.lastResult == LOCK_INVALID);
+            ASSERT(request4.lastResult == LOCK_OK);
+
+            // Now unlock the readers, and the writer succeeds as well.
+            ASSERT(lockMgr.unlock(&request2));
+            ASSERT(lockMgr.unlock(&request4));
+            if (unblockMethod == kDowngrading) {
+                ASSERT(lockMgr.unlock(&request1));
+            }
+            ASSERT(request3.lastResult == LOCK_OK);
+
+            // Unlock the writer
+            ASSERT(lockMgr.unlock(&request3));
+        }
+    }
 }
 
 TEST(LockManager, CompatibleFirstDelayedGrant) {

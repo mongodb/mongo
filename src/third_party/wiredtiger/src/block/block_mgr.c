@@ -61,11 +61,11 @@ __bm_block_header(WT_BM *bm)
  *	Write a buffer into a block, creating a checkpoint.
  */
 static int
-__bm_checkpoint(WT_BM *bm,
-    WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckptbase, bool data_cksum)
+__bm_checkpoint(WT_BM *bm, WT_SESSION_IMPL *session,
+    WT_ITEM *buf, WT_CKPT *ckptbase, bool data_checksum)
 {
 	return (__wt_block_checkpoint(
-	    session, bm->block, buf, ckptbase, data_cksum));
+	    session, bm->block, buf, ckptbase, data_checksum));
 }
 
 /*
@@ -73,12 +73,12 @@ __bm_checkpoint(WT_BM *bm,
  *	Write a buffer into a block, creating a checkpoint; readonly version.
  */
 static int
-__bm_checkpoint_readonly(WT_BM *bm,
-    WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckptbase, bool data_cksum)
+__bm_checkpoint_readonly(WT_BM *bm, WT_SESSION_IMPL *session,
+    WT_ITEM *buf, WT_CKPT *ckptbase, bool data_checksum)
 {
 	WT_UNUSED(buf);
 	WT_UNUSED(ckptbase);
-	WT_UNUSED(data_cksum);
+	WT_UNUSED(data_checksum);
 
 	return (__bm_readonly(bm, session));
 }
@@ -480,10 +480,10 @@ __bm_verify_start(WT_BM *bm,
  */
 static int
 __bm_write(WT_BM *bm, WT_SESSION_IMPL *session, WT_ITEM *buf,
-    uint8_t *addr, size_t *addr_sizep, bool data_cksum, bool checkpoint_io)
+    uint8_t *addr, size_t *addr_sizep, bool data_checksum, bool checkpoint_io)
 {
 	return (__wt_block_write(session,
-	    bm->block, buf, addr, addr_sizep, data_cksum, checkpoint_io));
+	    bm->block, buf, addr, addr_sizep, data_checksum, checkpoint_io));
 }
 
 /*
@@ -493,12 +493,12 @@ __bm_write(WT_BM *bm, WT_SESSION_IMPL *session, WT_ITEM *buf,
  */
 static int
 __bm_write_readonly(WT_BM *bm, WT_SESSION_IMPL *session, WT_ITEM *buf,
-    uint8_t *addr, size_t *addr_sizep, bool data_cksum, bool checkpoint_io)
+    uint8_t *addr, size_t *addr_sizep, bool data_checksum, bool checkpoint_io)
 {
 	WT_UNUSED(buf);
 	WT_UNUSED(addr);
 	WT_UNUSED(addr_sizep);
-	WT_UNUSED(data_cksum);
+	WT_UNUSED(data_checksum);
 	WT_UNUSED(checkpoint_io);
 
 	return (__bm_readonly(bm, session));
@@ -606,4 +606,29 @@ __wt_block_manager_open(WT_SESSION_IMPL *session,
 
 err:	WT_TRET(bm->close(bm, session));
 	return (ret);
+}
+
+/*
+ * __wt_block_panic --
+ * 	Report an error, then panic the handle and the system.
+ */
+int
+__wt_block_panic(WT_SESSION_IMPL *session, int error, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((cold))
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
+{
+	va_list ap;
+
+	/*
+	 * Ignore error returns from underlying event handlers, we already have
+	 * an error value to return.
+	 */
+	va_start(ap, fmt);
+	WT_IGNORE_RET(__wt_eventv(session, false, error, NULL, 0, fmt, ap));
+	va_end(ap);
+
+	/* Switch the handle into read-only mode. */
+	__bm_method_set(S2BT(session)->bm, true);
+
+	return (__wt_panic(session));
 }

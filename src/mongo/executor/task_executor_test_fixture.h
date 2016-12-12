@@ -53,10 +53,11 @@ public:
     static Status getDetectableErrorStatus();
 
     /**
-     * Validates command name in remote command request.
+     * Validates command name in remote command request. Returns the remote command request from
+     * the network interface for further validation if the command name matches.
      */
-    static void assertRemoteCommandNameEquals(StringData cmdName,
-                                              const RemoteCommandRequest& request);
+    static RemoteCommandRequest assertRemoteCommandNameEquals(StringData cmdName,
+                                                              const RemoteCommandRequest& request);
 
 protected:
     virtual ~TaskExecutorTest();

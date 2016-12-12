@@ -37,6 +37,7 @@
 #include "mongo/base/data_type_string_data.h"
 #include "mongo/base/data_type_terminated.h"
 #include "mongo/base/data_type_validated.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/rpc/object_check.h"
@@ -73,7 +74,7 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
     _database = std::move(str.value);
 
     uassert(28636,
-            str::stream() << "Database parsed in OP_COMMAND message must be between"
+            str::stream() << "Database parsed in OP_COMMAND message must be between "
                           << kMinDatabaseLength
                           << " and "
                           << kMaxDatabaseLength
@@ -90,7 +91,7 @@ CommandRequest::CommandRequest(const Message* message) : _message(message) {
     _commandName = std::move(str.value);
 
     uassert(28637,
-            str::stream() << "Command name parsed in OP_COMMAND message must be between"
+            str::stream() << "Command name parsed in OP_COMMAND message must be between "
                           << kMinCommandNameLength
                           << " and "
                           << kMaxCommandNameLength
@@ -136,9 +137,10 @@ DocumentRange CommandRequest::getInputDocs() const {
 }
 
 bool operator==(const CommandRequest& lhs, const CommandRequest& rhs) {
-    return std::tie(
-               lhs._database, lhs._commandName, lhs._metadata, lhs._commandArgs, lhs._inputDocs) ==
-        std::tie(rhs._database, rhs._commandName, rhs._metadata, rhs._commandArgs, rhs._inputDocs);
+    return (lhs._database == rhs._database) && (lhs._commandName == rhs._commandName) &&
+        SimpleBSONObjComparator::kInstance.evaluate(lhs._metadata == rhs._metadata) &&
+        SimpleBSONObjComparator::kInstance.evaluate(lhs._commandArgs == rhs._commandArgs) &&
+        (lhs._inputDocs == rhs._inputDocs);
 }
 
 bool operator!=(const CommandRequest& lhs, const CommandRequest& rhs) {

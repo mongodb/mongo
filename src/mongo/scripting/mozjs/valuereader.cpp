@@ -97,21 +97,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
             _value.setInt32(elem.Int());
             return;
         case mongo::Array: {
-            JS::AutoValueVector avv(_context);
-
-            BSONForEach(subElem, elem.embeddedObject()) {
-                JS::RootedValue member(_context);
-
-                ValueReader(_context, &member).fromBSONElement(subElem, parent, readOnly);
-                if (!avv.append(member)) {
-                    uasserted(ErrorCodes::JSInterpreterFailure, "Failed to append to JS array");
-                }
-            }
-            JS::RootedObject array(_context, JS_NewArrayObject(_context, avv));
-            if (!array) {
-                uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_NewArrayObject");
-            }
-            _value.setObjectOrNull(array);
+            fromBSONArray(elem.embeddedObject(), &parent, readOnly);
             return;
         }
         case mongo::Object:
@@ -252,6 +238,24 @@ void ValueReader::fromBSON(const BSONObj& obj, const BSONObj* parent, bool readO
     BSONInfo::make(_context, &child, obj, parent, readOnly);
 
     _value.setObjectOrNull(child);
+}
+
+void ValueReader::fromBSONArray(const BSONObj& obj, const BSONObj* parent, bool readOnly) {
+    JS::AutoValueVector avv(_context);
+
+    BSONForEach(elem, obj) {
+        JS::RootedValue member(_context);
+
+        ValueReader(_context, &member).fromBSONElement(elem, parent ? *parent : obj, readOnly);
+        if (!avv.append(member)) {
+            uasserted(ErrorCodes::JSInterpreterFailure, "Failed to append to JS array");
+        }
+    }
+    JS::RootedObject array(_context, JS_NewArrayObject(_context, avv));
+    if (!array) {
+        uasserted(ErrorCodes::JSInterpreterFailure, "Failed to JS_NewArrayObject");
+    }
+    _value.setObjectOrNull(array);
 }
 
 /**

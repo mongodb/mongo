@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -66,13 +67,13 @@ DistLockManager::ScopedDistLock acquireCollectionDistLock(OperationContext* txn,
                             << ChunkRange(args.getMinKey(), args.getMaxKey()).toString()
                             << " in "
                             << args.getNss().ns());
-    auto distLockStatus =
-        Grid::get(txn)->catalogClient(txn)->distLock(txn, args.getNss().ns(), whyMessage);
+    auto distLockStatus = Grid::get(txn)->catalogClient(txn)->getDistLockManager()->lock(
+        txn, args.getNss().ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
     if (!distLockStatus.isOK()) {
         const string msg = str::stream()
             << "Could not acquire collection lock for " << args.getNss().ns()
-            << " to migrate chunk [" << args.getMinKey() << "," << args.getMaxKey() << ") due to "
-            << distLockStatus.getStatus().toString();
+            << " to migrate chunk [" << redact(args.getMinKey()) << "," << redact(args.getMaxKey())
+            << ") due to " << distLockStatus.getStatus().toString();
         warning() << msg;
         uasserted(distLockStatus.getStatus().code(), msg);
     }
@@ -86,7 +87,7 @@ DistLockManager::ScopedDistLock acquireCollectionDistLock(OperationContext* txn,
  */
 void uassertStatusOKWithWarning(const Status& status) {
     if (!status.isOK()) {
-        warning() << "Chunk move failed" << causedBy(status);
+        warning() << "Chunk move failed" << causedBy(redact(status));
         uassertStatusOK(status);
     }
 }
@@ -98,6 +99,7 @@ MONGO_FP_DECLARE(moveChunkHangAtStep3);
 MONGO_FP_DECLARE(moveChunkHangAtStep4);
 MONGO_FP_DECLARE(moveChunkHangAtStep5);
 MONGO_FP_DECLARE(moveChunkHangAtStep6);
+MONGO_FP_DECLARE(moveChunkHangAtStep7);
 
 class MoveChunkCommand : public Command {
 public:
@@ -146,17 +148,17 @@ public:
 
         if (!shardingState->enabled()) {
             shardingState->initializeFromConfigConnString(
-                txn, moveChunkRequest.getConfigServerCS().toString());
+                txn,
+                moveChunkRequest.getConfigServerCS().toString(),
+                moveChunkRequest.getFromShardId().toString());
         }
-
-        shardingState->setShardName(moveChunkRequest.getFromShardId().toString());
 
         // Make sure we're as up-to-date as possible with shard information. This catches the case
         // where we might have changed a shard's host by removing/adding a shard with the same name.
         grid.shardRegistry()->reload(txn);
 
         auto scopedRegisterMigration =
-            uassertStatusOK(shardingState->registerMigration(moveChunkRequest));
+            uassertStatusOK(shardingState->registerDonateChunk(moveChunkRequest));
 
         Status status = {ErrorCodes::InternalError, "Uninitialized value"};
 
@@ -199,13 +201,27 @@ private:
             uassertStatusOK(ChunkMoveWriteConcernOptions::getEffectiveWriteConcern(
                 txn, moveChunkRequest.getSecondaryThrottle()));
 
+        // Resolve the donor and recipient shards and their connection string
+        auto const shardRegistry = Grid::get(txn)->shardRegistry();
+
+        const auto donorConnStr =
+            uassertStatusOK(shardRegistry->getShard(txn, moveChunkRequest.getFromShardId()))
+                ->getConnString();
+        const auto recipientHost = uassertStatusOK([&] {
+            auto recipientShard =
+                uassertStatusOK(shardRegistry->getShard(txn, moveChunkRequest.getToShardId()));
+
+            return recipientShard->getTargeter()->findHostNoWait(
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly});
+        }());
+
         string unusedErrMsg;
         MoveTimingHelper moveTimingHelper(txn,
                                           "from",
                                           moveChunkRequest.getNss().ns(),
                                           moveChunkRequest.getMinKey(),
                                           moveChunkRequest.getMaxKey(),
-                                          6,  // Total number of steps
+                                          7,  // Total number of steps
                                           &unusedErrMsg,
                                           moveChunkRequest.getToShardId(),
                                           moveChunkRequest.getFromShardId());
@@ -222,7 +238,8 @@ private:
                 scopedCollectionDistLock = acquireCollectionDistLock(txn, moveChunkRequest);
             }
 
-            MigrationSourceManager migrationSourceManager(txn, moveChunkRequest);
+            MigrationSourceManager migrationSourceManager(
+                txn, moveChunkRequest, donorConnStr, recipientHost);
 
             shardKeyPattern = migrationSourceManager.getKeyPattern().getOwned();
 
@@ -251,9 +268,13 @@ private:
             }
 
             uassertStatusOKWithWarning(migrationSourceManager.enterCriticalSection(txn));
-            uassertStatusOKWithWarning(migrationSourceManager.commitDonateChunk(txn));
+            uassertStatusOKWithWarning(migrationSourceManager.commitChunkOnRecipient(txn));
             moveTimingHelper.done(5);
             MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep5);
+
+            uassertStatusOKWithWarning(migrationSourceManager.commitChunkMetadataOnConfig(txn));
+            moveTimingHelper.done(6);
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep6);
         }
 
         // Schedule the range deleter
@@ -275,7 +296,7 @@ private:
             // This is an immediate delete, and as a consequence, there could be more
             // deletes happening simultaneously than there are deleter worker threads.
             if (!getDeleter()->deleteNow(txn, deleterOptions, &errMsg)) {
-                log() << "Error occured while performing cleanup: " << errMsg;
+                log() << "Error occured while performing cleanup: " << redact(errMsg);
             }
         } else {
             log() << "forking for cleanup of chunk data";
@@ -285,12 +306,12 @@ private:
                                            deleterOptions,
                                            NULL,  // Don't want to be notified
                                            &errMsg)) {
-                log() << "could not queue migration cleanup: " << errMsg;
+                log() << "could not queue migration cleanup: " << redact(errMsg);
             }
         }
 
-        moveTimingHelper.done(6);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep6);
+        moveTimingHelper.done(7);
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(moveChunkHangAtStep7);
     }
 
 } moveChunkCmd;

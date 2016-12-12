@@ -109,12 +109,12 @@ public:
         cmdBuilder.append("writeConcern", kMajorityWriteConcern.toBSON());
 
         auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
-        auto cmdResponseStatus =
-            uassertStatusOK(configShard->runCommand(txn,
-                                                    kPrimaryOnlyReadPreference,
-                                                    "admin",
-                                                    cmdBuilder.obj(),
-                                                    Shard::RetryPolicy::kIdempotent));
+        auto cmdResponseStatus = uassertStatusOK(
+            configShard->runCommandWithFixedRetryAttempts(txn,
+                                                          kPrimaryOnlyReadPreference,
+                                                          "admin",
+                                                          cmdBuilder.obj(),
+                                                          Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(cmdResponseStatus.commandStatus);
         return true;
     }

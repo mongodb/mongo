@@ -361,6 +361,13 @@ void ObjectWrapper::setBSON(Key key, const BSONObj& obj, bool readOnly) {
     setValue(key, value);
 }
 
+void ObjectWrapper::setBSONArray(Key key, const BSONObj& obj, bool readOnly) {
+    JS::RootedValue value(_context);
+    ValueReader(_context, &value).fromBSONArray(obj, nullptr, readOnly);
+
+    setValue(key, value);
+}
+
 void ObjectWrapper::setValue(Key key, JS::HandleValue val) {
     key.set(_context, _object, val);
 }

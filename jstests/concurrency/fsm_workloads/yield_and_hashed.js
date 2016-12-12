@@ -27,6 +27,7 @@ var $config = extendWorkload($config, function($config, $super) {
                     keyPattern: {c: 1},
                     startKey: {'': nMatches},
                     endKey: {},
+                    startKeyInclusive: true,
                     endKeyInclusive: true,
                     direction: -1
                 }
@@ -41,6 +42,7 @@ var $config = extendWorkload($config, function($config, $super) {
                     keyPattern: {d: 1},
                     startKey: {'': this.nDocs - nMatches},
                     endKey: {},
+                    startKeyInclusive: true,
                     endKeyInclusive: true,
                     direction: 1
                 }

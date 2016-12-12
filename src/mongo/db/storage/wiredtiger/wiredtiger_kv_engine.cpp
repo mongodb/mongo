@@ -31,9 +31,13 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
+#include "mongo/platform/basic.h"
+
 #ifdef _WIN32
 #define NVALGRIND
 #endif
+
+#include <memory>
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 
@@ -55,6 +59,7 @@
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_extensions.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -62,6 +67,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/exit.h"
@@ -221,7 +227,9 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
         ss << ",log_size=2GB),";
         ss << "statistics_log=(wait=" << wiredTigerGlobalOptions.statisticsLogDelaySecs << "),";
     }
-    ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())->getOpenConfig("system");
+    ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
+              ->getTableCreateConfig("system");
+    ss << WiredTigerExtensions::get(getGlobalServiceContext())->getOpenExtensionsConfig();
     ss << extraOpenOptions;
     if (_readOnly) {
         invariant(!_durable);
@@ -462,32 +470,33 @@ Status WiredTigerKVEngine::createRecordStore(OperationContext* opCtx,
     return wtRCToStatus(s->create(s, uri.c_str(), config.c_str()));
 }
 
-RecordStore* WiredTigerKVEngine::getRecordStore(OperationContext* opCtx,
-                                                StringData ns,
-                                                StringData ident,
-                                                const CollectionOptions& options) {
+std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext* opCtx,
+                                                                StringData ns,
+                                                                StringData ident,
+                                                                const CollectionOptions& options) {
     if (options.capped) {
-        return new WiredTigerRecordStore(opCtx,
-                                         ns,
-                                         _uri(ident),
-                                         _canonicalName,
-                                         options.capped,
-                                         _ephemeral,
-                                         options.cappedSize ? options.cappedSize : 4096,
-                                         options.cappedMaxDocs ? options.cappedMaxDocs : -1,
-                                         NULL,
-                                         _sizeStorer.get());
+        return stdx::make_unique<WiredTigerRecordStore>(
+            opCtx,
+            ns,
+            _uri(ident),
+            _canonicalName,
+            options.capped,
+            _ephemeral,
+            options.cappedSize ? options.cappedSize : 4096,
+            options.cappedMaxDocs ? options.cappedMaxDocs : -1,
+            nullptr,
+            _sizeStorer.get());
     } else {
-        return new WiredTigerRecordStore(opCtx,
-                                         ns,
-                                         _uri(ident),
-                                         _canonicalName,
-                                         false,
-                                         _ephemeral,
-                                         -1,
-                                         -1,
-                                         NULL,
-                                         _sizeStorer.get());
+        return stdx::make_unique<WiredTigerRecordStore>(opCtx,
+                                                        ns,
+                                                        _uri(ident),
+                                                        _canonicalName,
+                                                        false,
+                                                        _ephemeral,
+                                                        -1,
+                                                        -1,
+                                                        nullptr,
+                                                        _sizeStorer.get());
     }
 }
 

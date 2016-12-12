@@ -78,7 +78,7 @@ key_gen_setup(WT_ITEM *key)
 }
 
 static void
-key_gen_common(WT_ITEM *key, uint64_t keyno, int suffix)
+key_gen_common(WT_ITEM *key, uint64_t keyno, const char * const suffix)
 {
 	int len;
 	char *p;
@@ -86,11 +86,15 @@ key_gen_common(WT_ITEM *key, uint64_t keyno, int suffix)
 	p = key->mem;
 
 	/*
-	 * The key always starts with a 10-digit string (the specified cnt)
+	 * The key always starts with a 10-digit string (the specified row)
 	 * followed by two digits, a random number between 1 and 15 if it's
 	 * an insert, otherwise 00.
 	 */
-	len = sprintf(p, "%010" PRIu64 ".%02d", keyno, suffix);
+	u64_to_string_zf(keyno, key->mem, 11);
+	p[10] = '.';
+	p[11] = suffix[0];
+	p[12] = suffix[1];
+	len = 13;
 
 	/*
 	 * In a column-store, the key is only used for Berkeley DB inserts,
@@ -118,13 +122,19 @@ key_gen_common(WT_ITEM *key, uint64_t keyno, int suffix)
 void
 key_gen(WT_ITEM *key, uint64_t keyno)
 {
-	key_gen_common(key, keyno, 0);
+	key_gen_common(key, keyno, "00");
 }
 
 void
 key_gen_insert(WT_RAND_STATE *rnd, WT_ITEM *key, uint64_t keyno)
 {
-	key_gen_common(key, keyno, (int)mmrand(rnd, 1, 15));
+	static const char * const suffix[15] = {
+	    "01", "02", "03", "04", "05",
+	    "06", "07", "08", "09", "10",
+	    "11", "12", "13", "14", "15"
+	};
+
+	key_gen_common(key, keyno, suffix[mmrand(rnd, 1, 15) - 1]);
 }
 
 static uint32_t val_dup_data_len;	/* Length of duplicate data items */
@@ -221,7 +231,7 @@ val_gen(WT_RAND_STATE *rnd, WT_ITEM *value, uint64_t keyno)
 		p[10] = '/';
 		value->size = val_dup_data_len;
 	} else {
-		(void)sprintf(p, "%010" PRIu64, keyno);
+		u64_to_string_zf(keyno, p, 11);
 		p[10] = '/';
 		value->size =
 		    value_len(rnd, keyno, g.c_value_min, g.c_value_max);
@@ -319,17 +329,23 @@ path_setup(const char *home)
 	 */
 #undef	CMD
 #ifdef _WIN32
-#define	CMD	"test -e %s || mkdir %s; "				\
-		"cd %s && del /s /q * >:nul && rd /s /q KVS; "		\
-		"mkdir KVS"
+#define	CMD  "del /q rand.copy & " \
+	     "(IF EXIST %s\\rand copy /y %s\\rand rand.copy) & "	\
+	     "(IF EXIST %s rd /s /q %s) & mkdir %s & "			\
+	     "(IF EXIST rand.copy copy rand.copy %s\\rand) & " \
+	     "cd %s & mkdir KVS"
+	len = strlen(g.home) * 7 + strlen(CMD) + 1;
+	g.home_init = dmalloc(len);
+	snprintf(g.home_init, len, CMD,
+	    g.home, g.home, g.home, g.home, g.home, g.home, g.home);
 #else
 #define	CMD	"test -e %s || mkdir %s; "				\
 		"cd %s > /dev/null && rm -rf `ls | sed /rand/d`; "	\
 		"mkdir KVS"
-#endif
 	len = strlen(g.home) * 3 + strlen(CMD) + 1;
 	g.home_init = dmalloc(len);
 	snprintf(g.home_init, len, CMD, g.home, g.home, g.home);
+#endif
 
 	/* Primary backup directory. */
 	len = strlen(g.home) + strlen("BACKUP") + 2;
@@ -342,7 +358,7 @@ path_setup(const char *home)
 	 */
 #undef	CMD
 #ifdef _WIN32
-#define	CMD	"del %s/%s %s/%s /s /q >:nul && mkdir %s/%s %s/%s"
+#define	CMD	"rd /s /q %s\\%s %s\\%s & mkdir %s\\%s %s\\%s"
 #else
 #define	CMD	"rm -rf %s/%s %s/%s && mkdir %s/%s %s/%s"
 #endif

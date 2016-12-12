@@ -28,9 +28,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_coll_stats.h"
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/util/time_support.h"
 
@@ -38,7 +39,9 @@ using boost::intrusive_ptr;
 
 namespace mongo {
 
-REGISTER_DOCUMENT_SOURCE(collStats, DocumentSourceCollStats::createFromBson);
+REGISTER_DOCUMENT_SOURCE(collStats,
+                         DocumentSourceCollStats::LiteParsed::parse,
+                         DocumentSourceCollStats::createFromBson);
 
 const char* DocumentSourceCollStats::getSourceName() const {
     return "$collStats";
@@ -54,34 +57,69 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
     for (const auto& elem : specElem.embeddedObject()) {
         StringData fieldName = elem.fieldNameStringData();
 
-        if (fieldName == "latencyStats") {
+        if ("latencyStats" == fieldName) {
             uassert(40167,
-                    str::stream() << "latencyStats argument must be an object, but found: " << elem,
+                    str::stream() << "latencyStats argument must be an object, but got " << elem
+                                  << " of type "
+                                  << typeName(elem.type()),
                     elem.type() == BSONType::Object);
-            collStats->_latencySpecified = true;
+            if (!elem["histograms"].eoo()) {
+                uassert(40305,
+                        str::stream() << "histograms option to latencyStats must be bool, got "
+                                      << elem
+                                      << "of type "
+                                      << typeName(elem.type()),
+                        elem["histograms"].isBoolean());
+            }
+        } else if ("storageStats" == fieldName) {
+            uassert(40279,
+                    str::stream() << "storageStats argument must be an object, but got " << elem
+                                  << " of type "
+                                  << typeName(elem.type()),
+                    elem.type() == BSONType::Object);
         } else {
             uasserted(40168, str::stream() << "unrecognized option to $collStats: " << fieldName);
         }
     }
 
+    collStats->_collStatsSpec = specElem.Obj().getOwned();
     return collStats;
 }
 
-boost::optional<Document> DocumentSourceCollStats::getNext() {
+DocumentSource::GetNextResult DocumentSourceCollStats::getNext() {
     if (_finished) {
-        return boost::none;
+        return GetNextResult::makeEOF();
     }
 
     _finished = true;
 
     BSONObjBuilder builder;
-
+    builder.append("ns", pExpCtx->ns.ns());
     builder.appendDate("localTime", jsTime());
-    if (_latencySpecified) {
-        _mongod->appendLatencyStats(pExpCtx->ns, &builder);
+
+    if (_collStatsSpec.hasField("latencyStats")) {
+        // If the latencyStats field exists, it must have been validated as an object when parsing.
+        bool includeHistograms = false;
+        if (_collStatsSpec["latencyStats"].type() == BSONType::Object) {
+            includeHistograms = _collStatsSpec["latencyStats"]["histograms"].boolean();
+        }
+        _mongod->appendLatencyStats(pExpCtx->ns, includeHistograms, &builder);
     }
 
-    return Document(builder.obj());
+    if (_collStatsSpec.hasField("storageStats")) {
+        // If the storageStats field exists, it must have been validated as an object when parsing.
+        BSONObjBuilder storageBuilder(builder.subobjStart("storageStats"));
+        Status status = _mongod->appendStorageStats(
+            pExpCtx->ns, _collStatsSpec["storageStats"].Obj(), &storageBuilder);
+        storageBuilder.doneFast();
+        if (!status.isOK()) {
+            uasserted(40280,
+                      str::stream() << "Unable to retrieve storageStats in $collStats stage: "
+                                    << status.reason());
+        }
+    }
+
+    return {Document(builder.obj())};
 }
 
 bool DocumentSourceCollStats::isValidInitialSource() const {
@@ -89,10 +127,7 @@ bool DocumentSourceCollStats::isValidInitialSource() const {
 }
 
 Value DocumentSourceCollStats::serialize(bool explain) const {
-    if (_latencySpecified) {
-        return Value(DOC(getSourceName() << DOC("latencyStats" << Document())));
-    }
-    return Value(DOC(getSourceName() << Document()));
+    return Value(Document{{getSourceName(), _collStatsSpec}});
 }
 
 }  // namespace mongo

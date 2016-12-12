@@ -253,6 +253,14 @@ assert.commandWorked(explain);
 assert(planHasStage(explain.queryPlanner.winningPlan, "COUNT"));
 assert(planHasStage(explain.queryPlanner.winningPlan, "COUNT_SCAN"));
 
+// Explainable count with hint.
+assert.commandWorked(t.ensureIndex({c: 1}, {sparse: true}));
+explain = t.explain().count({c: {$exists: false}}, {hint: "c_1"});
+assert.commandWorked(explain);
+assert(planHasStage(explain.queryPlanner.winningPlan, "IXSCAN"));
+assert.eq(getPlanStage(explain.queryPlanner.winningPlan, "IXSCAN").indexName, "c_1");
+assert.commandWorked(t.dropIndex({c: 1}));
+
 //
 // .group()
 //

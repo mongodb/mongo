@@ -585,8 +585,7 @@ CompileError::throwError(JSContext* cx)
 
 CompileError::~CompileError()
 {
-    js_free((void*)report.uclinebuf);
-    js_free((void*)report.linebuf);
+    js_free((void*)report.linebuf());
     js_free((void*)report.ucmessage);
     js_free(message);
     message = nullptr;
@@ -689,22 +688,17 @@ TokenStream::reportCompileErrorNumberVA(uint32_t offset, unsigned flags, unsigne
         // Create the windowed strings.
         StringBuffer windowBuf(cx);
         if (!windowBuf.append(userbuf.rawCharPtrAt(windowStart), windowLength) ||
-            !windowBuf.append((char16_t)0))
+            !windowBuf.append('\0'))
+        {
+            return false;
+        }
+
+        // The window into the offending source line, without final \n.
+        mozilla::UniquePtr<char16_t[], JS::FreePolicy> linebuf(windowBuf.stealChars());
+        if (!linebuf)
             return false;
 
-        // Unicode and char versions of the window into the offending source
-        // line, without final \n.
-        err.report.uclinebuf = windowBuf.stealChars();
-        if (!err.report.uclinebuf)
-            return false;
-
-        mozilla::Range<const char16_t> tbchars(err.report.uclinebuf, windowLength);
-        err.report.linebuf = JS::LossyTwoByteCharsToNewLatin1CharsZ(cx, tbchars).c_str();
-        if (!err.report.linebuf)
-            return false;
-
-        err.report.tokenptr = err.report.linebuf + (offset - windowStart);
-        err.report.uctokenptr = err.report.uclinebuf + (offset - windowStart);
+        err.report.initLinebuf(linebuf.release(), windowLength, offset - windowStart);
     }
 
     if (cx->isJSContext())

@@ -53,6 +53,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/range_preserver.h"
+#include "mongo/db/server_options.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/log.h"
 
@@ -109,7 +110,7 @@ public:
             return false;
         }
 
-        const NamespaceString nss(parseNs(dbname, cmdObj));
+        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
         AutoGetCollectionForRead ctx(txn, nss);
 
         Collection* collection = ctx.getCollection();
@@ -182,6 +183,15 @@ public:
             if (collationEltStatus.isOK()) {
                 collation = collationElt.Obj();
             }
+        }
+        if (!collation.isEmpty() &&
+            serverGlobalParams.featureCompatibility.version.load() ==
+                ServerGlobalParams::FeatureCompatibility::Version::k32) {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::InvalidOptions,
+                       "The featureCompatibilityVersion must be 3.4 to use collation. See "
+                       "http://dochub.mongodb.org/core/3.4-feature-compatibility."));
         }
 
         long long numWanted = 100;
@@ -271,7 +281,7 @@ public:
 
             // Don't make a too-big result object.
             if (resultBuilder.len() + resObj.objsize() > BSONObjMaxUserSize) {
-                warning() << "Too many geoNear results for query " << rewritten.toString()
+                warning() << "Too many geoNear results for query " << redact(rewritten)
                           << ", truncating output.";
                 break;
             }
@@ -299,7 +309,7 @@ public:
         // Return an error if execution fails for any reason.
         if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
             log() << "Plan executor error during geoNear command: " << PlanExecutor::statestr(state)
-                  << ", stats: " << Explain::getWinningPlanStats(exec.get());
+                  << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
 
             return appendCommandStatus(result,
                                        Status(ErrorCodes::OperationFailed,
@@ -321,14 +331,14 @@ public:
             stats.append("avgDistance", totalDistance / results);
         }
         stats.append("maxDistance", farthestDist);
-        stats.append("time", curOp->elapsedMillis());
+        stats.appendIntOrLL("time", curOp->elapsedMicros() / 1000);
         stats.done();
 
         collection->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
 
         curOp->debug().setPlanSummaryMetrics(summary);
 
-        if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+        if (curOp->shouldDBProfile()) {
             BSONObjBuilder execStatsBob;
             Explain::getWinningPlanStats(exec.get(), &execStatsBob);
             curOp->debug().execStats = execStatsBob.obj();

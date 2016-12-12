@@ -64,8 +64,7 @@ Status dropCollection(OperationContext* txn,
         AutoGetDb autoDb(txn, dbname, MODE_X);
         Database* const db = autoDb.getDb();
         Collection* coll = db ? db->getCollection(collectionName) : nullptr;
-        ViewDefinition* view =
-            db ? db->getViewCatalog()->lookup(txn, collectionName.ns()) : nullptr;
+        auto view = db && !coll ? db->getViewCatalog()->lookup(txn, collectionName.ns()) : nullptr;
 
         if (!db || (!coll && !view)) {
             return Status(ErrorCodes::NamespaceNotFound, "ns not found");

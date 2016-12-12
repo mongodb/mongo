@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include <cctype>
+#include "mongo/db/pipeline/document_source_match.h"
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_algo.h"
@@ -36,8 +36,8 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/stringutils.h"
 
@@ -49,7 +49,9 @@ using std::unique_ptr;
 using std::string;
 using std::vector;
 
-REGISTER_DOCUMENT_SOURCE(match, DocumentSourceMatch::createFromBson);
+REGISTER_DOCUMENT_SOURCE(match,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceMatch::createFromBson);
 
 const char* DocumentSourceMatch::getSourceName() const {
     return "$match";
@@ -63,29 +65,29 @@ intrusive_ptr<DocumentSource> DocumentSourceMatch::optimize() {
     return getQuery().isEmpty() ? nullptr : this;
 }
 
-boost::optional<Document> DocumentSourceMatch::getNext() {
+DocumentSource::GetNextResult DocumentSourceMatch::getNext() {
     pExpCtx->checkForInterrupt();
 
     // The user facing error should have been generated earlier.
     massert(17309, "Should never call getNext on a $match stage with $text clause", !_isTextQuery);
 
-    while (boost::optional<Document> next = pSource->getNext()) {
+    auto nextInput = pSource->getNext();
+    for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
         // MatchExpression only takes BSON documents, so we have to make one. As an optimization,
         // only serialize the fields we need to do the match.
-        if (_dependencies.needWholeDocument) {
-            if (_expression->matchesBSON(next->toBson())) {
-                return next;
-            }
-        } else if (_expression->matchesBSON(getObjectForMatch(*next, _dependencies.fields))) {
-            return next;
+        BSONObj toMatch = _dependencies.needWholeDocument
+            ? nextInput.getDocument().toBson()
+            : getObjectForMatch(nextInput.getDocument(), _dependencies.fields);
+
+        if (_expression->matchesBSON(toMatch)) {
+            return nextInput;
         }
     }
 
-    // We have exhausted the previous source.
-    return boost::none;
+    return nextInput;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceMatch::optimizeAt(
+Pipeline::SourceContainer::iterator DocumentSourceMatch::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
@@ -109,12 +111,10 @@ Pipeline::SourceContainer::iterator DocumentSourceMatch::optimizeAt(
 BSONObj DocumentSourceMatch::getObjectForMatch(const Document& input,
                                                const std::set<std::string>& fields) {
     BSONObjBuilder matchObject;
-
     for (auto&& field : fields) {
         // getNestedField does not handle dotted paths correctly, so instead of retrieving the
         // entire path, we just extract the first element of the path.
-        FieldPath path(field);
-        auto prefix = path.getFieldName(0);
+        const auto prefix = FieldPath::extractFirstFieldFromDottedPath(field);
         if (!matchObject.hasField(prefix)) {
             // Avoid adding the same prefix twice.
             input.getField(prefix).addToBsonObj(&matchObject, prefix);
@@ -360,9 +360,11 @@ void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other
     StatusWithMatchExpression status = uassertStatusOK(
         MatchExpressionParser::parse(_predicate, ExtensionsCallbackNoop(), pExpCtx->getCollator()));
     _expression = std::move(status.getValue());
+    _dependencies = DepsTracker(_dependencies.getMetadataAvailable());
+    getDependencies(&_dependencies);
 }
 
-pair<intrusive_ptr<DocumentSource>, intrusive_ptr<DocumentSource>>
+pair<intrusive_ptr<DocumentSourceMatch>, intrusive_ptr<DocumentSourceMatch>>
 DocumentSourceMatch::splitSourceBy(const std::set<std::string>& fields) {
     pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> newExpr(
         expression::splitMatchExpressionBy(std::move(_expression), fields));
@@ -370,7 +372,7 @@ DocumentSourceMatch::splitSourceBy(const std::set<std::string>& fields) {
     invariant(newExpr.first || newExpr.second);
 
     if (!newExpr.first) {
-        // The entire $match dependends on 'fields'.
+        // The entire $match depends on 'fields'.
         _expression = std::move(newExpr.second);
         return {nullptr, this};
     } else if (!newExpr.second) {
@@ -388,15 +390,12 @@ DocumentSourceMatch::splitSourceBy(const std::set<std::string>& fields) {
     BSONObjBuilder firstBob;
     newExpr.first->serialize(&firstBob);
 
-    intrusive_ptr<DocumentSource> firstMatch(new DocumentSourceMatch(firstBob.obj(), pExpCtx));
-
     // This $match stage is still needed, so update the MatchExpression as needed.
     BSONObjBuilder secondBob;
     newExpr.second->serialize(&secondBob);
 
-    intrusive_ptr<DocumentSource> secondMatch(new DocumentSourceMatch(secondBob.obj(), pExpCtx));
-
-    return {firstMatch, secondMatch};
+    return {DocumentSourceMatch::create(firstBob.obj(), pExpCtx),
+            DocumentSourceMatch::create(secondBob.obj(), pExpCtx)};
 }
 
 boost::intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::descendMatchOnPath(
@@ -450,13 +449,19 @@ static void uassertNoDisallowedClauses(BSONObj query) {
     }
 }
 
+intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::create(
+    BSONObj filter, const intrusive_ptr<ExpressionContext>& expCtx) {
+    uassertNoDisallowedClauses(filter);
+    intrusive_ptr<DocumentSourceMatch> match(new DocumentSourceMatch(filter, expCtx));
+    match->injectExpressionContext(expCtx);
+    return match;
+}
+
 intrusive_ptr<DocumentSource> DocumentSourceMatch::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(15959, "the match filter must be an expression in an object", elem.type() == Object);
 
-    uassertNoDisallowedClauses(elem.Obj());
-
-    return new DocumentSourceMatch(elem.Obj(), pExpCtx);
+    return DocumentSourceMatch::create(elem.Obj(), pExpCtx);
 }
 
 BSONObj DocumentSourceMatch::getQuery() const {

@@ -85,15 +85,20 @@ public:
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
-        const string target = cmdObj.firstElement().valuestrsafe();
+        uassert(ErrorCodes::TypeMismatch,
+                str::stream() << "Field '" << cmdObj.firstElement().fieldName()
+                              << "' must be of type String",
+                cmdObj.firstElement().type() == BSONType::String);
+        const string target = cmdObj.firstElement().str();
 
-        const auto s = grid.shardRegistry()->getShard(txn, ShardId(target));
-        if (!s) {
+        const auto shardStatus = grid.shardRegistry()->getShard(txn, ShardId(target));
+        if (!shardStatus.isOK()) {
             string msg(str::stream() << "Could not drop shard '" << target
                                      << "' because it does not exist");
             log() << msg;
             return appendCommandStatus(result, Status(ErrorCodes::ShardNotFound, msg));
         }
+        const auto s = shardStatus.getValue();
 
         auto catalogClient = grid.catalogClient(txn);
         StatusWith<ShardDrainingStatus> removeShardResult =
@@ -142,7 +147,8 @@ public:
                                              BSONObj(),
                                              boost::none,  // return all
                                              &chunks,
-                                             nullptr);
+                                             nullptr,
+                                             repl::ReadConcernLevel::kMajorityReadConcern);
                 if (!status.isOK()) {
                     return appendCommandStatus(result, status);
                 }

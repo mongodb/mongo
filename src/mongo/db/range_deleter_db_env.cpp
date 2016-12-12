@@ -83,14 +83,14 @@ bool RangeDeleterDBEnv::deleteRange(OperationContext* txn,
 
     // log the opId so the user can use it to cancel the delete using killOp.
     unsigned int opId = txn->getOpID();
-    log() << "Deleter starting delete for: " << ns << " from " << inclusiveLower << " -> "
-          << exclusiveUpper << ", with opId: " << opId;
+    log() << "Deleter starting delete for: " << ns << " from " << redact(inclusiveLower) << " -> "
+          << redact(exclusiveUpper) << ", with opId: " << opId;
 
     try {
         *deletedDocs =
             Helpers::removeRange(txn,
                                  KeyRange(ns, inclusiveLower, exclusiveUpper, keyPattern),
-                                 false, /*maxInclusive*/
+                                 BoundInclusion::kIncludeStartKeyOnly,
                                  writeConcern,
                                  removeSaverPtr,
                                  fromMigrate,
@@ -104,7 +104,7 @@ bool RangeDeleterDBEnv::deleteRange(OperationContext* txn,
         }
 
         log() << "rangeDeleter deleted " << *deletedDocs << " documents for " << ns << " from "
-              << inclusiveLower << " -> " << exclusiveUpper;
+              << redact(inclusiveLower) << " -> " << redact(exclusiveUpper);
     } catch (const DBException& ex) {
         *errMsg = str::stream() << "Error encountered while deleting range: "
                                 << "ns" << ns << " from " << inclusiveLower << " -> "

@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "mongo/base/static_assert.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/storage/mmap_v1/diskloc.h"
 #include "mongo/db/storage/record_data.h"
@@ -175,6 +176,6 @@ private:
     DiskLoc _nextDeleted;
 };
 
-static_assert(16 == sizeof(DeletedRecord), "16 == sizeof(DeletedRecord)");
+MONGO_STATIC_ASSERT(16 == sizeof(DeletedRecord));
 
 }  // namespace mongo

@@ -41,7 +41,8 @@ class ReplicationCoordinatorExternalState;
  * Begins an initial sync of a node.  This drops all data, chooses a sync source,
  * and runs the cloner from that sync source.  The node's state is not changed.
  */
-void syncDoInitialSync(ReplicationCoordinatorExternalState* replicationCoordinatorExternalState);
+void syncDoInitialSync(OperationContext* txn,
+                       ReplicationCoordinatorExternalState* replicationCoordinatorExternalState);
 
 /**
  * Checks that the "admin" database contains a supported version of the auth data schema.

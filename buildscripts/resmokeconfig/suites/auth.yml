@@ -2,6 +2,9 @@ selector:
   js_test:
     roots:
     - jstests/auth/*.js
+    exclude_files:
+    # Skip until SERVER-25618 is resolved.
+    - jstests/auth/repl.js
 
 # Auth tests start their own mongod's.
 executor:

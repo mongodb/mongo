@@ -48,8 +48,9 @@ bool is32bit() {
 }
 
 void logProcessDetails() {
-    log() << mongodVersion();
-    printBuildInfo();
+    auto&& vii = VersionInfoInterface::instance();
+    log() << mongodVersion(vii);
+    vii.logBuildInfo();
     printCommandLineOpts();
 }
 

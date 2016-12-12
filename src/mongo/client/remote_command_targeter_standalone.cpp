@@ -42,16 +42,23 @@ ConnectionString RemoteCommandTargeterStandalone::connectionString() {
     return ConnectionString(_hostAndPort);
 }
 
-StatusWith<HostAndPort> RemoteCommandTargeterStandalone::findHost(
+StatusWith<HostAndPort> RemoteCommandTargeterStandalone::findHostWithMaxWait(
     const ReadPreferenceSetting& readPref, Milliseconds maxWait) {
     return _hostAndPort;
 }
 
-void RemoteCommandTargeterStandalone::markHostNotMaster(const HostAndPort& host) {
+StatusWith<HostAndPort> RemoteCommandTargeterStandalone::findHost(
+    OperationContext* txn, const ReadPreferenceSetting& readPref) {
+    return _hostAndPort;
+}
+
+void RemoteCommandTargeterStandalone::markHostNotMaster(const HostAndPort& host,
+                                                        const Status& status) {
     dassert(host == _hostAndPort);
 }
 
-void RemoteCommandTargeterStandalone::markHostUnreachable(const HostAndPort& host) {
+void RemoteCommandTargeterStandalone::markHostUnreachable(const HostAndPort& host,
+                                                          const Status& status) {
     dassert(host == _hostAndPort);
 }
 

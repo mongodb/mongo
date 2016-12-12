@@ -304,7 +304,9 @@ void MockReplicaSet::mockReplSetGetStatusCmd() {
             hostsField.push_back(hostMemberBuilder.obj());
         }
 
-        sort(hostsField.begin(), hostsField.end());
+        std::sort(hostsField.begin(),
+                  hostsField.end(),
+                  SimpleBSONObjComparator::kInstance.makeLessThan());
 
         // TODO: syncingTo
 

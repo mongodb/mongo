@@ -4,7 +4,7 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 1, other: {chunkSize: 1}});
+    var st = new ShardingTest({shards: 1, other: {chunkSize: 1, enableAutoSplit: true}});
 
     var configDB = st.s.getDB('config');
     assert.commandWorked(configDB.adminCommand({enableSharding: 'test'}));

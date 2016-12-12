@@ -83,7 +83,10 @@ public:
      *  - SendStaleConfigException if the expected collection version does not match what we find it
      *      to be after acquiring the distributed lock.
      */
-    MigrationSourceManager(OperationContext* txn, MoveChunkRequest request);
+    MigrationSourceManager(OperationContext* txn,
+                           MoveChunkRequest request,
+                           ConnectionString donorConnStr,
+                           HostAndPort recipientHost);
     ~MigrationSourceManager();
 
     /**
@@ -113,12 +116,21 @@ public:
     /**
      * Waits for the active clone operation to catch up and enters critical section. Once this call
      * returns successfully, no writes will be happening on this shard until the chunk donation is
-     * committed. Therefore, commitDonateChunk must be called as soon as possible after it.
+     * committed. Therefore, commitChunkOnRecipient/commitChunkMetadata must be called as soon as
+     * possible afterwards.
      *
      * Expected state: kCloneCaughtUp
      * Resulting state: kCriticalSection on success, kDone on failure
      */
     Status enterCriticalSection(OperationContext* txn);
+
+    /**
+     * Tells the recipient of the chunk to commit the chunk contents, which it received.
+     *
+     * Expected state: kCriticalSection
+     * Resulting state: kCloneCompleted on success, kDone on failure
+     */
+    Status commitChunkOnRecipient(OperationContext* txn);
 
     /**
      * Tells the recipient shard to fetch the latest portion of data from the donor and to commit it
@@ -129,10 +141,10 @@ public:
      *       applying the committed chunk information fails and we cannot definitely verify that the
      *       write was definitely applied or not, this call may crash the server.
      *
-     * Expected state: kCriticalSection
+     * Expected state: kCloneCompleted
      * Resulting state: kDone
      */
-    Status commitDonateChunk(OperationContext* txn);
+    Status commitChunkMetadataOnConfig(OperationContext* txn);
 
     /**
      * May be called at any time. Unregisters the migration source manager from the collection,
@@ -172,10 +184,17 @@ public:
         return _critSecSignal;
     }
 
+    /**
+     * Returns a report on the active migration.
+     *
+     * Must be called with some form of lock on the collection namespace.
+     */
+    BSONObj getMigrationStatusReport() const;
+
 private:
     // Used to track the current state of the source manager. See the methods above, which have
     // comments explaining the various state transitions.
-    enum State { kCreated, kCloning, kCloneCaughtUp, kCriticalSection, kDone };
+    enum State { kCreated, kCloning, kCloneCaughtUp, kCriticalSection, kCloneCompleted, kDone };
 
     /**
      * Called when any of the states fails. May only be called once and will put the migration
@@ -186,16 +205,20 @@ private:
     // The parameters to the moveChunk command
     const MoveChunkRequest _args;
 
+    // The resolved connection string of the donor shard
+    const ConnectionString _donorConnStr;
+
+    // The resolved primary of the recipient shard
+    const HostAndPort _recipientHost;
+
     // Gets initialized at creation time and will time the entire move chunk operation
     const Timer _startTime;
 
     // The current state. Used only for diagnostics and validation.
     State _state{kCreated};
 
-    // The cached collection metadata from just after the collection distributed lock was acquired.
-    // This metadata is guaranteed to not change until either failure or successful completion,
-    // because the distributed lock is being held. Available after stabilize stage has completed.
-    ScopedCollectionMetadata _committedMetadata;
+    // The cached collection metadata at the time the migration started.
+    ScopedCollectionMetadata _collectionMetadata;
 
     // The key pattern of the collection whose chunks are being moved.
     BSONObj _keyPattern;

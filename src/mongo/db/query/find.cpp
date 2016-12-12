@@ -89,11 +89,7 @@ bool shouldSaveCursor(OperationContext* txn,
     }
 
     const QueryRequest& qr = exec->getCanonicalQuery()->getQueryRequest();
-    if (!qr.wantMore() && !qr.isTailable()) {
-        return false;
-    }
-
-    if (qr.getNToReturn().value_or(0) == 1) {
+    if (!qr.wantMore()) {
         return false;
     }
 
@@ -158,7 +154,7 @@ void endQueryOp(OperationContext* txn,
         collection->infoCache()->notifyOfQuery(txn, summaryStats.indexesUsed);
     }
 
-    if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+    if (curOp->shouldDBProfile()) {
         BSONObjBuilder statsBob;
         Explain::getWinningPlanStats(&exec, &statsBob);
         curOp->debug().execStats = statsBob.obj();
@@ -213,7 +209,7 @@ void generateBatch(int ntoreturn,
 
     if (PlanExecutor::DEAD == *state || PlanExecutor::FAILURE == *state) {
         // Propagate this error to caller.
-        error() << "getMore executor error, stats: " << Explain::getWinningPlanStats(exec);
+        error() << "getMore executor error, stats: " << redact(Explain::getWinningPlanStats(exec));
         uasserted(17406, "getMore executor error: " + WorkingSetCommon::toStatusString(obj));
     }
 }
@@ -271,13 +267,23 @@ Message getMore(OperationContext* txn,
         // the data within a collection.
         cursorManager = CursorManager::getGlobalCursorManager();
     } else {
-        ctx = stdx::make_unique<AutoGetCollectionForRead>(txn, nss);
+        ctx = stdx::make_unique<AutoGetCollectionOrViewForRead>(txn, nss);
+        auto viewCtx = static_cast<AutoGetCollectionOrViewForRead*>(ctx.get());
+        if (viewCtx->getView()) {
+            uasserted(
+                ErrorCodes::CommandNotSupportedOnView,
+                str::stream() << "Namespace " << nss.ns()
+                              << " is a view. OP_GET_MORE operations are not supported on views. "
+                              << "Only clients which support the getMore command can be used to "
+                                 "query views.");
+        }
+
         Collection* collection = ctx->getCollection();
         uassert(17356, "collection dropped between getMore calls", collection);
         cursorManager = collection->getCursorManager();
     }
 
-    LOG(5) << "Running getMore, cursorid: " << cursorid << endl;
+    LOG(5) << "Running getMore, cursorid: " << cursorid;
 
     // This checks to make sure the operation is allowed on a replicated node.  Since we are not
     // passing in a query object (necessary to check SlaveOK query option), the only state where
@@ -289,8 +295,8 @@ Message getMore(OperationContext* txn,
     // A pin performs a CC lookup and if there is a CC, increments the CC's pin value so it
     // doesn't time out.  Also informs ClientCursor that there is somebody actively holding the
     // CC, so don't delete it.
-    ClientCursorPin ccPin(cursorManager, cursorid);
-    ClientCursor* cc = ccPin.c();
+    auto ccPin = cursorManager->pinCursor(cursorid);
+
     // These are set in the QueryResult msg we return.
     int resultFlags = ResultFlag_AwaitCapable;
 
@@ -303,10 +309,13 @@ Message getMore(OperationContext* txn,
     BufBuilder bb(InitialBufSize);
     bb.skip(sizeof(QueryResult::Value));
 
-    if (NULL == cc) {
+    if (!ccPin.isOK()) {
+        invariant(ccPin == ErrorCodes::CursorNotFound);
         cursorid = 0;
         resultFlags = ResultFlag_CursorNotFound;
     } else {
+        ClientCursor* cc = ccPin.getValue().getCursor();
+
         // Check for spoofing of the ns such that it does not match the one originally
         // there for the cursor.
         uassert(ErrorCodes::Unauthorized,
@@ -321,7 +330,7 @@ Message getMore(OperationContext* txn,
             uassertStatusOK(txn->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
 
         // Reset timeout timer on the cursor since the cursor is still in use.
-        cc->setIdleTime(0);
+        cc->resetIdleTime();
 
         // If the operation that spawned this cursor had a time limit set, apply leftover
         // time to this getmore.
@@ -420,7 +429,7 @@ Message getMore(OperationContext* txn,
         // subsequent getMore. The reason for this is that aggregation's source PlanExecutor
         // could be destroyed before we know whether we need execStats and we do not want to
         // generate for all operations due to cost.
-        if (!cc->isAggCursor() && curOp.shouldDBProfile(curOp.elapsedMillis())) {
+        if (!cc->isAggCursor() && curOp.shouldDBProfile()) {
             BSONObjBuilder execStatsBob;
             Explain::getWinningPlanStats(exec, &execStatsBob);
             curOp.debug().execStats = execStatsBob.obj();
@@ -448,7 +457,7 @@ Message getMore(OperationContext* txn,
         //    pin.  Because our ClientCursorPin is declared after our lock is declared, this
         //    will happen under the lock.
         if (!shouldSaveCursor) {
-            ccPin.deleteUnderlying();
+            ccPin.getValue().deleteUnderlying();
 
             // cc is now invalid, as is the executor
             cursorid = 0;
@@ -456,14 +465,14 @@ Message getMore(OperationContext* txn,
             curOp.debug().cursorExhausted = true;
 
             LOG(5) << "getMore NOT saving client cursor, ended with state "
-                   << PlanExecutor::statestr(state) << endl;
+                   << PlanExecutor::statestr(state);
         } else {
             // Continue caching the ClientCursor.
             cc->incPos(numResults);
             exec->saveState();
             exec->detachFromOperationContext();
             LOG(5) << "getMore saving client cursor ended with state "
-                   << PlanExecutor::statestr(state) << endl;
+                   << PlanExecutor::statestr(state);
 
             // Possibly note slave's position in the oplog.
             if ((cc->queryOptions() & QueryOption_OplogReplay) && !slaveReadTill.isNull()) {
@@ -514,12 +523,21 @@ std::string runQuery(OperationContext* txn,
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
     invariant(cq.get());
 
-    LOG(5) << "Running query:\n" << cq->toString();
-    LOG(2) << "Running query: " << cq->toStringShort();
+    LOG(5) << "Running query:\n" << redact(cq->toString());
+    LOG(2) << "Running query: " << redact(cq->toStringShort());
 
     // Parse, canonicalize, plan, transcribe, and get a plan executor.
-    AutoGetCollectionForRead ctx(txn, nss);
+    AutoGetCollectionOrViewForRead ctx(txn, nss);
     Collection* collection = ctx.getCollection();
+
+    if (ctx.getView()) {
+        uasserted(ErrorCodes::CommandNotSupportedOnView,
+                  str::stream()
+                      << "Namespace "
+                      << nss.ns()
+                      << " is a view. Legacy find operations are not supported on views. "
+                      << "Only clients which support the find command can be used to query views.");
+    }
 
     // We have a parsed query. Time to get the execution plan for it.
     std::unique_ptr<PlanExecutor> exec = uassertStatusOK(
@@ -613,8 +631,8 @@ std::string runQuery(OperationContext* txn,
 
         if (FindCommon::enoughForFirstBatch(qr, numResults)) {
             LOG(5) << "Enough for first batch, wantMore=" << qr.wantMore()
-                   << " ntoreturn=" << qr.getNToReturn().value_or(0) << " numResults=" << numResults
-                   << endl;
+                   << " ntoreturn=" << qr.getNToReturn().value_or(0)
+                   << " numResults=" << numResults;
             break;
         }
     }
@@ -630,7 +648,7 @@ std::string runQuery(OperationContext* txn,
     // Caller expects exceptions thrown in certain cases.
     if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
         error() << "Plan executor error during find: " << PlanExecutor::statestr(state)
-                << ", stats: " << Explain::getWinningPlanStats(exec.get());
+                << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
         uasserted(17144, "Executor error: " + WorkingSetCommon::toStatusString(obj));
     }
 
@@ -648,23 +666,21 @@ std::string runQuery(OperationContext* txn,
         exec->saveState();
         exec->detachFromOperationContext();
 
-        // Allocate a new ClientCursor.  We don't have to worry about leaking it as it's
-        // inserted into a global map by its ctor.
-        ClientCursor* cc =
-            new ClientCursor(collection->getCursorManager(),
-                             exec.release(),
-                             nss.ns(),
-                             txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
-                             qr.getOptions(),
-                             qr.getFilter());
-        ccId = cc->cursorid();
+        // Allocate a new ClientCursor and register it with the cursor manager.
+        ClientCursorPin pinnedCursor = collection->getCursorManager()->registerCursor(
+            {exec.release(),
+             nss.ns(),
+             txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+             qr.getOptions(),
+             qr.getFilter()});
+        ccId = pinnedCursor.getCursor()->cursorid();
 
         LOG(5) << "caching executor with cursorid " << ccId << " after returning " << numResults
-               << " results" << endl;
+               << " results";
 
         // TODO document
         if (qr.isOplogReplay() && !slaveReadTill.isNull()) {
-            cc->slaveReadTill(slaveReadTill);
+            pinnedCursor.getCursor()->slaveReadTill(slaveReadTill);
         }
 
         // TODO document
@@ -672,15 +688,15 @@ std::string runQuery(OperationContext* txn,
             curOp.debug().exhaust = true;
         }
 
-        cc->setPos(numResults);
+        pinnedCursor.getCursor()->setPos(numResults);
 
         // If the query had a time limit, remaining time is "rolled over" to the cursor (for
         // use by future getmore ops).
-        cc->setLeftoverMaxTimeMicros(txn->getRemainingMaxTimeMicros());
+        pinnedCursor.getCursor()->setLeftoverMaxTimeMicros(txn->getRemainingMaxTimeMicros());
 
-        endQueryOp(txn, collection, *cc->getExecutor(), numResults, ccId);
+        endQueryOp(txn, collection, *pinnedCursor.getCursor()->getExecutor(), numResults, ccId);
     } else {
-        LOG(5) << "Not caching executor but returning " << numResults << " results.\n";
+        LOG(5) << "Not caching executor but returning " << numResults << " results.";
         endQueryOp(txn, collection, *exec, numResults, ccId);
     }
 

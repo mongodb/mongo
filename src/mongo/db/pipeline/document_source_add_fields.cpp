@@ -28,11 +28,12 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_add_fields.h"
 
 #include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/parsed_add_fields.h"
 
 namespace mongo {
@@ -40,19 +41,26 @@ namespace mongo {
 using boost::intrusive_ptr;
 using parsed_aggregation_projection::ParsedAddFields;
 
-REGISTER_DOCUMENT_SOURCE_ALIAS(addFields, DocumentSourceAddFields::createFromBson);
+REGISTER_DOCUMENT_SOURCE(addFields,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceAddFields::createFromBson);
 
-std::vector<intrusive_ptr<DocumentSource>> DocumentSourceAddFields::createFromBson(
+intrusive_ptr<DocumentSource> DocumentSourceAddFields::create(
+    BSONObj addFieldsSpec, const intrusive_ptr<ExpressionContext>& expCtx) {
+    intrusive_ptr<DocumentSourceSingleDocumentTransformation> addFields(
+        new DocumentSourceSingleDocumentTransformation(
+            expCtx, ParsedAddFields::create(addFieldsSpec), "$addFields"));
+    addFields->injectExpressionContext(expCtx);
+    return addFields;
+}
+
+intrusive_ptr<DocumentSource> DocumentSourceAddFields::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
-
-    // Confirm that the stage was called with an object.
     uassert(40272,
             str::stream() << "$addFields specification stage must be an object, got "
                           << typeName(elem.type()),
             elem.type() == Object);
 
-    // Create the AddFields aggregation stage.
-    return {new DocumentSourceSingleDocumentTransformation(
-        expCtx, ParsedAddFields::create(elem.Obj()), "$addFields")};
-};
+    return DocumentSourceAddFields::create(elem.Obj(), expCtx);
+}
 }

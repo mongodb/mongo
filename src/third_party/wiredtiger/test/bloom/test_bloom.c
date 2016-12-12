@@ -56,8 +56,6 @@ void usage(void)
 extern char *__wt_optarg;
 extern int __wt_optind;
 
-void (*custom_die)(void) = NULL;
-
 int
 main(int argc, char *argv[])
 {
@@ -160,8 +158,7 @@ run(void)
 	item.size = g.c_key_max;
 	for (i = 0; i < g.c_ops; i++) {
 		item.data = g.entries[i];
-		if ((ret = __wt_bloom_insert(bloomp, &item)) != 0)
-			testutil_die(ret, "__wt_bloom_insert: %" PRIu32, i);
+		__wt_bloom_insert(bloomp, &item);
 	}
 
 	testutil_check(__wt_bloom_finalize(bloomp));

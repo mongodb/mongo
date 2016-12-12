@@ -15,12 +15,22 @@ env.SConscript(
 )
 
 env.Library(
+    target='version_impl',
+    source=[
+        'version_impl.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ]
+)
+
+env.Library(
     target='intrusive_counter',
     source=[
         'intrusive_counter.cpp',
         ],
     LIBDEPS=[
-        'foundation',
+        '$BUILD_DIR/mongo/base',
         ]
     )
 
@@ -75,7 +85,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/foundation',
     ],
 )
 
@@ -95,10 +104,10 @@ env.Library(
     target='progress_meter',
     source=[
         'progress_meter.cpp',
+        'thread_safe_string.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/foundation',
     ],
 )
 
@@ -132,25 +141,6 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='foundation',
-    source=[
-        "startup_test.cpp",
-        "touch_pages.cpp",
-        'file.cpp',
-        'platform_init.cpp',
-        'thread_safe_string.cpp',
-        'timer.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/platform/platform',
-        '$BUILD_DIR/third_party/shim_allocator',
-        '$BUILD_DIR/third_party/shim_boost',
-        '$BUILD_DIR/third_party/shim_tz',
-    ],
-)
-
-env.Library(
     target='clock_source_mock',
     source=[
         'clock_source_mock.cpp',
@@ -177,7 +167,7 @@ env.CppUnitTest(
         'text_test.cpp'
     ],
     LIBDEPS=[
-        'foundation',
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -187,7 +177,7 @@ env.CppUnitTest(
         'time_support_test.cpp',
     ],
     LIBDEPS=[
-        'foundation',
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -209,8 +199,6 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/platform/platform",
-        "$BUILD_DIR/mongo/util/foundation",
     ],
 )
 
@@ -229,10 +217,13 @@ env.Library(
     source=[
         "fail_point.cpp",
         "fail_point_registry.cpp",
+        "fail_point_server_parameter.cpp",
         "fail_point_service.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/bson/util/bson_extract",
+        "$BUILD_DIR/mongo/db/server_parameters",
     ],
 )
 
@@ -254,7 +245,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         'concurrency/spin_lock',
-        'foundation',
     ],
 )
 
@@ -317,7 +307,6 @@ env.Library(
         'ntservice.cpp',
     ],
     LIBDEPS=[
-        'foundation',
         'signal_handlers',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ],
@@ -366,7 +355,7 @@ env.Library(
         'elapsed_tracker.cpp',
     ],
     LIBDEPS=[
-        'foundation',
+        '$BUILD_DIR/mongo/base',
         'net/network', # this is for using listener to check elapsed time
     ],
 )
@@ -439,15 +428,11 @@ env.Library(
         "signal_win32.cpp",
     ],
     LIBDEPS=[
-        "foundation",
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/log_process_details",
         "$BUILD_DIR/mongo/db/service_context",
         "$BUILD_DIR/mongo/db/server_options_core",
     ],
-    LIBDEPS_TAGS=[
-        # Depends on logProcessDetailsForLogRotate and exitCleanly
-        'incomplete',
-    ]
 )
 
 env.CppUnitTest(
@@ -488,7 +473,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        'foundation',
     ],
 )
 
@@ -559,7 +543,6 @@ if env.TargetOSIs('windows'):
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/platform/platform',
         ],
     )
 

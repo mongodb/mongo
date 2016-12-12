@@ -2868,7 +2868,7 @@ MustBeUInt32(MDefinition* def, MDefinition** pwrapped)
     if (def->isUrsh()) {
         *pwrapped = def->toUrsh()->getOperand(0);
         MDefinition* rhs = def->toUrsh()->getOperand(1);
-        return !def->toUrsh()->bailoutsDisabled()
+        return def->toUrsh()->bailoutsDisabled()
             && rhs->isConstantValue()
             && rhs->constantValue().isInt32()
             && rhs->constantValue().toInt32() == 0;

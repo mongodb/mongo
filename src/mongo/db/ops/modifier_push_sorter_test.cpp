@@ -42,8 +42,8 @@ namespace {
 using mongo::BSONObj;
 using mongo::CollatorInterface;
 using mongo::CollatorInterfaceMock;
-using mongo::fromjson;
 using mongo::PatternElementCmp;
+using mongo::fromjson;
 using mongo::mutablebson::Document;
 using mongo::mutablebson::Element;
 using mongo::mutablebson::sortChildren;
@@ -92,9 +92,9 @@ TEST_F(ObjectArray, NormalOrder) {
 
     sortChildren(getArray(), PatternElementCmp(fromjson("{'a':1,'b':1}"), collator));
 
-    ASSERT_EQUALS(getOrigObj(0), getSortedObj(0));
-    ASSERT_EQUALS(getOrigObj(1), getSortedObj(2));
-    ASSERT_EQUALS(getOrigObj(2), getSortedObj(1));
+    ASSERT_BSONOBJ_EQ(getOrigObj(0), getSortedObj(0));
+    ASSERT_BSONOBJ_EQ(getOrigObj(1), getSortedObj(2));
+    ASSERT_BSONOBJ_EQ(getOrigObj(2), getSortedObj(1));
 }
 
 TEST_F(ObjectArray, MixedOrder) {
@@ -105,9 +105,9 @@ TEST_F(ObjectArray, MixedOrder) {
 
     sortChildren(getArray(), PatternElementCmp(fromjson("{b:1,a:-1}"), collator));
 
-    ASSERT_EQUALS(getOrigObj(0), getSortedObj(0));
-    ASSERT_EQUALS(getOrigObj(1), getSortedObj(1));
-    ASSERT_EQUALS(getOrigObj(2), getSortedObj(2));
+    ASSERT_BSONOBJ_EQ(getOrigObj(0), getSortedObj(0));
+    ASSERT_BSONOBJ_EQ(getOrigObj(1), getSortedObj(1));
+    ASSERT_BSONOBJ_EQ(getOrigObj(2), getSortedObj(2));
 }
 
 TEST_F(ObjectArray, ExtraFields) {
@@ -118,9 +118,9 @@ TEST_F(ObjectArray, ExtraFields) {
 
     sortChildren(getArray(), PatternElementCmp(fromjson("{a:1,b:1}"), collator));
 
-    ASSERT_EQUALS(getOrigObj(0), getSortedObj(0));
-    ASSERT_EQUALS(getOrigObj(1), getSortedObj(2));
-    ASSERT_EQUALS(getOrigObj(2), getSortedObj(1));
+    ASSERT_BSONOBJ_EQ(getOrigObj(0), getSortedObj(0));
+    ASSERT_BSONOBJ_EQ(getOrigObj(1), getSortedObj(2));
+    ASSERT_BSONOBJ_EQ(getOrigObj(2), getSortedObj(1));
 }
 
 TEST_F(ObjectArray, MissingFields) {
@@ -131,9 +131,9 @@ TEST_F(ObjectArray, MissingFields) {
 
     sortChildren(getArray(), PatternElementCmp(fromjson("{b:1,c:1}"), collator));
 
-    ASSERT_EQUALS(getOrigObj(0), getSortedObj(1));
-    ASSERT_EQUALS(getOrigObj(1), getSortedObj(0));
-    ASSERT_EQUALS(getOrigObj(2), getSortedObj(2));
+    ASSERT_BSONOBJ_EQ(getOrigObj(0), getSortedObj(1));
+    ASSERT_BSONOBJ_EQ(getOrigObj(1), getSortedObj(0));
+    ASSERT_BSONOBJ_EQ(getOrigObj(2), getSortedObj(2));
 }
 
 TEST_F(ObjectArray, NestedFields) {
@@ -144,9 +144,9 @@ TEST_F(ObjectArray, NestedFields) {
 
     sortChildren(getArray(), PatternElementCmp(fromjson("{'a.b':1}"), collator));
 
-    ASSERT_EQUALS(getOrigObj(0), getSortedObj(1));
-    ASSERT_EQUALS(getOrigObj(1), getSortedObj(0));
-    ASSERT_EQUALS(getOrigObj(2), getSortedObj(2));
+    ASSERT_BSONOBJ_EQ(getOrigObj(0), getSortedObj(1));
+    ASSERT_BSONOBJ_EQ(getOrigObj(1), getSortedObj(0));
+    ASSERT_BSONOBJ_EQ(getOrigObj(2), getSortedObj(2));
 }
 
 TEST_F(ObjectArray, SimpleNestedFields) {
@@ -157,9 +157,9 @@ TEST_F(ObjectArray, SimpleNestedFields) {
 
     sortChildren(getArray(), PatternElementCmp(fromjson("{'a.b':1}"), collator));
 
-    ASSERT_EQUALS(getOrigObj(0), getSortedObj(1));
-    ASSERT_EQUALS(getOrigObj(1), getSortedObj(0));
-    ASSERT_EQUALS(getOrigObj(2), getSortedObj(2));
+    ASSERT_BSONOBJ_EQ(getOrigObj(0), getSortedObj(1));
+    ASSERT_BSONOBJ_EQ(getOrigObj(1), getSortedObj(0));
+    ASSERT_BSONOBJ_EQ(getOrigObj(2), getSortedObj(2));
 }
 
 TEST_F(ObjectArray, NestedInnerObjectDescending) {
@@ -170,9 +170,9 @@ TEST_F(ObjectArray, NestedInnerObjectDescending) {
 
     sortChildren(getArray(), PatternElementCmp(fromjson("{'a.b.d':-1}"), collator));
 
-    ASSERT_EQUALS(getOrigObj(0), getSortedObj(2));
-    ASSERT_EQUALS(getOrigObj(1), getSortedObj(0));
-    ASSERT_EQUALS(getOrigObj(2), getSortedObj(1));
+    ASSERT_BSONOBJ_EQ(getOrigObj(0), getSortedObj(2));
+    ASSERT_BSONOBJ_EQ(getOrigObj(1), getSortedObj(0));
+    ASSERT_BSONOBJ_EQ(getOrigObj(2), getSortedObj(1));
 }
 
 TEST_F(ObjectArray, NestedInnerObjectAscending) {
@@ -183,9 +183,9 @@ TEST_F(ObjectArray, NestedInnerObjectAscending) {
 
     sortChildren(getArray(), PatternElementCmp(fromjson("{'a.b.d':1}"), collator));
 
-    ASSERT_EQUALS(getOrigObj(0), getSortedObj(0));
-    ASSERT_EQUALS(getOrigObj(2), getSortedObj(1));
-    ASSERT_EQUALS(getOrigObj(1), getSortedObj(2));
+    ASSERT_BSONOBJ_EQ(getOrigObj(0), getSortedObj(0));
+    ASSERT_BSONOBJ_EQ(getOrigObj(2), getSortedObj(1));
+    ASSERT_BSONOBJ_EQ(getOrigObj(1), getSortedObj(2));
 }
 
 TEST_F(ObjectArray, SortRespectsCollation) {
@@ -196,9 +196,9 @@ TEST_F(ObjectArray, SortRespectsCollation) {
 
     sortChildren(getArray(), PatternElementCmp(fromjson("{a: 1}"), &collator));
 
-    ASSERT_EQUALS(getOrigObj(0), getSortedObj(2));
-    ASSERT_EQUALS(getOrigObj(1), getSortedObj(0));
-    ASSERT_EQUALS(getOrigObj(2), getSortedObj(1));
+    ASSERT_BSONOBJ_EQ(getOrigObj(0), getSortedObj(2));
+    ASSERT_BSONOBJ_EQ(getOrigObj(1), getSortedObj(0));
+    ASSERT_BSONOBJ_EQ(getOrigObj(2), getSortedObj(1));
 }
 
 }  // unnamed namespace

@@ -34,12 +34,12 @@
 #include <type_traits>
 #include <utility>
 
+#include "mongo/base/static_assert.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/executor/async_stream_interface.h"
 #include "mongo/executor/async_stream_interface.h"
 #include "mongo/executor/connection_pool_asio.h"
-#include "mongo/executor/downconvert_find_and_getmore_commands.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/rpc/protocol.h"
@@ -76,8 +76,9 @@ using IsNetworkHandler =
 
 template <typename Handler>
 void asyncSendMessage(AsyncStreamInterface& stream, Message* m, Handler&& handler) {
-    static_assert(IsNetworkHandler<Handler>::value,
-                  "Handler passed to asyncSendMessage does not conform to NetworkHandler concept");
+    MONGO_STATIC_ASSERT_MSG(
+        IsNetworkHandler<Handler>::value,
+        "Handler passed to asyncSendMessage does not conform to NetworkHandler concept");
     m->header().setResponseToMsgId(0);
     m->header().setId(nextMessageId());
     // TODO: Some day we may need to support vector messages.
@@ -89,7 +90,7 @@ template <typename Handler>
 void asyncRecvMessageHeader(AsyncStreamInterface& stream,
                             MSGHEADER::Value* header,
                             Handler&& handler) {
-    static_assert(
+    MONGO_STATIC_ASSERT_MSG(
         IsNetworkHandler<Handler>::value,
         "Handler passed to asyncRecvMessageHeader does not conform to NetworkHandler concept");
     stream.read(asio::buffer(header->view().view2ptr(), sizeof(decltype(*header))),
@@ -101,7 +102,7 @@ void asyncRecvMessageBody(AsyncStreamInterface& stream,
                           MSGHEADER::Value* header,
                           Message* m,
                           Handler&& handler) {
-    static_assert(
+    MONGO_STATIC_ASSERT_MSG(
         IsNetworkHandler<Handler>::value,
         "Handler passed to asyncRecvMessageBody does not conform to NetworkHandler concept");
     // validate message length
@@ -175,11 +176,10 @@ ResponseStatus decodeRPC(Message* received,
 }  // namespace
 
 NetworkInterfaceASIO::AsyncCommand::AsyncCommand(AsyncConnection* conn,
-                                                 CommandType type,
                                                  Message&& command,
                                                  Date_t now,
                                                  const HostAndPort& target)
-    : _conn(conn), _type(type), _toSend(std::move(command)), _start(now), _target(target) {
+    : _conn(conn), _toSend(std::move(command)), _start(now), _target(target) {
     _toSend.header().setResponseToMsgId(0);
 }
 
@@ -212,23 +212,10 @@ ResponseStatus NetworkInterfaceASIO::AsyncCommand::response(AsyncOp* op,
         received = std::move(swm.getValue());
     }
 
-    switch (_type) {
-        case CommandType::kRPC: {
-            auto rs = decodeRPC(&received, protocol, now - _start, _target, metadataHook);
-            if (rs.isOK())
-                op->setResponseMetadata(rs.metadata);
-            return rs;
-        }
-        case CommandType::kDownConvertedFind: {
-            auto ns = DbMessage(_toSend).getns();
-            return upconvertLegacyQueryResponse(_toSend.header().getId(), ns, received);
-        }
-        case CommandType::kDownConvertedGetMore: {
-            auto ns = DbMessage(_toSend).getns();
-            return upconvertLegacyGetMoreResponse(_toSend.header().getId(), ns, received);
-        }
-    }
-    MONGO_UNREACHABLE;
+    auto rs = decodeRPC(&received, protocol, now - _start, _target, metadataHook);
+    if (rs.isOK())
+        op->setResponseMetadata(rs.metadata);
+    return rs;
 }
 
 void NetworkInterfaceASIO::_startCommand(AsyncOp* op) {
@@ -306,7 +293,6 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, ResponseStatus resp) 
         // If we fail during connection, we won't be able to access any of op's members after
         // calling finish(), so we return here.
         log() << "Failed to connect to " << op->request().target << " - " << resp.status;
-        _numFailedOps.fetchAndAdd(1);
         op->finish(resp);
         return;
     }

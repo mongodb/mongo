@@ -34,6 +34,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/db/query/collation/collation_spec.h"
 
 namespace mongo {
@@ -145,6 +146,16 @@ public:
             return false;
         }
         return (*lhs == *rhs);
+    }
+
+    /**
+     * Returns a clone of 'collator'. If 'collator' is nullptr, returns the null collator.
+     */
+    static std::unique_ptr<CollatorInterface> cloneCollator(const CollatorInterface* collator) {
+        if (!collator) {
+            return {nullptr};
+        }
+        return collator->clone();
     }
 
 protected:

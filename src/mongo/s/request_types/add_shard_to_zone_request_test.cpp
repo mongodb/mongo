@@ -62,11 +62,11 @@ TEST(AddShardToZoneRequest, CommandBuilderShouldAlwaysCreateConfigCommand) {
     request.appendAsConfigCommand(&builder);
     auto cmdObj = builder.obj();
 
-    ASSERT_EQ(BSON("_configsvrAddShardToZone"
-                   << "a"
-                   << "zone"
-                   << "z"),
-              cmdObj);
+    ASSERT_BSONOBJ_EQ(BSON("_configsvrAddShardToZone"
+                           << "a"
+                           << "zone"
+                           << "z"),
+                      cmdObj);
 }
 
 TEST(AddShardToZoneRequest, MissingZoneErrors) {
@@ -120,11 +120,11 @@ TEST(CfgAddShardToZoneRequest, BasicValidConfigCommand) {
     request.appendAsConfigCommand(&builder);
     auto cmdObj = builder.obj();
 
-    ASSERT_EQ(BSON("_configsvrAddShardToZone"
-                   << "a"
-                   << "zone"
-                   << "z"),
-              cmdObj);
+    ASSERT_BSONOBJ_EQ(BSON("_configsvrAddShardToZone"
+                           << "a"
+                           << "zone"
+                           << "z"),
+                      cmdObj);
 }
 
 TEST(CfgAddShardToZoneRequest, MissingZoneErrors) {

@@ -1,6 +1,10 @@
 // $group has inconsistent behavior when differentiating between null and missing values, provided
 // this test passes. Here, we check the cases where it is correct, and those where it is currently
 // incorrect.
+//
+// This test issues some pipelines where it assumes an initial $sort will be absorbed and be
+// covered, which will not happen if the $sort is within a $facet stage.
+// @tags: [do_not_wrap_aggregations_in_facets]
 load('jstests/aggregation/extras/utils.js');  // For resultsEq.
 
 (function() {

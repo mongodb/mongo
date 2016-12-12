@@ -35,7 +35,7 @@
     assert.eq(1, st.config.shards.count(), "initial server count wrong");
 
     // start a mongod with NO keyfile
-    var conn = MongoRunner.runMongod({});
+    var conn = MongoRunner.runMongod({shardsvr: ""});
     print(conn);
 
     // --------------- Test 1 --------------------
@@ -47,7 +47,7 @@
 
     //--------------- Test 2 --------------------
     // start mongod again, this time with keyfile
-    var conn = MongoRunner.runMongod({keyFile: "jstests/libs/key1"});
+    var conn = MongoRunner.runMongod({keyFile: "jstests/libs/key1", shardsvr: ""});
     // try adding the new shard
     assert.commandWorked(admin.runCommand({addShard: conn.host}));
 

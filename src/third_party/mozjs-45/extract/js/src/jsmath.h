@@ -139,6 +139,9 @@ extern bool
 math_sqrt_handle(JSContext* cx, js::HandleValue number, js::MutableHandleValue result);
 
 extern bool
+math_imul_handle(JSContext* cx, HandleValue lhs, HandleValue rhs, MutableHandleValue res);
+
+extern bool
 math_imul(JSContext* cx, unsigned argc, js::Value* vp);
 
 extern bool

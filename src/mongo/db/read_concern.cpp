@@ -81,13 +81,29 @@ Status waitForReadConcern(OperationContext* txn, const repl::ReadConcernArgs& re
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(txn);
 
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern) {
-        if (!readConcernArgs.getOpTime().isNull())
+        if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
+            // For master/slave and standalone nodes, Linearizable Read is not supported.
+            return {ErrorCodes::NotAReplicaSet,
+                    "node needs to be a replica set member to use read concern"};
+        }
+
+        // Replica sets running pv0 do not support linearizable read concern until further testing
+        // is completed (SERVER-27025).
+        if (!replCoord->isV1ElectionProtocol()) {
+            return {
+                ErrorCodes::IncompatibleElectionProtocol,
+                "Replica sets running protocol version 0 do not support readConcern: linearizable"};
+        }
+
+        if (!readConcernArgs.getOpTime().isNull()) {
             return {ErrorCodes::FailedToParse,
                     "afterOpTime not compatible with linearizable read concern"};
+        }
 
-        if (!replCoord->getMemberState().primary())
+        if (!replCoord->getMemberState().primary()) {
             return {ErrorCodes::NotMaster,
                     "cannot satisfy linearizable read concern on non-primary node"};
+        }
     }
 
     // Skip waiting for the OpTime when testing snapshot behavior
@@ -100,8 +116,7 @@ Status waitForReadConcern(OperationContext* txn, const repl::ReadConcernArgs& re
 
     if ((replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet ||
          testingSnapshotBehaviorInIsolation) &&
-        (readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern ||
-         readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern)) {
+        readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern) {
         // ReadConcern Majority is not supported in ProtocolVersion 0.
         if (!testingSnapshotBehaviorInIsolation && !replCoord->isV1ElectionProtocol()) {
             return {ErrorCodes::ReadConcernMajorityNotEnabled,
@@ -142,6 +157,12 @@ Status waitForLinearizableReadConcern(OperationContext* txn) {
         ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
         Lock::CollectionLock lock(txn->lockState(), "local.oplog.rs", MODE_IX);
+
+        if (!replCoord->canAcceptWritesForDatabase("admin")) {
+            return {ErrorCodes::NotMaster,
+                    "No longer primary when waiting for linearizable read concern"};
+        }
+
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
 
             WriteUnitOfWork uow(txn);

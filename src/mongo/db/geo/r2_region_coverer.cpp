@@ -108,7 +108,8 @@ void R2RegionCoverer::getCovering(const R2Region& region, vector<GeoHash>* cover
     while (!_candidateQueue->empty()) {
         Candidate* candidate = _candidateQueue->top().second;  // Owned
         _candidateQueue->pop();
-        LOG(3) << "Pop: " << candidate->cell;
+        // REDACT?? I think this may have User info, but I'm not sure how to redact
+        LOG(3) << "Pop: " << redact(candidate->cell.toString());
 
         // Try to expand this cell into its children
         if (candidate->cell.getBits() < _minLevel || candidate->numChildren == 1 ||
@@ -184,7 +185,8 @@ void R2RegionCoverer::addCandidate(Candidate* candidate) {
         int priority = -(((((int)candidate->cell.getBits() << 4) + candidate->numChildren) << 4) +
                          numTerminals);
         _candidateQueue->push(make_pair(priority, candidate));  // queue owns candidate
-        LOG(3) << "Push: " << candidate->cell << " (" << priority << ") ";
+        // REDACT??
+        LOG(3) << "Push: " << redact(candidate->cell.toString()) << " (" << priority << ") ";
     }
 }
 

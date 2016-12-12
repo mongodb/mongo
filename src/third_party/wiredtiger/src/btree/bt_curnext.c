@@ -587,8 +587,8 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	WT_STAT_FAST_CONN_INCR(session, cursor_next);
-	WT_STAT_FAST_DATA_INCR(session, cursor_next);
+	WT_STAT_CONN_INCR(session, cursor_next);
+	WT_STAT_DATA_INCR(session, cursor_next);
 
 	flags = WT_READ_SKIP_INTL;			/* Tree walk flags. */
 	if (truncating)
@@ -665,7 +665,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 		if (page != NULL &&
 		    (cbt->page_deleted_count > WT_BTREE_DELETE_THRESHOLD ||
 		    (newpage && cbt->page_deleted_count > 0)))
-			WT_ERR(__wt_page_evict_soon(session, cbt->ref));
+			__wt_page_evict_soon(session, cbt->ref);
 		cbt->page_deleted_count = 0;
 
 		WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));

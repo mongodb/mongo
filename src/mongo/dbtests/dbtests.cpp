@@ -39,12 +39,14 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/dbtests/framework.h"
+#include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers_synchronous.h"
@@ -54,22 +56,28 @@
 
 namespace mongo {
 namespace dbtests {
+namespace {
+const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
+}  // namespace
 
 void initWireSpec() {
     WireSpec& spec = WireSpec::instance();
     // accept from any version
-    spec.minWireVersionIncoming = RELEASE_2_4_AND_BEFORE;
-    spec.maxWireVersionIncoming = COMMANDS_ACCEPT_WRITE_CONCERN;
+    spec.incoming.minWireVersion = RELEASE_2_4_AND_BEFORE;
+    spec.incoming.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
     // connect to any version
-    spec.minWireVersionOutgoing = RELEASE_2_4_AND_BEFORE;
-    spec.maxWireVersionOutgoing = COMMANDS_ACCEPT_WRITE_CONCERN;
+    spec.outgoing.minWireVersion = RELEASE_2_4_AND_BEFORE;
+    spec.outgoing.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
 }
 
 Status createIndex(OperationContext* txn, StringData ns, const BSONObj& keys, bool unique) {
     BSONObjBuilder specBuilder;
-    specBuilder << "name" << DBClientBase::genIndexName(keys) << "ns" << ns << "key" << keys;
+    specBuilder.append("name", DBClientBase::genIndexName(keys));
+    specBuilder.append("ns", ns);
+    specBuilder.append("key", keys);
+    specBuilder.append("v", static_cast<int>(kIndexVersion));
     if (unique) {
-        specBuilder << "unique" << true;
+        specBuilder.appendBool("unique", true);
     }
     return createIndexFromSpec(txn, ns, specBuilder.done());
 }
@@ -84,7 +92,7 @@ Status createIndexFromSpec(OperationContext* txn, StringData ns, const BSONObj& 
         wunit.commit();
     }
     MultiIndexBlock indexer(txn, coll);
-    Status status = indexer.init(spec);
+    Status status = indexer.init(spec).getStatus();
     if (status == ErrorCodes::IndexAlreadyExists) {
         return Status::OK();
     }
@@ -114,7 +122,9 @@ int dbtestsMain(int argc, char** argv, char** envp) {
     repl::ReplSettings replSettings;
     replSettings.setOplogSizeBytes(10 * 1024 * 1024);
     repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
+    repl::getGlobalReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY);
     getGlobalAuthorizationManager()->setAuthEnabled(false);
+    ScriptEngine::setup();
     StartupTest::runTests();
     return mongo::dbtests::runDbTests(argc, argv);
 }

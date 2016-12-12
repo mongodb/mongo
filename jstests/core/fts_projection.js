@@ -100,7 +100,7 @@ assert.throws(function() {
         errorMessage = e;
         throw e;
     }
-}, null, 'Expected error from failed TEXT under OR planning');
+}, [], 'Expected error from failed TEXT under OR planning');
 assert.neq(-1,
            errorMessage.message.indexOf('TEXT'),
            'message from failed text planning does not mention TEXT: ' + errorMessage);

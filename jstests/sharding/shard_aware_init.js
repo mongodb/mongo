@@ -60,8 +60,17 @@
             return mongodConn;
         };
 
+        // Simulate the upsert that is performed by a config server on addShard.
+        var shardIdentityQuery = {
+            _id: shardIdentityDoc._id,
+            shardName: shardIdentityDoc.shardName,
+            clusterId: shardIdentityDoc.clusterId,
+        };
+        var shardIdentityUpdate = {
+            $set: {configsvrConnectionString: shardIdentityDoc.configsvrConnectionString}
+        };
         assert.writeOK(mongodConn.getDB('admin').system.version.update(
-            {_id: 'shardIdentity'}, shardIdentityDoc, true));
+            shardIdentityQuery, shardIdentityUpdate, {upsert: true}));
 
         var res = mongodConn.getDB('admin').runCommand({shardingState: 1});
 
@@ -69,6 +78,9 @@
         assert.eq(shardIdentityDoc.configsvrConnectionString, res.configServer);
         assert.eq(shardIdentityDoc.shardName, res.shardName);
         assert.eq(shardIdentityDoc.clusterId, res.clusterId);
+        // Should not be allowed to remove the shardIdentity document
+        assert.writeErrorWithCode(
+            mongodConn.getDB('admin').system.version.remove({_id: 'shardIdentity'}), 40070);
 
         //
         // Test normal startup

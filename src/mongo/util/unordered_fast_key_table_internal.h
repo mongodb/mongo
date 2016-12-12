@@ -44,21 +44,21 @@ inline int UnorderedFastKeyTable<K_L, K_S, V, Traits>::Area::find(const HashedKe
     do {
         unsigned pos = (key.hash() + probe) & _hashMask;
 
-        if (!_entries[pos].used) {
+        if (!_entries[pos].isUsed()) {
             // space is empty
             if (firstEmpty && *firstEmpty == -1)
                 *firstEmpty = pos;
-            if (!_entries[pos].everUsed)
+            if (!_entries[pos].wasEverUsed())
                 return -1;
             continue;
         }
 
-        if (_entries[pos].curHash != key.hash()) {
+        if (_entries[pos].getCurHash() != key.hash()) {
             // space has something else
             continue;
         }
 
-        if (!Traits::equals(key.key(), Traits::toLookup(_entries[pos].data.first))) {
+        if (!Traits::equals(key.key(), Traits::toLookup(_entries[pos].getData().first))) {
             // hashes match
             // strings are not equals
             continue;
@@ -74,12 +74,12 @@ inline int UnorderedFastKeyTable<K_L, K_S, V, Traits>::Area::find(const HashedKe
 template <typename K_L, typename K_S, typename V, typename Traits>
 inline bool UnorderedFastKeyTable<K_L, K_S, V, Traits>::Area::transfer(Area* newArea) const {
     for (auto&& entry : *this) {
-        if (!entry.used)
+        if (!entry.isUsed())
             continue;
 
         int firstEmpty = -1;
-        int loc = newArea->find(HashedKey(Traits::toLookup(entry.data.first), entry.curHash),
-                                &firstEmpty);
+        int loc = newArea->find(
+            HashedKey(Traits::toLookup(entry.getData().first), entry.getCurHash()), &firstEmpty);
 
         verify(loc == -1);
         if (firstEmpty < 0) {
@@ -107,33 +107,7 @@ inline UnorderedFastKeyTable<K_L, K_S, V, Traits>::UnorderedFastKeyTable(
 
 template <typename K_L, typename K_S, typename V, typename Traits>
 inline V& UnorderedFastKeyTable<K_L, K_S, V, Traits>::get(const HashedKey& key) {
-    if (!_area._entries) {
-        // This is the first insert ever. Need to allocate initial space.
-        dassert(_area.capacity() == 0);
-        _grow();
-    }
-
-    for (int numGrowTries = 0; numGrowTries < 5; numGrowTries++) {
-        int firstEmpty = -1;
-        int pos = _area.find(key, &firstEmpty);
-        if (pos >= 0)
-            return _area._entries[pos].data.second;
-
-        // key not in map
-        // need to add
-        if (firstEmpty >= 0) {
-            _size++;
-            _area._entries[firstEmpty].used = true;
-            _area._entries[firstEmpty].everUsed = true;
-            _area._entries[firstEmpty].curHash = key.hash();
-            _area._entries[firstEmpty].data.first = Traits::toStorage(key.key());
-            return _area._entries[firstEmpty].data.second;
-        }
-
-        // no space left in map
-        _grow();
-    }
-    msgasserted(16471, "UnorderedFastKeyTable couldn't add entry after growing many times");
+    return try_emplace(key).first->second;
 }
 
 template <typename K_L, typename K_S, typename V, typename Traits>
@@ -147,8 +121,7 @@ inline size_t UnorderedFastKeyTable<K_L, K_S, V, Traits>::erase(const HashedKey&
         return 0;
 
     --_size;
-    _area._entries[pos].used = false;
-    _area._entries[pos].data.second = V();
+    _area._entries[pos].unUse();
     return 1;
 }
 
@@ -158,8 +131,42 @@ void UnorderedFastKeyTable<K_L, K_S, V, Traits>::erase(const_iterator it) {
     dassert(it._area == &_area);
 
     --_size;
-    _area._entries[it._position].used = false;
-    _area._entries[it._position].data.second = V();
+    _area._entries[it._position].unUse();
+}
+
+template <typename K_L, typename K_S, typename V, typename Traits>
+template <typename... Args>
+inline auto UnorderedFastKeyTable<K_L, K_S, V, Traits>::try_emplace(const HashedKey& key,
+                                                                    Args&&... args)
+    -> std::pair<iterator, bool> {
+    if (!_area._entries) {
+        // This is the first insert ever. Need to allocate initial space.
+        dassert(_area.capacity() == 0);
+        _grow();
+    }
+
+    for (int numGrowTries = 0; numGrowTries < 5; numGrowTries++) {
+        int firstEmpty = -1;
+        int pos = _area.find(key, &firstEmpty);
+        if (pos >= 0) {
+            // This is only possible the first pass through the loop, since you're allocating space
+            // for a new element after that.
+            dassert(numGrowTries == 0);
+            return {iterator(&_area, pos), false};
+        }
+
+        // key not in map
+        // need to add
+        if (firstEmpty >= 0) {
+            _size++;
+            _area._entries[firstEmpty].emplaceData(key, std::forward<Args>(args)...);
+            return {iterator(&_area, firstEmpty), true};
+        }
+
+        // no space left in map
+        _grow();
+    }
+    msgasserted(16471, "UnorderedFastKeyTable couldn't add entry after growing many times");
 }
 
 template <typename K_L, typename K_S, typename V, typename Traits>

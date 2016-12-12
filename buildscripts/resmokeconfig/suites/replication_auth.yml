@@ -10,6 +10,8 @@ selector:
     exclude_files:
     # Skip any tests that run with auth explicitly.
     - jstests/repl/*[aA]uth*.js
+    # Skip until SERVER-25618 is resolved.
+    - jstests/repl/block1.js
 
 executor:
   js_test:

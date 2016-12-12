@@ -179,6 +179,11 @@ void authMongoCR(RunCommandHook runCommand, const BSONObj& params, AuthCompletio
 //
 
 AuthRequest createX509AuthCmd(const BSONObj& params, StringData clientName) {
+    if (clientName.empty()) {
+        return {ErrorCodes::AuthenticationFailed,
+                "Please enable SSL on the client-side to use the MONGODB-X509 authentication "
+                "mechanism."};
+    }
     auto db = extractDBField(params);
     if (!db.isOK())
         return std::move(db.getStatus());
@@ -187,16 +192,11 @@ AuthRequest createX509AuthCmd(const BSONObj& params, StringData clientName) {
     request.dbname = db.getValue();
 
     std::string username;
-    auto response = bsonExtractStringField(params, saslCommandUserFieldName, &username);
-    if (!response.isOK())
+    auto response = bsonExtractStringFieldWithDefault(
+        params, saslCommandUserFieldName, clientName.toString(), &username);
+    if (!response.isOK()) {
         return response;
-
-    if (clientName.toString() == "") {
-        return {ErrorCodes::AuthenticationFailed,
-                "Please enable SSL on the client-side to use the MONGODB-X509 authentication "
-                "mechanism."};
     }
-
     if (username != clientName.toString()) {
         StringBuilder message;
         message << "Username \"";

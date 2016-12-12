@@ -48,7 +48,7 @@ var server11675 = function() {
 
     assertSameAsFind({query: {}});  // sanity check
     assertSameAsFind({query: {$text: {$search: "apple"}}});
-    assertSameAsFind({query: {$and: [{$text: {$search: "apple"}}, {_id: 1}]}});
+    assertSameAsFind({query: {_id: 1, $text: {$search: "apple"}}});
     assertSameAsFind(
         {query: {$text: {$search: "apple"}}, project: {_id: 1, score: {$meta: "textScore"}}});
     assertSameAsFind({

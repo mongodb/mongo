@@ -2,6 +2,7 @@
 // secondary is up.
 (function() {
     'use strict';
+    load("jstests/replsets/rslib.js");
 
     var st = new ShardingTest(
         {name: "countSlaveOk", shards: 1, mongos: 1, other: {rs: true, rs0: {nodes: 2}}});
@@ -38,10 +39,10 @@
     printjson(rst.status());
 
     // Wait for the mongos to recognize the slave
-    ReplSetTest.awaitRSClientHosts(conn, sec, {ok: true, secondary: true});
+    awaitRSClientHosts(conn, sec, {ok: true, secondary: true});
 
     // Make sure that mongos realizes that primary is already down
-    ReplSetTest.awaitRSClientHosts(conn, primary, {ok: false});
+    awaitRSClientHosts(conn, primary, {ok: false});
 
     // Need to check slaveOk=true first, since slaveOk=false will destroy conn in pool when
     // master is down

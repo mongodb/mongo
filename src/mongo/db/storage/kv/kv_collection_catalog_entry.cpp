@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#include <memory>
+
 #include "mongo/db/storage/kv/kv_collection_catalog_entry.h"
 
 #include "mongo/db/index/index_descriptor.h"
@@ -81,13 +83,16 @@ public:
 };
 
 
-KVCollectionCatalogEntry::KVCollectionCatalogEntry(
-    KVEngine* engine, KVCatalog* catalog, StringData ns, StringData ident, RecordStore* rs)
+KVCollectionCatalogEntry::KVCollectionCatalogEntry(KVEngine* engine,
+                                                   KVCatalog* catalog,
+                                                   StringData ns,
+                                                   StringData ident,
+                                                   std::unique_ptr<RecordStore> rs)
     : BSONCollectionCatalogEntry(ns),
       _engine(engine),
       _catalog(catalog),
       _ident(ident.toString()),
-      _recordStore(rs) {}
+      _recordStore(std::move(rs)) {}
 
 KVCollectionCatalogEntry::~KVCollectionCatalogEntry() {}
 
@@ -228,12 +233,6 @@ void KVCollectionCatalogEntry::updateFlags(OperationContext* txn, int newValue) 
     md.options.flags = newValue;
     md.options.flagsSet = true;
     _catalog->putMetaData(txn, ns().toString(), md);
-}
-
-void KVCollectionCatalogEntry::clearTempFlag(OperationContext* txn) {
-    MetaData md = _getMetaData(txn);
-    md.options.temp = false;
-    _catalog->putMetaData(txn, ns().ns(), md);
 }
 
 void KVCollectionCatalogEntry::updateValidator(OperationContext* txn,

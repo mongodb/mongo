@@ -203,7 +203,7 @@ TEST(CollationSpecTest, ToBSONCorrectlySerializesDefaults) {
                                << "version"
                                << "myVersion");
 
-    ASSERT_EQ(expectedObj, collationSpec.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, collationSpec.toBSON());
 }
 
 TEST(CollationSpecTest, ToBSONCorrectlySerializesCaseFirstUpper) {
@@ -233,7 +233,7 @@ TEST(CollationSpecTest, ToBSONCorrectlySerializesCaseFirstUpper) {
                                << "version"
                                << "myVersion");
 
-    ASSERT_EQ(expectedObj, collationSpec.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, collationSpec.toBSON());
 }
 
 TEST(CollationSpecTest, ToBSONCorrectlySerializesCaseFirstLower) {
@@ -263,7 +263,7 @@ TEST(CollationSpecTest, ToBSONCorrectlySerializesCaseFirstLower) {
                                << "version"
                                << "myVersion");
 
-    ASSERT_EQ(expectedObj, collationSpec.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, collationSpec.toBSON());
 }
 
 TEST(CollationSpecTest, ToBSONCorrectlySerializesPrimaryStrength) {
@@ -293,7 +293,7 @@ TEST(CollationSpecTest, ToBSONCorrectlySerializesPrimaryStrength) {
                                << "version"
                                << "myVersion");
 
-    ASSERT_EQ(expectedObj, collationSpec.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, collationSpec.toBSON());
 }
 
 TEST(CollationSpecTest, ToBSONCorrectlySerializesSecondaryStrength) {
@@ -323,7 +323,7 @@ TEST(CollationSpecTest, ToBSONCorrectlySerializesSecondaryStrength) {
                                << "version"
                                << "myVersion");
 
-    ASSERT_EQ(expectedObj, collationSpec.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, collationSpec.toBSON());
 }
 
 TEST(CollationSpecTest, ToBSONCorrectlySerializesQuaternaryStrength) {
@@ -353,7 +353,7 @@ TEST(CollationSpecTest, ToBSONCorrectlySerializesQuaternaryStrength) {
                                << "version"
                                << "myVersion");
 
-    ASSERT_EQ(expectedObj, collationSpec.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, collationSpec.toBSON());
 }
 
 TEST(CollationSpecTest, ToBSONCorrectlySerializesIdenticalStrength) {
@@ -383,7 +383,7 @@ TEST(CollationSpecTest, ToBSONCorrectlySerializesIdenticalStrength) {
                                << "version"
                                << "myVersion");
 
-    ASSERT_EQ(expectedObj, collationSpec.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, collationSpec.toBSON());
 }
 
 TEST(CollationSpecTest, ToBSONCorrectlySerializesAlternateShifted) {
@@ -413,7 +413,7 @@ TEST(CollationSpecTest, ToBSONCorrectlySerializesAlternateShifted) {
                                << "version"
                                << "myVersion");
 
-    ASSERT_EQ(expectedObj, collationSpec.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, collationSpec.toBSON());
 }
 
 TEST(CollationSpecTest, ToBSONCorrectlySerializesMaxVariableSpace) {
@@ -443,7 +443,7 @@ TEST(CollationSpecTest, ToBSONCorrectlySerializesMaxVariableSpace) {
                                << "version"
                                << "myVersion");
 
-    ASSERT_EQ(expectedObj, collationSpec.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, collationSpec.toBSON());
 }
 
 }  // namespace

@@ -569,7 +569,7 @@ class TypedArrayObjectTemplate : public TypedArrayObject
                 }
 
                 InvokeArgs args(cx);
-                if (!args.init(3))
+                if (!args.init(cx, 3))
                     return nullptr;
 
                 args.setCallee(cx->compartment()->maybeGlobal()->createArrayFromBuffer<NativeType>());
@@ -1225,7 +1225,7 @@ DataViewObject::constructWrapped(JSContext* cx, HandleObject bufobj, const CallA
     }
 
     InvokeArgs args2(cx);
-    if (!args2.init(3))
+    if (!args2.init(cx, 3))
         return false;
     args2.setCallee(global->createDataViewForThis());
     args2.setThis(ObjectValue(*bufobj));
@@ -2505,7 +2505,7 @@ JS_FRIEND_API(JSObject*)
 JS_NewDataView(JSContext* cx, HandleObject arrayBuffer, uint32_t byteOffset, int32_t byteLength)
 {
     ConstructArgs cargs(cx);
-    if (!cargs.init(3))
+    if (!cargs.init(cx, 3))
         return nullptr;
 
     RootedObject constructor(cx);

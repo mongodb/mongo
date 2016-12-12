@@ -116,5 +116,55 @@ TEST(AsyncTimerMock, CancelExpired) {
     ASSERT(!fired);
 }
 
+TEST(AsyncTimerMock, Now) {
+    AsyncTimerFactoryMock factory;
+
+    ASSERT(factory.now() == Date_t::fromMillisSinceEpoch(0));
+
+    factory.fastForward(Milliseconds(200));
+    ASSERT(factory.now() == Date_t::fromMillisSinceEpoch(200));
+
+    factory.fastForward(Milliseconds(1000));
+    ASSERT(factory.now() == Date_t::fromMillisSinceEpoch(1200));
+
+    factory.fastForward(Milliseconds(1022));
+    ASSERT(factory.now() == Date_t::fromMillisSinceEpoch(2222));
+}
+
+TEST(AsyncTimerMock, WorksAfterCancel) {
+    AsyncTimerFactoryMock factory;
+
+    // Set a timer
+    bool fired1 = false;
+    auto timer = factory.make(Milliseconds(100));
+    timer->asyncWait([&fired1](std::error_code ec) {
+        // This timer should have been canceled
+        ASSERT(ec);
+        ASSERT(ec == asio::error::operation_aborted);
+        fired1 = true;
+    });
+
+    // Cancel timer
+    timer->cancel();
+
+    // Ensure that its handler was called
+    ASSERT(fired1);
+
+    fired1 = false;
+    bool fired2 = false;
+
+    // Add a new callback to to timer.
+    timer->asyncWait([&fired2](std::error_code ec) {
+        // This timer should NOT have been canceled
+        ASSERT(!ec);
+        fired2 = true;
+    });
+
+    // Fast forward so it expires
+    factory.fastForward(Milliseconds(100));
+    ASSERT(fired2);
+    ASSERT(!fired1);
+}
+
 }  // namespace executor
 }  // namespace mongo

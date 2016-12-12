@@ -96,6 +96,11 @@ public:
         return DocumentSource::SEE_NEXT;
     }
 
+    DocumentSource::GetModPathsReturn getModifiedPaths() const final {
+        // TODO SERVER-25510 Only report added paths as modified.
+        return {DocumentSource::GetModPathsReturn::Type::kAllPaths, std::set<std::string>{}};
+    }
+
     /**
      * Add the specified fields to 'inputDoc'.
      *

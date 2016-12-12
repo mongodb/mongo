@@ -42,6 +42,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/request_interface.h"
 #include "mongo/s/cluster_last_error_info.h"
@@ -54,10 +55,6 @@ namespace mongo {
 
 using std::string;
 using std::stringstream;
-
-bool isMongos() {
-    return true;
-}
 
 /**
  * When this callback is run, we record a shard that we've used for useful work in an operation to
@@ -104,7 +101,7 @@ void Command::execCommandClient(OperationContext* txn,
         return;
     }
 
-    Status status = _checkAuthorization(c, txn->getClient(), dbname, cmdObj);
+    Status status = checkAuthorization(c, txn, dbname, cmdObj);
     if (!status.isOK()) {
         appendCommandStatus(result, status);
         return;
@@ -133,6 +130,11 @@ void Command::execCommandClient(OperationContext* txn,
         return;
     }
 
+
+    // attach tracking
+    rpc::TrackingMetadata trackingMetadata;
+    trackingMetadata.initWithOperName(c->getName());
+    rpc::TrackingMetadata::get(txn) = trackingMetadata;
 
     std::string errmsg;
     bool ok = false;

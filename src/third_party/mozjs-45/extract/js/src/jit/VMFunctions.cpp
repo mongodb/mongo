@@ -75,7 +75,7 @@ InvokeFunction(JSContext* cx, HandleObject obj, bool constructing, uint32_t argc
         }
 
         ConstructArgs cargs(cx);
-        if (!cargs.init(argc))
+        if (!cargs.init(cx, argc))
             return false;
 
         for (uint32_t i = 0; i < argc; i++)
@@ -806,7 +806,7 @@ InterpretResume(JSContext* cx, HandleObject obj, HandleValue val, HandleProperty
     MOZ_ASSERT(selfHostedFun.toObject().is<JSFunction>());
 
     InvokeArgs args(cx);
-    if (!args.init(3))
+    if (!args.init(cx, 3))
         return false;
 
     args.setCallee(selfHostedFun);
@@ -1314,7 +1314,7 @@ bool
 ThrowObjectCoercible(JSContext* cx, HandleValue v)
 {
     MOZ_ASSERT(v.isUndefined() || v.isNull());
-    MOZ_ALWAYS_FALSE(ToObjectSlow(cx, v, false));
+    MOZ_ALWAYS_FALSE(ToObjectSlow(cx, v, true));
     return false;
 }
 

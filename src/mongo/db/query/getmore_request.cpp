@@ -70,7 +70,7 @@ GetMoreRequest::GetMoreRequest(NamespaceString namespaceString,
 
 Status GetMoreRequest::isValid() const {
     if (!nss.isValid()) {
-        return Status(ErrorCodes::BadValue,
+        return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "Invalid namespace for getMore: " << nss.ns());
     }
 
@@ -89,11 +89,11 @@ Status GetMoreRequest::isValid() const {
 }
 
 // static
-std::string GetMoreRequest::parseNs(const std::string& dbname, const BSONObj& cmdObj) {
+NamespaceString GetMoreRequest::parseNs(const std::string& dbname, const BSONObj& cmdObj) {
     BSONElement collElt = cmdObj["collection"];
     const std::string coll = (collElt.type() == BSONType::String) ? collElt.String() : "";
 
-    return str::stream() << dbname << "." << coll;
+    return NamespaceString(dbname, coll);
 }
 
 // static
@@ -103,7 +103,7 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
 
     // Required fields.
     boost::optional<CursorId> cursorid;
-    boost::optional<std::string> fullns;
+    boost::optional<NamespaceString> nss;
 
     // Optional fields.
     boost::optional<long long> batchSize;
@@ -127,7 +127,7 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
                                       << cmdObj};
             }
 
-            fullns = parseNs(dbname, cmdObj);
+            nss = parseNs(dbname, cmdObj);
         } else if (str::equals(fieldName, kBatchSizeField)) {
             if (!el.isNumber()) {
                 return {ErrorCodes::TypeMismatch,
@@ -171,17 +171,13 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
                 str::stream() << "Field 'getMore' missing in: " << cmdObj};
     }
 
-    if (!fullns) {
+    if (!nss) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << "Field 'collection' missing in: " << cmdObj};
     }
 
-    GetMoreRequest request(NamespaceString(*fullns),
-                           *cursorid,
-                           batchSize,
-                           awaitDataTimeout,
-                           term,
-                           lastKnownCommittedOpTime);
+    GetMoreRequest request(
+        std::move(*nss), *cursorid, batchSize, awaitDataTimeout, term, lastKnownCommittedOpTime);
     Status validStatus = request.isValid();
     if (!validStatus.isOK()) {
         return validStatus;

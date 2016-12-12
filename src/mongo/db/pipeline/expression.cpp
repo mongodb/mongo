@@ -710,6 +710,15 @@ intrusive_ptr<Expression> ExpressionCompare::parse(BSONElement bsonExpr,
 
 ExpressionCompare::ExpressionCompare(CmpOp theCmpOp) : cmpOp(theCmpOp) {}
 
+boost::intrusive_ptr<ExpressionCompare> ExpressionCompare::create(
+    CmpOp cmpOp,
+    const boost::intrusive_ptr<Expression>& exprLeft,
+    const boost::intrusive_ptr<Expression>& exprRight) {
+    boost::intrusive_ptr<ExpressionCompare> expr = new ExpressionCompare(cmpOp);
+    expr->vpOperand = {exprLeft, exprRight};
+    return expr;
+}
+
 namespace {
 // Lookup table for truth value returns
 struct CmpLookup {
@@ -1200,7 +1209,7 @@ intrusive_ptr<ExpressionObject> ExpressionObject::create(
 intrusive_ptr<ExpressionObject> ExpressionObject::parse(BSONObj obj,
                                                         const VariablesParseState& vps) {
     // Make sure we don't have any duplicate field names.
-    std::unordered_set<string> specifiedFields;
+    stdx::unordered_set<string> specifiedFields;
 
     vector<pair<string, intrusive_ptr<Expression>>> expressions;
     for (auto&& elem : obj) {
@@ -1236,7 +1245,7 @@ void ExpressionObject::addDependencies(DepsTracker* deps) const {
 Value ExpressionObject::evaluateInternal(Variables* vars) const {
     MutableDocument outputDoc;
     for (auto&& pair : _expressions) {
-        outputDoc.setNestedField(FieldPath(pair.first), pair.second->evaluateInternal(vars));
+        outputDoc.addField(pair.first, pair.second->evaluateInternal(vars));
     }
     return outputDoc.freezeToValue();
 }
@@ -1244,7 +1253,7 @@ Value ExpressionObject::evaluateInternal(Variables* vars) const {
 Value ExpressionObject::serialize(bool explain) const {
     MutableDocument outputDoc;
     for (auto&& pair : _expressions) {
-        outputDoc.setNestedField(FieldPath(pair.first), pair.second->serialize(explain));
+        outputDoc.addField(pair.first, pair.second->serialize(explain));
     }
     return outputDoc.freezeToValue();
 }
@@ -2683,7 +2692,7 @@ Value ExpressionRange::evaluateInternal(Variables* vars) const {
         Value stepVal(vpOperand[2]->evaluateInternal(vars));
 
         uassert(34447,
-                str::stream() << "$range requires a numeric starting value, found value of type:"
+                str::stream() << "$range requires a numeric step value, found value of type:"
                               << typeName(stepVal.getType()),
                 stepVal.numeric());
         uassert(34448,

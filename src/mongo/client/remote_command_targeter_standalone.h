@@ -43,12 +43,15 @@ public:
 
     ConnectionString connectionString() override;
 
-    StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
-                                     Milliseconds maxWait) override;
+    StatusWith<HostAndPort> findHost(OperationContext* txn,
+                                     const ReadPreferenceSetting& readPref) override;
 
-    void markHostNotMaster(const HostAndPort& host) override;
+    StatusWith<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
+                                                Milliseconds maxWait) override;
 
-    void markHostUnreachable(const HostAndPort& host) override;
+    void markHostNotMaster(const HostAndPort& host, const Status& status) override;
+
+    void markHostUnreachable(const HostAndPort& host, const Status& status) override;
 
 private:
     const HostAndPort _hostAndPort;

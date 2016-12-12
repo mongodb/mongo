@@ -861,8 +861,8 @@ JitCode::finalize(FreeOp* fop)
     // Don't do this if the Ion code is protected, as the signal handler will
     // deadlock trying to reacquire the interrupt lock.
     {
-        AutoWritableJitCode awjc(this);
-        memset(code_, JS_SWEPT_CODE_PATTERN, bufferSize_);
+        AutoWritableJitCode awjc(fop->runtime(), code_ - headerSize_, headerSize_ + bufferSize_);
+        memset(code_ - headerSize_, JS_SWEPT_CODE_PATTERN, headerSize_ + bufferSize_);
         code_ = nullptr;
     }
 
@@ -2240,6 +2240,9 @@ IonCompile(JSContext* cx, JSScript* script,
                 ". (Compiled on background thread.)",
                 builderScript->filename(), builderScript->lineno());
 
+        if (!CreateMIRRootList(*builder))
+            return AbortReason_Alloc;
+
         if (!StartOffThreadIonCompile(cx, builder)) {
             JitSpew(JitSpew_IonAbort, "Unable to start off-thread ion compilation.");
             builder->graphSpewer().endFunction();
@@ -2328,6 +2331,13 @@ CheckScript(JSContext* cx, JSScript* script, bool osr)
         // object as scope chain, this is not valid when the script has a
         // non-syntactic global scope.
         TrackAndSpewIonAbort(cx, script, "has non-syntactic global scope");
+        return false;
+    }
+
+    if (script->nTypeSets() >= UINT16_MAX) {
+        // In this case multiple bytecode ops can share a single observed
+        // TypeSet (see bug 1303710).
+        TrackAndSpewIonAbort(cx, script, "too many typesets");
         return false;
     }
 

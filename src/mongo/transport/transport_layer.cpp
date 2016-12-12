@@ -43,5 +43,8 @@ const Status TransportLayer::ShutdownStatus =
 const Status TransportLayer::TicketSessionUnknownStatus = Status(
     ErrorCodes::TransportSessionUnknown, "TransportLayer does not own the Ticket's Session.");
 
+const Status TransportLayer::TicketSessionClosedStatus = Status(
+    ErrorCodes::TransportSessionClosed, "Operation attempted on a closed transport Session.");
+
 }  // namespace transport
 }  // namespace mongo

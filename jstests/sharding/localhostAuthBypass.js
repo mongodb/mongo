@@ -27,7 +27,8 @@
     };
 
     var addShard = function(st, shouldPass) {
-        var m = MongoRunner.runMongod({auth: "", keyFile: keyfile, useHostname: false});
+        var m =
+            MongoRunner.runMongod({auth: "", keyFile: keyfile, useHostname: false, 'shardsvr': ''});
         var res = st.getDB("admin").runCommand({addShard: m.host});
         if (shouldPass) {
             assert.commandWorked(res, "Add shard");

@@ -45,9 +45,7 @@ class CollectionBulkLoader {
 public:
     virtual ~CollectionBulkLoader() = default;
 
-    virtual Status init(OperationContext* txn,
-                        Collection* coll,
-                        const std::vector<BSONObj>& indexSpecs) = 0;
+    virtual Status init(Collection* coll, const std::vector<BSONObj>& indexSpecs) = 0;
     /**
      * Inserts the documents into the collection record store, and indexes them with the
      * MultiIndexBlock on the side.

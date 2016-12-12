@@ -44,24 +44,54 @@ class OperationContext;
 class PseudoRandom;
 class PlanExecutor;
 
+/**
+ * A container which owns ClientCursor objects. This class is used to create, access, and delete
+ * ClientCursors. It is also responsible for allocating the cursor ids that are passed back to
+ * clients.
+ *
+ * In addition to managing the lifetime of ClientCursors, the CursorManager is responsible for
+ * notifying yielded queries of write operations and collection drops. For this reason, query
+ * PlanExecutor objects which are not contained within a ClientCursor are also registered with the
+ * CursorManager. Query executors must be registered with the CursorManager, either as a bare
+ * PlanExecutor or inside a ClientCursor (but cannot be registered in both ways).
+ *
+ * There is a CursorManager per-collection and a global CursorManager. The global CursorManager owns
+ * cursors whose lifetime is not tied to that of the collection and which do not need to receive
+ * notifications about writes for a particular collection. In contrast, cursors owned by a
+ * collection's CursorManager, unless pinned, are destroyed when the collection is destroyed. Such
+ * cursors receive notifications about writes to the collection.
+ *
+ * Callers must hold the collection lock in at least MODE_IS in order to access a collection's
+ * CursorManager, which guards against the CursorManager being concurrently deleted due to a
+ * catalog-level operation such as a collection drop. No locks are required to access the global
+ * cursor manager.
+ *
+ * The CursorManager is internally synchronized; operations on a given collection may call methods
+ * concurrently on that collection's CursorManager.
+ *
+ * See clientcursor.h for more information.
+ */
 class CursorManager {
 public:
     CursorManager(StringData ns);
 
     /**
-     * will kill() all PlanExecutor instances it has
+     * Destroys the CursorManager. Managed cursors which are not pinned are destroyed. Ownership of
+     * pinned cursors is transferred to the corresponding ClientCursorPin.
      */
     ~CursorManager();
 
-    // -----------------
-
     /**
-     * @param collectionGoingAway Pass as true if the Collection instance is going away.
-     *                            This could be because the db is being closed, or the
-     *                            collection/db is being dropped.
-     * @param reason              The motivation for invalidating all cursors. Will be used
-     *                            for error reporting and logging when an operation finds that
-     *                            the cursor it was operating on has been killed.
+     * Kills all managed query executors and ClientCursors.
+     *
+     * 'collectionGoingAway' indicates whether the Collection instance is being deleted.  This could
+     * be because the db is being closed, or the collection/db is being dropped. When passing
+     * a 'collectionGoingAway' value of true, callers must have exclusive access to the collection
+     * (i.e. must have the collection, database, or global resource locked in MODE_X).
+     *
+     * The 'reason' is the motivation for invalidating all cursors. This will be used for error
+     * reporting and logging when an operation finds that the cursor it was operating on has been
+     * killed.
      */
     void invalidateAll(bool collectionGoingAway, const std::string& reason);
 
@@ -71,19 +101,17 @@ public:
      */
     void invalidateDocument(OperationContext* txn, const RecordId& dl, InvalidationType type);
 
-    /*
-     * timesout cursors that have been idle for too long
-     * note: must have a readlock on the collection
-     * @return number timed out
+    /**
+     * Destroys cursors that have been inactive for too long.
+     *
+     * Returns the number of cursors that were timed out.
      */
     std::size_t timeoutCursors(int millisSinceLastCall);
 
-    // -----------------
-
     /**
      * Register an executor so that it can be notified of deletion/invalidation during yields.
-     * Must be called before an executor yields.  If an executor is cached (inside a
-     * ClientCursor) it MUST NOT be registered; the two are mutually exclusive.
+     * Must be called before an executor yields.  If an executor is registered inside a
+     * ClientCursor it must not be itself registered; the two are mutually exclusive.
      */
     void registerExecutor(PlanExecutor* exec);
 
@@ -92,10 +120,28 @@ public:
      */
     void deregisterExecutor(PlanExecutor* exec);
 
-    // -----------------
+    /**
+     * Constructs a new ClientCursor according to the given 'cursorParams'. The cursor is atomically
+     * registered with the manager and returned in pinned state.
+     */
+    ClientCursorPin registerCursor(const ClientCursorParams& cursorParams);
 
-    CursorId registerCursor(ClientCursor* cc);
-    void deregisterCursor(ClientCursor* cc);
+    /**
+     * Constructs and pins a special ClientCursor used to track sharding state for the given
+     * collection. See range_preserver.h for more details.
+     */
+    ClientCursorPin registerRangePreserverCursor(const Collection* collection);
+
+    /**
+     * Pins and returns the cursor with the given id.
+     *
+     * Returns ErrorCodes::CursorNotFound if the cursor does not exist.
+     *
+     * Throws a UserException if the cursor is already pinned. Callers need not specially handle
+     * this error, as it should only happen if a misbehaving client attempts to simultaneously issue
+     * two operations against the same cursor id.
+     */
+    StatusWith<ClientCursorPin> pinCursor(CursorId id);
 
     /**
      * Returns an OK status if the cursor was successfully erased.
@@ -112,39 +158,43 @@ public:
      * the given cursor id.  Otherwise, returns false.
      *
      * The return value of this method does not indicate any information about whether or not a
-     * cursor actually exists with the given cursor id.  Use the find() method for that purpose.
+     * cursor actually exists with the given cursor id.
      */
     bool ownsCursorId(CursorId cursorId) const;
 
     void getCursorIds(std::set<CursorId>* openCursors) const;
-    std::size_t numCursors() const;
 
     /**
-     * @param pin - if true, will try to pin cursor
-     *                  if pinned already, will assert
-     *                  otherwise will pin
+     * Returns the number of ClientCursors currently registered. Excludes any registered bare
+     * PlanExecutors.
      */
-    ClientCursor* find(CursorId id, bool pin);
-
-    void unpin(ClientCursor* cursor);
-
-    // ----------------------
+    std::size_t numCursors() const;
 
     static CursorManager* getGlobalCursorManager();
 
     static int eraseCursorGlobalIfAuthorized(OperationContext* txn, int n, const char* ids);
+
     static bool eraseCursorGlobalIfAuthorized(OperationContext* txn, CursorId id);
 
     static bool eraseCursorGlobal(OperationContext* txn, CursorId id);
 
     /**
-     * @return number timed out
+     * Deletes inactive cursors from the global cursor manager and from all per-collection cursor
+     * managers. Returns the number of cursors that were timed out.
      */
     static std::size_t timeoutCursorsGlobal(OperationContext* txn, int millisSinceLastCall);
 
 private:
+    friend class ClientCursorPin;
+
     CursorId _allocateCursorId_inlock();
     void _deregisterCursor_inlock(ClientCursor* cc);
+    ClientCursorPin _registerCursor_inlock(
+        std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor);
+
+    void deregisterCursor(ClientCursor* cc);
+
+    void unpin(ClientCursor* cursor);
 
     NamespaceString _nss;
     unsigned _collectionCacheRuntimeId;
@@ -158,4 +208,4 @@ private:
     typedef std::map<CursorId, ClientCursor*> CursorMap;
     CursorMap _cursors;
 };
-}
+}  // namespace mongo

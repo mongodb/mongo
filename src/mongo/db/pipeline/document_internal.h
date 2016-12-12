@@ -33,6 +33,7 @@
 #include <bitset>
 #include <boost/intrusive_ptr.hpp>
 
+#include "mongo/base/static_assert.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -123,8 +124,7 @@ private:
 };
 // Real size is sizeof(ValueElement) + nameLen
 #pragma pack()
-static_assert(sizeof(ValueElement) == (sizeof(Value) + sizeof(Position) + sizeof(int) + 1),
-              "sizeof(ValueElement) == (sizeof(Value) + sizeof(Position) + sizeof(int) + 1)");
+MONGO_STATIC_ASSERT(sizeof(ValueElement) == (sizeof(Value) + sizeof(Position) + sizeof(int) + 1));
 
 // This is an internal class for Document. See FieldIterator for the public version.
 class DocumentStorageIterator {

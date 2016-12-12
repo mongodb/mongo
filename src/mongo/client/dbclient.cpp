@@ -236,10 +236,16 @@ rpc::UniqueReply DBClientWithCommands::runCommandWithMetadata(StringData databas
     return rpc::UniqueReply(std::move(replyMsg), std::move(commandReply));
 }
 
-bool DBClientWithCommands::runCommand(const string& dbname,
-                                      const BSONObj& cmd,
-                                      BSONObj& info,
-                                      int options) {
+std::tuple<rpc::UniqueReply, DBClientWithCommands*>
+DBClientWithCommands::runCommandWithMetadataAndTarget(StringData database,
+                                                      StringData command,
+                                                      const BSONObj& metadata,
+                                                      const BSONObj& commandArgs) {
+    return std::make_tuple(runCommandWithMetadata(database, command, metadata, commandArgs), this);
+}
+
+std::tuple<bool, DBClientWithCommands*> DBClientWithCommands::runCommandWithTarget(
+    const string& dbname, const BSONObj& cmd, BSONObj& info, int options) {
     BSONObj upconvertedCmd;
     BSONObj upconvertedMetadata;
 
@@ -251,12 +257,23 @@ bool DBClientWithCommands::runCommand(const string& dbname,
 
     auto commandName = upconvertedCmd.firstElementFieldName();
 
-    auto result = runCommandWithMetadata(dbname, commandName, upconvertedMetadata, upconvertedCmd);
+    auto resultTuple =
+        runCommandWithMetadataAndTarget(dbname, commandName, upconvertedMetadata, upconvertedCmd);
+    auto result = std::move(std::get<0>(resultTuple));
 
     info = result->getCommandReply().getOwned();
 
-    return isOk(info);
+    return std::make_tuple(isOk(info), std::get<1>(resultTuple));
 }
+
+bool DBClientWithCommands::runCommand(const string& dbname,
+                                      const BSONObj& cmd,
+                                      BSONObj& info,
+                                      int options) {
+    auto res = runCommandWithTarget(dbname, cmd, info, options);
+    return std::get<0>(res);
+}
+
 
 /* note - we build a bson obj here -- for something that is super common like getlasterror you
           should have that object prebuilt as that would be faster.
@@ -725,13 +742,19 @@ executor::RemoteCommandResponse initWireVersion(DBClientConnection* conn,
             bob.append("hostInfo", sb.str());
         }
 
+        auto versionString = VersionInfoInterface::instance().version();
+
         Status serializeStatus = ClientMetadata::serialize(
-            "MongoDB Internal Client", mongo::versionString, applicationName, &bob);
+            "MongoDB Internal Client", versionString, applicationName, &bob);
         if (!serializeStatus.isOK()) {
             return serializeStatus;
         }
 
         conn->getCompressorManager().clientBegin(&bob);
+
+        if (WireSpec::instance().isInternalClient) {
+            WireSpec::appendInternalClientWireVersion(WireSpec::instance().outgoing, &bob);
+        }
 
         Date_t start{Date_t::now()};
         auto result =
@@ -800,12 +823,18 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress, StringData 
         return swProtocolSet.getStatus();
     }
 
-    _setServerRPCProtocols(swProtocolSet.getValue());
+    auto validateStatus =
+        rpc::validateWireVersion(WireSpec::instance().outgoing, swProtocolSet.getValue().version);
+    if (!validateStatus.isOK()) {
+        warning() << "remote host has incompatible wire version: " << validateStatus;
 
-    auto negotiatedProtocol =
-        rpc::negotiate(getServerRPCProtocols(),
-                       rpc::computeProtocolSet(WireSpec::instance().minWireVersionOutgoing,
-                                               WireSpec::instance().maxWireVersionOutgoing));
+        return validateStatus;
+    }
+
+    _setServerRPCProtocols(swProtocolSet.getValue().protocolSet);
+
+    auto negotiatedProtocol = rpc::negotiate(
+        getServerRPCProtocols(), rpc::computeProtocolSet(WireSpec::instance().outgoing));
 
     if (!negotiatedProtocol.isOK()) {
         return negotiatedProtocol.getStatus();
@@ -872,8 +901,24 @@ Status DBClientConnection::connectSocketOnly(const HostAndPort& serverAddress) {
     }
 
 #ifdef MONGO_CONFIG_SSL
-    int sslModeVal = sslGlobalParams.sslMode.load();
-    if (sslModeVal == SSLParams::SSLMode_preferSSL || sslModeVal == SSLParams::SSLMode_requireSSL) {
+    // Prefer to get SSL mode directly from our URI, but if it is not set, fall back to
+    // checking global SSL params. DBClientConnections create through the shell will have a
+    // meaningful URI set, but DBClientConnections created from within the server may not.
+    int sslMode;
+    auto options = _uri.getOptions();
+    auto iter = options.find("ssl");
+    if (iter != options.end()) {
+        if (iter->second == "true") {
+            sslMode = SSLParams::SSLMode_requireSSL;
+        } else {
+            sslMode = SSLParams::SSLMode_disabled;
+        }
+    } else {
+        sslMode = sslGlobalParams.sslMode.load();
+    }
+
+    if (sslMode == SSLParams::SSLMode_preferSSL || sslMode == SSLParams::SSLMode_requireSSL) {
+        uassert(40312, "SSL is not enabled; cannot create an SSL connection", sslManager());
         if (!_port->secure(sslManager(), serverAddress.host())) {
             return Status(ErrorCodes::SSLHandshakeFailed, "Failed to initialize SSL on connection");
         }
@@ -1176,7 +1221,7 @@ list<BSONObj> DBClientWithCommands::getIndexSpecs(const string& ns, int options)
         const long long id = cursorObj["id"].Long();
 
         if (id != 0) {
-            const std::string ns = cursorObj["ns"].String();
+            invariant(ns == cursorObj["ns"].String());
             unique_ptr<DBClientCursor> cursor = getMore(ns, id, 0, 0);
             while (cursor->more()) {
                 specs.push_back(cursor->nextSafe().getOwned());
@@ -1271,12 +1316,14 @@ void DBClientWithCommands::createIndex(StringData ns, const IndexSpec& descripto
 
 DBClientConnection::DBClientConnection(bool _autoReconnect,
                                        double so_timeout,
+                                       MongoURI uri,
                                        const HandshakeValidationHook& hook)
     : _failed(false),
       autoReconnect(_autoReconnect),
       autoReconnectBackoff(1000, 2000),
       _so_timeout(so_timeout),
-      _hook(hook) {
+      _hook(hook),
+      _uri(std::move(uri)) {
     _numConnections.fetchAndAdd(1);
 }
 
@@ -1387,12 +1434,13 @@ void DBClientConnection::handleNotMasterResponse(const BSONElement& elemToCheck)
         return;
     }
 
-    MONGO_LOG_COMPONENT(1, logger::LogComponent::kReplication)
-        << "got not master from: " << _serverAddress << " of repl set: " << _parentReplSetName;
-
     ReplicaSetMonitorPtr monitor = ReplicaSetMonitor::get(_parentReplSetName);
     if (monitor) {
-        monitor->failedHost(_serverAddress);
+        monitor->failedHost(_serverAddress,
+                            {ErrorCodes::NotMaster,
+                             str::stream() << "got not master from: " << _serverAddress
+                                           << " of repl set: "
+                                           << _parentReplSetName});
     }
 
     _failed = true;

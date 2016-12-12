@@ -35,8 +35,8 @@ var dumpRestoreAuth2 = function(backup_role, restore_role) {
               "setup2: " + tojson(admindb.system.users.getIndexes()));
     assert.eq(1, admindb.system.roles.count(), "setup3");
     assert.eq(2, admindb.system.roles.getIndexes().length, "setup4");
-    assert.eq(1, admindb.system.version.count());
-    var versionDoc = admindb.system.version.findOne();
+    assert.eq(1, admindb.system.version.find({_id: "authSchema"}).count());
+    var versionDoc = admindb.system.version.findOne({_id: "authSchema"});
 
     // Logout root user.
     admindb.logout();
@@ -110,9 +110,11 @@ var dumpRestoreAuth2 = function(backup_role, restore_role) {
     assert.eq(1, admindb.system.roles.find({role: 'customRole'}).count(), "didn't restore roles");
     assert.eq(2, admindb.system.users.getIndexes().length, "didn't maintain user indexes");
     assert.eq(2, admindb.system.roles.getIndexes().length, "didn't maintain role indexes");
-    assert.eq(1, admindb.system.version.count(), "didn't restore version");
-    assert.docEq(
-        versionDoc, admindb.system.version.findOne(), "version doc wasn't restored properly");
+    assert.eq(
+        1, admindb.system.version.find({_id: "authSchema"}).count(), "didn't restore version");
+    assert.docEq(versionDoc,
+                 admindb.system.version.findOne({_id: "authSchema"}),
+                 "version doc wasn't restored properly");
     admindb.logout();
 
     t.stop();

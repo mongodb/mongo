@@ -117,7 +117,7 @@ StatusWith<boost::optional<BSONObj>> advanceExecutor(OperationContext* txn,
 
     if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
         error() << "Plan executor error during findAndModify: " << PlanExecutor::statestr(state)
-                << ", stats: " << Explain::getWinningPlanStats(exec);
+                << ", stats: " << redact(Explain::getWinningPlanStats(exec));
 
         if (WorkingSetCommon::isValidStatusMemberObject(value)) {
             const Status errorStatus = WorkingSetCommon::getMemberObjectStatus(value);
@@ -395,11 +395,6 @@ public:
                 }
 
                 AutoGetOrCreateDb autoDb(txn, dbName, MODE_IX);
-                if (autoDb.getDb()->getViewCatalog()->lookup(txn, nsString.ns())) {
-                    return appendCommandStatus(result,
-                                               {ErrorCodes::CommandNotSupportedOnView,
-                                                "findAndModify not supported on views"});
-                }
                 Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
 
                 // Attach the namespace and database profiling level to the current op.
@@ -418,6 +413,11 @@ public:
                 }
 
                 Collection* const collection = autoDb.getDb()->getCollection(nsString.ns());
+                if (!collection && autoDb.getDb()->getViewCatalog()->lookup(txn, nsString.ns())) {
+                    return appendCommandStatus(result,
+                                               {ErrorCodes::CommandNotSupportedOnView,
+                                                "findAndModify not supported on a view"});
+                }
                 auto statusWithPlanExecutor =
                     getExecutorDelete(txn, opDebug, collection, &parsedDelete);
                 if (!statusWithPlanExecutor.isOK()) {
@@ -450,7 +450,7 @@ public:
                 // Fill out OpDebug with the number of deleted docs.
                 opDebug->ndeleted = getDeleteStats(exec.get())->docsDeleted;
 
-                if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+                if (curOp->shouldDBProfile()) {
                     BSONObjBuilder execStatsBob;
                     Explain::getWinningPlanStats(exec.get(), &execStatsBob);
                     curOp->debug().execStats = execStatsBob.obj();
@@ -472,12 +472,6 @@ public:
                 }
 
                 AutoGetOrCreateDb autoDb(txn, dbName, MODE_IX);
-                if (autoDb.getDb()->getViewCatalog()->lookup(txn, nsString.ns())) {
-                    return appendCommandStatus(result,
-                                               {ErrorCodes::CommandNotSupportedOnView,
-                                                "findAndModify not supported on views"});
-                }
-
                 Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), MODE_IX);
 
                 // Attach the namespace and database profiling level to the current op.
@@ -496,6 +490,11 @@ public:
                 }
 
                 Collection* collection = autoDb.getDb()->getCollection(nsString.ns());
+                if (!collection && autoDb.getDb()->getViewCatalog()->lookup(txn, nsString.ns())) {
+                    return appendCommandStatus(result,
+                                               {ErrorCodes::CommandNotSupportedOnView,
+                                                "findAndModify not supported on a view"});
+                }
 
                 // Create the collection if it does not exist when performing an upsert
                 // because the update stage does not create its own collection.
@@ -555,7 +554,7 @@ public:
                 UpdateStage::recordUpdateStatsInOpDebug(getUpdateStats(exec.get()), opDebug);
                 opDebug->setPlanSummaryMetrics(summaryStats);
 
-                if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+                if (curOp->shouldDBProfile()) {
                     BSONObjBuilder execStatsBob;
                     Explain::getWinningPlanStats(exec.get(), &execStatsBob);
                     curOp->debug().execStats = execStatsBob.obj();

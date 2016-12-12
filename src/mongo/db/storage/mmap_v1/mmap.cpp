@@ -72,15 +72,13 @@ MemoryMappedFile::MemoryMappedFile(OptionSet options)
     created();
 }
 
-/* Create. Must not exist.
-@param zero fill file with zeros when true
-*/
 void* MemoryMappedFile::create(const std::string& filename, unsigned long long len, bool zero) {
     uassert(13468,
             string("can't create file already exists ") + filename,
             !boost::filesystem::exists(filename));
     void* p = map(filename.c_str(), len);
-    if (p && zero) {
+    fassert(16331, p);
+    if (zero) {
         size_t sz = (size_t)len;
         verify(len == sz);
         memset(p, 0, sz);
@@ -107,7 +105,10 @@ void* MemoryMappedFile::map(const char* filename) {
                                             << ' '
                                             << e.what());
     }
-    return map(filename, l);
+
+    void* ret = map(filename, l);
+    fassert(16334, ret);
+    return ret;
 }
 
 /* --- MongoFile -------------------------------------------------

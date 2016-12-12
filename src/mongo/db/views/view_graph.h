@@ -27,12 +27,12 @@
 */
 #pragma once
 
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -50,23 +50,27 @@ class ViewGraph {
 
 public:
     static const int kMaxViewDepth;
+    static const int kMaxViewPipelineSizeBytes;
 
     ViewGraph() = default;
 
     /**
      * Called when a view is added to the catalog. 'refs' are a list of namespaces that the view
      * represented by 'viewNss' references in its viewOn or pipeline. Checks if this view introduces
-     * a cycle or max diameter. If an error is detected, it will not insert.
+     * a cycle, max diameter, or max pipeline size. If an error is detected, it will not insert.
      */
     Status insertAndValidate(const NamespaceString& viewNss,
-                             const std::vector<NamespaceString>& refs);
+                             const std::vector<NamespaceString>& refs,
+                             const int pipelineSize);
 
     /**
      * Called when view definitions are being reloaded from the catalog (e.g. on restart of mongod).
-     * Does the same as insertAndValidate except does not check for cycles or max diameter.
+     * Does the same as insertAndValidate except does not check for cycles, max diameter, or max
+     * pipeline size.
      */
     void insertWithoutValidating(const NamespaceString& viewNss,
-                                 const std::vector<NamespaceString>& refs);
+                                 const std::vector<NamespaceString>& refs,
+                                 const int pipelineSize);
 
     /**
      * Called when a view is removed from the catalog. If the view does not exist in the graph it is
@@ -87,34 +91,37 @@ private:
     struct Node {
         // Note, a view may refer to the same child more than once, but we only need to know the
         // set of children and parents, since we do not need to traverse duplicates.
-        std::unordered_set<uint64_t> parents;
-        std::unordered_set<uint64_t> children;
+        stdx::unordered_set<uint64_t> parents;
+        stdx::unordered_set<uint64_t> children;
         std::string ns;
+        int size = 0;
     };
 
     // Bookkeeping for graph traversals.
-    struct NodeHeight {
+    struct NodeStats {
         bool checked = false;
         int height = 0;
+        int cumulativeSize = 0;
     };
 
-    using HeightMap = std::unordered_map<uint64_t, NodeHeight>;
+    using StatsMap = stdx::unordered_map<uint64_t, NodeStats>;
 
     /**
-     * Recursively traverses parents of this node and computes their heights. Returns an error
-     * if the maximum depth is exceeded.
+     * Recursively traverses parents of this node and computes their heights and sizes. Returns an
+     * error if the maximum depth is exceeded or the pipeline size exceeds the max.
      */
-    ErrorCodes::Error _getParentsHeight(uint64_t currentId, int currentDepth, HeightMap* heightMap);
+    ErrorCodes::Error _getParentsStats(uint64_t currentId, int currentDepth, StatsMap* statsMap);
 
     /**
-     * Recursively traverses children of the starting node and computes their heights. Returns an
-     * error if the maximum depth is exceeded or a cycle is detected through the starting node.
+     * Recursively traverses children of the starting node and computes their heights and sizes.
+     * Returns an error if the maximum depth is exceeded, a cycle is detected through the starting
+     * node, or the pipeline size exceeds the max.
      */
-    ErrorCodes::Error _getChildrenHeightAndCheckCycle(uint64_t startingId,
-                                                      uint64_t currentId,
-                                                      int currentDepth,
-                                                      HeightMap* heightMap,
-                                                      std::vector<uint64_t>* cycleIds);
+    ErrorCodes::Error _getChildrenStatsAndCheckCycle(uint64_t startingId,
+                                                     uint64_t currentId,
+                                                     int currentDepth,
+                                                     StatsMap* statsMap,
+                                                     std::vector<uint64_t>* cycleIds);
 
     /**
      * Gets the id for this namespace, and creates an id if it doesn't exist.
@@ -127,7 +134,7 @@ private:
 
     // Maps node ids to nodes. There is a 1-1 correspondance with _namespaceIds, hence the lifetime
     // of a node is the same as the lifetime as its corresponding node id.
-    std::unordered_map<uint64_t, Node> _graph;
+    stdx::unordered_map<uint64_t, Node> _graph;
     static uint64_t _idCounter;
 };
 }  // namespace mongo

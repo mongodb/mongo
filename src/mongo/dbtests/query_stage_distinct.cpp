@@ -236,6 +236,76 @@ public:
     }
 };
 
+class QueryStageDistinctCompoundIndex : public DistinctBase {
+public:
+    void run() {
+        // insert documents with a: 1 and b: 1
+        for (size_t i = 0; i < 1000; ++i) {
+            insert(BSON("a" << 1 << "b" << 1));
+        }
+        // insert documents with a: 1 and b: 2
+        for (size_t i = 0; i < 1000; ++i) {
+            insert(BSON("a" << 1 << "b" << 2));
+        }
+        // insert documents with a: 2 and b: 1
+        for (size_t i = 0; i < 1000; ++i) {
+            insert(BSON("a" << 2 << "b" << 1));
+        }
+        // insert documents with a: 2 and b: 3
+        for (size_t i = 0; i < 1000; ++i) {
+            insert(BSON("a" << 2 << "b" << 3));
+        }
+
+        addIndex(BSON("a" << 1 << "b" << 1));
+
+        AutoGetCollectionForRead ctx(&_txn, ns());
+        Collection* coll = ctx.getCollection();
+
+        std::vector<IndexDescriptor*> indices;
+        coll->getIndexCatalog()->findIndexesByKeyPattern(
+            &_txn, BSON("a" << 1 << "b" << 1), false, &indices);
+        ASSERT_EQ(1U, indices.size());
+
+        DistinctParams params;
+        params.descriptor = indices[0];
+        ASSERT_TRUE(params.descriptor);
+
+        params.direction = 1;
+        params.fieldNo = 1;
+        params.bounds.isSimpleRange = false;
+
+        OrderedIntervalList aOil{"a"};
+        aOil.intervals.push_back(IndexBoundsBuilder::allValues());
+        params.bounds.fields.push_back(aOil);
+
+        OrderedIntervalList bOil{"b"};
+        bOil.intervals.push_back(IndexBoundsBuilder::allValues());
+        params.bounds.fields.push_back(bOil);
+
+        WorkingSet ws;
+        DistinctScan distinct(&_txn, params, &ws);
+
+        WorkingSetID wsid;
+        PlanStage::StageState state;
+
+        std::vector<int> seen;
+
+        while (PlanStage::IS_EOF != (state = distinct.work(&wsid))) {
+            ASSERT_NE(PlanStage::FAILURE, state);
+            ASSERT_NE(PlanStage::DEAD, state);
+            if (PlanStage::ADVANCED == state) {
+                seen.push_back(getIntFieldDotted(ws, wsid, "b"));
+            }
+        }
+
+        ASSERT_EQUALS(4U, seen.size());
+        ASSERT_EQUALS(1, seen[0]);
+        ASSERT_EQUALS(2, seen[1]);
+        ASSERT_EQUALS(1, seen[2]);
+        ASSERT_EQUALS(3, seen[3]);
+    }
+};
+
 // XXX: add a test case with bounds where skipping to the next key gets us a result that's not
 // valid w.r.t. our query.
 
@@ -246,6 +316,7 @@ public:
     void setupTests() {
         add<QueryStageDistinctBasic>();
         add<QueryStageDistinctMultiKey>();
+        add<QueryStageDistinctCompoundIndex>();
     }
 };
 

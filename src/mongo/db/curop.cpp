@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+// CHECK_LOG_REDACTION
+
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
 #include "mongo/platform/basic.h"
@@ -44,6 +46,7 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/util/log.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -246,7 +249,7 @@ ProgressMeter& CurOp::setMessage_inlock(const char* msg,
                                         int secondsBetween) {
     if (progressMeterTotal) {
         if (_progressMeter.isActive()) {
-            error() << "old _message: " << _message << " new message:" << msg;
+            error() << "old _message: " << redact(_message) << " new message:" << redact(msg);
             verify(!_progressMeter.isActive());
         }
         _progressMeter.reset(progressMeterTotal, secondsBetween);
@@ -425,7 +428,7 @@ string OpDebug::report(Client* client,
     if (clientMetadata) {
         auto appName = clientMetadata.get().getApplicationName();
         if (!appName.empty()) {
-            s << " appName:" << appName;
+            s << " appName: \"" << escape(appName) << '\"';
         }
     }
 
@@ -440,28 +443,27 @@ string OpDebug::report(Client* client,
                 mutablebson::Document cmdToLog(query, mutablebson::Document::kInPlaceDisabled);
                 curCommand->redactForLogging(&cmdToLog);
                 s << curCommand->getName() << " ";
-                s << cmdToLog.toString();
+                s << redact(cmdToLog.getObject());
             } else {  // Should not happen but we need to handle curCommand == NULL gracefully.
-                s << query.toString();
+                s << redact(query);
             }
         } else {
             s << " query: ";
-            s << query.toString();
+            s << redact(query);
         }
     }
 
     auto originatingCommand = curop.originatingCommand();
     if (!originatingCommand.isEmpty()) {
-        s << " originatingCommand: " << originatingCommand;
+        s << " originatingCommand: " << redact(originatingCommand);
     }
 
     if (!curop.getPlanSummary().empty()) {
-        s << " planSummary: " << curop.getPlanSummary();
+        s << " planSummary: " << redact(curop.getPlanSummary().toString());
     }
 
     if (!updateobj.isEmpty()) {
-        s << " update: ";
-        updateobj.toString(s);
+        s << " update: " << redact(updateobj);
     }
 
     auto collation = curop.collation();
@@ -505,7 +507,7 @@ string OpDebug::report(Client* client,
     }
 
     if (!exceptionInfo.empty()) {
-        s << " exception: " << exceptionInfo.msg;
+        s << " exception: " << redact(exceptionInfo.msg);
         if (exceptionInfo.code)
             s << " code:" << exceptionInfo.code;
     }
@@ -527,7 +529,7 @@ string OpDebug::report(Client* client,
         s << " protocol:" << getProtoString(networkOp);
     }
 
-    s << " " << executionTime << "ms";
+    s << " " << (executionTimeMicros / 1000) << "ms";
 
     return s.str();
 }
@@ -624,7 +626,7 @@ void OpDebug::append(const CurOp& curop,
     if (iscommand) {
         b.append("protocol", getProtoString(networkOp));
     }
-    b.append("millis", executionTime);
+    b.appendIntOrLL("millis", executionTimeMicros / 1000);
 
     if (!curop.getPlanSummary().empty()) {
         b.append("planSummary", curop.getPlanSummary());

@@ -39,8 +39,10 @@
 namespace mongo {
 namespace mozjs {
 
-const JSFunctionSpec MaxKeyInfo::methods[2] = {
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(tojson, MaxKeyInfo), JS_FS_END,
+const JSFunctionSpec MaxKeyInfo::methods[3] = {
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(tojson, MaxKeyInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, MaxKeyInfo),
+    JS_FS_END,
 };
 
 const char* const MaxKeyInfo::className = "MaxKey";
@@ -86,6 +88,10 @@ void MaxKeyInfo::hasInstance(JSContext* cx,
 
 void MaxKeyInfo::Functions::tojson::call(JSContext* cx, JS::CallArgs args) {
     ValueReader(cx, args.rval()).fromStringData("{ \"$maxKey\" : 1 }");
+}
+
+void MaxKeyInfo::Functions::toJSON::call(JSContext* cx, JS::CallArgs args) {
+    ValueReader(cx, args.rval()).fromBSON(BSON("$maxKey" << 1), nullptr, false);
 }
 
 void MaxKeyInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto) {

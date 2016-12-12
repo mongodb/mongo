@@ -34,6 +34,8 @@
 #include <set>
 #include <vector>
 
+#include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/audit.h"
@@ -47,12 +49,12 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/balancer/balancer_configuration.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_write.h"
+#include "mongo/s/commands/cluster_write.h"
 #include "mongo/s/config.h"
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
@@ -205,7 +207,8 @@ public:
         // The rest of the checks require a connection to the primary db
         ConnectionString shardConnString;
         {
-            const auto shard = grid.shardRegistry()->getShard(txn, config->getPrimaryId());
+            const auto shard =
+                uassertStatusOK(grid.shardRegistry()->getShard(txn, config->getPrimaryId()));
             shardConnString = shard->getConnString();
         }
 
@@ -222,52 +225,74 @@ public:
             }
         }
 
-        BSONObj collectionOptions;
-        if (res["options"].type() == BSONType::Object) {
-            collectionOptions = res["options"].Obj();
-        }
-
-        // Check that collection is not capped.
-        if (collectionOptions["capped"].trueValue()) {
-            errmsg = "can't shard capped collection";
-            conn.done();
-            return false;
-        }
-
-        // Get collection default collation.
         BSONObj defaultCollation;
-        {
-            BSONElement collationElement;
-            auto status = bsonExtractTypedField(
-                collectionOptions, "collation", BSONType::Object, &collationElement);
-            if (status.isOK()) {
-                defaultCollation = collationElement.Obj().getOwned();
-                if (defaultCollation.isEmpty()) {
+
+        if (!res.isEmpty()) {
+            // Check that namespace is not a view.
+            {
+                std::string namespaceType;
+                auto status = bsonExtractStringField(res, "type", &namespaceType);
+                if (!status.isOK()) {
+                    conn.done();
+                    return appendCommandStatus(result, status);
+                }
+
+                if (namespaceType == "view") {
                     conn.done();
                     return appendCommandStatus(
                         result,
-                        {ErrorCodes::BadValue,
-                         "Default collation in collection metadata cannot be empty."});
+                        {ErrorCodes::CommandNotSupportedOnView, "Views cannot be sharded."});
                 }
-            } else if (status != ErrorCodes::NoSuchKey) {
-                conn.done();
-                return appendCommandStatus(
-                    result,
-                    {status.code(),
-                     str::stream() << "Could not parse default collation in collection metadata "
-                                   << causedBy(status)});
             }
-        }
 
-        // If the collection has a non-simple default collation but the user did not specify the
-        // simple collation explicitly, return an error.
-        if (!defaultCollation.isEmpty() && !simpleCollationSpecified) {
-            return appendCommandStatus(result,
-                                       {ErrorCodes::BadValue,
-                                        str::stream()
-                                            << "Collection has default collation: "
-                                            << collectionOptions["collation"]
-                                            << ". Must specify collation {locale: 'simple'}"});
+            BSONObj collectionOptions;
+            if (res["options"].type() == BSONType::Object) {
+                collectionOptions = res["options"].Obj();
+            }
+
+            // Check that collection is not capped.
+            if (collectionOptions["capped"].trueValue()) {
+                errmsg = "can't shard capped collection";
+                conn.done();
+                return false;
+            }
+
+            // Get collection default collation.
+            {
+                BSONElement collationElement;
+                auto status = bsonExtractTypedField(
+                    collectionOptions, "collation", BSONType::Object, &collationElement);
+                if (status.isOK()) {
+                    defaultCollation = collationElement.Obj().getOwned();
+                    if (defaultCollation.isEmpty()) {
+                        conn.done();
+                        return appendCommandStatus(
+                            result,
+                            {ErrorCodes::BadValue,
+                             "Default collation in collection metadata cannot be empty."});
+                    }
+                } else if (status != ErrorCodes::NoSuchKey) {
+                    conn.done();
+                    return appendCommandStatus(
+                        result,
+                        {status.code(),
+                         str::stream()
+                             << "Could not parse default collation in collection metadata "
+                             << causedBy(status)});
+                }
+            }
+
+            // If the collection has a non-simple default collation but the user did not specify the
+            // simple collation explicitly, return an error.
+            if (!defaultCollation.isEmpty() && !simpleCollationSpecified) {
+                conn.done();
+                return appendCommandStatus(result,
+                                           {ErrorCodes::BadValue,
+                                            str::stream()
+                                                << "Collection has default collation: "
+                                                << collectionOptions["collation"]
+                                                << ". Must specify collation {locale: 'simple'}"});
+            }
         }
 
         // The proposed shard key must be validated against the set of existing indexes.
@@ -325,7 +350,7 @@ public:
             BSONObj currentKey = idx["key"].embeddedObject();
             // Check 2.i. and 2.ii.
             if (!idx["sparse"].trueValue() && idx["filter"].eoo() && idx["collation"].eoo() &&
-                proposedKey.isPrefixOf(currentKey)) {
+                proposedKey.isPrefixOf(currentKey, SimpleBSONElementComparator::kInstance)) {
                 // We can't currently use hashed indexes with a non-default hash seed
                 // Check v.
                 // Note that this means that, for sharding, we only support one hashed index
@@ -352,7 +377,8 @@ public:
 
             for (list<BSONObj>::iterator it = indexes.begin(); it != indexes.end(); ++it) {
                 BSONObj idx = *it;
-                if (idx["key"].embeddedObject() == proposedKey) {
+                if (SimpleBSONObjComparator::kInstance.evaluate(idx["key"].embeddedObject() ==
+                                                                proposedKey)) {
                     eqQueryResult = idx;
                     break;
                 }
@@ -400,12 +426,12 @@ public:
             // 5. If no useful index exists, and collection empty, create one on proposedKey.
             //    Only need to call ensureIndex on primary shard, since indexes get copied to
             //    receiving shard whenever a migrate occurs.
-            Status status = clusterCreateIndex(
-                txn,
-                nss.ns(),
-                proposedKey,
-                BSON(CollationSpec::kLocaleField << CollationSpec::kSimpleBinaryComparison),
-                careAboutUnique);
+            //    If the collection has a default collation, explicitly send the simple
+            //    collation as part of the createIndex request.
+            BSONObj collationArg =
+                !defaultCollation.isEmpty() ? CollationSpec::kSimpleSpec : BSONObj();
+            Status status =
+                clusterCreateIndex(txn, nss.ns(), proposedKey, collationArg, careAboutUnique);
             if (!status.isOK()) {
                 errmsg = str::stream() << "ensureIndex failed to create index on "
                                        << "primary shard: " << status.reason();
@@ -457,7 +483,9 @@ public:
                 current += intervalSize;
             }
 
-            sort(allSplits.begin(), allSplits.end());
+            sort(allSplits.begin(),
+                 allSplits.end(),
+                 SimpleBSONObjComparator::kInstance.makeLessThan());
 
             // 1. the initial splits define the "big chunks" that we will subdivide later
             int lastIndex = -1;
@@ -510,10 +538,11 @@ public:
             int i = 0;
             for (ChunkMap::const_iterator c = chunkMap.begin(); c != chunkMap.end(); ++c, ++i) {
                 const ShardId& shardId = shardIds[i % numShards];
-                const auto to = grid.shardRegistry()->getShard(txn, shardId);
-                if (!to) {
+                const auto toStatus = grid.shardRegistry()->getShard(txn, shardId);
+                if (!toStatus.isOK()) {
                     continue;
                 }
+                const auto to = toStatus.getValue();
 
                 shared_ptr<Chunk> chunk = c->second;
 
@@ -568,6 +597,7 @@ public:
                             chunkManager->getVersion(),
                             currentChunk->getMin(),
                             currentChunk->getMax(),
+                            currentChunk->getLastmod(),
                             subSplits);
                         if (!splitStatus.isOK()) {
                             warning() << "couldn't split chunk " << redact(currentChunk->toString())

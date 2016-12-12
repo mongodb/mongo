@@ -29,6 +29,7 @@
 #include "mongo/db/query/expression_index.h"
 
 #include <iostream>
+#include <unordered_set>
 
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/r2_region_coverer.h"
@@ -94,8 +95,8 @@ void ExpressionMapping::GeoHashsToIntervalsWithParents(
         geoHash.appendHashMin(&builder, "");
         geoHash.appendHashMax(&builder, "");
 
-        oilOut->intervals.push_back(
-            IndexBoundsBuilder::makeRangeInterval(builder.obj(), true, true));
+        oilOut->intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+            builder.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
     }
 }
 
@@ -151,7 +152,8 @@ void S2CellIdsToIntervalsUnsorted(const std::vector<S2CellId>& intervalSet,
             b.append("start", start);
             b.append("end", end);
             invariant(start <= end);
-            oilOut->intervals.push_back(IndexBoundsBuilder::makeRangeInterval(b.obj(), true, true));
+            oilOut->intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+                b.obj(), BoundInclusion::kIncludeBothStartAndEndKeys));
         } else {
             // for backwards compatibility, use strings
             std::string start = interval.toString();
@@ -159,8 +161,8 @@ void S2CellIdsToIntervalsUnsorted(const std::vector<S2CellId>& intervalSet,
             end[start.size() - 1]++;
             b.append("start", start);
             b.append("end", end);
-            oilOut->intervals.push_back(
-                IndexBoundsBuilder::makeRangeInterval(b.obj(), true, false));
+            oilOut->intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+                b.obj(), BoundInclusion::kIncludeStartKeyOnly));
         }
     }
 }
@@ -186,7 +188,7 @@ void ExpressionMapping::S2CellIdsToIntervalsWithParents(const std::vector<S2Cell
                                                         const S2IndexingParams& indexParams,
                                                         OrderedIntervalList* oilOut) {
     // There may be duplicates when going up parent cells if two cells share a parent
-    std::unordered_set<S2CellId> exactSet;
+    std::unordered_set<S2CellId> exactSet;  // NOLINT
     for (const S2CellId& interval : intervalSet) {
         S2CellId coveredCell = interval;
         // Look at the cells that cover us.  We want to look at every cell that contains the

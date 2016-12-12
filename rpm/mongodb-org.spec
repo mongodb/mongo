@@ -30,7 +30,7 @@ MongoDB features:
 * Text Search
 * Aggregation Framework & Native MapReduce
 
-This metapackage will install the mongo shell, import/export tools, other client utilities, server software, default configuration, and init.d scripts.
+This metapackage will install the mongo shell, import/export tools, other client utilities, server software, default configuration, and systemd service files.
 
 %package server
 Summary: MongoDB database server
@@ -56,7 +56,7 @@ MongoDB features:
 * Text Search
 * Aggregation Framework & Native MapReduce
 
-This package contains the MongoDB server software, default configuration files, and init.d scripts.
+This package contains the MongoDB server software, default configuration files, and systemd service files.
 
 %package shell
 Summary: MongoDB shell client
@@ -172,13 +172,10 @@ mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1
 cp debian/*.1 $RPM_BUILD_ROOT/usr/share/man/man1/
 # FIXME: remove this rm when mongosniff is back in the package
 rm -v $RPM_BUILD_ROOT/usr/share/man/man1/mongosniff.1*
-mkdir -p $RPM_BUILD_ROOT/etc/init.d
-cp -v rpm/init.d-mongod $RPM_BUILD_ROOT/etc/init.d/mongod
-chmod a+x $RPM_BUILD_ROOT/etc/init.d/mongod
 mkdir -p $RPM_BUILD_ROOT/etc
 cp -v rpm/mongod.conf $RPM_BUILD_ROOT/etc/mongod.conf
-mkdir -p $RPM_BUILD_ROOT/etc/sysconfig
-cp -v rpm/mongod.sysconfig $RPM_BUILD_ROOT/etc/sysconfig/mongod
+mkdir -p $RPM_BUILD_ROOT/lib/systemd/system
+cp -v rpm/mongod.service $RPM_BUILD_ROOT/lib/systemd/system
 mkdir -p $RPM_BUILD_ROOT/var/lib/mongo
 mkdir -p $RPM_BUILD_ROOT/var/log/mongodb
 mkdir -p $RPM_BUILD_ROOT/var/run/mongodb
@@ -198,19 +195,19 @@ fi
 %post server
 if test $1 = 1
 then
-  /sbin/chkconfig --add mongod
+  /usr/bin/systemctl enable mongod
 fi
 
 %preun server
 if test $1 = 0
 then
-  /sbin/chkconfig --del mongod
+  /usr/bin/systemctl disable mongod
 fi
 
 %postun server
 if test $1 -ge 1
 then
-  /sbin/service mongod condrestart >/dev/null 2>&1 || :
+  /usr/bin/systemctl restart mongod >/dev/null 2>&1 || :
 fi
 
 %files
@@ -220,8 +217,7 @@ fi
 %config(noreplace) /etc/mongod.conf
 %{_bindir}/mongod
 %{_mandir}/man1/mongod.1*
-/etc/init.d/mongod
-%config(noreplace) /etc/sysconfig/mongod
+/lib/systemd/system/mongod.service
 %attr(0755,mongod,mongod) %dir /var/lib/mongo
 %attr(0755,mongod,mongod) %dir /var/log/mongodb
 %attr(0755,mongod,mongod) %dir /var/run/mongodb
@@ -270,6 +266,9 @@ fi
 %{_mandir}/man1/mongostat.1*
 
 %changelog
+* Mon Oct 10 2016 Sam Kleinman <sam@mongodb.com>
+- Support for systemd init processes.
+
 * Thu Dec 19 2013 Ernie Hershey <ernie.hershey@mongodb.com>
 - Packaging file cleanup
 

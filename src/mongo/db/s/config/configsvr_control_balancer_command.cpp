@@ -33,8 +33,8 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
-#include "mongo/s/balancer/balancer.h"
-#include "mongo/s/balancer/balancer_configuration.h"
+#include "mongo/db/s/balancer/balancer.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -78,16 +78,14 @@ public:
              int options,
              std::string& errmsg,
              BSONObjBuilder& result) final {
-        if (cmdObj.firstElementFieldName() != getName()) {
-            uasserted(ErrorCodes::InternalError,
-                      str::stream() << "Expected to find a " << getName() << " command, but found "
-                                    << cmdObj);
-        }
+        uassert(ErrorCodes::InternalError,
+                str::stream() << "Expected to find a " << getName() << " command, but found "
+                              << cmdObj,
+                cmdObj.firstElementFieldName() == getName());
 
-        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            uasserted(ErrorCodes::IllegalOperation,
-                      str::stream() << getName() << " can only be run on config servers");
-        }
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << getName() << " can only be run on config servers",
+                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
         _run(txn, &result);
 

@@ -34,6 +34,7 @@
 #include "mongo/base/init.h"
 #include "mongo/util/processinfo.h"
 
+#include <boost/filesystem/path.hpp>
 #include <fstream>
 #include <iostream>
 
@@ -54,23 +55,25 @@ public:
         out.close();
     }
 
-    bool write(const string& p) {
+    bool write(const boost::filesystem::path& p) {
         path = p;
         ofstream out(path.c_str(), ios_base::out);
         out << ProcessId::getCurrent() << endl;
         if (!out.good()) {
             auto errAndStr = errnoAndDescription();
             if (errAndStr.first == 0) {
-                log() << "ERROR: Cannot write pid file to " << path
+                log() << "ERROR: Cannot write pid file to " << path.string()
                       << ": Unable to determine OS error";
             } else {
-                log() << "ERROR: Cannot write pid file to " << path << ": " << errAndStr.second;
+                log() << "ERROR: Cannot write pid file to " << path.string() << ": "
+                      << errAndStr.second;
             }
         }
         return out.good();
     }
 
-    string path;
+private:
+    boost::filesystem::path path;
 } pidFileWiper;
 
 bool writePidFile(const string& path) {

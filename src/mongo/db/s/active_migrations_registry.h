@@ -31,6 +31,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/s/migration_session_id.h"
 #include "mongo/s/move_chunk_request.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
@@ -39,7 +40,8 @@
 namespace mongo {
 
 class OperationContext;
-class ScopedRegisterMigration;
+class ScopedRegisterDonateChunk;
+class ScopedRegisterReceiveChunk;
 template <typename T>
 class StatusWith;
 
@@ -56,30 +58,55 @@ public:
 
     /**
      * If there are no migrations running on this shard, registers an active migration with the
-     * specified arguments and returns a ScopedRegisterMigration, which must be signaled by the
+     * specified arguments and returns a ScopedRegisterDonateChunk, which must be signaled by the
      * caller before it goes out of scope.
      *
      * If there is an active migration already running on this shard and it has the exact same
-     * arguments, returns a ScopedRegisterMigration, which can be used to join the already running
+     * arguments, returns a ScopedRegisterDonateChunk, which can be used to join the already running
      * migration.
      *
-     * Othwerwise returns a ConflictingOperationInProgress error.
+     * Otherwise returns a ConflictingOperationInProgress error.
      */
-    StatusWith<ScopedRegisterMigration> registerMigration(const MoveChunkRequest& args);
+    StatusWith<ScopedRegisterDonateChunk> registerDonateChunk(const MoveChunkRequest& args);
 
     /**
-     * If a migration has been previously registered through a call to registerMigration returns
+     * If there are no migrations running on this shard, registers an active receive operation with
+     * the specified session id and returns a ScopedRegisterReceiveChunk, which will unregister it
+     * when it goes out of scope.
+     *
+     * Otherwise returns a ConflictingOperationInProgress error.
+     */
+    StatusWith<ScopedRegisterReceiveChunk> registerReceiveChunk(const NamespaceString& nss,
+                                                                const ChunkRange& chunkRange,
+                                                                const ShardId& fromShardId);
+
+    /**
+     * If a migration has been previously registered through a call to registerDonateChunk returns
      * that namespace. Otherwise returns boost::none.
      */
-    boost::optional<NamespaceString> getActiveMigrationNss();
+    boost::optional<NamespaceString> getActiveDonateChunkNss();
+
+    /**
+     * Returns a report on the active migration if there currently is one. Otherwise, returns an
+     * empty BSONObj.
+     *
+     * Takes an IS lock on the namespace of the active migration, if one is active.
+     */
+    BSONObj getActiveMigrationStatusReport(OperationContext* txn);
 
 private:
-    friend class ScopedRegisterMigration;
+    friend class ScopedRegisterDonateChunk;
+    friend class ScopedRegisterReceiveChunk;
 
     // Describes the state of a currently active moveChunk operation
     struct ActiveMoveChunkState {
         ActiveMoveChunkState(MoveChunkRequest inArgs)
             : args(std::move(inArgs)), notification(std::make_shared<Notification<Status>>()) {}
+
+        /**
+         * Constructs an error status to return in the case of conflicting operations.
+         */
+        Status constructErrorStatus() const;
 
         // Exact arguments of the currently active operation
         MoveChunkRequest args;
@@ -88,11 +115,37 @@ private:
         std::shared_ptr<Notification<Status>> notification;
     };
 
+    // Describes the state of a currently active receive chunk operation
+    struct ActiveReceiveChunkState {
+        ActiveReceiveChunkState(NamespaceString inNss, ChunkRange inRange, ShardId inFromShardId)
+            : nss(std::move(inNss)), range(std::move(inRange)), fromShardId(inFromShardId) {}
+
+        /**
+         * Constructs an error status to return in the case of conflicting operations.
+         */
+        Status constructErrorStatus() const;
+
+        // Namesspace for which a chunk is being received
+        NamespaceString nss;
+
+        // Bounds of the chunk being migrated
+        ChunkRange range;
+
+        // Id of the shard from which the chunk is being received
+        ShardId fromShardId;
+    };
+
     /**
      * Unregisters a previously registered namespace with ongoing migration. Must only be called if
-     * a previous call to registerMigration has succeeded.
+     * a previous call to registerDonateChunk has succeeded.
      */
-    void _clearMigration();
+    void _clearDonateChunk();
+
+    /**
+     * Unregisters a previously registered incoming migration. Must only be called if a previous
+     * call to registerReceiveChunk has succeeded.
+     */
+    void _clearReceiveChunk();
 
     // Protects the state below
     stdx::mutex _mutex;
@@ -100,24 +153,28 @@ private:
     // If there is an active moveChunk operation going on, this field contains the request, which
     // initiated it
     boost::optional<ActiveMoveChunkState> _activeMoveChunkState;
+
+    // If there is an active receive of a chunk going on, this field contains the session id, which
+    // initiated it
+    boost::optional<ActiveReceiveChunkState> _activeReceiveChunkState;
 };
 
 /**
- * Object of this class is returned from the registerMigration call of the active migrations
+ * Object of this class is returned from the registerDonateChunk call of the active migrations
  * registry. It can exist in two modes - 'unregister' and 'join'. See the comments for
- * registerMigration method for more details.
+ * registerDonateChunk method for more details.
  */
-class ScopedRegisterMigration {
-    MONGO_DISALLOW_COPYING(ScopedRegisterMigration);
+class ScopedRegisterDonateChunk {
+    MONGO_DISALLOW_COPYING(ScopedRegisterDonateChunk);
 
 public:
-    ScopedRegisterMigration(ActiveMigrationsRegistry* registry,
-                            bool forUnregister,
-                            std::shared_ptr<Notification<Status>> completionNotification);
-    ~ScopedRegisterMigration();
+    ScopedRegisterDonateChunk(ActiveMigrationsRegistry* registry,
+                              bool forUnregister,
+                              std::shared_ptr<Notification<Status>> completionNotification);
+    ~ScopedRegisterDonateChunk();
 
-    ScopedRegisterMigration(ScopedRegisterMigration&&);
-    ScopedRegisterMigration& operator=(ScopedRegisterMigration&&);
+    ScopedRegisterDonateChunk(ScopedRegisterDonateChunk&&);
+    ScopedRegisterDonateChunk& operator=(ScopedRegisterDonateChunk&&);
 
     /**
      * Returns true if the migration object is in the 'unregister' mode, which means that the holder
@@ -149,6 +206,25 @@ private:
 
     // This is the future, which will be signaled at the end of a migration
     std::shared_ptr<Notification<Status>> _completionNotification;
+};
+
+/**
+ * Object of this class is returned from the registerReceiveChunk call of the active migrations
+ * registry.
+ */
+class ScopedRegisterReceiveChunk {
+    MONGO_DISALLOW_COPYING(ScopedRegisterReceiveChunk);
+
+public:
+    ScopedRegisterReceiveChunk(ActiveMigrationsRegistry* registry);
+    ~ScopedRegisterReceiveChunk();
+
+    ScopedRegisterReceiveChunk(ScopedRegisterReceiveChunk&&);
+    ScopedRegisterReceiveChunk& operator=(ScopedRegisterReceiveChunk&&);
+
+private:
+    // Registry from which to unregister the migration. Not owned.
+    ActiveMigrationsRegistry* _registry;
 };
 
 }  // namespace mongo

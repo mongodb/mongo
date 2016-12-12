@@ -59,10 +59,6 @@
 	0				/* uint32_t flags */		\
 }
 
-struct __wt_cursor_backup_entry {
-	char *name;			/* File name */
-	WT_DATA_HANDLE *handle;		/* Handle */
-};
 struct __wt_cursor_backup {
 	WT_CURSOR iface;
 
@@ -70,7 +66,7 @@ struct __wt_cursor_backup {
 	WT_FSTREAM *bfs;		/* Backup file stream */
 	uint32_t maxid;			/* Maximum log file ID seen */
 
-	WT_CURSOR_BACKUP_ENTRY *list;	/* List of files to be copied. */
+	char **list;			/* List of files to be copied. */
 	size_t list_allocated;
 	size_t list_next;
 
@@ -365,9 +361,11 @@ struct __wt_cursor_join_entry {
 	uint32_t		 bloom_hash_count; /* hash functions in bloom */
 	uint64_t		 count;		/* approx number of matches */
 
-#define	WT_CURJOIN_ENTRY_BLOOM		0x01	/* use a bloom filter */
-#define	WT_CURJOIN_ENTRY_DISJUNCTION	0x02	/* endpoints are or-ed */
-#define	WT_CURJOIN_ENTRY_OWN_BLOOM	0x04	/* this entry owns the bloom */
+#define	WT_CURJOIN_ENTRY_BLOOM		 0x01	/* use a bloom filter */
+#define	WT_CURJOIN_ENTRY_DISJUNCTION	 0x02	/* endpoints are or-ed */
+#define	WT_CURJOIN_ENTRY_FALSE_POSITIVES 0x04	/* after bloom filter do not
+						 * filter false positives */
+#define	WT_CURJOIN_ENTRY_OWN_BLOOM	 0x08	/* this entry owns the bloom */
 	uint8_t			 flags;
 
 	WT_CURSOR_JOIN_ENDPOINT	*ends;		/* reference endpoints */
@@ -425,6 +423,7 @@ struct __wt_cursor_metadata {
 	WT_CURSOR iface;
 
 	WT_CURSOR *file_cursor;		/* Queries of regular metadata */
+	WT_CURSOR *create_cursor;	/* Extra cursor for create option */
 
 #define	WT_MDC_CREATEONLY	0x01
 #define	WT_MDC_ONMETADATA	0x02
@@ -466,7 +465,7 @@ struct __wt_cursor_stat {
 	uint64_t v;			/* Current stats value */
 	WT_ITEM	 pv;			/* Current stats value (string) */
 
-	/* Uses the same values as WT_CONNECTION::stat_flags field */
+	/* Options declared in flags.py, shared by WT_CONNECTION::stat_flags */
 	uint32_t flags;
 };
 

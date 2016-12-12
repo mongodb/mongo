@@ -61,6 +61,11 @@ Status wrappedRun(OperationContext* txn,
 
     // If db/collection does not exist, short circuit and return.
     if (!db || !collection) {
+        if (db && db->getViewCatalog()->lookup(txn, toDeleteNs)) {
+            return {ErrorCodes::CommandNotSupportedOnView,
+                    str::stream() << "Cannot drop indexes on view " << toDeleteNs};
+        }
+
         return Status(ErrorCodes::NamespaceNotFound, "ns not found");
     }
 
@@ -145,7 +150,6 @@ Status dropIndexes(OperationContext* txn,
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         ScopedTransaction transaction(txn, MODE_IX);
         AutoGetDb autoDb(txn, dbName, MODE_X);
-        Database* db = autoDb.getDb();
 
         bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
             !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss);
@@ -155,20 +159,14 @@ Status dropIndexes(OperationContext* txn,
                     str::stream() << "Not primary while dropping indexes in " << nss.ns()};
         }
 
-        if (db && db->getViewCatalog()->lookup(txn, nss.ns())) {
-            return {ErrorCodes::CommandNotSupportedOnView,
-                    str::stream() << "Cannot drop indexes on view " << nss.ns()};
-        }
-
         WriteUnitOfWork wunit(txn);
         Status status = wrappedRun(txn, dbName, nss.ns(), autoDb.getDb(), idxDescriptor, result);
         if (!status.isOK()) {
             return status;
         }
 
-        auto opObserver = getGlobalServiceContext()->getOpObserver();
-        if (opObserver)
-            opObserver->onDropIndex(txn, dbName.toString() + ".$cmd", idxDescriptor);
+        getGlobalServiceContext()->getOpObserver()->onDropIndex(
+            txn, dbName.toString() + ".$cmd", idxDescriptor);
 
         wunit.commit();
     }

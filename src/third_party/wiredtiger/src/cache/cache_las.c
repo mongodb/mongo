@@ -49,7 +49,7 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
 	 * don't have to worry about users seeing inconsistent data source
 	 * information.
 	 */
-	if (FLD_ISSET(conn->stat_flags, WT_CONN_STAT_CLEAR)) {
+	if (FLD_ISSET(conn->stat_flags, WT_STAT_CLEAR)) {
 		WT_STAT_SET(session, dstats, cursor_insert, 0);
 		WT_STAT_SET(session, dstats, cursor_remove, 0);
 	}
@@ -63,6 +63,7 @@ int
 __wt_las_create(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	uint32_t session_flags;
 	const char *drop_cfg[] = {
 	    WT_CONFIG_BASE(session, WT_SESSION_drop), "force=true", NULL };
@@ -80,7 +81,9 @@ __wt_las_create(WT_SESSION_IMPL *session)
 	 *
 	 * Discard any previous incarnation of the table.
 	 */
-	WT_RET(__wt_session_drop(session, WT_LAS_URI, drop_cfg));
+	WT_WITH_SCHEMA_LOCK(session,
+	    ret = __wt_schema_drop(session, WT_LAS_URI, drop_cfg));
+	WT_RET(ret);
 
 	/* Re-create the table. */
 	WT_RET(__wt_session_create(session, WT_LAS_URI, WT_LAS_FORMAT));
@@ -200,7 +203,7 @@ __wt_las_cursor_open(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
  * __wt_las_cursor --
  *	Return a lookaside cursor.
  */
-int
+void
 __wt_las_cursor(
     WT_SESSION_IMPL *session, WT_CURSOR **cursorp, uint32_t *session_flags)
 {
@@ -235,8 +238,6 @@ __wt_las_cursor(
 
 	/* Turn caching and eviction off. */
 	F_SET(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
-
-	return (0);
 }
 
 /*
@@ -304,7 +305,7 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_scr_alloc(session, 0, &las_addr));
 	WT_ERR(__wt_scr_alloc(session, 0, &las_key));
 
-	WT_ERR(__wt_las_cursor(session, &cursor, &session_flags));
+	__wt_las_cursor(session, &cursor, &session_flags);
 
 	/*
 	 * If we're not starting a new sweep, position the cursor using the key

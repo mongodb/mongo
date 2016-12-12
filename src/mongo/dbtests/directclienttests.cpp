@@ -210,4 +210,4 @@ public:
 };
 
 SuiteInstance<All> myall;
-}
+}  // namespace DirectClientTests

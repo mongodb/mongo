@@ -405,7 +405,7 @@ IntlInitialize(JSContext* cx, HandleObject obj, Handle<PropertyName*> initialize
     MOZ_ASSERT(initializerValue.toObject().is<JSFunction>());
 
     InvokeArgs args(cx);
-    if (!args.init(3))
+    if (!args.init(cx, 3))
         return false;
 
     args.setCallee(initializerValue);
@@ -484,7 +484,7 @@ GetInternals(JSContext* cx, HandleObject obj, MutableHandleObject internals)
     MOZ_ASSERT(getInternalsValue.toObject().is<JSFunction>());
 
     InvokeArgs args(cx);
-    if (!args.init(1))
+    if (!args.init(cx, 1))
         return false;
 
     args.setCallee(getInternalsValue);

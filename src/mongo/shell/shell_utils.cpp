@@ -154,27 +154,10 @@ BSONObj isWindows(const BSONObj& a, void* data) {
 #endif
 }
 
-BSONObj isAddressSanitizerActive(const BSONObj& a, void* data) {
-    bool isSanitized = false;
-// See the following for information on how we detect address sanitizer in clang and gcc.
-//
-// - http://clang.llvm.org/docs/AddressSanitizer.html#has-feature-address-sanitizer
-// - https://gcc.gnu.org/ml/gcc-patches/2012-11/msg01827.html
-//
-#if defined(__has_feature)
-#if __has_feature(address_sanitizer)
-    isSanitized = true;
-#endif
-#elif defined(__SANITIZE_ADDRESS__)
-    isSanitized = true;
-#endif
-    return BSON("" << isSanitized);
-}
-
 BSONObj getBuildInfo(const BSONObj& a, void* data) {
     uassert(16822, "getBuildInfo accepts no arguments", a.nFields() == 0);
     BSONObjBuilder b;
-    appendBuildInfo(b);
+    VersionInfoInterface::instance().appendBuildInfo(&b);
     return BSON("" << b.done());
 }
 
@@ -189,7 +172,10 @@ BSONObj isKeyTooLarge(const BSONObj& a, void* data) {
 
 BSONObj validateIndexKey(const BSONObj& a, void* data) {
     BSONObj key = a[0].Obj();
-    Status indexValid = validateKeyPattern(key);
+    // This is related to old upgrade-checking code when v:1 indexes were the latest version, hence
+    // always validate using v:1 rules here.
+    Status indexValid =
+        index_key_validate::validateKeyPattern(key, IndexDescriptor::IndexVersion::kV1);
     if (!indexValid.isOK()) {
         return BSON("" << BSON("ok" << false << "type" << indexValid.codeString() << "errmsg"
                                     << indexValid.reason()));
@@ -227,7 +213,7 @@ BSONObj readMode(const BSONObj&, void*) {
 
 BSONObj interpreterVersion(const BSONObj& a, void* data) {
     uassert(16453, "interpreterVersion accepts no arguments", a.nFields() == 0);
-    return BSON("" << globalScriptEngine->getInterpreterVersionString());
+    return BSON("" << getGlobalScriptEngine()->getInterpreterVersionString());
 }
 
 void installShellUtils(Scope& scope) {
@@ -236,7 +222,6 @@ void installShellUtils(Scope& scope) {
     scope.injectNative("_srand", JSSrand);
     scope.injectNative("_rand", JSRand);
     scope.injectNative("_isWindows", isWindows);
-    scope.injectNative("_isAddressSanitizerActive", isAddressSanitizerActive);
     scope.injectNative("interpreterVersion", interpreterVersion);
     scope.injectNative("getBuildInfo", getBuildInfo);
     scope.injectNative("isKeyTooLarge", isKeyTooLarge);

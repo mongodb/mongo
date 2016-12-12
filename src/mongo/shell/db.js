@@ -243,6 +243,7 @@ var DB;
      *  @param name String - name of the new view to create
      *  @param viewOn String - name of the backing view or collection
      *  @param pipeline [{ $operator: {...}}, ... ] - the aggregation pipeline that defines the view
+     *  @param options { } - options on the view, e.g., collations
      */
     DB.prototype.createView = function(name, viewOn, pipeline, opt) {
         var options = opt || {};
@@ -403,10 +404,19 @@ var DB;
       * @return Object returned has member ok set to true if operation succeeds, false otherwise.
       * See also: db.clone()
     */
-    DB.prototype.copyDatabase = function(fromdb, todb, fromhost, username, password, mechanism) {
+    DB.prototype.copyDatabase = function(
+        fromdb, todb, fromhost, username, password, mechanism, slaveOk) {
         assert(isString(fromdb) && fromdb.length);
         assert(isString(todb) && todb.length);
         fromhost = fromhost || "";
+        if ((typeof username === "boolean") && (typeof password === "undefined") &&
+            (typeof mechanism === "undefined") && (typeof slaveOk === "undefined")) {
+            slaveOk = username;
+            username = undefined;
+        }
+        if (typeof slaveOk !== "boolean") {
+            slaveOk = false;
+        }
 
         if (!mechanism) {
             mechanism = this._getDefaultAuthenticationMechanism();
@@ -415,13 +425,14 @@ var DB;
 
         // Check for no auth or copying from localhost
         if (!username || !password || fromhost == "") {
-            return this._adminCommand({copydb: 1, fromhost: fromhost, fromdb: fromdb, todb: todb});
+            return this._adminCommand(
+                {copydb: 1, fromhost: fromhost, fromdb: fromdb, todb: todb, slaveOk: slaveOk});
         }
 
         // Use the copyDatabase native helper for SCRAM-SHA-1
         if (mechanism == "SCRAM-SHA-1") {
             return this.getMongo().copyDatabaseWithSCRAM(
-                fromdb, todb, fromhost, username, password);
+                fromdb, todb, fromhost, username, password, slaveOk);
         }
 
         // Fall back to MONGODB-CR
@@ -433,7 +444,8 @@ var DB;
             todb: todb,
             username: username,
             nonce: n.nonce,
-            key: this.__pwHash(n.nonce, username, password)
+            key: this.__pwHash(n.nonce, username, password),
+            slaveOk: slaveOk,
         });
     };
 
@@ -455,7 +467,7 @@ var DB;
         print("\tdb.commandHelp(name) returns the help for the command");
         print("\tdb.copyDatabase(fromdb, todb, fromhost)");
         print("\tdb.createCollection(name, { size : ..., capped : ..., max : ... } )");
-        print("\tdb.createView(name, viewOn : ..., pipeline : [ { $operator: {...}}, ... ] )");
+        print("\tdb.createView(name, viewOn, [ { $operator: {...}}, ... ], { viewOptions } )");
         print("\tdb.createUser(userDocument)");
         print("\tdb.currentOp() displays currently executing operations in the db");
         print("\tdb.dropDatabase()");
@@ -793,7 +805,7 @@ var DB;
             throw _getErrorWithCode(res, "listCollections failed: " + tojson(res));
         }
 
-        return new DBCommandCursor(this._mongo, res).toArray().sort(compareOn("name"));
+        return new DBCommandCursor(res._mongo, res).toArray().sort(compareOn("name"));
     };
 
     /**
@@ -1216,7 +1228,7 @@ var DB;
     /////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    var _defaultWriteConcern = {w: 'majority', wtimeout: 60 * 1000};
+    var _defaultWriteConcern = {w: 'majority', wtimeout: 5 * 60 * 1000};
 
     function getUserObjString(userObj) {
         var pwd = userObj.pwd;

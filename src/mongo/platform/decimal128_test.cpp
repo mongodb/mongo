@@ -202,6 +202,13 @@ TEST(Decimal128Test, TestDoubleConstructorMaxRoundUp) {
     ASSERT_EQUALS(d.toString(), "1.79769313486232E+308");
 }
 
+TEST(Decimal128Test, TestDoubleConstructorRoundAllNines) {
+    double allNines = 0.999999999999999;  // 15 nines
+    Decimal128 d(
+        allNines, Decimal128::kRoundTo15Digits, Decimal128::RoundingMode::kRoundTiesToAway);
+    ASSERT_EQUALS(d.toString(), "0.999999999999999");  // 15 nines
+}
+
 TEST(Decimal128Test, TestDoubleConstructorMaxNeg) {
     double doubleMax = -1 * DBL_MAX;
     Decimal128 d(doubleMax);

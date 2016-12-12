@@ -307,10 +307,6 @@ class MOZ_RAII AutoHashMapRooter : protected AutoGCRooter
         return map.sizeOfIncludingThis(mallocSizeOf);
     }
 
-    uint32_t generation() const {
-        return map.generation();
-    }
-
     /************************************************** Shorthand operations */
 
     bool has(const Lookup& l) const {
@@ -420,10 +416,6 @@ class MOZ_RAII AutoHashSetRooter : protected AutoGCRooter
     }
     size_t sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf) const {
         return set.sizeOfIncludingThis(mallocSizeOf);
-    }
-
-    uint32_t generation() const {
-        return set.generation();
     }
 
     /************************************************** Shorthand operations */
@@ -4461,7 +4453,7 @@ class MOZ_RAII JSAutoByteString
     }
 
     ~JSAutoByteString() {
-        js_free(mBytes);
+        JS_free(nullptr, mBytes);
     }
 
     /* Take ownership of the given byte array. */
@@ -4506,7 +4498,7 @@ class MOZ_RAII JSAutoByteString
     }
 
   private:
-    char*       mBytes;
+    char* mBytes;
     MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
 
     /* Copy and assignment are not supported. */
@@ -4768,26 +4760,43 @@ JS_ReportAllocationOverflow(JSContext* cx);
 
 class JSErrorReport
 {
+    // Offending source line without final '\n'.
+    const char16_t* linebuf_;
+
+    // Number of chars in linebuf_. Does not include trailing '\0'.
+    size_t linebufLength_;
+
+    // The 0-based offset of error token in linebuf_.
+    size_t tokenOffset_;
+
   public:
     JSErrorReport()
-      : filename(nullptr), lineno(0), column(0), isMuted(false), linebuf(nullptr),
-        tokenptr(nullptr), uclinebuf(nullptr), uctokenptr(nullptr), flags(0), errorNumber(0),
-        ucmessage(nullptr), messageArgs(nullptr), exnType(0)
+      : linebuf_(nullptr), linebufLength_(0), tokenOffset_(0),
+        filename(nullptr), lineno(0), column(0), isMuted(false),
+        flags(0), errorNumber(0), ucmessage(nullptr),
+        messageArgs(nullptr), exnType(0)
     {}
 
     const char*     filename;      /* source file name, URL, etc., or null */
     unsigned        lineno;         /* source line number */
     unsigned        column;         /* zero-based column index in line */
     bool            isMuted;        /* See the comment in ReadOnlyCompileOptions. */
-    const char*     linebuf;       /* offending source line without final \n */
-    const char*     tokenptr;      /* pointer to error token in linebuf */
-    const char16_t* uclinebuf;     /* unicode (original) line buffer */
-    const char16_t* uctokenptr;    /* unicode (original) token pointer */
     unsigned        flags;          /* error/warning, etc. */
     unsigned        errorNumber;    /* the error number, e.g. see js.msg */
     const char16_t* ucmessage;     /* the (default) error message */
     const char16_t** messageArgs;  /* arguments for the error message */
     int16_t         exnType;        /* One of the JSExnType constants */
+
+    const char16_t* linebuf() const {
+        return linebuf_;
+    }
+    size_t linebufLength() const {
+        return linebufLength_;
+    }
+    size_t tokenOffset() const {
+        return tokenOffset_;
+    }
+    void initLinebuf(const char16_t* linebuf, size_t linebufLength, size_t tokenOffset);
 };
 
 /*

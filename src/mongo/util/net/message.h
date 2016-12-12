@@ -35,6 +35,7 @@
 #include "mongo/base/data_view.h"
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/encoded_value_storage.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/mongoutils/str.h"
@@ -278,7 +279,7 @@ private:
 class Value : public EncodedValueStorage<Layout, ConstView, View> {
 public:
     Value() {
-        static_assert(sizeof(Value) == sizeof(Layout), "sizeof(Value) == sizeof(Layout)");
+        MONGO_STATIC_ASSERT(sizeof(Value) == sizeof(Layout));
     }
 
     Value(ZeroInitTag_t zit) : EncodedValueStorage<Layout, ConstView, View>(zit) {}
@@ -394,7 +395,7 @@ private:
 class Value : public EncodedValueStorage<Layout, ConstView, View> {
 public:
     Value() {
-        static_assert(sizeof(Value) == sizeof(Layout), "sizeof(Value) == sizeof(Layout)");
+        MONGO_STATIC_ASSERT(sizeof(Value) == sizeof(Layout));
     }
 
     Value(ZeroInitTag_t zit) : EncodedValueStorage<Layout, ConstView, View>(zit) {}

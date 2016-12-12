@@ -32,6 +32,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/namespace_string.h"
@@ -97,6 +98,9 @@ const char kAwaitDataField[] = "awaitData";
 const char kPartialResultsField[] = "allowPartialResults";
 const char kTermField[] = "term";
 const char kOptionsField[] = "options";
+
+// Field names for sorting options.
+const char kNaturalSortField[] = "$natural";
 
 }  // namespace
 
@@ -585,8 +589,9 @@ Status QueryRequest::validate() const {
 
     if (_tailable) {
         // Tailable cursors cannot have any sort other than {$natural: 1}.
-        const BSONObj expectedSort = BSON("$natural" << 1);
-        if (!_sort.isEmpty() && _sort != expectedSort) {
+        const BSONObj expectedSort = BSON(kNaturalSortField << 1);
+        if (!_sort.isEmpty() &&
+            SimpleBSONObjComparator::kInstance.evaluate(_sort != expectedSort)) {
             return Status(ErrorCodes::BadValue,
                           "cannot use tailable option with a sort other than {$natural: 1}");
         }
@@ -730,6 +735,11 @@ Status QueryRequest::init(int ntoskip,
         } else {
             _ntoreturn = ntoreturn;
         }
+    }
+
+    // An ntoreturn of 1 is special because it also means to return at most one batch.
+    if (_ntoreturn.value_or(0) == 1) {
+        _wantMore = false;
     }
 
     // Initialize flags passed as 'queryOptions' bit vector.
@@ -922,11 +932,6 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
         return {ErrorCodes::InvalidPipelineOperator,
                 str::stream() << "Option " << kMaxField << " not supported in aggregation."};
     }
-    if (!_wantMore) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << kSingleBatchField
-                              << " not supported in aggregation."};
-    }
     if (_maxScan != 0) {
         return {ErrorCodes::InvalidPipelineOperator,
                 str::stream() << "Option " << kMaxScanField << " not supported in aggregation."};
@@ -978,6 +983,18 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
     if (_ntoreturn) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Cannot convert to an aggregation if ntoreturn is set."};
+    }
+    if (_sort[kNaturalSortField]) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Sort option " << kNaturalSortField
+                              << " not supported in aggregation."};
+    }
+    // The aggregation command normally does not support the 'singleBatch' option, but we make a
+    // special exception if 'limit' is set to 1.
+    if (!_wantMore && _limit.value_or(0) != 1LL) {
+        return {ErrorCodes::InvalidPipelineOperator,
+                str::stream() << "Option " << kSingleBatchField
+                              << " not supported in aggregation."};
     }
 
     // Now that we've successfully validated this QR, begin building the aggregation command.

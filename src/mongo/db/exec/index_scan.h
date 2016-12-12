@@ -165,9 +165,13 @@ private:
     //    BSON compares against scanned keys. In this case _checker will be NULL.
     //
 
+    // The key that the index cursor should start on/after.
+    BSONObj _startKey;
     // The key that the index cursor should stop on/after.
     BSONObj _endKey;
 
+    // Is the start key included in the range?
+    bool _startKeyInclusive;
     // Is the end key included in the range?
     bool _endKeyInclusive;
 };

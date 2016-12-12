@@ -44,16 +44,16 @@ namespace mongo {
 class MergeChunkRequest {
 public:
     MergeChunkRequest(NamespaceString nss,
+                      std::string shardName,
                       OID epoch,
-                      std::vector<BSONObj> chunkBoundaries,
-                      std::string shardName);
+                      std::vector<BSONObj> chunkBoundaries);
 
     /**
-     * Parses the provided BSON content as the internal _configsvrMergeChunk command, and if
+     * Parses the provided BSON content as the internal _configsvrCommitChunkMerge command, and if
      * it contains the correct types, constructs a MergeChunkRequest object from it.
      *
      * {
-     *   _configsvrMergeChunk: <NamespaceString nss>,
+     *   _configsvrCommitChunkMerge: <NamespaceString nss>,
      *   collEpoch: <OID epoch>,
      *   chunkBoundaries: [
      *       <BSONObj key1>,
@@ -73,31 +73,34 @@ public:
     BSONObj toConfigCommandBSON(const BSONObj& writeConcern);
 
     /**
-     * Creates a serialized BSONObj of the internal _configsvrMergeChunk command from this
+     * Creates a serialized BSONObj of the internal _configsvCommitChunkMerge command from this
      * MergeChunkRequest instance.
      */
     void appendAsConfigCommand(BSONObjBuilder* cmdBuilder);
 
-    const NamespaceString& getNamespace() const;
-    const OID& getEpoch() const;
-    const std::vector<BSONObj>& getChunkBoundaries() const;
-    const std::string& getShardName() const;
+    const NamespaceString& getNamespace() const {
+        return _nss;
+    }
+
+    const OID& getEpoch() const {
+        return _epoch;
+    }
+
+    const std::vector<BSONObj>& getChunkBoundaries() const {
+        return _chunkBoundaries;
+    }
+
+    const std::string& getShardName() const {
+        return _shardName;
+    }
 
 private:
-    /**
-     * Returns a validation Status for this MergeChunkRequest instance. Performs checks for
-     * valid Namespace, non-empty BSONObjs, and at least two chunks to merge as specified
-     * in _chunkBoundaries.
-     */
-    Status _validate();
-
     NamespaceString _nss;
     OID _epoch;
 
-    /**
-     * Specifies the boundaries of the chunks to be merged.
-     */
+    // The boundaries of the chunks to be merged.
     std::vector<BSONObj> _chunkBoundaries;
+
     std::string _shardName;
 };
 

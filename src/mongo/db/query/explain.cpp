@@ -676,8 +676,9 @@ void Explain::generateServerInfo(BSONObjBuilder* out) {
     BSONObjBuilder serverBob(out->subobjStart("serverInfo"));
     out->append("host", getHostNameCached());
     out->appendNumber("port", serverGlobalParams.port);
-    out->append("version", versionString);
-    out->append("gitVersion", gitVersion());
+    auto&& vii = VersionInfoInterface::instance();
+    out->append("version", vii.version());
+    out->append("gitVersion", vii.gitVersion());
     serverBob.doneFast();
 }
 
@@ -721,12 +722,17 @@ void Explain::explainStages(PlanExecutor* exec,
         executePlanStatus = exec->executePlan();
     }
 
+    // If executing the query failed because it was killed, then the collection may no longer be
+    // valid. We indicate this by setting our collection pointer to null.
+    if (executePlanStatus == ErrorCodes::QueryPlanKilled) {
+        collection = nullptr;
+    }
+
     // Get stats for the winning plan. If there is only a single candidate plan, it is considered
     // the winner.
     unique_ptr<PlanStageStats> winningStats(
         mps ? std::move(mps->getStats()->children[mps->bestPlanIdx()])
             : std::move(exec->getStats()));
-
 
     //
     // Use the stats trees to produce explain BSON.
@@ -749,7 +755,7 @@ void Explain::explainStages(PlanExecutor* exec,
 
         // Generate exec stats BSON for the winning plan.
         OperationContext* opCtx = exec->getOpCtx();
-        long long totalTimeMillis = CurOp::get(opCtx)->elapsedMillis();
+        long long totalTimeMillis = CurOp::get(opCtx)->elapsedMicros() / 1000;
         generateExecStats(winningStats.get(), verbosity, &execBob, totalTimeMillis);
 
         // Also generate exec stats for all plans, if the verbosity level is high enough.
@@ -836,6 +842,9 @@ void Explain::getSummaryStats(const PlanExecutor& exec, PlanSummaryStats* statsO
     // the tree into a list and then compute these aggregations.
     std::vector<const PlanStage*> stages;
     flattenExecTree(root, &stages);
+
+    statsOut->totalKeysExamined = 0;
+    statsOut->totalDocsExamined = 0;
 
     for (size_t i = 0; i < stages.size(); i++) {
         statsOut->totalKeysExamined +=

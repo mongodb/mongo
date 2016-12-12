@@ -142,8 +142,8 @@ public:
         bool copyIndexes = copyIndexesSpec.isBoolean() ? copyIndexesSpec.boolean() : true;
 
         log() << "cloneCollection.  db:" << dbname << " collection:" << collection
-              << " from: " << fromhost << " query: " << query << " "
-              << (copyIndexes ? "" : ", not copying indexes") << endl;
+              << " from: " << fromhost << " query: " << redact(query) << " "
+              << (copyIndexes ? "" : ", not copying indexes");
 
         Cloner cloner;
         unique_ptr<DBClientConnection> myconn;

@@ -86,6 +86,48 @@ BSONObj buildCommand() {
     return commandReplyBob.obj();
 }
 
+BSONObj buildErrReply(const Status status, const BSONObj& extraInfo = {}) {
+    BSONObjBuilder bob;
+    bob.appendElements(extraInfo);
+    bob.append("ok", 0.0);
+    bob.append("errmsg", status.reason());
+    bob.append("code", status.code());
+    bob.append("codeName", ErrorCodes::errorString(status.code()));
+    return bob.obj();
+}
+
+TEST(CommandReplyBuilder, CommandError) {
+    const Status status(ErrorCodes::InvalidLength, "Response payload too long");
+    BSONObj metadata = buildMetadata();
+    rpc::CommandReplyBuilder replyBuilder;
+    replyBuilder.setCommandReply(status);
+    replyBuilder.setMetadata(metadata);
+    auto msg = replyBuilder.done();
+
+    rpc::CommandReply parsed(&msg);
+
+    ASSERT_BSONOBJ_EQ(parsed.getMetadata(), metadata);
+    ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), buildErrReply(status));
+}
+
+TEST(LegacyReplyBuilder, CommandError) {
+    const Status status(ErrorCodes::InvalidLength, "Response payload too long");
+    BSONObj metadata = buildMetadata();
+    BSONObjBuilder extra;
+    extra.append("a", "b");
+    extra.append("c", "d");
+    const BSONObj extraObj = extra.obj();
+    rpc::LegacyReplyBuilder replyBuilder;
+    replyBuilder.setCommandReply(status, extraObj);
+    replyBuilder.setMetadata(metadata);
+    auto msg = replyBuilder.done();
+
+    rpc::LegacyReply parsed(&msg);
+
+    ASSERT_BSONOBJ_EQ(parsed.getMetadata(), metadata);
+    ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), buildErrReply(status, extraObj));
+}
+
 TEST(CommandReplyBuilder, MemAccess) {
     BSONObj metadata = buildMetadata();
     BSONObj commandReply = buildCommand();
@@ -96,8 +138,8 @@ TEST(CommandReplyBuilder, MemAccess) {
 
     rpc::CommandReply parsed(&msg);
 
-    ASSERT_EQUALS(parsed.getMetadata(), metadata);
-    ASSERT_EQUALS(parsed.getCommandReply(), commandReply);
+    ASSERT_BSONOBJ_EQ(parsed.getMetadata(), metadata);
+    ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), commandReply);
 }
 
 TEST(LegacyReplyBuilder, MemAccess) {
@@ -110,8 +152,8 @@ TEST(LegacyReplyBuilder, MemAccess) {
 
     rpc::LegacyReply parsed(&msg);
 
-    ASSERT_EQUALS(parsed.getMetadata(), metadata);
-    ASSERT_EQUALS(parsed.getCommandReply(), commandReply);
+    ASSERT_BSONOBJ_EQ(parsed.getMetadata(), metadata);
+    ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), commandReply);
 }
 
 template <typename T>
@@ -147,7 +189,7 @@ void testRoundTrip(rpc::ReplyBuilderInterface& replyBuilder) {
 
     T parsed(&msg);
 
-    ASSERT_EQUALS(parsed.getMetadata(), metadata);
+    ASSERT_BSONOBJ_EQ(parsed.getMetadata(), metadata);
     if (replyBuilder.getProtocol() != rpc::Protocol::kOpQuery) {
         ASSERT_TRUE(parsed.getOutputDocs() == outputDocRange);
     }

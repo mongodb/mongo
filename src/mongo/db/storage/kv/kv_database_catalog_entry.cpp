@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/db/storage/kv/kv_database_catalog_entry.h"
 
 #include "mongo/db/operation_context.h"
@@ -217,9 +219,6 @@ Status KVDatabaseCatalogEntry::createCollection(OperationContext* txn,
     if (!status.isOK())
         return status;
 
-    RecordStore* rs = _engine->getEngine()->getRecordStore(txn, ns, ident, options);
-    invariant(rs);
-
     // Mark collation feature as in use if the collection has a non-simple default collation.
     if (!options.collation.isEmpty()) {
         const auto feature = KVCatalog::FeatureTracker::NonRepairableFeature::kCollation;
@@ -230,8 +229,12 @@ Status KVDatabaseCatalogEntry::createCollection(OperationContext* txn,
     }
 
     txn->recoveryUnit()->registerChange(new AddCollectionChange(txn, this, ns, ident, true));
-    _collections[ns.toString()] =
-        new KVCollectionCatalogEntry(_engine->getEngine(), _engine->getCatalog(), ns, ident, rs);
+
+    auto rs = _engine->getEngine()->getRecordStore(txn, ns, ident, options);
+    invariant(rs);
+
+    _collections[ns.toString()] = new KVCollectionCatalogEntry(
+        _engine->getEngine(), _engine->getCatalog(), ns, ident, std::move(rs));
 
     return Status::OK();
 }
@@ -243,11 +246,11 @@ void KVDatabaseCatalogEntry::initCollection(OperationContext* opCtx,
 
     const std::string ident = _engine->getCatalog()->getCollectionIdent(ns);
 
-    RecordStore* rs;
+    std::unique_ptr<RecordStore> rs;
     if (forRepair) {
         // Using a NULL rs since we don't want to open this record store before it has been
         // repaired. This also ensures that if we try to use it, it will blow up.
-        rs = NULL;
+        rs = nullptr;
     } else {
         BSONCollectionCatalogEntry::MetaData md = _engine->getCatalog()->getMetaData(opCtx, ns);
         rs = _engine->getEngine()->getRecordStore(opCtx, ns, ident, md.options);
@@ -255,8 +258,8 @@ void KVDatabaseCatalogEntry::initCollection(OperationContext* opCtx,
     }
 
     // No change registration since this is only for committed collections
-    _collections[ns] =
-        new KVCollectionCatalogEntry(_engine->getEngine(), _engine->getCatalog(), ns, ident, rs);
+    _collections[ns] = new KVCollectionCatalogEntry(
+        _engine->getEngine(), _engine->getCatalog(), ns, ident, std::move(rs));
 }
 
 void KVDatabaseCatalogEntry::reinitCollectionAfterRepair(OperationContext* opCtx,
@@ -306,7 +309,6 @@ Status KVDatabaseCatalogEntry::renameCollection(OperationContext* txn,
     invariant(identFrom == identTo);
 
     BSONCollectionCatalogEntry::MetaData md = _engine->getCatalog()->getMetaData(txn, toNS);
-    RecordStore* rs = _engine->getEngine()->getRecordStore(txn, toNS, identTo, md.options);
 
     const CollectionMap::iterator itFrom = _collections.find(fromNS.toString());
     invariant(itFrom != _collections.end());
@@ -315,8 +317,11 @@ Status KVDatabaseCatalogEntry::renameCollection(OperationContext* txn,
     _collections.erase(itFrom);
 
     txn->recoveryUnit()->registerChange(new AddCollectionChange(txn, this, toNS, identTo, false));
+
+    auto rs = _engine->getEngine()->getRecordStore(txn, toNS, identTo, md.options);
+
     _collections[toNS.toString()] = new KVCollectionCatalogEntry(
-        _engine->getEngine(), _engine->getCatalog(), toNS, identTo, rs);
+        _engine->getEngine(), _engine->getCatalog(), toNS, identTo, std::move(rs));
 
     return Status::OK();
 }

@@ -69,15 +69,18 @@ void MultiApplierTest::tearDown() {
     executor::ThreadPoolExecutorTest::tearDown();
 }
 
+Status applyOperation(MultiApplier::OperationPtrs*) {
+    return Status::OK();
+};
+
 TEST_F(MultiApplierTest, InvalidConstruction) {
     const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
-    auto applyOperation = [](MultiApplier::OperationPtrs*) {};
     auto multiApply = [](OperationContext*,
                          MultiApplier::Operations,
                          MultiApplier::ApplyOperationFn) -> StatusWith<OpTime> {
         return Status(ErrorCodes::InternalError, "not implemented");
     };
-    auto callback = [](const StatusWith<Timestamp>&, const MultiApplier::Operations&) {};
+    auto callback = [](const Status&) {};
 
     // Null executor.
     ASSERT_THROWS_CODE_AND_WHAT(
@@ -134,9 +137,23 @@ TEST_F(MultiApplierTest, InvalidConstruction) {
         "callback function cannot be null");
 }
 
+TEST_F(MultiApplierTest, MultiApplierTransitionsDirectlyToCompleteIfShutdownBeforeStarting) {
+    const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
+
+    auto multiApply = [](OperationContext*,
+                         MultiApplier::Operations,
+                         MultiApplier::ApplyOperationFn) -> StatusWith<OpTime> { return OpTime(); };
+    auto callback = [](const Status&) {};
+
+    MultiApplier multiApplier(&getExecutor(), operations, applyOperation, multiApply, callback);
+    ASSERT_EQUALS(MultiApplier::State::kPreStart, multiApplier.getState_forTest());
+
+    multiApplier.shutdown();
+    ASSERT_EQUALS(MultiApplier::State::kComplete, multiApplier.getState_forTest());
+}
+
 TEST_F(MultiApplierTest, MultiApplierInvokesCallbackWithCallbackCanceledStatusUponCancellation) {
     const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
-    auto applyOperation = [](MultiApplier::OperationPtrs*) {};
 
     bool multiApplyInvoked = false;
     auto multiApply = [&](OperationContext* txn,
@@ -146,37 +163,34 @@ TEST_F(MultiApplierTest, MultiApplierInvokesCallbackWithCallbackCanceledStatusUp
         return operations.back().getOpTime();
     };
 
-    StatusWith<Timestamp> callbackResult = getDetectableErrorStatus();
-    MultiApplier::Operations operationsApplied;
-    auto callback = [&](const StatusWith<Timestamp>& result,
-                        const MultiApplier::Operations& operations) {
-        callbackResult = result;
-        operationsApplied = operations;
-    };
+    auto callbackResult = getDetectableErrorStatus();
+    auto callback = [&](const Status& result) { callbackResult = result; };
 
     MultiApplier multiApplier(&getExecutor(), operations, applyOperation, multiApply, callback);
+    ASSERT_EQUALS(MultiApplier::State::kPreStart, multiApplier.getState_forTest());
     {
         auto net = getNet();
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
 
         // Executor cannot run multiApply callback while we are on the network thread.
         ASSERT_OK(multiApplier.startup());
+        ASSERT_EQUALS(MultiApplier::State::kRunning, multiApplier.getState_forTest());
+
         multiApplier.shutdown();
+        ASSERT_EQUALS(MultiApplier::State::kShuttingDown, multiApplier.getState_forTest());
 
         net->runReadyNetworkOperations();
     }
     multiApplier.join();
+    ASSERT_EQUALS(MultiApplier::State::kComplete, multiApplier.getState_forTest());
 
     ASSERT_FALSE(multiApplyInvoked);
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, callbackResult);
-    ASSERT_EQUALS(1U, operationsApplied.size());
-    ASSERT_EQUALS(operations[0].raw, operationsApplied[0].raw);
 }
 
 TEST_F(MultiApplierTest, MultiApplierPassesMultiApplyErrorToCallback) {
     const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
-    auto applyOperation = [](MultiApplier::OperationPtrs*) {};
 
     bool multiApplyInvoked = false;
     Status multiApplyError(ErrorCodes::OperationFailed, "multi apply failed");
@@ -187,13 +201,8 @@ TEST_F(MultiApplierTest, MultiApplierPassesMultiApplyErrorToCallback) {
         return multiApplyError;
     };
 
-    StatusWith<Timestamp> callbackResult = getDetectableErrorStatus();
-    MultiApplier::Operations operationsApplied;
-    auto callback = [&](const StatusWith<Timestamp>& result,
-                        const MultiApplier::Operations& operations) {
-        callbackResult = result;
-        operationsApplied = operations;
-    };
+    auto callbackResult = getDetectableErrorStatus();
+    auto callback = [&](const Status& result) { callbackResult = result; };
 
     MultiApplier multiApplier(&getExecutor(), operations, applyOperation, multiApply, callback);
     ASSERT_OK(multiApplier.startup());
@@ -207,13 +216,10 @@ TEST_F(MultiApplierTest, MultiApplierPassesMultiApplyErrorToCallback) {
     ASSERT_TRUE(multiApplyInvoked);
 
     ASSERT_EQUALS(multiApplyError, callbackResult);
-    ASSERT_EQUALS(1U, operationsApplied.size());
-    ASSERT_EQUALS(operations[0].raw, operationsApplied[0].raw);
 }
 
 TEST_F(MultiApplierTest, MultiApplierCatchesMultiApplyExceptionAndConvertsToCallbackStatus) {
     const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
-    auto applyOperation = [](MultiApplier::OperationPtrs*) {};
 
     bool multiApplyInvoked = false;
     Status multiApplyError(ErrorCodes::OperationFailed, "multi apply failed");
@@ -225,13 +231,8 @@ TEST_F(MultiApplierTest, MultiApplierCatchesMultiApplyExceptionAndConvertsToCall
         return operations.back().getOpTime();
     };
 
-    StatusWith<Timestamp> callbackResult = getDetectableErrorStatus();
-    MultiApplier::Operations operationsApplied;
-    auto callback = [&](const StatusWith<Timestamp>& result,
-                        const MultiApplier::Operations& operations) {
-        callbackResult = result;
-        operationsApplied = operations;
-    };
+    auto callbackResult = getDetectableErrorStatus();
+    auto callback = [&](const Status& result) { callbackResult = result; };
 
     MultiApplier multiApplier(&getExecutor(), operations, applyOperation, multiApply, callback);
     ASSERT_OK(multiApplier.startup());
@@ -245,15 +246,12 @@ TEST_F(MultiApplierTest, MultiApplierCatchesMultiApplyExceptionAndConvertsToCall
     ASSERT_TRUE(multiApplyInvoked);
 
     ASSERT_EQUALS(multiApplyError, callbackResult);
-    ASSERT_EQUALS(1U, operationsApplied.size());
-    ASSERT_EQUALS(operations[0].raw, operationsApplied[0].raw);
 }
 
 TEST_F(
     MultiApplierTest,
     MultiApplierProvidesOperationContextToMultiApplyFunctionButDisposesBeforeInvokingFinishCallback) {
     const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
-    auto applyOperation = [](MultiApplier::OperationPtrs*) {};
 
     OperationContext* multiApplyTxn = nullptr;
     MultiApplier::Operations operationsToApply;
@@ -265,13 +263,10 @@ TEST_F(
         return operationsToApply.back().getOpTime();
     };
 
-    StatusWith<Timestamp> callbackResult = getDetectableErrorStatus();
-    MultiApplier::Operations operationsApplied;
+    auto callbackResult = getDetectableErrorStatus();
     OperationContext* callbackTxn = nullptr;
-    auto callback = [&](const StatusWith<Timestamp>& result,
-                        const MultiApplier::Operations& operations) {
+    auto callback = [&](const Status& result) {
         callbackResult = result;
-        operationsApplied = operations;
         callbackTxn = cc().getOperationContext();
     };
 
@@ -286,13 +281,61 @@ TEST_F(
 
     ASSERT_TRUE(multiApplyTxn);
     ASSERT_EQUALS(1U, operationsToApply.size());
-    ASSERT_EQUALS(operations[0].raw, operationsToApply[0].raw);
+    ASSERT_BSONOBJ_EQ(operations[0].raw, operationsToApply[0].raw);
 
     ASSERT_OK(callbackResult);
-    ASSERT_EQUALS(operations.back().getOpTime().getTimestamp(), callbackResult.getValue());
-    ASSERT_EQUALS(1U, operationsApplied.size());
-    ASSERT_EQUALS(operations[0].raw, operationsApplied[0].raw);
     ASSERT_FALSE(callbackTxn);
+}
+
+class SharedCallbackState {
+    MONGO_DISALLOW_COPYING(SharedCallbackState);
+
+public:
+    explicit SharedCallbackState(bool* sharedCallbackStateDestroyed)
+        : _sharedCallbackStateDestroyed(sharedCallbackStateDestroyed) {}
+    ~SharedCallbackState() {
+        *_sharedCallbackStateDestroyed = true;
+    }
+
+private:
+    bool* _sharedCallbackStateDestroyed;
+};
+
+TEST_F(MultiApplierTest, MultiApplierResetsOnCompletionCallbackFunctionPointerUponCompletion) {
+    bool sharedCallbackStateDestroyed = false;
+    auto sharedCallbackData = std::make_shared<SharedCallbackState>(&sharedCallbackStateDestroyed);
+
+    const MultiApplier::Operations operations{OplogEntry(BSON("ts" << Timestamp(Seconds(123), 0)))};
+
+    auto multiApply = [&](OperationContext*,
+                          MultiApplier::Operations operations,
+                          MultiApplier::ApplyOperationFn) -> StatusWith<OpTime> {
+        return operations.back().getOpTime();
+    };
+
+    auto callbackResult = getDetectableErrorStatus();
+
+    MultiApplier multiApplier(
+        &getExecutor(),
+        operations,
+        applyOperation,
+        multiApply,
+        [&callbackResult, sharedCallbackData](const Status& result) { callbackResult = result; });
+
+    sharedCallbackData.reset();
+    ASSERT_FALSE(sharedCallbackStateDestroyed);
+
+    ASSERT_OK(multiApplier.startup());
+    {
+        auto net = getNet();
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        net->runReadyNetworkOperations();
+    }
+    multiApplier.join();
+
+    ASSERT_OK(callbackResult);
+    // Shared state should be destroyed when applier is finished.
+    ASSERT_TRUE(sharedCallbackStateDestroyed);
 }
 
 }  // namespace

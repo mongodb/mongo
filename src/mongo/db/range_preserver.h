@@ -26,6 +26,7 @@
  *    it in the license file.
  */
 
+#include <boost/optional.hpp>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/clientcursor.h"
@@ -36,26 +37,20 @@ namespace mongo {
  * A RangePreserver prevents the RangeDeleter from removing any new data ranges in a collection.
  * Previously queued ranges may still be deleted but the documents in those ranges will be
  * filtered by CollectionMetadata::belongsToMe.
- *
- * TODO(greg/hk): Currently, creating a ClientCursor is how we accomplish this.  This should
- * change.
  */
 class RangePreserver {
 public:
     /**
-     * Sharding uses the set of active cursor IDs as the current state.  We add a dummy
-     * ClientCursor, which creates an additional cursor ID.  The cursor ID lasts as long as this
-     * object does.  The ClientCursorPin guarantees that the underlying ClientCursor is not
-     * deleted until this object goes out of scope.
+     * Sharding uses the set of active cursor IDs as the current state. We pin a dummy
+     * ClientCursor, which creates an additional cursor ID. The cursor ID lasts as long as this
+     * object does. The ClientCursorPin guarantees that the underlying ClientCursor is not deleted
+     * until this object goes out of scope.
      */
     RangePreserver(const Collection* collection) {
         // Empty collections don't have any data we need to preserve
         if (collection) {
-            // Not a memory leak.  Cached in a static structure by CC's ctor.
-            ClientCursor* cc = new ClientCursor(collection);
-
             // Pin keeps the CC from being deleted while it's in scope.  We delete it ourselves.
-            _pin.reset(new ClientCursorPin(collection->getCursorManager(), cc->cursorid()));
+            _pin.emplace(collection->getCursorManager()->registerRangePreserverCursor(collection));
         }
     }
 
@@ -65,7 +60,7 @@ public:
     }
 
 private:
-    std::unique_ptr<ClientCursorPin> _pin;
+    boost::optional<ClientCursorPin> _pin;
 };
 
 }  // namespace mongo

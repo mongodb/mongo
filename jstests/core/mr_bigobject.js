@@ -21,7 +21,7 @@ r = function(k, v) {
 
 assert.throws(function() {
     r = t.mapReduce(m, r, "mr_bigobject_out");
-}, null, "emit should fail");
+}, [], "emit should fail");
 
 m = function() {
     emit(1, this.s);

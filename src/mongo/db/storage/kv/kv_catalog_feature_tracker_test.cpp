@@ -74,8 +74,8 @@ public:
             WriteUnitOfWork wuow(opCtx.get());
             ASSERT_OK(_helper->getEngine()->createRecordStore(
                 opCtx.get(), "catalog", "catalog", CollectionOptions()));
-            _rs.reset(_helper->getEngine()->getRecordStore(
-                opCtx.get(), "catalog", "catalog", CollectionOptions()));
+            _rs = _helper->getEngine()->getRecordStore(
+                opCtx.get(), "catalog", "catalog", CollectionOptions());
             wuow.commit();
         }
 

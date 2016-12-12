@@ -43,21 +43,6 @@ const auto getStorageInterface =
     ServiceContext::declareDecoration<std::unique_ptr<StorageInterface>>();
 }
 
-bool BatchBoundaries::operator==(const BatchBoundaries& rhs) const {
-    if (&rhs == this) {
-        return true;
-    }
-    return start == rhs.start && end == rhs.end;
-}
-
-std::string BatchBoundaries::toString() const {
-    return str::stream() << "[start=" << start.toString() << ", end=" << end.toString() << "]";
-}
-
-std::ostream& operator<<(std::ostream& stream, const BatchBoundaries& boundaries) {
-    return stream << boundaries.toString();
-}
-
 StorageInterface* StorageInterface::get(ServiceContext* service) {
     return getStorageInterface(service).get();
 }

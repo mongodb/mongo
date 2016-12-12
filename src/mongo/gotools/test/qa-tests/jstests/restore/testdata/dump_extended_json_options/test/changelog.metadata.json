@@ -1,0 +1,1 @@
+{ "options" : { "create" : "changelog", "size" : { "$numberLong" : "10000000" }, "capped" : true }, "indexes" : [ { "v" : 1, "key" : { "_id" : { "$numberLong" : "1"}}, "ns" : "config.changelog", "name" : "_id_" }, {"v":1,"key":{"pos":"2d"},"name":"position_2d","ns":"config.changelog","min":{"$numberLong":"0"},"max":{"$numberLong":"1000"},"bits":{"$numberLong":"32"}} ] }

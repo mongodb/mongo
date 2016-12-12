@@ -1,7 +1,7 @@
 selector:
   js_test:
     roots:
-    - jstests/core/*.js
+    - jstests/core/**/*.js
     exclude_files:
     # Tests that won't work with an injected 'majority' readConcern
     # and/or an injected 'majority' writeConcern. Where a function is
@@ -75,6 +75,7 @@ executor:
         readMode: commands
     hooks:
     - class: ValidateCollections
+    - class: CheckReplOplogs
     - class: CheckReplDBHash
     - class: CleanEveryN
       n: 20
@@ -83,6 +84,7 @@ executor:
       mongod_options:
         set_parameters:
           enableTestCommands: 1
+          numInitialSyncAttempts: 1
         enableMajorityReadConcern: ''
       num_nodes: 2
       # Needs to be set for any ephemeral or no-journaling storage engine

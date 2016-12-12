@@ -27,14 +27,16 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper import complex_populate, simple_populate
-from helper import key_populate, value_populate
+from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
 
 # test_cursor_random02.py
 #    Cursor next_random operations
 class test_cursor_random02(wttest.WiredTigerTestCase):
-    type = 'table:random'
+    types = [
+        ('lsm', dict(type='lsm:random')),
+        ('table', dict(type='table:random'))
+    ]
     config = [
         ('not-sample', dict(config='next_random=true'))
     ]
@@ -46,26 +48,37 @@ class test_cursor_random02(wttest.WiredTigerTestCase):
         ('10000', dict(records=10000)),
         ('50000', dict(records=50000)),
     ]
-    scenarios = make_scenarios(config, records)
+    scenarios = make_scenarios(config, records, types)
 
     # Check that next_random works in the presence of a larger set of values,
     # where the values are in an insert list.
     def test_cursor_random_reasonable_distribution(self):
         uri = self.type
         num_entries = self.records
+        if uri == 'table:random':
+            config = 'leaf_page_max=100MB'
+        else:
+            config = ''
 
         # Set the leaf-page-max value, otherwise the page might split.
-        simple_populate(self, uri,
-            'leaf_page_max=100MB,key_format=S', num_entries)
+        ds = SimpleDataSet(self, uri, num_entries, config=config)
+        ds.populate()
         # Setup an array to track which keys are seen
         visitedKeys = [0] * (num_entries + 1)
+        # Setup a counter to see when we find a sequential key
+        sequentialKeys = 0
 
         cursor = self.session.open_cursor(uri, None, 'next_random=true')
+        lastKey = None
         for i in range(0, num_entries):
             self.assertEqual(cursor.next(), 0)
             current = cursor.get_key()
             current = int(current)
             visitedKeys[current] = visitedKeys[current] + 1
+            if lastKey != None:
+                if current == (lastKey + 1):
+                    sequentialKeys += 1
+            lastKey = current
 
         differentKeys = sum(x > 0 for x in visitedKeys)
 
@@ -76,7 +89,10 @@ class test_cursor_random02(wttest.WiredTigerTestCase):
             str(num_entries) + ', ' + \
             str((int)((differentKeys * 100) / num_entries)) + '%')
         '''
-
+        # Can't test for non-sequential data when there is 1 item in the table
+        if num_entries > 1:
+            self.assertGreater(num_entries - 1, sequentialKeys,
+                'cursor is returning sequential data')
         self.assertGreater(differentKeys, num_entries / 4,
             'next_random random distribution not adequate')
 

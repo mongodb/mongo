@@ -28,49 +28,51 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/document_source_skip.h"
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
 
-DocumentSourceSkip::DocumentSourceSkip(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), _skip(0), _needToSkip(true) {}
+DocumentSourceSkip::DocumentSourceSkip(const intrusive_ptr<ExpressionContext>& pExpCtx,
+                                       long long nToSkip)
+    : DocumentSource(pExpCtx), _nToSkip(nToSkip) {}
 
-REGISTER_DOCUMENT_SOURCE(skip, DocumentSourceSkip::createFromBson);
+REGISTER_DOCUMENT_SOURCE(skip,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceSkip::createFromBson);
 
 const char* DocumentSourceSkip::getSourceName() const {
     return "$skip";
 }
 
-boost::optional<Document> DocumentSourceSkip::getNext() {
+DocumentSource::GetNextResult DocumentSourceSkip::getNext() {
     pExpCtx->checkForInterrupt();
 
-    if (_needToSkip) {
-        _needToSkip = false;
-        for (long long i = 0; i < _skip; i++) {
-            if (!pSource->getNext())
-                return boost::none;
-        }
+    auto nextInput = pSource->getNext();
+    for (; _nSkippedSoFar < _nToSkip && nextInput.isAdvanced(); nextInput = pSource->getNext()) {
+        ++_nSkippedSoFar;
     }
-
-    return pSource->getNext();
+    return nextInput;
 }
 
 Value DocumentSourceSkip::serialize(bool explain) const {
-    return Value(DOC(getSourceName() << _skip));
+    return Value(DOC(getSourceName() << _nToSkip));
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceSkip::optimize() {
-    return _skip == 0 ? nullptr : this;
+    return _nToSkip == 0 ? nullptr : this;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceSkip::optimizeAt(
+Pipeline::SourceContainer::iterator DocumentSourceSkip::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
@@ -80,11 +82,11 @@ Pipeline::SourceContainer::iterator DocumentSourceSkip::optimizeAt(
     if (nextLimit) {
         // Swap the $limit before this stage, allowing a top-k sort to be possible, provided there
         // is a $sort stage.
-        nextLimit->setLimit(nextLimit->getLimit() + _skip);
+        nextLimit->setLimit(nextLimit->getLimit() + _nToSkip);
         std::swap(*itr, *std::next(itr));
         return itr == container->begin() ? itr : std::prev(itr);
     } else if (nextSkip) {
-        _skip += nextSkip->getSkip();
+        _nToSkip += nextSkip->getSkip();
         container->erase(std::next(itr));
         return itr;
     }
@@ -92,10 +94,10 @@ Pipeline::SourceContainer::iterator DocumentSourceSkip::optimizeAt(
 }
 
 intrusive_ptr<DocumentSourceSkip> DocumentSourceSkip::create(
-    const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    intrusive_ptr<DocumentSourceSkip> pSource(new DocumentSourceSkip(pExpCtx));
-    pSource->injectExpressionContext(pExpCtx);
-    return pSource;
+    const intrusive_ptr<ExpressionContext>& pExpCtx, long long nToSkip) {
+    intrusive_ptr<DocumentSourceSkip> skip(new DocumentSourceSkip(pExpCtx, nToSkip));
+    skip->injectExpressionContext(pExpCtx);
+    return skip;
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceSkip::createFromBson(
@@ -103,12 +105,9 @@ intrusive_ptr<DocumentSource> DocumentSourceSkip::createFromBson(
     uassert(15972,
             str::stream() << "Argument to $skip must be a number not a " << typeName(elem.type()),
             elem.isNumber());
+    auto nToSkip = elem.numberLong();
+    uassert(15956, "Argument to $skip cannot be negative", nToSkip >= 0);
 
-    intrusive_ptr<DocumentSourceSkip> pSkip(DocumentSourceSkip::create(pExpCtx));
-
-    pSkip->_skip = elem.numberLong();
-    uassert(15956, "Argument to $skip cannot be negative", pSkip->_skip >= 0);
-
-    return pSkip;
+    return DocumentSourceSkip::create(pExpCtx, nToSkip);
 }
 }

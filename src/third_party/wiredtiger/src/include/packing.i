@@ -81,7 +81,7 @@ __pack_init(WT_SESSION_IMPL *session, WT_PACK *pack, const char *fmt)
  * __pack_name_init --
  *      Initialize the name of a pack iterator.
  */
-static inline int
+static inline void
 __pack_name_init(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *names,
     bool iskey, WT_PACK_NAME *pn)
 {
@@ -89,11 +89,9 @@ __pack_name_init(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *names,
 	pn->iskey = iskey;
 
 	if (names->str != NULL)
-		WT_RET(__wt_config_subinit(session, &pn->config, names));
+		__wt_config_subinit(session, &pn->config, names);
 	else
 		pn->genname = 1;
-
-	return (0);
 }
 
 /*

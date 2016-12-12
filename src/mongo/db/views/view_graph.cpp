@@ -34,6 +34,10 @@
 
 namespace mongo {
 
+// Leave room for view name and type in documents returned from listCollections, or an actual query
+// on a sharded system.
+const int ViewGraph::kMaxViewPipelineSizeBytes = 16 * 1000 * 1000;
+
 const int ViewGraph::kMaxViewDepth = 20;
 uint64_t ViewGraph::_idCounter = 0;
 
@@ -43,8 +47,9 @@ void ViewGraph::clear() {
 }
 
 Status ViewGraph::insertAndValidate(const NamespaceString& viewNss,
-                                    const std::vector<NamespaceString>& refs) {
-    insertWithoutValidating(viewNss, refs);
+                                    const std::vector<NamespaceString>& refs,
+                                    const int pipelineSize) {
+    insertWithoutValidating(viewNss, refs, pipelineSize);
 
     // Perform validation on this newly inserted view. Note, if the graph was put in an invalid
     // state through unvalidated inserts (e.g. if the user manually edits system.views)
@@ -58,13 +63,22 @@ Status ViewGraph::insertAndValidate(const NamespaceString& viewNss,
                                     << kMaxViewDepth);
     };
 
+    auto viewPipelineMaxSizeExceeded = [this, &viewNss]() -> Status {
+        this->remove(viewNss);
+        return Status(ErrorCodes::ViewPipelineMaxSizeExceeded,
+                      str::stream() << "View pipeline exceeds maximum size; maximum size is "
+                                    << ViewGraph::kMaxViewPipelineSizeBytes);
+    };
+
     // Check for cycles and get the height of the children.
-    HeightMap heightMap;
+    StatsMap statsMap;
     std::vector<uint64_t> cycleVertices;
     ErrorCodes::Error childRes =
-        _getChildrenHeightAndCheckCycle(nodeId, nodeId, 0, &heightMap, &cycleVertices);
+        _getChildrenStatsAndCheckCycle(nodeId, nodeId, 0, &statsMap, &cycleVertices);
     if (childRes == ErrorCodes::ViewDepthLimitExceeded) {
         return viewDepthLimitExceeded();
+    } else if (childRes == ErrorCodes::ViewPipelineMaxSizeExceeded) {
+        return viewPipelineMaxSizeExceeded();
     } else if (childRes == ErrorCodes::GraphContainsCycle) {
         // Make the error message with the namespaces of the cycle and remove the node.
         str::stream ss;
@@ -79,17 +93,22 @@ Status ViewGraph::insertAndValidate(const NamespaceString& viewNss,
     }
 
     // Subtract one since the child height includes the non-view leaf node(s).
-    int childrenHeight = heightMap[nodeId].height - 1;
+    int childrenHeight = statsMap[nodeId].height - 1;
 
-    // Get the height of the parents to obtain the diameter through this node.
-    heightMap.clear();
-    ErrorCodes::Error parentRes = _getParentsHeight(nodeId, 0, &heightMap);
+    int childrenSize = statsMap[nodeId].cumulativeSize;
+
+    // Get the height of the parents to obtain the diameter through this node, as well as the size
+    // of the pipeline to check if if the combined pipeline exceeds the max size.
+    statsMap.clear();
+    ErrorCodes::Error parentRes = _getParentsStats(nodeId, 0, &statsMap);
     if (parentRes == ErrorCodes::ViewDepthLimitExceeded) {
         return viewDepthLimitExceeded();
+    } else if (parentRes == ErrorCodes::ViewPipelineMaxSizeExceeded) {
+        return viewPipelineMaxSizeExceeded();
     }
 
     // Check the combined heights of the children and parents.
-    int parentsHeight = heightMap[nodeId].height;
+    int parentsHeight = statsMap[nodeId].height;
     // Subtract one since the parent and children heights include the current node.
     int diameter = parentsHeight + childrenHeight - 1;
 
@@ -97,16 +116,29 @@ Status ViewGraph::insertAndValidate(const NamespaceString& viewNss,
         return viewDepthLimitExceeded();
     }
 
+    // Check the combined sizes of the children and parents.
+    int parentsSize = statsMap[nodeId].cumulativeSize;
+    // Subtract the current node's size since the parent and children sizes include the current
+    // node.
+    const Node& currentNode = _graph[nodeId];
+    int pipelineTotalSize = parentsSize + childrenSize - currentNode.size;
+
+    if (pipelineTotalSize > kMaxViewPipelineSizeBytes) {
+        return viewPipelineMaxSizeExceeded();
+    }
+
     return Status::OK();
 }
 
 void ViewGraph::insertWithoutValidating(const NamespaceString& viewNss,
-                                        const std::vector<NamespaceString>& refs) {
+                                        const std::vector<NamespaceString>& refs,
+                                        const int pipelineSize) {
     uint64_t nodeId = _getNodeId(viewNss);
     // Note, the parent pointers of this node are set when the parents are inserted.
     // This sets the children pointers of the node for this view, as well as the parent
     // pointers for its children.
     Node* node = &(_graph[nodeId]);
+    node->size = pipelineSize;
     invariant(node->children.empty());
 
     for (const NamespaceString& childNss : refs) {
@@ -150,11 +182,12 @@ void ViewGraph::remove(const NamespaceString& viewNss) {
     }
 }
 
-ErrorCodes::Error ViewGraph::_getParentsHeight(uint64_t currentId,
-                                               int currentDepth,
-                                               HeightMap* heightMap) {
+ErrorCodes::Error ViewGraph::_getParentsStats(uint64_t currentId,
+                                              int currentDepth,
+                                              StatsMap* statsMap) {
     const Node& currentNode = _graph[currentId];
     int maxHeightOfParents = 0;
+    int maxSizeOfParents = 0;
 
     // Return early if we've already exceeded the maximum depth. This will also be triggered if
     // we're traversing a cycle introduced through unvalidated inserts.
@@ -163,26 +196,32 @@ ErrorCodes::Error ViewGraph::_getParentsHeight(uint64_t currentId,
     }
 
     for (uint64_t parentId : currentNode.parents) {
-        if (!(*heightMap)[parentId].checked) {
-            auto res = _getParentsHeight(parentId, currentDepth + 1, heightMap);
+        if (!(*statsMap)[parentId].checked) {
+            auto res = _getParentsStats(parentId, currentDepth + 1, statsMap);
             if (res != ErrorCodes::OK) {
                 return res;
             }
         }
-        maxHeightOfParents = std::max(maxHeightOfParents, (*heightMap)[parentId].height);
+        maxHeightOfParents = std::max(maxHeightOfParents, (*statsMap)[parentId].height);
+        maxSizeOfParents = std::max(maxSizeOfParents, (*statsMap)[parentId].cumulativeSize);
     }
 
-    (*heightMap)[currentId].checked = true;
-    (*heightMap)[currentId].height = maxHeightOfParents + 1;
+    (*statsMap)[currentId].checked = true;
+    (*statsMap)[currentId].height = maxHeightOfParents + 1;
+    (*statsMap)[currentId].cumulativeSize += maxSizeOfParents + currentNode.size;
+
+    if ((*statsMap)[currentId].cumulativeSize > kMaxViewPipelineSizeBytes) {
+        return ErrorCodes::ViewPipelineMaxSizeExceeded;
+    }
 
     return ErrorCodes::OK;
 }
 
-ErrorCodes::Error ViewGraph::_getChildrenHeightAndCheckCycle(uint64_t startingId,
-                                                             uint64_t currentId,
-                                                             int currentDepth,
-                                                             HeightMap* heightMap,
-                                                             std::vector<uint64_t>* cycleIds) {
+ErrorCodes::Error ViewGraph::_getChildrenStatsAndCheckCycle(uint64_t startingId,
+                                                            uint64_t currentId,
+                                                            int currentDepth,
+                                                            StatsMap* statsMap,
+                                                            std::vector<uint64_t>* cycleIds) {
     // Check children of current node.
     const Node& currentNode = _graph[currentId];
     if (currentDepth > 0 && currentId == startingId) {
@@ -196,10 +235,11 @@ ErrorCodes::Error ViewGraph::_getChildrenHeightAndCheckCycle(uint64_t startingId
     }
 
     int maxHeightOfChildren = 0;
+    int maxSizeOfChildren = 0;
     for (uint64_t childId : currentNode.children) {
-        if (!(*heightMap)[childId].checked) {
-            auto res = _getChildrenHeightAndCheckCycle(
-                startingId, childId, currentDepth + 1, heightMap, cycleIds);
+        if (!(*statsMap)[childId].checked) {
+            auto res = _getChildrenStatsAndCheckCycle(
+                startingId, childId, currentDepth + 1, statsMap, cycleIds);
             if (res == ErrorCodes::GraphContainsCycle) {
                 cycleIds->push_back(currentId);
                 return res;
@@ -207,11 +247,13 @@ ErrorCodes::Error ViewGraph::_getChildrenHeightAndCheckCycle(uint64_t startingId
                 return res;
             }
         }
-        maxHeightOfChildren = std::max(maxHeightOfChildren, (*heightMap)[childId].height);
+        maxHeightOfChildren = std::max(maxHeightOfChildren, (*statsMap)[childId].height);
+        maxSizeOfChildren = std::max(maxSizeOfChildren, (*statsMap)[childId].cumulativeSize);
     }
 
-    (*heightMap)[currentId].checked = true;
-    (*heightMap)[currentId].height = maxHeightOfChildren + 1;
+    (*statsMap)[currentId].checked = true;
+    (*statsMap)[currentId].height = maxHeightOfChildren + 1;
+    (*statsMap)[currentId].cumulativeSize += maxSizeOfChildren + currentNode.size;
     return ErrorCodes::OK;
 }
 

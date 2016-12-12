@@ -51,7 +51,7 @@ AsyncSecureStream::~AsyncSecureStream() {
     destroyStream(&_stream.lowest_layer(), _connected);
 }
 
-void AsyncSecureStream::connect(const asio::ip::tcp::resolver::iterator endpoints,
+void AsyncSecureStream::connect(asio::ip::tcp::resolver::iterator endpoints,
                                 ConnectHandler&& connectHandler) {
     // Stash the connectHandler as we won't be able to call it until we re-enter the state
     // machine.
@@ -108,7 +108,7 @@ void AsyncSecureStream::_handleHandshake(std::error_code ec, const std::string& 
 }
 
 void AsyncSecureStream::cancel() {
-    cancelStream(&_stream.lowest_layer(), _connected);
+    cancelStream(&_stream.lowest_layer());
 }
 
 bool AsyncSecureStream::isOpen() {

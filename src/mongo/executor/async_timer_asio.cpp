@@ -26,9 +26,14 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kASIO
+
+#include "mongo/platform/basic.h"
+
 #include "mongo/executor/async_timer_asio.h"
 
 #include "mongo/stdx/memory.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace executor {
@@ -37,7 +42,11 @@ AsyncTimerASIO::AsyncTimerASIO(asio::io_service::strand* strand, Milliseconds ex
     : _strand(strand), _timer(_strand->get_io_service(), expiration.toSystemDuration()) {}
 
 void AsyncTimerASIO::cancel() {
-    _timer.cancel();
+    std::error_code ec;
+    _timer.cancel(ec);
+    if (ec) {
+        log() << "Failed to cancel timer: " << ec.message();
+    }
 }
 
 void AsyncTimerASIO::asyncWait(AsyncTimerInterface::Handler handler) {
@@ -47,6 +56,11 @@ void AsyncTimerASIO::asyncWait(AsyncTimerInterface::Handler handler) {
 std::unique_ptr<AsyncTimerInterface> AsyncTimerFactoryASIO::make(asio::io_service::strand* strand,
                                                                  Milliseconds expiration) {
     return stdx::make_unique<AsyncTimerASIO>(strand, expiration);
+}
+
+Date_t AsyncTimerFactoryASIO::now() {
+    return Date_t::fromDurationSinceEpoch(asio::system_timer::clock_type::now() -
+                                          asio::system_timer::clock_type::from_time_t(0));
 }
 
 }  // namespace executor

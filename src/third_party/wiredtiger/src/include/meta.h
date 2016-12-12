@@ -29,12 +29,10 @@
 #define	WT_LAS_URI		"file:WiredTigerLAS.wt"	/* Lookaside table URI*/
 
 /*
- * Pre computed hash for the metadata file. Used to optimize comparisons
- * against the metafile URI. The validity is checked on connection open
- * when diagnostic is enabled.
+ * Optimize comparisons against the metafile URI, flag handles that reference
+ * the metadata file.
  */
-#define	WT_IS_METADATA(session, dh)					\
-	F_ISSET((dh), WT_DHANDLE_IS_METADATA)
+#define	WT_IS_METADATA(dh)      F_ISSET((dh), WT_DHANDLE_IS_METADATA)
 #define	WT_METAFILE_ID		0			/* Metadata file ID */
 
 #define	WT_METADATA_VERSION	"WiredTiger version"	/* Version keys */
@@ -44,9 +42,9 @@
  * WT_WITH_TURTLE_LOCK --
  *	Acquire the turtle file lock, perform an operation, drop the lock.
  */
-#define	WT_WITH_TURTLE_LOCK(session, ret, op) do {			\
+#define	WT_WITH_TURTLE_LOCK(session, op) do {				\
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_TURTLE));\
-	WT_WITH_LOCK(session, ret,					\
+	WT_WITH_LOCK_WAIT(session,					\
 	    &S2C(session)->turtle_lock, WT_SESSION_LOCKED_TURTLE, op);	\
 } while (0)
 

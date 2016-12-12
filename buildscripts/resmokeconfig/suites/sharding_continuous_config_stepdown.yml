@@ -12,15 +12,12 @@ selector:
     # Count/write/aggregate/group commands against the config shard do not support retries yet
     - jstests/sharding/addshard1.js
     - jstests/sharding/addshard2.js
-    - jstests/sharding/auto1.js
+    - jstests/sharding/autosplit.js
     - jstests/sharding/auto_rebalance_parallel.js
     - jstests/sharding/auto_rebalance_parallel_replica_sets.js
     - jstests/sharding/autosplit_heuristics.js
-    - jstests/sharding/balance_tags1.js
-    - jstests/sharding/balance_tags2.js
     - jstests/sharding/basic_drop_coll.js
     - jstests/sharding/basic_merge.js
-    - jstests/sharding/bulk_shard_insert.js
     - jstests/sharding/count1.js
     - jstests/sharding/count2.js
     - jstests/sharding/cursor1.js
@@ -58,8 +55,6 @@ selector:
     - jstests/sharding/sharding_balance3.js
     - jstests/sharding/sharding_balance4.js
     - jstests/sharding/sharding_migrate_cursor1.js
-    - jstests/sharding/tag_auto_split.js
-    - jstests/sharding/tag_auto_split_partial_key.js
     - jstests/sharding/tag_range.js
     - jstests/sharding/top_chunk_autosplit.js
     - jstests/sharding/count_config_servers.js
@@ -72,8 +67,9 @@ selector:
     - jstests/sharding/bulk_insert.js
     - jstests/sharding/printShardingStatus.js
     # Balancer writes (direct write to config database with no retries)
+    - jstests/sharding/convert_to_and_from_sharded.js
     - jstests/sharding/remove2.js
-    - jstests/sharding/auto2.js
+    - jstests/sharding/autosplit_with_balancer.js
     - jstests/sharding/features3.js
     - jstests/sharding/in_memory_sort_limit.js
     - jstests/sharding/parallel.js
@@ -82,7 +78,6 @@ selector:
     # Calls the config server primary directly (not through mongos)
     - jstests/sharding/moveprimary_ignore_sharded.js
     - jstests/sharding/min_optime_recovery_on_successful_move_chunk_commit.js
-
     - jstests/sharding/read_after_optime.js
     - jstests/sharding/server_status.js
     - jstests/sharding/drop_configdb.js
@@ -96,11 +91,13 @@ selector:
     - jstests/sharding/all_config_servers_blackholed_from_mongos.js
     - jstests/sharding/batch_write_command_sharded.js
     - jstests/sharding/config_rs_no_primary.js
+    - jstests/sharding/config_version_rollback.js
     - jstests/sharding/startup_with_all_configs_down.js
     - jstests/sharding/lagged_config_secondary.js
     - jstests/sharding/autodiscover_config_rs_from_secondary.js
     - jstests/sharding/rs_stepdown_and_pooling.js
     - jstests/sharding/mongos_no_replica_set_refresh.js
+    - jstests/sharding/movechunk_interrupt_at_primary_stepdown.js
     - jstests/sharding/primary_config_server_blackholed_from_mongos.js
     - jstests/sharding/shard_aware_on_config_election.js
     # Nothing is affected by config server step down
@@ -119,6 +116,12 @@ selector:
     - jstests/sharding/move_chunk_wc.js
     # Expects that connections to all shards/config servers will never close
     - jstests/sharding/shard6.js
+    # Stepping down the primary can make the balancer rerun a migration that was designed to fail
+    # earlier, but can potentially pass on the second try.
+    - jstests/sharding/migration_ignore_interrupts_1.js
+    # Stepping down the config can cause moveChunks stopped on shards via killOp to be restarted.
+    - jstests/sharding/migration_ignore_interrupts_3.js
+    - jstests/sharding/migration_ignore_interrupts_4.js
 
 executor:
   js_test:

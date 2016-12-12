@@ -138,8 +138,9 @@ public:
 
     /**
      * Runs the specified command returns the BSON command response plus parsed out Status of this
-     * response and write concern error (if present). Waits for up to the deadline for the
-     * OperationContext. Retries failed operations according to the given "retryPolicy".
+     * response and write concern error (if present). Retries failed operations according to the
+     * given "retryPolicy".  Retries indefinitely until/unless a non-retriable error is encountered,
+     * the maxTimeMs on the OperationContext expires, or the operation is interrupted.
      */
     StatusWith<CommandResponse> runCommand(OperationContext* txn,
                                            const ReadPreferenceSetting& readPref,
@@ -158,6 +159,31 @@ public:
                                            const BSONObj& cmdObj,
                                            Milliseconds maxTimeMSOverride,
                                            RetryPolicy retryPolicy);
+
+    /**
+     * Same as runCommand, but will only retry failed operations up to 3 times, regardless of
+     * the retryPolicy or the remaining maxTimeMs.
+     * Wherever possible this method should be avoided in favor of runCommand.
+     */
+    StatusWith<CommandResponse> runCommandWithFixedRetryAttempts(
+        OperationContext* txn,
+        const ReadPreferenceSetting& readPref,
+        const std::string& dbName,
+        const BSONObj& cmdObj,
+        RetryPolicy retryPolicy);
+
+    /**
+     * Same as runCommand, but will only retry failed operations up to 3 times, regardless of
+     * the retryPolicy or the remaining maxTimeMs.
+     * Wherever possible this method should be avoided in favor of runCommand.
+     */
+    StatusWith<CommandResponse> runCommandWithFixedRetryAttempts(
+        OperationContext* txn,
+        const ReadPreferenceSetting& readPref,
+        const std::string& dbName,
+        const BSONObj& cmdObj,
+        Milliseconds maxTimeMSOverride,
+        RetryPolicy retryPolicy);
 
     /**
      * Expects a single-entry batch wrtie command and runs it on the config server's primary using
@@ -196,6 +222,14 @@ public:
     // This timeout will be used by default in operations against the config server, unless
     // explicitly overridden
     static const Milliseconds kDefaultConfigCommandTimeout;
+
+    /**
+     * Returns false if the error is a retriable error and/or causes a replset monitor update. These
+     * errors, if from a remote call, should not be further propagated back to another server
+     * because that server will interpret them as orignating on this server rather than the one this
+     * server called.
+     */
+    static bool shouldErrorBePropagated(ErrorCodes::Error code);
 
 protected:
     struct HostWithResponse {

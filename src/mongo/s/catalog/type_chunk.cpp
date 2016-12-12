@@ -35,6 +35,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -61,7 +62,7 @@ const char kMaxKey[] = "max";
 
 ChunkRange::ChunkRange(BSONObj minKey, BSONObj maxKey)
     : _minKey(std::move(minKey)), _maxKey(std::move(maxKey)) {
-    dassert(_minKey < _maxKey);
+    dassert(SimpleBSONObjComparator::kInstance.evaluate(_minKey < _maxKey));
 }
 
 StatusWith<ChunkRange> ChunkRange::fromBSON(const BSONObj& obj) {
@@ -91,7 +92,7 @@ StatusWith<ChunkRange> ChunkRange::fromBSON(const BSONObj& obj) {
         }
     }
 
-    if (minKey.Obj() >= maxKey.Obj()) {
+    if (SimpleBSONObjComparator::kInstance.evaluate(minKey.Obj() >= maxKey.Obj())) {
         return {ErrorCodes::FailedToParse,
                 str::stream() << "min: " << minKey.Obj() << " should be less than max: "
                               << maxKey.Obj()};
@@ -210,8 +211,9 @@ Status ChunkType::validate() const {
 
     // 'min' and 'max' must share the same fields.
     if (_min->nFields() != _max->nFields()) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "min and max have a different number of keys");
+        return {ErrorCodes::BadValue,
+                str::stream() << "min and max don't have the same number of keys: " << *_min << ", "
+                              << *_max};
     }
 
     BSONObjIterator minIt(getMin());
@@ -220,15 +222,16 @@ Status ChunkType::validate() const {
         BSONElement minElem = minIt.next();
         BSONElement maxElem = maxIt.next();
         if (strcmp(minElem.fieldName(), maxElem.fieldName())) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "min and max must have the same set of keys");
+            return {ErrorCodes::BadValue,
+                    str::stream() << "min and max don't have matching keys: " << *_min << ", "
+                                  << *_max};
         }
     }
 
     // 'max' should be greater than 'min'.
     if (_min->woCompare(getMax()) >= 0) {
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "max key must be greater than min key");
+        return {ErrorCodes::BadValue,
+                str::stream() << "max is not greater than min: " << *_min << ", " << *_max};
     }
 
     return Status::OK();

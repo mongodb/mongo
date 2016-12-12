@@ -89,7 +89,7 @@ setup:	op->format = af;
 
 err:
 	if (c != NULL)
-		(void)c->close(c);
+		WT_TRET(c->close(c));
 	__wt_free(session, af->uri);
 	__wt_free(session, af->config);
 	__wt_free(session, af->key_format);
@@ -113,7 +113,7 @@ __async_new_op_alloc(WT_SESSION_IMPL *session, const char *uri,
 
 	conn = S2C(session);
 	async = conn->async;
-	WT_STAT_FAST_CONN_INCR(session, async_op_alloc);
+	WT_STAT_CONN_INCR(session, async_op_alloc);
 	*opp = NULL;
 
 retry:
@@ -143,8 +143,8 @@ retry:
 	 * We still haven't found one.  Return an error.
 	 */
 	if (op == NULL || op->state != WT_ASYNCOP_FREE) {
-		WT_STAT_FAST_CONN_INCR(session, async_full);
-		WT_RET(EBUSY);
+		WT_STAT_CONN_INCR(session, async_full);
+		return (EBUSY);
 	}
 	/*
 	 * Set the state of this op handle as READY for the user to use.
@@ -152,10 +152,10 @@ retry:
 	 * Start the next search at the next entry after this one.
 	 */
 	if (!__wt_atomic_cas32(&op->state, WT_ASYNCOP_FREE, WT_ASYNCOP_READY)) {
-		WT_STAT_FAST_CONN_INCR(session, async_alloc_race);
+		WT_STAT_CONN_INCR(session, async_alloc_race);
 		goto retry;
 	}
-	WT_STAT_FAST_CONN_INCRV(session, async_alloc_view, view);
+	WT_STAT_CONN_INCRV(session, async_alloc_view, view);
 	WT_RET(__async_get_format(conn, uri, config, op));
 	op->unique_id = __wt_atomic_add64(&async->op_id, 1);
 	op->optype = WT_AOP_NONE;
@@ -232,7 +232,7 @@ __async_start(WT_SESSION_IMPL *session)
 	uint32_t i, session_flags;
 
 	conn = S2C(session);
-	conn->async_cfg = 1;
+	conn->async_cfg = true;
 	/*
 	 * Async is on, allocate the WT_ASYNC structure and initialize the ops.
 	 */
@@ -339,16 +339,16 @@ __wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[])
 	 * 2. If async is off, and the user wants it on, start it.
 	 * 3. If not a toggle and async is off, we're done.
 	 */
-	if (conn->async_cfg > 0 && !run) {
+	if (conn->async_cfg && !run) {
 		/* Case 1 */
 		WT_TRET(__wt_async_flush(session));
 		ret = __wt_async_destroy(session);
-		conn->async_cfg = 0;
+		conn->async_cfg = false;
 		return (ret);
-	} else if (conn->async_cfg == 0 && run)
+	} else if (!conn->async_cfg && run)
 		/* Case 2 */
 		return (__async_start(session));
-	else if (conn->async_cfg == 0)
+	else if (!conn->async_cfg)
 		/* Case 3 */
 		return (0);
 
@@ -489,7 +489,6 @@ __wt_async_flush(WT_SESSION_IMPL *session)
 {
 	WT_ASYNC *async;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	uint32_t i, workers;
 
 	conn = S2C(session);
@@ -508,7 +507,7 @@ __wt_async_flush(WT_SESSION_IMPL *session)
 	if (workers == 0)
 		return (0);
 
-	WT_STAT_FAST_CONN_INCR(session, async_flush);
+	WT_STAT_CONN_INCR(session, async_flush);
 	/*
 	 * We have to do several things.  First we have to prevent
 	 * other callers from racing with us so that only one
@@ -540,16 +539,15 @@ retry:
 	(void)__wt_atomic_add64(&async->flush_gen, 1);
 	WT_ASSERT(session, async->flush_op.state == WT_ASYNCOP_FREE);
 	async->flush_op.state = WT_ASYNCOP_READY;
-	WT_ERR(__wt_async_op_enqueue(session, &async->flush_op));
+	WT_RET(__wt_async_op_enqueue(session, &async->flush_op));
 	while (async->flush_state != WT_ASYNC_FLUSH_COMPLETE)
-		WT_ERR(__wt_cond_wait(NULL, async->flush_cond, 100000));
+		__wt_cond_wait(session, async->flush_cond, 100000);
 	/*
 	 * Flush is done.  Clear the flags.
 	 */
 	async->flush_op.state = WT_ASYNCOP_FREE;
 	WT_PUBLISH(async->flush_state, WT_ASYNC_FLUSH_NONE);
-err:
-	return (ret);
+	return (0);
 }
 
 /*
@@ -601,7 +599,8 @@ __wt_async_new_op(WT_SESSION_IMPL *session, const char *uri,
 
 	conn = S2C(session);
 	if (!conn->async_cfg)
-		return (ENOTSUP);
+		WT_RET_MSG(
+		    session, ENOTSUP, "Asynchronous operations not configured");
 
 	op = NULL;
 	WT_ERR(__async_new_op_alloc(session, uri, config, &op));

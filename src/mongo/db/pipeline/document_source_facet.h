@@ -34,7 +34,9 @@
 #include <vector>
 
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/util/string_map.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/pipeline.h"
 
 namespace mongo {
 
@@ -43,7 +45,6 @@ class TeeBuffer;
 class DocumentSourceTeeConsumer;
 struct ExpressionContext;
 class NamespaceString;
-class Pipeline;
 
 /**
  * A $facet stage contains multiple sub-pipelines. Each input to the $facet stage will feed into
@@ -53,23 +54,43 @@ class Pipeline;
  * For example, {$facet: {facetA: [{$skip: 1}], facetB: [{$limit: 1}]}} would describe a $facet
  * stage which will produce a document like the following:
  * {facetA: [<all input documents except the first one>], facetB: [<the first document>]}.
- *
- * TODO SERVER-24154: Should inherit from SplittableDocumentSource so that it can split in a sharded
- * cluster.
  */
-class DocumentSourceFacet final : public DocumentSourceNeedsMongod {
+class DocumentSourceFacet final : public DocumentSourceNeedsMongod,
+                                  public SplittableDocumentSource {
 public:
+    struct FacetPipeline {
+        FacetPipeline(std::string name, boost::intrusive_ptr<Pipeline> pipeline)
+            : name(std::move(name)), pipeline(std::move(pipeline)) {}
+
+        std::string name;
+        boost::intrusive_ptr<Pipeline> pipeline;
+    };
+
+    class LiteParsed : public LiteParsedDocumentSource {
+    public:
+        static std::unique_ptr<LiteParsed> parse(const AggregationRequest& request,
+                                                 const BSONElement& spec);
+
+        stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final;
+
+    private:
+        LiteParsed(std::vector<LiteParsedPipeline> liteParsedPipelines)
+            : _liteParsedPipelines(std::move(liteParsedPipelines)) {}
+
+        const std::vector<LiteParsedPipeline> _liteParsedPipelines;
+    };
+
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
     static boost::intrusive_ptr<DocumentSourceFacet> create(
-        StringMap<boost::intrusive_ptr<Pipeline>> facetPipelines,
+        std::vector<FacetPipeline> facetPipelines,
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
      * Blocking call. Will consume all input and produces one output document.
      */
-    boost::optional<Document> getNext() final;
+    GetNextResult getNext() final;
 
     /**
      * Optimizes inner pipelines.
@@ -95,20 +116,34 @@ public:
      */
     void setSource(DocumentSource* source) final;
 
+    /**
+     * The $facet stage must be run on the merging shard.
+     *
+     * TODO SERVER-24154: Should be smarter about splitting so that parts of the sub-pipelines can
+     * potentially be run in parallel on multiple shards.
+     */
+    boost::intrusive_ptr<DocumentSource> getShardSource() final {
+        return nullptr;
+    }
+    boost::intrusive_ptr<DocumentSource> getMergeSource() final {
+        return this;
+    }
+
     // The following are overridden just to forward calls to sub-pipelines.
     void addInvolvedCollections(std::vector<NamespaceString>* collections) const final;
     void doInjectMongodInterface(std::shared_ptr<MongodInterface> mongod) final;
     void doDetachFromOperationContext() final;
     void doReattachToOperationContext(OperationContext* opCtx) final;
+    bool needsPrimaryShard() const final;
 
 private:
-    DocumentSourceFacet(StringMap<boost::intrusive_ptr<Pipeline>> facetPipelines,
-                        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+    DocumentSourceFacet(std::vector<FacetPipeline> facetPipelines,
+                        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     Value serialize(bool explain = false) const final;
 
     boost::intrusive_ptr<TeeBuffer> _teeBuffer;
-    StringMap<boost::intrusive_ptr<Pipeline>> _facetPipelines;
+    std::vector<FacetPipeline> _facets;
 
     bool _done = false;
 };

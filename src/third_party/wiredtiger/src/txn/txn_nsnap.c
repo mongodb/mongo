@@ -42,12 +42,19 @@ __nsnap_drop_one(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name)
 		return (WT_NOTFOUND);
 
 	/* Bump the global ID if we are removing the first entry */
-	if (found == TAILQ_FIRST(&txn_global->nsnaph))
+	if (found == TAILQ_FIRST(&txn_global->nsnaph)) {
+		WT_ASSERT(session, !__wt_txn_visible_all(
+		    session, txn_global->nsnap_oldest_id));
 		txn_global->nsnap_oldest_id = (TAILQ_NEXT(found, q) != NULL) ?
-		    TAILQ_NEXT(found, q)->snap_min : WT_TXN_NONE;
+		    TAILQ_NEXT(found, q)->pinned_id : WT_TXN_NONE;
+		WT_DIAGNOSTIC_YIELD;
+		WT_ASSERT(session, txn_global->nsnap_oldest_id == WT_TXN_NONE ||
+		    !__wt_txn_visible_all(
+		    session, txn_global->nsnap_oldest_id));
+	}
 	TAILQ_REMOVE(&txn_global->nsnaph, found, q);
 	__nsnap_destroy(session, found);
-	WT_STAT_FAST_CONN_INCR(session, txn_snapshots_dropped);
+	WT_STAT_CONN_INCR(session, txn_snapshots_dropped);
 
 	return (ret);
 }
@@ -104,7 +111,7 @@ __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, bool inclusive)
 		}
 
 		if (TAILQ_NEXT(last, q) != NULL)
-			new_nsnap_oldest = TAILQ_NEXT(last, q)->snap_min;
+			new_nsnap_oldest = TAILQ_NEXT(last, q)->pinned_id;
 	}
 
 	do {
@@ -112,12 +119,20 @@ __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, bool inclusive)
 		WT_ASSERT(session, nsnap != NULL);
 		TAILQ_REMOVE(&txn_global->nsnaph, nsnap, q);
 		__nsnap_destroy(session, nsnap);
-		WT_STAT_FAST_CONN_INCR(session, txn_snapshots_dropped);
+		WT_STAT_CONN_INCR(session, txn_snapshots_dropped);
 	/* Last will be NULL in the all case so it will never match */
 	} while (nsnap != last && !TAILQ_EMPTY(&txn_global->nsnaph));
 
 	/* Now that the queue of named snapshots is updated, update the ID */
+	WT_ASSERT(session, !__wt_txn_visible_all(
+	    session, txn_global->nsnap_oldest_id) &&
+	    (new_nsnap_oldest == WT_TXN_NONE ||
+	    WT_TXNID_LE(txn_global->nsnap_oldest_id, new_nsnap_oldest)));
 	txn_global->nsnap_oldest_id = new_nsnap_oldest;
+	WT_DIAGNOSTIC_YIELD;
+	WT_ASSERT(session,
+	    new_nsnap_oldest == WT_TXN_NONE ||
+	    !__wt_txn_visible_all(session, new_nsnap_oldest));
 
 	return (ret);
 }
@@ -137,26 +152,46 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	const char *txn_cfg[] =
 	    { WT_CONFIG_BASE(session, WT_SESSION_begin_transaction),
 	      "isolation=snapshot", NULL };
-	bool started_txn;
+	bool include_updates, started_txn;
 
 	started_txn = false;
 	nsnap_new = NULL;
 	txn_global = &S2C(session)->txn_global;
 	txn = &session->txn;
 
+	WT_RET(__wt_config_gets_def(session, cfg, "include_updates", 0, &cval));
+	include_updates = cval.val != 0;
+
 	WT_RET(__wt_config_gets_def(session, cfg, "name", 0, &cval));
 	WT_ASSERT(session, cval.len != 0);
 
 	if (!F_ISSET(txn, WT_TXN_RUNNING)) {
+		if (include_updates)
+			WT_RET_MSG(session, EINVAL, "A transaction must be "
+			    "running to include updates in a named snapshot");
+
 		WT_RET(__wt_txn_begin(session, txn_cfg));
 		started_txn = true;
 	}
-	F_SET(txn, WT_TXN_READONLY);
+	if (!include_updates)
+		F_SET(txn, WT_TXN_READONLY);
 
 	/* Save a copy of the transaction's snapshot. */
 	WT_ERR(__wt_calloc_one(session, &nsnap_new));
 	nsnap = nsnap_new;
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &nsnap->name));
+
+	/*
+	 * To include updates from a writing transaction, make sure a
+	 * transaction ID has been allocated.
+	 */
+	if (include_updates) {
+		WT_ERR(__wt_txn_id_check(session));
+		WT_ASSERT(session, txn->id != WT_TXN_NONE);
+		nsnap->id = txn->id;
+	} else
+		nsnap->id = WT_TXN_NONE;
+	nsnap->pinned_id = WT_SESSION_TXN_STATE(session)->pinned_id;
 	nsnap->snap_min = txn->snap_min;
 	nsnap->snap_max = txn->snap_max;
 	if (txn->snapshot_count > 0) {
@@ -175,16 +210,25 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	WT_ERR_NOTFOUND_OK(__nsnap_drop_one(session, &cval));
 
-	if (TAILQ_EMPTY(&txn_global->nsnaph))
-		txn_global->nsnap_oldest_id = nsnap_new->snap_min;
+	if (TAILQ_EMPTY(&txn_global->nsnaph)) {
+		WT_ASSERT(session, txn_global->nsnap_oldest_id == WT_TXN_NONE &&
+		    !__wt_txn_visible_all(session, nsnap_new->pinned_id));
+		__wt_readlock(session, txn_global->scan_rwlock);
+		txn_global->nsnap_oldest_id = nsnap_new->pinned_id;
+		__wt_readunlock(session, txn_global->scan_rwlock);
+	}
 	TAILQ_INSERT_TAIL(&txn_global->nsnaph, nsnap_new, q);
-	WT_STAT_FAST_CONN_INCR(session, txn_snapshots_created);
+	WT_STAT_CONN_INCR(session, txn_snapshots_created);
 	nsnap_new = NULL;
 
-err:	if (started_txn)
+err:	if (started_txn) {
+#ifdef HAVE_DIAGNOSTIC
+		uint64_t pinned_id = WT_SESSION_TXN_STATE(session)->pinned_id;
+#endif
 		WT_TRET(__wt_txn_rollback(session, NULL));
-	else if (ret == 0)
-		F_SET(txn, WT_TXN_NAMED_SNAPSHOT);
+		WT_DIAGNOSTIC_YIELD;
+		WT_ASSERT(session, !__wt_txn_visible_all(session, pinned_id));
+	}
 
 	if (nsnap_new != NULL)
 		__nsnap_destroy(session, nsnap_new);
@@ -220,8 +264,7 @@ __wt_txn_named_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[])
 	/* We are done if there are no named drops */
 
 	if (names_config.len != 0) {
-		WT_RET(__wt_config_subinit(
-		    session, &objectconf, &names_config));
+		__wt_config_subinit(session, &objectconf, &names_config);
 		while ((ret = __wt_config_next(&objectconf, &k, &v)) == 0) {
 			ret = __nsnap_drop_one(session, &k);
 			if (ret != 0)
@@ -256,19 +299,37 @@ __wt_txn_named_snapshot_get(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *nameval)
 	if (session->ncursors > 0)
 		WT_RET(__wt_session_copy_values(session));
 
-	WT_RET(__wt_readlock(session, txn_global->nsnap_rwlock));
+	__wt_readlock(session, txn_global->nsnap_rwlock);
 	TAILQ_FOREACH(nsnap, &txn_global->nsnaph, q)
 		if (WT_STRING_MATCH(nsnap->name, nameval->str, nameval->len)) {
-			txn->snap_min = txn_state->snap_min = nsnap->snap_min;
+			/*
+			 * Acquire the scan lock so the oldest ID can't move
+			 * forward without seeing our pinned ID.
+			 */
+			__wt_readlock(session, txn_global->scan_rwlock);
+			txn_state->pinned_id = nsnap->pinned_id;
+			__wt_readunlock(session, txn_global->scan_rwlock);
+
+			WT_ASSERT(session, !__wt_txn_visible_all(
+			    session, txn_state->pinned_id) &&
+			    txn_global->nsnap_oldest_id != WT_TXN_NONE &&
+			    WT_TXNID_LE(txn_global->nsnap_oldest_id,
+			    txn_state->pinned_id));
+			txn->snap_min = nsnap->snap_min;
 			txn->snap_max = nsnap->snap_max;
 			if ((txn->snapshot_count = nsnap->snapshot_count) != 0)
 				memcpy(txn->snapshot, nsnap->snapshot,
 				    nsnap->snapshot_count *
 				    sizeof(*nsnap->snapshot));
+			if (nsnap->id != WT_TXN_NONE) {
+				WT_ASSERT(session, txn->id == WT_TXN_NONE);
+				txn->id = nsnap->id;
+				F_SET(txn, WT_TXN_READONLY);
+			}
 			F_SET(txn, WT_TXN_HAS_SNAPSHOT);
 			break;
 		}
-	WT_RET(__wt_readunlock(session, txn_global->nsnap_rwlock));
+	__wt_readunlock(session, txn_global->nsnap_rwlock);
 
 	if (nsnap == NULL)
 		WT_RET_MSG(session, EINVAL,
@@ -352,7 +413,7 @@ __wt_txn_named_snapshot_config(WT_SESSION_IMPL *session,
  * __wt_txn_named_snapshot_destroy --
  *	Destroy all named snapshots on connection close
  */
-int
+void
 __wt_txn_named_snapshot_destroy(WT_SESSION_IMPL *session)
 {
 	WT_NAMED_SNAPSHOT *nsnap;
@@ -365,6 +426,4 @@ __wt_txn_named_snapshot_destroy(WT_SESSION_IMPL *session)
 		TAILQ_REMOVE(&txn_global->nsnaph, nsnap, q);
 		__nsnap_destroy(session, nsnap);
 	}
-
-	return (0);
 }

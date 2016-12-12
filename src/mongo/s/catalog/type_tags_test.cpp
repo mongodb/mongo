@@ -52,8 +52,8 @@ TEST(TagsType, Valid) {
 
     ASSERT_EQUALS(tag.getNS(), "test.mycol");
     ASSERT_EQUALS(tag.getTag(), "tag");
-    ASSERT_EQUALS(tag.getMinKey(), BSON("a" << 10));
-    ASSERT_EQUALS(tag.getMaxKey(), BSON("a" << 20));
+    ASSERT_BSONOBJ_EQ(tag.getMinKey(), BSON("a" << 10));
+    ASSERT_BSONOBJ_EQ(tag.getMaxKey(), BSON("a" << 20));
 }
 
 TEST(TagsType, MissingNsField) {

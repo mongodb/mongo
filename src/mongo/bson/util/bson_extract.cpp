@@ -170,6 +170,21 @@ Status bsonExtractIntegerField(const BSONObj& object, StringData fieldName, long
     return Status::OK();
 }
 
+Status bsonExtractDoubleField(const BSONObj& object, StringData fieldName, double* out) {
+    BSONElement value;
+    Status status = bsonExtractField(object, fieldName, &value);
+    if (!status.isOK())
+        return status;
+    if (!value.isNumber()) {
+        return Status(ErrorCodes::TypeMismatch,
+                      mongoutils::str::stream() << "Expected field \"" << fieldName
+                                                << "\" to have numeric type, but found "
+                                                << typeName(value.type()));
+    }
+    *out = value.numberDouble();
+    return Status::OK();
+}
+
 Status bsonExtractIntegerFieldWithDefault(const BSONObj& object,
                                           StringData fieldName,
                                           long long defaultValue,

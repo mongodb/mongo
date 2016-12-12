@@ -25,14 +25,29 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/util/concurrency/thread_name.h"
 
 #include <boost/thread/tss.hpp>
 
+#if defined(__APPLE__) || defined(__linux__)
+#include <pthread.h>
+#endif
+#if defined(__APPLE__)
+#include <sys/proc_info.h>
+#endif
+#if defined(__linux__)
+#include <sys/syscall.h>
+#include <sys/types.h>
+#endif
+
 #include "mongo/base/init.h"
+#include "mongo/config.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -40,6 +55,36 @@ namespace mongo {
 using std::string;
 
 namespace {
+
+#ifdef _WIN32
+// From https://msdn.microsoft.com/en-us/library/xcb2z8hs.aspx
+// Note: The thread name is only set for the thread if the debugger is attached.
+
+const DWORD MS_VC_EXCEPTION = 0x406D1388;
+#pragma pack(push, 8)
+typedef struct tagTHREADNAME_INFO {
+    DWORD dwType;      // Must be 0x1000.
+    LPCSTR szName;     // Pointer to name (in user addr space).
+    DWORD dwThreadID;  // Thread ID (-1=caller thread).
+    DWORD dwFlags;     // Reserved for future use, must be zero.
+} THREADNAME_INFO;
+#pragma pack(pop)
+
+void setWindowsThreadName(DWORD dwThreadID, const char* threadName) {
+    THREADNAME_INFO info;
+    info.dwType = 0x1000;
+    info.szName = threadName;
+    info.dwThreadID = dwThreadID;
+    info.dwFlags = 0;
+#pragma warning(push)
+#pragma warning(disable : 6320 6322)
+    __try {
+        RaiseException(MS_VC_EXCEPTION, 0, sizeof(info) / sizeof(ULONG_PTR), (ULONG_PTR*)&info);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    }
+#pragma warning(pop)
+}
+#endif
 
 boost::thread_specific_ptr<std::string> threadName;
 AtomicInt64 nextUnnamedThreadId{1};
@@ -62,6 +107,41 @@ MONGO_INITIALIZER(ThreadNameInitializer)(InitializerContext*) {
 void setThreadName(StringData name) {
     invariant(mongoInitializersHaveRun);
     threadName.reset(new string(name.toString()));
+
+#if defined(_WIN32)
+    // Naming should not be expensive compared to thread creation and connection set up, but if
+    // testing shows otherwise we should make this depend on DEBUG again.
+    setWindowsThreadName(GetCurrentThreadId(), threadName->c_str());
+#elif defined(__APPLE__)
+    // Maximum thread name length on OS X is MAXTHREADNAMESIZE (64 characters). This assumes
+    // OS X 10.6 or later.
+    int error = pthread_setname_np(threadName->substr(0, MAXTHREADNAMESIZE - 1).c_str());
+    if (error) {
+        log() << "Ignoring error from setting thread name: " << errnoWithDescription(error);
+    }
+#elif defined(__linux__) && defined(MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP)
+    // Do not set thread name on the main() thread. Setting the name on main thread breaks
+    // pgrep/pkill since these programs base this name on /proc/*/status which displays the thread
+    // name, not the executable name.
+    if (getpid() != syscall(SYS_gettid)) {
+        //  Maximum thread name length supported on Linux is 16 including the null terminator.
+        //  Ideally we use short and descriptive thread names that fit: this helps for log
+        //  readibility as well. Still, as the limit is so low and a few current names exceed the
+        //  limit, it's best to shorten long names.
+        int error = 0;
+        if (threadName->size() > 15) {
+            std::string shortName =
+                threadName->substr(0, 7) + '.' + threadName->substr(threadName->size() - 7);
+            error = pthread_setname_np(pthread_self(), shortName.c_str());
+        } else {
+            error = pthread_setname_np(pthread_self(), threadName->c_str());
+        }
+
+        if (error) {
+            log() << "Ignoring error from setting thread name: " << errnoWithDescription(error);
+        }
+    }
+#endif
 }
 
 const string& getThreadName() {

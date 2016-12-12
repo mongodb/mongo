@@ -26,9 +26,9 @@
     }
 
     // Wait for replication to all config server replica set members to ensure that mongos
-    // doesn't read from a stale config server when trying to verify if the initial cluster metadata
+    // will be able to do majority reads when trying to verify if the initial cluster metadata
     // has been properly written.
-    rst.awaitReplication();
+    rst.awaitLastOpCommitted();
     // Now take down the one electable node
     rst.stop(0);
     rst.awaitNoPrimary();
@@ -43,5 +43,4 @@
     var admin = mongos.getDB('admin');
     mongos.setSlaveOk(true);
     assert.eq(1, admin.foo.findOne().a);
-
 })();

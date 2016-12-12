@@ -58,3 +58,24 @@ assert.eq(0, b.count({i: 9.1}));    // make sure early one is gone
 assert(db.getCollectionNames().indexOf("jstests_rename_b") >= 0);
 assert(db.getCollectionNames().indexOf("jstests_rename_a") < 0);
 assert(db.jstests_rename_b.stats().capped);
+
+assert.throws(function() {
+    db.jstests_rename.renameCollection({fail: "fail fail fail"});
+}, [], "renameCollection should fail when passed a garbage object");
+
+db.jstests_rename_d.drop();
+db.jstests_rename_e.drop();
+
+db.jstests_rename_d.save({a: 222});
+assert.commandWorked(db.jstests_rename_d.renameCollection('jstests_rename_e'));
+
+assert(db.getCollectionNames().indexOf("jstests_rename_d") < 0);
+assert(db.getCollectionNames().indexOf("jstests_rename_e") >= 0);
+assert.eq(db.jstests_rename_e.findOne().a, 222);
+
+assert.commandWorked(
+    db.jstests_rename_e.renameCollection({to: 'jstests_rename_d', dropTarget: true}));
+
+assert(db.getCollectionNames().indexOf("jstests_rename_d") >= 0);
+assert(db.getCollectionNames().indexOf("jstests_rename_e") < 0);
+assert.eq(db.jstests_rename_d.findOne().a, 222);

@@ -84,7 +84,7 @@ void AsyncStream::read(asio::mutable_buffer buffer, StreamHandler&& streamHandle
 }
 
 void AsyncStream::cancel() {
-    cancelStream(&_stream, _connected);
+    cancelStream(&_stream);
 }
 
 bool AsyncStream::isOpen() {

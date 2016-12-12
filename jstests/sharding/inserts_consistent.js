@@ -1,84 +1,71 @@
 // Test write re-routing on version mismatch.
+(function() {
+    'use strict';
 
-var st = new ShardingTest({shards: 2, mongos: 2, verbose: 2});
+    var st = new ShardingTest({shards: 2, mongos: 2});
 
-jsTest.log("Doing test setup...");
+    var mongos = st.s;
+    var admin = mongos.getDB("admin");
+    var config = mongos.getDB("config");
+    var coll = st.s.getCollection('TestDB.coll');
 
-// Stop balancer, since it'll just get in the way of this
-st.stopBalancer();
+    assert.commandWorked(mongos.adminCommand({enableSharding: 'TestDB'}));
+    st.ensurePrimaryShard('TestDB', st.shard0.shardName);
+    assert.commandWorked(mongos.adminCommand({shardCollection: 'TestDB.coll', key: {_id: 1}}));
 
-var mongos = st.s;
-var admin = mongos.getDB("admin");
-var config = mongos.getDB("config");
-var coll = st.s.getCollection(jsTest.name() + ".coll");
+    jsTest.log("Refreshing second mongos...");
 
-st.shardColl(coll, {_id: 1}, {_id: 0}, false);
+    var mongosB = st.s1;
+    var adminB = mongosB.getDB("admin");
+    var collB = mongosB.getCollection(coll + "");
 
-jsTest.log("Refreshing second mongos...");
+    // Make sure mongosB knows about the coll
+    assert.eq(0, collB.find().itcount());
 
-var mongosB = st.s1;
-var adminB = mongosB.getDB("admin");
-var collB = mongosB.getCollection(coll + "");
+    jsTest.log("Moving chunk to create stale mongos...");
+    assert.commandWorked(
+        admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName}));
 
-// Make sure mongosB knows about the coll
-assert.eq(0, collB.find().itcount());
-// printjson( adminB.runCommand({ flushRouterConfig : 1 }) )
+    jsTest.log("Inserting docs that needs to be retried...");
 
-jsTest.log("Moving chunk to create stale mongos...");
-
-var otherShard = config.chunks.findOne({_id: sh._collRE(coll)}).shard;
-for (var i = 0; i < st._shardNames.length; i++) {
-    if (otherShard != st._shardNames[i]) {
-        otherShard = st._shardNames[i];
-        break;
+    var nextId = -1;
+    for (var i = 0; i < 2; i++) {
+        printjson("Inserting " + nextId);
+        assert.writeOK(collB.insert({_id: nextId--, hello: "world"}));
     }
-}
 
-print("Other shard : " + otherShard);
+    jsTest.log("Inserting doc which successfully goes through...");
 
-printjson(admin.runCommand({moveChunk: coll + "", find: {_id: 0}, to: otherShard}));
+    // Do second write
+    assert.writeOK(collB.insert({_id: nextId--, goodbye: "world"}));
 
-jsTest.log("Inserting docs that needs to be retried...");
+    // Assert that write went through
+    assert.eq(coll.find().itcount(), 3);
 
-var nextId = -1;
-for (var i = 0; i < 2; i++) {
-    printjson("Inserting " + nextId);
-    assert.writeOK(collB.insert({_id: nextId--, hello: "world"}));
-}
+    jsTest.log("Now try moving the actual chunk we're writing to...");
 
-jsTest.log("Inserting doc which successfully goes through...");
+    // Now move the actual chunk we're writing to
+    printjson(admin.runCommand({moveChunk: coll + "", find: {_id: -1}, to: st.shard1.shardName}));
 
-// Do second write
-assert.writeOK(collB.insert({_id: nextId--, goodbye: "world"}));
+    jsTest.log("Inserting second docs to get written back...");
 
-// Assert that write went through
-assert.eq(coll.find().itcount(), 3);
+    // Will fail entirely if too many of these, waiting for write to get applied can get too long.
+    for (var i = 0; i < 2; i++) {
+        collB.insert({_id: nextId--, hello: "world"});
+    }
 
-jsTest.log("Now try moving the actual chunk we're writing to...");
+    // Refresh server
+    printjson(adminB.runCommand({flushRouterConfig: 1}));
 
-// Now move the actual chunk we're writing to
-printjson(admin.runCommand({moveChunk: coll + "", find: {_id: -1}, to: otherShard}));
+    jsTest.log("Inserting second doc which successfully goes through...");
 
-jsTest.log("Inserting second docs to get written back...");
+    // Do second write
+    assert.writeOK(collB.insert({_id: nextId--, goodbye: "world"}));
 
-// Will fail entirely if too many of these, waiting for write to get applied can get too long.
-for (var i = 0; i < 2; i++) {
-    collB.insert({_id: nextId--, hello: "world"});
-}
+    jsTest.log("All docs written this time!");
 
-// Refresh server
-printjson(adminB.runCommand({flushRouterConfig: 1}));
+    // Assert that writes went through.
+    assert.eq(coll.find().itcount(), 6);
 
-jsTest.log("Inserting second doc which successfully goes through...");
-
-// Do second write
-assert.writeOK(collB.insert({_id: nextId--, goodbye: "world"}));
-
-jsTest.log("All docs written this time!");
-
-// Assert that writes went through.
-assert.eq(coll.find().itcount(), 6);
-
-jsTest.log("DONE");
-
-st.stop();
+    st.stop();
+})();

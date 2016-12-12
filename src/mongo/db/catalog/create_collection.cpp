@@ -40,19 +40,25 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 
 namespace mongo {
-Status createCollection(OperationContext* txn, const std::string& dbName, const BSONObj& cmdObj) {
+Status createCollection(OperationContext* txn,
+                        const std::string& dbName,
+                        const BSONObj& cmdObj,
+                        const BSONObj& idIndex) {
     BSONObjIterator it(cmdObj);
 
     // Extract ns from first cmdObj element.
     BSONElement firstElt = it.next();
-    uassert(15888, "must pass name of collection to create", firstElt.valuestrsafe()[0] != '\0');
+    uassert(ErrorCodes::TypeMismatch,
+            str::stream() << "Expected first element to be of type String in: " << cmdObj,
+            firstElt.type() == BSONType::String);
+    uassert(15888, "must pass name of collection to create", !firstElt.valueStringData().empty());
 
-    Status status = userAllowedCreateNS(dbName, firstElt.valuestr());
+    Status status = userAllowedCreateNS(dbName, firstElt.valueStringData());
     if (!status.isOK()) {
         return status;
     }
 
-    NamespaceString nss(dbName, firstElt.valuestrsafe());
+    const NamespaceString nss(dbName, firstElt.valueStringData());
 
     // Build options object from remaining cmdObj elements.
     BSONObjBuilder optionsBuilder;
@@ -79,7 +85,8 @@ Status createCollection(OperationContext* txn, const std::string& dbName, const 
         WriteUnitOfWork wunit(txn);
 
         // Create collection.
-        status = userCreateNS(txn, ctx.db(), nss.ns(), options);
+        const bool createDefaultIndexes = true;
+        status = userCreateNS(txn, ctx.db(), nss.ns(), options, createDefaultIndexes, idIndex);
         if (!status.isOK()) {
             return status;
         }

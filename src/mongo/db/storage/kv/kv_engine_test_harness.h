@@ -30,7 +30,10 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
@@ -45,6 +48,8 @@ public:
 
     virtual KVEngine* restartEngine() = 0;
 
-    static KVHarnessHelper* create();
+    static std::unique_ptr<KVHarnessHelper> create();
+    static void registerFactory(stdx::function<std::unique_ptr<KVHarnessHelper>()> factory);
 };
-}
+
+}  // namespace mongo

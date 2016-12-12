@@ -42,6 +42,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
+#include "mongo/util/stringutils.h"
 #include "mongo/util/version.h"
 
 #if defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
@@ -255,9 +256,12 @@ void addOSComponentsToSoMap(BSONObjBuilder* soMap);
  */
 MONGO_INITIALIZER(ExtractSOMap)(InitializerContext*) {
     BSONObjBuilder soMap;
-    soMap << "mongodbVersion" << versionString;
-    soMap << "gitVersion" << gitVersion();
-    soMap << "compiledModules" << compiledModules();
+
+    auto&& vii = VersionInfoInterface::instance(VersionInfoInterface::NotEnabledAction::kFallback);
+    soMap << "mongodbVersion" << vii.version();
+    soMap << "gitVersion" << vii.gitVersion();
+    soMap << "compiledModules" << vii.modules();
+
     struct utsname unameData;
     if (!uname(&unameData)) {
         BSONObjBuilder unameBuilder(soMap.subobjStart("uname"));

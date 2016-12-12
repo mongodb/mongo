@@ -684,7 +684,7 @@ TEST(Parsing, DefaultValuesNotInBSON) {
     ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
 
     mongo::BSONObj expected = BSON("val1" << 6);
-    ASSERT_EQUALS(expected, environment.toBSON());
+    ASSERT_BSONOBJ_EQ(expected, environment.toBSON());
 }
 
 TEST(Parsing, ImplicitValue) {

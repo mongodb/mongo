@@ -60,6 +60,7 @@
 #include "mongo/scripting/mozjs/oid.h"
 #include "mongo/scripting/mozjs/regexp.h"
 #include "mongo/scripting/mozjs/timestamp.h"
+#include "mongo/scripting/mozjs/uri.h"
 
 namespace mongo {
 namespace mozjs {
@@ -88,6 +89,8 @@ public:
     void reset() override;
 
     void kill();
+
+    void interrupt();
 
     bool isKillPending() const override;
 
@@ -289,6 +292,11 @@ public:
         return _timestampProto;
     }
 
+    template <typename T>
+    typename std::enable_if<std::is_same<T, URIInfo>::value, WrapType<T>&>::type getProto() {
+        return _uriProto;
+    }
+
     void setQuickExit(int exitCode);
     bool getQuickExit(int* exitCode);
 
@@ -322,11 +330,10 @@ private:
     struct MozRuntime {
     public:
         MozRuntime(const MozJSScriptEngine* engine);
-        ~MozRuntime();
 
-        PRThread* _thread = nullptr;
-        JSRuntime* _runtime = nullptr;
-        JSContext* _context = nullptr;
+        std::unique_ptr<PRThread, std::function<void(PRThread*)>> _thread;
+        std::unique_ptr<JSRuntime, std::function<void(JSRuntime*)>> _runtime;
+        std::unique_ptr<JSContext, std::function<void(JSContext*)>> _context;
     };
 
     /**
@@ -380,12 +387,12 @@ private:
     WrapType<BSONInfo> _bsonProto;
     WrapType<CodeInfo> _codeProto;
     WrapType<CountDownLatchInfo> _countDownLatchProto;
-    WrapType<CursorInfo> _cursorProto;
     WrapType<CursorHandleInfo> _cursorHandleProto;
+    WrapType<CursorInfo> _cursorProto;
     WrapType<DBCollectionInfo> _dbCollectionProto;
+    WrapType<DBInfo> _dbProto;
     WrapType<DBPointerInfo> _dbPointerProto;
     WrapType<DBQueryInfo> _dbQueryProto;
-    WrapType<DBInfo> _dbProto;
     WrapType<DBRefInfo> _dbRefProto;
     WrapType<ErrorInfo> _errorProto;
     WrapType<JSThreadInfo> _jsThreadProto;
@@ -395,13 +402,14 @@ private:
     WrapType<MongoHelpersInfo> _mongoHelpersProto;
     WrapType<MongoLocalInfo> _mongoLocalProto;
     WrapType<NativeFunctionInfo> _nativeFunctionProto;
+    WrapType<NumberDecimalInfo> _numberDecimalProto;
     WrapType<NumberIntInfo> _numberIntProto;
     WrapType<NumberLongInfo> _numberLongProto;
-    WrapType<NumberDecimalInfo> _numberDecimalProto;
     WrapType<ObjectInfo> _objectProto;
     WrapType<OIDInfo> _oidProto;
     WrapType<RegExpInfo> _regExpProto;
     WrapType<TimestampInfo> _timestampProto;
+    WrapType<URIInfo> _uriProto;
 };
 
 inline MozJSImplScope* getScope(JSContext* cx) {

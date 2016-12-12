@@ -132,10 +132,14 @@ public:
      */
     virtual void setForceSyncSourceIndex(int index) = 0;
 
+    enum class ChainingPreference { kAllowChaining, kUseConfiguration };
+
     /**
      * Chooses and sets a new sync source, based on our current knowledge of the world.
      */
-    virtual HostAndPort chooseNewSyncSource(Date_t now, const Timestamp& lastTimestampApplied) = 0;
+    virtual HostAndPort chooseNewSyncSource(Date_t now,
+                                            const OpTime& lastOpTimeFetched,
+                                            ChainingPreference chainingPreference) = 0;
 
     /**
      * Suppresses selecting "host" as sync source until "until".
@@ -249,6 +253,7 @@ public:
         const OpTime& lastOpDurable;
         const OpTime& lastCommittedOpTime;
         const OpTime& readConcernMajorityOpTime;
+        const BSONObj& initialSyncStatus;
     };
 
     // produce a reply to a status request
@@ -260,8 +265,14 @@ public:
     // replset.
     virtual void fillIsMasterForReplSet(IsMasterResponse* response) = 0;
 
-    // produce a reply to a freeze request
-    virtual void prepareFreezeResponse(Date_t now, int secs, BSONObjBuilder* response) = 0;
+    enum class PrepareFreezeResponseResult { kNoAction, kElectSelf };
+
+    /**
+     * Produce a reply to a freeze request. Returns a PostMemberStateUpdateAction on success that
+     * may trigger state changes in the caller.
+     */
+    virtual StatusWith<PrepareFreezeResponseResult> prepareFreezeResponse(
+        Date_t now, int secs, BSONObjBuilder* response) = 0;
 
     ////////////////////////////////////////////////////////////
     //
@@ -383,12 +394,24 @@ public:
     /**
      * Tries to transition the coordinator from the leader role to the follower role.
      *
-     * Fails if "force" is not set and no follower is known to be up.  It is illegal
-     * to call this method if the node is not leader.
+     * If force==true, step down this node and return true immediately. Else, a step down
+     * succeeds only if the following conditions are met:
      *
-     * Returns whether or not the step down succeeded.
+     *      C1. A majority set of nodes, M, in the replica set have optimes greater than or
+     *      equal to the last applied optime of the primary.
+     *
+     *      C2. If C1 holds, then there must exist at least one electable secondary node in the
+     *      majority set M.
+     *
+     * If C1 and C2 hold, a step down occurs and this method returns true. Else, the step down
+     * fails and this method returns false.
+     *
+     * NOTE: It is illegal to call this method if the node is not a primary.
      */
-    virtual bool stepDown(Date_t until, bool force, const OpTime& lastOpApplied) = 0;
+    virtual bool stepDown(Date_t until,
+                          bool force,
+                          const OpTime& lastOpApplied,
+                          const OpTime& lastOpCommitted) = 0;
 
     /**
      * Sometimes a request to step down comes in (like via a heartbeat), but we don't have the
@@ -511,6 +534,7 @@ private:
 //
 
 std::ostream& operator<<(std::ostream& os, TopologyCoordinator::Role role);
+std::ostream& operator<<(std::ostream& os, TopologyCoordinator::PrepareFreezeResponseResult result);
 
 }  // namespace repl
 }  // namespace mongo

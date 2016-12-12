@@ -71,7 +71,8 @@ IndexScan::IndexScan(OperationContext* txn,
       _shouldDedup(true),
       _forward(params.direction == 1),
       _params(params),
-      _endKeyInclusive(false) {
+      _startKeyInclusive(IndexBounds::isStartIncludedInBound(params.bounds.boundInclusion)),
+      _endKeyInclusive(IndexBounds::isEndIncludedInBound(params.bounds.boundInclusion)) {
     // We can't always access the descriptor in the call to getStats() so we pull
     // any info we need for stats reporting out here.
     _specificStats.keyPattern = _keyPattern;
@@ -85,7 +86,7 @@ IndexScan::IndexScan(OperationContext* txn,
     _specificStats.isUnique = _params.descriptor->unique();
     _specificStats.isSparse = _params.descriptor->isSparse();
     _specificStats.isPartial = _params.descriptor->isPartial();
-    _specificStats.indexVersion = _params.descriptor->version();
+    _specificStats.indexVersion = static_cast<int>(_params.descriptor->version());
 }
 
 boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
@@ -104,20 +105,18 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
 
     if (_params.bounds.isSimpleRange) {
         // Start at one key, end at another.
+        _startKey = _params.bounds.startKey;
         _endKey = _params.bounds.endKey;
-        _endKeyInclusive = _params.bounds.endKeyInclusive;
         _indexCursor->setEndPosition(_endKey, _endKeyInclusive);
-        return _indexCursor->seek(_params.bounds.startKey, /*inclusive*/ true);
+        return _indexCursor->seek(_startKey, _startKeyInclusive);
     } else {
         // For single intervals, we can use an optimized scan which checks against the position
         // of an end cursor.  For all other index scans, we fall back on using
         // IndexBoundsChecker to determine when we've finished the scan.
-        BSONObj startKey;
-        bool startKeyInclusive;
         if (IndexBoundsBuilder::isSingleInterval(
-                _params.bounds, &startKey, &startKeyInclusive, &_endKey, &_endKeyInclusive)) {
+                _params.bounds, &_startKey, &_startKeyInclusive, &_endKey, &_endKeyInclusive)) {
             _indexCursor->setEndPosition(_endKey, _endKeyInclusive);
-            return _indexCursor->seek(startKey, startKeyInclusive);
+            return _indexCursor->seek(_startKey, _startKeyInclusive);
         } else {
             _checker.reset(new IndexBoundsChecker(&_params.bounds, _keyPattern, _params.direction));
 
@@ -154,6 +153,15 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
 
     if (kv) {
         // In debug mode, check that the cursor isn't lying to us.
+        if (kDebugBuild && !_startKey.isEmpty()) {
+            int cmp = kv->key.woCompare(_startKey,
+                                        Ordering::make(_params.descriptor->keyPattern()),
+                                        /*compareFieldNames*/ false);
+            if (cmp == 0)
+                dassert(_startKeyInclusive);
+            dassert(_forward ? cmp >= 0 : cmp <= 0);
+        }
+
         if (kDebugBuild && !_endKey.isEmpty()) {
             int cmp = kv->key.woCompare(_endKey,
                                         Ordering::make(_params.descriptor->keyPattern()),

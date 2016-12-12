@@ -154,31 +154,31 @@ void* MemoryMappedFile::map(const char* filename, unsigned long long& length) {
     const int posixOpenOpts = O_NOATIME | (readOnly ? O_RDONLY : O_RDWR);
     fd = ::open(filename, posixOpenOpts);
     if (fd <= 0) {
-        log() << "couldn't open " << filename << ' ' << errnoWithDescription() << endl;
+        severe() << "couldn't open " << filename << ' ' << errnoWithDescription() << endl;
         fd = 0;  // our sentinel for not opened
         return 0;
     }
 
     unsigned long long filelen = lseek(fd, 0, SEEK_END);
-    uassert(10447,
-            str::stream() << "map file alloc failed, wanted: " << length << " filelen: " << filelen
-                          << ' '
-                          << sizeof(size_t),
-            filelen == length);
+    if (filelen != length) {
+        severe() << "map file alloc failed, wanted: " << length << " filelen: " << filelen << ' '
+                 << sizeof(size_t);
+        fassertFailed(16330);
+    }
     lseek(fd, 0, SEEK_SET);
 
     const int mmapProtectionOpts = readOnly ? PROT_READ : (PROT_READ | PROT_WRITE);
     void* view = mmap(NULL, length, mmapProtectionOpts, MAP_SHARED, fd, 0);
     if (view == MAP_FAILED) {
-        error() << "  mmap() failed for " << filename << " len:" << length << " "
-                << errnoWithDescription() << endl;
+        severe() << "  mmap() failed for " << filename << " len:" << length << " "
+                 << errnoWithDescription() << endl;
         if (errno == ENOMEM) {
             if (sizeof(void*) == 4)
-                error() << "mmap failed with out of memory. You are using a 32-bit build and "
-                           "probably need to upgrade to 64"
-                        << endl;
+                severe() << "mmap failed with out of memory. You are using a 32-bit build and "
+                            "probably need to upgrade to 64"
+                         << endl;
             else
-                error() << "mmap failed with out of memory. (64 bit build)" << endl;
+                severe() << "mmap failed with out of memory. (64 bit build)" << endl;
         }
         return 0;
     }
@@ -203,14 +203,14 @@ void* MemoryMappedFile::createPrivateMap() {
     if (x == MAP_FAILED) {
         if (errno == ENOMEM) {
             if (sizeof(void*) == 4) {
-                error() << "mmap private failed with out of memory. You are using a 32-bit build "
-                           "and probably need to upgrade to 64"
-                        << endl;
+                severe() << "mmap private failed with out of memory. You are using a 32-bit build "
+                            "and probably need to upgrade to 64"
+                         << endl;
             } else {
-                error() << "mmap private failed with out of memory. (64 bit build)" << endl;
+                severe() << "mmap private failed with out of memory. (64 bit build)" << endl;
             }
         } else {
-            error() << "mmap private failed " << errnoWithDescription() << endl;
+            severe() << "mmap private failed " << errnoWithDescription() << endl;
         }
         return 0;
     }
@@ -233,8 +233,7 @@ void* MemoryMappedFile::remapPrivateView(void* oldPrivateAddr) {
                    0);
     if (x == MAP_FAILED) {
         int err = errno;
-        error() << "13601 Couldn't remap private view: " << errnoWithDescription(err) << endl;
-        log() << "aborting" << endl;
+        severe() << "13601 Couldn't remap private view: " << errnoWithDescription(err) << endl;
         printMemInfo();
         abort();
     }

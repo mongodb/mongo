@@ -2451,15 +2451,14 @@ DebugScopes::ensureCompartmentData(JSContext* cx)
     if (c->debugScopes)
         return c->debugScopes;
 
-    c->debugScopes = cx->runtime()->new_<DebugScopes>(cx);
-    if (c->debugScopes && c->debugScopes->init())
-        return c->debugScopes;
+    auto debugScopes = cx->make_unique<DebugScopes>(cx);
+    if (!debugScopes || !debugScopes->init()) {
+        ReportOutOfMemory(cx);
+        return nullptr;
+    }
 
-    if (c->debugScopes)
-        js_delete<DebugScopes>(c->debugScopes);
-    c->debugScopes = nullptr;
-    ReportOutOfMemory(cx);
-    return nullptr;
+    c->debugScopes = debugScopes.release();
+    return c->debugScopes;
 }
 
 DebugScopeObject*

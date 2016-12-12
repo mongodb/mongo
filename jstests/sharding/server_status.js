@@ -27,7 +27,7 @@
 
         if (isCSRS) {
             assert.gt(configConnStr.indexOf('/'), 0);
-            assert.eq(1, configIsMaster.configsvr);  // If it's a shard, this field won't exist.
+            assert.gte(configIsMaster.configsvr, 1);  // If it's a shard, this field won't exist.
             assert.neq(null, configOpTimeObj);
             assert.neq(null, configOpTimeObj.ts);
             assert.neq(null, configOpTimeObj.t);

@@ -33,6 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/index_spec.h"
+#include "mongo/client/mongo_uri.h"
 #include "mongo/client/query.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/jsobj.h"
@@ -419,6 +420,19 @@ public:
                                                     const BSONObj& metadata,
                                                     const BSONObj& commandArgs);
 
+    /*
+     * This wraps up the runCommandWithMetadata function above, but returns the DBClient that
+     * actually ran the command. When called against a replica set, this will return the specific
+     * replica set member the command ran against.
+     *
+     * This is used in the shell so that cursors can send getMore through the correct connection.
+     */
+    virtual std::tuple<rpc::UniqueReply, DBClientWithCommands*> runCommandWithMetadataAndTarget(
+        StringData database,
+        StringData command,
+        const BSONObj& metadata,
+        const BSONObj& commandArgs);
+
     /** Run a database command.  Database commands are represented as BSON objects.  Common database
         commands have prebuilt helper functions -- see below.  If a helper is not available you can
         directly call runCommand.
@@ -436,6 +450,18 @@ public:
                             const BSONObj& cmd,
                             BSONObj& info,
                             int options = 0);
+
+    /*
+     * This wraps up the runCommand function avove, but returns the DBClient that actually ran
+     * the command. When called against a replica set, this will return the specific
+     * replica set member the command ran against.
+     *
+     * This is used in the shell so that cursors can send getMore through the correct connection.
+     */
+    virtual std::tuple<bool, DBClientWithCommands*> runCommandWithTarget(const std::string& dbname,
+                                                                         const BSONObj& cmd,
+                                                                         BSONObj& info,
+                                                                         int options = 0);
 
     /**
     * Authenticates to another cluster member using appropriate authentication data.
@@ -954,6 +980,7 @@ public:
      */
     DBClientConnection(bool _autoReconnect = false,
                        double so_timeout = 0,
+                       MongoURI uri = {},
                        const HandshakeValidationHook& hook = HandshakeValidationHook());
 
     virtual ~DBClientConnection() {
@@ -1163,6 +1190,8 @@ private:
     HandshakeValidationHook _hook;
 
     MessageCompressorManager _compressorManager;
+
+    MongoURI _uri;
 };
 
 BSONElement getErrField(const BSONObj& result);

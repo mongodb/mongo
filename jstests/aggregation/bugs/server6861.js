@@ -19,9 +19,9 @@ function assertResult(result, expression) {
 assertResult([{a: 1}], {$project: {_id: 0, a: 1}});
 
 // Incorrect number of fields.
-assertCode(16435, {});
-assertCode(16435, {$project: {_id: 0, a: 1}, $group: {_id: 0}});
-assertCode(16435, {$project: {_id: 0, a: 1}, $group: {_id: 0}, $sort: {a: 1}});
+assertCode(40323, {});
+assertCode(40323, {$project: {_id: 0, a: 1}, $group: {_id: 0}});
+assertCode(40323, {$project: {_id: 0, a: 1}, $group: {_id: 0}, $sort: {a: 1}});
 
 // Invalid stage specification.
-assertCode(16436, {$noSuchStage: {a: 1}});
+assertCode(40324, {$noSuchStage: {a: 1}});

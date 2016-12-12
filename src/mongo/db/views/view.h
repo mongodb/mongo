@@ -28,11 +28,13 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/collation/collator_interface.h"
 
 namespace mongo {
 
@@ -42,19 +44,20 @@ namespace mongo {
 class ViewDefinition {
 public:
     /**
-     * Create a new view.
-     *
-     * @param dbName The name of the database owning the view.
-     * @param viewName The name of the view. Does not include the database name.
-     * @param viewOnName The name of the view or collection upon which this view is defined. Does
-     * not include the database name.
-     * @param pipeline A series of pipeline stages representing an aggregation on the `viewOn`
-     * namespace.
+     * In the database 'dbName', create a new view 'viewName' on the view or collection
+     * 'viewOnName'. Neither 'viewName' nor 'viewOnName' should include the name of the database.
      */
     ViewDefinition(StringData dbName,
                    StringData viewName,
                    StringData viewOnName,
-                   const BSONObj& pipeline);
+                   const BSONObj& pipeline,
+                   std::unique_ptr<CollatorInterface> collation);
+
+    /**
+     * Copying a view 'other' clones its collator and does a simple copy of all other fields.
+     */
+    ViewDefinition(const ViewDefinition& other);
+    ViewDefinition& operator=(const ViewDefinition& other);
 
     /**
      * @return The fully-qualified namespace of this view.
@@ -79,6 +82,13 @@ public:
         return _pipeline;
     }
 
+    /**
+     * Returns the default collator for this view.
+     */
+    const CollatorInterface* defaultCollator() const {
+        return _collator.get();
+    }
+
     void setViewOn(const NamespaceString& viewOnNss);
 
     /**
@@ -89,6 +99,7 @@ public:
 private:
     NamespaceString _viewNss;
     NamespaceString _viewOnNss;
+    std::unique_ptr<CollatorInterface> _collator;
     std::vector<BSONObj> _pipeline;
 };
 }  // namespace mongo

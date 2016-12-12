@@ -50,7 +50,7 @@ __wt_cursor_get_value_notsup(WT_CURSOR *cursor, ...)
 void
 __wt_cursor_set_key_notsup(WT_CURSOR *cursor, ...)
 {
-	(void)__wt_cursor_notsup(cursor);
+	WT_IGNORE_RET(__wt_cursor_notsup(cursor));
 }
 
 /*
@@ -60,7 +60,7 @@ __wt_cursor_set_key_notsup(WT_CURSOR *cursor, ...)
 void
 __wt_cursor_set_value_notsup(WT_CURSOR *cursor, ...)
 {
-	(void)__wt_cursor_notsup(cursor);
+	WT_IGNORE_RET(__wt_cursor_notsup(cursor));
 }
 
 /*
@@ -539,7 +539,6 @@ err:		cursor->saved_err = ret;
 int
 __wt_cursor_close(WT_CURSOR *cursor)
 {
-	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cursor->session;
@@ -548,7 +547,7 @@ __wt_cursor_close(WT_CURSOR *cursor)
 		TAILQ_REMOVE(&session->cursors, cursor, q);
 
 		(void)__wt_atomic_sub32(&S2C(session)->open_cursor_count, 1);
-		WT_STAT_FAST_DATA_DECR(session, session_cursor_open);
+		WT_STAT_DATA_DECR(session, session_cursor_open);
 	}
 
 	__wt_buf_free(session, &cursor->key);
@@ -557,7 +556,7 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	__wt_free(session, cursor->internal_uri);
 	__wt_free(session, cursor->uri);
 	__wt_overwrite_and_free(session, cursor);
-	return (ret);
+	return (0);
 }
 
 /*
@@ -764,7 +763,7 @@ __wt_cursor_init(WT_CURSOR *cursor,
 
 	F_SET(cursor, WT_CURSTD_OPEN);
 	(void)__wt_atomic_add32(&S2C(session)->open_cursor_count, 1);
-	WT_STAT_FAST_DATA_INCR(session, session_cursor_open);
+	WT_STAT_DATA_INCR(session, session_cursor_open);
 
 	*cursorp = (cdump != NULL) ? cdump : cursor;
 	return (0);

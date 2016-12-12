@@ -31,7 +31,6 @@ import os
 import shutil
 import wiredtiger, wttest
 from wttest import unittest
-from helper import key_populate, simple_populate
 
 # test_shared_cache01.py
 #    Checkpoint tests

@@ -269,8 +269,6 @@ public:
     // ---- prep  -----
     bool sourceExists();
 
-    long long incomingDocuments();
-
     // ---- map stage ----
 
     /**
@@ -321,7 +319,8 @@ public:
     long long postProcessCollection(OperationContext* txn, CurOp* op, ProgressMeterHolder& pm);
     long long postProcessCollectionNonAtomic(OperationContext* txn,
                                              CurOp* op,
-                                             ProgressMeterHolder& pm);
+                                             ProgressMeterHolder& pm,
+                                             bool callerHoldsGlobalLock);
 
     /**
      * if INMEMORY will append

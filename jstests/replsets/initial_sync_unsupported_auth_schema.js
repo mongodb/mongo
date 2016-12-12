@@ -1,24 +1,10 @@
 // Test that initial sync aborts when it encounters auth data from unsupported
 // auth schemas (see: SERVER-17671)
 
-function checkedReInitiate(rst) {
-    try {
-        rst.reInitiate();
-    } catch (e) {
-        // reInitiate can throw because it tries to run an ismaster command on
-        // all secondaries, including the new one that may have already aborted
-        var errMsg = tojson(e);
-        if (errMsg.indexOf('error doing query: failed') > -1 ||
-            errMsg.indexOf('socket exception') > -1) {
-            // Ignore these exceptions, which are indicative of an aborted node
-        } else {
-            throw e;
-        }
-    }
-}
-
 function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
     'use strict';
+
+    load("jstests/replsets/rslib.js");  // For reInitiateWithoutThrowingOnAbortedMember
 
     // Create a replica set with one data-bearing node and one arbiter to
     // ensure availability when the added node fasserts later in the test
@@ -36,7 +22,7 @@ function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
     rst.add();
 
     clearRawMongoProgramOutput();
-    checkedReInitiate(rst);
+    reInitiateWithoutThrowingOnAbortedMember(rst);
 
     var msg;
     if (schema.hasOwnProperty('currentVersion')) {
@@ -83,7 +69,7 @@ function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
     rst.add();
 
     clearRawMongoProgramOutput();
-    checkedReInitiate(rst);
+    reInitiateWithoutThrowingOnAbortedMember(rst);
 
     var msg = /During initial sync, found documents in admin\.system\.users/;
 

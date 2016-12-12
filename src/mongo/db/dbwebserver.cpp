@@ -74,10 +74,11 @@ namespace {
 
 void doUnlockedStuff(stringstream& ss) {
     // This is in the header already ss << "port:      " << port << '\n'
+    auto&& vii = VersionInfoInterface::instance();
     ss << "<pre>";
-    ss << mongodVersion() << '\n';
-    ss << "git hash: " << gitVersion() << '\n';
-    ss << openSSLVersion("OpenSSL version: ", "\n");
+    ss << mongodVersion(vii) << '\n';
+    ss << "git hash: " << vii.gitVersion() << '\n';
+    ss << vii.openSSLVersion("OpenSSL version: ", "\n");
     ss << "uptime: " << time(0) - serverGlobalParams.started << " seconds\n";
     ss << "</pre>";
 }

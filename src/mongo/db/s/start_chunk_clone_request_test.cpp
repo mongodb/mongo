@@ -52,6 +52,7 @@ TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
         sessionId,
         assertGet(ConnectionString::parse("TestConfigRS/CS1:12345,CS2:12345,CS3:12345")),
         assertGet(ConnectionString::parse("TestDonorRS/Donor1:12345,Donor2:12345,Donor3:12345")),
+        ShardId("shard0001"),
         ShardId("shard0002"),
         BSON("Key" << -100),
         BSON("Key" << 100),
@@ -62,6 +63,7 @@ TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
 
     auto request = assertGet(StartChunkCloneRequest::createFromCommand(
         NamespaceString(cmdObj["_recvChunkStart"].String()), cmdObj));
+
     ASSERT_EQ("TestDB.TestColl", request.getNss().ns());
     ASSERT_EQ(sessionId.toString(), request.getSessionId().toString());
     ASSERT(sessionId.matches(request.getSessionId()));
@@ -70,10 +72,11 @@ TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
         assertGet(ConnectionString::parse("TestDonorRS/Donor1:12345,Donor2:12345,Donor3:12345"))
             .toString(),
         request.getFromShardConnectionString().toString());
-    ASSERT_EQ("shard0002", request.getToShardId());
-    ASSERT_EQ(BSON("Key" << -100), request.getMinKey());
-    ASSERT_EQ(BSON("Key" << 100), request.getMaxKey());
-    ASSERT_EQ(BSON("Key" << 1), request.getShardKeyPattern());
+    ASSERT_EQ("shard0001", request.getFromShardId().toString());
+    ASSERT_EQ("shard0002", request.getToShardId().toString());
+    ASSERT_BSONOBJ_EQ(BSON("Key" << -100), request.getMinKey());
+    ASSERT_BSONOBJ_EQ(BSON("Key" << 100), request.getMaxKey());
+    ASSERT_BSONOBJ_EQ(BSON("Key" << 1), request.getShardKeyPattern());
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kOff,
               request.getSecondaryThrottle().getSecondaryThrottle());
 }

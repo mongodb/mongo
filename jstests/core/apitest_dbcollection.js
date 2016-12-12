@@ -224,7 +224,7 @@ assert.eq(0, db.getCollection("test_db").getIndexes().length, "24");
     // Cannot specify both indexDetailsKey and indexDetailsName.
     var error = assert.throws(function() {
         t.stats({indexDetails: true, indexDetailsKey: indexKey, indexDetailsName: indexName});
-    }, null, 'indexDetailsKey and indexDetailsName cannot be used at the same time');
+    }, [], 'indexDetailsKey and indexDetailsName cannot be used at the same time');
     assert.eq(Error,
               error.constructor,
               'db.collection.stats() failed when both indexDetailsKey and indexDetailsName ' +

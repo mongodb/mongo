@@ -189,16 +189,12 @@ public:
     // XXX document
     virtual bool equivalent(const MatchExpression* other) const = 0;
 
-    /**
-    * Determine if a document satisfies the tree-predicate.
-    *
-    * The caller may optionally provide a non-null MatchDetails as an out-parameter. For matching
-    *documents, the MatchDetails provide further info on how the document was
-    *matched---specifically, which array element matched an array predicate.
-    *
-    * The caller must check that the MatchDetails is valid via the isValid() method before using.
-    */
+    //
+    // Determine if a document satisfies the tree-predicate.
+    //
+
     virtual bool matches(const MatchableDocument* doc, MatchDetails* details = 0) const = 0;
+
     virtual bool matchesBSON(const BSONObj& doc, MatchDetails* details = 0) const;
 
     /**

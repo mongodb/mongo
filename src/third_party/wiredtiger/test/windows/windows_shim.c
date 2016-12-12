@@ -105,6 +105,17 @@ pthread_rwlock_unlock(pthread_rwlock_t *rwlock)
 }
 
 int
+pthread_rwlock_trywrlock(pthread_rwlock_t *rwlock)
+{
+	if (TryAcquireSRWLockExclusive(&rwlock->rwlock)) {
+		rwlock->exclusive_locked = GetCurrentThreadId();
+		return (0);
+	}
+
+	return (EBUSY);
+}
+
+int
 pthread_rwlock_wrlock(pthread_rwlock_t *rwlock)
 {
 	AcquireSRWLockExclusive(&rwlock->rwlock);

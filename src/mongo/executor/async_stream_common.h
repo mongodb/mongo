@@ -80,9 +80,15 @@ void readStream(ASIOStream* stream,
                      strand->wrap(std::forward<Handler>(handler)));
 }
 
+void logCancelFailed(std::error_code ec);
+
 template <typename ASIOStream>
-void cancelStream(ASIOStream* stream, bool connected) {
-    stream->cancel();
+void cancelStream(ASIOStream* stream) {
+    std::error_code ec;
+    stream->cancel(ec);
+    if (ec) {
+        logCancelFailed(ec);
+    }
 }
 
 void logFailureInSetStreamNonBlocking(std::error_code ec);
@@ -127,7 +133,8 @@ bool checkIfStreamIsOpen(ASIOStream* stream, bool connected) {
         // If the read worked or we got EWOULDBLOCK or EAGAIN (since we are in non-blocking mode),
         // we assume the socket is still open.
         return true;
-    } else if (ec == asio::error::eof) {
+    } else if (ec == asio::error::eof || ec == asio::error::connection_reset ||
+               ec == asio::error::network_reset) {
         return false;
     }
     // We got a different error. Log it and return false so we throw the connection away.

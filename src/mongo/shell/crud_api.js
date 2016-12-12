@@ -27,12 +27,17 @@ DBCollection.prototype._createWriteConcern = function(options) {
  *     Otherwise, returns the same object passed.
  */
 DBCollection.prototype.addIdIfNeeded = function(obj) {
+    if (typeof obj !== "object") {
+        throw new Error('argument passed to addIdIfNeeded is not an object');
+    }
     if (typeof(obj._id) == "undefined" && !Array.isArray(obj)) {
         var tmp = obj;  // don't want to modify input
         obj = {_id: new ObjectId()};
 
         for (var key in tmp) {
-            obj[key] = tmp[key];
+            if (tmp.hasOwnProperty(key)) {
+                obj[key] = tmp[key];
+            }
         }
     }
 

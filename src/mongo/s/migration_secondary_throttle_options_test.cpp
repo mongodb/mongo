@@ -44,7 +44,7 @@ TEST(MigrationSecondaryThrottleOptions, CreateDefault) {
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kDefault);
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault, options.getSecondaryThrottle());
     ASSERT(!options.isWriteConcernSpecified());
-    ASSERT_EQUALS(BSONObj(), options.toBSON());
+    ASSERT_BSONOBJ_EQ(BSONObj(), options.toBSON());
 }
 
 TEST(MigrationSecondaryThrottleOptions, CreateOn) {
@@ -52,7 +52,7 @@ TEST(MigrationSecondaryThrottleOptions, CreateOn) {
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOn);
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kOn, options.getSecondaryThrottle());
     ASSERT(!options.isWriteConcernSpecified());
-    ASSERT_EQUALS(BSON("secondaryThrottle" << true), options.toBSON());
+    ASSERT_BSONOBJ_EQ(BSON("secondaryThrottle" << true), options.toBSON());
 }
 
 TEST(MigrationSecondaryThrottleOptions, CreateOff) {
@@ -60,7 +60,7 @@ TEST(MigrationSecondaryThrottleOptions, CreateOff) {
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff);
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kOff, options.getSecondaryThrottle());
     ASSERT(!options.isWriteConcernSpecified());
-    ASSERT_EQUALS(BSON("secondaryThrottle" << false), options.toBSON());
+    ASSERT_BSONOBJ_EQ(BSON("secondaryThrottle" << false), options.toBSON());
 }
 
 TEST(MigrationSecondaryThrottleOptions, NotSpecifiedInCommandBSON) {
@@ -68,7 +68,7 @@ TEST(MigrationSecondaryThrottleOptions, NotSpecifiedInCommandBSON) {
         MigrationSecondaryThrottleOptions::createFromCommand(BSON("someOtherField" << 1)));
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault, options.getSecondaryThrottle());
     ASSERT(!options.isWriteConcernSpecified());
-    ASSERT_EQUALS(BSONObj(), options.toBSON());
+    ASSERT_BSONOBJ_EQ(BSONObj(), options.toBSON());
 }
 
 TEST(MigrationSecondaryThrottleOptions, EnabledInCommandBSONWithoutWriteConcern) {
@@ -121,7 +121,7 @@ TEST(MigrationSecondaryThrottleOptions, NotSpecifiedInBalancerConfig) {
         MigrationSecondaryThrottleOptions::createFromBalancerConfig(BSON("someOtherField" << 1)));
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault, options.getSecondaryThrottle());
     ASSERT(!options.isWriteConcernSpecified());
-    ASSERT_EQUALS(BSONObj(), options.toBSON());
+    ASSERT_BSONOBJ_EQ(BSONObj(), options.toBSON());
 }
 
 TEST(MigrationSecondaryThrottleOptions, EnabledInBalancerConfigLegacyStyle) {

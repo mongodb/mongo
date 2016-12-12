@@ -40,9 +40,10 @@
 namespace mongo {
 namespace mozjs {
 
-const JSFunctionSpec NumberIntInfo::methods[4] = {
+const JSFunctionSpec NumberIntInfo::methods[5] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD(toNumber, NumberIntInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD(toString, NumberIntInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, NumberIntInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD(valueOf, NumberIntInfo),
     JS_FS_END,
 };
@@ -85,6 +86,12 @@ void NumberIntInfo::Functions::toString::call(JSContext* cx, JS::CallArgs args) 
     ss << "NumberInt(" << val << ")";
 
     ValueReader(cx, args.rval()).fromStringData(ss.operator std::string());
+}
+
+void NumberIntInfo::Functions::toJSON::call(JSContext* cx, JS::CallArgs args) {
+    int val = NumberIntInfo::ToNumberInt(cx, args.thisv());
+
+    args.rval().setInt32(val);
 }
 
 void NumberIntInfo::construct(JSContext* cx, JS::CallArgs args) {

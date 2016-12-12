@@ -118,8 +118,8 @@ void checkUpconvert(const BSONObj& legacyCommandReply,
         BSONObjBuilder commandReplyBob;
         BSONObjBuilder metadataBob;
         ASSERT_OK(ShardingMetadata::upconvert(legacyCommandReply, &commandReplyBob, &metadataBob));
-        ASSERT_EQ(commandReplyBob.done(), upconvertedCommandReply);
-        ASSERT_EQ(metadataBob.done(), upconvertedReplyMetadata);
+        ASSERT_BSONOBJ_EQ(commandReplyBob.done(), upconvertedCommandReply);
+        ASSERT_BSONOBJ_EQ(metadataBob.done(), upconvertedReplyMetadata);
     }
 }
 
@@ -207,7 +207,7 @@ void checkDownconvert(const BSONObj& commandReply,
                       const BSONObj& downconvertedCommand) {
     BSONObjBuilder downconvertedCommandBob;
     ASSERT_OK(ShardingMetadata::downconvert(commandReply, metadata, &downconvertedCommandBob));
-    ASSERT_EQ(downconvertedCommandBob.done(), downconvertedCommand);
+    ASSERT_BSONOBJ_EQ(downconvertedCommandBob.done(), downconvertedCommand);
 }
 
 TEST(ShardingMetadata, Downconvert) {

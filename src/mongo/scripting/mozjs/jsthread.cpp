@@ -191,7 +191,7 @@ private:
             auto thisv = static_cast<JSThread*>(priv);
 
             try {
-                MozJSImplScope scope(static_cast<MozJSScriptEngine*>(globalScriptEngine));
+                MozJSImplScope scope(static_cast<MozJSScriptEngine*>(getGlobalScriptEngine()));
 
                 scope.setParentStack(thisv->_sharedData->_stack);
                 thisv->_sharedData->_returnData = scope.callThreadArgs(thisv->_sharedData->_args);

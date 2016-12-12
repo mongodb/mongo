@@ -90,11 +90,14 @@ public:
     ~ScopedChunkManager();
 
     /**
-     * Ensures that the specified database and collection both exist in the cache and if so, returns
-     * it. Otherwise, if it does not exist or any other error occurs, passes that error back.
+     * If the specified database and collection do not exist in the cache, tries to load them from
+     * the config server and returns a reference. If they are already in the cache, makes a call to
+     * the config server to check if there are any incremental updates to the collection chunk
+     * metadata and if so incorporates those. Otherwise, if it does not exist or any other error
+     * occurs, passes that error back.
      */
-    static StatusWith<ScopedChunkManager> getExisting(OperationContext* txn,
-                                                      const NamespaceString& nss);
+    static StatusWith<ScopedChunkManager> refreshAndGet(OperationContext* txn,
+                                                        const NamespaceString& nss);
 
     /**
      * Returns the underlying database for which we hold reference.

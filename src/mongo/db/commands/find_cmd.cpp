@@ -49,6 +49,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
@@ -123,7 +124,7 @@ public:
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) override {
-        NamespaceString nss(parseNs(dbname, cmdObj));
+        const NamespaceString nss(parseNs(dbname, cmdObj));
         auto hasTerm = cmdObj.hasField(kTermField);
         return AuthorizationSession::get(client)->checkAuthForFind(nss, hasTerm);
     }
@@ -145,6 +146,14 @@ public:
         auto qrStatus = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
         if (!qrStatus.isOK()) {
             return qrStatus.getStatus();
+        }
+
+        if (!qrStatus.getValue()->getCollation().isEmpty() &&
+            serverGlobalParams.featureCompatibility.version.load() ==
+                ServerGlobalParams::FeatureCompatibility::Version::k32) {
+            return Status(ErrorCodes::InvalidOptions,
+                          "The featureCompatibilityVersion must be 3.4 to use collation. See "
+                          "http://dochub.mongodb.org/core/3.4-feature-compatibility.");
         }
 
         // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
@@ -242,6 +251,16 @@ public:
         }
 
         auto& qr = qrStatus.getValue();
+
+        if (!qr->getCollation().isEmpty() &&
+            serverGlobalParams.featureCompatibility.version.load() ==
+                ServerGlobalParams::FeatureCompatibility::Version::k32) {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::InvalidOptions,
+                       "The featureCompatibilityVersion must be 3.4 to use collation. See "
+                       "http://dochub.mongodb.org/core/3.4-feature-compatibility."));
+        }
 
         // Validate term before acquiring locks, if provided.
         if (auto term = qr->getReplicationTerm()) {
@@ -348,7 +367,7 @@ public:
         if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
             firstBatch.abandon();
             error() << "Plan executor error during find command: " << PlanExecutor::statestr(state)
-                    << ", stats: " << Explain::getWinningPlanStats(exec.get());
+                    << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
 
             return appendCommandStatus(result,
                                        Status(ErrorCodes::OperationFailed,
@@ -371,26 +390,25 @@ public:
             // First unregister the PlanExecutor so it can be re-registered with ClientCursor.
             exec->deregisterExec();
 
-            // Create a ClientCursor containing this plan executor. We don't have to worry about
-            // leaking it as it's inserted into a global map by its ctor.
-            ClientCursor* cursor =
-                new ClientCursor(collection->getCursorManager(),
-                                 exec.release(),
-                                 nss.ns(),
-                                 txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
-                                 originalQR.getOptions(),
-                                 cmdObj.getOwned());
-            cursorId = cursor->cursorid();
+            // Create a ClientCursor containing this plan executor and register it with the cursor
+            // manager.
+            ClientCursorPin pinnedCursor = collection->getCursorManager()->registerCursor(
+                {exec.release(),
+                 nss.ns(),
+                 txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+                 originalQR.getOptions(),
+                 cmdObj.getOwned()});
+            cursorId = pinnedCursor.getCursor()->cursorid();
 
             invariant(!exec);
-            PlanExecutor* cursorExec = cursor->getExecutor();
+            PlanExecutor* cursorExec = pinnedCursor.getCursor()->getExecutor();
 
             // State will be restored on getMore.
             cursorExec->saveState();
             cursorExec->detachFromOperationContext();
 
-            cursor->setLeftoverMaxTimeMicros(txn->getRemainingMaxTimeMicros());
-            cursor->setPos(numResults);
+            pinnedCursor.getCursor()->setLeftoverMaxTimeMicros(txn->getRemainingMaxTimeMicros());
+            pinnedCursor.getCursor()->setPos(numResults);
 
             // Fill out curop based on the results.
             endQueryOp(txn, collection, *cursorExec, numResults, cursorId);

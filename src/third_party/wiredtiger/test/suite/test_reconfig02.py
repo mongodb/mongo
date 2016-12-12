@@ -28,7 +28,6 @@
 
 import fnmatch, os, time
 import wiredtiger, wttest
-from helper import simple_populate
 
 # test_reconfig02.py
 #    Smoke-test the connection reconfiguration operations.

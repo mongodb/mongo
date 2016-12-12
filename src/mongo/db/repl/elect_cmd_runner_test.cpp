@@ -199,7 +199,7 @@ TEST_F(ElectCmdRunnerTest, TwoNodes) {
     _net->enterNetwork();
     const NetworkInterfaceMock::NetworkOperationIterator noi = _net->getNextReadyRequest();
     ASSERT_EQUALS("admin", noi->getRequest().dbname);
-    ASSERT_EQUALS(stripRound(electRequest), stripRound(noi->getRequest().cmdObj));
+    ASSERT_BSONOBJ_EQ(stripRound(electRequest), stripRound(noi->getRequest().cmdObj));
     ASSERT_EQUALS(HostAndPort("h1"), noi->getRequest().target);
     _net->scheduleResponse(noi,
                            startDate + Milliseconds(10),

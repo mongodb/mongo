@@ -2,7 +2,7 @@
 
 # Check lang directories for potential name conflicts
 t=__wt.$$
-trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+trap 'rm -f $t' 0 1 2 3 13 15
 
 cd ../lang
 
@@ -21,5 +21,8 @@ for d in *; do
 		echo "$l: potential SWIG naming conflict"
 		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 		cat $t
+		exit 1
 	}
 done
+
+exit 0

@@ -45,9 +45,10 @@ struct GlobalInfo : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(print);
         MONGO_DECLARE_JS_FUNCTION(version);
         MONGO_DECLARE_JS_FUNCTION(buildInfo);
+        MONGO_DECLARE_JS_FUNCTION(getJSHeapLimitMB);
     };
 
-    static const JSFunctionSpec freeFunctions[5];
+    static const JSFunctionSpec freeFunctions[6];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_GLOBAL_FLAGS;

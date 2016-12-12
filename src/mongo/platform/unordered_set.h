@@ -27,10 +27,10 @@
 
 #pragma once
 
-#include <unordered_set>
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
-using std::unordered_set;
+using stdx::unordered_set;
 
 }  // namespace mongo

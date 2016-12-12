@@ -106,7 +106,8 @@ class Nursery
         numNurseryChunks_(0),
         profileThreshold_(0),
         enableProfiling_(false),
-        freeMallocedBuffersTask(nullptr)
+        freeMallocedBuffersTask(nullptr),
+        sweepActions_(nullptr)
     {}
     ~Nursery();
 
@@ -195,6 +196,9 @@ class Nursery
         MOZ_ASSERT(!cellsWithUid_.has(cell));
         return cellsWithUid_.put(cell);
     }
+
+    using SweepThunk = void (*)(void *data);
+    void queueSweepAction(SweepThunk thunk, void* data);
 
     size_t sizeOfHeapCommitted() const {
         return numActiveChunks_ * gc::ChunkSize;
@@ -294,6 +298,9 @@ class Nursery
     using CellsWithUniqueIdSet = HashSet<gc::Cell*, PointerHasher<gc::Cell*, 3>, SystemAllocPolicy>;
     CellsWithUniqueIdSet cellsWithUid_;
 
+    struct SweepAction;
+    SweepAction* sweepActions_;
+
     /* The maximum number of bytes allowed to reside in nursery buffers. */
     static const size_t MaxNurseryBufferSize = 1024;
 
@@ -377,6 +384,8 @@ class Nursery
      * collection.
      */
     void sweep();
+
+    void runSweepActions();
 
     /* Change the allocable space provided by the nursery. */
     void growAllocableSpace();

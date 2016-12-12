@@ -6,8 +6,6 @@
 (function() {
     "use strict";
 
-    load('jstests/libs/override_methods/multiversion_override_balancer_control.js');
-
     var waitForIsMaster = function(conn) {
         assert.soon(function() {
             var res = conn.getDB('admin').runCommand({isMaster: 1});

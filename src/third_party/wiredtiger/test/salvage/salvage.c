@@ -64,8 +64,6 @@ static int	 verbose;			/* -v flag */
 extern int __wt_optind;
 extern char *__wt_optarg;
 
-void (*custom_die)(void) = NULL;
-
 int
 main(int argc, char *argv[])
 {
@@ -602,8 +600,8 @@ copy(u_int gen, u_int recno)
 			dsk->recno = recno;
 		dsk->write_gen = gen;
 		blk = WT_BLOCK_HEADER_REF(buf);
-		blk->cksum = 0;
-		blk->cksum = __wt_cksum(dsk, PSIZE);
+		blk->checksum = 0;
+		blk->checksum = __wt_checksum(dsk, PSIZE);
 		CHECK(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
 	}
 

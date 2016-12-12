@@ -74,10 +74,6 @@ public:
      */
     static int Create(OperationContext* txn, const std::string& uri, const std::string& config);
 
-    /**
-     * @param unique - If this is a unique index.
-     *                 Note: even if unique, it may be allowed ot be non-unique at times.
-     */
     WiredTigerIndex(OperationContext* ctx, const std::string& uri, const IndexDescriptor* desc);
 
     virtual Status insert(OperationContext* txn,
@@ -104,8 +100,6 @@ public:
 
     virtual long long getSpaceUsedBytes(OperationContext* txn) const;
 
-    bool isDup(WT_CURSOR* c, const BSONObj& key, const RecordId& id);
-
     virtual Status initAsEmpty(OperationContext* txn);
 
     virtual Status compact(OperationContext* txn);
@@ -113,6 +107,10 @@ public:
     const std::string& uri() const {
         return _uri;
     }
+
+    // WiredTigerIndex additions
+
+    bool isDup(WT_CURSOR* c, const BSONObj& key, const RecordId& id);
 
     uint64_t tableId() const {
         return _tableId;
@@ -123,6 +121,10 @@ public:
 
     KeyString::Version keyStringVersion() const {
         return _keyStringVersion;
+    }
+
+    std::string indexName() const {
+        return _indexName;
     }
 
     virtual bool unique() const = 0;

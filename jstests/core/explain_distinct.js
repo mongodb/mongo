@@ -65,7 +65,7 @@
     assert.eq(false, stage.isUnique);
     assert.eq(false, stage.isSparse);
     assert.eq(false, stage.isPartial);
-    assert.eq(1, stage.indexVersion);
+    assert.lte(1, stage.indexVersion);
     assert("indexBounds" in stage);
 
     assert.commandWorked(coll.createIndex({a: 1, b: 1}));
@@ -80,7 +80,8 @@
     assert.eq([1], coll.distinct('b', {a: 1}));
     var explain = runDistinctExplain(coll, 'b', {a: 1});
     assert.commandWorked(explain);
-    assert.eq(10, explain.executionStats.nReturned);
-    assert(planHasStage(explain.queryPlanner.winningPlan, "FETCH"));
-    assert(isIxscan(explain.queryPlanner.winningPlan));
+    assert.eq(1, explain.executionStats.nReturned);
+    assert(!planHasStage(explain.queryPlanner.winningPlan, "FETCH"));
+    assert(planHasStage(explain.queryPlanner.winningPlan, "PROJECTION"));
+    assert(planHasStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
 })();

@@ -36,7 +36,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/s/balancer/balancer.h"
+#include "mongo/db/s/balancer/balancer.h"
 #include "mongo/s/request_types/balance_chunk_request_type.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -65,7 +65,7 @@ public:
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
+        return true;
     }
 
     Status checkAuthForCommand(Client* client,

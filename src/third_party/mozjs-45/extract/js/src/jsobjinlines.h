@@ -284,7 +284,8 @@ SetNewObjectMetadata(ExclusiveContext* cxArg, JSObject* obj)
     // thread, except when analysis/compilation is active, to avoid recursion.
     if (JSContext* cx = cxArg->maybeJSContext()) {
         if (MOZ_UNLIKELY((size_t)cx->compartment()->hasObjectMetadataCallback()) &&
-            !cx->zone()->types.activeAnalysis)
+            !cx->zone()->types.activeAnalysis &&
+            !cx->zone()->usedByExclusiveThread)
         {
             // Use AutoEnterAnalysis to prohibit both any GC activity under the
             // callback, and any reentering of JS via Invoke() etc.

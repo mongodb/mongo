@@ -150,7 +150,9 @@ public:
     virtual long long getTerm();
     virtual UpdateTermResult updateTerm(long long term, Date_t now);
     virtual void setForceSyncSourceIndex(int index);
-    virtual HostAndPort chooseNewSyncSource(Date_t now, const Timestamp& lastTimestampApplied);
+    virtual HostAndPort chooseNewSyncSource(Date_t now,
+                                            const OpTime& lastOpTimeFetched,
+                                            ChainingPreference chainingPreference) override;
     virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
     virtual void unblacklistSyncSource(const HostAndPort& host, Date_t now);
     virtual void clearSyncSourceBlacklist();
@@ -192,7 +194,9 @@ public:
                                        BSONObjBuilder* response,
                                        Status* result);
     virtual void fillIsMasterForReplSet(IsMasterResponse* response);
-    virtual void prepareFreezeResponse(Date_t now, int secs, BSONObjBuilder* response);
+    virtual StatusWith<PrepareFreezeResponseResult> prepareFreezeResponse(Date_t now,
+                                                                          int secs,
+                                                                          BSONObjBuilder* response);
     virtual void updateConfig(const ReplicaSetConfig& newConfig,
                               int selfIndex,
                               Date_t now,
@@ -213,7 +217,10 @@ public:
     virtual void processLoseElection();
     virtual Status checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied) const;
     virtual void setMyHeartbeatMessage(const Date_t now, const std::string& message);
-    virtual bool stepDown(Date_t until, bool force, const OpTime& lastOpApplied);
+    virtual bool stepDown(Date_t until,
+                          bool force,
+                          const OpTime& lastOpApplied,
+                          const OpTime& lastOpCommitted);
     virtual bool stepDownIfPending();
     virtual Date_t getStepDownTime() const;
     virtual void prepareReplMetadata(rpc::ReplSetMetadata* metadata,
@@ -272,7 +279,8 @@ private:
         NoData = 1 << 6,
         NotInitialized = 1 << 7,
         VotedTooRecently = 1 << 8,
-        RefusesToStand = 1 << 9
+        RefusesToStand = 1 << 9,
+        NotCloseEnoughToLatestForPriorityTakeover = 1 << 10,
     };
     typedef int UnelectableReasonMask;
 
@@ -300,6 +308,9 @@ private:
     // for an election
     bool _isOpTimeCloseEnoughToLatestToElect(const OpTime& otherOpTime,
                                              const OpTime& ourLastOpApplied) const;
+
+    // Is our optime close enough to the latest known optime to call for a priority takeover.
+    bool _amIFreshEnoughForPriorityTakeover(const OpTime& ourLastOpApplied) const;
 
     // Returns reason why "self" member is unelectable
     UnelectableReasonMask _getMyUnelectableReason(const Date_t now,

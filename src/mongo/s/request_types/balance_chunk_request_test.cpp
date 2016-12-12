@@ -58,8 +58,8 @@ TEST(BalanceChunkRequest, ParseFromConfigCommandNoSecondaryThrottle) {
                                    << version.epoch())));
     const auto& chunk = request.getChunk();
     ASSERT_EQ("TestDB.TestColl", chunk.getNS());
-    ASSERT_EQ(BSON("a" << -100LL), chunk.getMin());
-    ASSERT_EQ(BSON("a" << 100LL), chunk.getMax());
+    ASSERT_BSONOBJ_EQ(BSON("a" << -100LL), chunk.getMin());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 100LL), chunk.getMax());
     ASSERT_EQ(ShardId("TestShard0000"), chunk.getShard());
     ASSERT_EQ(version, chunk.getVersion());
 
@@ -88,8 +88,8 @@ TEST(BalanceChunkRequest, ParseFromConfigCommandWithSecondaryThrottle) {
                                                                 << BSON("w" << 2)))));
     const auto& chunk = request.getChunk();
     ASSERT_EQ("TestDB.TestColl", chunk.getNS());
-    ASSERT_EQ(BSON("a" << -100LL), chunk.getMin());
-    ASSERT_EQ(BSON("a" << 100LL), chunk.getMax());
+    ASSERT_BSONOBJ_EQ(BSON("a" << -100LL), chunk.getMin());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 100LL), chunk.getMax());
     ASSERT_EQ(ShardId("TestShard0000"), chunk.getShard());
     ASSERT_EQ(version, chunk.getVersion());
 

@@ -33,6 +33,7 @@
 #include <cstring>
 #include <type_traits>
 
+#include "mongo/base/static_assert.h"
 #include "mongo/config.h"
 
 namespace mongo {
@@ -43,10 +44,12 @@ namespace mongo {
 */
 template <typename T, typename BaseWordT>
 class AtomicProxy {
-    static_assert(sizeof(T) == sizeof(BaseWordT), "T and BaseWordT must have the same size");
-    static_assert(std::is_integral<BaseWordT>::value, "BaseWordT must be an integral type");
+    MONGO_STATIC_ASSERT_MSG(sizeof(T) == sizeof(BaseWordT),
+                            "T and BaseWordT must have the same size");
+    MONGO_STATIC_ASSERT_MSG(std::is_integral<BaseWordT>::value,
+                            "BaseWordT must be an integral type");
 #if MONGO_HAVE_STD_IS_TRIVIALLY_COPYABLE
-    static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
+    MONGO_STATIC_ASSERT_MSG(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
 #endif
 public:
     using value_type = T;

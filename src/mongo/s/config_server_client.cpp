@@ -68,12 +68,12 @@ Status moveChunk(OperationContext* txn,
 Status rebalanceChunk(OperationContext* txn, const ChunkType& chunk) {
     auto shardRegistry = Grid::get(txn)->shardRegistry();
     auto shard = shardRegistry->getConfigShard();
-    auto cmdResponseStatus =
-        shard->runCommand(txn,
-                          kPrimaryOnlyReadPreference,
-                          "admin",
-                          BalanceChunkRequest::serializeToRebalanceCommandForConfig(chunk),
-                          Shard::RetryPolicy::kIdempotent);
+    auto cmdResponseStatus = shard->runCommandWithFixedRetryAttempts(
+        txn,
+        kPrimaryOnlyReadPreference,
+        "admin",
+        BalanceChunkRequest::serializeToRebalanceCommandForConfig(chunk),
+        Shard::RetryPolicy::kNotIdempotent);
     if (!cmdResponseStatus.isOK()) {
         return cmdResponseStatus.getStatus();
     }

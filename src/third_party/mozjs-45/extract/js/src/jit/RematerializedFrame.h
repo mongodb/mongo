@@ -56,6 +56,7 @@ class RematerializedFrame
 
     Value returnValue_;
     Value thisArgument_;
+    Value newTarget_;
     Value slots_[1];
 
     RematerializedFrame(JSContext* cx, uint8_t* top, unsigned numActualArgs,
@@ -196,7 +197,7 @@ class RematerializedFrame
         return slots_;
     }
     Value* locals() {
-        return slots_ + numActualArgs_ + isConstructing_;
+        return slots_ + numActualArgs_;
     }
 
     Value& unaliasedLocal(unsigned i) {
@@ -220,9 +221,8 @@ class RematerializedFrame
         MOZ_ASSERT(isFunctionFrame());
         if (callee()->isArrow())
             return callee()->getExtendedSlot(FunctionExtended::ARROW_NEWTARGET_SLOT);
-        if (isConstructing())
-            return argv()[numActualArgs()];
-        return UndefinedValue();
+        MOZ_ASSERT_IF(!isConstructing(), newTarget_.isUndefined());
+        return newTarget_;
     }
 
     Value returnValue() const {

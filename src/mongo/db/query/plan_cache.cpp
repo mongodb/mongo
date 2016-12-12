@@ -605,7 +605,7 @@ void PlanCache::encodeKeyForProj(const BSONObj& projObj, StringBuilder* keyBuild
          ++i) {
         const BSONElement& elt = (*i).second;
 
-        if (elt.isSimpleType()) {
+        if (elt.type() != BSONType::Object) {
             // For inclusion/exclusion projections, we encode as "i" or "e".
             *keyBuilder << (elt.trueValue() ? "i" : "e");
         } else {
@@ -665,7 +665,7 @@ Status PlanCache::add(const CanonicalQuery& query,
 
     if (NULL != evictedEntry.get()) {
         LOG(1) << _ns << ": plan cache maximum size exceeded - "
-               << "removed least recently used entry " << evictedEntry->toString();
+               << "removed least recently used entry " << redact(evictedEntry->toString());
     }
 
     return Status::OK();

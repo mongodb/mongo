@@ -350,7 +350,7 @@ bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
         return false;
     } else {
         warning() << "Unknown indexing for node " << node->toString() << " and field "
-                  << elt.toString() << endl;
+                  << elt.toString();
         verify(0);
     }
 }

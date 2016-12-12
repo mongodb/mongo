@@ -121,6 +121,16 @@ Value ExclusionNode::applyProjectionToValue(Value val) const {
     }
 }
 
+void ExclusionNode::addModifiedPaths(std::set<std::string>* modifiedPaths) const {
+    for (auto&& excludedField : _excludedFields) {
+        modifiedPaths->insert(FieldPath::getFullyQualifiedPath(_pathToNode, excludedField));
+    }
+
+    for (auto&& childPair : _children) {
+        childPair.second->addModifiedPaths(modifiedPaths);
+    }
+}
+
 //
 // ParsedExclusionProjection.
 //

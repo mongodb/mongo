@@ -85,18 +85,20 @@ using logger::LogComponent;
 void Helpers::ensureIndex(OperationContext* txn,
                           Collection* collection,
                           BSONObj keyPattern,
+                          IndexDescriptor::IndexVersion indexVersion,
                           bool unique,
                           const char* name) {
     BSONObjBuilder b;
     b.append("name", name);
     b.append("ns", collection->ns().ns());
     b.append("key", keyPattern);
+    b.append("v", static_cast<int>(indexVersion));
     b.appendBool("unique", unique);
     BSONObj o = b.done();
 
     MultiIndexBlock indexer(txn, collection);
 
-    Status status = indexer.init(o);
+    Status status = indexer.init(o).getStatus();
     if (status.code() == ErrorCodes::IndexAlreadyExists)
         return;
     uassertStatusOK(status);
@@ -293,7 +295,7 @@ BSONObj Helpers::inferKeyPattern(const BSONObj& o) {
 
 long long Helpers::removeRange(OperationContext* txn,
                                const KeyRange& range,
-                               bool maxInclusive,
+                               BoundInclusion boundInclusion,
                                const WriteConcernOptions& writeConcern,
                                RemoveSaver* callback,
                                bool fromMigrate,
@@ -335,10 +337,12 @@ long long Helpers::removeRange(OperationContext* txn,
 
         // Extend bounds to match the index we found
 
+        invariant(IndexBounds::isStartIncludedInBound(boundInclusion));
         // Extend min to get (min, MinKey, MinKey, ....)
         min = Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.minKey, false));
         // If upper bound is included, extend max to get (max, MaxKey, MaxKey, ...)
         // If not included, extend max to get (max, MinKey, MinKey, ....)
+        const bool maxInclusive = IndexBounds::isEndIncludedInBound(boundInclusion);
         max = Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(range.maxKey, maxInclusive));
     }
 
@@ -354,12 +358,18 @@ long long Helpers::removeRange(OperationContext* txn,
     while (1) {
         // Scoping for write lock.
         {
-            OldClientWriteContext ctx(txn, ns);
+            AutoGetCollection ctx(txn, NamespaceString(ns), MODE_IX, MODE_IX);
             Collection* collection = ctx.getCollection();
             if (!collection)
                 break;
 
             IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(txn, indexName);
+
+            if (!desc) {
+                warning(LogComponent::kSharding) << "shard key index '" << indexName << "' on '"
+                                                 << ns << "' was dropped";
+                return -1;
+            }
 
             unique_ptr<PlanExecutor> exec(
                 InternalPlanner::indexScan(txn,
@@ -367,7 +377,7 @@ long long Helpers::removeRange(OperationContext* txn,
                                            desc,
                                            min,
                                            max,
-                                           maxInclusive,
+                                           boundInclusion,
                                            PlanExecutor::YIELD_MANUAL,
                                            InternalPlanner::FORWARD,
                                            InternalPlanner::IXSCAN_FETCH));
@@ -429,8 +439,8 @@ long long Helpers::removeRange(OperationContext* txn,
             NamespaceString nss(ns);
             if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss)) {
                 warning() << "stepped down from primary while deleting chunk; "
-                          << "orphaning data in " << ns << " in range [" << min << ", " << max
-                          << ")";
+                          << "orphaning data in " << ns << " in range [" << redact(min) << ", "
+                          << redact(max) << ")";
                 return numDeleted;
             }
 
@@ -518,14 +528,14 @@ Helpers::RemoveSaver::~RemoveSaver() {
         Status status = _protector->finalize(protectedBuffer.get(), protectedSizeMax, &resultLen);
         if (!status.isOK()) {
             severe() << "Unable to finalize DataProtector while closing RemoveSaver: "
-                     << status.reason();
+                     << redact(status);
             fassertFailed(34350);
         }
 
         _out->write(reinterpret_cast<const char*>(protectedBuffer.get()), resultLen);
         if (_out->fail()) {
             severe() << "Couldn't write finalized DataProtector data to: " << _file.string()
-                     << " for remove saving: " << errnoWithDescription();
+                     << " for remove saving: " << redact(errnoWithDescription());
             fassertFailed(34351);
         }
 
@@ -533,7 +543,7 @@ Helpers::RemoveSaver::~RemoveSaver() {
         status = _protector->finalizeTag(protectedBuffer.get(), protectedSizeMax, &resultLen);
         if (!status.isOK()) {
             severe() << "Unable to get finalizeTag from DataProtector while closing RemoveSaver: "
-                     << status.reason();
+                     << redact(status);
             fassertFailed(34352);
         }
         if (resultLen != _protector->getNumberOfBytesReservedForTag()) {
@@ -546,7 +556,7 @@ Helpers::RemoveSaver::~RemoveSaver() {
         _out->write(reinterpret_cast<const char*>(protectedBuffer.get()), resultLen);
         if (_out->fail()) {
             severe() << "Couldn't write finalizeTag from DataProtector to: " << _file.string()
-                     << " for remove saving: " << errnoWithDescription();
+                     << " for remove saving: " << redact(errnoWithDescription());
             fassertFailed(34354);
         }
     }
@@ -554,11 +564,14 @@ Helpers::RemoveSaver::~RemoveSaver() {
 
 Status Helpers::RemoveSaver::goingToDelete(const BSONObj& o) {
     if (!_out) {
+        // We don't expect to ever pass "" to create_directories below, but catch
+        // this anyway as per SERVER-26412.
+        invariant(!_root.empty());
         boost::filesystem::create_directories(_root);
         _out.reset(new ofstream(_file.string().c_str(), ios_base::out | ios_base::binary));
         if (_out->fail()) {
             string msg = str::stream() << "couldn't create file: " << _file.string()
-                                       << " for remove saving: " << errnoWithDescription();
+                                       << " for remove saving: " << redact(errnoWithDescription());
             error() << msg;
             _out.reset();
             _out = 0;
@@ -591,7 +604,7 @@ Status Helpers::RemoveSaver::goingToDelete(const BSONObj& o) {
     _out->write(reinterpret_cast<const char*>(data), dataSize);
     if (_out->fail()) {
         string msg = str::stream() << "couldn't write document to file: " << _file.string()
-                                   << " for remove saving: " << errnoWithDescription();
+                                   << " for remove saving: " << redact(errnoWithDescription());
         error() << msg;
         return Status(ErrorCodes::OperationFailed, msg);
     }

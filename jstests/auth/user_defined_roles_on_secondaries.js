@@ -54,7 +54,7 @@
     //
     //     read
     //    /    \
-//  r1      r2
+    //  r1      r2
     //
     var rstest = new ReplSetTest({name: name, nodes: 1, nodeOptions: {}});
 
@@ -80,12 +80,19 @@
     //
     //     read
     //    /    \
-//  r1      r2
+    //  r1      r2
     //    \    /
     //      r3
     //
     rstest.add();
     rstest.reInitiate();
+
+    // This write will have to wait on the initial sync to complete before progressing.
+    assert.soonNoExcept(() => {
+        assert.writeOK(rstest.getPrimary().getDB("db1")["aCollection"].insert(
+            {_id: "afterSecondNodeAdded"}, {writeConcern: {w: 2, wtimeout: 60 * 1000}}));
+        return true;
+    });
 
     rstest.getPrimary().getDB("db1").createRole({
         role: "r3",

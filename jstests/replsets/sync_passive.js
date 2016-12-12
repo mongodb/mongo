@@ -29,7 +29,7 @@ config.members[0].priority = 2;
 config.members[2].priority = 0;
 
 replTest.initiate(config);
-replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
+replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
 
 var master = replTest.getPrimary().getDB("test");
 var server0 = master;
@@ -57,7 +57,7 @@ print("restart #1");
 replTest.restart(1);
 
 print("check sync");
-replTest.awaitReplication(60 * 1000);
+replTest.awaitReplication();
 
 print("add data");
 reconnect(server1);

@@ -27,6 +27,8 @@
  */
 #include "test_util.h"
 
+void (*custom_die)(void) = NULL;
+
 /*
  * die --
  *	Report an error and quit.
@@ -82,12 +84,22 @@ testutil_clean_work_dir(char *dir)
 	int ret;
 	char *buf;
 
+#ifdef _WIN32
 	/* Additional bytes for the Windows rd command. */
+	len = 2 * strlen(dir) + strlen(RM_COMMAND) +
+		strlen(DIR_EXISTS_COMMAND) + 4;
+	if ((buf = malloc(len)) == NULL)
+		testutil_die(ENOMEM, "Failed to allocate memory");
+
+	snprintf(buf, len, "%s %s %s %s", DIR_EXISTS_COMMAND, dir,
+		 RM_COMMAND, dir);
+#else
 	len = strlen(dir) + strlen(RM_COMMAND) + 1;
 	if ((buf = malloc(len)) == NULL)
 		testutil_die(ENOMEM, "Failed to allocate memory");
 
 	snprintf(buf, len, "%s%s", RM_COMMAND, dir);
+#endif
 
 	if ((ret = system(buf)) != 0 && ret != ENOENT)
 		testutil_die(ret, "%s", buf);
@@ -132,10 +144,25 @@ testutil_cleanup(TEST_OPTS *opts)
 	if (!opts->preserve)
 		testutil_clean_work_dir(opts->home);
 
-	free(opts->conn_config);
-	free(opts->table_config);
 	free(opts->uri);
 	free(opts->home);
+}
+
+/*
+ * testutil_disable_long_tests --
+ *	Return if TESTUTIL_DISABLE_LONG_TESTS is set.
+ */
+bool
+testutil_disable_long_tests(void)
+{
+	const char *res;
+
+	if (__wt_getenv(NULL,
+	    "TESTUTIL_DISABLE_LONG_TESTS", &res) == WT_NOTFOUND)
+		return (false);
+
+	free((void *)res);
+	return (true);
 }
 
 /*

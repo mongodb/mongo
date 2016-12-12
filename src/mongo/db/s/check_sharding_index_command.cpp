@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
@@ -134,14 +135,15 @@ public:
             max = Helpers::toKeyFormat(kp.extendRangeBound(max, false));
         }
 
-        unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,
-                                                                 collection,
-                                                                 idx,
-                                                                 min,
-                                                                 max,
-                                                                 false,  // endKeyInclusive
-                                                                 PlanExecutor::YIELD_MANUAL,
-                                                                 InternalPlanner::FORWARD));
+        unique_ptr<PlanExecutor> exec(
+            InternalPlanner::indexScan(txn,
+                                       collection,
+                                       idx,
+                                       min,
+                                       max,
+                                       BoundInclusion::kIncludeStartKeyOnly,
+                                       PlanExecutor::YIELD_MANUAL,
+                                       InternalPlanner::FORWARD));
         exec->setYieldPolicy(PlanExecutor::YIELD_AUTO, collection);
 
         // Find the 'missingField' value used to represent a missing document field in a key of
@@ -170,7 +172,10 @@ public:
                 }
                 BSONElement currKeyElt = i.next();
 
-                if (!currKeyElt.eoo() && !currKeyElt.valuesEqual(missingField))
+                const StringData::ComparatorInterface* stringComparator = nullptr;
+                BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
+                                             stringComparator);
+                if (!currKeyElt.eoo() && eltCmp.evaluate(currKeyElt != missingField))
                     continue;
 
                 // This is a fetch, but it's OK.  The underlying code won't throw a page fault
@@ -187,8 +192,8 @@ public:
                     continue;
 
                 const string msg = str::stream()
-                    << "found missing value in key " << currKey << " for doc: "
-                    << (obj.hasField("_id") ? obj.toString() : obj["_id"].toString());
+                    << "found missing value in key " << redact(currKey)
+                    << " for doc: " << (obj.hasField("_id") ? redact(obj) : redact(obj["_id"]));
                 log() << "checkShardingIndex for '" << nss.toString() << "' failed: " << msg;
 
                 errmsg = msg;

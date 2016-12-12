@@ -35,6 +35,7 @@
 #include <set>
 
 #include "mongo/base/init.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/config.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
@@ -350,8 +351,8 @@ bool ASIOMessagingPort::recv(Message& m) {
         }
 
         if (_awaitingHandshake) {
-            static_assert(sizeof(kGET) - 1 <= kHeaderLen,
-                          "HTTP GET string must be smaller than the message header.");
+            MONGO_STATIC_ASSERT_MSG(sizeof(kGET) - 1 <= kHeaderLen,
+                                    "HTTP GET string must be smaller than the message header.");
             if (memcmp(md.view2ptr(), kGET, strlen(kGET)) == 0) {
                 std::string httpMsg =
                     "It looks like you are trying to access MongoDB over HTTP on the native driver "

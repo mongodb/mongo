@@ -31,15 +31,12 @@
 #include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/client/dbclientinterface.h"
-#include "mongo/db/jsobj.h"
 
 namespace mongo {
 
 class ShardingCatalogClient;
 class CollectionMetadata;
 class CollectionType;
-class DBClientCursor;
 class OperationContext;
 
 /**
@@ -62,14 +59,9 @@ class OperationContext;
  * from the config server without sacrificing the freshness and accuracy of the metadata it
  * builds. (See ConfigDiffTracker class.)
  *
- * The class is not thread safe.
  */
 class MetadataLoader {
 public:
-    explicit MetadataLoader();
-
-    ~MetadataLoader();
-
     /**
      * Fills a new metadata instance representing the chunkset of the collection 'ns'
      * (or its entirety, if not sharded) that lives on 'shard' with data from the config server.
@@ -89,12 +81,12 @@ public:
      * @return HostUnreachable if there was an error contacting the config servers
      * @return RemoteChangeDetected if the data loaded was modified by another operation
      */
-    Status makeCollectionMetadata(OperationContext* txn,
-                                  ShardingCatalogClient* catalogClient,
-                                  const std::string& ns,
-                                  const std::string& shard,
-                                  const CollectionMetadata* oldMetadata,
-                                  CollectionMetadata* metadata) const;
+    static Status makeCollectionMetadata(OperationContext* txn,
+                                         ShardingCatalogClient* catalogClient,
+                                         const std::string& ns,
+                                         const std::string& shard,
+                                         const CollectionMetadata* oldMetadata,
+                                         CollectionMetadata* metadata);
 
 private:
     /**
@@ -108,11 +100,11 @@ private:
      * @return RemoteChangeDetected if the collection doc loaded is unexpectedly different
      *
      */
-    Status _initCollection(OperationContext* txn,
-                           ShardingCatalogClient* catalogClient,
-                           const std::string& ns,
-                           const std::string& shard,
-                           CollectionMetadata* metadata) const;
+    static Status _initCollection(OperationContext* txn,
+                                  ShardingCatalogClient* catalogClient,
+                                  const std::string& ns,
+                                  const std::string& shard,
+                                  CollectionMetadata* metadata);
 
     /**
      * Returns OK and fills in the chunk state of 'metadata' to portray the chunks of the
@@ -127,12 +119,12 @@ private:
      * @return NamespaceNotFound if there are no chunks loaded and an epoch change is detected
      * TODO: @return FailedToParse
      */
-    Status initChunks(OperationContext* txn,
-                      ShardingCatalogClient* catalogClient,
-                      const std::string& ns,
-                      const std::string& shard,
-                      const CollectionMetadata* oldMetadata,
-                      CollectionMetadata* metadata) const;
+    static Status _initChunks(OperationContext* txn,
+                              ShardingCatalogClient* catalogClient,
+                              const std::string& ns,
+                              const std::string& shard,
+                              const CollectionMetadata* oldMetadata,
+                              CollectionMetadata* metadata);
 };
 
 }  // namespace mongo

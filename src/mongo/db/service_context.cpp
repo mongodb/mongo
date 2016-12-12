@@ -34,6 +34,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_manager.h"
@@ -129,8 +130,8 @@ ServiceContext::~ServiceContext() {
 }
 
 ServiceContext::UniqueClient ServiceContext::makeClient(std::string desc,
-                                                        transport::Session* session) {
-    std::unique_ptr<Client> client(new Client(std::move(desc), this, session));
+                                                        transport::SessionHandle session) {
+    std::unique_ptr<Client> client(new Client(std::move(desc), this, std::move(session)));
     auto observer = _clientObservers.cbegin();
     try {
         for (; observer != _clientObservers.cend(); ++observer) {
@@ -156,6 +157,10 @@ ServiceContext::UniqueClient ServiceContext::makeClient(std::string desc,
 
 transport::TransportLayer* ServiceContext::getTransportLayer() const {
     return _transportLayerManager.get();
+}
+
+ServiceEntryPoint* ServiceContext::getServiceEntryPoint() const {
+    return _serviceEntryPoint.get();
 }
 
 Status ServiceContext::addAndStartTransportLayer(std::unique_ptr<transport::TransportLayer> tl) {
@@ -184,6 +189,10 @@ void ServiceContext::setFastClockSource(std::unique_ptr<ClockSource> newSource) 
 
 void ServiceContext::setPreciseClockSource(std::unique_ptr<ClockSource> newSource) {
     _preciseClockSource = std::move(newSource);
+}
+
+void ServiceContext::setServiceEntryPoint(std::unique_ptr<ServiceEntryPoint> sep) {
+    _serviceEntryPoint = std::move(sep);
 }
 
 void ServiceContext::ClientDeleter::operator()(Client* client) const {

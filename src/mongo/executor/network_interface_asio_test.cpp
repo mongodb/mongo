@@ -59,11 +59,11 @@ HostAndPort testHost{"localhost", 20000};
 void initWireSpecMongoD() {
     WireSpec& spec = WireSpec::instance();
     // accept from any version
-    spec.minWireVersionIncoming = RELEASE_2_4_AND_BEFORE;
-    spec.maxWireVersionIncoming = COMMANDS_ACCEPT_WRITE_CONCERN;
+    spec.incoming.minWireVersion = RELEASE_2_4_AND_BEFORE;
+    spec.incoming.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
     // connect to any version
-    spec.minWireVersionOutgoing = RELEASE_2_4_AND_BEFORE;
-    spec.maxWireVersionOutgoing = COMMANDS_ACCEPT_WRITE_CONCERN;
+    spec.outgoing.minWireVersion = RELEASE_2_4_AND_BEFORE;
+    spec.outgoing.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
 }
 
 // Utility function to use with mock streams
@@ -72,9 +72,9 @@ RemoteCommandResponse simulateIsMaster(RemoteCommandRequest request) {
     ASSERT_EQ(request.dbname, "admin");
 
     RemoteCommandResponse response;
-    response.data = BSON("minWireVersion" << mongo::WireSpec::instance().minWireVersionIncoming
+    response.data = BSON("minWireVersion" << mongo::WireSpec::instance().incoming.minWireVersion
                                           << "maxWireVersion"
-                                          << mongo::WireSpec::instance().maxWireVersionIncoming);
+                                          << mongo::WireSpec::instance().incoming.maxWireVersion);
     return response;
 }
 
@@ -135,10 +135,10 @@ public:
     }
 
     void assertNumOps(uint64_t canceled, uint64_t timedOut, uint64_t failed, uint64_t succeeded) {
-        ASSERT(net().getNumCanceledOps() == canceled);
-        ASSERT(net().getNumTimedOutOps() == timedOut);
-        ASSERT(net().getNumFailedOps() == failed);
-        ASSERT(net().getNumSucceededOps() == succeeded);
+        ASSERT_EQ(canceled, net().getNumCanceledOps());
+        ASSERT_EQ(timedOut, net().getNumTimedOutOps());
+        ASSERT_EQ(failed, net().getNumFailedOps());
+        ASSERT_EQ(succeeded, net().getNumSucceededOps());
     }
 
 protected:
@@ -180,7 +180,7 @@ TEST_F(NetworkInterfaceASIOTest, CancelOperation) {
 
     // Wait for op to complete, assert that it was canceled.
     auto& result = deferred.get();
-    ASSERT(result.status == ErrorCodes::CallbackCanceled);
+    ASSERT_EQ(ErrorCodes::CallbackCanceled, result.status);
     ASSERT(result.elapsedMillis);
     assertNumOps(1u, 0u, 0u, 0u);
 }
@@ -203,7 +203,7 @@ TEST_F(NetworkInterfaceASIOTest, ImmediateCancel) {
                            });
 
     auto& result = deferred.get();
-    ASSERT(result.status == ErrorCodes::CallbackCanceled);
+    ASSERT_EQ(ErrorCodes::CallbackCanceled, result.status);
     ASSERT(result.elapsedMillis);
     // expect 0 completed ops because the op was canceled before getting a connection
     assertNumOps(1u, 0u, 0u, 0u);
@@ -295,7 +295,7 @@ TEST_F(NetworkInterfaceASIOTest, CancelWithTimeout) {
 
     // Wait for op to complete, assert that cancellation error had precedence.
     auto& result = deferred.get();
-    ASSERT(result.status == ErrorCodes::CallbackCanceled);
+    ASSERT_EQ(ErrorCodes::CallbackCanceled, result.status);
     ASSERT(result.elapsedMillis);
     assertNumOps(1u, 0u, 0u, 0u);
 }
@@ -325,7 +325,7 @@ TEST_F(NetworkInterfaceASIOTest, TimeoutWithNetworkError) {
 
     // Wait for op to complete, assert that timeout had precedence.
     auto& result = deferred.get();
-    ASSERT(result.status == ErrorCodes::ExceededTimeLimit);
+    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, result.status);
     ASSERT(result.elapsedMillis);
     assertNumOps(0u, 1u, 1u, 0u);
 }
@@ -356,7 +356,7 @@ TEST_F(NetworkInterfaceASIOTest, CancelWithTimeoutAndNetworkError) {
 
     // Wait for op to complete, assert that the cancellation had precedence.
     auto& result = deferred.get();
-    ASSERT(result.status == ErrorCodes::CallbackCanceled);
+    ASSERT_EQ(ErrorCodes::CallbackCanceled, result.status);
     ASSERT(result.elapsedMillis);
     assertNumOps(1u, 0u, 0u, 0u);
 }
@@ -390,11 +390,11 @@ TEST_F(NetworkInterfaceASIOTest, AsyncOpTimeout) {
         ASSERT(!deferred.hasCompleted());
 
         // Advance clock and force timeout
-        factory.fastForward(Milliseconds(800));
+        factory.fastForward(Milliseconds(500));
     }
 
     auto& result = deferred.get();
-    ASSERT(result.status == ErrorCodes::ExceededTimeLimit);
+    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, result.status);
     ASSERT(result.elapsedMillis);
     assertNumOps(0u, 1u, 1u, 0u);
 }
@@ -436,8 +436,8 @@ TEST_F(NetworkInterfaceASIOTest, StartCommand) {
     auto& res = deferred.get();
     ASSERT(res.elapsedMillis);
     uassertStatusOK(res.status);
-    ASSERT_EQ(res.data, expectedCommandReply);
-    ASSERT_EQ(res.metadata, expectedMetadata);
+    ASSERT_BSONOBJ_EQ(res.data, expectedCommandReply);
+    ASSERT_BSONOBJ_EQ(res.metadata, expectedMetadata);
     assertNumOps(0u, 0u, 0u, 1u);
 }
 
@@ -511,7 +511,7 @@ public:
         }
 
         auto& response = deferred.get();
-        ASSERT(response.status == code);
+        ASSERT_EQ(code, response.status);
         ASSERT(response.elapsedMillis);
         assertNumOps(0u, 0u, 1u, 0u);
     }
@@ -580,6 +580,7 @@ public:
         NetworkInterfaceASIO::Options options{};
         options.streamFactory = std::move(factory);
         options.networkConnectionHook = std::move(hook);
+        options.timerFactory = stdx::make_unique<AsyncTimerFactoryMock>();
         _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
         _net->startup();
     }
@@ -624,7 +625,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, InvalidIsMaster) {
 
     // we should stop here.
     auto& res = deferred.get();
-    ASSERT(res.status == validationFailedStatus);
+    ASSERT_EQ(validationFailedStatus, res.status);
     ASSERT(res.elapsedMillis);
 
     assertNumOps(0u, 0u, 1u, 0u);
@@ -671,9 +672,9 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, ValidateHostInvalid) {
         rpc::Protocol::kOpQuery, [](RemoteCommandRequest request) -> RemoteCommandResponse {
             RemoteCommandResponse response;
             response.data =
-                BSON("minWireVersion" << mongo::WireSpec::instance().minWireVersionIncoming
+                BSON("minWireVersion" << mongo::WireSpec::instance().incoming.minWireVersion
                                       << "maxWireVersion"
-                                      << mongo::WireSpec::instance().maxWireVersionIncoming
+                                      << mongo::WireSpec::instance().incoming.maxWireVersion
                                       << "TESTKEY"
                                       << "TESTVALUE");
             return response;
@@ -681,7 +682,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, ValidateHostInvalid) {
 
     // we should stop here.
     auto& res = deferred.get();
-    ASSERT(res.status == validationFailedStatus);
+    ASSERT_EQ(validationFailedStatus, res.status);
     ASSERT(res.elapsedMillis);
     ASSERT(validateCalled);
     ASSERT(hostCorrect);
@@ -730,7 +731,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsError) {
     // We should stop here.
     auto& res = deferred.get();
 
-    ASSERT(res.status == makeRequestError);
+    ASSERT_EQ(makeRequestError, res.status);
     ASSERT(res.elapsedMillis);
     ASSERT(makeRequestCalled);
     ASSERT(!handleReplyCalled);
@@ -780,7 +781,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
     // Simulate user command.
     stream->simulateServer(rpc::Protocol::kOpCommandV1,
                            [&](RemoteCommandRequest request) -> RemoteCommandResponse {
-                               ASSERT_EQ(commandRequest, request.cmdObj);
+                               ASSERT_BSONOBJ_EQ(commandRequest, request.cmdObj);
 
                                RemoteCommandResponse response;
                                response.data = commandReply;
@@ -792,9 +793,9 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
     auto& result = deferred.get();
 
     ASSERT(result.isOK());
-    ASSERT(result.data == commandReply);
+    ASSERT_BSONOBJ_EQ(commandReply, result.data);
     ASSERT(result.elapsedMillis);
-    ASSERT(result.metadata == metadata);
+    ASSERT_BSONOBJ_EQ(metadata, result.metadata);
     assertNumOps(0u, 0u, 0u, 1u);
 }
 
@@ -829,7 +830,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
         [&](const HostAndPort& remoteHost, RemoteCommandResponse&& response) {
             handleReplyCalled = true;
             handleReplyArgumentCorrect =
-                (response.data == hookCommandReply) && (response.metadata == hookReplyMetadata);
+                SimpleBSONObjComparator::kInstance.evaluate(response.data == hookCommandReply) &&
+                SimpleBSONObjComparator::kInstance.evaluate(response.metadata == hookReplyMetadata);
             return handleReplyError;
         }));
 
@@ -850,8 +852,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
     // Simulate hook reply
     stream->simulateServer(rpc::Protocol::kOpCommandV1,
                            [&](RemoteCommandRequest request) -> RemoteCommandResponse {
-                               ASSERT_EQ(request.cmdObj, hookCommandRequest);
-                               ASSERT_EQ(request.metadata, hookRequestMetadata);
+                               ASSERT_BSONOBJ_EQ(request.cmdObj, hookCommandRequest);
+                               ASSERT_BSONOBJ_EQ(request.metadata, hookRequestMetadata);
 
                                RemoteCommandResponse response;
                                response.data = hookCommandReply;
@@ -860,7 +862,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
                            });
 
     auto& result = deferred.get();
-    ASSERT(result.status == handleReplyError);
+    ASSERT_EQ(handleReplyError, result.status);
     ASSERT(result.elapsedMillis);
     ASSERT(makeRequestCalled);
     ASSERT(handleReplyCalled);
@@ -899,6 +901,71 @@ TEST_F(NetworkInterfaceASIOTest, SetAlarmReturnsNotOKIfShutdownHasStarted) {
     ASSERT_NOT_OK(net().setAlarm(net().now() + Milliseconds(100), [] {}));
 }
 
+TEST_F(NetworkInterfaceASIOTest, IsMasterRequestContainsOutgoingWireVersionInternalClientInfo) {
+    WireSpec::instance().isInternalClient = true;
+
+    RemoteCommandRequest request{testHost, "testDB", BSON("ping" << 1), BSONObj(), nullptr};
+    auto deferred = startCommand(makeCallbackHandle(), request);
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+
+    // Verify that the isMaster reply has the expected internalClient data.
+    stream->simulateServer(
+        rpc::Protocol::kOpQuery, [](RemoteCommandRequest request) -> RemoteCommandResponse {
+            auto internalClientElem = request.cmdObj["internalClient"];
+            ASSERT_EQ(internalClientElem.type(), BSONType::Object);
+            auto minWireVersionElem = internalClientElem.Obj()["minWireVersion"];
+            auto maxWireVersionElem = internalClientElem.Obj()["maxWireVersion"];
+            ASSERT_EQ(minWireVersionElem.type(), BSONType::NumberInt);
+            ASSERT_EQ(maxWireVersionElem.type(), BSONType::NumberInt);
+            ASSERT_EQ(minWireVersionElem.numberInt(), WireSpec::instance().outgoing.minWireVersion);
+            ASSERT_EQ(maxWireVersionElem.numberInt(), WireSpec::instance().outgoing.maxWireVersion);
+            return simulateIsMaster(request);
+        });
+
+    // Simulate ping reply.
+    stream->simulateServer(rpc::Protocol::kOpCommandV1,
+                           [&](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               RemoteCommandResponse response;
+                               response.data = BSON("ok" << 1);
+                               return response;
+                           });
+
+    // Verify that the ping op is counted as a success.
+    auto& res = deferred.get();
+    ASSERT(res.elapsedMillis);
+    assertNumOps(0u, 0u, 0u, 1u);
+}
+
+TEST_F(NetworkInterfaceASIOTest, IsMasterRequestMissingInternalClientInfoWhenNotInternalClient) {
+    WireSpec::instance().isInternalClient = false;
+
+    RemoteCommandRequest request{testHost, "testDB", BSON("ping" << 1), BSONObj(), nullptr};
+    auto deferred = startCommand(makeCallbackHandle(), request);
+    auto stream = streamFactory().blockUntilStreamExists(testHost);
+    ConnectEvent{stream}.skip();
+
+    // Verify that the isMaster reply has the expected internalClient data.
+    stream->simulateServer(rpc::Protocol::kOpQuery,
+                           [](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               ASSERT_FALSE(request.cmdObj["internalClient"]);
+                               return simulateIsMaster(request);
+                           });
+
+    // Simulate ping reply.
+    stream->simulateServer(rpc::Protocol::kOpCommandV1,
+                           [&](RemoteCommandRequest request) -> RemoteCommandResponse {
+                               RemoteCommandResponse response;
+                               response.data = BSON("ok" << 1);
+                               return response;
+                           });
+
+    // Verify that the ping op is counted as a success.
+    auto& res = deferred.get();
+    ASSERT(res.elapsedMillis);
+    assertNumOps(0u, 0u, 0u, 1u);
+}
+
 class NetworkInterfaceASIOMetadataTest : public NetworkInterfaceASIOTest {
 protected:
     void setUp() override {}
@@ -909,6 +976,7 @@ protected:
         NetworkInterfaceASIO::Options options{};
         options.streamFactory = std::move(factory);
         options.metadataHook = std::move(metadataHook);
+        options.timerFactory = stdx::make_unique<AsyncTimerFactoryMock>();
         _net = stdx::make_unique<NetworkInterfaceASIO>(std::move(options));
         _net->startup();
     }
@@ -957,7 +1025,7 @@ TEST_F(NetworkInterfaceASIOMetadataTest, Metadata) {
     // Simulate hook reply
     stream->simulateServer(rpc::Protocol::kOpCommandV1,
                            [&](RemoteCommandRequest request) -> RemoteCommandResponse {
-                               ASSERT(request.metadata["foo"].str() == "bar");
+                               ASSERT_EQ("bar", request.metadata["foo"].str());
                                RemoteCommandResponse response;
                                response.data = BSON("ok" << 1);
                                response.metadata = BSON("baz"

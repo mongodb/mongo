@@ -37,7 +37,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/write_concern.h"
-#include "mongo/s/balancer/balancer_configuration.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -47,7 +47,6 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -155,13 +154,6 @@ bool DBConfig::isSharded(const string& ns) {
     return i->second.isSharded();
 }
 
-const ShardId& DBConfig::getShardId(OperationContext* txn, const string& ns) {
-    uassert(28679, "ns can't be sharded", !isSharded(ns));
-
-    uassert(10178, "no primary!", grid.shardRegistry()->getShard(txn, _primaryId));
-    return _primaryId;
-}
-
 void DBConfig::invalidateNs(const std::string& ns) {
     stdx::lock_guard<stdx::mutex> lk(_lock);
 
@@ -185,13 +177,13 @@ void DBConfig::enableSharding(OperationContext* txn) {
 }
 
 bool DBConfig::removeSharding(OperationContext* txn, const string& ns) {
+    stdx::lock_guard<stdx::mutex> lk(_lock);
+
     if (!_shardingEnabled) {
         warning() << "could not remove sharding for collection " << ns
                   << ", sharding not enabled for db";
         return false;
     }
-
-    stdx::lock_guard<stdx::mutex> lk(_lock);
 
     CollectionInfoMap::iterator i = _collections.find(ns);
 
@@ -232,7 +224,10 @@ void DBConfig::getChunkManagerOrPrimary(OperationContext* txn,
         // No namespace
         if (i == _collections.end()) {
             // If we don't know about this namespace, it's unsharded by default
-            primary = grid.shardRegistry()->getShard(txn, _primaryId);
+            auto primaryStatus = grid.shardRegistry()->getShard(txn, _primaryId);
+            if (primaryStatus.isOK()) {
+                primary = primaryStatus.getValue();
+            }
         } else {
             CollectionInfo& cInfo = i->second;
 
@@ -243,13 +238,16 @@ void DBConfig::getChunkManagerOrPrimary(OperationContext* txn,
             if (_shardingEnabled && cInfo.isSharded()) {
                 manager = cInfo.getCM();
             } else {
-                primary = grid.shardRegistry()->getShard(txn, _primaryId);
+                auto primaryStatus = grid.shardRegistry()->getShard(txn, _primaryId);
+                if (primaryStatus.isOK()) {
+                    primary = primaryStatus.getValue();
+                }
             }
         }
     }
 
-    verify(manager || primary);
-    verify(!manager || !primary);
+    invariant(manager || primary);
+    invariant(!manager || !primary);
 }
 
 
@@ -288,8 +286,10 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
             _loadIfNeeded(txn, currentReloadIteration);
         }
 
-        CollectionInfo& ci = _collections[ns];
-        uassert(10181, str::stream() << "not sharded:" << ns, ci.isSharded());
+        const CollectionInfo& ci = _collections[ns];
+        uassert(ErrorCodes::NamespaceNotSharded,
+                str::stream() << "Collection is not sharded: " << ns,
+                ci.isSharded());
 
         invariant(!ci.key().isEmpty());
 
@@ -318,7 +318,8 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
                                                BSON(ChunkType::DEPRECATED_lastmod() << -1),
                                                1,
                                                &newestChunk,
-                                               nullptr));
+                                               nullptr,
+                                               repl::ReadConcernLevel::kMajorityReadConcern));
 
         if (!newestChunk.empty()) {
             invariant(newestChunk.size() == 1);
@@ -547,7 +548,8 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
      */
 
     log() << "DBConfig::dropDatabase: " << _name;
-    grid.catalogClient(txn)->logChange(txn, "dropDatabase.start", _name, BSONObj());
+    grid.catalogClient(txn)->logChange(
+        txn, "dropDatabase.start", _name, BSONObj(), ShardingCatalogClient::kMajorityWriteConcern);
 
     // 1
     grid.catalogCache()->invalidate(_name);
@@ -583,7 +585,8 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
 
     // 3
     {
-        const auto shard = grid.shardRegistry()->getShard(txn, _primaryId);
+        const auto shard = uassertStatusOK(grid.shardRegistry()->getShard(txn, _primaryId));
+
         ScopedDbConnection conn(shard->getConnString(), 30.0);
         BSONObj res;
         if (!conn->dropDatabase(_name, txn->getWriteConcern(), &res)) {
@@ -602,12 +605,12 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
 
     // 4
     for (const ShardId& shardId : shardIds) {
-        const auto shard = grid.shardRegistry()->getShard(txn, shardId);
-        if (!shard) {
+        const auto shardStatus = grid.shardRegistry()->getShard(txn, shardId);
+        if (!shardStatus.isOK()) {
             continue;
         }
 
-        ScopedDbConnection conn(shard->getConnString(), 30.0);
+        ScopedDbConnection conn(shardStatus.getValue()->getConnString(), 30.0);
         BSONObj res;
         if (!conn->dropDatabase(_name, txn->getWriteConcern(), &res)) {
             errmsg = res.toString() + " at " + shardId.toString();
@@ -625,7 +628,8 @@ bool DBConfig::dropDatabase(OperationContext* txn, string& errmsg) {
 
     LOG(1) << "\t dropped primary db for: " << _name;
 
-    grid.catalogClient(txn)->logChange(txn, "dropDatabase", _name, BSONObj());
+    grid.catalogClient(txn)->logChange(
+        txn, "dropDatabase", _name, BSONObj(), ShardingCatalogClient::kMajorityWriteConcern);
 
     return true;
 }
@@ -635,35 +639,42 @@ bool DBConfig::_dropShardedCollections(OperationContext* txn,
                                        set<ShardId>& shardIds,
                                        string& errmsg) {
     num = 0;
-    set<string> seen;
+    set<std::string> seen;
     while (true) {
-        CollectionInfoMap::iterator i = _collections.begin();
-        for (; i != _collections.end(); ++i) {
-            if (i->second.isSharded()) {
+        std::string aCollection;
+        {
+            stdx::lock_guard<stdx::mutex> lk(_lock);
+
+            CollectionInfoMap::iterator i = _collections.begin();
+            for (; i != _collections.end(); ++i) {
+                if (i->second.isSharded()) {
+                    break;
+                }
+            }
+
+            if (i == _collections.end()) {
                 break;
             }
+
+            aCollection = i->first;
+            if (seen.count(aCollection)) {
+                errmsg = "seen a collection twice!";
+                return false;
+            }
+
+            seen.insert(aCollection);
+            LOG(1) << "\t dropping sharded collection: " << aCollection;
+
+            i->second.getCM()->getAllShardIds(&shardIds);
         }
+        // drop lock before network activity
 
-        if (i == _collections.end()) {
-            break;
-        }
-
-        if (seen.count(i->first)) {
-            errmsg = "seen a collection twice!";
-            return false;
-        }
-
-        seen.insert(i->first);
-        LOG(1) << "\t dropping sharded collection: " << i->first;
-
-        i->second.getCM()->getAllShardIds(&shardIds);
-
-        uassertStatusOK(grid.catalogClient(txn)->dropCollection(txn, NamespaceString(i->first)));
+        uassertStatusOK(grid.catalogClient(txn)->dropCollection(txn, NamespaceString(aCollection)));
 
         // We should warn, but it's not a fatal error if someone else reloaded the db/coll as
         // unsharded in the meantime
-        if (!removeSharding(txn, i->first)) {
-            warning() << "collection " << i->first
+        if (!removeSharding(txn, aCollection)) {
+            warning() << "collection " << aCollection
                       << " was reloaded as unsharded before drop completed"
                       << " during drop of all collections";
         }
@@ -680,7 +691,7 @@ void DBConfig::getAllShardIds(set<ShardId>* shardIds) {
     dassert(shardIds);
 
     stdx::lock_guard<stdx::mutex> lk(_lock);
-    shardIds->insert(getPrimaryId());
+    shardIds->insert(_primaryId);
     for (CollectionInfoMap::const_iterator it(_collections.begin()), end(_collections.end());
          it != end;
          ++it) {
@@ -698,6 +709,16 @@ void DBConfig::getAllShardedCollections(set<string>& namespaces) {
         if (i->second.isSharded())
             namespaces.insert(i->first);
     }
+}
+
+bool DBConfig::isShardingEnabled() {
+    stdx::lock_guard<stdx::mutex> lk(_lock);
+    return _shardingEnabled;
+}
+
+ShardId DBConfig::getPrimaryId() {
+    stdx::lock_guard<stdx::mutex> lk(_lock);
+    return _primaryId;
 }
 
 /* --- ConfigServer ---- */

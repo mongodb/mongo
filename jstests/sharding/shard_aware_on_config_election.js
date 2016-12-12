@@ -90,6 +90,10 @@
         assert.writeOK(st.s.getDB("config").getCollection("shards").update(
             {"_id": rst.name}, {$unset: {"state": ""}}, {writeConcern: {w: "majority"}}));
 
+        // Make sure shardIdentity delete replicated to all nodes before restarting them with
+        // --shardsvr since if they try to replicate that delete while runnning with --shardsvr
+        // they will crash.
+        rst.awaitReplication();
         jsTest.log("Restart " + rst.name +
                    " with --shardsvr to allow initializing its sharding awareness");
         for (var nodeId = 0; nodeId < rst.nodes.length; nodeId++) {

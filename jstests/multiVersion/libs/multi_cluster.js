@@ -3,8 +3,8 @@
 //
 
 /**
- * Restarts the specified binaries in options to the binVersion. Note: this does not
- * perform any upgrade operations.
+ * Restarts the specified binaries in options with the specified binVersion.
+ * Note: this does not perform any upgrade operations.
  *
  * @param binVersion {string}
  * @param options {Object} format:

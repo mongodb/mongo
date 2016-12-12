@@ -1063,427 +1063,160 @@ TEST(CollatorFactoryICUTest, FactoryMadeCollatorComparisonKeysCorrectEnUS) {
     ASSERT_LT(comparisonKeyABB.getKeyData().compare(comparisonKeyBA.getKeyData()), 0);
 }
 
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithArabicLocale) {
+TEST(CollatorFactoryICUTest, BackwardsTrueWithStrengthOneFails) {
     CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "ar"))
-                  .getStatus());
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "backwards"
+                                              << true
+                                              << "strength"
+                                              << 1));
+    ASSERT_NOT_OK(collator.getStatus());
 }
 
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithArmenianLocale) {
+TEST(CollatorFactoryICUTest, BackwardsTrueWithStrengthTwoSucceeds) {
     CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "hy"))
-                  .getStatus());
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "backwards"
+                                              << true
+                                              << "strength"
+                                              << 2));
+    ASSERT_OK(collator.getStatus());
 }
 
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithBengaliLocale) {
+TEST(CollatorFactoryICUTest, CaseFirstLowerWithStrengthThreeSucceeds) {
     CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "bn"))
-                  .getStatus());
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "caseFirst"
+                                              << "lower"
+                                              << "strength"
+                                              << 3));
+    ASSERT_OK(collator.getStatus());
 }
 
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithCatalanLocale) {
+TEST(CollatorFactoryICUTest, CaseFirstUpperWithStrengthThreeSucceeds) {
     CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "ca"))
-                  .getStatus());
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "caseFirst"
+                                              << "upper"
+                                              << "strength"
+                                              << 3));
+    ASSERT_OK(collator.getStatus());
 }
 
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithChineseLocale) {
+TEST(CollatorFactoryICUTest, CaseFirstLowerWithCaseLevelSucceeds) {
     CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "zh"))
-                  .getStatus());
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "caseFirst"
+                                              << "lower"
+                                              << "caseLevel"
+                                              << true
+                                              << "strength"
+                                              << 1));
+    ASSERT_OK(collator.getStatus());
 }
 
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithChineseTraditionalLocale) {
+TEST(CollatorFactoryICUTest, CaseFirstUpperWithCaseLevelSucceeds) {
     CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "zh_Hant"))
-                  .getStatus());
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "caseFirst"
+                                              << "upper"
+                                              << "caseLevel"
+                                              << true
+                                              << "strength"
+                                              << 1));
+    ASSERT_OK(collator.getStatus());
 }
 
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithCroatianLocale) {
+TEST(CollatorFactoryICUTest, CaseFirstOffWithStrengthOneSucceeds) {
     CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "hr"))
-                  .getStatus());
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "caseFirst"
+                                              << "off"
+                                              << "strength"
+                                              << 1));
+    ASSERT_OK(collator.getStatus());
 }
 
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithCzechLocale) {
+TEST(CollatorFactoryICUTest, CaseFirstLowerWithStrengthOneFails) {
     CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "cs"))
-                  .getStatus());
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "caseFirst"
+                                              << "lower"
+                                              << "strength"
+                                              << 1));
+    ASSERT_NOT_OK(collator.getStatus());
 }
 
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithDanishLocale) {
+TEST(CollatorFactoryICUTest, CaseFirstLowerWithStrengthTwoFails) {
     CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "da"))
-                  .getStatus());
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "caseFirst"
+                                              << "lower"
+                                              << "strength"
+                                              << 2));
+    ASSERT_NOT_OK(collator.getStatus());
 }
 
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithEnglishLocale) {
+TEST(CollatorFactoryICUTest, CaseFirstUpperWithStrengthOneFails) {
     CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "en"))
-                  .getStatus());
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "caseFirst"
+                                              << "upper"
+                                              << "strength"
+                                              << 1));
+    ASSERT_NOT_OK(collator.getStatus());
 }
 
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithEnglishUnitedStatesLocale) {
+TEST(CollatorFactoryICUTest, CaseFirstUpperWithStrengthTwoFails) {
     CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "en_US"))
-                  .getStatus());
+    auto collator = factory.makeFromBSON(BSON("locale"
+                                              << "en_US"
+                                              << "caseFirst"
+                                              << "upper"
+                                              << "strength"
+                                              << 2));
+    ASSERT_NOT_OK(collator.getStatus());
 }
 
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithEnglishUnitedStatesComputerLocale) {
+TEST(CollatorFactoryICUTest, GermanPhonebookCollatoHasExpectedComparisonSemantics) {
     CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "en_US_POSIX"))
-                  .getStatus());
+    auto dictionaryCollator = factory.makeFromBSON(BSON("locale"
+                                                        << "de"));
+    ASSERT_OK(dictionaryCollator.getStatus());
+    auto phonebookCollator = factory.makeFromBSON(BSON("locale"
+                                                       << "de@collation=phonebook"));
+    ASSERT_OK(phonebookCollator.getStatus());
+
+    StringData withoutAccent("of");
+    StringData withAccent("öf");
+
+    ASSERT_LT(dictionaryCollator.getValue()->compare(withoutAccent, withAccent), 0);
+    ASSERT_GT(phonebookCollator.getValue()->compare(withoutAccent, withAccent), 0);
 }
 
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithEstonianLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "et"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithFilipinoLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "fil"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithFinnishLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "fi"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithFrenchLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "fr"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithFrenchCanadaLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "fr_CA"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithGeorgianLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "ka"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithGermanLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "de"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithGermanAustriaLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "de_AT"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithGreekLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "el"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithHebrewLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "he"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithHindiLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "hi"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithHungarianLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "hu"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithIcelandicLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "is"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithIndonesianLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "id"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithIrishLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "ga"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithItalianLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "it"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithJapaneseLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "ja"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithKoreanLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "ko"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithLatvianLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "lv"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithLithuanianLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "lt"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithNorwegianNynorskLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "nn"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithPashtoLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "ps"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithPersianLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "fa"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithPersianAfghanistanLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "fa_AF"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithPolishLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "pl"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithPortugueseLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "pt"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithPunjabiLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "pa"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithRomanianLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "ro"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithRussianLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "ru"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithSlovakLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "sk"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithSlovenianLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "sl"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithSpanishLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "es"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithSwedishLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "sv"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithThaiLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "th"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithTurkishLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "tr"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithUkrainianLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "uk"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithUrduLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "ur"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationSucceedsWithVietnameseLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_OK(factory
-                  .makeFromBSON(BSON("locale"
-                                     << "vi"))
-                  .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationFailsWithAfrikaansLocale) {
+TEST(CollatorFactoryICUTest, AliasNoForNorwegianBokmalLocaleNotSupported) {
     CollatorFactoryICU factory;
     ASSERT_NOT_OK(factory
                       .makeFromBSON(BSON("locale"
-                                         << "af"))
+                                         << "no"))
                       .getStatus());
 }
 
-TEST(CollatorFactoryICUTest, FactoryInitializationFailsWithEsperantoLocale) {
+TEST(CollatorFactoryICUTest, TraditionalSpanishAliasNotSupported) {
     CollatorFactoryICU factory;
     ASSERT_NOT_OK(factory
                       .makeFromBSON(BSON("locale"
-                                         << "eo"))
-                      .getStatus());
-}
-
-TEST(CollatorFactoryICUTest, FactoryInitializationFailsWithSwahiliLocale) {
-    CollatorFactoryICU factory;
-    ASSERT_NOT_OK(factory
-                      .makeFromBSON(BSON("locale"
-                                         << "sw"))
+                                         << "es__TRADITIONAL"))
                       .getStatus());
 }
 

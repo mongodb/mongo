@@ -40,33 +40,5 @@
         shardHost: shardDoc.host
     }));
 
-    var configAdmin = st.c0.getDB('admin');
-    // Initialize internal config string.
-    assert.commandWorked(configAdmin.runCommand({
-        setShardVersion: '',
-        init: true,
-        authoritative: true,
-        configdb: configStr,
-        shard: 'config'
-    }));
-
-    // Passing configdb that does not match initialized value is not ok.
-    assert.commandFailed(configAdmin.runCommand({
-        setShardVersion: '',
-        init: true,
-        authoritative: true,
-        configdb: 'bad-rs/local:12,local:34',
-        shard: 'config'
-    }));
-
-    // Passing configdb that matches initialized value is ok.
-    assert.commandWorked(configAdmin.runCommand({
-        setShardVersion: '',
-        init: true,
-        authoritative: true,
-        configdb: alternateConfigStr,
-        shard: 'config'
-    }));
-
     st.stop();
 })();

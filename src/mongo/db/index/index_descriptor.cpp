@@ -30,10 +30,18 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/index/index_descriptor.h"
+
+#include <algorithm>
+
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace {
 void populateOptionsMap(std::map<StringData, BSONElement>& theMap, const BSONObj& spec) {
@@ -42,20 +50,114 @@ void populateOptionsMap(std::map<StringData, BSONElement>& theMap, const BSONObj
         const BSONElement e = it.next();
 
         StringData fieldName = e.fieldNameStringData();
-        if (fieldName == "key" || fieldName == "ns" || fieldName == "name" ||
-            fieldName == "v" ||                     // not considered for equivalence
-            fieldName == "textIndexVersion" ||      // same as "v"
-            fieldName == "2dsphereIndexVersion" ||  // same as "v"
-            fieldName == "background" ||            // this is a creation time option only
-            fieldName == "dropDups" ||              // this is now ignored
-            fieldName == "sparse" ||                // checked specially
-            fieldName == "unique"                   // check specially
+        if (fieldName == IndexDescriptor::kKeyPatternFieldName ||
+            fieldName == IndexDescriptor::kNamespaceFieldName ||
+            fieldName == IndexDescriptor::kIndexNameFieldName ||
+            fieldName ==
+                IndexDescriptor::kIndexVersionFieldName ||  // not considered for equivalence
+            fieldName == IndexDescriptor::kTextVersionFieldName ||      // same as index version
+            fieldName == IndexDescriptor::k2dsphereVersionFieldName ||  // same as index version
+            fieldName ==
+                IndexDescriptor::kBackgroundFieldName ||  // this is a creation time option only
+            fieldName == IndexDescriptor::kDropDuplicatesFieldName ||  // this is now ignored
+            fieldName == IndexDescriptor::kSparseFieldName ||          // checked specially
+            fieldName == IndexDescriptor::kUniqueFieldName             // check specially
             ) {
             continue;
         }
         theMap[fieldName] = e;
     }
 }
+}  // namespace
+
+constexpr StringData IndexDescriptor::k2dIndexBitsFieldName;
+constexpr StringData IndexDescriptor::k2dIndexMaxFieldName;
+constexpr StringData IndexDescriptor::k2dIndexMinFieldName;
+constexpr StringData IndexDescriptor::k2dsphereCoarsestIndexedLevel;
+constexpr StringData IndexDescriptor::k2dsphereFinestIndexedLevel;
+constexpr StringData IndexDescriptor::k2dsphereVersionFieldName;
+constexpr StringData IndexDescriptor::kBackgroundFieldName;
+constexpr StringData IndexDescriptor::kCollationFieldName;
+constexpr StringData IndexDescriptor::kDefaultLanguageFieldName;
+constexpr StringData IndexDescriptor::kDropDuplicatesFieldName;
+constexpr StringData IndexDescriptor::kExpireAfterSecondsFieldName;
+constexpr StringData IndexDescriptor::kGeoHaystackBucketSize;
+constexpr StringData IndexDescriptor::kIndexNameFieldName;
+constexpr StringData IndexDescriptor::kIndexVersionFieldName;
+constexpr StringData IndexDescriptor::kKeyPatternFieldName;
+constexpr StringData IndexDescriptor::kLanguageOverrideFieldName;
+constexpr StringData IndexDescriptor::kNamespaceFieldName;
+constexpr StringData IndexDescriptor::kPartialFilterExprFieldName;
+constexpr StringData IndexDescriptor::kSparseFieldName;
+constexpr StringData IndexDescriptor::kStorageEngineFieldName;
+constexpr StringData IndexDescriptor::kTextVersionFieldName;
+constexpr StringData IndexDescriptor::kUniqueFieldName;
+constexpr StringData IndexDescriptor::kWeightsFieldName;
+
+bool IndexDescriptor::isIndexVersionSupported(IndexVersion indexVersion) {
+    switch (indexVersion) {
+        case IndexVersion::kV0:
+        case IndexVersion::kV1:
+        case IndexVersion::kV2:
+            return true;
+    }
+    return false;
+}
+
+std::set<IndexVersion> IndexDescriptor::getSupportedIndexVersions() {
+    return {IndexVersion::kV0, IndexVersion::kV1, IndexVersion::kV2};
+}
+
+Status IndexDescriptor::isIndexVersionAllowedForCreation(
+    IndexVersion indexVersion,
+    const ServerGlobalParams::FeatureCompatibility& featureCompatibility,
+    const BSONObj& indexSpec) {
+    switch (indexVersion) {
+        case IndexVersion::kV0:
+            break;
+        case IndexVersion::kV1:
+            return Status::OK();
+        case IndexVersion::kV2: {
+            if (ServerGlobalParams::FeatureCompatibility::Version::k32 ==
+                    featureCompatibility.version.load() &&
+                featureCompatibility.validateFeaturesAsMaster.load()) {
+                return {ErrorCodes::CannotCreateIndex,
+                        str::stream() << "Invalid index specification " << indexSpec
+                                      << "; cannot create an index with v="
+                                      << static_cast<int>(IndexVersion::kV2)
+                                      << " when the featureCompatibilityVersion is 3.2. See "
+                                         "http://dochub.mongodb.org/core/"
+                                         "3.4-feature-compatibility."};
+            }
+            return Status::OK();
+        }
+    }
+    return {ErrorCodes::CannotCreateIndex,
+            str::stream() << "Invalid index specification " << indexSpec
+                          << "; cannot create an index with v="
+                          << static_cast<int>(indexVersion)};
+}
+
+IndexVersion IndexDescriptor::getDefaultIndexVersion(
+    ServerGlobalParams::FeatureCompatibility::Version featureCompatibilityVersion) {
+    ServerGlobalParams::FeatureCompatibility featureCompatibility;
+    featureCompatibility.version.store(featureCompatibilityVersion);
+    // We always pass validateFeaturesAsMaster=true since this flag should not affect our
+    // determination of the default index version.
+    featureCompatibility.validateFeaturesAsMaster.store(true);
+    // We pass in an empty object for the index specification because it is only used within the
+    // error reason.
+    if (!IndexDescriptor::isIndexVersionAllowedForCreation(
+             IndexVersion::kV2, featureCompatibility, BSONObj())
+             .isOK()) {
+        // When the featureCompatibilityVersion is 3.2, we use index version v=1 as the default
+        // index version.
+        return IndexVersion::kV1;
+    }
+
+    // When the featureCompatibilityVersion is 3.4, we use index version v=2 as the default index
+    // version.
+    return IndexVersion::kV2;
 }
 
 bool IndexDescriptor::areIndexOptionsEquivalent(const IndexDescriptor* other) const {
@@ -76,13 +178,15 @@ bool IndexDescriptor::areIndexOptionsEquivalent(const IndexDescriptor* other) co
     std::map<StringData, BSONElement> newOptionsMap;
     populateOptionsMap(newOptionsMap, other->infoObj());
 
-    return existingOptionsMap == newOptionsMap;
-}
-
-void IndexDescriptor::_checkOk() const {
-    if (_magic == 123987)
-        return;
-    log() << "uh oh: " << (void*)(this) << " " << _magic;
-    invariant(0);
+    return existingOptionsMap.size() == newOptionsMap.size() &&
+        std::equal(existingOptionsMap.begin(),
+                   existingOptionsMap.end(),
+                   newOptionsMap.begin(),
+                   [](const std::pair<StringData, BSONElement>& lhs,
+                      const std::pair<StringData, BSONElement>& rhs) {
+                       return lhs.first == rhs.first &&
+                           SimpleBSONElementComparator::kInstance.evaluate(lhs.second ==
+                                                                           rhs.second);
+                   });
 }
 }

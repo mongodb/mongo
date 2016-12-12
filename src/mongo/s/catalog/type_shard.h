@@ -110,12 +110,12 @@ public:
     }
     void setMaxSizeMB(const long long maxSizeMB);
 
-    const std::vector<std::string> getTags() const {
+    std::vector<std::string> getTags() const {
         return _tags.value_or(std::vector<std::string>());
     }
     void setTags(const std::vector<std::string>& tags);
 
-    const ShardState getState() const {
+    ShardState getState() const {
         return _state.value_or(ShardState::kNotShardAware);
     }
     void setState(const ShardState state);

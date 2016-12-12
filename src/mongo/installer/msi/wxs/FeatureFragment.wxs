@@ -2,7 +2,7 @@
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Fragment>
     <?if $(var.Edition) = Enterprise ?>
-      <WixVariable Id="MiscToolsDesc" Value="Miscellaneous MongoDB tools (bsondump, mongodecrypt, mongofiles, mongooplog, mongoperf)" />
+      <WixVariable Id="MiscToolsDesc" Value="Miscellaneous MongoDB tools (bsondump, mongodecrypt, mongofiles, mongoldap, mongooplog, mongoperf)" />
     <?else?>
       <WixVariable Id="MiscToolsDesc" Value="Miscellaneous MongoDB tools (bsondump, mongofiles, mongooplog, mongoperf)" />
     <?endif?>
@@ -93,6 +93,7 @@
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseBase" />
             <ComponentRef Id="c_mongodecrypt"/>
+            <ComponentRef Id="c_mongoldap"/>
           <?endif ?>
           <?if $(var.Edition) = SSL ?>
             <ComponentGroupRef Id="cg_SSLBase" />

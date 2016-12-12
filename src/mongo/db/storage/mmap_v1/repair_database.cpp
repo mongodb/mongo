@@ -257,7 +257,7 @@ public:
 
             MONGO_ASSERT_ON_EXCEPTION(boost::filesystem::remove_all(_path));
         } catch (DBException& e) {
-            error() << "RepairFileDeleter failed to cleanup: " << e;
+            error() << "RepairFileDeleter failed to cleanup: " << redact(e);
             error() << "aborting";
             fassertFailed(17402);
         }
@@ -397,7 +397,7 @@ Status MMAPV1Engine::repairDatabase(OperationContext* txn,
                     indexes.push_back(desc->infoObj());
                 }
 
-                Status status = indexer.init(indexes);
+                Status status = indexer.init(indexes).getStatus();
                 if (!status.isOK()) {
                     return status;
                 }

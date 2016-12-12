@@ -114,9 +114,8 @@ void* wrap_alloc(T&& func, void* ptr, size_t bytes) {
 
     if (mb && (tb + bytes > mb)) {
         auto scope = mongo::mozjs::MozJSImplScope::getThreadScope();
-        invariant(scope);
-
-        scope->setOOM();
+        if (scope)
+            scope->setOOM();
 
         // We fall through here because we want to let spidermonkey continue
         // with whatever it was doing.  Calling setOOM will fail the top level

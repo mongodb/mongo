@@ -251,8 +251,7 @@ void JournalWriter::_journalWriterThread() {
             _applyToDataFilesNotify->notifyAll(buffer->_commitNumber);
         }
     } catch (const DBException& e) {
-        severe() << "dbexception in journalWriterThread causing immediate shutdown: "
-                 << e.toString();
+        severe() << "dbexception in journalWriterThread causing immediate shutdown: " << redact(e);
         invariant(false);
     } catch (const std::ios_base::failure& e) {
         severe() << "ios_base exception in journalWriterThread causing immediate shutdown: "
@@ -263,7 +262,8 @@ void JournalWriter::_journalWriterThread() {
                  << e.what();
         invariant(false);
     } catch (const std::exception& e) {
-        severe() << "exception in journalWriterThread causing immediate shutdown: " << e.what();
+        severe() << "exception in journalWriterThread causing immediate shutdown: "
+                 << redact(e.what());
         invariant(false);
     } catch (...) {
         severe() << "unhandled exception in journalWriterThread causing immediate shutdown";

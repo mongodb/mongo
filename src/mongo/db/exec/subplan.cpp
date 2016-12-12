@@ -173,7 +173,7 @@ Status SubplanStage::planSubqueries() {
     for (size_t i = 0; i < _plannerParams.indices.size(); ++i) {
         const IndexEntry& ie = _plannerParams.indices[i];
         _indexMap[ie.name] = i;
-        LOG(5) << "Subplanner: index " << i << " is " << ie.toString();
+        LOG(5) << "Subplanner: index " << i << " is " << ie;
     }
 
     const ExtensionsCallbackReal extensionsCallback(getOpCtx(), &_collection->ns());
@@ -400,7 +400,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
         return Status(ErrorCodes::BadValue, ss);
     }
 
-    LOG(5) << "Subplanner: fully tagged tree is " << solnRoot->toString();
+    LOG(5) << "Subplanner: fully tagged tree is " << redact(solnRoot->toString());
 
     // Takes ownership of 'solnRoot'
     _compositeSolution.reset(
@@ -412,7 +412,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
         return Status(ErrorCodes::BadValue, ss);
     }
 
-    LOG(5) << "Subplanner: Composite solution is " << _compositeSolution->toString();
+    LOG(5) << "Subplanner: Composite solution is " << redact(_compositeSolution->toString());
 
     // Use the index tags from planning each branch to construct the composite solution,
     // and set that solution as our child stage.

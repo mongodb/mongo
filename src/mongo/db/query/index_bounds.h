@@ -37,6 +37,13 @@
 
 namespace mongo {
 
+enum class BoundInclusion {
+    kExcludeBothStartAndEndKeys,
+    kIncludeStartKeyOnly,
+    kIncludeEndKeyOnly,
+    kIncludeBothStartAndEndKeys
+};
+
 /**
  * An ordered list of intervals for one field.
  */
@@ -74,7 +81,7 @@ struct OrderedIntervalList {
  * interpret.  Previously known as FieldRangeVector.
  */
 struct IndexBounds {
-    IndexBounds() : isSimpleRange(false), endKeyInclusive(false) {}
+    IndexBounds() : isSimpleRange(false), boundInclusion(BoundInclusion::kIncludeStartKeyOnly) {}
 
     // For each indexed field, the values that the field is allowed to take on.
     std::vector<OrderedIntervalList> fields;
@@ -101,6 +108,26 @@ struct IndexBounds {
     bool operator!=(const IndexBounds& other) const;
 
     /**
+     * Returns if the start key should be included in the bounds specified by the given
+     * BoundInclusion.
+     */
+    static bool isStartIncludedInBound(BoundInclusion boundInclusion);
+
+    /**
+     * Returns if the end key should be included in the bounds specified by the given
+     * BoundInclusion.
+     */
+    static bool isEndIncludedInBound(BoundInclusion boundInclusion);
+
+    /**
+     * Returns a BoundInclusion given two booleans of whether to included the start key and the end
+     * key.
+     */
+    static BoundInclusion makeBoundInclusionFromBoundBools(bool startKeyInclusive,
+                                                           bool endKeyInclusive);
+
+
+    /**
      * BSON format for explain. The format is an array of strings for each field.
      * Each string represents an interval. The strings use "[" and "]" if the interval
      * bounds are inclusive, and "(" / ")" if exclusive.
@@ -114,7 +141,7 @@ struct IndexBounds {
     bool isSimpleRange;
     BSONObj startKey;
     BSONObj endKey;
-    bool endKeyInclusive;
+    BoundInclusion boundInclusion;
 };
 
 /**

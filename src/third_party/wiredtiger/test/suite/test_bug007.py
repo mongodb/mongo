@@ -56,6 +56,5 @@ class test_bug007(wttest.WiredTigerTestCase):
         # Forced salvage should succeed.
         self.session.salvage(uri, "force")
 
-
 if __name__ == '__main__':
     wttest.run()

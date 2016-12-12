@@ -64,6 +64,7 @@ TEST_F(StorePossibleCursorTest, ReturnsValidCursorResponse) {
     auto outgoingCursorResponse =
         storePossibleCursor(hostAndPort,
                             cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse),
+                            nss,
                             nullptr,  // TaskExecutor
                             getManager());
     ASSERT_OK(outgoingCursorResponse.getStatus());
@@ -73,14 +74,15 @@ TEST_F(StorePossibleCursorTest, ReturnsValidCursorResponse) {
     ASSERT_EQ(nss.toString(), parsedOutgoingResponse.getValue().getNSS().toString());
     ASSERT_EQ(0U, parsedOutgoingResponse.getValue().getCursorId());
     ASSERT_EQ(2U, parsedOutgoingResponse.getValue().getBatch().size());
-    ASSERT_EQ(fromjson("{_id: 1}"), parsedOutgoingResponse.getValue().getBatch()[0]);
-    ASSERT_EQ(fromjson("{_id: 2}"), parsedOutgoingResponse.getValue().getBatch()[1]);
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), parsedOutgoingResponse.getValue().getBatch()[0]);
+    ASSERT_BSONOBJ_EQ(fromjson("{_id: 2}"), parsedOutgoingResponse.getValue().getBatch()[1]);
 }
 
 // Test that storePossibleCursor() propagates an error if it cannot parse the cursor response.
 TEST_F(StorePossibleCursorTest, FailsGracefullyOnBadCursorResponseDocument) {
     auto outgoingCursorResponse = storePossibleCursor(hostAndPort,
                                                       fromjson("{ok: 1, cursor: {}}"),
+                                                      nss,
                                                       nullptr,  // TaskExecutor
                                                       getManager());
     ASSERT_NOT_OK(outgoingCursorResponse.getStatus());
@@ -94,10 +96,11 @@ TEST_F(StorePossibleCursorTest, PassesUpCommandResultIfItDoesNotDescribeACursor)
                                  << "cursor");
     auto outgoingCursorResponse = storePossibleCursor(hostAndPort,
                                                       notACursorObj,
+                                                      nss,
                                                       nullptr,  // TaskExecutor
                                                       getManager());
     ASSERT_OK(outgoingCursorResponse.getStatus());
-    ASSERT_EQ(notACursorObj, outgoingCursorResponse.getValue());
+    ASSERT_BSONOBJ_EQ(notACursorObj, outgoingCursorResponse.getValue());
 }
 
 }  // namespace

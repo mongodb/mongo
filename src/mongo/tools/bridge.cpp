@@ -383,8 +383,6 @@ MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
 
 }  // namespace
 
-void logProcessDetailsForLogRotate() {}
-
 int bridgeMain(int argc, char** argv, char** envp) {
     static StaticObserver staticObserver;
 
@@ -398,7 +396,7 @@ int bridgeMain(int argc, char** argv, char** envp) {
 
     setupSignalHandlers();
     runGlobalInitializersOrDie(argc, argv, envp);
-    startSignalProcessingThread();
+    startSignalProcessingThread(LogFileStatus::kNoLogFileToRotate);
 
     listener = stdx::make_unique<BridgeListener>();
     listener->setupSockets();

@@ -28,7 +28,6 @@
 
 import Queue
 import threading, time, wiredtiger, wttest
-from helper import key_populate, simple_populate
 from wtthread import checkpoint_thread, op_thread
 from wtscenario import make_scenarios
 
@@ -83,7 +82,6 @@ class test_checkpoint02(wttest.WiredTigerTestCase):
             i += 1
 
         self.assertEqual(i, self.nops)
-
 
 if __name__ == '__main__':
     wttest.run()

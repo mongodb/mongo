@@ -11,6 +11,7 @@ function parseConfig(config) {
         'iterations',
         'passConnectionCache',
         'setup',
+        'skip',
         'startState',
         'states',
         'teardown',
@@ -73,6 +74,11 @@ function parseConfig(config) {
 
     config.setup = config.setup || function() {};
     assert.eq('function', typeof config.setup);
+
+    config.skip = config.skip || function() {
+        return {skip: false};
+    };
+    assert.eq('function', typeof config.skip);
 
     config.teardown = config.teardown || function() {};
     assert.eq('function', typeof config.teardown);

@@ -120,7 +120,7 @@ ConvertAndCopyTo(JSContext* cx,
         return false;
 
     InvokeArgs args(cx);
-    if (!args.init(5))
+    if (!args.init(cx, 5))
         return false;
 
     args.setCallee(ObjectValue(*func));
@@ -159,7 +159,7 @@ Reify(JSContext* cx,
         return false;
 
     InvokeArgs args(cx);
-    if (!args.init(3))
+    if (!args.init(cx, 3))
         return false;
 
     args.setCallee(ObjectValue(*func));

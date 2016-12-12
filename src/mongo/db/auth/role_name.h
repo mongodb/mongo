@@ -164,7 +164,7 @@ private:
 
 }  // namespace mongo
 
-// Define hash function for RoleNames so they can be keys in std::unordered_map
+// Define hash function for RoleNames so they can be keys in stdx::unordered_map
 MONGO_HASH_NAMESPACE_START
 template <>
 struct hash<mongo::RoleName> {

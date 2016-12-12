@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/value_internal.h"
 #include "mongo/platform/unordered_set.h"
@@ -102,7 +103,8 @@ public:
     explicit Value(const Document& doc) : _storage(Object, doc) {}
     explicit Value(const BSONObj& obj);
     explicit Value(const BSONArray& arr);
-    explicit Value(const std::vector<BSONObj>& arr);
+    explicit Value(const std::vector<BSONObj>& vec);
+    explicit Value(const std::vector<Document>& vec);
     explicit Value(std::vector<Value> vec) : _storage(Array, new RCVector(std::move(vec))) {}
     explicit Value(const BSONBinData& bd) : _storage(BinData, bd) {}
     explicit Value(const BSONRegEx& re) : _storage(RegEx, re) {}
@@ -334,7 +336,7 @@ private:
     ValueStorage _storage;
     friend class MutableValue;  // gets and sets _storage.genericRCPtr
 };
-static_assert(sizeof(Value) == 16, "sizeof(Value) == 16");
+MONGO_STATIC_ASSERT(sizeof(Value) == 16);
 
 inline void swap(mongo::Value& lhs, mongo::Value& rhs) {
     lhs.swap(rhs);

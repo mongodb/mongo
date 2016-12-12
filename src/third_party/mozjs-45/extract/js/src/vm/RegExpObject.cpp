@@ -45,10 +45,20 @@ js::RegExpAlloc(ExclusiveContext* cx, HandleObject proto /* = nullptr */)
 {
     // Note: RegExp objects are always allocated in the tenured heap. This is
     // not strictly required, but simplifies embedding them in jitcode.
-    RegExpObject* regexp = NewObjectWithClassProto<RegExpObject>(cx, proto, TenuredObject);
+    Rooted<RegExpObject*> regexp(cx);
+
+    regexp = NewObjectWithClassProto<RegExpObject>(cx, proto, TenuredObject);
     if (!regexp)
         return nullptr;
+
     regexp->initPrivate(nullptr);
+
+    if (!EmptyShape::ensureInitialCustomShape<RegExpObject>(cx, regexp))
+        return nullptr;
+
+    MOZ_ASSERT(regexp->lookupPure(cx->names().lastIndex)->slot() ==
+               RegExpObject::lastIndexSlot());
+
     return regexp;
 }
 
@@ -137,7 +147,7 @@ RegExpObject::trace(JSTracer* trc, JSObject* obj)
     //      be a marking tracer.
     //   2. When a write barrier executes, IsMarkingTracer is true, but
     //      isHeapBusy() will be false.
-    if (trc->runtime()->isHeapBusy() &&
+    if (trc->runtime()->isHeapCollecting() &&
         trc->isMarkingTracer() &&
         !obj->asTenured().zone()->isPreservingCode())
     {
@@ -145,13 +155,6 @@ RegExpObject::trace(JSTracer* trc, JSObject* obj)
     } else {
         shared->trace(trc);
     }
-}
-
-/* static */ bool
-RegExpObject::initFromAtom(ExclusiveContext* cx, Handle<RegExpObject*> regexp, HandleAtom source,
-                           RegExpFlag flags)
-{
-    return regexp->init(cx, source, flags);
 }
 
 const Class RegExpObject::class_ = {
@@ -223,8 +226,7 @@ RegExpObject::createNoStatics(ExclusiveContext* cx, HandleAtom source, RegExpFla
     if (!regexp)
         return nullptr;
 
-    if (!RegExpObject::initFromAtom(cx, regexp, source, flags))
-        return nullptr;
+    regexp->initAndZeroLastIndex(source, flags, cx);
 
     return regexp;
 }
@@ -253,30 +255,25 @@ RegExpObject::assignInitialShape(ExclusiveContext* cx, Handle<RegExpObject*> sel
     return self->addDataProperty(cx, cx->names().lastIndex, LAST_INDEX_SLOT, JSPROP_PERMANENT);
 }
 
-bool
-RegExpObject::init(ExclusiveContext* cx, HandleAtom source, RegExpFlag flags)
+void
+RegExpObject::initIgnoringLastIndex(HandleAtom source, RegExpFlag flags)
 {
-    Rooted<RegExpObject*> self(cx, this);
+    // If this is a re-initialization with an existing RegExpShared, 'flags'
+    // may not match getShared()->flags, so forget the RegExpShared.
+    NativeObject::setPrivate(nullptr);
 
-    if (!EmptyShape::ensureInitialCustomShape<RegExpObject>(cx, self))
-        return false;
+    setSource(source);
+    setGlobal(flags & GlobalFlag);
+    setIgnoreCase(flags & IgnoreCaseFlag);
+    setMultiline(flags & MultilineFlag);
+    setSticky(flags & StickyFlag);
+}
 
-    MOZ_ASSERT(self->lookup(cx, NameToId(cx->names().lastIndex))->slot() ==
-               LAST_INDEX_SLOT);
-
-    /*
-     * If this is a re-initialization with an existing RegExpShared, 'flags'
-     * may not match getShared()->flags, so forget the RegExpShared.
-     */
-    self->NativeObject::setPrivate(nullptr);
-
-    self->zeroLastIndex();
-    self->setSource(source);
-    self->setGlobal(flags & GlobalFlag);
-    self->setIgnoreCase(flags & IgnoreCaseFlag);
-    self->setMultiline(flags & MultilineFlag);
-    self->setSticky(flags & StickyFlag);
-    return true;
+void
+RegExpObject::initAndZeroLastIndex(HandleAtom source, RegExpFlag flags, ExclusiveContext* cx)
+{
+    initIgnoringLastIndex(source, flags);
+    zeroLastIndex(cx);
 }
 
 static MOZ_ALWAYS_INLINE bool
@@ -880,46 +877,41 @@ js::CloneRegExpObject(JSContext* cx, JSObject* obj_)
 {
     Rooted<RegExpObject*> regex(cx, &obj_->as<RegExpObject>());
 
-    // Check that the RegExpShared for |regex| is okay to reuse in the clone.
-    // If the |RegExpStatics| provides additional flags, we'll need a new
-    // |RegExpShared|.
-    RegExpStatics* currentStatics = regex->getProto()->global().getRegExpStatics(cx);
-    if (!currentStatics)
-        return nullptr;
-
-    Rooted<JSAtom*> source(cx, regex->getSource());
-
-    RegExpFlag origFlags = regex->getFlags();
-    RegExpFlag staticsFlags = currentStatics->getFlags();
-    if ((origFlags & staticsFlags) != staticsFlags) {
-        Rooted<RegExpObject*> clone(cx, RegExpAlloc(cx));
-        if (!clone)
-            return nullptr;
-
-        if (!RegExpObject::initFromAtom(cx, clone, source, RegExpFlag(origFlags | staticsFlags)))
-            return nullptr;
-
-        return clone;
-    }
-
-    // Otherwise, the clone can use |regexp|'s RegExpShared.
+    // Unlike RegExpAlloc, all clones must use |regex|'s group.  Allocate
+    // in the tenured heap to simplify embedding them in JIT code.
     RootedObjectGroup group(cx, regex->group());
-
-    // Note: RegExp objects are always allocated in the tenured heap. This is
-    // not strictly required, but it simplifies embedding them in jitcode.
     Rooted<RegExpObject*> clone(cx, NewObjectWithGroup<RegExpObject>(cx, group, TenuredObject));
     if (!clone)
         return nullptr;
     clone->initPrivate(nullptr);
 
-    RegExpGuard g(cx);
-    if (!regex->getShared(cx, &g))
+    if (!EmptyShape::ensureInitialCustomShape<RegExpObject>(cx, clone))
         return nullptr;
 
-    if (!RegExpObject::initFromAtom(cx, clone, source, g->getFlags()))
+    Rooted<JSAtom*> source(cx, regex->getSource());
+
+    // Check that the RegExpShared for |regex| is okay to reuse in the clone.
+    RegExpStatics* currentStatics = regex->getProto()->global().getRegExpStatics(cx);
+    if (!currentStatics)
         return nullptr;
 
-    clone->setShared(*g.re());
+    RegExpFlag origFlags = regex->getFlags();
+    RegExpFlag staticsFlags = currentStatics->getFlags();
+    if ((origFlags & staticsFlags) != staticsFlags) {
+        // If |currentStatics| provides additional flags, we'll have to use a
+        // new |RegExpShared|.
+        clone->initAndZeroLastIndex(source, RegExpFlag(origFlags | staticsFlags), cx);
+    } else {
+        // Otherwise we can use |regexp|'s RegExpShared.  Initialize using its
+        // flags and associate it with the clone.
+        RegExpGuard g(cx);
+        if (!regex->getShared(cx, &g))
+            return nullptr;
+
+        clone->initAndZeroLastIndex(source, g->getFlags(), cx);
+        clone->setShared(*g.re());
+    }
+
     return clone;
 }
 

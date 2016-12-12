@@ -100,8 +100,9 @@ public:
 
 private:
     friend struct DepsTracker;  // so it can call constructor
-    explicit ParsedDeps(const Document& fields) : _fields(fields) {}
+    explicit ParsedDeps(Document&& fields) : _fields(std::move(fields)), _nFields(_fields.size()) {}
 
     Document _fields;
+    int _nFields;  // Cache the number of top-level fields needed.
 };
 }

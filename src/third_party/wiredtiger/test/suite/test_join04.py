@@ -163,6 +163,5 @@ class test_join04(wttest.WiredTigerTestCase):
             for c in cursors:
                 c.close()
 
-
 if __name__ == '__main__':
     wttest.run()

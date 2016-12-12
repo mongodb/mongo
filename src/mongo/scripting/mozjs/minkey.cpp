@@ -39,8 +39,10 @@
 namespace mongo {
 namespace mozjs {
 
-const JSFunctionSpec MinKeyInfo::methods[2] = {
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD(tojson, MinKeyInfo), JS_FS_END,
+const JSFunctionSpec MinKeyInfo::methods[3] = {
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(tojson, MinKeyInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, MinKeyInfo),
+    JS_FS_END,
 };
 
 const char* const MinKeyInfo::className = "MinKey";
@@ -86,6 +88,10 @@ void MinKeyInfo::hasInstance(JSContext* cx,
 
 void MinKeyInfo::Functions::tojson::call(JSContext* cx, JS::CallArgs args) {
     ValueReader(cx, args.rval()).fromStringData("{ \"$minKey\" : 1 }");
+}
+
+void MinKeyInfo::Functions::toJSON::call(JSContext* cx, JS::CallArgs args) {
+    ValueReader(cx, args.rval()).fromBSON(BSON("$minKey" << 1), nullptr, false);
 }
 
 void MinKeyInfo::postInstall(JSContext* cx, JS::HandleObject global, JS::HandleObject proto) {

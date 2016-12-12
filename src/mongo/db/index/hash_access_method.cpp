@@ -51,9 +51,9 @@ HashAccessMethod::HashAccessMethod(IndexCatalogEntry* btreeState, SortedDataInte
     _collator = btreeState->getCollator();
 }
 
-void HashAccessMethod::getKeys(const BSONObj& obj,
-                               BSONObjSet* keys,
-                               MultikeyPaths* multikeyPaths) const {
+void HashAccessMethod::doGetKeys(const BSONObj& obj,
+                                 BSONObjSet* keys,
+                                 MultikeyPaths* multikeyPaths) const {
     ExpressionKeysPrivate::getHashKeys(
         obj, _hashedField, _seed, _hashVersion, _descriptor->isSparse(), _collator, keys);
 }

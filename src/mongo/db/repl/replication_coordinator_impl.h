@@ -46,7 +46,6 @@
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/storage/snapshot_name.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/unordered_map.h"
@@ -85,14 +84,10 @@ class StorageInterface;
 class TopologyCoordinator;
 class VoteRequester;
 
-class ReplicationCoordinatorImpl : public ReplicationCoordinator, public KillOpListenerInterface {
+class ReplicationCoordinatorImpl : public ReplicationCoordinator {
     MONGO_DISALLOW_COPYING(ReplicationCoordinatorImpl);
 
 public:
-    // For testing only.
-    using StepDownNonBlockingResult =
-        std::pair<std::unique_ptr<mongo::Lock::GlobalLock>, ReplicationExecutor::EventHandle>;
-
     // Takes ownership of the "externalState", "topCoord" and "network" objects.
     ReplicationCoordinatorImpl(const ReplSettings& settings,
                                ReplicationCoordinatorExternalState* externalState,
@@ -134,18 +129,6 @@ public:
 
     virtual void clearSyncSourceBlacklist() override;
 
-    /*
-     * Implementation of the KillOpListenerInterface interrupt method so that we can wake up
-     * threads blocked in awaitReplication() when a killOp command comes in.
-     */
-    virtual void interrupt(unsigned opId);
-
-    /*
-     * Implementation of the KillOpListenerInterface interruptAll method so that we can wake up
-     * threads blocked in awaitReplication() when we kill all operations.
-     */
-    virtual void interruptAll();
-
     virtual ReplicationCoordinator::StatusAndDuration awaitReplication(
         OperationContext* txn, const OpTime& opTime, const WriteConcernOptions& writeConcern);
 
@@ -169,7 +152,7 @@ public:
                                          const NamespaceString& ns,
                                          bool slaveOk);
 
-    virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
+    virtual bool shouldRelaxIndexConstraints(const NamespaceString& ns);
 
     virtual Status setLastOptimeForSlave(const OID& rid, const Timestamp& ts);
 
@@ -212,7 +195,8 @@ public:
     virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand(
         ReplSetUpdatePositionCommandStyle commandStyle) const override;
 
-    virtual Status processReplSetGetStatus(BSONObjBuilder* result) override;
+    virtual Status processReplSetGetStatus(BSONObjBuilder* result,
+                                           ReplSetGetStatusResponseStyle responseStyle) override;
 
     virtual void fillIsMasterForReplSet(IsMasterResponse* result) override;
 
@@ -230,7 +214,8 @@ public:
 
     virtual bool getMaintenanceMode() override;
 
-    virtual Status processReplSetSyncFrom(const HostAndPort& target,
+    virtual Status processReplSetSyncFrom(OperationContext* txn,
+                                          const HostAndPort& target,
                                           BSONObjBuilder* resultObj) override;
 
     virtual Status processReplSetFreeze(int secs, BSONObjBuilder* resultObj) override;
@@ -276,7 +261,7 @@ public:
 
     virtual bool isReplEnabled() const override;
 
-    virtual HostAndPort chooseNewSyncSource(const Timestamp& lastTimestampFetched) override;
+    virtual HostAndPort chooseNewSyncSource(const OpTime& lastOpTimeFetched) override;
 
     virtual void blacklistSyncSource(const HostAndPort& host, Date_t until) override;
 
@@ -284,9 +269,6 @@ public:
 
     virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
                                         const rpc::ReplSetMetadata& metadata) override;
-
-    virtual SyncSourceResolverResponse selectSyncSource(OperationContext* txn,
-                                                        const OpTime& lastOpTimeFetched) override;
 
     virtual OpTime getLastCommittedOpTime() const override;
 
@@ -367,22 +349,6 @@ public:
      */
     Status setLastAppliedOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
     Status setLastDurableOptime_forTest(long long cfgVer, long long memberId, const OpTime& opTime);
-
-    /**
-     * Non-blocking version of stepDown.
-     * Returns a pair of global shared lock and event handle which are used to wait for the step
-     * down operation to complete. The global shared lock prevents writes until the step down has
-     * completed (or failed).
-     * When the operation is complete (wait() returns), 'result' will be set to the
-     * final status of the operation.
-     * If the handle is invalid, step down failed before we could schedule the rest of
-     * the step down processing and the error will be available immediately in 'result'.
-     */
-    StepDownNonBlockingResult stepDown_nonBlocking(OperationContext* txn,
-                                                   bool force,
-                                                   const Milliseconds& waitTime,
-                                                   const Milliseconds& stepdownTime,
-                                                   Status* result);
 
     /**
      * Non-blocking version of setFollowerMode.
@@ -551,6 +517,11 @@ private:
     typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;
 
     /**
+     * Appends a "replicationProgress" section with data for each member in set.
+     */
+    void _appendSlaveInfoData_inlock(BSONObjBuilder* result);
+
+    /**
      * Looks up the SlaveInfo in _slaveInfo associated with the given RID and returns a pointer
      * to it, or returns NULL if there is no SlaveInfo with the given RID.
      */
@@ -635,17 +606,14 @@ private:
     void _handleTimePassing(const ReplicationExecutor::CallbackArgs& cbData);
 
     /**
-     * Helper method for _awaitReplication that takes an already locked unique_lock and a
-     * Timer for timing the operation which has been counting since before the lock was
-     * acquired.
+     * Helper method for _awaitReplication that takes an already locked unique_lock, but leaves
+     * operation timing to the caller.
      */
-    ReplicationCoordinator::StatusAndDuration _awaitReplication_inlock(
-        const Timer* timer,
-        stdx::unique_lock<stdx::mutex>* lock,
-        OperationContext* txn,
-        const OpTime& opTime,
-        SnapshotName minSnapshot,
-        const WriteConcernOptions& writeConcern);
+    Status _awaitReplication_inlock(stdx::unique_lock<stdx::mutex>* lock,
+                                    OperationContext* txn,
+                                    const OpTime& opTime,
+                                    SnapshotName minSnapshot,
+                                    const WriteConcernOptions& writeConcern);
 
     /**
      * Returns true if the given writeConcern is satisfied up to "optime" or is unsatisfiable.
@@ -677,22 +645,15 @@ private:
     /**
      * Triggers all callbacks that are blocked waiting for new heartbeat data
      * to decide whether or not to finish a step down.
-     * Should only be called with _topoMutex held.
      */
-    void _signalStepDownWaiters();
+    void _signalStepDownWaiter_inlock();
 
     /**
-     * Helper for stepDown run within a ReplicationExecutor callback.  This method assumes
-     * it is running within a global shared lock, and thus that no writes are going on at the
-     * same time.
+     * Non-blocking helper method for the stepDown method, that represents executing
+     * one attempt to step down. See implementation of this method and stepDown for
+     * details.
      */
-    void _stepDownContinue(const ReplicationExecutor::EventHandle finishedEvent,
-                           OperationContext* txn,
-                           Date_t waitUntil,
-                           Date_t stepdownUntil,
-                           bool force,
-                           bool restartHeartbeats,
-                           Status* result);
+    bool _tryToStepDown(Date_t waitUntil, Date_t stepdownUntil, bool force);
 
     OID _getMyRID_inlock() const;
 
@@ -949,7 +910,10 @@ private:
      */
     void _requestRemotePrimaryStepdown(const HostAndPort& target);
 
-    ReplicationExecutor::EventHandle _stepDownStart();
+    /**
+     * Schedules stepdown to run with the global exclusive lock.
+     */
+    ReplicationExecutor::EventHandle _stepDownStart(bool hasMutex);
 
     /**
      * Completes a step-down of the current node.  Must be run with a global
@@ -988,9 +952,11 @@ private:
      * Utility method that schedules or performs actions specified by a HeartbeatResponseAction
      * returned by a TopologyCoordinator::processHeartbeatResponse(V1) call with the given
      * value of "responseStatus".
+     * 'hasMutex' is true if the caller is holding _mutex.  TODO(SERVER-27083): Remove this.
      */
     void _handleHeartbeatResponseAction(const HeartbeatResponseAction& action,
-                                        const StatusWith<ReplSetHeartbeatResponse>& responseStatus);
+                                        const StatusWith<ReplSetHeartbeatResponse>& responseStatus,
+                                        bool hasMutex);
 
     /**
      * Scan the SlaveInfoVector and determine the highest OplogEntry present on a majority of
@@ -1071,11 +1037,11 @@ private:
     void _startElectSelfIfEligibleV1(bool isPriorityTakeover);
 
     /**
-     * Reset the term of last vote to 0 to prevent any node from voting for term 0.
-     * Blocking until last vote write finishes. Must be called without holding _mutex.
+     * Resets the term of last vote to 0 to prevent any node from voting for term 0.
+     * Returns the event handle that indicates when last vote write finishes.
      */
-    void _resetElectionInfoOnProtocolVersionUpgrade(const ReplicaSetConfig& oldConfig,
-                                                    const ReplicaSetConfig& newConfig);
+    EventHandle _resetElectionInfoOnProtocolVersionUpgrade(const ReplicaSetConfig& oldConfig,
+                                                           const ReplicaSetConfig& newConfig);
 
     /**
      * Schedules work and returns handle to callback.
@@ -1219,6 +1185,14 @@ private:
     // TODO: ideally this should only change on rollbacks NOT on mongod restarts also.
     int _rbid;  // (M)
 
+    // Indicates that we've received a request to stepdown from PRIMARY (likely via a heartbeat)
+    // TODO(SERVER-27083): This bool is redundant of the same-named bool in TopologyCoordinatorImpl,
+    // but due to mutex ordering between _mutex and _topoMutex we can't inspect the
+    // TopologyCoordinator field in awaitReplication() where this bool is used.  Once we get rid
+    // of topoMutex and start guarding access to the TopologyCoordinator via _mutex we should
+    // consolidate the two bools.
+    bool _stepDownPending = false;  // (M)
+
     // list of information about clients waiting on replication.  Does *not* own the WaiterInfos.
     WaiterList _replicationWaiterList;  // (M)
 
@@ -1272,8 +1246,8 @@ private:
     // This member's index position in the current config.
     int _selfIndex;  // (MX)
 
-    // Vector of events that should be signaled whenever new heartbeat data comes in.
-    std::vector<ReplicationExecutor::EventHandle> _stepDownWaiters;  // (X)
+    // Condition to signal when new heartbeat data comes in.
+    stdx::condition_variable _stepDownWaiters;  // (X)
 
     // State for conducting an election of this node.
     // the presence of a non-null _freshnessChecker pointer indicates that an election is
@@ -1322,7 +1296,7 @@ private:
     // Storage interface used by data replicator.
     StorageInterface* _storage;  // (PS)
     // Data Replicator used to replicate data
-    std::unique_ptr<DataReplicator> _dr;  // (S)
+    std::shared_ptr<DataReplicator> _dr;  // (I) pointer set under mutex, copied by callers.
 
     // Hands out the next snapshot name.
     AtomicUInt64 _snapshotNameGenerator;  // (S)

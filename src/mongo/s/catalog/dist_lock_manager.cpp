@@ -38,7 +38,6 @@ namespace mongo {
 
 const Seconds DistLockManager::kDefaultLockTimeout(20);
 const Milliseconds DistLockManager::kSingleLockAttemptTimeout(0);
-const Milliseconds DistLockManager::kDefaultLockRetryInterval(500);
 
 DistLockManager::ScopedDistLock::ScopedDistLock(OperationContext* txn,
                                                 DistLockHandle lockHandle,
@@ -74,10 +73,8 @@ DistLockManager::ScopedDistLock& DistLockManager::ScopedDistLock::operator=(
 StatusWith<DistLockManager::ScopedDistLock> DistLockManager::lock(OperationContext* txn,
                                                                   StringData name,
                                                                   StringData whyMessage,
-                                                                  Milliseconds waitFor,
-                                                                  Milliseconds lockTryInterval) {
-    auto distLockHandleStatus =
-        lockWithSessionID(txn, name, whyMessage, OID::gen(), waitFor, lockTryInterval);
+                                                                  Milliseconds waitFor) {
+    auto distLockHandleStatus = lockWithSessionID(txn, name, whyMessage, OID::gen(), waitFor);
     if (!distLockHandleStatus.isOK()) {
         return distLockHandleStatus.getStatus();
     }

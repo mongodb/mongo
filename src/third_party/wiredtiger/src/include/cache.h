@@ -26,8 +26,8 @@ struct __wt_evict_entry {
 	uint64_t  score;		/* Relative eviction priority */
 };
 
-#define	WT_EVICT_URGENT_QUEUE	0	/* Urgent queue index */
-#define	WT_EVICT_QUEUE_MAX	3	/* Urgent plus two ordinary queues */
+#define	WT_EVICT_QUEUE_MAX	3	/* Two ordinary queues plus urgent */
+#define	WT_EVICT_URGENT_QUEUE	2	/* Urgent queue index */
 
 /*
  * WT_EVICT_QUEUE --
@@ -40,18 +40,6 @@ struct __wt_evict_queue {
 	uint32_t evict_candidates;	/* LRU list pages to evict */
 	uint32_t evict_entries;		/* LRU entries in the queue */
 	volatile uint32_t evict_max;	/* LRU maximum eviction slot used */
-};
-
-/*
- * WT_EVICT_WORKER --
- *	Encapsulation of an eviction worker thread.
- */
-struct __wt_evict_worker {
-	WT_SESSION_IMPL *session;
-	u_int id;
-	wt_thread_t tid;
-#define	WT_EVICT_WORKER_RUN	0x01
-	uint32_t flags;
 };
 
 /* Cache operations. */
@@ -69,7 +57,7 @@ struct __wt_cache {
 	/*
 	 * Different threads read/write pages to/from the cache and create pages
 	 * in the cache, so we cannot know precisely how much memory is in use
-	 * at any specific time.  However, even though the values don't have to
+	 * at any specific time. However, even though the values don't have to
 	 * be exact, they can't be garbage, we track what comes in and what goes
 	 * out and calculate the difference as needed.
 	 */
@@ -78,7 +66,7 @@ struct __wt_cache {
 	uint64_t bytes_dirty_leaf;
 	uint64_t pages_dirty_leaf;
 	uint64_t bytes_evict;		/* Bytes/pages discarded by eviction */
-	uint64_t pages_evict;
+	volatile uint64_t pages_evict;
 	uint64_t pages_evicted;		/* Pages evicted during a pass */
 	uint64_t bytes_image;		/* Bytes of disk images */
 	uint64_t bytes_inmem;		/* Bytes/pages in memory */
@@ -103,35 +91,69 @@ struct __wt_cache {
 	uint64_t read_gen;		/* Current page read generation */
 	uint64_t read_gen_oldest;	/* Oldest read generation the eviction
 					 * server saw in its last queue load */
+	uint64_t evict_pass_gen;	/* Number of eviction passes */
 
 	/*
 	 * Eviction thread information.
 	 */
 	WT_CONDVAR *evict_cond;		/* Eviction server condition */
 	WT_SPINLOCK evict_walk_lock;	/* Eviction walk location */
-	/* Condition signalled when the eviction server populates the queue */
-	WT_CONDVAR *evict_waiter_cond;
 
-	u_int eviction_trigger;		/* Percent to trigger eviction */
-	u_int eviction_target;		/* Percent to end eviction */
 	u_int eviction_dirty_target;    /* Percent to allow dirty */
 	u_int eviction_dirty_trigger;	/* Percent to trigger dirty eviction */
+	u_int eviction_trigger;		/* Percent to trigger eviction */
+	u_int eviction_target;		/* Percent to end eviction */
+
+	u_int eviction_checkpoint_target;/* Percent to reduce dirty
+					   to during checkpoint scrubs */
+	double eviction_scrub_limit;	/* Percent of cache to trigger
+					   dirty eviction during checkpoint
+					   scrubs */
 
 	u_int overhead_pct;	        /* Cache percent adjustment */
+
+	/*
+	 * Pass interrupt counter.
+	 */
+	volatile uint32_t pass_intr;	/* Interrupt eviction pass. */
 
 	/*
 	 * LRU eviction list information.
 	 */
 	WT_SPINLOCK evict_pass_lock;	/* Eviction pass lock */
 	WT_SESSION_IMPL *walk_session;	/* Eviction pass session */
+	WT_DATA_HANDLE *evict_file_next;/* LRU next file to search */
+
 	WT_SPINLOCK evict_queue_lock;	/* Eviction current queue lock */
 	WT_EVICT_QUEUE evict_queues[WT_EVICT_QUEUE_MAX];
-	WT_EVICT_QUEUE *evict_current_queue;/* LRU current queue in use */
-	uint32_t evict_queue_fill;	/* LRU eviction queue index to fill */
+	WT_EVICT_QUEUE *evict_current_queue; /* LRU current queue in use */
+	WT_EVICT_QUEUE *evict_fill_queue;    /* LRU next queue to fill.
+						This is usually the same as the
+						"other" queue but under heavy
+						load the eviction server will
+						start filling the current queue
+						before it switches. */
+	WT_EVICT_QUEUE *evict_other_queue;   /* LRU queue not in use */
+	WT_EVICT_QUEUE *evict_urgent_queue;  /* LRU urgent queue */
 	uint32_t evict_slots;		/* LRU list eviction slots */
-	WT_DATA_HANDLE
-		*evict_file_next;	/* LRU next file to search */
-	uint32_t evict_max_refs_per_file;/* LRU pages per file per pass */
+
+#define	WT_EVICT_SCORE_BUMP	10
+#define	WT_EVICT_SCORE_CUTOFF	10
+#define	WT_EVICT_SCORE_MAX	100
+	uint32_t evict_aggressive_score;/* Score of how aggressive eviction
+					   should be about selecting eviction
+					   candidates. If eviction is
+					   struggling to make progress, this
+					   score rises (up to a maximum of
+					   100), at which point the cache is
+					   "stuck" and transaction will be
+					   rolled back. */
+	uint32_t evict_empty_score;	/* Score of how often LRU queues are
+					   empty on refill. This score varies
+					   between 0 (if the queue hasn't been
+					   empty for a long time) and 100 (if
+					   the queue has been empty the last 10
+					   times we filled up. */
 
 	/*
 	 * Cache pool information.
@@ -148,34 +170,24 @@ struct __wt_cache {
 	uint64_t cp_saved_read;		/* Read count at last review */
 
 	/*
-	 * Work state.
-	 */
-#define	WT_EVICT_STATE_AGGRESSIVE	0x01 /* Eviction isn't making progress:
-						try harder */
-#define	WT_EVICT_STATE_CLEAN		0x02 /* Evict clean pages */
-#define	WT_EVICT_STATE_DIRTY		0x04 /* Evict dirty pages */
-#define	WT_EVICT_STATE_SCRUB		0x08 /* Scrub dirty pages pages */
-#define	WT_EVICT_STATE_URGENT		0x10 /* Pages are in the urgent queue */
-#define	WT_EVICT_STATE_ALL	(WT_EVICT_STATE_CLEAN | WT_EVICT_STATE_DIRTY)
-	uint32_t state;
-	/*
-	 * Pass interrupt counter.
-	 */
-	uint32_t pass_intr;		/* Interrupt eviction pass. */
-
-	/*
 	 * Flags.
 	 */
-#define	WT_CACHE_POOL_MANAGER	0x01	/* The active cache pool manager */
-#define	WT_CACHE_POOL_RUN	0x02	/* Cache pool thread running */
-#define	WT_CACHE_STUCK		0x04	/* Eviction server is stuck */
-#define	WT_CACHE_WALK_REVERSE	0x08	/* Scan backwards for candidates */
+#define	WT_CACHE_EVICT_CLEAN	  0x001 /* Evict clean pages */
+#define	WT_CACHE_EVICT_CLEAN_HARD 0x002 /* Clean % blocking app threads */
+#define	WT_CACHE_EVICT_DIRTY	  0x004 /* Evict dirty pages */
+#define	WT_CACHE_EVICT_DIRTY_HARD 0x008 /* Dirty % blocking app threads */
+#define	WT_CACHE_EVICT_SCRUB	  0x010 /* Scrub dirty pages */
+#define	WT_CACHE_EVICT_URGENT	  0x020 /* Pages are in the urgent queue */
+#define	WT_CACHE_EVICT_ALL	(WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_DIRTY)
+#define	WT_CACHE_EVICT_MASK	  0x0FF
+#define	WT_CACHE_POOL_MANAGER	  0x100 /* The active cache pool manager */
+#define	WT_CACHE_POOL_RUN	  0x200 /* Cache pool thread running */
 	uint32_t flags;
 };
 
-#define	WT_WITH_PASS_LOCK(session, ret, op) do {			\
+#define	WT_WITH_PASS_LOCK(session, op) do {				\
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_PASS));	\
-	WT_WITH_LOCK(session, ret,					\
+	WT_WITH_LOCK_WAIT(session,					\
 	    &cache->evict_pass_lock, WT_SESSION_LOCKED_PASS, op);	\
 } while (0)
 

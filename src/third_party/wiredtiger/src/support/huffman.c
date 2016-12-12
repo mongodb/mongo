@@ -560,7 +560,7 @@ __wt_huffman_close(WT_SESSION_IMPL *session, void *huffman_arg)
  * __wt_print_huffman_code --
  *	Prints a symbol's Huffman code.
  */
-int
+void
 __wt_print_huffman_code(void *huffman_arg, uint16_t symbol)
 {
 	WT_HUFFMAN_CODE code;
@@ -583,8 +583,6 @@ __wt_print_huffman_code(void *huffman_arg, uint16_t symbol)
 			    "%" PRIx16 ", length %" PRIu8 "\n",
 				symbol, code.pattern, code.length);
 	}
-
-	return (0);
 }
 #endif
 
@@ -825,7 +823,8 @@ __wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg,
 		 * where that's not true.
 		 */
 		if (from_len_bits < len)	/* corrupted */
-			WT_ERR(EINVAL);
+			WT_ERR_MSG(session, EINVAL,
+			    "huffman decompression detected input corruption");
 		from_len_bits -= len;
 
 		WT_ASSERT(session,

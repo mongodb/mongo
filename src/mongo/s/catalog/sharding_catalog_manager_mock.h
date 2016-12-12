@@ -28,6 +28,9 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
@@ -82,9 +85,19 @@ public:
                             const std::vector<BSONObj>& chunkBoundaries,
                             const std::string& shardName) override;
 
+    StatusWith<BSONObj> commitChunkMigration(OperationContext* txn,
+                                             const NamespaceString& nss,
+                                             const ChunkType& migratedChunk,
+                                             const boost::optional<ChunkType>& controlChunk,
+                                             const OID& collectionEpoch,
+                                             const ShardId& fromShard,
+                                             const ShardId& toShard) override;
+
     void appendConnectionStats(executor::ConnectionPoolStats* stats) override;
 
     Status initializeConfigDatabaseIfNeeded(OperationContext* txn) override;
+
+    void discardCachedConfigDatabaseInitializationState() override;
 
     Status initializeShardingAwarenessOnUnawareShards(OperationContext* txn) override;
 
@@ -94,6 +107,9 @@ public:
                                                  const std::string& shardName) override;
 
     void cancelAddShardTaskIfNeeded(const ShardId& shardId) override;
+
+    Status setFeatureCompatibilityVersionOnShards(OperationContext* txn,
+                                                  const std::string& version) override;
 };
 
 }  // namespace mongo

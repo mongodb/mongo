@@ -26,10 +26,15 @@
                    'failed to insert document in source collection');
     assert.commandWorked(primarySourceDB.foo.ensureIndex({a: 1}),
                          'failed to create index in source collection on primary');
+    assert.commandWorked(primarySourceDB.runCommand({create: "fooView", viewOn: "foo"}),
+                         'failed to create view on source collection on primary');
 
     assert.eq(1,
               primarySourceDB.foo.find().itcount(),
               'incorrect number of documents in source collection on primary before copy');
+    assert.eq(1,
+              primarySourceDB.fooView.find().itcount(),
+              'incorrect number of documents in source view on primary before copy');
     assert.eq(0,
               primaryTargetDB.foo.find().itcount(),
               'target collection on primary should be empty before copy');
@@ -41,6 +46,19 @@
     assert.eq(primarySourceDB.foo.find().itcount(),
               primaryTargetDB.foo.find().itcount(),
               'incorrect number of documents in target collection on primary after copy');
+
+    // Confirm that 'fooView' is still a view namespace after copy.
+    let res = primaryTargetDB.runCommand({listCollections: 1, filter: {name: "fooView"}});
+    assert.commandWorked(res);
+    assert(res.cursor.firstBatch.length === 1);
+    assert(res.cursor.firstBatch[0].hasOwnProperty("type"), tojson(res));
+    assert.eq("view",
+              res.cursor.firstBatch[0].type,
+              "Namespace exected to be view: " + tojson(res.cursor.firstBatch[0]));
+
+    assert.eq(primarySourceDB.fooView.find().itcount(),
+              primaryTargetDB.fooView.find().itcount(),
+              'incorrect number of documents in target view on primary after copy');
 
     assert.eq(primarySourceDB.foo.getIndexes().length,
               primaryTargetDB.foo.getIndexes().length,
@@ -54,6 +72,10 @@
               secondarySourceDB.foo.find().itcount(),
               'incorrect number of documents in source collection on secondary after copy');
 
+    assert.eq(primarySourceDB.fooView.find().itcount(),
+              secondarySourceDB.fooView.find().itcount(),
+              'incorrect number of documents in source view on secondary after copy');
+
     assert.eq(primarySourceDB.foo.getIndexes().length,
               secondarySourceDB.foo.getIndexes().length,
               'incorrect number of indexes in source collection on secondary after copy');
@@ -63,6 +85,10 @@
     assert.eq(primaryTargetDB.foo.find().itcount(),
               secondaryTargetDB.foo.find().itcount(),
               'incorrect number of documents in target collection on secondary after copy');
+
+    assert.eq(primaryTargetDB.fooView.find().itcount(),
+              secondaryTargetDB.fooView.find().itcount(),
+              'incorrect number of documents in target view on secondary after copy');
 
     assert.eq(primaryTargetDB.foo.getIndexes().length,
               secondaryTargetDB.foo.getIndexes().length,

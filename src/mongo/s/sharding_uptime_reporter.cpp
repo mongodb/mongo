@@ -34,6 +34,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/server_options.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_mongos.h"
 #include "mongo/s/grid.h"
@@ -52,9 +53,35 @@ std::string constructInstanceIdString() {
     return str::stream() << getHostNameCached() << ":" << serverGlobalParams.port;
 }
 
+/**
+ * Reports the uptime status of the current instance to the config.pings collection. This method
+ * is best-effort and never throws.
+ */
+void reportStatus(OperationContext* txn, const std::string& instanceId, const Timer& upTimeTimer) {
+    MongosType mType;
+    mType.setName(instanceId);
+    mType.setPing(jsTime());
+    mType.setUptime(upTimeTimer.seconds());
+    // balancer is never active in mongos. Here for backwards compatibility only.
+    mType.setWaiting(true);
+    mType.setMongoVersion(VersionInfoInterface::instance().version().toString());
+
+    try {
+        Grid::get(txn)->catalogClient(txn)->updateConfigDocument(
+            txn,
+            MongosType::ConfigNS,
+            BSON(MongosType::name(instanceId)),
+            BSON("$set" << mType.toBSON()),
+            true,
+            ShardingCatalogClient::kMajorityWriteConcern);
+    } catch (const std::exception& e) {
+        log() << "Caught exception while reporting uptime: " << e.what();
+    }
+}
+
 }  // namespace
 
-ShardingUptimeReporter::ShardingUptimeReporter() : _instanceId(constructInstanceIdString()) {}
+ShardingUptimeReporter::ShardingUptimeReporter() = default;
 
 ShardingUptimeReporter::~ShardingUptimeReporter() {
     // The thread must not be running when this object is destroyed
@@ -67,10 +94,19 @@ void ShardingUptimeReporter::startPeriodicThread() {
     _thread = stdx::thread([this] {
         Client::initThread("Uptime reporter");
 
+        const std::string instanceId(constructInstanceIdString());
+        const Timer upTimeTimer;
+
         while (!inShutdown()) {
             {
                 auto txn = cc().makeOperationContext();
-                reportStatus(txn.get(), false);
+                reportStatus(txn.get(), instanceId, upTimeTimer);
+
+                auto status =
+                    Grid::get(txn.get())->getBalancerConfiguration()->refreshAndCheck(txn.get());
+                if (!status.isOK()) {
+                    warning() << "failed to refresh mongos settings" << causedBy(status);
+                }
             }
 
             sleepFor(kUptimeReportInterval);
@@ -78,25 +114,5 @@ void ShardingUptimeReporter::startPeriodicThread() {
     });
 }
 
-void ShardingUptimeReporter::reportStatus(OperationContext* txn, bool isBalancerActive) const {
-    MongosType mType;
-    mType.setName(getInstanceId());
-    mType.setPing(jsTime());
-    mType.setUptime(_timer.seconds());
-    mType.setWaiting(!isBalancerActive);
-    mType.setMongoVersion(versionString);
-
-    try {
-        Grid::get(txn)->catalogClient(txn)->updateConfigDocument(
-            txn,
-            MongosType::ConfigNS,
-            BSON(MongosType::name(getInstanceId())),
-            BSON("$set" << mType.toBSON()),
-            true,
-            ShardingCatalogClient::kMajorityWriteConcern);
-    } catch (const std::exception& e) {
-        log() << "Caught exception while reporting uptime: " << e.what();
-    }
-}
 
 }  // namespace mongo

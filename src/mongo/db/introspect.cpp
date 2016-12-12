@@ -161,8 +161,7 @@ void profile(OperationContext* txn, NetworkOp op) {
         }
     } catch (const AssertionException& assertionEx) {
         warning() << "Caught Assertion while trying to profile " << networkOpToString(op)
-                  << " against " << CurOp::get(txn)->getNS() << ": " << assertionEx.toString()
-                  << endl;
+                  << " against " << CurOp::get(txn)->getNS() << ": " << redact(assertionEx);
     }
 }
 
@@ -183,7 +182,7 @@ Status createProfileCollection(OperationContext* txn, Database* db) {
     }
 
     // system.profile namespace doesn't exist; create it
-    log() << "Creating profile collection: " << dbProfilingNS << endl;
+    log() << "Creating profile collection: " << dbProfilingNS;
 
     CollectionOptions collectionOptions;
     collectionOptions.capped = true;

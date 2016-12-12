@@ -24,7 +24,9 @@ extern "C" {
  *******************************************/
 #ifndef _WIN32
 #include <sys/mman.h>
+#endif
 #include <sys/stat.h>
+#ifndef _WIN32
 #include <sys/time.h>
 #include <sys/uio.h>
 #endif
@@ -106,8 +108,8 @@ struct __wt_col_rle;
     typedef struct __wt_col_rle WT_COL_RLE;
 struct __wt_colgroup;
     typedef struct __wt_colgroup WT_COLGROUP;
-struct __wt_compact;
-    typedef struct __wt_compact WT_COMPACT;
+struct __wt_compact_state;
+    typedef struct __wt_compact_state WT_COMPACT_STATE;
 struct __wt_condvar;
     typedef struct __wt_condvar WT_CONDVAR;
 struct __wt_config;
@@ -124,8 +126,6 @@ struct __wt_connection_stats;
     typedef struct __wt_connection_stats WT_CONNECTION_STATS;
 struct __wt_cursor_backup;
     typedef struct __wt_cursor_backup WT_CURSOR_BACKUP;
-struct __wt_cursor_backup_entry;
-    typedef struct __wt_cursor_backup_entry WT_CURSOR_BACKUP_ENTRY;
 struct __wt_cursor_btree;
     typedef struct __wt_cursor_btree WT_CURSOR_BTREE;
 struct __wt_cursor_bulk;
@@ -170,14 +170,10 @@ struct __wt_evict_entry;
     typedef struct __wt_evict_entry WT_EVICT_ENTRY;
 struct __wt_evict_queue;
     typedef struct __wt_evict_queue WT_EVICT_QUEUE;
-struct __wt_evict_worker;
-    typedef struct __wt_evict_worker WT_EVICT_WORKER;
 struct __wt_ext;
     typedef struct __wt_ext WT_EXT;
 struct __wt_extlist;
     typedef struct __wt_extlist WT_EXTLIST;
-struct __wt_fair_lock;
-    typedef struct __wt_fair_lock WT_FAIR_LOCK;
 struct __wt_fh;
     typedef struct __wt_fh WT_FH;
 struct __wt_file_handle_inmem;
@@ -218,6 +214,8 @@ struct __wt_logslot;
     typedef struct __wt_logslot WT_LOGSLOT;
 struct __wt_lsm_chunk;
     typedef struct __wt_lsm_chunk WT_LSM_CHUNK;
+struct __wt_lsm_cursor_chunk;
+    typedef struct __wt_lsm_cursor_chunk WT_LSM_CURSOR_CHUNK;
 struct __wt_lsm_data_source;
     typedef struct __wt_lsm_data_source WT_LSM_DATA_SOURCE;
 struct __wt_lsm_manager;
@@ -286,6 +284,10 @@ struct __wt_split_stash;
     typedef struct __wt_split_stash WT_SPLIT_STASH;
 struct __wt_table;
     typedef struct __wt_table WT_TABLE;
+struct __wt_thread;
+    typedef struct __wt_thread WT_THREAD;
+struct __wt_thread_group;
+    typedef struct __wt_thread_group WT_THREAD_GROUP;
 struct __wt_txn;
     typedef struct __wt_txn WT_TXN;
 struct __wt_txn_global;
@@ -350,6 +352,7 @@ union __wt_rand_state;
 #include "meta.h"
 #include "os.h"
 #include "schema.h"
+#include "thread_group.h"
 #include "txn.h"
 
 #include "session.h"			/* required by connection.h */

@@ -522,20 +522,28 @@ js::PrintError(JSContext* cx, FILE* file, const char* message, JSErrorReport* re
         fputs(prefix, file);
     fputs(message, file);
 
-    if (report->linebuf) {
-        /* report->linebuf usually ends with a newline. */
-        int n = strlen(report->linebuf);
-        fprintf(file, ":\n%s%s%s%s",
-                prefix,
-                report->linebuf,
-                (n > 0 && report->linebuf[n-1] == '\n') ? "" : "\n",
-                prefix);
-        n = report->tokenptr - report->linebuf;
-        for (int i = 0, j = 0; i < n; i++) {
-            if (report->linebuf[i] == '\t') {
-                for (int k = (j + 8) & ~7; j < k; j++) {
+    if (const char16_t* linebuf = report->linebuf()) {
+        size_t n = report->linebufLength();
+
+        fputs(":\n", file);
+        if (prefix)
+            fputs(prefix, file);
+
+        for (size_t i = 0; i < n; i++)
+            fputc(static_cast<char>(linebuf[i]), file);
+
+        // linebuf usually ends with a newline. If not, add one here.
+        if (n == 0 || linebuf[n-1] != '\n')
+            fputc('\n', file);
+
+        if (prefix)
+            fputs(prefix, file);
+
+        n = report->tokenOffset();
+        for (size_t i = 0, j = 0; i < n; i++) {
+            if (linebuf[i] == '\t') {
+                for (size_t k = (j + 8) & ~7; j < k; j++)
                     fputc('.', file);
-                }
                 continue;
             }
             fputc('.', file);

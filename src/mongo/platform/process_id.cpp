@@ -33,10 +33,11 @@
 #include <limits>
 #include <sstream>
 
+#include "mongo/base/static_assert.h"
+
 namespace mongo {
 
-static_assert(sizeof(NativeProcessId) == sizeof(uint32_t),
-              "sizeof(NativeProcessId) == sizeof(uint32_t)");
+MONGO_STATIC_ASSERT(sizeof(NativeProcessId) == sizeof(uint32_t));
 
 namespace {
 #ifdef _WIN32

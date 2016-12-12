@@ -85,11 +85,15 @@ ShardRegistry::ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
     : _shardFactory(std::move(shardFactory)), _initConfigServerCS(configServerCS) {}
 
 ShardRegistry::~ShardRegistry() {
-    if (_executor) {
+    shutdown();
+}
+
+void ShardRegistry::shutdown() {
+    if (_executor && !_isShutdown) {
         LOG(1) << "Shutting down task executor for reloading shard registry";
         _executor->shutdown();
         _executor->join();
-        _executor.reset();
+        _isShutdown = true;
     }
 }
 
@@ -97,12 +101,8 @@ ConnectionString ShardRegistry::getConfigServerConnectionString() const {
     return getConfigShard()->getConnString();
 }
 
-void ShardRegistry::rebuildConfigShard() {
-    _data.rebuildConfigShard(_shardFactory.get());
-    invariant(_data.getConfigShard());
-}
-
-shared_ptr<Shard> ShardRegistry::getShard(OperationContext* txn, const ShardId& shardId) {
+StatusWith<shared_ptr<Shard>> ShardRegistry::getShard(OperationContext* txn,
+                                                      const ShardId& shardId) {
     // If we know about the shard, return it.
     auto shard = _data.findByShardId(shardId);
     if (shard) {
@@ -113,16 +113,27 @@ shared_ptr<Shard> ShardRegistry::getShard(OperationContext* txn, const ShardId& 
     bool didReload = reload(txn);
     shard = _data.findByShardId(shardId);
 
-    // If we found the shard, return it. If we did not find the shard but performed the reload
-    // ourselves, return, because it means the shard does not exist.
-    if (shard || didReload) {
+    // If we found the shard, return it.
+    if (shard) {
         return shard;
+    }
+
+    // If we did not find the shard but performed the reload
+    // ourselves, return, because it means the shard does not exist.
+    if (didReload) {
+        return {ErrorCodes::ShardNotFound, str::stream() << "Shard " << shardId << " not found"};
     }
 
     // If we did not perform the reload ourselves (because there was a concurrent reload), force a
     // reload again to ensure that we have seen data at least as up to date as our first reload.
     reload(txn);
-    return _data.findByShardId(shardId);
+    shard = _data.findByShardId(shardId);
+
+    if (shard) {
+        return shard;
+    }
+
+    return {ErrorCodes::ShardNotFound, str::stream() << "Shard " << shardId << " not found"};
 }
 
 shared_ptr<Shard> ShardRegistry::getShardNoReload(const ShardId& shardId) {
@@ -161,6 +172,8 @@ void ShardRegistry::updateReplSetHosts(const ConnectionString& newConnString) {
     invariant(newConnString.type() == ConnectionString::SET ||
               newConnString.type() == ConnectionString::CUSTOM);  // For dbtests
 
+    // to prevent update config shard connection string during init
+    stdx::unique_lock<stdx::mutex> lock(_reloadMutex);
     _data.rebuildShardIfExists(newConnString, _shardFactory.get());
 }
 
@@ -286,7 +299,6 @@ bool ShardRegistry::reload(OperationContext* txn) {
         invariant(shard);
 
         auto name = shard->getConnString().getSetName();
-        log() << "ShardRegistry::reload: Removing RSM for " << name;
         ReplicaSetMonitor::remove(name);
     }
 
@@ -343,7 +355,7 @@ void ShardRegistryData::_init(OperationContext* txn, ShardFactory* shardFactory)
         auto shard = shardFactory->createShard(std::move(std::get<0>(shardInfo)),
                                                std::move(std::get<1>(shardInfo)));
 
-        _addShard_inlock(std::move(shard));
+        _addShard_inlock(std::move(shard), false);
     }
 }
 
@@ -363,7 +375,7 @@ shared_ptr<Shard> ShardRegistryData::getConfigShard() const {
 void ShardRegistryData::addConfigShard(std::shared_ptr<Shard> shard) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _configShard = shard;
-    _addShard_inlock(shard);
+    _addShard_inlock(shard, true);
 }
 
 shared_ptr<Shard> ShardRegistryData::findByRSName(const string& name) const {
@@ -428,14 +440,6 @@ void ShardRegistryData::shardIdSetDifference(std::set<ShardId>& diff) const {
     }
 }
 
-void ShardRegistryData::rebuildConfigShard(ShardFactory* factory) {
-    stdx::unique_lock<stdx::mutex> rebuildConfigShardLock(_mutex);
-
-    ConnectionString configConnString = _configShard->originalConnString();
-
-    _rebuildShard_inlock(configConnString, factory);
-}
-
 void ShardRegistryData::rebuildShardIfExists(const ConnectionString& newConnString,
                                              ShardFactory* factory) {
     stdx::unique_lock<stdx::mutex> updateConnStringLock(_mutex);
@@ -453,15 +457,17 @@ void ShardRegistryData::_rebuildShard_inlock(const ConnectionString& newConnStri
     auto it = _rsLookup.find(newConnString.getSetName());
     invariant(it->second);
     auto shard = factory->createShard(it->second->getId(), newConnString);
-    _addShard_inlock(shard);
+    _addShard_inlock(shard, true);
     if (shard->isConfig()) {
         _configShard = shard;
     }
 }
 
-void ShardRegistryData::_addShard_inlock(const std::shared_ptr<Shard>& shard) {
+void ShardRegistryData::_addShard_inlock(const std::shared_ptr<Shard>& shard, bool useOriginalCS) {
     const ShardId shardId = shard->getId();
-    const ConnectionString connString = shard->originalConnString();
+
+    const ConnectionString connString =
+        useOriginalCS ? shard->originalConnString() : shard->getConnString();
 
     auto currentShard = _findByShardId_inlock(shardId);
     if (currentShard) {
@@ -481,6 +487,7 @@ void ShardRegistryData::_addShard_inlock(const std::shared_ptr<Shard>& shard) {
 
     _lookup[shard->getId()] = shard;
 
+    LOG(3) << "Adding shard " << shard->getId() << ", with CS " << connString.toString();
     if (connString.type() == ConnectionString::SET) {
         _rsLookup[connString.getSetName()] = shard;
     } else if (connString.type() == ConnectionString::CUSTOM) {

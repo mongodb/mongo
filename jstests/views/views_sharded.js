@@ -8,11 +8,7 @@
 (function() {
     "use strict";
 
-    let st = new ShardingTest({
-        name: "views_sharded",
-        shards: 2,
-        other: {shardOptions: {setParameter: "enableViews=1"}, enableBalancer: false}
-    });
+    let st = new ShardingTest({name: "views_sharded", shards: 2, other: {enableBalancer: false}});
 
     let mongos = st.s;
     let config = mongos.getDB("config");
@@ -74,5 +70,19 @@
     result = db.runCommand({explain: {distinct: "view", key: "a", query: {a: {$lte: 8}}}});
     assert.commandWorked(result);
     assert(result.hasOwnProperty("shards"), tojson(result));
+
+    //
+    // Confirm cleanupOrphaned command fails.
+    //
+    result = st.getPrimaryShard(db.getName()).getDB("admin").runCommand({
+        cleanupOrphaned: view.getFullName()
+    });
+    assert.commandFailedWithCode(result, ErrorCodes.CommandNotSupportedOnView);
+
+    //
+    //  Confirm getShardVersion command fails.
+    //
+    assert.commandFailedWithCode(db.adminCommand({getShardVersion: view.getFullName()}),
+                                 ErrorCodes.NamespaceNotSharded);
 
 })();

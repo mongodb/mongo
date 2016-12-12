@@ -120,8 +120,13 @@ bool ReplicationCoordinatorMock::isMasterForReportingPurposes() {
 }
 
 bool ReplicationCoordinatorMock::canAcceptWritesForDatabase(StringData dbName) {
-    // TODO
-    return true;
+    // Return true if we allow writes explicitly even when not in primary state, as in sharding
+    // unit tests, so that the op observers can fire but the tests don't have to set all the states
+    // as if it's in primary.
+    if (_alwaysAllowWrites) {
+        return true;
+    }
+    return dbName == "local" || _memberState.primary() || _settings.isMaster();
 }
 
 bool ReplicationCoordinatorMock::canAcceptWritesFor(const NamespaceString& ns) {
@@ -136,9 +141,8 @@ Status ReplicationCoordinatorMock::checkCanServeReadsFor(OperationContext* txn,
     return Status::OK();
 }
 
-bool ReplicationCoordinatorMock::shouldIgnoreUniqueIndex(const IndexDescriptor* idx) {
-    // TODO
-    return false;
+bool ReplicationCoordinatorMock::shouldRelaxIndexConstraints(const NamespaceString& ns) {
+    return !canAcceptWritesFor(ns);
 }
 
 Status ReplicationCoordinatorMock::setLastOptimeForSlave(const OID& rid, const Timestamp& ts) {
@@ -249,7 +253,8 @@ void ReplicationCoordinatorMock::processReplSetMetadata(const rpc::ReplSetMetada
 
 void ReplicationCoordinatorMock::cancelAndRescheduleElectionTimeout() {}
 
-Status ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder* result) {
+Status ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder*,
+                                                           ReplSetGetStatusResponseStyle) {
     return Status::OK();
 }
 
@@ -274,7 +279,8 @@ bool ReplicationCoordinatorMock::getMaintenanceMode() {
     return false;
 }
 
-Status ReplicationCoordinatorMock::processReplSetSyncFrom(const HostAndPort& target,
+Status ReplicationCoordinatorMock::processReplSetSyncFrom(OperationContext* txn,
+                                                          const HostAndPort& target,
                                                           BSONObjBuilder* resultObj) {
     // TODO
     return Status::OK();
@@ -364,7 +370,7 @@ Status ReplicationCoordinatorMock::checkReplEnabledForCommand(BSONObjBuilder* re
     return Status::OK();
 }
 
-HostAndPort ReplicationCoordinatorMock::chooseNewSyncSource(const Timestamp& lastTimestampFetched) {
+HostAndPort ReplicationCoordinatorMock::chooseNewSyncSource(const OpTime& lastOpTimeFetched) {
     return HostAndPort();
 }
 
@@ -377,11 +383,6 @@ void ReplicationCoordinatorMock::resetLastOpTimesFromOplog(OperationContext* txn
 bool ReplicationCoordinatorMock::shouldChangeSyncSource(const HostAndPort& currentSource,
                                                         const rpc::ReplSetMetadata& metadata) {
     invariant(false);
-}
-
-SyncSourceResolverResponse ReplicationCoordinatorMock::selectSyncSource(
-    OperationContext* txn, const OpTime& lastOpTimeFetched) {
-    return SyncSourceResolverResponse();
 }
 
 OpTime ReplicationCoordinatorMock::getLastCommittedOpTime() const {
@@ -463,6 +464,10 @@ void ReplicationCoordinatorMock::setIndexPrefetchConfig(
 
 Status ReplicationCoordinatorMock::stepUpIfEligible() {
     return Status::OK();
+}
+
+void ReplicationCoordinatorMock::alwaysAllowWrites(bool allowWrites) {
+    _alwaysAllowWrites = allowWrites;
 }
 
 }  // namespace repl

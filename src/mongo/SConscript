@@ -69,6 +69,7 @@ baseSource=[
     'base/status.cpp',
     'base/string_data.cpp',
     'base/validate_locale.cpp',
+    'bson/bson_comparator_interface_base.cpp',
     'bson/bson_validate.cpp',
     'bson/bsonelement.cpp',
     'bson/bsonmisc.cpp',
@@ -77,6 +78,8 @@ baseSource=[
     'bson/bsontypes.cpp',
     'bson/json.cpp',
     'bson/oid.cpp',
+    'bson/simple_bsonelement_comparator.cpp',
+    'bson/simple_bsonobj_comparator.cpp',
     'bson/timestamp.cpp',
     'logger/component_message_log_domain.cpp',
     'logger/console.cpp',
@@ -93,7 +96,14 @@ baseSource=[
     'logger/rotatable_file_manager.cpp',
     'logger/rotatable_file_writer.cpp',
     'platform/decimal128.cpp',
+    'platform/posix_fadvise.cpp',
+    'platform/process_id.cpp',
     'platform/random.cpp',
+    'platform/shared_library.cpp',
+    'platform/shared_library_${TARGET_OS_FAMILY}.cpp',
+    'platform/stack_locator.cpp',
+    'platform/stack_locator_${TARGET_OS}.cpp',
+    'platform/strcasestr.cpp',
     'platform/strnlen.cpp',
     'util/allocator.cpp',
     'util/assert_util.cpp',
@@ -102,18 +112,22 @@ baseSource=[
     'util/duration.cpp',
     'util/exception_filter_win32.cpp',
     'util/exit.cpp',
+    'util/file.cpp',
     'util/hex.cpp',
     'util/itoa.cpp',
     'util/log.cpp',
+    'util/platform_init.cpp',
     'util/signal_handlers_synchronous.cpp',
     'util/stacktrace.cpp',
     'util/stacktrace_${TARGET_OS_FAMILY}.cpp',
+    'util/startup_test.cpp',
     'util/static_observer.cpp',
     'util/stringutils.cpp',
     'util/system_clock_source.cpp',
     'util/system_tick_source.cpp',
     'util/text.cpp',
     'util/time_support.cpp',
+    'util/timer.cpp',
     'util/version.cpp',
 ]
 
@@ -121,10 +135,12 @@ baseLibDeps=[
     # NOTE: This library *must not* depend on any libraries than
     # the ones declared here. Do not add to this list.
     '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
+    '$BUILD_DIR/third_party/shim_allocator',
     '$BUILD_DIR/third_party/shim_boost',
-    '$BUILD_DIR/third_party/shim_pcrecpp',
     '$BUILD_DIR/third_party/shim_intel_decimal128',
+    '$BUILD_DIR/third_party/shim_pcrecpp',
     '$BUILD_DIR/third_party/shim_tz',
+    'logger/max_log_size',
     'util/debugger',
     'util/quick_exit',
 ]
@@ -195,7 +211,7 @@ for tup in env['MONGO_BUILDINFO_ENVIRONMENT_DATA']:
 buildInfoInitializer = '{{ {0} }}'.format(', '.join(buildInfoInitializer))
 
 generatedVersionFile = env.Substfile(
-    'util/version.cpp.in',
+    'util/version_constants.h.in',
     SUBST_DICT=[
         ('@mongo_version@', env['MONGO_VERSION']),
         ('@mongo_version_major@', version_parts[0]),
@@ -211,10 +227,21 @@ generatedVersionFile = env.Substfile(
     ])
 env.Alias('generated-sources', generatedVersionFile)
 
+if env.TargetOSIs('windows'):
+    generatedResourceConstantFile = env.Substfile(
+        'util/resource_constants.h.in',
+        SUBST_DICT=[
+            ('@mongo_version@', env['MONGO_VERSION']),
+            ('@mongo_version_major@', version_parts[0]),
+            ('@mongo_version_minor@', version_parts[1]),
+            ('@mongo_version_patch@', version_parts[2]),
+            ('@mongo_git_hash@', env['MONGO_GIT_HASH']),
+        ])
+    env.Alias('generated-sources', generatedResourceConstantFile)
+
 config_header_substs = (
     ('@mongo_config_byte_order@', 'MONGO_CONFIG_BYTE_ORDER'),
     ('@mongo_config_debug_build@', 'MONGO_CONFIG_DEBUG_BUILD'),
-    ('@mongo_config_have_thread_local@', 'MONGO_CONFIG_HAVE_THREAD_LOCAL'),
     ('@mongo_config_have___declspec_thread@', 'MONGO_CONFIG_HAVE___DECLSPEC_THREAD'),
     ('@mongo_config_have___thread@', 'MONGO_CONFIG_HAVE___THREAD'),
     ('@mongo_config_have_execinfo_backtrace@', 'MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE'),
@@ -222,11 +249,13 @@ config_header_substs = (
     ('@mongo_config_have_header_unistd_h@', 'MONGO_CONFIG_HAVE_HEADER_UNISTD_H'),
     ('@mongo_config_have_memset_s@', 'MONGO_CONFIG_HAVE_MEMSET_S'),
     ('@mongo_config_have_posix_monotonic_clock@', 'MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK'),
-    ('@mongo_config_have_std_is_trivially_copyable@', 'MONGO_CONFIG_HAVE_STD_IS_TRIVIALLY_COPYABLE'),
-    ('@mongo_config_have_std_enable_if_t@', 'MONGO_CONFIG_HAVE_STD_ENABLE_IF_T'),
-    ('@mongo_config_have_std_make_unique@', 'MONGO_CONFIG_HAVE_STD_MAKE_UNIQUE'),
+    ('@mongo_config_have_pthread_setname_np@', 'MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP'),
     ('@mongo_config_have_std_align@', 'MONGO_CONFIG_HAVE_STD_ALIGN'),
+    ('@mongo_config_have_std_enable_if_t@', 'MONGO_CONFIG_HAVE_STD_ENABLE_IF_T'),
+    ('@mongo_config_have_std_is_trivially_copyable@', 'MONGO_CONFIG_HAVE_STD_IS_TRIVIALLY_COPYABLE'),
+    ('@mongo_config_have_std_make_unique@', 'MONGO_CONFIG_HAVE_STD_MAKE_UNIQUE'),
     ('@mongo_config_have_strnlen@', 'MONGO_CONFIG_HAVE_STRNLEN'),
+    ('@mongo_config_have_thread_local@', 'MONGO_CONFIG_HAVE_THREAD_LOCAL'),
     ('@mongo_config_optimized_build@', 'MONGO_CONFIG_OPTIMIZED_BUILD'),
     ('@mongo_config_ssl@', 'MONGO_CONFIG_SSL'),
     ('@mongo_config_ssl_has_asn1_any_definitions@', 'MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS'),
@@ -247,20 +276,23 @@ generateConfigHeaderFile = env.Substfile(
 env.Alias('generated-sources', generateConfigHeaderFile)
 
 mongodLibDeps = [
-    "db/commands/core",
-    "db/conn_pool_options",
-    "db/mongod_options",
-    "db/mongodandmongos",
-    "db/mongodwebserver",
-    "db/serveronly",
-    "db/repl/replset_commands",
-    "db/repl/storage_interface_impl",
-    "executor/network_interface_factory",
+    'db/commands/core',
+    'db/conn_pool_options',
+    'db/mongod_options',
+    'db/mongodandmongos',
+    'db/mongodwebserver',
+    'db/repl/replset_commands',
+    'db/repl/storage_interface_impl',
+    'db/s/balancer',
+    'db/serveronly',
+    'executor/network_interface_factory',
     's/commands/shared_cluster_commands',
-    "transport/transport_layer_legacy",
-    "transport/service_entry_point_utils",
-    "util/clock_sources",
-    "util/ntservice",
+    'transport/service_entry_point_utils',
+    'transport/transport_layer_legacy',
+    'util/clock_sources',
+    'util/fail_point',
+    'util/ntservice',
+    'util/version_impl',
 ]
 
 if has_option('use-cpu-profiler'):
@@ -272,23 +304,22 @@ mongod = env.Program(
         "db/db.cpp",
         "db/mongod_options_init.cpp",
         "db/service_entry_point_mongod.cpp",
-    ],
+    ] + env.WindowsResourceFile("db/db.rc"),
     LIBDEPS=mongodLibDeps,
 )
-
 env.Default(env.Install('#/', mongod))
 
 # tools
 rewrittenTools = [ "mongodump", "mongorestore", "mongoexport", "mongoimport", "mongostat", "mongotop", "bsondump", "mongofiles", "mongooplog" ]
 
-# mongobridge and mongoperf
+# mongoperf
 env.Install(
     '#/',
     [
         env.Program("mongoperf",
                     [
                         "client/examples/mongoperf.cpp",
-                    ],
+                    ] + env.WindowsResourceFile("client/examples/mongoperf.rc"),
                     LIBDEPS=[
                         "db/serveronly",
                     ]),
@@ -304,13 +335,12 @@ env.Install(
             's/mongos_options_init.cpp',
             's/server.cpp',
             's/service_entry_point_mongos.cpp',
-        ],
+        ] + env.WindowsResourceFile("s/server.rc"),
         LIBDEPS=[
             'db/conn_pool_options',
             'db/commands/core',
             'db/mongodandmongos',
             's/client/sharding_connection_hook',
-            's/cluster_ops_impl',
             's/commands/cluster_commands',
             's/commands/shared_cluster_commands',
             's/coreshard',
@@ -319,31 +349,16 @@ env.Install(
             'transport/service_entry_point_utils',
             'transport/transport_layer_legacy',
             'util/clock_sources',
+            'util/fail_point',
             'util/ntservice',
             'util/options_parser/options_parser_init',
+            'util/version_impl',
         ]))
 
 env.Library("linenoise_utf8",
     source=[
         "shell/linenoise_utf8.cpp",
     ])
-
-# --- sniffer ---
-mongosniff_built = False
-if env.TargetOSIs('osx') or env["_HAVEPCAP"]:
-    mongosniff_built = True
-    sniffEnv = env.Clone()
-    sniffEnv.Append( CPPDEFINES="MONGO_EXPOSE_MACROS" )
-
-    if not env.TargetOSIs('windows'):
-        sniffEnv.Append( LIBS=[ "pcap" ] )
-    else:
-        sniffEnv.Append( LIBS=[ "wpcap" ] )
-
-    sniffEnv.Install( '#/', sniffEnv.Program( "mongosniff", "tools/sniffer.cpp",
-                                              LIBDEPS = [
-                                                 "db/serveronly",
-                                              ] ) )
 
 # --- shell ---
 
@@ -378,6 +393,7 @@ if not has_option('noshell') and usemozjs:
                     'util/options_parser/options_parser_init',
                     'util/processinfo',
                     'util/signal_handlers',
+                    'util/version_impl',
                     'executor/thread_pool_task_executor',
                     'executor/network_interface_thread_pool',
                     'executor/network_interface_factory'
@@ -390,7 +406,7 @@ if not has_option('noshell') and usemozjs:
 
     mongo_shell = shellEnv.Program(
         "mongo",
-        "shell/dbshell.cpp",
+        ["shell/dbshell.cpp"] + env.WindowsResourceFile("shell/shell.rc"),
         LIBDEPS=["$BUILD_DIR/third_party/shim_pcrecpp",
                  "shell_core",
                  "db/server_options_core",
@@ -477,16 +493,14 @@ if has_option("use-new-tools"):
     toolsRoot = "src/mongo-tools"
     for t in rewrittenTools:
         installExternalBinary(env, "%s/%s" % (toolsRoot, t))
+    if has_option("build-mongoreplay") and get_option("build-mongoreplay") == "true":
+        installExternalBinary(env, "%s/%s" % (toolsRoot, "mongoreplay"))
 
 # legacy tools
 installBinary(env, "mongoperf")
 env.Alias("tools", '#/' + add_exe("mongoperf"))
 
 env.Alias("tools", "#/" + add_exe("mongobridge"))
-
-if mongosniff_built:
-    installBinary(env, "mongosniff")
-    env.Alias("tools", '#/' + add_exe("mongosniff"))
 
 installBinary( env, "mongod" )
 installBinary( env, "mongos" )

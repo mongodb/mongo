@@ -38,9 +38,10 @@ class OperationContext;
 class Status;
 
 /**
- * This state machine is responsible for the actual movement of chunk documents from donor to a
- * recipient shard. Its lifetime is owned and controlled by a single migration source manager which
- * registers it for notifications from the replication subsystem.
+ * This class is responsible for producing chunk documents to be moved from donor to a recipient
+ * shard and its methods represent cloning stages. Its lifetime is owned and controlled by a single
+ * migration source manager which registers it for notifications from the replication subsystem
+ * before calling startClone.
  *
  * Unless explicitly indicated, the methods on this class are not thread-safe.
  *
@@ -48,7 +49,7 @@ class Status;
  * it begins receiving notifications from the replication subsystem through the
  * on[insert/update/delete]Op methods. It is up to the creator to decide how these methods end up
  * being called, but currently this is done through the CollectionShardingState. The creator then
- * kicks off the migration as soon as possible by calling startClone.
+ * kicks off the cloning as soon as possible by calling startClone.
  */
 class MigrationChunkClonerSource {
     MONGO_DISALLOW_COPYING(MigrationChunkClonerSource);
@@ -61,7 +62,8 @@ public:
      * the recipient shard to start cloning. Before calling this method, this chunk cloner must be
      * registered for notifications from the replication subsystem (not checked here).
      *
-     * NOTE: Must be called without any locks and must succeed, before any other methods are called.
+     * NOTE: Must be called without any locks and must succeed, before any other methods are called
+     * (except for cancelClone and [insert/update/delete]Op).
      */
     virtual Status startClone(OperationContext* txn) = 0;
 

@@ -15,7 +15,7 @@
     conf.protocolVersion = 0;
     replSet.initiate(conf);
 
-    replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
+    replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY);
     replSet.awaitSecondaryNodes();
     replSet.awaitReplication();
     var primary = replSet.getPrimary();

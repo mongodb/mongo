@@ -28,13 +28,18 @@
 
 #include "mongo/platform/basic.h"
 
+#include <algorithm>
+
 #include "mongo/bson/json.h"
+#include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/query/count_request.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace {
+
+static const NamespaceString testns("TestDB.TestColl");
 
 TEST(CountRequest, ParseDefaults) {
     const bool isExplain = false;
@@ -51,7 +56,7 @@ TEST(CountRequest, ParseDefaults) {
     const CountRequest& countRequest = countRequestStatus.getValue();
 
     ASSERT_EQ(countRequest.getNs().ns(), "TestDB.TestColl");
-    ASSERT_EQUALS(countRequest.getQuery(), fromjson("{ a : { '$lte' : 10 } }"));
+    ASSERT_BSONOBJ_EQ(countRequest.getQuery(), fromjson("{ a : { '$lte' : 10 } }"));
 
     // Defaults
     ASSERT_EQUALS(countRequest.getLimit(), 0);
@@ -84,11 +89,11 @@ TEST(CountRequest, ParseComplete) {
     const CountRequest& countRequest = countRequestStatus.getValue();
 
     ASSERT_EQ(countRequest.getNs().ns(), "TestDB.TestColl");
-    ASSERT_EQUALS(countRequest.getQuery(), fromjson("{ a : { '$gte' : 11 } }"));
+    ASSERT_BSONOBJ_EQ(countRequest.getQuery(), fromjson("{ a : { '$gte' : 11 } }"));
     ASSERT_EQUALS(countRequest.getLimit(), 100);
     ASSERT_EQUALS(countRequest.getSkip(), 1000);
-    ASSERT_EQUALS(countRequest.getHint(), fromjson("{ b : 5 }"));
-    ASSERT_EQUALS(countRequest.getCollation(), fromjson("{ locale : 'en_US' }"));
+    ASSERT_BSONOBJ_EQ(countRequest.getHint(), fromjson("{ b : 5 }"));
+    ASSERT_BSONOBJ_EQ(countRequest.getCollation(), fromjson("{ locale : 'en_US' }"));
 }
 
 TEST(CountRequest, ParseWithExplain) {
@@ -106,7 +111,7 @@ TEST(CountRequest, ParseWithExplain) {
     const CountRequest& countRequest = countRequestStatus.getValue();
 
     ASSERT_EQ(countRequest.getNs().ns(), "TestDB.TestColl");
-    ASSERT_EQUALS(countRequest.getQuery(), fromjson("{ a : { '$lte' : 10 } }"));
+    ASSERT_BSONOBJ_EQ(countRequest.getQuery(), fromjson("{ a : { '$lte' : 10 } }"));
 
     // Defaults
     ASSERT_EQUALS(countRequest.getLimit(), 0);
@@ -139,11 +144,11 @@ TEST(CountRequest, ParseNegativeLimit) {
     const CountRequest& countRequest = countRequestStatus.getValue();
 
     ASSERT_EQ(countRequest.getNs().ns(), "TestDB.TestColl");
-    ASSERT_EQUALS(countRequest.getQuery(), fromjson("{ a : { '$gte' : 11 } }"));
+    ASSERT_BSONOBJ_EQ(countRequest.getQuery(), fromjson("{ a : { '$gte' : 11 } }"));
     ASSERT_EQUALS(countRequest.getLimit(), 100);
     ASSERT_EQUALS(countRequest.getSkip(), 1000);
-    ASSERT_EQUALS(countRequest.getHint(), fromjson("{ b : 5 }"));
-    ASSERT_EQUALS(countRequest.getCollation(), fromjson("{ locale : 'en_US' }"));
+    ASSERT_BSONOBJ_EQ(countRequest.getHint(), fromjson("{ b : 5 }"));
+    ASSERT_BSONOBJ_EQ(countRequest.getCollation(), fromjson("{ locale : 'en_US' }"));
 }
 
 TEST(CountRequest, FailParseMissingNS) {
@@ -201,7 +206,77 @@ TEST(CountRequest, ToBSON) {
                  "  hint : { b : 5 },"
                  "  collation : { locale : 'en_US' } },"));
 
-    ASSERT_EQUALS(actualObj, expectedObj);
+    ASSERT_BSONOBJ_EQ(actualObj, expectedObj);
+}
+
+TEST(CountRequest, ConvertToAggregationWithHintFails) {
+    CountRequest countRequest(testns, BSONObj());
+    countRequest.setHint(BSON("x" << 1));
+    ASSERT_NOT_OK(countRequest.asAggregationCommand());
+}
+
+TEST(CountRequest, ConvertToAggregationSucceeds) {
+    CountRequest countRequest(testns, BSONObj());
+    auto agg = countRequest.asAggregationCommand();
+    ASSERT_OK(agg);
+
+    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    ASSERT_OK(ar.getStatus());
+    ASSERT(ar.getValue().isCursorCommand());
+    ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
+
+    std::vector<BSONObj> expectedPipeline{BSON("$count"
+                                               << "count")};
+    ASSERT(std::equal(expectedPipeline.begin(),
+                      expectedPipeline.end(),
+                      ar.getValue().getPipeline().begin(),
+                      SimpleBSONObjComparator::kInstance.makeEqualTo()));
+}
+
+TEST(CountRequest, ConvertToAggregationWithQueryAndFilterAndLimit) {
+    CountRequest countRequest(testns, BSON("x" << 7));
+    countRequest.setLimit(200);
+    countRequest.setSkip(300);
+    auto agg = countRequest.asAggregationCommand();
+    ASSERT_OK(agg);
+
+    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    ASSERT_OK(ar.getStatus());
+    ASSERT(ar.getValue().isCursorCommand());
+    ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
+
+    std::vector<BSONObj> expectedPipeline{BSON("$match" << BSON("x" << 7)),
+                                          BSON("$skip" << 300),
+                                          BSON("$limit" << 200),
+                                          BSON("$count"
+                                               << "count")};
+    ASSERT(std::equal(expectedPipeline.begin(),
+                      expectedPipeline.end(),
+                      ar.getValue().getPipeline().begin(),
+                      SimpleBSONObjComparator::kInstance.makeEqualTo()));
+}
+
+TEST(CountRequest, ConvertToAggregationWithExplain) {
+    CountRequest countRequest(testns, BSONObj());
+    countRequest.setExplain(true);
+    auto agg = countRequest.asAggregationCommand();
+    ASSERT_OK(agg);
+
+    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    ASSERT_OK(ar.getStatus());
+    ASSERT(ar.getValue().isExplain());
+    ASSERT(ar.getValue().isCursorCommand());
+    ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
+
+    std::vector<BSONObj> expectedPipeline{BSON("$count"
+                                               << "count")};
+    ASSERT(std::equal(expectedPipeline.begin(),
+                      expectedPipeline.end(),
+                      ar.getValue().getPipeline().begin(),
+                      SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 
 }  // namespace

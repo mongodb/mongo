@@ -86,12 +86,12 @@ bool dbEval(OperationContext* txn,
 
     verify(code);
 
-    if (!globalScriptEngine) {
+    if (!getGlobalScriptEngine()) {
         errmsg = "db side execution is disabled";
         return false;
     }
 
-    unique_ptr<Scope> s(globalScriptEngine->newScope());
+    unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
     s->registerOperation(txn);
 
     ScriptingFunction f = s->createFunction(code);
@@ -112,8 +112,8 @@ bool dbEval(OperationContext* txn,
         if (argsElement.type() == Array) {
             args = argsElement.embeddedObject();
             if (edebug) {
-                log() << "args:" << args.toString() << endl;
-                log() << "code:\n" << code << endl;
+                log() << "args:" << args;
+                log() << "code:\n" << redact(code);
             }
         }
     }
@@ -124,11 +124,11 @@ bool dbEval(OperationContext* txn,
         res = s->invoke(f, &args, 0, 0);
         int m = t.millis();
         if (m > serverGlobalParams.slowMS) {
-            log() << "dbeval slow, time: " << dec << m << "ms " << dbName << endl;
+            log() << "dbeval slow, time: " << dec << m << "ms " << dbName;
             if (m >= 1000)
-                log() << code << endl;
+                log() << redact(code);
             else
-                OCCASIONALLY log() << code << endl;
+                OCCASIONALLY log() << redact(code);
         }
     }
 

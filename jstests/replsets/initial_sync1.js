@@ -77,8 +77,7 @@ wait(function() {
     return config2.version == config.version && (config3 && config3.version == config.version);
 });
 
-replTest.waitForState(
-    slave2, [ReplSetTest.State.SECONDARY, ReplSetTest.State.RECOVERING], 60 * 1000);
+replTest.waitForState(slave2, [ReplSetTest.State.SECONDARY, ReplSetTest.State.RECOVERING]);
 
 print("7. Kill the secondary in the middle of syncing");
 replTest.stop(slave1);
@@ -90,7 +89,7 @@ replTest.waitForState(slave2, ReplSetTest.State.SECONDARY, 60 * 1000);
 print("9. Bring the secondary back up");
 replTest.start(slave1, {}, true);
 reconnect(slave1);
-replTest.waitForState(slave1, [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY], 60 * 1000);
+replTest.waitForState(slave1, [ReplSetTest.State.PRIMARY, ReplSetTest.State.SECONDARY]);
 
 print("10. Insert some stuff");
 master = replTest.getPrimary();
@@ -101,7 +100,7 @@ for (var i = 0; i < 100; i++) {
 assert.writeOK(bulk.execute());
 
 print("11. Everyone happy eventually");
-replTest.awaitReplication(300000);
+replTest.awaitReplication();
 
 MongoRunner.stopMongod(slave2);
 replTest.stopSet();

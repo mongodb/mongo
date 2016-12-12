@@ -58,6 +58,14 @@ env.Library('boost_chrono', [
             'boost_system',
         ])
 
+env.Library('boost_iostreams', [
+        'libs/iostreams/src/file_descriptor.cpp',
+        'libs/iostreams/src/mapped_file.cpp',
+        ],
+        LIBDEPS=[
+            'boost_system',
+        ])
+
 regexEnv = env.Clone()
 if regexEnv.ToolchainIs("clang"):
     regexEnv.AppendUnique(CCFLAGS=["-Wno-deprecated-register"])

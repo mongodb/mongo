@@ -316,11 +316,11 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 	}
 
 	/* If we can't lock it, don't scan, that's okay. */
-	if (__wt_fair_trylock(session, &page->page_lock) != 0)
+	if (__wt_try_writelock(session, &page->page_lock) != 0)
 		return (0);
 
 	obsolete = __wt_update_obsolete_check(session, page, upd->next);
-	WT_RET(__wt_fair_unlock(session, &page->page_lock));
+	__wt_writeunlock(session, &page->page_lock);
 	if (obsolete != NULL)
 		__wt_update_obsolete_free(session, page, obsolete);
 

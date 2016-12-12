@@ -80,6 +80,22 @@ Status addMongoShellOptions(moe::OptionSection* options) {
 
     options->addOptionChaining("eval", "eval", moe::String, "evaluate javascript");
 
+    options
+        ->addOptionChaining(
+            "objcheck", "objcheck", moe::Switch, "inspect client data for validity on receipt")
+        .hidden()
+        .setSources(moe::SourceAllLegacy)
+        .incompatibleWith("noobjcheck");
+
+    options
+        ->addOptionChaining("noobjcheck",
+                            "noobjcheck",
+                            moe::Switch,
+                            "do NOT inspect client data for validity on receipt (DEFAULT)")
+        .hidden()
+        .setSources(moe::SourceAllLegacy)
+        .incompatibleWith("objcheck");
+
     moe::OptionSection authenticationOptions("Authentication Options");
 
     authenticationOptions.addOptionChaining(
@@ -200,6 +216,9 @@ Status addMongoShellOptions(moe::OptionSection* options) {
     if (!ret.isOK())
         return ret;
 
+    options->addOptionChaining(
+        "jsHeapLimitMB", "jsHeapLimitMB", moe::Int, "set the js scope's heap size limit");
+
     return Status::OK();
 }
 
@@ -218,13 +237,14 @@ std::string getMongoShellHelp(StringData name, const moe::OptionSection& options
 
 bool handlePreValidationMongoShellOptions(const moe::Environment& params,
                                           const std::vector<std::string>& args) {
+    auto&& vii = VersionInfoInterface::instance();
     if (params.count("version") || params.count("help")) {
         setPlainConsoleLogger();
-        log() << mongoShellVersion();
+        log() << mongoShellVersion(vii);
         if (params.count("help")) {
             log() << getMongoShellHelp(args[0], moe::startupOptions);
         } else {
-            printBuildInfo();
+            vii.logBuildInfo();
         }
         return false;
     }
@@ -248,6 +268,16 @@ Status storeMongoShellOptions(const moe::Environment& params,
     }
     if (params.count("verbose")) {
         logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
+    }
+
+    // `objcheck` option is part of `serverGlobalParams` to avoid making common parts depend upon
+    // the client options.  The option is set to false in clients by default.
+    if (params.count("objcheck")) {
+        serverGlobalParams.objcheck = true;
+    } else if (params.count("noobjcheck")) {
+        serverGlobalParams.objcheck = false;
+    } else {
+        serverGlobalParams.objcheck = false;
     }
 
     if (params.count("port")) {
@@ -367,6 +397,16 @@ Status storeMongoShellOptions(const moe::Environment& params,
                 shellGlobalParams.files.insert(shellGlobalParams.files.begin(), dbaddress);
             }
         }
+    }
+
+    if (params.count("jsHeapLimitMB")) {
+        int jsHeapLimitMB = params["jsHeapLimitMB"].as<int>();
+        if (jsHeapLimitMB <= 0) {
+            StringBuilder sb;
+            sb << "ERROR: \"jsHeapLimitMB\" needs to be greater than 0";
+            return Status(ErrorCodes::BadValue, sb.str());
+        }
+        shellGlobalParams.jsHeapLimitMB = jsHeapLimitMB;
     }
 
     if (shellGlobalParams.url == "*") {

@@ -282,9 +282,9 @@ StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(OperationContext* 
     return extractShardKeyFromQuery(*query);
 }
 
-StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQuery& query) const {
+BSONObj ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQuery& query) const {
     if (!isValid())
-        return StatusWith<BSONObj>(BSONObj());
+        return BSONObj();
 
     // Extract equalities from query.
     EqualityMatches equalities;
@@ -297,7 +297,7 @@ StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQue
     // NOTE: Failure to extract equality matches just means we return no shard key - it's not
     // an error we propagate
     if (!eqStatus.isOK())
-        return StatusWith<BSONObj>(BSONObj());
+        return BSONObj();
 
     // Extract key from equalities
     // NOTE: The method below is equivalent to constructing a BSONObj and running
@@ -312,7 +312,7 @@ StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQue
         BSONElement equalEl = findEqualityElement(equalities, patternPath);
 
         if (!isShardKeyElement(equalEl, false))
-            return StatusWith<BSONObj>(BSONObj());
+            return BSONObj();
 
         if (isHashedPattern()) {
             keyBuilder.append(
@@ -326,7 +326,7 @@ StatusWith<BSONObj> ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQue
     }
 
     dassert(isShardKey(keyBuilder.asTempObj()));
-    return StatusWith<BSONObj>(keyBuilder.obj());
+    return keyBuilder.obj();
 }
 
 bool ShardKeyPattern::isUniqueIndexCompatible(const BSONObj& uniqueIndexPattern) const {

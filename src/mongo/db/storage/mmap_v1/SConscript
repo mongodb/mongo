@@ -1,3 +1,5 @@
+# -*- mode: python -*-
+
 Import("env")
 Import("mmapv1")
 
@@ -74,7 +76,6 @@ env.Library(
         ],
     LIBDEPS= [
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/foundation',
         ]
     )
 
@@ -86,7 +87,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/storage/paths',
         '$BUILD_DIR/mongo/util/fail_point',
-        '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/processinfo',
     ],
 )
@@ -110,7 +110,6 @@ env.Library(
     ],
     LIBDEPS=[
         'file_allocator',
-        '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/progress_meter',
         '$BUILD_DIR/mongo/db/storage/storage_options'
     ],
@@ -125,6 +124,7 @@ env.Library(
         'record_store_v1_repair_iterator.cpp',
         'record_store_v1_simple.cpp',
         'record_store_v1_simple_iterator.cpp',
+        'touch_pages.cpp',
         ],
     LIBDEPS= [
         '$BUILD_DIR/mongo/db/commands/server_status_core',
@@ -191,7 +191,7 @@ if mmapv1:
 
     env.CppUnitTest(target = 'namespace_test',
                     source = ['catalog/namespace_test.cpp'],
-                    LIBDEPS = ['$BUILD_DIR/mongo/util/foundation'])
+                    LIBDEPS = ['$BUILD_DIR/mongo/base'])
 
     env.CppUnitTest(
         target='record_store_v1_simple_test',

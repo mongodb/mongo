@@ -114,6 +114,9 @@ bool BatchedDeleteRequest::parseBSON(StringData dbName, const BSONObj& source, s
             if (fieldState == FieldParser::FIELD_INVALID)
                 return false;
             _ns = NamespaceString(dbName, collNameTemp);
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Invalid namespace: " << _ns.ns(),
+                    _ns.isValid());
             _isNSSet = fieldState == FieldParser::FIELD_SET;
         } else if (fieldName == deletes.name()) {
             fieldState = FieldParser::extract(field, deletes, &_deletes, errMsg);

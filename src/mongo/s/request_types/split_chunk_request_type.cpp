@@ -40,7 +40,7 @@ using std::vector;
 
 namespace {
 
-const char kConfigsvrSplitChunk[] = "_configsvrSplitChunk";
+const char kConfigsvrSplitChunk[] = "_configsvrCommitChunkSplit";
 const char kCollEpoch[] = "collEpoch";
 const char kSplitPoints[] = "splitPoints";
 const char kShardName[] = "shard";
@@ -48,10 +48,10 @@ const char kShardName[] = "shard";
 }  // unnamed namespace
 
 SplitChunkRequest::SplitChunkRequest(NamespaceString nss,
+                                     string shardName,
                                      OID epoch,
                                      ChunkRange chunkRange,
-                                     vector<BSONObj> splitPoints,
-                                     string shardName)
+                                     vector<BSONObj> splitPoints)
     : _nss(std::move(nss)),
       _epoch(std::move(epoch)),
       _chunkRange(std::move(chunkRange)),
@@ -102,10 +102,10 @@ StatusWith<SplitChunkRequest> SplitChunkRequest::parseFromConfigCommand(const BS
     }
 
     auto request = SplitChunkRequest(NamespaceString(ns),
+                                     std::move(shardName),
                                      std::move(epoch),
                                      std::move(chunkRangeStatus.getValue()),
-                                     std::move(splitPoints),
-                                     std::move(shardName));
+                                     std::move(splitPoints));
     Status validationStatus = request._validate();
     if (!validationStatus.isOK()) {
         return validationStatus;
@@ -160,7 +160,7 @@ const string& SplitChunkRequest::getShardName() const {
 Status SplitChunkRequest::_validate() {
     if (!getNamespace().isValid()) {
         return Status(ErrorCodes::InvalidNamespace,
-                      str::stream() << "invalid namespaace '" << _nss.ns()
+                      str::stream() << "invalid namespace '" << _nss.ns()
                                     << "' specified for request");
     }
 

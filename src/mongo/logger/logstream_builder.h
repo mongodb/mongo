@@ -31,6 +31,7 @@
 #include <sstream>
 #include <string>
 
+#include "mongo/bson/bsontypes.h"
 #include "mongo/logger/labeled_level.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/log_severity.h"
@@ -186,6 +187,11 @@ public:
     template <typename Period>
     LogstreamBuilder& operator<<(const Duration<Period>& d) {
         stream() << d;
+        return *this;
+    }
+
+    LogstreamBuilder& operator<<(BSONType t) {
+        stream() << typeName(t);
         return *this;
     }
 

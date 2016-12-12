@@ -38,6 +38,7 @@
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
@@ -77,6 +78,15 @@ int compareElementValues(const BSONElement& l,
 */
 class BSONElement {
 public:
+    // Declared in bsonobj_comparator_interface.h.
+    class ComparatorInterface;
+
+    /**
+     * Operator overloads for relops return a DeferredComparison which can subsequently be evaluated
+     * by a BSONObj::ComparatorInterface.
+     */
+    using DeferredComparison = BSONComparatorInterfaceBase<BSONElement>::DeferredComparison;
+
     /** These functions, which start with a capital letter, throw a MsgAssertionException if the
         element is not of the required type. Example:
 
@@ -287,9 +297,6 @@ public:
     */
     bool trueValue() const;
 
-    /** True if number, string, bool, date, OID */
-    bool isSimpleType() const;
-
     /** True if element is of a numeric type. */
     bool isNumber() const;
 
@@ -473,21 +480,16 @@ public:
         return p + strlen(p) + 1;
     }
 
-    /** like operator== but doesn't check the fieldname,
-        just the value.
-    */
-    bool valuesEqual(const BSONElement& r) const {
-        return woCompare(r, false) == 0;
-    }
-
-    /** Returns true if elements are equal. */
-    bool operator==(const BSONElement& r) const {
-        return woCompare(r, true) == 0;
-    }
-    /** Returns true if elements are unequal. */
-    bool operator!=(const BSONElement& r) const {
-        return !operator==(r);
-    }
+    //
+    // Comparison API.
+    //
+    // BSONElement instances can be compared via a raw bytewise comparison or a logical comparison.
+    //
+    // Logical comparison can be done either using woCompare() or with operator overloads. Most
+    // callers should prefer operator overloads. Note that the operator overloads return a
+    // DeferredComparison, which must subsequently be evaluated by a
+    // BSONElement::ComparatorInterface. See bsonelement_comparator_interface.h for details.
+    //
 
     /**
      * Compares the raw bytes of the two BSONElements, including the field names. This will treat
@@ -513,14 +515,29 @@ public:
                   bool considerFieldName = true,
                   const StringData::ComparatorInterface* comparator = nullptr) const;
 
-    /**
-     * Functor compatible with std::hash for std::unordered_{map,set}
-     * Warning: The hash function is subject to change. Do not use in cases where hashes need
-     *          to be consistent across versions.
-     */
-    struct Hasher {
-        size_t operator()(const BSONElement& elem) const;
-    };
+    DeferredComparison operator<(const BSONElement& other) const {
+        return DeferredComparison(DeferredComparison::Type::kLT, *this, other);
+    }
+
+    DeferredComparison operator<=(const BSONElement& other) const {
+        return DeferredComparison(DeferredComparison::Type::kLTE, *this, other);
+    }
+
+    DeferredComparison operator>(const BSONElement& other) const {
+        return DeferredComparison(DeferredComparison::Type::kGT, *this, other);
+    }
+
+    DeferredComparison operator>=(const BSONElement& other) const {
+        return DeferredComparison(DeferredComparison::Type::kGTE, *this, other);
+    }
+
+    DeferredComparison operator==(const BSONElement& other) const {
+        return DeferredComparison(DeferredComparison::Type::kEQ, *this, other);
+    }
+
+    DeferredComparison operator!=(const BSONElement& other) const {
+        return DeferredComparison(DeferredComparison::Type::kNE, *this, other);
+    }
 
     const char* rawdata() const {
         return data;
@@ -584,16 +601,6 @@ public:
         const char* start = value();
         start += 4 + ConstDataView(start).read<LittleEndian<int>>();
         return mongo::OID::from(start);
-    }
-
-    /** this does not use fieldName in the comparison, just the value */
-    bool operator<(const BSONElement& other) const {
-        int x = (int)canonicalType() - (int)other.canonicalType();
-        if (x < 0)
-            return true;
-        else if (x > 0)
-            return false;
-        return compareElementValues(*this, other) < 0;
     }
 
     // @param maxLen don't scan more than maxLen bytes
@@ -693,22 +700,6 @@ inline bool BSONElement::isNumber() const {
         case NumberDouble:
         case NumberDecimal:
         case NumberInt:
-            return true;
-        default:
-            return false;
-    }
-}
-
-inline bool BSONElement::isSimpleType() const {
-    switch (type()) {
-        case NumberLong:
-        case NumberDouble:
-        case NumberInt:
-        case NumberDecimal:
-        case mongo::String:
-        case mongo::Bool:
-        case mongo::Date:
-        case jstOID:
             return true;
         default:
             return false;
@@ -825,7 +816,4 @@ inline BSONElement::BSONElement() {
     fieldNameSize_ = 0;
     totalSize = 1;
 }
-
-// TODO(SERVER-14596): move to a better place; take a StringData.
-std::string escape(const std::string& s, bool escape_slash = false);
 }

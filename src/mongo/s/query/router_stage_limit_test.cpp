@@ -51,7 +51,7 @@ TEST(RouterStageLimitTest, LimitIsOne) {
     auto firstResult = limitStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
-    ASSERT_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
 
     auto secondResult = limitStage->next();
     ASSERT_OK(secondResult.getStatus());
@@ -74,12 +74,12 @@ TEST(RouterStageLimitTest, LimitIsTwo) {
     auto firstResult = limitStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
-    ASSERT_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
 
     auto secondResult = limitStage->next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
-    ASSERT_EQ(*secondResult.getValue().getResult(), BSON("a" << 2));
+    ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(), BSON("a" << 2));
 
     auto thirdResult = limitStage->next();
     ASSERT_OK(thirdResult.getStatus());
@@ -98,7 +98,7 @@ TEST(RouterStageLimitTest, LimitStagePropagatesError) {
     auto firstResult = limitStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
-    ASSERT_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
 
     auto secondResult = limitStage->next();
     ASSERT_NOT_OK(secondResult.getStatus());
@@ -124,7 +124,7 @@ TEST(RouterStageLimitTest, LimitStagePropagatesViewDefinition) {
     ASSERT_OK(result.getStatus());
     ASSERT(!result.getValue().getResult());
     ASSERT(result.getValue().getViewDefinition());
-    ASSERT_EQ(*result.getValue().getViewDefinition(), viewDef);
+    ASSERT_BSONOBJ_EQ(*result.getValue().getViewDefinition(), viewDef);
 }
 
 TEST(RouterStageLimitTest, LimitStageToleratesMidStreamEOF) {
@@ -142,7 +142,7 @@ TEST(RouterStageLimitTest, LimitStageToleratesMidStreamEOF) {
     auto firstResult = limitStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
-    ASSERT_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
 
     auto secondResult = limitStage->next();
     ASSERT_OK(secondResult.getStatus());
@@ -151,7 +151,7 @@ TEST(RouterStageLimitTest, LimitStageToleratesMidStreamEOF) {
     auto thirdResult = limitStage->next();
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().getResult());
-    ASSERT_EQ(*thirdResult.getValue().getResult(), BSON("a" << 2));
+    ASSERT_BSONOBJ_EQ(*thirdResult.getValue().getResult(), BSON("a" << 2));
 
     auto fourthResult = limitStage->next();
     ASSERT_OK(fourthResult.getStatus());
@@ -170,13 +170,13 @@ TEST(RouterStageLimitTest, LimitStageRemotesExhausted) {
     auto firstResult = limitStage->next();
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
-    ASSERT_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1));
     ASSERT_TRUE(limitStage->remotesExhausted());
 
     auto secondResult = limitStage->next();
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().getResult());
-    ASSERT_EQ(*secondResult.getValue().getResult(), BSON("a" << 2));
+    ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(), BSON("a" << 2));
     ASSERT_TRUE(limitStage->remotesExhausted());
 
     auto thirdResult = limitStage->next();

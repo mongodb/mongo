@@ -41,6 +41,8 @@ namespace unicode {
  *
  * This is specific to the use case in mongo::unicode::String and not intended as a general purpose
  * vector class.
+ *
+ * This specialization offers acceleration for x86_64
  */
 class ByteVector {
 public:

@@ -36,6 +36,7 @@
 #include <stdio.h>
 #include <yaml-cpp/yaml.h>
 
+#include "mongo/base/init.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
@@ -56,7 +57,21 @@ using std::shared_ptr;
 
 namespace po = boost::program_options;
 
+stdx::function<bool()> OptionsParser::useStrict;
+
 namespace {
+
+bool shouldUseStrict() {
+    return true;
+}
+
+MONGO_INITIALIZER_GENERAL(OptionsParseUseStrict,
+                          MONGO_NO_PREREQUISITES,
+                          ("BeginStartupOptionParsing"))
+(InitializerContext* context) {
+    OptionsParser::useStrict = shouldUseStrict;
+    return Status::OK();
+}
 
 // The following section contains utility functions that convert between the various objects
 // we need to deal with while parsing command line options.
@@ -269,6 +284,9 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
     }
 
     if (!isRegistered) {
+        if (!OptionsParser::useStrict()) {
+            return Status::OK();
+        }
         StringBuilder sb;
         sb << "Unrecognized option: " << key;
         return Status(ErrorCodes::BadValue, sb.str());
@@ -738,7 +756,7 @@ Status OptionsParser::parseINIConfigFile(const OptionSection& options,
 
     std::istringstream is(config);
     try {
-        po::store(po::parse_config_file(is, boostOptions), vm);
+        po::store(po::parse_config_file(is, boostOptions, !OptionsParser::useStrict()), vm);
         ret = addBoostVariablesToEnvironment(vm, options, environment);
         if (!ret.isOK()) {
             return ret;

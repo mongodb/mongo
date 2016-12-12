@@ -9,6 +9,7 @@ var blacklist = [
     'distinct.js',             // SERVER-13116 distinct isn't sharding aware
     'distinct_noindex.js',     // SERVER-13116 distinct isn't sharding aware
     'distinct_projection.js',  // SERVER-13116 distinct isn't sharding aware
+    'create_database.js',      // SERVER-17397 Drops of sharded namespaces may not fully succeed
     'drop_database.js',        // SERVER-17397 Drops of sharded namespaces may not fully succeed
 
     // Disabled due to SERVER-3645, '.count() can be wrong on sharded collections'.
@@ -18,8 +19,9 @@ var blacklist = [
     'count_limit_skip.js',
     'count_noindex.js',
 
-    // $graphLookup does not support sharded clusters.
+    // $lookup and $graphLookup are not supported on sharded collections.
     'agg_graph_lookup.js',
+    'view_catalog_cycle_lookup.js',
 
     // Disabled due to SERVER-20057, 'Concurrent, sharded mapReduces can fail when temporary
     // namespaces collide across mongos processes'
@@ -53,6 +55,7 @@ var blacklist = [
     'findAndModify_remove_queue.js',            // remove cannot be {} for findAndModify
     'findAndModify_remove_queue_unindexed.js',  // findAndModify requires a shard key
     'findAndModify_update_collscan.js',         // findAndModify requires a shard key
+    'findAndModify_update_grow.js',             // can cause OOM kills on test hosts
     'findAndModify_update_queue.js',            // findAndModify requires a shard key
     'findAndModify_update_queue_unindexed.js',  // findAndModify requires a shard key
     'group.js',                // the group command cannot be issued against a sharded cluster
@@ -96,4 +99,4 @@ var blacklist = [
 runWorkloadsSerially(ls(dir).filter(function(file) {
     return !Array.contains(blacklist, file);
 }),
-                     {sharded: true, replication: true});
+                     {sharded: {enabled: true}, replication: {enabled: true}});

@@ -32,7 +32,6 @@
 import os
 from wiredtiger import wiredtiger_open,WIREDTIGER_VERSION_STRING,stat
 
-
 def main():
     # Create a clean test directory for this run of the test program
     os.system('rm -rf WT_HOME')
@@ -58,18 +57,15 @@ def main():
     print_derived_stats(session)
     conn.close()
 
-
 def print_database_stats(session):
     statcursor = session.open_cursor("statistics:")
     print_cursor(statcursor)
     statcursor.close()
 
-
 def print_file_stats(session):
     fstatcursor = session.open_cursor("statistics:table:access")
     print_cursor(fstatcursor)
     fstatcursor.close()
-
 
 def print_overflow_pages(session):
     ostatcursor = session.open_cursor("statistics:table:access")
@@ -77,7 +73,6 @@ def print_overflow_pages(session):
     if val != 0:
         print '%s=%s' % (str(val[0]), str(val[1]))
     ostatcursor.close()
-
 
 def print_derived_stats(session):
     dstatcursor = session.open_cursor("statistics:table:access")
@@ -97,7 +92,6 @@ def print_derived_stats(session):
         print "Write amplification is " + '{:.2f}'.format(fs_writes / (app_insert + app_remove + app_update))
     dstatcursor.close()
 
-
 def print_cursor(mycursor):
     while mycursor.next() == 0:
         val = mycursor.get_value()
@@ -106,4 +100,3 @@ def print_cursor(mycursor):
 
 if __name__ == "__main__":
     main()
-

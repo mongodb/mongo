@@ -21,27 +21,15 @@
     replSet.startSet();
     replSet.initiate();
 
-    var waitForPrimary = function(i) {
-        // Refresh connections to nodes.
-        replSet.status();
-        assert.commandWorked(
-            replSet.nodes[i].adminCommand({
-                replSetTest: 1,
-                waitForMemberState: ReplSetTest.State.PRIMARY,
-                timeoutMillis: 60 * 1000,
-            }),
-            'node ' + i + ' ' + replSet.nodes[i].host + ' failed to become primary');
-    };
-
-    waitForPrimary(0);
+    replSet.waitForState(0, ReplSetTest.State.PRIMARY);
     // Wait until all nodes get the "no-op" of "new primary" after initial sync.
     waitUntilAllNodesCaughtUp(replSet.nodes);
     replSet.stop(0);
 
-    waitForPrimary(1);
+    replSet.waitForState(1, ReplSetTest.State.PRIMARY);
     replSet.stop(1);
 
-    waitForPrimary(2);
+    replSet.waitForState(2, ReplSetTest.State.PRIMARY);
 
     // Cannot stop any more nodes because we will not have a majority.
 })();

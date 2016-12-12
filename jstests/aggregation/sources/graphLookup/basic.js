@@ -10,6 +10,41 @@
     local.drop();
     foreign.drop();
 
+    // Ensure a $graphLookup works even if one of the involved collections doesn't exist.
+    const basicGraphLookup = {
+        $graphLookup: {
+            from: "foreign",
+            startWith: "$starting",
+            connectFromField: "from",
+            connectToField: "to",
+            as: "results"
+        }
+    };
+
+    assert.eq(
+        local.aggregate([basicGraphLookup]).toArray().length,
+        0,
+        "expected an empty result set for a $graphLookup with non-existent local and foreign " +
+            "collections");
+
+    assert.writeOK(foreign.insert({}));
+
+    assert.eq(local.aggregate([basicGraphLookup]).toArray().length,
+              0,
+              "expected an empty result set for a $graphLookup on a non-existent local collection");
+
+    local.drop();
+    foreign.drop();
+
+    assert.writeOK(local.insert({_id: 0}));
+
+    assert.eq(local.aggregate([basicGraphLookup]).toArray(),
+              [{_id: 0, results: []}],
+              "expected $graphLookup to succeed with a non-existent foreign collection");
+
+    local.drop();
+    foreign.drop();
+
     var bulk = foreign.initializeUnorderedBulkOp();
     for (var i = 0; i < 100; i++) {
         bulk.insert({_id: i, neighbors: [i - 1, i + 1]});

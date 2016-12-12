@@ -14,6 +14,7 @@
  */
 uint64_t
 __wt_strtouq(const char *nptr, char **endptr, int base)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 #if defined(HAVE_STRTOUQ)
 	return (strtouq(nptr, endptr, base));

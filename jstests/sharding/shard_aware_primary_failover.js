@@ -29,8 +29,17 @@
         clusterId: ObjectId()
     };
 
-    assert.writeOK(primaryConn.getDB('admin').system.version.insert(
-        shardIdentityDoc, {writeConcern: {w: 'majority'}}));
+    // Simulate the upsert that is performed by a config server on addShard.
+    var shardIdentityQuery = {
+        _id: shardIdentityDoc._id,
+        shardName: shardIdentityDoc.shardName,
+        clusterId: shardIdentityDoc.clusterId
+    };
+    var shardIdentityUpdate = {
+        $set: {configsvrConnectionString: shardIdentityDoc.configsvrConnectionString}
+    };
+    assert.writeOK(primaryConn.getDB('admin').system.version.update(
+        shardIdentityQuery, shardIdentityUpdate, {upsert: true, writeConcern: {w: 'majority'}}));
 
     replTest.stopMaster();
     replTest.waitForMaster();

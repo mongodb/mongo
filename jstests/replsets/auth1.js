@@ -42,6 +42,8 @@ load("jstests/replsets/rslib.js");
         m, _isWindows() ? 100 : 1, "mongod should exit w/ 1 (EXIT_FAILURE): permissions too open");
     MongoRunner.stopMongod(port[0]);
 
+    // Pre-populate the data directory for the first replica set node, to be started later, with
+    // a user's credentials.
     print("add a user to server0: foo");
     m = MongoRunner.runMongod({dbpath: MongoRunner.dataPath + name + "-0"});
     m.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles});
@@ -51,11 +53,13 @@ load("jstests/replsets/rslib.js");
 
     print("start up rs");
     var rs = new ReplSetTest({"name": name, "nodes": 3});
-    print("restart 0 with keyFile");
-    m = rs.restart(0, {"keyFile": key1_600});
-    print("restart 1 with keyFile");
+
+    // The first node is started with the pre-populated data directory.
+    print("start 0 with keyFile");
+    m = rs.start(0, {"keyFile": key1_600, noCleanData: true});
+    print("start 1 with keyFile");
     rs.start(1, {"keyFile": key1_600});
-    print("restart 2 with keyFile");
+    print("start 2 with keyFile");
     rs.start(2, {"keyFile": key1_600});
 
     var result = m.getDB("admin").auth("foo", "bar");

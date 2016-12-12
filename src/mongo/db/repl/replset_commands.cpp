@@ -201,7 +201,18 @@ public:
         if (!status.isOK())
             return appendCommandStatus(result, status);
 
-        status = getGlobalReplicationCoordinator()->processReplSetGetStatus(&result);
+        bool includeInitialSync = false;
+        Status initialSyncStatus =
+            bsonExtractBooleanFieldWithDefault(cmdObj, "initialSync", false, &includeInitialSync);
+        if (!initialSyncStatus.isOK()) {
+            return appendCommandStatus(result, initialSyncStatus);
+        }
+
+        auto responseStyle = ReplicationCoordinator::ReplSetGetStatusResponseStyle::kBasic;
+        if (includeInitialSync) {
+            responseStyle = ReplicationCoordinator::ReplSetGetStatusResponseStyle::kInitialSync;
+        }
+        status = getGlobalReplicationCoordinator()->processReplSetGetStatus(&result, responseStyle);
         return appendCommandStatus(result, status);
     }
 
@@ -574,7 +585,8 @@ class CmdReplSetSyncFrom : public ReplSetCommand {
 public:
     virtual void help(stringstream& help) const {
         help << "{ replSetSyncFrom : \"host:port\" }\n";
-        help << "Change who this member is syncing from.";
+        help << "Change who this member is syncing from. Note: This will interrupt and restart an "
+                "in-progress initial sync.";
     }
     CmdReplSetSyncFrom() : ReplSetCommand("replSetSyncFrom") {}
     virtual bool run(OperationContext* txn,
@@ -592,9 +604,9 @@ public:
         if (!status.isOK())
             return appendCommandStatus(result, status);
 
-        return appendCommandStatus(
-            result,
-            getGlobalReplicationCoordinator()->processReplSetSyncFrom(targetHostAndPort, &result));
+        return appendCommandStatus(result,
+                                   getGlobalReplicationCoordinator()->processReplSetSyncFrom(
+                                       txn, targetHostAndPort, &result));
     }
 
 private:
@@ -728,7 +740,7 @@ public:
         /* we want to keep heartbeat connections open when relinquishing primary.
            tag them here. */
         transport::Session::TagMask originalTag = 0;
-        transport::Session* session = txn->getClient()->session();
+        auto session = txn->getClient()->session();
         if (session) {
             originalTag = session->getTags();
             session->replaceTags(originalTag | transport::Session::kKeepOpen);

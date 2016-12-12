@@ -42,25 +42,20 @@ namespace mongo {
 
 namespace {
 
-void NoLockFuncSet(StringData name,
-                   StringData whyMessage,
-                   Milliseconds waitFor,
-                   Milliseconds lockTryInterval) {
+void NoLockFuncSet(StringData name, StringData whyMessage, Milliseconds waitFor) {
     FAIL(str::stream() << "Lock not expected to be called. "
                        << "Name: "
                        << name
                        << ", whyMessage: "
                        << whyMessage
                        << ", waitFor: "
-                       << waitFor
-                       << ", lockTryInterval: "
-                       << lockTryInterval);
+                       << waitFor);
 }
 
 }  // namespace
 
-DistLockManagerMock::DistLockManagerMock()
-    : _lockReturnStatus{Status::OK()}, _lockChecker{NoLockFuncSet} {}
+DistLockManagerMock::DistLockManagerMock(std::unique_ptr<DistLockCatalog> catalog)
+    : _catalog(std::move(catalog)), _lockReturnStatus{Status::OK()}, _lockChecker{NoLockFuncSet} {}
 
 void DistLockManagerMock::startUp() {}
 
@@ -75,10 +70,9 @@ std::string DistLockManagerMock::getProcessID() {
 StatusWith<DistLockHandle> DistLockManagerMock::lockWithSessionID(OperationContext* txn,
                                                                   StringData name,
                                                                   StringData whyMessage,
-                                                                  const OID lockSessionID,
-                                                                  Milliseconds waitFor,
-                                                                  Milliseconds lockTryInterval) {
-    _lockChecker(name, whyMessage, waitFor, lockTryInterval);
+                                                                  const OID& lockSessionID,
+                                                                  Milliseconds waitFor) {
+    _lockChecker(name, whyMessage, waitFor);
     _lockChecker = NoLockFuncSet;
 
     if (!_lockReturnStatus.isOK()) {
@@ -100,14 +94,34 @@ StatusWith<DistLockHandle> DistLockManagerMock::lockWithSessionID(OperationConte
     return info.lockID;
 }
 
+StatusWith<DistLockHandle> DistLockManagerMock::tryLockWithLocalWriteConcern(
+    OperationContext* txn, StringData name, StringData whyMessage, const OID& lockSessionID) {
+    // Not yet implemented
+    MONGO_UNREACHABLE;
+}
+
 void DistLockManagerMock::unlockAll(OperationContext* txn, const std::string& processID) {
-    fassertFailed(34366);  // Not implemented for the mock
+    // Not yet implemented
+    MONGO_UNREACHABLE;
 }
 
 void DistLockManagerMock::unlock(OperationContext* txn, const DistLockHandle& lockHandle) {
     std::vector<LockInfo>::iterator it =
         std::find_if(_locks.begin(), _locks.end(), [&lockHandle](LockInfo info) -> bool {
             return info.lockID == lockHandle;
+        });
+    if (it == _locks.end()) {
+        return;
+    }
+    _locks.erase(it);
+}
+
+void DistLockManagerMock::unlock(OperationContext* txn,
+                                 const DistLockHandle& lockHandle,
+                                 StringData name) {
+    std::vector<LockInfo>::iterator it =
+        std::find_if(_locks.begin(), _locks.end(), [&lockHandle, &name](LockInfo info) -> bool {
+            return ((info.lockID == lockHandle) && (info.name == name));
         });
     if (it == _locks.end()) {
         return;
@@ -123,4 +137,5 @@ void DistLockManagerMock::expectLock(LockFunc checker, Status status) {
     _lockReturnStatus = std::move(status);
     _lockChecker = checker;
 }
-}
+
+}  // namespace mongo

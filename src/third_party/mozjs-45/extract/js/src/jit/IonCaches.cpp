@@ -699,10 +699,10 @@ CheckDOMProxyExpandoDoesNotShadow(JSContext* cx, MacroAssembler& masm, JSObject*
         ExpandoAndGeneration* expandoAndGeneration = (ExpandoAndGeneration*)expandoVal.toPrivate();
         masm.movePtr(ImmPtr(expandoAndGeneration), tempVal.scratchReg());
 
-        masm.branch32(Assembler::NotEqual,
+        masm.branch64(Assembler::NotEqual,
                       Address(tempVal.scratchReg(),
                               ExpandoAndGeneration::offsetOfGeneration()),
-                      Imm32(expandoAndGeneration->generation),
+                      Imm64(expandoAndGeneration->generation),
                       &failDOMProxyCheck);
 
         expandoVal = expandoAndGeneration->expando;

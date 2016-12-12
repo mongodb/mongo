@@ -15,6 +15,8 @@ import uuid
 from buildscripts import utils
 from buildscripts import moduleconfig
 
+import SCons
+
 from mongo_scons_utils import (
     default_buildinfo_environment_data,
     default_variant_dir_generator,
@@ -382,16 +384,21 @@ add_option('use-new-tools',
     nargs=0,
 )
 
+add_option('build-mongoreplay',
+    help='when building with --use-new-tools, build mongoreplay ( requires pcap dev )',
+    nargs=1,
+)
+
 add_option('use-cpu-profiler',
     help='Link against the google-perftools profiler library',
     nargs=0,
 )
 
 add_option('build-fast-and-loose',
-    choices=['on', 'off'],
+    choices=['on', 'off', 'auto'],
     const='on',
-    default='on',
-    help='looser dependency checking, ignored for --release builds',
+    default='auto',
+    help='looser dependency checking',
     nargs='?',
     type='choice',
 )
@@ -426,8 +433,10 @@ add_option('win-version-min',
 )
 
 add_option('cache',
+    choices=["all", "nolinked"],
+    const='all',
     help='Use an object cache rather than a per-build variant directory (experimental)',
-    nargs=0,
+    nargs='?',
 )
 
 add_option('cache-dir',
@@ -479,6 +488,22 @@ add_option('runtime-hardening',
     default="on",
     help="Enable runtime hardening features (e.g. stack smash protection)",
     type='choice',
+)
+
+add_option('use-s390x-crc32',
+    choices=["on", "off"],
+    default="on",
+    help="Enable CRC32 hardware accelaration on s390x",
+    type='choice',
+)
+
+add_option('git-decider',
+    choices=["on", "off"],
+    const='on',
+    default="off",
+    help="Use git metadata for out-of-date detection for source files",
+    nargs='?',
+    type="choice",
 )
 
 try:
@@ -546,11 +571,11 @@ def variable_arch_converter(val):
 def decide_platform_tools():
     if is_running_os('windows'):
         # we only support MS toolchain on windows
-        return ['msvc', 'mslink', 'mslib']
+        return ['msvc', 'mslink', 'mslib', 'masm']
     elif is_running_os('linux', 'solaris'):
-        return ['gcc', 'g++', 'gnulink', 'ar']
+        return ['gcc', 'g++', 'gnulink', 'ar', 'gas']
     elif is_running_os('osx'):
-        return ['gcc', 'g++', 'applelink', 'ar']
+        return ['gcc', 'g++', 'applelink', 'ar', 'as']
     else:
         return ["default"]
 
@@ -586,6 +611,20 @@ env_vars.Add('ABIDW',
 env_vars.Add('ARFLAGS',
     help='Sets flags for the archiver',
     converter=variable_shlex_converter)
+
+env_vars.Add(
+    'CACHE_SIZE',
+    help='Maximum size of the cache (in gigabytes)',
+    default=32,
+    converter=lambda x:int(x)
+)
+
+env_vars.Add(
+    'CACHE_PRUNE_TARGET',
+    help='Maximum percent in-use in cache after pruning',
+    default=66,
+    converter=lambda x:int(x)
+)
 
 env_vars.Add('CC',
     help='Select the C compiler to use')
@@ -721,6 +760,10 @@ env_vars.Add('VERBOSE',
     default='auto',
 )
 
+env_vars.Add('WINDOWS_OPENSSL_BIN',
+    help='Sets the path to the openssl binaries for packaging',
+    default='c:/openssl/bin')
+
 # -- Validate user provided options --
 
 # A dummy environment that should *only* have the variables we have set. In practice it has
@@ -788,7 +831,7 @@ def printLocalInfo():
 
 printLocalInfo()
 
-boostLibs = [ "thread" , "filesystem" , "program_options", "system", "regex", "chrono" ]
+boostLibs = [ "thread" , "filesystem" , "program_options", "system", "regex", "chrono", "iostreams" ]
 
 onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) in [ "mongod" , "mongos" , "test" ] )
 
@@ -1115,12 +1158,30 @@ else:
     env['MONGO_ALLOCATOR'] = get_option('allocator')
 
 if has_option("cache"):
-    if has_option("release"):
-        env.FatalError(
-            "Using the experimental --cache option is not permitted for --release builds")
     if has_option("gcov"):
         env.FatalError("Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084")
     env.CacheDir(str(env.Dir(cacheDir)))
+
+    if get_option("cache") == "nolinked":
+        def noCacheEmitter(target, source, env):
+            for t in target:
+                env.NoCache(t)
+            return target, source
+
+        def addNoCacheEmitter(builder):
+            origEmitter = builder.emitter
+            if SCons.Util.is_Dict(origEmitter):
+                for k,v in origEmitter:
+                    origEmitter[k] = SCons.Builder.ListEmitter([v, noCacheEmitter])
+            elif SCons.Util.is_List(origEmitter):
+                emitter.append(noCacheEmitter)
+            else:
+                builder.emitter = SCons.Builder.ListEmitter([origEmitter, noCacheEmitter])
+
+        addNoCacheEmitter(env['BUILDERS']['Program'])
+        addNoCacheEmitter(env['BUILDERS']['StaticLibrary'])
+        addNoCacheEmitter(env['BUILDERS']['SharedLibrary'])
+        addNoCacheEmitter(env['BUILDERS']['LoadableModule'])
 
 # Normalize the link model. If it is auto, then a release build uses 'object' mode. Otherwise
 # we automatically select the 'static' model on non-windows platforms, or 'object' if on
@@ -1242,13 +1303,22 @@ if link_model.startswith("dynamic"):
 if optBuild:
     env.SetConfigHeaderDefine("MONGO_CONFIG_OPTIMIZED_BUILD")
 
-# Ignore requests to build fast and loose for release builds.
-# Also ignore fast-and-loose option if the scons cache is enabled (see SERVER-19088)
-if get_option('build-fast-and-loose') == "on" and \
-    not has_option('release') and not has_option('cache'):
+# Enable the fast decider if exlicltly requested or if in 'auto' mode and not in conflict with other
+# options.
+if get_option('build-fast-and-loose') == 'on' or \
+   (get_option('build-fast-and-loose') == 'auto' and \
+    not has_option('release') and \
+    not has_option('cache')):
     # See http://www.scons.org/wiki/GoFastButton for details
     env.Decider('MD5-timestamp')
     env.SetOption('max_drift', 1)
+
+# If the user has requested the git decider, enable it if it is available. We want to do this after
+# we set the basic decider above, so that we 'chain' to that one.
+if get_option('git-decider') == 'on':
+    git_decider = Tool('git_decider')
+    if git_decider.exists(env):
+        git_decider(env)
 
 # On non-windows platforms, we may need to differentiate between flags being used to target an
 # executable (like -fPIE), vs those being used to target a (shared) library (like -fPIC). To do so,
@@ -1284,6 +1354,9 @@ if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
     env['ARCOMSTR'] = 'Generating placeholder library $TARGET'
     env['RANLIBCOM'] = noop_action
     env['RANLIBCOMSTR'] = 'Skipping ranlib for $TARGET'
+elif env['_LIBDEPS'] == '$_LIBDEPS_LIBS':
+    env.Tool('thin_archive')
+
 
 libdeps.setup_environment(env, emitting_shared=(link_model.startswith("dynamic")))
 
@@ -1837,6 +1910,12 @@ def doConfigure(myenv):
         # see: http://stackoverflow.com/questions/21755206/how-to-get-around-gcc-void-b-4-may-be-used-uninitialized-in-this-funct
         AddToCXXFLAGSIfSupported(myenv, "-Wno-maybe-uninitialized")
 
+        # Disable warning about templates that can't be implicitly instantiated. It is an attempt to
+        # make a link error into an easier-to-debug compiler failure, but it triggers false
+        # positives if explicit instantiation is used in a TU that can see the full definition. This
+        # is a problem at least for the S2 headers.
+        AddToCXXFLAGSIfSupported(myenv, "-Wno-undefined-var-template")
+
         # Check if we can set "-Wnon-virtual-dtor" when "-Werror" is set. The only time we can't set it is on
         # clang 3.4, where a class with virtual function(s) and a non-virtual destructor throws a warning when
         # it shouldn't.
@@ -1872,11 +1951,10 @@ def doConfigure(myenv):
         conf.Finish()
 
     if get_option('runtime-hardening') == "on":
-        # Clang honors these flags, but doesn't actually do anything with them for compatibility, so we
-        # need to only do this for GCC. On clang, we do things differently. Note that we need to add
-        # these to the LINKFLAGS as well, since otherwise we might not link libssp when we need to (see
-        # SERVER-12456).
-        if myenv.ToolchainIs('gcc'):
+        # Enable 'strong' stack protection preferentially, but fall back to 'all' if it is not
+        # available. Note that we need to add these to the LINKFLAGS as well, since otherwise we
+        # might not link libssp when we need to (see SERVER-12456).
+        if myenv.ToolchainIs('gcc', 'clang'):
             if AddToCCFLAGSIfSupported(myenv, '-fstack-protector-strong'):
                 myenv.Append(
                     LINKFLAGS=[
@@ -1889,10 +1967,10 @@ def doConfigure(myenv):
                         '-fstack-protector-all',
                     ]
                 )
-        elif myenv.ToolchainIs('clang'):
-            # TODO: Clang stack hardening. There are several interesting
-            # things to try here, but they each have consequences we need
-            # to investigate.
+
+        if myenv.ToolchainIs('clang'):
+            # TODO: There are several interesting things to try here, but they each have
+            # consequences we need to investigate.
             #
             # - fsanitize=bounds: This does static bounds checking. We can
             #   probably turn this on along with fsanitize-trap so that we
@@ -2200,6 +2278,10 @@ def doConfigure(myenv):
         if not myenv.ToolchainIs('clang', 'gcc'):
             env.FatalError('sanitize is only supported with clang or gcc')
 
+        if myenv.ToolchainIs('gcc'):
+            # GCC's implementation of ASAN depends on libdl.
+            env.Append(LIBS=['dl'])
+
         if env['MONGO_ALLOCATOR'] == 'tcmalloc':
             # There are multiply defined symbols between the sanitizer and
             # our vendorized tcmalloc.
@@ -2276,15 +2358,6 @@ def doConfigure(myenv):
             if not AddToCCFLAGSIfSupported(myenv, "-fno-sanitize-recover"):
                 AddToCCFLAGSIfSupported(myenv, "-fno-sanitize-recover=undefined")
 
-            # Ideally, we would apply this only in the WiredTiger
-            # directory until WT-2631 is resolved, but we can't rely
-            # on the flag being supported until clang-3.6, which isn't
-            # our minimum, and we don't have access to
-            # AddToCCFFLAGSIfSupported in the scope of the WT
-            # Sconscript.
-            #
-            AddToCCFLAGSIfSupported(myenv, "-fno-sanitize=nonnull-attribute")
-
     if myenv.ToolchainIs('msvc') and optBuild:
         # http://blogs.msdn.com/b/vcblog/archive/2013/09/11/introducing-gw-compiler-switch.aspx
         #
@@ -2302,6 +2375,13 @@ def doConfigure(myenv):
 
         # Explicitly enable GNU build id's if the linker supports it.
         AddToLINKFLAGSIfSupported(myenv, '-Wl,--build-id')
+
+        # Explicitly use the new gnu hash section if the linker offers it.
+        AddToLINKFLAGSIfSupported(myenv, '-Wl,--hash-style=gnu')
+
+        # Try to have the linker tell us about ODR violations. Don't use this on UBSAN (see SERVER-27229) for now.
+        if not has_option('sanitize') or not 'undefined' in get_option('sanitize'):
+            AddToLINKFLAGSIfSupported(myenv, '-Wl,--detect-odr-violations')
 
         # Disallow an executable stack. Also, issue a warning if any files are found that would
         # cause the stack to become executable if the noexecstack flag was not in play, so that we
@@ -2549,7 +2629,47 @@ def doConfigure(myenv):
     conf = Configure(myenv, custom_tests = {
         'CheckBoostMinVersion': CheckBoostMinVersion,
     })
+
+    # pthread_setname_np was added in GLIBC 2.12, and Solaris 11.3
+    if posix_system:
+        myenv = conf.Finish()
+
+        def CheckPThreadSetNameNP(context):
+            compile_test_body = textwrap.dedent("""
+            #define _GNU_SOURCE
+            #include <pthread.h>
+
+            int main() {
+                pthread_setname_np(pthread_self(), "test");
+                return 0;
+            }
+            """)
+
+            context.Message("Checking if pthread_setname_np is supported... ")
+            result = context.TryCompile(compile_test_body, ".c")
+            context.Result(result)
+            return result
+
+        conf = Configure(myenv, custom_tests = {
+            'CheckPThreadSetNameNP': CheckPThreadSetNameNP,
+        })
+
+        if conf.CheckPThreadSetNameNP():
+            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP")
+
     libdeps.setup_conftests(conf)
+
+    def addOpenSslLibraryToDistArchive(file_name):
+        openssl_bin_path = os.path.normpath(env['WINDOWS_OPENSSL_BIN'].lower())
+        full_file_name = os.path.join(openssl_bin_path, file_name)
+        if os.path.exists(full_file_name):
+            env.Append(ARCHIVE_ADDITIONS=[full_file_name])
+            env.Append(ARCHIVE_ADDITION_DIR_MAP={
+                    openssl_bin_path: "bin"
+                    })
+            return True
+        else:
+            return False
 
     if has_option( "ssl" ):
         sslLibName = "ssl"
@@ -2557,6 +2677,12 @@ def doConfigure(myenv):
         if conf.env.TargetOSIs('windows'):
             sslLibName = "ssleay32"
             cryptoLibName = "libeay32"
+
+            # Add the SSL binaries to the zip file distribution
+            files = ['ssleay32.dll', 'libeay32.dll']
+            for extra_file in files:
+                if not addOpenSslLibraryToDistArchive(extra_file):
+                    print("WARNING: Cannot find SSL library '%s'" % extra_file)
 
         # Used to import system certificate keychains
         if conf.env.TargetOSIs('osx'):
@@ -2673,6 +2799,7 @@ def doConfigure(myenv):
             # permit more than four parameters.
             "BOOST_THREAD_DONT_PROVIDE_VARIADIC_THREAD",
             "BOOST_SYSTEM_NO_DEPRECATED",
+            "BOOST_MATH_NO_LONG_DOUBLE_MATH_FUNCTIONS",
         ]
     )
 
@@ -2805,15 +2932,21 @@ env = doConfigure( env )
 # compilation database entries for the configure tests, which is weird.
 env.Tool("compilation_db")
 
-# Load the dagger tool for build dependency graph introspection
-env.Tool("dagger")
-
 def checkErrorCodes():
     import buildscripts.errorcodes as x
     if x.checkErrorCodes() == False:
         env.FatalError("next id to use: {0}", x.getNextCode())
 
 checkErrorCodes()
+
+# Resource Files are Windows specific
+def env_windows_resource_file(env, path):
+    if env.TargetOSIs('windows'):
+        return [ env.RES(path) ]
+    else:
+        return []
+
+env.AddMethod(env_windows_resource_file, 'WindowsResourceFile')
 
 # --- lint ----
 
@@ -2907,8 +3040,15 @@ def injectMongoIncludePaths(thisEnv):
     thisEnv.AppendUnique(CPPPATH=['$BUILD_DIR'])
 env.AddMethod(injectMongoIncludePaths, 'InjectMongoIncludePaths')
 
-compileDb = env.Alias("compiledb", env.CompilationDatabase('compile_commands.json'))
-dependencyDb = env.Alias("dagger", env.Dagger('library_dependency_graph.json'))
+compileCommands = env.CompilationDatabase('compile_commands.json')
+compileDb = env.Alias("compiledb", compileCommands)
+
+# Microsoft Visual Studio Project generation for code browsing
+vcxprojFile = env.Command(
+    "mongodb.vcxproj",
+    compileCommands,
+    r"$PYTHON buildscripts\make_vcxproj.py mongodb")
+vcxproj = env.Alias("vcxproj", vcxprojFile)
 
 env.Alias("distsrc-tar", env.DistSrc("mongodb-src-${MONGO_VERSION}.tar"))
 env.Alias("distsrc-tgz", env.GZip(
@@ -2922,8 +3062,31 @@ env.SConscript('src/SConscript', variant_dir='$BUILD_DIR', duplicate=False)
 
 all = env.Alias('all', ['core', 'tools', 'dbtest', 'unittests', 'integration_tests'])
 
-# Require everything to be built before trying to extract build dependency information
-env.Requires(dependencyDb, all)
+# If we can, load the dagger tool for build dependency graph introspection.
+# Dagger is only supported on Linux and OSX (not Windows or Solaris).
+if is_running_os('osx') or is_running_os('linux'):
+    env.Tool("dagger")
+    dependencyDb = env.Alias("dagger", env.Dagger('library_dependency_graph.json'))
+
+    # Require everything to be built before trying to extract build dependency information
+    env.Requires(dependencyDb, all)
+
+# We don't want installing files to cause them to flow into the cache,
+# since presumably we can re-install them from the origin if needed.
+env.NoCache(env.FindInstalledFiles())
+
+# Declare the cache prune target
+cachePrune = env.Command(
+    target="#cache-prune",
+    source=[
+        "#buildscripts/scons_cache_prune.py",
+    ],
+    action="$PYTHON ${SOURCES[0]} --cache-dir=${CACHE_DIR.abspath} --cache-size=${CACHE_SIZE} --prune-ratio=${CACHE_PRUNE_TARGET/100.00}",
+    CACHE_DIR=env.Dir(cacheDir),
+)
+
+env.AlwaysBuild(cachePrune)
+env.Alias('cache-prune', cachePrune)
 
 # Substitute environment variables in any build targets so that we can
 # say, for instance:

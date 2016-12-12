@@ -25,7 +25,7 @@
         // so it cannot vote while fsync locked in PV1. Use PV0 explicitly here.
         protocolVersion: 0
     });
-    replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY, 60 * 1000);
+    replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
     var master = replTest.getPrimary();
 
     // do a write

@@ -82,7 +82,7 @@ Status canonicalizeMongodOptions(moe::Environment* params);
 // Must be called after "storeMongodOptions"
 StatusWith<repl::ReplSettings> parseMongodReplicationOptions(const moe::Environment& params);
 
-Status storeMongodOptions(const moe::Environment& params, const std::vector<std::string>& args);
+Status storeMongodOptions(const moe::Environment& params);
 
 void setGlobalReplSettings(const repl::ReplSettings& settings);
 const repl::ReplSettings& getGlobalReplSettings();

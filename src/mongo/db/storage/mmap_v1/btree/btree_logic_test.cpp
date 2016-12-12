@@ -1192,7 +1192,7 @@ protected:
 
     virtual void validate() {
         OperationContextNoop txn;
-        ASSERT_NOT_EQUALS(_oldTop,
+        ASSERT_BSONOBJ_NE(_oldTop,
                           this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
     }
 
@@ -1219,8 +1219,8 @@ protected:
 
     virtual void validate() {
         OperationContextNoop txn;
-        ASSERT_TRUE(_oldTop !=
-                    this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
+        ASSERT_BSONOBJ_NE(_oldTop,
+                          this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
     }
 
 private:
@@ -1665,8 +1665,8 @@ class NoMoveAtLowWaterMarkRight : public MergeSizeJustRightRight<OnDiskFormat> {
 
     virtual void validate() {
         OperationContextNoop txn;
-        ASSERT_EQUALS(_oldTop,
-                      this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
+        ASSERT_BSONOBJ_EQ(_oldTop,
+                          this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
     }
 
     virtual bool merge() const {
@@ -1689,7 +1689,7 @@ class MoveBelowLowWaterMarkRight : public NoMoveAtLowWaterMarkRight<OnDiskFormat
     virtual void validate() {
         OperationContextNoop txn;
         // Different top means we rebalanced
-        ASSERT_NOT_EQUALS(this->_oldTop,
+        ASSERT_BSONOBJ_NE(this->_oldTop,
                           this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
     }
 };
@@ -1706,8 +1706,8 @@ class NoMoveAtLowWaterMarkLeft : public MergeSizeJustRightLeft<OnDiskFormat> {
 
     virtual void validate() {
         OperationContextNoop txn;
-        ASSERT_EQUALS(this->_oldTop,
-                      this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
+        ASSERT_BSONOBJ_EQ(this->_oldTop,
+                          this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
     }
     virtual bool merge() const {
         return false;
@@ -1729,7 +1729,7 @@ class MoveBelowLowWaterMarkLeft : public NoMoveAtLowWaterMarkLeft<OnDiskFormat> 
     virtual void validate() {
         OperationContextNoop txn;
         // Different top means we rebalanced
-        ASSERT_NOT_EQUALS(this->_oldTop,
+        ASSERT_BSONOBJ_NE(this->_oldTop,
                           this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
     }
 };

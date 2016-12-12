@@ -28,6 +28,12 @@
  *    it in the license file.
  */
 
+#pragma once
+
+#include <memory>
+#include <set>
+
+#include "mongo/base/string_data.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
@@ -93,7 +99,8 @@ bool isPathPrefixOf(StringData first, StringData second);
 
 /**
  * Applies 'func' to each node of 'expr', where the first argument is a pointer to that actual node
- * (not a copy), and the second argument is the path to that node.
+ * (not a copy), and the second argument is the path to that node. Callers should not depend on the
+ * order of the traversal of the nodes.
  */
 void mapOver(MatchExpression* expr, NodeTraversalFunc func, std::string path = "");
 

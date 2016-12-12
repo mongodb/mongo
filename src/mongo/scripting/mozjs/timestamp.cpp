@@ -38,10 +38,15 @@
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace mozjs {
+
+const JSFunctionSpec TimestampInfo::methods[2] = {
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD(toJSON, TimestampInfo), JS_FS_END,
+};
 
 const char* const TimestampInfo::className = "Timestamp";
 
@@ -82,6 +87,16 @@ void TimestampInfo::construct(JSContext* cx, JS::CallArgs args) {
     }
 
     args.rval().setObjectOrNull(thisv);
+}
+
+void TimestampInfo::Functions::toJSON::call(JSContext* cx, JS::CallArgs args) {
+    ObjectWrapper o(cx, args.thisv());
+
+    ValueReader(cx, args.rval())
+        .fromBSON(BSON("$timestamp" << BSON("t" << o.getNumber(InternedString::t) << "i"
+                                                << o.getNumber(InternedString::i))),
+                  nullptr,
+                  false);
 }
 
 }  // namespace mozjs

@@ -74,11 +74,9 @@ __stdio_init(WT_FSTREAM *fs, const char *name, FILE *fp)
  * __wt_os_stdio --
  *	Initialize the stdio configuration.
  */
-int
+void
 __wt_os_stdio(WT_SESSION_IMPL *session)
 {
 	__stdio_init(WT_STDERR(session), "stderr", stderr);
 	__stdio_init(WT_STDOUT(session), "stdout", stdout);
-
-	return (0);
 }

@@ -1,3 +1,4 @@
+# -*- mode: python -*-
 Import("env")
 Import("wiredtiger")
 Import("get_option")
@@ -9,14 +10,17 @@ if sanitizer_list:
 
 env.Library(
     target='storage_wiredtiger_customization_hooks',
-    source= ['wiredtiger_customization_hooks.cpp'],
+    source= [
+        'wiredtiger_customization_hooks.cpp',
+        'wiredtiger_extensions.cpp',
+    ],
     LIBDEPS= ['$BUILD_DIR/mongo/base',
               '$BUILD_DIR/mongo/db/service_context'],
     PROGDEPS_DEPENDENTS=[
         '$BUILD_DIR/mongo/mongod',
         '$BUILD_DIR/mongo/mongos',
     ],
-    )
+)
 
 if wiredtiger:
     wtEnv = env.Clone()
@@ -55,7 +59,6 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/storage/storage_options',
             '$BUILD_DIR/mongo/util/concurrency/ticketholder',
             '$BUILD_DIR/mongo/util/elapsed_tracker',
-            '$BUILD_DIR/mongo/util/foundation',
             '$BUILD_DIR/mongo/util/processinfo',
             '$BUILD_DIR/third_party/shim_wiredtiger',
             '$BUILD_DIR/third_party/shim_snappy',

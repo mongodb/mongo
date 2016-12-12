@@ -37,6 +37,7 @@
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/platform/decimal128.h"
@@ -181,8 +182,7 @@ Value::Value(const BSONElement& elem) : _storage(elem.type()) {
         }
 
         case jstOID:
-            static_assert(sizeof(_storage.oid) == OID::kOIDSize,
-                          "sizeof(_storage.oid) == OID::kOIDSize");
+            MONGO_STATIC_ASSERT(sizeof(_storage.oid) == OID::kOIDSize);
             memcpy(_storage.oid, elem.OID().view().view(), OID::kOIDSize);
             break;
 
@@ -242,13 +242,22 @@ Value::Value(const BSONArray& arr) : _storage(Array) {
     _storage.putVector(vec.get());
 }
 
-Value::Value(const vector<BSONObj>& arr) : _storage(Array) {
-    intrusive_ptr<RCVector> vec(new RCVector);
-    vec->vec.reserve(arr.size());
-    for (auto&& obj : arr) {
-        vec->vec.push_back(Value(obj));
+Value::Value(const vector<BSONObj>& vec) : _storage(Array) {
+    intrusive_ptr<RCVector> storageVec(new RCVector);
+    storageVec->vec.reserve(vec.size());
+    for (auto&& obj : vec) {
+        storageVec->vec.push_back(Value(obj));
     }
-    _storage.putVector(vec.get());
+    _storage.putVector(storageVec.get());
+}
+
+Value::Value(const vector<Document>& vec) : _storage(Array) {
+    intrusive_ptr<RCVector> storageVec(new RCVector);
+    storageVec->vec.reserve(vec.size());
+    for (auto&& obj : vec) {
+        storageVec->vec.push_back(Value(obj));
+    }
+    _storage.putVector(storageVec.get());
 }
 
 Value Value::createIntOrLong(long long longValue) {
@@ -836,8 +845,7 @@ void Value::hash_combine(size_t& seed,
 
         case bsonTimestamp:
         case Date:
-            static_assert(sizeof(_storage.dateValue) == sizeof(_storage.timestampValue),
-                          "sizeof(_storage.dateValue) == sizeof(_storage.timestampValue)");
+            MONGO_STATIC_ASSERT(sizeof(_storage.dateValue) == sizeof(_storage.timestampValue));
             boost::hash_combine(seed, _storage.dateValue);
             break;
 
@@ -930,8 +938,8 @@ void Value::hash_combine(size_t& seed,
 
         case CodeWScope: {
             intrusive_ptr<const RCCodeWScope> cws = _storage.getCodeWScope();
-            boost::hash_combine(seed, SimpleStringDataComparator::kInstance.hash(cws->code));
-            boost::hash_combine(seed, BSONObj::Hasher()(cws->scope));
+            SimpleStringDataComparator::kInstance.hash_combine(seed, cws->code);
+            SimpleBSONObjComparator::kInstance.hash_combine(seed, cws->scope);
             break;
         }
     }
@@ -1015,7 +1023,7 @@ bool Value::integral() const {
             // If we are able to convert the decimal to an int32_t without an rounding errors,
             // then it is integral.
             uint32_t signalingFlags = Decimal128::kNoFlag;
-            (void)_storage.getDecimal().toInt(&signalingFlags);
+            (void)_storage.getDecimal().toIntExact(&signalingFlags);
             return signalingFlags == Decimal128::kNoFlag;
         }
         default:

@@ -35,11 +35,13 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/cursor_request.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
@@ -98,7 +100,7 @@ public:
 
         // Check for the listIndexes ActionType on the database, or find on system.indexes for pre
         // 3.0 systems.
-        NamespaceString ns(parseNs(dbname, cmdObj));
+        const NamespaceString ns(parseNsCollectionRequired(dbname, cmdObj));
         if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns),
                                                            ActionType::listIndexes) ||
             authzSession->isAuthorizedForActionsOnResource(
@@ -120,7 +122,7 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        const NamespaceString ns(parseNs(dbname, cmdObj));
+        const NamespaceString ns(parseNsCollectionRequired(dbname, cmdObj));
 
         const long long defaultBatchSize = std::numeric_limits<long long>::max();
         long long batchSize;
@@ -162,6 +164,27 @@ public:
             }
             MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "listIndexes", ns.ns());
 
+            if (ns.ns() == FeatureCompatibilityVersion::kCollection &&
+                indexNames[i] == FeatureCompatibilityVersion::k32IncompatibleIndexName) {
+                BSONObjBuilder bob;
+
+                for (auto&& indexSpecElem : indexSpec) {
+                    auto indexSpecElemFieldName = indexSpecElem.fieldNameStringData();
+                    if (indexSpecElemFieldName == IndexDescriptor::kIndexVersionFieldName) {
+                        // Include the index version in the command response as a decimal type
+                        // instead of as a 32-bit integer. This is a new BSON type that isn't
+                        // supported by versions of MongoDB earlier than 3.4 that will cause 3.2
+                        // secondaries to crash when performing initial sync.
+                        bob.append(IndexDescriptor::kIndexVersionFieldName,
+                                   indexSpecElem.numberDecimal());
+                    } else {
+                        bob.append(indexSpecElem);
+                    }
+                }
+
+                indexSpec = bob.obj();
+            }
+
             WorkingSetID id = ws->allocate();
             WorkingSetMember* member = ws->get(id);
             member->keyData.clear();
@@ -171,14 +194,11 @@ public:
             root->pushBack(id);
         }
 
-        const std::string cursorNamespace = str::stream() << dbname << ".$cmd." << getName() << "."
-                                                          << ns.coll();
-        dassert(NamespaceString(cursorNamespace).isValid());
-        dassert(NamespaceString(cursorNamespace).isListIndexesCursorNS());
-        dassert(ns == NamespaceString(cursorNamespace).getTargetNSForListIndexes());
+        const NamespaceString cursorNss = NamespaceString::makeListIndexesNSS(dbname, ns.coll());
+        dassert(ns == cursorNss.getTargetNSForListIndexes());
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            txn, std::move(ws), std::move(root), cursorNamespace, PlanExecutor::YIELD_MANUAL);
+            txn, std::move(ws), std::move(root), cursorNss.ns(), PlanExecutor::YIELD_MANUAL);
         if (!statusWithPlanExecutor.isOK()) {
             return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
@@ -207,15 +227,14 @@ public:
         if (!exec->isEOF()) {
             exec->saveState();
             exec->detachFromOperationContext();
-            ClientCursor* cursor =
-                new ClientCursor(CursorManager::getGlobalCursorManager(),
-                                 exec.release(),
-                                 cursorNamespace,
-                                 txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot());
-            cursorId = cursor->cursorid();
+            auto pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
+                {exec.release(),
+                 cursorNss.ns(),
+                 txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot()});
+            cursorId = pinnedCursor.getCursor()->cursorid();
         }
 
-        appendCursorResponseObject(cursorId, cursorNamespace, firstBatch.arr(), &result);
+        appendCursorResponseObject(cursorId, cursorNss.ns(), firstBatch.arr(), &result);
 
         return true;
     }

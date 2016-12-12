@@ -137,7 +137,7 @@ TEST(ToBSONTests, NormalValues) {
                                      << "string");
     // TODO: Put a comparison here that doesn't depend on the field order.  Right now it is
     // based on the sort order of keys in a std::map.
-    ASSERT_EQUALS(obj, environment.toBSON());
+    ASSERT_BSONOBJ_EQ(obj, environment.toBSON());
 }
 
 TEST(ToBSONTests, DottedValues) {
@@ -151,7 +151,7 @@ TEST(ToBSONTests, DottedValues) {
                                      << true);
     // TODO: Put a comparison here that doesn't depend on the field order.  Right now it is
     // based on the sort order of keys in a std::map.
-    ASSERT_EQUALS(obj, environment.toBSON());
+    ASSERT_BSONOBJ_EQ(obj, environment.toBSON());
 }
 
 TEST(ToBSONTests, DeepDottedValues) {
@@ -171,6 +171,6 @@ TEST(ToBSONTests, DeepDottedValues) {
                     << 6.0);
     // TODO: Put a comparison here that doesn't depend on the field order.  Right now it is
     // based on the sort order of keys in a std::map.
-    ASSERT_EQUALS(obj, environment.toBSON());
+    ASSERT_BSONOBJ_EQ(obj, environment.toBSON());
 }
 }  // unnamed namespace

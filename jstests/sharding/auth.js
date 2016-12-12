@@ -2,6 +2,7 @@
 // authentication is used
 (function() {
     'use strict';
+    load("jstests/replsets/rslib.js");
 
     var adminUser = {db: "admin", username: "foo", password: "bar"};
 
@@ -37,7 +38,7 @@
         name: "auth",
         mongos: 1,
         shards: 0,
-        other: {keyFile: "jstests/libs/key1", chunkSize: 1},
+        other: {keyFile: "jstests/libs/key1", chunkSize: 1, enableAutoSplit: true},
     });
 
     if (s.getDB('admin').runCommand('buildInfo').bits < 64) {
@@ -66,7 +67,7 @@
     login(adminUser);
 
     var d1 = new ReplSetTest({name: "d1", nodes: 3, useHostName: true});
-    d1.startSet({keyFile: "jstests/libs/key2"});
+    d1.startSet({keyFile: "jstests/libs/key2", shardsvr: ""});
     d1.initiate();
 
     print("d1 initiated");
@@ -97,7 +98,7 @@
     print("start rs w/correct key");
 
     d1.stopSet();
-    d1.startSet({keyFile: "jstests/libs/key1"});
+    d1.startSet({keyFile: "jstests/libs/key1", restart: true});
     d1.initiate();
 
     var master = d1.getPrimary();
@@ -147,7 +148,7 @@
     logout(testUser);
 
     var d2 = new ReplSetTest({name: "d2", nodes: 3, useHostName: true});
-    d2.startSet({keyFile: "jstests/libs/key1"});
+    d2.startSet({keyFile: "jstests/libs/key1", shardsvr: ""});
     d2.initiate();
     d2.awaitSecondaryNodes();
 
@@ -160,8 +161,8 @@
     print("logged in");
     result = s.getDB("admin").runCommand({addShard: shardName});
 
-    ReplSetTest.awaitRSClientHosts(s.s, d1.nodes, {ok: true});
-    ReplSetTest.awaitRSClientHosts(s.s, d2.nodes, {ok: true});
+    awaitRSClientHosts(s.s, d1.nodes, {ok: true});
+    awaitRSClientHosts(s.s, d2.nodes, {ok: true});
 
     s.getDB("test").foo.remove({});
 
@@ -242,10 +243,10 @@
     d2.waitForState(d2.getSecondaries(), ReplSetTest.State.SECONDARY, 5 * 60 * 1000);
 
     authutil.asCluster(d1.nodes, "jstests/libs/key1", function() {
-        d1.awaitReplication(120000);
+        d1.awaitReplication();
     });
     authutil.asCluster(d2.nodes, "jstests/libs/key1", function() {
-        d2.awaitReplication(120000);
+        d2.awaitReplication();
     });
 
     // add admin on shard itself, hack to prevent localhost auth bypass

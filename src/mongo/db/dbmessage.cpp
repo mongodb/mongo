@@ -32,6 +32,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/strnlen.h"
+#include "mongo/rpc/object_check.h"
 #include "mongo/transport/session.h"
 
 namespace mongo {
@@ -120,13 +121,14 @@ const char* DbMessage::getArray(size_t count) const {
 }
 
 BSONObj DbMessage::nextJsObj() {
-    massert(10304,
+    uassert(ErrorCodes::InvalidBSON,
             "Client Error: Remaining data too small for BSON object",
             _nextjsobj != NULL && _theEnd - _nextjsobj >= 5);
 
     if (serverGlobalParams.objcheck) {
-        Status status = validateBSON(_nextjsobj, _theEnd - _nextjsobj);
-        massert(10307,
+        Status status = validateBSON(
+            _nextjsobj, _theEnd - _nextjsobj, Validator<BSONObj>::enabledBSONVersion());
+        uassert(ErrorCodes::InvalidBSON,
                 str::stream() << "Client Error: bad object in message: " << status.reason(),
                 status.isOK());
     }
@@ -175,7 +177,7 @@ OpQueryReplyBuilder::OpQueryReplyBuilder() : _buffer(32768) {
     _buffer.skip(sizeof(QueryResult::Value));
 }
 
-void OpQueryReplyBuilder::send(transport::Session* session,
+void OpQueryReplyBuilder::send(const transport::SessionHandle& session,
                                int queryResultFlags,
                                const Message& requestMsg,
                                int nReturned,
@@ -190,7 +192,8 @@ void OpQueryReplyBuilder::send(transport::Session* session,
     uassertStatusOK(session->sinkMessage(response).wait());
 }
 
-void OpQueryReplyBuilder::sendCommandReply(transport::Session* session, const Message& requestMsg) {
+void OpQueryReplyBuilder::sendCommandReply(const transport::SessionHandle& session,
+                                           const Message& requestMsg) {
     send(session, /*queryFlags*/ 0, requestMsg, /*nReturned*/ 1);
 }
 
@@ -207,7 +210,7 @@ void OpQueryReplyBuilder::putInMessage(
 }
 
 void replyToQuery(int queryResultFlags,
-                  transport::Session* session,
+                  const transport::SessionHandle& session,
                   Message& requestMsg,
                   const void* data,
                   int size,
@@ -220,7 +223,7 @@ void replyToQuery(int queryResultFlags,
 }
 
 void replyToQuery(int queryResultFlags,
-                  transport::Session* session,
+                  const transport::SessionHandle& session,
                   Message& requestMsg,
                   const BSONObj& responseObj) {
     replyToQuery(queryResultFlags,

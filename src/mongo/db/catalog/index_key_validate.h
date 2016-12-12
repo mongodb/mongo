@@ -28,13 +28,55 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/server_options.h"
 
 namespace mongo {
 class BSONObj;
+class CollatorInterface;
+class NamespaceString;
+class Status;
+template <typename T>
+class StatusWith;
+
+namespace index_key_validate {
 
 /**
- * Checks if the key is valid for building an index.
+ * Checks if the key is valid for building an index according to the validation rules for the given
+ * index version.
  */
-Status validateKeyPattern(const BSONObj& key);
+Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion indexVersion);
+
+/**
+ * Validates the index specification 'indexSpec' and returns an equivalent index specification that
+ * has any missing attributes filled in. If the index specification is malformed, then an error
+ * status is returned.
+ */
+StatusWith<BSONObj> validateIndexSpec(
+    const BSONObj& indexSpec,
+    const NamespaceString& expectedNamespace,
+    const ServerGlobalParams::FeatureCompatibility& featureCompatibility);
+
+/**
+ * Performs additional validation for _id index specifications. This should be called after
+ * validateIndexSpec().
+ */
+Status validateIdIndexSpec(const BSONObj& indexSpec);
+
+/**
+ * Confirms that 'indexSpec' contains only valid field names. Returns an error if an unexpected
+ * field name is found.
+ */
+Status validateIndexSpecFieldNames(const BSONObj& indexSpec);
+
+/**
+ * Validates the 'collation' field in the index specification 'indexSpec' and fills in the full
+ * collation spec. If 'collation' is missing, fills it in with the spec for 'defaultCollator'.
+ * Returns the index specification with 'collation' filled in.
+ */
+StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* txn,
+                                               const BSONObj& indexSpec,
+                                               const CollatorInterface* defaultCollator);
+
+}  // namespace index_key_validate
 }  // namespace mongo

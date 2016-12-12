@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/duration.h"
@@ -103,7 +104,7 @@ public:
     }
 
     bool operator==(const TagSet& other) const {
-        return _tags == other._tags;
+        return SimpleBSONObjComparator::kInstance.evaluate(_tags == other._tags);
     }
     bool operator!=(const TagSet& other) const {
         return !(*this == other);

@@ -5,10 +5,36 @@ pre:
     - command: shell.track
 
 post:
+    - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+          set -v
+          source ./dsienv.sh
+          $DSI_PATH/bin/make_artifact.sh
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: work/reports.tgz
+        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/${task_name}-${build_id}.${ext|tgz}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: test-log
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: work/reports/graphs/timeseries-p1.html
+        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-p1-${task_name}-${build_id}.html
+        bucket: mciuploads
+        permissions: public-read
+        content_type: text/html
+        display_name: timeseries-p1.html
     - command: attach.results
       params:
         file_location: work/report.json
-    - command: shell.cleanup
     - command: shell.exec
       # destroy the cluster
       params:
@@ -19,6 +45,8 @@ post:
           # call terraform destroy twice to avoid AWS timeout
           yes yes | ./terraform destroy
           yes yes | ./terraform destroy
+          # clean all file to be safe
+          rm -rf *
           echo "Cluster DESTROYED."
     - command: shell.exec
       params:
@@ -56,13 +84,61 @@ functions:
         directory: src
     - command: shell.exec
       params:
-        silent: true
+        working_dir: work
         script: |
-          # generate aws private key file
-          echo "${terraform_secret}" > secret
-          chmod 400 secret
-          echo "${ec2_pem}" > keys/aws.pem
-          chmod 400 keys/aws.pem
+          cat > bootstrap.yml <<EOF
+          cluster_type: ${cluster}
+          platform: ${platform}
+          setup: ${setup}
+          storageEngine: ${storageEngine}
+          test: ${test}
+          production: true
+          EOF
+
+          cat > runtime.yml <<EOF
+          # evergreen default expansions
+          is_patch: ${is_patch}
+          task_id: ${task_id}
+          task_name: ${task_name}
+          execution: ${execution}
+          build_id: ${build_id}
+          build_variant: ${build_variant}
+          version_id: ${version_id}
+          workdir: ${workdir}
+          revision: ${revision}
+          project: ${project}
+          branch_name: ${branch_name}
+
+          # sys-perf expansions
+          # Shouldn't be needed: testList: ${testList}
+          ext: ${ext}
+          script_flags : ${script_flags}
+          dsi_rev: ${dsi_rev}
+          compare_task: ${compare_task}
+          workloads_rev: ${workloads_rev}
+          YCSB_rev: ${YCSB_rev}
+
+          # compositions of expansions
+          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz"
+          EOF
+    - command: shell.exec
+      params:
+        silent: true
+        working_dir: work
+        script: |
+          # AWS ssh secret key
+          echo "${ec2_pem}" > aws_ssh_key.pem
+          chmod 400 aws_ssh_key.pem
+
+          cat > runtime_secret.yml <<EOF
+          # Note that inside system_perf.yml we have ${aws_key} & ${aws_secret}, which are used for
+          # Evergreen resources. The below are used for dsi resources, and are NOT the same!
+          aws_access_key: "${terraform_key}"
+          aws_secret_key: "${terraform_secret}"
+          perf_jira_user: "${perf_jira_user}"
+          perf_jira_pw: "${perf_jira_pw}"
+          EOF
+          chmod 400 runtime_secret.yml
     - command: shell.exec
       params:
         working_dir: work
@@ -72,7 +148,7 @@ functions:
           virtualenv ./venv
           source ./venv/bin/activate
           pip install -r ../src/dsi/dsi/requirements.txt
-          python ../src/dsi/dsi/bin/setup_work_env.py --cluster-type ${cluster} --aws-key-name ${terraform_key} --ssh-keyfile-path ../keys/aws.pem --aws-secret-file ../secret --mongo-download-url https://s3.amazonaws.com/mciuploads/longevity/${build_variant}/${revision}/mongodb-${build_id}.tar.gz --production
+          python ../src/dsi/dsi/bin/setup_work_env.py --production
     - command: shell.exec
       params:
         script: |
@@ -99,7 +175,7 @@ functions:
           set -e
           set -o verbose
           source ./dsienv.sh
-          $DSI_PATH/bin/setup-cluster.sh ${cluster} ../terraform
+          $DSI_PATH/bin/setup-cluster.sh ${cluster} false
 
   "configure mongodb cluster":
     - command: shell.exec
@@ -112,7 +188,7 @@ functions:
           source ./dsienv.sh
           source ./venv/bin/activate
           cp mongodb_setup.${setup}.${storageEngine}.yml mongodb_setup.yml
-          $DSI_PATH/bin/mongodb_setup.py --config
+          $DSI_PATH/bin/mongodb_setup.py && echo "${setup} MongoDB Cluster STARTED."
 
   "run test":
     - command: shell.exec
@@ -145,8 +221,6 @@ functions:
           # destroy the EC2 cluster
           yes yes | ./terraform destroy
           yes yes | ./terraform destroy
-          # clean all file to be safe
-          rm -rf *
           echo "Cluster DESTROYED."
           echo "All perf results"
           cd ..
@@ -154,51 +228,12 @@ functions:
 
   "make test log artifact":
     - command: shell.exec
-      # destroy the cluster
       params:
         working_dir: work
         script: |
-          set -e
-          set -o verbose
+          set -v
           source ./dsienv.sh
-          # move additional file here
-          cd reports
-          cp ../infrastructure_provisioning.out.yml .
-          cp ../ips.sh .
-          cp ../ips.py .
-          cp ../perf.json .
-          cd ..
-          $DSI_PATH/bin/retrieve-diag-data.sh
-          $DSI_PATH/bin/generate-timeseries-html.sh
-
-    - command: archive.targz_pack
-      params:
-        target: "reports.tgz"
-        source_dir: "work"
-        include:
-          - "reports/**"
-
-  "upload log file":
-    - command: s3.put
-      params:
-            aws_key: ${aws_key}
-            aws_secret: ${aws_secret}
-            local_file: reports.tgz
-            remote_file: longevity/${build_variant}/${revision}/logs/${test}-${build_id}.${ext|tgz}
-            bucket: mciuploads
-            permissions: public-read
-            content_type: ${content_type|application/x-gzip}
-            display_name: ${test}-longevity-testlog
-    - command: s3.put
-      params:
-            aws_key: ${aws_key}
-            aws_secret: ${aws_secret}
-            local_file: work/reports/graphs/timeseries-p1.html
-            remote_file: dsi/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-p1-${test}-${build_id}.html
-            bucket: mciuploads
-            permissions: public-read
-            content_type: text/html
-            display_name: timeseries-p1.html
+          $DSI_PATH/bin/make_artifact.sh
 
   "analyze":
     - command: json.get_history
@@ -220,8 +255,10 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          python -u ../src/dsi/dsi/analysis/post_run_check.py --ycsb-throughput-analysis . --rev ${revision} -f history.json -t tags.json --refTag 3.2.1-Baseline --overrideFile ../src/dsi/dsi/analysis/master/longevity_override.json --project_id mongo-longevity --task_name ${task_name} --variant ${build_variant}
-
+          TAG="3.2.1-Baseline"
+          PROJECT="mongo-longevity"
+          OVERRIDEFILE="../src/dsi/dsi/analysis/master/longevity_override.json"
+          python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --reports-analysis reports --perf-file reports/perf.json --rev ${revision} -f history.json -t tags.json --refTag $TAG --overrideFile $OVERRIDEFILE --project_id $PROJECT --task_name ${task_name} --variant ${build_variant}
 
 tasks:
 - name: compile
@@ -276,7 +313,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongodb.tar.gz
-        remote_file: longevity/${build_variant}/${revision}/mongodb-${build_id}.tar.gz
+        remote_file: ${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -295,16 +332,15 @@ tasks:
         storageEngine: "wiredTiger"
         test: "ycsb"
     - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "ycsb"
-    - func: "destroy cluster"
     - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
+    - func: "destroy cluster"
 
 - name: shard_cluster_MMAPv1_test
   depends_on:
     - name: compile
-  exec_timeout_secs: 28800
+  exec_timeout_secs: 216000
   commands:
     - func: "prepare environment"
     - func: "bring up 3 shard cluster"
@@ -314,11 +350,10 @@ tasks:
         storageEngine: "mmapv1"
         test: "ycsb"
     - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "ycsb"
-    - func: "destroy cluster"
     - func: "analyze"
+      vars:
+        script_flags: --ycsb-throughput-analysis reports
+    - func: "destroy cluster"
 
 
 #######################################
@@ -353,6 +388,7 @@ buildvariants:
     numShard: 3
     storageEngine: wiredTiger
     use_scons_cache: true
+    project: &project longevity
   run_on:
     - "rhel70-perf-longevity"
   tasks:
@@ -372,6 +408,7 @@ buildvariants:
     numShard: 3
     storageEngine: mmapv1
     use_scons_cache: true
+    project: *project
   run_on:
     - "rhel70-perf-longevity"
   tasks:

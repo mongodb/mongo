@@ -188,7 +188,6 @@ JSRuntime::JSRuntime(JSRuntime* parentRuntime)
     profilingScripts(false),
     suppressProfilerSampling(false),
     hadOutOfMemory(false),
-    handlingInitFailure(false),
     haveCreatedContext(false),
     allowRelazificationForTesting(false),
     data(nullptr),

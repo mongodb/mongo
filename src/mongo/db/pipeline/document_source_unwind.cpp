@@ -28,10 +28,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/document_source_unwind.h"
+
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/value.h"
 
 namespace mongo {
@@ -55,7 +57,7 @@ public:
      *
      * Returns boost::none if the array is exhausted.
      */
-    boost::optional<Document> getNext();
+    DocumentSource::GetNextResult getNext();
 
 private:
     // Tracks whether or not we can possibly return any more documents. Note we may return
@@ -100,11 +102,11 @@ void DocumentSourceUnwind::Unwinder::resetDocument(const Document& document) {
     _haveNext = true;
 }
 
-boost::optional<Document> DocumentSourceUnwind::Unwinder::getNext() {
+DocumentSource::GetNextResult DocumentSourceUnwind::Unwinder::getNext() {
     // WARNING: Any functional changes to this method must also be implemented in the unwinding
     // implementation of the $lookup stage.
     if (!_haveNext) {
-        return boost::none;
+        return GetNextResult::makeEOF();
     }
 
     // Track which index this value came from. If 'includeArrayIndex' was specified, we will use
@@ -119,7 +121,7 @@ boost::optional<Document> DocumentSourceUnwind::Unwinder::getNext() {
             // Preserve documents with empty arrays if asked to, otherwise skip them.
             _haveNext = false;
             if (!_preserveNullAndEmptyArrays) {
-                return boost::none;
+                return GetNextResult::makeEOF();
             }
             _output.removeNestedField(_unwindPathFieldIndexes);
         } else {
@@ -138,7 +140,7 @@ boost::optional<Document> DocumentSourceUnwind::Unwinder::getNext() {
         // Preserve a nullish value if asked to, otherwise skip it.
         _haveNext = false;
         if (!_preserveNullAndEmptyArrays) {
-            return boost::none;
+            return GetNextResult::makeEOF();
         }
     } else {
         // Any non-nullish, non-array type should pass through.
@@ -163,7 +165,9 @@ DocumentSourceUnwind::DocumentSourceUnwind(const intrusive_ptr<ExpressionContext
       _indexPath(indexPath),
       _unwinder(new Unwinder(fieldPath, preserveNullAndEmptyArrays, indexPath)) {}
 
-REGISTER_DOCUMENT_SOURCE(unwind, DocumentSourceUnwind::createFromBson);
+REGISTER_DOCUMENT_SOURCE(unwind,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceUnwind::createFromBson);
 
 const char* DocumentSourceUnwind::getSourceName() const {
     return "$unwind";
@@ -183,27 +187,28 @@ intrusive_ptr<DocumentSourceUnwind> DocumentSourceUnwind::create(
     return source;
 }
 
-boost::optional<Document> DocumentSourceUnwind::getNext() {
+DocumentSource::GetNextResult DocumentSourceUnwind::getNext() {
     pExpCtx->checkForInterrupt();
 
-    boost::optional<Document> out = _unwinder->getNext();
-    while (!out) {
+    auto nextOut = _unwinder->getNext();
+    while (nextOut.isEOF()) {
         // No more elements in array currently being unwound. This will loop if the input
         // document is missing the unwind field or has an empty array.
-        boost::optional<Document> input = pSource->getNext();
-        if (!input)
-            return boost::none;  // input exhausted
+        auto nextInput = pSource->getNext();
+        if (!nextInput.isAdvanced()) {
+            return nextInput;
+        }
 
         // Try to extract an output document from the new input document.
-        _unwinder->resetDocument(*input);
-        out = _unwinder->getNext();
+        _unwinder->resetDocument(nextInput.releaseDocument());
+        nextOut = _unwinder->getNext();
     }
 
-    return out;
+    return nextOut;
 }
 
 BSONObjSet DocumentSourceUnwind::getOutputSorts() {
-    BSONObjSet out;
+    BSONObjSet out = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     std::string unwoundPath = getUnwindPath();
     BSONObjSet inputSort = pSource->getOutputSorts();
 
@@ -227,43 +232,12 @@ BSONObjSet DocumentSourceUnwind::getOutputSorts() {
     return out;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceUnwind::optimizeAt(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
-    invariant(*itr == this);
-
-    if (auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get())) {
-        std::set<std::string> fields = {_unwindPath.fullPath()};
-
-        if (_indexPath) {
-            fields.insert((*_indexPath).fullPath());
-        }
-
-        auto splitMatch = nextMatch->splitSourceBy(fields);
-
-        invariant(splitMatch.first || splitMatch.second);
-
-        if (!splitMatch.first && splitMatch.second) {
-            // No optimization was possible.
-            return std::next(itr);
-        }
-
-        container->erase(std::next(itr));
-
-        // If splitMatch.second is not null, then there is a new $match stage to insert after
-        // ourselves.
-        if (splitMatch.second) {
-            container->insert(std::next(itr), std::move(splitMatch.second));
-        }
-
-        if (splitMatch.first) {
-            container->insert(itr, std::move(splitMatch.first));
-            if (std::prev(itr) == container->begin()) {
-                return std::prev(itr);
-            }
-            return std::prev(std::prev(itr));
-        }
+DocumentSource::GetModPathsReturn DocumentSourceUnwind::getModifiedPaths() const {
+    std::set<std::string> modifiedFields{_unwindPath.fullPath()};
+    if (_indexPath) {
+        modifiedFields.insert(_indexPath->fullPath());
     }
-    return std::next(itr);
+    return {GetModPathsReturn::Type::kFiniteSet, std::move(modifiedFields)};
 }
 
 Value DocumentSourceUnwind::serialize(bool explain) const {

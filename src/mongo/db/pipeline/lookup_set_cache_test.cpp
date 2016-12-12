@@ -43,7 +43,9 @@ namespace mongo {
 bool vectorContains(const boost::optional<std::vector<BSONObj>>& vector,
                     const BSONObj& expectedObj) {
     ASSERT_TRUE(vector);
-    return std::find(vector->begin(), vector->end(), expectedObj) != vector->end();
+    return std::find_if(vector->begin(), vector->end(), [&expectedObj](const BSONObj& obj) {
+               return SimpleBSONObjComparator::kInstance.evaluate(expectedObj == obj);
+           }) != vector->end();
 }
 
 BSONObj intToObj(int value) {

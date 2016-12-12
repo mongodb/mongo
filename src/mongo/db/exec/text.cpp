@@ -105,7 +105,7 @@ unique_ptr<PlanStage> TextStage::buildTextTree(OperationContext* txn,
             MAX_WEIGHT, term, _params.indexPrefix, _params.spec.getTextIndexVersion());
         ixparams.bounds.endKey = FTSIndexFormat::getIndexKey(
             0, term, _params.indexPrefix, _params.spec.getTextIndexVersion());
-        ixparams.bounds.endKeyInclusive = true;
+        ixparams.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         ixparams.bounds.isSimpleRange = true;
         ixparams.descriptor = _params.index;
         ixparams.direction = -1;

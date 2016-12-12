@@ -38,8 +38,8 @@ __wt_curjoin_joined(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cursor->session;
-	__wt_errx(session, "cursor is being used in a join");
-	return (ENOTSUP);
+
+	WT_RET_MSG(session, ENOTSUP, "cursor is being used in a join");
 }
 
 /*
@@ -326,8 +326,7 @@ __curjoin_close(WT_CURSOR *cursor)
 	JOINABLE_CURSOR_API_CALL(cursor, session, close, NULL);
 
 	__wt_schema_release_table(session, cjoin->table);
-	/* These are owned by the table */
-	cursor->internal_uri = NULL;
+	/* This is owned by the table */
 	cursor->key_format = NULL;
 	if (cjoin->projection != NULL) {
 		__wt_free(session, cjoin->projection);
@@ -612,19 +611,19 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 
 	if (entry->bloom != NULL) {
 		/*
+		 * If the item is not in the Bloom filter, we return
+		 * immediately, otherwise, we still may need to check the
+		 * long way, since it may be a false positive.
+		 *
 		 * If we don't own the Bloom filter, we must be sharing one
 		 * in a previous entry. So the shared filter has already
-		 * been checked and passed.
+		 * been checked and passed, we don't need to check it again.
+		 * We'll still need to check the long way.
 		 */
-		if (!F_ISSET(entry, WT_CURJOIN_ENTRY_OWN_BLOOM))
+		if (F_ISSET(entry, WT_CURJOIN_ENTRY_OWN_BLOOM))
+			WT_ERR(__wt_bloom_inmem_get(entry->bloom, key));
+		if (F_ISSET(entry, WT_CURJOIN_ENTRY_FALSE_POSITIVES))
 			return (0);
-
-		/*
-		 * If the item is not in the Bloom filter, we return
-		 * immediately, otherwise, we still need to check the
-		 * long way.
-		 */
-		WT_ERR(__wt_bloom_inmem_get(entry->bloom, key));
 		bloom_found = true;
 	}
 	if (entry->subjoin != NULL) {
@@ -673,6 +672,8 @@ __curjoin_entry_member(WT_SESSION_IMPL *session, WT_CURSOR_JOIN_ENTRY *entry,
 		extract_cursor.entry = entry;
 		WT_ERR(idx->extractor->extract(idx->extractor,
 		    &session->iface, key, &v, &extract_cursor.iface));
+		__wt_buf_free(session, &extract_cursor.iface.key);
+		__wt_buf_free(session, &extract_cursor.iface.value);
 		if (!extract_cursor.ismember)
 			WT_ERR(WT_NOTFOUND);
 	} else
@@ -875,7 +876,7 @@ insert:
 		}
 		else
 			WT_ERR(c->get_key(c, &curvalue));
-		WT_ERR(__wt_bloom_insert(bloom, &curvalue));
+		__wt_bloom_insert(bloom, &curvalue);
 		entry->stats.bloom_insert++;
 advance:
 		if ((ret = c->next(c)) == WT_NOTFOUND)
@@ -917,6 +918,9 @@ __curjoin_init_next(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		WT_RET_MSG(session, EINVAL,
 		    "join cursor has not yet been joined with any other "
 		    "cursors");
+
+	/* Get a consistent view of our subordinate cursors if appropriate. */
+	__wt_txn_cursor_op(session);
 
 	if (F_ISSET((WT_CURSOR *)cjoin, WT_CURSTD_RAW))
 		config = &raw_cfg[0];
@@ -1301,11 +1305,14 @@ __wt_curjoin_open(WT_SESSION_IMPL *session,
 
 	WT_STATIC_ASSERT(offsetof(WT_CURSOR_JOIN, iface) == 0);
 
-	if (!WT_PREFIX_SKIP(uri, "join:"))
-		return (EINVAL);
+	if (owner != NULL)
+		WT_RET_MSG(session, EINVAL,
+		    "unable to initialize a join cursor with existing owner");
+
 	tablename = uri;
-	if (!WT_PREFIX_SKIP(tablename, "table:"))
-		return (EINVAL);
+	if (!WT_PREFIX_SKIP(tablename, "join:table:"))
+		return (
+		    __wt_unexpected_object_type(session, uri, "join:table:"));
 
 	columns = strchr(tablename, '(');
 	if (columns == NULL)
@@ -1318,7 +1325,6 @@ __wt_curjoin_open(WT_SESSION_IMPL *session,
 	cursor = &cjoin->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
-	cursor->internal_uri = table->name;
 	cursor->key_format = table->key_format;
 	cursor->value_format = table->value_format;
 	cjoin->table = table;
@@ -1332,9 +1338,6 @@ __wt_curjoin_open(WT_SESSION_IMPL *session,
 		    session, tmp->data, tmp->size, &cursor->value_format));
 		WT_ERR(__wt_strdup(session, columns, &cjoin->projection));
 	}
-
-	if (owner != NULL)
-		WT_ERR(EINVAL);
 
 	WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
 
@@ -1440,6 +1443,11 @@ __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin,
 		    F_MASK(entry, WT_CURJOIN_ENTRY_BLOOM))
 			WT_RET_MSG(session, EINVAL,
 			    "join has incompatible strategy "
+			    "values for the same index");
+		if (LF_MASK(WT_CURJOIN_ENTRY_FALSE_POSITIVES) !=
+		    F_MASK(entry, WT_CURJOIN_ENTRY_FALSE_POSITIVES))
+			WT_RET_MSG(session, EINVAL,
+			    "join has incompatible bloom_false_positives "
 			    "values for the same index");
 
 		/*

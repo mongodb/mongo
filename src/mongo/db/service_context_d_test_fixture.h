@@ -56,6 +56,7 @@ protected:
      */
     ServiceContext* getServiceContext();
 
+private:
     /**
      * Drops all databases. Call this before global ReplicationCoordinator is destroyed -- it is
      * used to drop the databases.

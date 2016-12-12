@@ -85,7 +85,6 @@ saslClientEnv.Library(
         '$BUILD_DIR/mongo/executor/remote_command',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/rpc/metadata',
-        '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/md5',
         '$BUILD_DIR/mongo/util/net/network',
     ],
@@ -149,6 +148,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/authcommon',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/dbmessage',
+        '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/db/write_concern_options',
         '$BUILD_DIR/mongo/executor/connection_pool_stats',
         '$BUILD_DIR/mongo/executor/network_interface_factory',
@@ -156,8 +156,8 @@ env.Library(
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/rpc/rpc',
-        '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/md5',
+        '$BUILD_DIR/mongo/util/net/network',
         'authentication',
         'connection_string',
         'read_preference',
@@ -179,13 +179,13 @@ env.Library(
 env.Library(
     target='remote_command_targeter',
     source=[
-        'remote_command_targeter.cpp',
         'remote_command_targeter_factory_impl.cpp',
         'remote_command_targeter_rs.cpp',
         'remote_command_targeter_standalone.cpp',
     ],
     LIBDEPS=[
         'clientdriver',
+        '$BUILD_DIR/mongo/db/service_context',
     ]
 )
 
@@ -243,6 +243,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/transport/transport_layer_legacy',
         '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/mongo/util/version_impl',
     ],
 )
 

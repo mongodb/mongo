@@ -32,7 +32,6 @@
 #include "mongo/base/secure_allocator.h"
 
 #include <memory>
-#include <unordered_map>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -46,10 +45,13 @@
 #include "mongo/base/init.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/secure_zero_memory.h"
+#include "mongo/util/text.h"
 
 namespace mongo {
 
@@ -64,6 +66,85 @@ namespace {
  * have to flow all allocations through page based allocations.
  */
 #ifdef _WIN32
+
+/**
+ * Enable a privilege in the current process.
+ */
+void EnablePrivilege(const wchar_t* name) {
+    LUID luid;
+    if (!LookupPrivilegeValueW(nullptr, name, &luid)) {
+        auto str = errnoWithPrefix("Failed to LookupPrivilegeValue");
+        warning() << str;
+        return;
+    }
+
+    // Get the access token for the current process.
+    HANDLE accessToken;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &accessToken)) {
+        auto str = errnoWithPrefix("Failed to OpenProcessToken");
+        warning() << str;
+        return;
+    }
+
+    const auto accessTokenGuard = MakeGuard([&] { CloseHandle(accessToken); });
+
+    TOKEN_PRIVILEGES privileges = {0};
+
+    privileges.PrivilegeCount = 1;
+    privileges.Privileges[0].Luid = luid;
+    privileges.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+    if (!AdjustTokenPrivileges(
+            accessToken, false, &privileges, sizeof(privileges), nullptr, nullptr)) {
+        auto str = errnoWithPrefix("Failed to AdjustTokenPrivileges");
+        warning() << str;
+    }
+
+    if (GetLastError() == ERROR_NOT_ALL_ASSIGNED) {
+        warning() << "Failed to adjust token privilege for privilege '" << toUtf8String(name)
+                  << "'";
+    }
+}
+
+/**
+ * Lock to ensure calls to grow our working set size are serialized.
+ *
+ * The lock is needed since we are doing a two step process of querying the currently working set
+ * size, and then raising the working set. This is the same reason that "i++" has race conditions
+ * across multiple threads.
+ */
+stdx::mutex workingSizeMutex;
+
+/**
+ * Grow the minimum working set size of the process to the specified size.
+ */
+void growWorkingSize(std::size_t bytes) {
+    size_t minWorkingSetSize;
+    size_t maxWorkingSetSize;
+
+    stdx::lock_guard<stdx::mutex> lock(workingSizeMutex);
+
+    if (!GetProcessWorkingSetSize(GetCurrentProcess(), &minWorkingSetSize, &maxWorkingSetSize)) {
+        auto str = errnoWithPrefix("Failed to GetProcessWorkingSetSize");
+        severe() << str;
+        fassertFailed(40285);
+    }
+
+    // Since allocation request is aligned to page size, we can just add it to the current working
+    // set size.
+    maxWorkingSetSize = std::max(minWorkingSetSize + bytes, maxWorkingSetSize);
+
+    // Increase the working set size minimum to the new lower bound.
+    if (!SetProcessWorkingSetSizeEx(GetCurrentProcess(),
+                                    minWorkingSetSize + bytes,
+                                    maxWorkingSetSize,
+                                    QUOTA_LIMITS_HARDWS_MIN_ENABLE |
+                                        QUOTA_LIMITS_HARDWS_MAX_DISABLE)) {
+        auto str = errnoWithPrefix("Failed to SetProcessWorkingSetSizeEx");
+        severe() << str;
+        fassertFailed(40286);
+    }
+}
 
 void* systemAllocate(std::size_t bytes) {
     // Flags:
@@ -85,6 +166,17 @@ void* systemAllocate(std::size_t bytes) {
     }
 
     if (VirtualLock(ptr, bytes) == 0) {
+        DWORD gle = GetLastError();
+
+        // Try to grow the working set if we have hit our quota.
+        if (gle == ERROR_WORKING_SET_QUOTA) {
+            growWorkingSize(bytes);
+
+            if (VirtualLock(ptr, bytes) != 0) {
+                return ptr;
+            }
+        }
+
         auto str = errnoWithPrefix("Failed to VirtualLock");
         severe() << str;
         fassertFailed(28828);
@@ -231,13 +323,18 @@ private:
 
 // See secure_allocator_details::allocate for a more detailed comment on what these are used for
 stdx::mutex allocatorMutex;  // Protects the values below
-std::unordered_map<void*, std::shared_ptr<Allocation>> secureTable;
+stdx::unordered_map<void*, std::shared_ptr<Allocation>> secureTable;
 std::shared_ptr<Allocation> lastAllocation = nullptr;
 
 }  // namespace
 
 MONGO_INITIALIZER_GENERAL(SecureAllocator, ("SystemInfo"), MONGO_NO_DEPENDENTS)
 (InitializerContext* context) {
+#if _WIN32
+    // Enable the increase working set size privilege in our access token.
+    EnablePrivilege(SE_INC_WORKING_SET_NAME);
+#endif
+
     return Status::OK();
 }
 

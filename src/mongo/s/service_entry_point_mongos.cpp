@@ -73,12 +73,13 @@ using transport::TransportLayer;
 
 ServiceEntryPointMongos::ServiceEntryPointMongos(TransportLayer* tl) : _tl(tl) {}
 
-void ServiceEntryPointMongos::startSession(Session&& session) {
-    launchWrappedServiceEntryWorkerThread(std::move(session),
-                                          [this](Session* session) { _sessionLoop(session); });
+void ServiceEntryPointMongos::startSession(transport::SessionHandle session) {
+    launchWrappedServiceEntryWorkerThread(
+        std::move(session),
+        [this](const transport::SessionHandle& session) { _sessionLoop(session); });
 }
 
-void ServiceEntryPointMongos::_sessionLoop(Session* session) {
+void ServiceEntryPointMongos::_sessionLoop(const transport::SessionHandle& session) {
     Message message;
     int64_t counter = 0;
 
@@ -92,7 +93,13 @@ void ServiceEntryPointMongos::_sessionLoop(Session* session) {
         {
             auto status = session->sourceMessage(&message).wait();
 
-            if (ErrorCodes::isInterruption(status.code())) {
+            if (ErrorCodes::isInterruption(status.code()) ||
+                ErrorCodes::isNetworkError(status.code())) {
+                break;
+            }
+
+            // Our session may have been closed internally.
+            if (status == TransportLayer::TicketSessionClosedStatus) {
                 break;
             }
 

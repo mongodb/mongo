@@ -190,7 +190,7 @@ TEST(ReadAfterSerialize, Empty) {
 
     BSONObj obj(builder.done());
 
-    ASSERT_EQ(BSON(ReadConcernArgs::kReadConcernFieldName << BSONObj()), obj);
+    ASSERT_BSONOBJ_EQ(BSON(ReadConcernArgs::kReadConcernFieldName << BSONObj()), obj);
 }
 
 TEST(ReadAfterSerialize, ReadAfterOnly) {
@@ -203,7 +203,7 @@ TEST(ReadAfterSerialize, ReadAfterOnly) {
             ReadConcernArgs::kAfterOpTimeFieldName << BSON(
                 OpTime::kTimestampFieldName << Timestamp(20, 30) << OpTime::kTermFieldName << 2))));
 
-    ASSERT_EQ(expectedObj, builder.done());
+    ASSERT_BSONOBJ_EQ(expectedObj, builder.done());
 }
 
 TEST(ReadAfterSerialize, CommitLevelOnly) {
@@ -214,7 +214,7 @@ TEST(ReadAfterSerialize, CommitLevelOnly) {
     BSONObj expectedObj(BSON(ReadConcernArgs::kReadConcernFieldName
                              << BSON(ReadConcernArgs::kLevelFieldName << "local")));
 
-    ASSERT_EQ(expectedObj, builder.done());
+    ASSERT_BSONOBJ_EQ(expectedObj, builder.done());
 }
 
 TEST(ReadAfterSerialize, FullSpecification) {
@@ -231,7 +231,7 @@ TEST(ReadAfterSerialize, FullSpecification) {
                 << BSON(OpTime::kTimestampFieldName << Timestamp(20, 30) << OpTime::kTermFieldName
                                                     << 2))));
 
-    ASSERT_EQ(expectedObj, builder.done());
+    ASSERT_BSONOBJ_EQ(expectedObj, builder.done());
 }
 
 }  // unnamed namespace

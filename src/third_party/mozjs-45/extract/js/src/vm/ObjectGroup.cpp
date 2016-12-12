@@ -147,12 +147,12 @@ ObjectGroup::useSingletonForClone(JSFunction* fun)
 
     uint32_t begin, end;
     if (fun->hasScript()) {
-        if (!fun->nonLazyScript()->usesArgumentsApplyAndThis())
+        if (!fun->nonLazyScript()->isLikelyConstructorWrapper())
             return false;
         begin = fun->nonLazyScript()->sourceStart();
         end = fun->nonLazyScript()->sourceEnd();
     } else {
-        if (!fun->lazyScript()->usesArgumentsApplyAndThis())
+        if (!fun->lazyScript()->isLikelyConstructorWrapper())
             return false;
         begin = fun->lazyScript()->begin();
         end = fun->lazyScript()->end();

@@ -38,8 +38,11 @@ namespace mongo {
 /**
  * Creates and parses commit chunk migration command BSON objects.
  */
-class CommitChunkMigrationRequest {
-public:
+struct CommitChunkMigrationRequest {
+
+    CommitChunkMigrationRequest(const NamespaceString& nss, const ChunkType& chunk)
+        : _nss(nss), _migratedChunk(chunk), _shardHasDistributedLock() {}
+
     /**
      * Parses the input command and produces a request corresponding to its arguments.
      */
@@ -56,32 +59,33 @@ public:
                                 const ShardId& fromShard,
                                 const ShardId& toShard,
                                 const ChunkType& migratedChunkType,
-                                const boost::optional<ChunkType>& controlChunkType);
+                                const boost::optional<ChunkType>& controlChunkType,
+                                const ChunkVersion& fromShardChunkVersion,
+                                const bool& shardHasDistributedLock);
 
     const NamespaceString& getNss() const {
         return _nss;
     }
-
     const ShardId& getFromShard() const {
         return _fromShard;
     }
-
     const ShardId& getToShard() const {
         return _toShard;
     }
-
-    const ChunkRange& getMigratedChunkRange() const {
-        return _migratedChunkRange;
+    const ChunkType& getMigratedChunk() const {
+        return _migratedChunk;
+    }
+    const boost::optional<ChunkType>& getControlChunk() const {
+        return _controlChunk;
     }
 
-    const ChunkRange& getControlChunkRange() const;
-
-    bool hasControlChunkRange() {
-        return bool(_controlChunkRange);
+    bool shardHasDistributedLock() {
+        return _shardHasDistributedLock;
     }
 
-private:
-    CommitChunkMigrationRequest(const NamespaceString& nss, const ChunkRange& range);
+    const OID& getCollectionEpoch() {
+        return _collectionEpoch;
+    }
 
     // The collection for which this request applies.
     NamespaceString _nss;
@@ -92,11 +96,16 @@ private:
     // The recipient shard name.
     ShardId _toShard;
 
-    // Range of migrated chunk being moved.
-    ChunkRange _migratedChunkRange;
+    // The chunk being moved.
+    ChunkType _migratedChunk;
 
-    // Range of control chunk being moved, if it exists.
-    boost::optional<ChunkRange> _controlChunkRange;
+    // A chunk on the shard moved from, if any remain.
+    boost::optional<ChunkType> _controlChunk;
+
+    // Flag to indicate whether the shard has the distlock.
+    bool _shardHasDistributedLock;
+
+    OID _collectionEpoch;
 };
 
 }  // namespace mongo

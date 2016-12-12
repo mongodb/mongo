@@ -25,7 +25,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
 #pragma once
 
 #include <string>
@@ -43,6 +42,7 @@ class OperationContext;
 class RemoteCommandTargeter;
 class ShardId;
 class ShardType;
+class ChunkType;
 class Status;
 template <typename T>
 class StatusWith;
@@ -138,8 +138,8 @@ public:
                                           const ChunkRange& range) = 0;
 
     /**
-     * Updates chunk metadata in config.chunks collection to reflect the given chunk being split
-     * into multiple smaller chunks based on the specified split points.
+     * Updates metadata in config.chunks collection to show the given chunk as split
+     * into smaller chunks at the specified split points.
      */
     virtual Status commitChunkSplit(OperationContext* txn,
                                     const NamespaceString& ns,
@@ -149,14 +149,25 @@ public:
                                     const std::string& shardName) = 0;
 
     /**
-     * Updates chunk metadata in config.chunks collection to reflect the given chunks being merged
-     * into a single larger chunk based on the specified boundaries of the smaller chunks.
+     * Updates metadata in config.chunks collection so the chunks with given boundaries are seen
+     * merged into a single larger chunk.
      */
     virtual Status commitChunkMerge(OperationContext* txn,
                                     const NamespaceString& ns,
                                     const OID& requestEpoch,
                                     const std::vector<BSONObj>& chunkBoundaries,
                                     const std::string& shardName) = 0;
+
+    /**
+     * Updates metadata in config.chunks collection to show the given chunk in its new shard.
+     */
+    virtual StatusWith<BSONObj> commitChunkMigration(OperationContext* txn,
+                                                     const NamespaceString& nss,
+                                                     const ChunkType& migratedChunk,
+                                                     const boost::optional<ChunkType>& controlChunk,
+                                                     const OID& collectionEpoch,
+                                                     const ShardId& fromShard,
+                                                     const ShardId& toShard) = 0;
 
     /**
      * Append information about the connection pools owned by the CatalogManager.
@@ -168,6 +179,14 @@ public:
      * necessary indexes and populating the config.version document.
      */
     virtual Status initializeConfigDatabaseIfNeeded(OperationContext* txn) = 0;
+
+    /**
+     * Called if the config.version document is rolled back.  Indicates to the
+     * ShardingCatalogManager that on the next transition to primary
+     * initializeConfigDatabaseIfNeeded will need to re-run the work to initialize the config
+     * database.
+     */
+    virtual void discardCachedConfigDatabaseInitializationState() = 0;
 
     /**
      * For upgrade from 3.2 to 3.4, for each shard in config.shards that is not marked as sharding
@@ -198,6 +217,12 @@ public:
      * a shardIdentity document into the shard with id shardId (if there is such a task pending).
      */
     virtual void cancelAddShardTaskIfNeeded(const ShardId& shardId) = 0;
+
+    /**
+     * Runs the setFeatureCompatibilityVersion command on all shards.
+     */
+    virtual Status setFeatureCompatibilityVersionOnShards(OperationContext* txn,
+                                                          const std::string& version) = 0;
 
 protected:
     ShardingCatalogManager() = default;

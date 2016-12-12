@@ -21,9 +21,10 @@ var lastOp = local.oplog.rs.find().sort({$natural: -1}).limit(1).next();
 printjson(lastOp);
 
 print("3: change minvalid");
-// primaries don't populate minvalid by default
-local.replset.minvalid.insert(
-    {ts: new Timestamp(lastOp.ts.t, lastOp.ts.i + 1), h: new NumberLong("1234567890")});
+assert.writeOK(local.replset.minvalid.update(
+    {},
+    {$set: {ts: new Timestamp(lastOp.ts.t, lastOp.ts.i + 1), h: new NumberLong("1234567890")}},
+    {upsert: true}));
 printjson(local.replset.minvalid.findOne());
 
 print("4: restart");

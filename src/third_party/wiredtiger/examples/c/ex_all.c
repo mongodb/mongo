@@ -611,6 +611,13 @@ session_ops(WT_SESSION *session)
 	    "block_compressor=zlib,key_format=S,value_format=S");
 	/*! [Create a zlib compressed table] */
 	ret = session->drop(session, "table:mytable", NULL);
+
+	/*! [Create a zstd compressed table] */
+	ret = session->create(session,
+	    "table:mytable",
+	    "block_compressor=zstd,key_format=S,value_format=S");
+	/*! [Create a zstd compressed table] */
+	ret = session->drop(session, "table:mytable", NULL);
 #endif
 
 	/*! [Configure checksums to uncompressed] */
@@ -1108,6 +1115,32 @@ main(void)
 	if (ret == 0)
 		(void)conn->close(conn, NULL);
 
+	/*! [Configure zlib extension with compression level] */
+	ret = wiredtiger_open(home, NULL,
+	    "create,"
+	    "extensions=[/usr/local/lib/"
+	    "libwiredtiger_zlib.so=[config=[compression_level=3]]]", &conn);
+	/*! [Configure zlib extension with compression level] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+
+	/*! [Configure zstd extension] */
+	ret = wiredtiger_open(home, NULL,
+	    "create,"
+	    "extensions=[/usr/local/lib/libwiredtiger_zstd.so]", &conn);
+	/*! [Configure zstd extension] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+
+	/*! [Configure zstd extension with compression level] */
+	ret = wiredtiger_open(home, NULL,
+	    "create,"
+	    "extensions=[/usr/local/lib/"
+	    "libwiredtiger_zstd.so=[config=[compression_level=9]]]", &conn);
+	/*! [Configure zstd extension with compression level] */
+	if (ret == 0)
+		(void)conn->close(conn, NULL);
+
 	/*
 	 * This example code gets run, and direct I/O might not be available,
 	 * causing the open to fail.  The documentation requires code snippets,
@@ -1126,7 +1159,7 @@ main(void)
 	    home, NULL, "create,file_extend=(data=16MB)", &conn);
 	/*! [Configure file_extend] */
 	if (ret == 0)
-		(void)conn->close(conn, NULL);
+		ret = conn->close(conn, NULL);
 
 	/*! [Eviction configuration] */
 	/*
@@ -1137,7 +1170,7 @@ main(void)
 	    "create,eviction_trigger=90,eviction_dirty_target=75", &conn);
 	/*! [Eviction configuration] */
 	if (ret == 0)
-		(void)conn->close(conn, NULL);
+		ret = conn->close(conn, NULL);
 
 	/*! [Eviction worker configuration] */
 	/* Configure up to four eviction threads */
@@ -1145,20 +1178,20 @@ main(void)
 	    "create,eviction_trigger=90,eviction=(threads_max=4)", &conn);
 	/*! [Eviction worker configuration] */
 	if (ret == 0)
-		(void)conn->close(conn, NULL);
+		ret = conn->close(conn, NULL);
 
 	/*! [Statistics configuration] */
 	ret = wiredtiger_open(home, NULL, "create,statistics=(all)", &conn);
 	/*! [Statistics configuration] */
 	if (ret == 0)
-		(void)conn->close(conn, NULL);
+		ret = conn->close(conn, NULL);
 
 	/*! [Statistics logging] */
 	ret = wiredtiger_open(
 	    home, NULL, "create,statistics_log=(wait=30)", &conn);
 	/*! [Statistics logging] */
 	if (ret == 0)
-		(void)conn->close(conn, NULL);
+		ret = conn->close(conn, NULL);
 
 #ifdef MIGHT_NOT_RUN
 	/*
@@ -1171,7 +1204,7 @@ main(void)
 	    &conn);
 	/*! [Statistics logging with a table] */
 	if (ret == 0)
-		(void)conn->close(conn, NULL);
+		ret = conn->close(conn, NULL);
 
 	/*
 	 * Don't run this code, statistics logging doesn't yet support indexes.
@@ -1182,7 +1215,7 @@ main(void)
 	    &conn);
 	/*! [Statistics logging with a source type] */
 	if (ret == 0)
-		(void)conn->close(conn, NULL);
+		ret = conn->close(conn, NULL);
 
 	/*
 	 * Don't run this code, because memory checkers get very upset when we

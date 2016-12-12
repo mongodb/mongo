@@ -28,9 +28,10 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
 
-#include "mongo/transport/session.h"
-#include "mongo/transport/ticket.h"
-#include "mongo/transport/ticket_impl.h"
+#include <memory>
+
+#include "mongo/transport/mock_session.h"
+#include "mongo/transport/mock_ticket.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/message.h"
@@ -85,32 +86,8 @@ public:
                          Milliseconds delay = Milliseconds(0));
     void longSessionStressTest();
 
-private:
-    /**
-     * A mock ticket class for our test suite.
-     */
-    class MockTicket : public transport::TicketImpl {
-    public:
-        // Source constructor
-        MockTicket(const transport::Session& session, Message* message, Date_t expiration);
-
-        // Sink constructor
-        MockTicket(const transport::Session& session, Date_t expiration);
-
-        MockTicket(MockTicket&&) = default;
-        MockTicket& operator=(MockTicket&&) = default;
-
-        transport::Session::Id sessionId() const override;
-
-        Date_t expiration() const override;
-
-        boost::optional<Message*> message();
-
-    private:
-        boost::optional<Message*> _message;
-        transport::Session::Id _sessionId;
-        Date_t _expiration;
-    };
+    class SEPTestSession;
+    using SEPTestSessionHandle = std::shared_ptr<SEPTestSession>;
 
     /**
      * This class mocks the TransportLayer and allows us to insert hooks beneath
@@ -118,44 +95,50 @@ private:
      */
     class MockTLHarness : public transport::TransportLayer {
     public:
+        friend class SEPTestSession;
+
         MockTLHarness();
 
         transport::Ticket sourceMessage(
-            transport::Session& session,
+            const transport::SessionHandle& session,
             Message* message,
             Date_t expiration = transport::Ticket::kNoExpirationDate) override;
         transport::Ticket sinkMessage(
-            transport::Session& session,
+            const transport::SessionHandle& session,
             const Message& message,
             Date_t expiration = transport::Ticket::kNoExpirationDate) override;
         Status wait(transport::Ticket&& ticket) override;
         void asyncWait(transport::Ticket&& ticket, TicketCallback callback) override;
-        SSLPeerInfo getX509PeerInfo(const transport::Session& session) const override;
-        void registerTags(const transport::Session& session) override;
+        SSLPeerInfo getX509PeerInfo(const transport::ConstSessionHandle& session) const override;
+
         Stats sessionStats() override;
-        void end(transport::Session& session) override;
-        void endAllSessions(
-            transport::Session::TagMask tags = transport::Session::kEmptyTagMask) override;
+        void end(const transport::SessionHandle& session) override;
+        void endAllSessions(transport::Session::TagMask tags) override;
         Status start() override;
         void shutdown() override;
 
-        ServiceEntryPointTestSuite::MockTicket* getMockTicket(const transport::Ticket& ticket);
+        transport::MockTicket* getMockTicket(const transport::Ticket& ticket);
 
         // Mocked method hooks
-        stdx::function<transport::Ticket(transport::Session&, Message*, Date_t)> _sourceMessage;
-        stdx::function<transport::Ticket(transport::Session&, const Message&, Date_t)> _sinkMessage;
+        stdx::function<transport::Ticket(const transport::SessionHandle&, Message*, Date_t)>
+            _sourceMessage;
+        stdx::function<transport::Ticket(const transport::SessionHandle&, const Message&, Date_t)>
+            _sinkMessage;
         stdx::function<Status(transport::Ticket)> _wait;
         stdx::function<void(transport::Ticket, TicketCallback)> _asyncWait;
-        stdx::function<void(const transport::Session&)> _end;
+        stdx::function<void(const transport::SessionHandle&)> _end;
+        stdx::function<void(SEPTestSession& session)> _destroy_hook;
         stdx::function<void(transport::Session::TagMask tags)> _endAllSessions =
             [](transport::Session::TagMask tags) {};
         stdx::function<Status(void)> _start = [] { return Status::OK(); };
         stdx::function<void(void)> _shutdown = [] {};
 
         // Pre-set hook methods
-        transport::Ticket _defaultSource(transport::Session& s, Message* m, Date_t d);
-        transport::Ticket _defaultSink(transport::Session& s, const Message&, Date_t d);
-        transport::Ticket _sinkThenErrorOnWait(transport::Session& s, const Message& m, Date_t d);
+        transport::Ticket _defaultSource(const transport::SessionHandle& s, Message* m, Date_t d);
+        transport::Ticket _defaultSink(const transport::SessionHandle& s, const Message&, Date_t d);
+        transport::Ticket _sinkThenErrorOnWait(const transport::SessionHandle& s,
+                                               const Message& m,
+                                               Date_t d);
 
         Status _defaultWait(transport::Ticket ticket);
         Status _waitError(transport::Ticket ticket);
@@ -163,8 +146,32 @@ private:
 
         // Reset all hooks to their defaults
         void _resetHooks();
+
+    private:
+        void _destroy(SEPTestSession& session);
     };
 
+    /**
+     * A light wrapper around the mock session class, to handle our destroy logic.
+     */
+    class SEPTestSession : public transport::MockSession {
+        MockTLHarness* _mockTL;
+
+    public:
+        static std::shared_ptr<SEPTestSession> create(MockTLHarness* tl) {
+            std::shared_ptr<SEPTestSession> handle(new SEPTestSession(tl));
+            return handle;
+        }
+
+        ~SEPTestSession() {
+            _mockTL->_destroy(*this);
+        }
+
+    private:
+        explicit SEPTestSession(MockTLHarness* tl) : transport::MockSession(tl), _mockTL(tl) {}
+    };
+
+private:
     std::unique_ptr<MockTLHarness> _tl;
     std::unique_ptr<ServiceEntryPoint> _sep;
 };

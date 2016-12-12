@@ -30,6 +30,7 @@
 #include <cstdint>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
@@ -38,6 +39,9 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+// Returns the current interrupt interval from the setParameter value
+int getScriptingEngineInterruptInterval();
 
 /**
  * DeadlineMonitor
@@ -93,10 +97,17 @@ public:
      * @param   timeoutMs   number of milliseconds before the deadline expires
      */
     void startDeadline(_Task* const task, int64_t timeoutMs) {
-        const auto deadline = Date_t::now() + Milliseconds(timeoutMs);
+        Date_t deadline;
+        if (timeoutMs > 0) {
+            deadline = Date_t::now() + Milliseconds(timeoutMs);
+        } else {
+            deadline = Date_t::max();
+        }
         stdx::lock_guard<stdx::mutex> lk(_deadlineMutex);
 
-        _tasks[task] = deadline;
+        if (_tasks.find(task) == _tasks.end()) {
+            _tasks.emplace(task, deadline);
+        }
 
         if (deadline < _nearestDeadlineWallclock) {
             _nearestDeadlineWallclock = deadline;
@@ -122,14 +133,29 @@ private:
      */
     void deadlineMonitorThread() {
         stdx::unique_lock<stdx::mutex> lk(_deadlineMutex);
+        Date_t lastInterruptCycle = Date_t::now();
         while (!_inShutdown) {
             // get the next interval to wait
             const Date_t now = Date_t::now();
+            const auto interruptInterval = Milliseconds{getScriptingEngineInterruptInterval()};
+
+            if ((interruptInterval.count() > 0) && (now - lastInterruptCycle > interruptInterval)) {
+                for (const auto& task : _tasks) {
+                    if (task.second > now)
+                        task.first->interrupt();
+                }
+                lastInterruptCycle = now;
+            }
 
             // wait for a task to be added or a deadline to expire
             if (_nearestDeadlineWallclock > now) {
                 if (_nearestDeadlineWallclock == Date_t::max()) {
-                    _newDeadlineAvailable.wait(lk);
+                    if ((interruptInterval.count() > 0) &&
+                        (_nearestDeadlineWallclock - now > interruptInterval)) {
+                        _newDeadlineAvailable.wait_for(lk, interruptInterval.toSystemDuration());
+                    } else {
+                        _newDeadlineAvailable.wait(lk);
+                    }
                 } else {
                     _newDeadlineAvailable.wait_until(lk,
                                                      _nearestDeadlineWallclock.toSystemTimePoint());
@@ -139,7 +165,7 @@ private:
 
             // set the next interval to wait for deadline completion
             _nearestDeadlineWallclock = Date_t::max();
-            typename TaskDeadlineMap::iterator i = _tasks.begin();
+            auto i = _tasks.begin();
             while (i != _tasks.end()) {
                 if (i->second < now) {
                     // deadline expired
@@ -156,7 +182,7 @@ private:
         }
     }
 
-    typedef unordered_map<_Task*, Date_t> TaskDeadlineMap;
+    using TaskDeadlineMap = stdx::unordered_map<_Task*, Date_t>;
     TaskDeadlineMap _tasks;      // map of running tasks with deadlines
     stdx::mutex _deadlineMutex;  // protects all non-const members, except _monitorThread
     stdx::condition_variable _newDeadlineAvailable;    // Signaled for timeout, start and stop

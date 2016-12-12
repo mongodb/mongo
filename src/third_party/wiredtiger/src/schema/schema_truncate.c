@@ -20,7 +20,7 @@ __truncate_table(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	u_int i;
 
 	WT_RET(__wt_schema_get_table(session, uri, strlen(uri), false, &table));
-	WT_STAT_FAST_DATA_INCR(session, cursor_truncate);
+	WT_STAT_DATA_INCR(session, cursor_truncate);
 
 	/* Truncate the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++)
@@ -55,7 +55,7 @@ __truncate_dsrc(WT_SESSION_IMPL *session, const char *uri)
 	while ((ret = cursor->next(cursor)) == 0)
 		WT_ERR(cursor->remove(cursor));
 	WT_ERR_NOTFOUND_OK(ret);
-	WT_STAT_FAST_DATA_INCR(session, cursor_truncate);
+	WT_STAT_DATA_INCR(session, cursor_truncate);
 
 err:	WT_TRET(cursor->close(cursor));
 	return (ret);

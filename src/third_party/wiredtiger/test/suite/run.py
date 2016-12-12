@@ -82,6 +82,8 @@ Options:\n\
   -D dir  | --dir dir            use dir rather than WT_TEST.\n\
                                  dir is removed/recreated as a first step.\n\
   -d      | --debug              run with \'pdb\', the python debugger\n\
+  -n      | --dry-run            perform a dry-run, listing all scenarios to\n\
+                                 be run without executing any.\n\
   -g      | --gdb                all subprocesses (like calls to wt) use gdb\n\
   -h      | --help               show this message\n\
   -j N    | --parallel N         run all tests in parallel using N processes\n\
@@ -236,7 +238,7 @@ if __name__ == '__main__':
     tests = unittest.TestSuite()
 
     # Turn numbers and ranges into test module names
-    preserve = timestamp = debug = gdbSub = longtest = False
+    preserve = timestamp = debug = dryRun = gdbSub = longtest = False
     parallel = 0
     configfile = None
     configwrite = False
@@ -260,6 +262,9 @@ if __name__ == '__main__':
                 continue
             if option == '-debug' or option == 'd':
                 debug = True
+                continue
+            if option == '-dry-run' or option == 'n':
+                dryRun = True
                 continue
             if option == '-gdb' or option == 'g':
                 gdbSub = True
@@ -341,6 +346,15 @@ if __name__ == '__main__':
     if debug:
         import pdb
         pdb.set_trace()
+    if dryRun:
+        # We have to de-dupe here as some scenarios overlap in the same suite
+        dryOutput = set()
+        for test in tests:
+            dryOutput.add(test.shortDesc())
+        for line in dryOutput:
+            print line
+    else:
+        result = wttest.runsuite(tests, parallel)
+        sys.exit(0 if result.wasSuccessful() else 1)
 
-    result = wttest.runsuite(tests, parallel)
-    sys.exit(0 if result.wasSuccessful() else 1)
+    sys.exit(0)

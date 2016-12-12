@@ -32,7 +32,10 @@
 
 #include "mongo/db/index/expression_keys_private.h"
 
+#include <algorithm>
+
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -58,11 +61,21 @@ std::string dumpKeyset(const BSONObjSet& objs) {
 }
 
 bool assertKeysetsEqual(const BSONObjSet& expectedKeys, const BSONObjSet& actualKeys) {
-    if (expectedKeys != actualKeys) {
+    if (expectedKeys.size() != actualKeys.size()) {
         log() << "Expected: " << dumpKeyset(expectedKeys) << ", "
               << "Actual: " << dumpKeyset(actualKeys);
         return false;
     }
+
+    if (!std::equal(expectedKeys.begin(),
+                    expectedKeys.end(),
+                    actualKeys.begin(),
+                    SimpleBSONObjComparator::kInstance.makeEqualTo())) {
+        log() << "Expected: " << dumpKeyset(expectedKeys) << ", "
+              << "Actual: " << dumpKeyset(actualKeys);
+        return false;
+    }
+
     return true;
 }
 
@@ -72,13 +85,13 @@ BSONObj makeHashKey(BSONElement elt) {
 
 TEST(HashKeyGeneratorTest, CollationAppliedBeforeHashing) {
     BSONObj obj = fromjson("{a: 'string'}");
-    BSONObjSet actualKeys;
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ExpressionKeysPrivate::getHashKeys(
         obj, "a", kHashSeed, kHashVersion, false, &collator, &actualKeys);
 
     BSONObj backwardsObj = fromjson("{a: 'gnirts'}");
-    BSONObjSet expectedKeys;
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     expectedKeys.insert(makeHashKey(backwardsObj["a"]));
 
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));
@@ -86,12 +99,12 @@ TEST(HashKeyGeneratorTest, CollationAppliedBeforeHashing) {
 
 TEST(HashKeyGeneratorTest, CollationDoesNotAffectNonStringFields) {
     BSONObj obj = fromjson("{a: 5}");
-    BSONObjSet actualKeys;
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ExpressionKeysPrivate::getHashKeys(
         obj, "a", kHashSeed, kHashVersion, false, &collator, &actualKeys);
 
-    BSONObjSet expectedKeys;
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     expectedKeys.insert(makeHashKey(obj["a"]));
 
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));
@@ -100,12 +113,12 @@ TEST(HashKeyGeneratorTest, CollationDoesNotAffectNonStringFields) {
 TEST(HashKeyGeneratorTest, CollatorAppliedBeforeHashingNestedObject) {
     BSONObj obj = fromjson("{a: {b: 'string'}}");
     BSONObj backwardsObj = fromjson("{a: {b: 'gnirts'}}");
-    BSONObjSet actualKeys;
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ExpressionKeysPrivate::getHashKeys(
         obj, "a", kHashSeed, kHashVersion, false, &collator, &actualKeys);
 
-    BSONObjSet expectedKeys;
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     expectedKeys.insert(makeHashKey(backwardsObj["a"]));
 
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));
@@ -113,11 +126,11 @@ TEST(HashKeyGeneratorTest, CollatorAppliedBeforeHashingNestedObject) {
 
 TEST(HashKeyGeneratorTest, NoCollation) {
     BSONObj obj = fromjson("{a: 'string'}");
-    BSONObjSet actualKeys;
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     ExpressionKeysPrivate::getHashKeys(
         obj, "a", kHashSeed, kHashVersion, false, nullptr, &actualKeys);
 
-    BSONObjSet expectedKeys;
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     expectedKeys.insert(makeHashKey(obj["a"]));
 
     ASSERT(assertKeysetsEqual(expectedKeys, actualKeys));

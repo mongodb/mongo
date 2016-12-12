@@ -11,6 +11,26 @@ for (var i = 0; i < N; ++i) {
 t.ensureIndex({foo: 1});
 t.ensureIndex({foo: 1, baz: 1});
 
+// Test that stageDebug fails if neither the keyPattern nor the index name are present.
+assert.commandFailed(db.runCommand({
+    stageDebug: {
+        collection: collname,
+        plan: {
+            ixscan: {
+                args: {
+                    startKey: {
+                        "": 20,
+                        endKey: {},
+                        startKeyInclusive: true,
+                        endKeyInclusive: true,
+                        direction: -1
+                    }
+                }
+            }
+        }
+    }
+}));
+
 // foo <= 20
 ixscan1 = {
     ixscan: {
@@ -18,6 +38,7 @@ ixscan1 = {
             keyPattern: {foo: 1},
             startKey: {"": 20},
             endKey: {},
+            startKeyInclusive: true,
             endKeyInclusive: true,
             direction: -1
         }
@@ -34,6 +55,7 @@ ixscan1 = {
             keyPattern: {foo: 1},
             startKey: {"": 20},
             endKey: {"": 30},
+            startKeyInclusive: true,
             endKeyInclusive: false,
             direction: 1
         }
@@ -50,6 +72,7 @@ ixscan1 = {
             keyPattern: {foo: 1},
             startKey: {"": 20},
             endKey: {"": 30},
+            startKeyInclusive: true,
             endKeyInclusive: true,
             direction: 1
         }
@@ -67,6 +90,7 @@ ixscan1 = {
             keyPattern: {foo: 1},
             startKey: {"": 20},
             endKey: {"": 30},
+            startKeyInclusive: true,
             endKeyInclusive: true,
             direction: 1
         },
@@ -85,6 +109,7 @@ ixscan1 = {
             keyPattern: {foo: 1, baz: 1},
             startKey: {foo: 20, baz: MinKey},
             endKey: {foo: 30, baz: MaxKey},
+            startKeyInclusive: true,
             endKeyInclusive: true,
             direction: 1
         },
@@ -103,6 +128,7 @@ ixscan1 = {
             keyPattern: {foo: 1, baz: 1},
             startKey: {foo: 20, baz: MinKey},
             endKey: {foo: 30, baz: MaxKey},
+            startKeyInclusive: true,
             endKeyInclusive: true,
             direction: 1
         },
@@ -126,6 +152,7 @@ var ixscanAmbiguous = {
             keyPattern: {a: 1},
             startKey: {a: 1},
             endKey: {a: 2},
+            startKeyInclusive: true,
             endKeyInclusive: true,
             direction: 1
         },
@@ -142,6 +169,7 @@ var ixscanName = {
             name: "numeric",
             startKey: {a: ""},
             endKey: {a: {}},  // All strings
+            startKeyInclusive: true,
             endKeyInclusive: false,
             direction: 1
         },

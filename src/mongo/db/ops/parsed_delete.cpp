@@ -41,6 +41,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/server_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -59,6 +60,14 @@ Status ParsedDelete::parseRequest() {
     // It is invalid to request that a ProjectionStage be applied to the DeleteStage if the
     // DeleteStage would not return the deleted document.
     invariant(_request->getProj().isEmpty() || _request->shouldReturnDeleted());
+
+    if (!_request->getCollation().isEmpty() &&
+        serverGlobalParams.featureCompatibility.version.load() ==
+            ServerGlobalParams::FeatureCompatibility::Version::k32) {
+        return Status(ErrorCodes::InvalidOptions,
+                      "The featureCompatibilityVersion must be 3.4 to use collation. See "
+                      "http://dochub.mongodb.org/core/3.4-feature-compatibility.");
+    }
 
     if (CanonicalQuery::isSimpleIdQuery(_request->getQuery())) {
         return Status::OK();

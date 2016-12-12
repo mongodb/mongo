@@ -55,7 +55,7 @@ public:
     /**
      * Appends the three histograms with latency totals and operation counts.
      */
-    void append(BSONObjBuilder* builder) const;
+    void append(bool includeHistograms, BSONObjBuilder* builder) const;
 
 private:
     struct HistogramData {
@@ -68,7 +68,10 @@ private:
 
     static uint64_t _getBucketMicros(int bucket);
 
-    void _append(const HistogramData& data, const char* key, BSONObjBuilder* builder) const;
+    void _append(const HistogramData& data,
+                 const char* key,
+                 bool includeHistograms,
+                 BSONObjBuilder* builder) const;
 
     void _incrementData(uint64_t latency, int bucket, HistogramData* data);
 

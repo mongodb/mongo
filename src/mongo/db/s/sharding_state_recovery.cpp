@@ -196,7 +196,7 @@ Status modifyRecoveryDocument(OperationContext* txn,
             grid.configOpTime(),
             change);
 
-        LOG(1) << "Changing sharding recovery document " << updateObj;
+        LOG(1) << "Changing sharding recovery document " << redact(updateObj);
 
         UpdateRequest updateReq(NamespaceString::kConfigCollectionNamespace);
         updateReq.setQuery(RecoveryDocument::getQuery());
@@ -241,7 +241,7 @@ Status ShardingStateRecovery::startMetadataOp(OperationContext* txn) {
 void ShardingStateRecovery::endMetadataOp(OperationContext* txn) {
     Status status = modifyRecoveryDocument(txn, RecoveryDocument::Decrement, WriteConcernOptions());
     if (!status.isOK()) {
-        warning() << "Failed to decrement minOpTimeUpdaters due to " << status;
+        warning() << "Failed to decrement minOpTimeUpdaters due to " << redact(status);
     }
 }
 
@@ -268,7 +268,7 @@ Status ShardingStateRecovery::recover(OperationContext* txn) {
 
     const auto recoveryDoc = std::move(recoveryDocStatus.getValue());
 
-    log() << "Sharding state recovery process found document " << recoveryDoc.toBSON();
+    log() << "Sharding state recovery process found document " << redact(recoveryDoc.toBSON());
 
     // Make sure the sharding state is initialized
     ShardingState* const shardingState = ShardingState::get(txn);
@@ -278,8 +278,8 @@ Status ShardingStateRecovery::recover(OperationContext* txn) {
     // TODO(SERER-25276): Remove this after 3.4 since 3.4 shards should always have ShardingState
     // initialized by this point.
     if (!shardingState->enabled()) {
-        shardingState->initializeFromConfigConnString(txn, recoveryDoc.getConfigsvr().toString());
-        shardingState->setShardName(recoveryDoc.getShardName());
+        shardingState->initializeFromConfigConnString(
+            txn, recoveryDoc.getConfigsvr().toString(), recoveryDoc.getShardName());
     }
 
     if (!recoveryDoc.getMinOpTimeUpdaters()) {
@@ -298,7 +298,8 @@ Status ShardingStateRecovery::recover(OperationContext* txn) {
         grid.catalogClient(txn)->logChange(txn,
                                            "Sharding minOpTime recovery",
                                            NamespaceString::kConfigCollectionNamespace.ns(),
-                                           recoveryDocBSON);
+                                           recoveryDocBSON,
+                                           ShardingCatalogClient::kMajorityWriteConcern);
     if (!status.isOK())
         return status;
 
@@ -307,7 +308,7 @@ Status ShardingStateRecovery::recover(OperationContext* txn) {
     // Finally, clear the recovery document so next time we don't need to recover
     status = modifyRecoveryDocument(txn, RecoveryDocument::Clear, kLocalWriteConcern);
     if (!status.isOK()) {
-        warning() << "Failed to reset sharding state recovery document due to " << status;
+        warning() << "Failed to reset sharding state recovery document due to " << redact(status);
     }
 
     return Status::OK();

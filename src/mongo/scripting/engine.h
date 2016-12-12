@@ -249,6 +249,9 @@ public:
     virtual void enableJavaScriptProtection(bool value) = 0;
     virtual bool isJavaScriptProtectionEnabled() const = 0;
 
+    virtual int getJSHeapLimitMB() const = 0;
+    virtual void setJSHeapLimitMB(int limit) = 0;
+
     static void setup();
     static void dropScopeCache();
 
@@ -293,5 +296,6 @@ void installGlobalUtils(Scope& scope);
 bool hasJSReturn(const std::string& s);
 const char* jsSkipWhiteSpace(const char* raw);
 
-extern ScriptEngine* globalScriptEngine;
+ScriptEngine* getGlobalScriptEngine();
+void setGlobalScriptEngine(ScriptEngine* impl);
 }

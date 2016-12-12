@@ -49,18 +49,18 @@
     replTest.awaitReplication();
 
     assert.commandWorked(secondDB.adminCommand(
-        {configureFailPoint: 'crashAfterStartingIndexBuild', mode: 'alwaysOn'}));
+        {configureFailPoint: 'hangAfterStartingIndexBuildUnlocked', mode: 'alwaysOn'}));
     coll.createIndex({i: 1}, {background: true});
+    masterDB.getLastError(2);
     assert.eq(2, coll.getIndexes().length);
 
-    assert.eq(waitProgram(second.pid),
-              MongoRunner.EXIT_TEST,
-              "secondary should have crashed due to the 'crashAfterStartingIndexBuild' " +
-                  "failpoint being set.");
-
-    // Restart the secondary. Not using the restart() function here
-    // since the server is already killed by the fail point.
-    replTest.start(secondId, {}, /*restart=*/true, /*wait=*/true);
+    // Kill -9 and restart the secondary, after making sure all writes are durable.
+    // Waiting for durable is important for both (A) the record that we started the index build so
+    // it is rebuild on restart, and (B) the update to minvalid to show that we've already applied
+    // the oplog entry so it isn't replayed. If (A) is present without (B), then there are two ways
+    // that the index can be rebuilt on startup and this test is only for the one triggered by (A).
+    secondDB.adminCommand({fsync: 1});
+    replTest.restart(secondId, {}, /*signal=*/9, /*wait=*/true);
 
     // Make sure secondary comes back.
     assert.soon(function() {

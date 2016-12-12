@@ -43,8 +43,10 @@ import SCons
 import graph
 import graph_consts
 
-LIB_DB = []
-OBJ_DB = []
+
+LIB_DB = [] # Stores every SCons library nodes
+OBJ_DB = [] # Stores every SCons object file node
+EXE_DB = {} # Stores every SCons executable node, with the object files that build into it {Executable: [object files]}
 
 
 class DependencyCycleError(SCons.Errors.UserError):
@@ -120,6 +122,13 @@ def emit_obj_db_entry(target, source, env):
         OBJ_DB.append(t)
     return target, source
 
+def emit_prog_db_entry(target, source, env):
+    for t in target:
+        if str(t) is None:
+            continue
+        EXE_DB[t] = [str(s) for s in source]
+
+    return target, source
 
 def emit_lib_db_entry(target, source, env):
     """Emitter for libraries. We add each library
@@ -213,7 +222,6 @@ def __generate_file_rels(obj, g):
     """Generate all file to file and by extension, file to library and library
     to file relationships
     """
-
     file_node = g.get_node(str(obj))
 
     if file_node is None:
@@ -231,6 +239,18 @@ def __generate_file_rels(obj, g):
         for obj in objs:
             g.add_edge(graph_consts.FIL_FIL, file_node.id, obj)
 
+def __generate_exe_rels(exe, g):
+    """Generates all executable to library relationships, and populates the
+    contained files field in each NodeExe object"""
+    exe_node = g.find_node(str(exe), graph_consts.NODE_EXE)
+    for lib in exe.all_children():
+        lib = lib.get_path()
+        if lib is None or not lib.endswith(".a"):
+            continue
+        lib_node = g.find_node(lib, graph_consts.NODE_LIB)
+        g.add_edge(graph_consts.EXE_LIB, exe_node.id, lib_node.id)
+
+    exe_node.contained_files = set(EXE_DB[exe])
 
 def write_obj_db(target, source, env):
     """The bulk of the tool. This method takes all the objects and libraries
@@ -248,6 +268,9 @@ def write_obj_db(target, source, env):
 
     for obj in OBJ_DB:
         __generate_file_rels(obj, g)
+
+    for exe in EXE_DB.keys():
+        __generate_exe_rels(exe, g)
 
     # target is given as a list of target SCons nodes - this builder is only responsible for
     # building the json target, so this list is of length 1. export_to_json

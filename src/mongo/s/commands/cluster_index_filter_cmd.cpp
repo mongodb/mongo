@@ -107,9 +107,8 @@ public:
         // commands are tied to query shape (data has no effect on query shape).
         vector<Strategy::CommandResult> results;
         const BSONObj query;
-        const BSONObj collation =
-            BSON(CollationSpec::kLocaleField << CollationSpec::kSimpleBinaryComparison);
-        Strategy::commandOp(txn, dbname, cmdObj, options, nss.ns(), query, collation, &results);
+        Strategy::commandOp(
+            txn, dbname, cmdObj, options, nss.ns(), query, CollationSpec::kSimpleSpec, &results);
 
         // Set value of first shard result's "ok" field.
         bool clusterCmdResult = true;

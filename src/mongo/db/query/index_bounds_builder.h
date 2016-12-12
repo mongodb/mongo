@@ -108,15 +108,14 @@ public:
      * Make a range interval from the provided object.
      * The object must have exactly two fields.  The first field is the start, the second the
      * end.
-     * The two inclusive flags indicate whether or not the start/end fields are included in the
+     * The BoundInclusion indicates whether or not the start/end fields are included in the
      * interval (closed interval if included, open if not).
      */
-    static Interval makeRangeInterval(const BSONObj& obj, bool startInclusive, bool endInclusive);
+    static Interval makeRangeInterval(const BSONObj& obj, BoundInclusion boundInclusion);
 
     static Interval makeRangeInterval(const std::string& start,
                                       const std::string& end,
-                                      bool startInclusive,
-                                      bool endInclusive);
+                                      BoundInclusion boundInclusion);
 
     /**
      * Make a point interval from the provided object.

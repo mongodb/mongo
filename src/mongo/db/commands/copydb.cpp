@@ -134,21 +134,33 @@ public:
         }
 
         CloneOptions cloneOptions;
-        cloneOptions.fromDB = cmdObj.getStringField("fromdb");
+        const auto fromdbElt = cmdObj["fromdb"];
+        uassert(ErrorCodes::TypeMismatch,
+                "'fromdb' must be of type String",
+                fromdbElt.type() == BSONType::String);
+        cloneOptions.fromDB = fromdbElt.str();
         cloneOptions.slaveOk = cmdObj["slaveOk"].trueValue();
         cloneOptions.useReplAuth = false;
         cloneOptions.snapshot = true;
 
-        string todb = cmdObj.getStringField("todb");
-        if (fromhost.empty() || todb.empty() || cloneOptions.fromDB.empty()) {
+        const auto todbElt = cmdObj["todb"];
+        uassert(ErrorCodes::TypeMismatch,
+                "'todb' must be of type String",
+                todbElt.type() == BSONType::String);
+        const std::string todb = todbElt.str();
+
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid 'todb' name: " << todb,
+                NamespaceString::validDBName(todb, NamespaceString::DollarInDbNameBehavior::Allow));
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid 'fromdb' name: " << cloneOptions.fromDB,
+                NamespaceString::validDBName(cloneOptions.fromDB,
+                                             NamespaceString::DollarInDbNameBehavior::Allow));
+
+        if (fromhost.empty()) {
             errmsg =
                 "params missing - {copydb: 1, fromhost: <connection string>, "
                 "fromdb: <db>, todb: <db>}";
-            return false;
-        }
-
-        if (!NamespaceString::validDBName(todb, NamespaceString::DollarInDbNameBehavior::Allow)) {
-            errmsg = "invalid todb name: " + todb;
             return false;
         }
 

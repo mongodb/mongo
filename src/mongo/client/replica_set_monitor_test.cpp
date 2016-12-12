@@ -28,15 +28,13 @@
 
 #include "mongo/platform/basic.h"
 
-
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_internal.h"
 #include "mongo/unittest/unittest.h"
 
-
+namespace mongo {
 namespace {
 
-using namespace mongo;
 using std::set;
 
 // Pull nested types to top-level scope
@@ -65,6 +63,24 @@ const std::set<HostAndPort> basicSeedsSet(basicSeeds.begin(), basicSeeds.end());
 
 TEST(ReplicaSetMonitor, InitialState) {
     SetStatePtr state = std::make_shared<SetState>("name", basicSeedsSet);
+    ASSERT_EQUALS(state->name, "name");
+    ASSERT(state->seedNodes == basicSeedsSet);
+    ASSERT(state->lastSeenMaster.empty());
+    ASSERT_EQUALS(state->nodes.size(), basicSeeds.size());
+    for (size_t i = 0; i < basicSeeds.size(); i++) {
+        Node* node = state->findNode(basicSeeds[i]);
+        ASSERT(node);
+        ASSERT_EQUALS(node->host.toString(), basicSeeds[i].toString());
+        ASSERT(!node->isUp);
+        ASSERT(!node->isMaster);
+        ASSERT(node->tags.isEmpty());
+    }
+}
+
+TEST(ReplicaSetMonitor, InitialStateMongoURI) {
+    auto uri = MongoURI::parse("mongodb://a,b,c/?replicaSet=name");
+    ASSERT_OK(uri.getStatus());
+    SetStatePtr state = std::make_shared<SetState>(uri.getValue());
     ASSERT_EQUALS(state->name, "name");
     ASSERT(state->seedNodes == basicSeedsSet);
     ASSERT(state->lastSeenMaster.empty());
@@ -942,7 +958,7 @@ TEST(ReplicaSetMonitor, OutOfBandFailedHost) {
 
         if (i >= 1) {
             HostAndPort a("a");
-            rsm->failedHost(a);
+            rsm->failedHost(a, {ErrorCodes::InternalError, "Test error"});
             Node* node = state->findNode(a);
             ASSERT(node);
             ASSERT(!node->isUp);
@@ -1512,9 +1528,9 @@ TEST(ReplicaSetMonitor, MaxStalenessMSAllFailed) {
     ASSERT_EQUALS(ns.step, NextStep::DONE);
 
     // make sure all secondaries are in the scan
-    refresher.failedHost(HostAndPort("a"));
-    refresher.failedHost(HostAndPort("b"));
-    refresher.failedHost(HostAndPort("c"));
+    refresher.failedHost(HostAndPort("a"), {ErrorCodes::InternalError, "Test error"});
+    refresher.failedHost(HostAndPort("b"), {ErrorCodes::InternalError, "Test error"});
+    refresher.failedHost(HostAndPort("c"), {ErrorCodes::InternalError, "Test error"});
 
     HostAndPort notStale = state->getMatchingHost(secondary);
     ASSERT_EQUALS(notStale.host(), "");
@@ -1564,8 +1580,8 @@ TEST(ReplicaSetMonitor, MaxStalenessMSAllButPrimaryFailed) {
 
     // make sure the primary is in the scan
     ASSERT(state->findNode(HostAndPort("a")));
-    refresher.failedHost(HostAndPort("b"));
-    refresher.failedHost(HostAndPort("c"));
+    refresher.failedHost(HostAndPort("b"), {ErrorCodes::InternalError, "Test error"});
+    refresher.failedHost(HostAndPort("c"), {ErrorCodes::InternalError, "Test error"});
 
     // No match because the request needs secondaryOnly host
     HostAndPort notStale = state->getMatchingHost(secondary);
@@ -1616,7 +1632,7 @@ TEST(ReplicaSetMonitor, MaxStalenessMSOneSecondaryFailed) {
 
     ASSERT(state->findNode(HostAndPort("a")));
     ASSERT(state->findNode(HostAndPort("b")));
-    refresher.failedHost(HostAndPort("c"));
+    refresher.failedHost(HostAndPort("c"), {ErrorCodes::InternalError, "Test error"});
 
     // No match because the write date is stale
     HostAndPort notStale = state->getMatchingHost(secondary);
@@ -1667,9 +1683,9 @@ TEST(ReplicaSetMonitor, MaxStalenessMSNonStaleSecondaryMatched) {
     // Ensure that we have heard from all hosts and scan is done
     ASSERT_EQUALS(ns.step, NextStep::DONE);
 
-    refresher.failedHost(HostAndPort("a"));
+    refresher.failedHost(HostAndPort("a"), {ErrorCodes::InternalError, "Test error"});
     ASSERT(state->findNode(HostAndPort("b")));
-    refresher.failedHost(HostAndPort("c"));
+    refresher.failedHost(HostAndPort("c"), {ErrorCodes::InternalError, "Test error"});
 
     HostAndPort notStale = state->getMatchingHost(secondary);
     ASSERT_EQUALS(notStale.host(), "b");
@@ -1897,5 +1913,5 @@ TEST(ReplicaSetMonitor, MinOpTimeIgnored) {
     ASSERT_EQUALS(notStale.host(), "c");
 }
 
-
 }  // namespace
+}  // namespace mongo

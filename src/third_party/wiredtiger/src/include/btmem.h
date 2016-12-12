@@ -218,6 +218,14 @@ struct __wt_page_modify {
 	/* The first unwritten transaction ID (approximate). */
 	uint64_t first_dirty_txn;
 
+	/* The transaction state last time eviction was attempted. */
+	uint64_t last_eviction_id;
+
+#ifdef HAVE_DIAGNOSTIC
+	/* Check that transaction time moves forward. */
+	uint64_t last_oldest_id;
+#endif
+
 	/* Avoid checking for obsolete updates during checkpoints. */
 	uint64_t obsolete_check_txn;
 
@@ -226,9 +234,6 @@ struct __wt_page_modify {
 
 	/* The largest update transaction ID (approximate). */
 	uint64_t update_txn;
-
-	/* Check that transaction time moves forward. */
-	uint64_t last_oldest_id;
 
 	/* Dirty bytes added to the cache. */
 	size_t bytes_dirty;
@@ -306,7 +311,7 @@ struct __wt_page_modify {
 		 */
 		WT_ADDR	 addr;
 		uint32_t size;
-		uint32_t cksum;
+		uint32_t checksum;
 	} *multi;
 	uint32_t multi_entries;		/* Multiple blocks element count */
 	} m;
@@ -425,6 +430,8 @@ struct __wt_page_modify {
 #define	WT_PM_REC_MULTIBLOCK	2	/* Reconciliation: multiple blocks */
 #define	WT_PM_REC_REPLACE	3	/* Reconciliation: single block */
 	uint8_t rec_result;		/* Reconciliation state */
+
+	uint8_t update_restored;	/* Page created by restoring updates */
 };
 
 /*
@@ -436,9 +443,6 @@ struct __wt_page {
 	union {
 		/*
 		 * Internal pages (both column- and row-store).
-		 *
-		 * The page record number is only used by column-store, but it's
-		 * simpler having only one kind of internal page.
 		 *
 		 * In-memory internal pages have an array of pointers to child
 		 * structures, maintained in collated order.  When a page is
@@ -584,9 +588,10 @@ struct __wt_page {
 
 	/*
 	 * Used to protect and co-ordinate splits for internal pages and
-	 * reconciliation for all pages.
+	 * reconciliation for all pages. Only used to co-ordinate among the
+	 * uncommon cases that require exclusive access to a page.
 	 */
-	WT_FAIR_LOCK page_lock;
+	WT_RWLOCK page_lock;
 
 	/*
 	 * The page's read generation acts as an LRU value for each page in the
@@ -613,6 +618,8 @@ struct __wt_page {
 #define	WT_READGEN_START_VALUE	100
 #define	WT_READGEN_STEP		100
 	uint64_t read_gen;
+	/* The evict pass generation for the page */
+	uint64_t evict_pass_gen;
 
 	size_t memory_footprint;	/* Memory attached to the page */
 
@@ -713,7 +720,7 @@ struct __wt_ref {
 	 * up our slot in the page's index structure.
 	 */
 	WT_PAGE * volatile home;	/* Reference page */
-	uint32_t pindex_hint;		/* Reference page index hint */
+	volatile uint32_t pindex_hint;	/* Reference page index hint */
 
 #define	WT_REF_DISK	0		/* Page is on disk */
 #define	WT_REF_DELETED	1		/* Page is on disk, but deleted */

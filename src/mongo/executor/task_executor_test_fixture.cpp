@@ -43,8 +43,8 @@ Status TaskExecutorTest::getDetectableErrorStatus() {
     return Status(ErrorCodes::InternalError, "Not mutated");
 }
 
-void TaskExecutorTest::assertRemoteCommandNameEquals(StringData cmdName,
-                                                     const RemoteCommandRequest& request) {
+RemoteCommandRequest TaskExecutorTest::assertRemoteCommandNameEquals(
+    StringData cmdName, const RemoteCommandRequest& request) {
     auto&& cmdObj = request.cmdObj;
     ASSERT_FALSE(cmdObj.isEmpty());
     if (cmdName != cmdObj.firstElementFieldName()) {
@@ -53,6 +53,7 @@ void TaskExecutorTest::assertRemoteCommandNameEquals(StringData cmdName,
             << cmdObj.firstElementFieldName() << "\" instead: " << request.toString();
         FAIL(msg);
     }
+    return request;
 }
 
 TaskExecutorTest::~TaskExecutorTest() = default;

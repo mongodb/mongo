@@ -38,7 +38,6 @@
 namespace mongo {
 
 class ChunkType;
-class MetadataLoader;
 
 /**
  * The collection metadata has metadata information about a collection, in particular the
@@ -83,41 +82,6 @@ public:
     std::unique_ptr<CollectionMetadata> clonePlusPending(const ChunkType& chunk) const;
 
     /**
-     * Returns a new metadata's instance based on 'this's state by removing 'chunk'. When cloning
-     * away the last chunk, the resulting metadata's shard version will be zero.
-     *
-     * The chunk to be migrated must exist, otherwise the call will fassert.
-     */
-    std::unique_ptr<CollectionMetadata> cloneMigrate(
-        const ChunkType& chunk, const ChunkVersion& newCollectionVersion) const;
-
-    /**
-     * Returns a new metadata's instance by splitting an existing 'chunk' at the points
-     * described by 'splitKeys'. The first resulting chunk will have 'newShardVersion' and
-     * subsequent one would have that with the minor version incremented at each chunk. The
-     * caller owns the metadata.
-     *
-     * If a new metadata can't be created returns a failed status.
-     *
-     * Note: 'splitKeys' must be sorted in ascending order.
-     */
-    StatusWith<std::unique_ptr<CollectionMetadata>> cloneSplit(
-        const BSONObj& minKey,
-        const BSONObj& maxKey,
-        const std::vector<BSONObj>& splitKeys,
-        const ChunkVersion& newShardVersion) const;
-
-    /**
-     * Returns a new metadata instance by merging a key range which starts and ends at existing
-     *chunks into a single chunk. The range may not have holes. The resulting metadata will have the
-     *'newShardVersion'.
-     *
-     * If a new metadata can't be created, returns a failed status.
-     */
-    StatusWith<std::unique_ptr<CollectionMetadata>> cloneMerge(
-        const BSONObj& minKey, const BSONObj& maxKey, const ChunkVersion& newShardVersion) const;
-
-    /**
      * Returns true if the document key 'key' is a valid instance of a shard key for this
      * metadata.  The 'key' must contain exactly the same fields as the shard key pattern.
      */
@@ -148,6 +112,13 @@ public:
      * Given a chunk identifying key "chunkMinKey", finds a different chunk if one exists.
      */
     bool getDifferentChunk(const BSONObj& chunkMinKey, ChunkType* differentChunk) const;
+
+    /**
+     * Validates that the passed-in chunk's bounds exactly match a chunk in the metadata cache. If
+     * the chunk's version has been set as well (it might not be in the case of request coming from
+     * a 3.2 shard), also ensures that the versions are the same.
+     */
+    Status checkChunkIsValid(const ChunkType& chunk);
 
     /**
      * Given a key in the shard key range, get the next range which overlaps or is greater than
@@ -214,17 +185,22 @@ public:
      */
     void toBSONPending(BSONArrayBuilder& bb) const;
 
+    /**
+     * String output of the collection and shard versions.
+     */
     std::string toStringBasic() const;
 
     /**
-     * This method is used only for unit-tests and it returns a new metadata's instance based on
-     * 'this's state by adding 'chunk'. The new metadata can never be zero.
+     * This method is used only for unit-tests and it returns a new metadata's instance based on the
+     * current state by adding a chunk with the specified bounds and version. The chunk's version
+     * must be higher than that of all chunks which are in the cache.
      *
-     * It will fassert if the chunk bounds are incorrect or overlap an existing chunk.
+     * It will fassert if the chunk bounds are incorrect or overlap an existing chunk or if the
+     * chunk version is lower than the maximum one.
      */
     std::unique_ptr<CollectionMetadata> clonePlusChunk(const BSONObj& minKey,
                                                        const BSONObj& maxKey,
-                                                       const ChunkVersion& newShardVersion) const;
+                                                       const ChunkVersion& chunkVersion) const;
 
     /**
      * Returns true if this metadata was loaded with all necessary information.

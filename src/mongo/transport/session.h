@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/session_id.h"
@@ -43,12 +45,16 @@ struct SSLPeerInfo;
 namespace transport {
 
 class TransportLayer;
+class Session;
+
+using SessionHandle = std::shared_ptr<Session>;
+using ConstSessionHandle = std::shared_ptr<const Session>;
 
 /**
  * This type contains data needed to associate Messages with connections
  * (on the transport side) and Messages with Client objects (on the database side).
  */
-class Session {
+class Session : public std::enable_shared_from_this<Session> {
     MONGO_DISALLOW_COPYING(Session);
 
 public:
@@ -68,20 +74,9 @@ public:
     static constexpr TagMask kKeepOpen = 1;
 
     /**
-     * Construct a new session.
-     */
-    Session(HostAndPort remote, HostAndPort local, TransportLayer* tl);
-
-    /**
      * Destroys a session, calling end() for this session in its TransportLayer.
      */
-    ~Session();
-
-    /**
-     * Move constructor and assignment operator.
-     */
-    Session(Session&& other);
-    Session& operator=(Session&& other);
+    virtual ~Session() = default;
 
     /**
      * Return the id for this session.
@@ -91,43 +86,16 @@ public:
     }
 
     /**
-     * Return the remote host for this session.
+     * The TransportLayer for this Session.
      */
-    const HostAndPort& remote() const {
-        return _remote;
-    }
-
-    /**
-     * Return the local host information for this session.
-     */
-    const HostAndPort& local() const {
-        return _local;
-    }
-
-    /**
-     * Return the X509 peer information for this connection (SSL only).
-     */
-    SSLPeerInfo getX509PeerInfo() const;
-
-    /**
-     * Set this session's tags. This Session will register
-     * its new tags with its TransportLayer.
-     */
-    void replaceTags(TagMask tags);
-
-    /**
-     * Get this session's tags.
-     */
-    TagMask getTags() const {
-        return _tags;
-    }
+    virtual TransportLayer* getTransportLayer() const = 0;
 
     /**
      * Source (receive) a new Message for this Session.
      *
      * This method will forward to sourceMessage on this Session's transport layer.
      */
-    Ticket sourceMessage(Message* message, Date_t expiration = Ticket::kNoExpirationDate);
+    virtual Ticket sourceMessage(Message* message, Date_t expiration = Ticket::kNoExpirationDate);
 
     /**
      * Sink (send) a new Message for this Session. This method should be used
@@ -135,43 +103,50 @@ public:
      *
      * This method will forward to sinkMessage on this Session's transport layer.
      */
-    Ticket sinkMessage(const Message& message, Date_t expiration = Ticket::kNoExpirationDate);
+    virtual Ticket sinkMessage(const Message& message,
+                               Date_t expiration = Ticket::kNoExpirationDate);
 
     /**
-     * The TransportLayer for this Session.
+     * Return the X509 peer information for this connection (SSL only).
      */
-    TransportLayer* getTransportLayer() const {
-        return _tl;
-    }
+    virtual SSLPeerInfo getX509PeerInfo() const;
 
-    /*
-     * End the session.
+    /**
+     * Return the remote host for this session.
      */
-    void end();
+    virtual const HostAndPort& remote() const = 0;
 
-    /*
-     * Return true if the session ended, false otherwise.
+    /**
+     * Return the local host information for this session.
      */
-    bool ended() const {
-        return _ended;
-    }
+    virtual const HostAndPort& local() const = 0;
 
-    MessageCompressorManager& getCompressorManager() {
-        return _messageCompressorManager;
-    }
+    /**
+     * Set this session's tags. This Session will register
+     * its new tags with its TransportLayer.
+     */
+    virtual void replaceTags(TagMask tags);
+
+    /**
+     * Get this session's tags.
+     */
+    virtual TagMask getTags() const;
+
+    /**
+     * Get the compressor manager for this session.
+     */
+    virtual MessageCompressorManager& getCompressorManager();
+
+protected:
+    /**
+     * Construct a new session.
+     */
+    Session();
 
 private:
-    bool _ended = false;
-
-    Id _id;
-
-    HostAndPort _remote;
-    HostAndPort _local;
+    const Id _id;
 
     TagMask _tags;
-
-    TransportLayer* _tl;
-
     MessageCompressorManager _messageCompressorManager;
 };
 

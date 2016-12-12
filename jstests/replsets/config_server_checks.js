@@ -86,8 +86,8 @@ function expectState(rst, state) {
 
     (function() {
         // Test that a set initialized without --configsvr but then restarted with --configsvr will
-        // fail to
-        // start up and won't automatically add "configsvr" to the replset config (SERVER-21236).
+        // fail to start up and won't automatically add "configsvr" to the replset config
+        // (SERVER-21236).
         jsTestLog("set initiated without configsvr, restarted adding --configsvr cmd line");
         var rst = new ReplSetTest(
             {name: "configrs7", nodes: 1, nodeOptions: {journal: "", storageEngine: "wiredTiger"}});
@@ -98,17 +98,26 @@ function expectState(rst, state) {
 
         rst.getPrimary();
         expectState(rst, ReplSetTest.State.PRIMARY);
-        assert.throws(function() {
-            rst.restart(0, {configsvr: ""}, true);
-        });
+
+        var node = rst.nodes[0];
+        var options = node.savedOptions;
+        options.configsvr = "";
+        options.noCleanData = true;
+        options.waitForConnect = false;
+
+        MongoRunner.stopMongod(node);
+
+        var mongod = MongoRunner.runMongod(options);
+        var exitCode = waitProgram(mongod.pid);
+        assert.eq(
+            MongoRunner.EXIT_ABRUPT, exitCode, "Mongod should have failed to start, but didn't");
 
         rst.stopSet();
     })();
 
     (function() {
         // Test that a set initialized with --configsvr but then restarted without --configsvr will
-        // fail to
-        // start up.
+        // fail to start up.
         jsTestLog("set initiated with configsvr, restarted without --configsvr cmd line");
         var rst = new ReplSetTest({
             name: "configrs8",

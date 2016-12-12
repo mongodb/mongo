@@ -86,8 +86,8 @@ MONGO_FP_DECLARE(failAllRemoves);
 void finishCurOp(OperationContext* txn, CurOp* curOp) {
     try {
         curOp->done();
-        int executionTimeMs = curOp->totalTimeMillis();
-        curOp->debug().executionTime = executionTimeMs;
+        long long executionTimeMicros = curOp->totalTimeMicros();
+        curOp->debug().executionTimeMicros = executionTimeMicros;
 
         recordCurOpMetrics(txn);
         Top::get(txn->getServiceContext())
@@ -100,14 +100,14 @@ void finishCurOp(OperationContext* txn, CurOp* curOp) {
                     curOp->getReadWriteType());
 
         if (!curOp->debug().exceptionInfo.empty()) {
-            LOG(3) << "Caught Assertion in " << logicalOpToString(curOp->getLogicalOp()) << ": "
-                   << curOp->debug().exceptionInfo.toString();
+            LOG(3) << "Caught Assertion in " << redact(logicalOpToString(curOp->getLogicalOp()))
+                   << ": " << curOp->debug().exceptionInfo.toString();
         }
 
         const bool logAll = logger::globalLogDomain()->shouldLog(logger::LogComponent::kCommand,
                                                                  logger::LogSeverity::Debug(1));
-        const bool logSlow =
-            executionTimeMs > (serverGlobalParams.slowMS + curOp->getExpectedLatencyMs());
+        const bool logSlow = executionTimeMicros >
+            (serverGlobalParams.slowMS + curOp->getExpectedLatencyMs()) * 1000LL;
 
         if (logAll || logSlow) {
             Locker::LockerInfo lockerInfo;
@@ -115,14 +115,14 @@ void finishCurOp(OperationContext* txn, CurOp* curOp) {
             log() << curOp->debug().report(txn->getClient(), *curOp, lockerInfo.stats);
         }
 
-        if (curOp->shouldDBProfile(executionTimeMs)) {
+        if (curOp->shouldDBProfile()) {
             profile(txn, CurOp::get(txn)->getNetworkOp());
         }
     } catch (const DBException& ex) {
         // We need to ignore all errors here. We don't want a successful op to fail because of a
         // failure to record stats. We also don't want to replace the error reported for an op that
         // is failing.
-        log() << "Ignoring error from finishCurOp: " << ex.toString();
+        log() << "Ignoring error from finishCurOp: " << redact(ex);
     }
 }
 
@@ -167,7 +167,7 @@ private:
 };
 
 void assertCanWrite_inlock(OperationContext* txn, const NamespaceString& ns) {
-    uassert(ErrorCodes::NotMaster,
+    uassert(ErrorCodes::PrimarySteppedDown,
             str::stream() << "Not primary while writing to " << ns.ns(),
             repl::ReplicationCoordinator::get(txn->getServiceContext())->canAcceptWritesFor(ns));
     CollectionShardingState::get(txn, ns)->checkShardVersionOrThrow(txn);
@@ -436,7 +436,7 @@ WriteResult performInserts(OperationContext* txn, const InsertOp& wholeOp) {
 
     size_t bytesInBatch = 0;
     std::vector<BSONObj> batch;
-    const size_t maxBatchSize = internalQueryExecYieldIterations / 2;
+    const size_t maxBatchSize = internalInsertMaxBatchSize;
     batch.reserve(std::min(wholeOp.documents.size(), maxBatchSize));
 
     for (auto&& doc : wholeOp.documents) {
@@ -542,7 +542,7 @@ static WriteResult::SingleResult performSingleUpdateOp(OperationContext* txn,
         collection->getCollection()->infoCache()->notifyOfQuery(txn, summary.indexesUsed);
     }
 
-    if (curOp.shouldDBProfile(curOp.elapsedMillis())) {
+    if (curOp.shouldDBProfile()) {
         BSONObjBuilder execStatsBob;
         Explain::getWinningPlanStats(exec.get(), &execStatsBob);
         curOp.debug().execStats = execStatsBob.obj();
@@ -656,7 +656,7 @@ static WriteResult::SingleResult performSingleDeleteOp(OperationContext* txn,
     }
     curOp.debug().setPlanSummaryMetrics(summary);
 
-    if (curOp.shouldDBProfile(curOp.elapsedMillis())) {
+    if (curOp.shouldDBProfile()) {
         BSONObjBuilder execStatsBob;
         Explain::getWinningPlanStats(exec.get(), &execStatsBob);
         curOp.debug().execStats = execStatsBob.obj();

@@ -54,7 +54,7 @@ void assertFixSuccess(const std::string& s) {
 
         // fixSpec() on an already-fixed spec shouldn't change it.
         BSONObj fixed2 = assertGet(FTSSpec::fixSpec(fixed));
-        ASSERT_EQUALS(fixed, fixed2);
+        ASSERT_BSONOBJ_EQ(fixed, fixed2);
     } catch (UserException&) {
         ASSERT(false);
     }
@@ -283,7 +283,7 @@ TEST(FTSSpec, Extra2) {
     ASSERT_EQUALS(StringData("x"), spec.extraAfter(0));
 
     BSONObj fixed2 = assertGet(FTSSpec::fixSpec(fixed));
-    ASSERT_EQUALS(fixed, fixed2);
+    ASSERT_BSONOBJ_EQ(fixed, fixed2);
 }
 
 TEST(FTSSpec, Extra3) {
@@ -291,15 +291,15 @@ TEST(FTSSpec, Extra3) {
                                           << "text"));
     BSONObj fixed = assertGet(FTSSpec::fixSpec(user));
 
-    ASSERT_EQUALS(BSON("x" << 1 << "_fts"
-                           << "text"
-                           << "_ftsx"
-                           << 1),
-                  fixed["key"].Obj());
-    ASSERT_EQUALS(BSON("data" << 1), fixed["weights"].Obj());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 1 << "_fts"
+                               << "text"
+                               << "_ftsx"
+                               << 1),
+                      fixed["key"].Obj());
+    ASSERT_BSONOBJ_EQ(BSON("data" << 1), fixed["weights"].Obj());
 
     BSONObj fixed2 = assertGet(FTSSpec::fixSpec(fixed));
-    ASSERT_EQUALS(fixed, fixed2);
+    ASSERT_BSONOBJ_EQ(fixed, fixed2);
 
     FTSSpec spec(fixed);
     ASSERT_EQUALS(1U, spec.numExtraBefore());
@@ -309,10 +309,10 @@ TEST(FTSSpec, Extra3) {
     BSONObj prefix;
 
     ASSERT(spec.getIndexPrefix(BSON("x" << 2), &prefix).isOK());
-    ASSERT_EQUALS(BSON("x" << 2), prefix);
+    ASSERT_BSONOBJ_EQ(BSON("x" << 2), prefix);
 
     ASSERT(spec.getIndexPrefix(BSON("x" << 3 << "y" << 4), &prefix).isOK());
-    ASSERT_EQUALS(BSON("x" << 3), prefix);
+    ASSERT_BSONOBJ_EQ(BSON("x" << 3), prefix);
 
     ASSERT(!spec.getIndexPrefix(BSON("x" << BSON("$gt" << 5)), &prefix).isOK());
     ASSERT(!spec.getIndexPrefix(BSON("y" << 4), &prefix).isOK());

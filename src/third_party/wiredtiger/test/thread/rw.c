@@ -175,8 +175,8 @@ reader_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 	if ((ret = cursor->search(cursor)) != 0 && ret != WT_NOTFOUND)
 		testutil_die(ret, "cursor.search");
 	if (log_print)
-		(void)session->log_printf(session,
-		    "Reader Thread %p key %017u", pthread_self(), keyno);
+		testutil_check(session->log_printf(session,
+		    "Reader Thread %p key %017u", pthread_self(), keyno));
 }
 
 /*
@@ -276,8 +276,8 @@ writer_op(WT_SESSION *session, WT_CURSOR *cursor, INFO *s)
 			testutil_die(ret, "cursor.update");
 	}
 	if (log_print)
-		(void)session->log_printf(session,
-		    "Writer Thread %p key %017u", pthread_self(), keyno);
+		testutil_check(session->log_printf(session,
+		    "Writer Thread %p key %017u", pthread_self(), keyno));
 }
 
 /*

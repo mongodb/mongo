@@ -268,7 +268,7 @@ TEST(Path, ArrayIndex3) {
 
     ASSERT(cursor.more());
     e = cursor.next();
-    ASSERT_EQUALS(BSON("1" << 4), e.element().Obj());
+    ASSERT_BSONOBJ_EQ(BSON("1" << 4), e.element().Obj());
     ASSERT(e.outerArray());
 
     ASSERT(!cursor.more());
@@ -354,7 +354,7 @@ TEST(Path, NestedArrayImplicitTraversal) {
     ASSERT(cursor.more());
     e = cursor.next();
     ASSERT_EQUALS(Array, e.element().type());
-    ASSERT_EQUALS(BSON("0" << 2 << "1" << 3), e.element().Obj());
+    ASSERT_BSONOBJ_EQ(BSON("0" << 2 << "1" << 3), e.element().Obj());
     ASSERT_EQUALS("0", e.arrayOffset().fieldNameStringData());
 
     ASSERT(cursor.more());
@@ -372,7 +372,7 @@ TEST(Path, NestedArrayImplicitTraversal) {
     ASSERT(cursor.more());
     e = cursor.next();
     ASSERT_EQUALS(Array, e.element().type());
-    ASSERT_EQUALS(BSON("0" << 4 << "1" << 5), e.element().Obj());
+    ASSERT_BSONOBJ_EQ(BSON("0" << 4 << "1" << 5), e.element().Obj());
     ASSERT_EQUALS("1", e.arrayOffset().fieldNameStringData());
 
     ASSERT(!cursor.more());
@@ -407,7 +407,7 @@ TEST(Path, ArrayOffsetWithImplicitAndExplicitTraversal) {
     ASSERT(cursor.more());
     e = cursor.next();
     ASSERT_EQUALS(Array, e.element().type());
-    ASSERT_EQUALS(BSON("0" << 2 << "1" << 3), e.element().Obj());
+    ASSERT_BSONOBJ_EQ(BSON("0" << 2 << "1" << 3), e.element().Obj());
     ASSERT(e.arrayOffset().eoo());
 
     ASSERT(cursor.more());

@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/indexability.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/util/log.h"
 
@@ -249,7 +250,7 @@ bool CanonicalQuery::isSimpleIdQuery(const BSONObj& query) {
                 if (elt.Obj().firstElementFieldName()[0] == '$') {
                     return false;
                 }
-            } else if (!elt.isSimpleType() && BinData != elt.type()) {
+            } else if (!Indexability::isExactBoundsGenerating(elt)) {
                 // The _id fild cannot be something like { _id : { $gt : ...
                 // But it can be BinData.
                 return false;

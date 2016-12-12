@@ -43,7 +43,8 @@ if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredT
 
     // make sure node 0 becomes primary initially
     var config = replTest.getReplSetConfig();
-    config.members[0].priority = 1;
+    config.members[1].priority = 0;
+    config.members[2].priority = 0;
     replTest.initiate(config);
 
     var masterDB = replTest.getPrimary().getDB("test");

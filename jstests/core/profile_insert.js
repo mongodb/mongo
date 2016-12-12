@@ -6,8 +6,7 @@
     // For getLatestProfilerEntry and getProfilerProtocolStringForCommand
     load("jstests/libs/profiler.js");
 
-    var conn = new Mongo(db.getMongo().host);
-    var testDB = conn.getDB("profile_insert");
+    var testDB = db.getSiblingDB("profile_insert");
     assert.commandWorked(testDB.dropDatabase());
     var coll = testDB.getCollection("test");
     var isWriteCommand = (db.getMongo().writeMode() === "commands");
@@ -33,8 +32,9 @@
         assert.eq(profileObj.query.documents.length, 1, tojson(profileObj));
         assert.eq(profileObj.query.documents[0], doc, tojson(profileObj));
         assert.eq(profileObj.query.ordered, true, tojson(profileObj));
-        assert.eq(
-            profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
+        assert.eq(profileObj.protocol,
+                  getProfilerProtocolStringForCommand(testDB.getMongo()),
+                  tojson(profileObj));
         assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
     }
 

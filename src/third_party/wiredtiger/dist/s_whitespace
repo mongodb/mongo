@@ -2,48 +2,33 @@
 
 # Single space and remove trailing whitespace from source files.
 t=__wt.$$
-trap 'rm -f $t; exit 0' 0 1 2 3 13 15
-
-# Clear lines that only contain whitespace, discard trailing empty lines.
-whitespace()
-{
-	sed -e 's/[	 ][	 ]*$//' \
-	    -e '${' \
-	    -e '/^$/d' \
-	    -e '}' < $1 > $t
-	cmp $t $1 > /dev/null 2>&1 || (echo "$1" && cp $t $1)
-}
+trap 'rm -f $t' 0 1 2 3 13 15
 
 # Clear lines that only contain whitespace, compress multiple empty lines
 # into a single line, discard trailing empty lines.
-whitespace_and_empty_line()
+whitespace()
 {
-	sed -e 's/[	 ][	 ]*$//' \
-	    -e '/^$/N' \
-	    -e '/\n$/D' < $1 > $t
+	sed -e 's/[	 ][	 ]*$//' < $1 | \
+	    cat -s | \
+	    sed -e '${' -e '/^$/d' -e '}' > $t
 	cmp $t $1 > /dev/null 2>&1 || (echo "$1" && cp $t $1)
 }
 
 cd ..
 
-# Scripts.
-for f in `find dist -name '*.py' -name 's_*'`; do
-	whitespace_and_empty_line $f
-done
-
-# C-language sources.
-for f in `find bench examples ext src test \
+find bench dist examples ext src test \
     -name '*.[chi]' -o \
     -name '*.dox' -o \
     -name '*.in' -o \
+    -name '*.py' -o \
+    -name 's_*' -o \
     -name 'Makefile.am' |
     sed -e '/Makefile.in/d' \
-	-e '/checksum\/power8/d'`; do
-	whitespace_and_empty_line $f
-done
-
-# Python sources.
-for f in `find test \
-    -name '*.py' | sed '/3rdparty/d'`; do
+        -e '/checksum\/power8/d' \
+        -e '/3rdparty/d' \
+        -e '/docs\/tools/d' \
+| while read f ; do
 	whitespace $f
 done
+
+exit 0

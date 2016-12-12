@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper import complex_populate
+from wtdataset import ComplexDataSet
 
 # test_bug012.py
 class test_bug012(wttest.WiredTigerTestCase):
@@ -71,10 +71,11 @@ class test_bug012(wttest.WiredTigerTestCase):
 
     # Test that we detect illegal extractors.
     #
-    # This test is a little fragile, we're depending on complex_populate to do
+    # This test is a little fragile, we're depending on ComplexDataSet to do
     # the heavy-lifting, so if that function changes, this could break.
     def test_illegal_extractor(self):
-        complex_populate(self, 'table:A', 'key_format=S', 10)
+        ds = ComplexDataSet(self, 'table:A', 10)
+        ds.populate()
         msg = '/unknown extractor/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
             self.session.create('index:A:xyzzy',

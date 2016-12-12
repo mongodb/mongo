@@ -36,12 +36,17 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/stdx/thread.h"
 
 #include "mongo/dbtests/dbtests.h"
 
 namespace CountTests {
+
+namespace {
+const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
+}  // namespace
 
 class Base {
 public:
@@ -83,6 +88,7 @@ protected:
         Helpers::ensureIndex(&_txn,
                              _collection,
                              key,
+                             kIndexVersion,
                              /*unique=*/false,
                              /*name=*/key.firstElementFieldName());
     }

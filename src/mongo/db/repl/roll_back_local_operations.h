@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog_interface.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
@@ -49,7 +50,7 @@ public:
      */
     using RollbackOperationFn = stdx::function<Status(const BSONObj&)>;
 
-    using RollbackCommonPoint = std::pair<Timestamp, RecordId>;
+    using RollbackCommonPoint = std::pair<OpTime, RecordId>;
 
     /**
      * Initializes rollback processor with a valid local oplog.

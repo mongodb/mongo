@@ -28,11 +28,12 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_project.h"
 
 #include <boost/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
 
 namespace mongo {
@@ -41,19 +42,22 @@ using boost::intrusive_ptr;
 using parsed_aggregation_projection::ParsedAggregationProjection;
 using parsed_aggregation_projection::ProjectionType;
 
-REGISTER_DOCUMENT_SOURCE_ALIAS(project, DocumentSourceProject::createFromBson);
+REGISTER_DOCUMENT_SOURCE(project,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceProject::createFromBson);
 
 intrusive_ptr<DocumentSource> DocumentSourceProject::create(
-    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    uassert(15969, "$project specification must be an object", elem.type() == Object);
-
-    return new DocumentSourceSingleDocumentTransformation(
-        expCtx, ParsedAggregationProjection::create(elem.Obj()), "$project");
+    BSONObj projectSpec, const intrusive_ptr<ExpressionContext>& expCtx) {
+    intrusive_ptr<DocumentSource> project(new DocumentSourceSingleDocumentTransformation(
+        expCtx, ParsedAggregationProjection::create(projectSpec), "$project"));
+    project->injectExpressionContext(expCtx);
+    return project;
 }
 
-std::vector<intrusive_ptr<DocumentSource>> DocumentSourceProject::createFromBson(
+intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
-    return {DocumentSourceProject::create(elem, expCtx)};
+    uassert(15969, "$project specification must be an object", elem.type() == Object);
+    return DocumentSourceProject::create(elem.Obj(), expCtx);
 }
 
 }  // namespace mongo

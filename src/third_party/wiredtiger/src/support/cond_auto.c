@@ -58,12 +58,12 @@ __wt_cond_auto_alloc(
  * __wt_cond_auto_signal --
  *	Signal a condition variable.
  */
-int
+void
 __wt_cond_auto_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 {
 
 	WT_ASSERT(session, cond->min_wait != 0);
-	return (__wt_cond_signal(session, cond));
+	__wt_cond_signal(session, cond);
 }
 
 /*
@@ -73,7 +73,7 @@ __wt_cond_auto_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
  *	TODO: Can this version of the API be removed, now that we have the
  *	auto adjusting condition variables?
  */
-int
+void
 __wt_cond_auto_wait_signal(
     WT_SESSION_IMPL *session, WT_CONDVAR *cond, bool progress, bool *signalled)
 {
@@ -85,7 +85,7 @@ __wt_cond_auto_wait_signal(
 	 */
 	WT_ASSERT(session, cond->min_wait != 0);
 
-	WT_STAT_FAST_CONN_INCR(session, cond_auto_wait);
+	WT_STAT_CONN_INCR(session, cond_auto_wait);
 	if (progress)
 		cond->prev_wait = cond->min_wait;
 	else {
@@ -94,15 +94,12 @@ __wt_cond_auto_wait_signal(
 		    cond->max_wait, cond->prev_wait + delta);
 	}
 
-	WT_RET(__wt_cond_wait_signal(
-	    session, cond, cond->prev_wait, signalled));
+	__wt_cond_wait_signal(session, cond, cond->prev_wait, signalled);
 
 	if (progress || *signalled)
-		WT_STAT_FAST_CONN_INCR(session, cond_auto_wait_reset);
+		WT_STAT_CONN_INCR(session, cond_auto_wait_reset);
 	if (*signalled)
 		cond->prev_wait = cond->min_wait;
-
-	return (0);
 }
 
 /*
@@ -110,7 +107,7 @@ __wt_cond_auto_wait_signal(
  *	Wait on a mutex, optionally timing out.  If we get it before the time
  *	out period expires, let the caller know.
  */
-int
+void
 __wt_cond_auto_wait(
     WT_SESSION_IMPL *session, WT_CONDVAR *cond, bool progress)
 {
@@ -120,9 +117,7 @@ __wt_cond_auto_wait(
 	 * Call the signal version so the wait period is reset if the
 	 * condition is woken explicitly.
 	 */
-	WT_RET(__wt_cond_auto_wait_signal(session, cond, progress, &signalled));
-
-	return (0);
+	__wt_cond_auto_wait_signal(session, cond, progress, &signalled);
 }
 
 /*

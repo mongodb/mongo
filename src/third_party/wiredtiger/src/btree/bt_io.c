@@ -139,12 +139,12 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_verify_dsk(session, tmp->data, buf));
 	}
 
-	WT_STAT_FAST_CONN_INCR(session, cache_read);
-	WT_STAT_FAST_DATA_INCR(session, cache_read);
+	WT_STAT_CONN_INCR(session, cache_read);
+	WT_STAT_DATA_INCR(session, cache_read);
 	if (F_ISSET(dsk, WT_PAGE_COMPRESSED))
-		WT_STAT_FAST_DATA_INCR(session, compress_read);
-	WT_STAT_FAST_CONN_INCRV(session, cache_bytes_read, dsk->mem_size);
-	WT_STAT_FAST_DATA_INCRV(session, cache_bytes_read, dsk->mem_size);
+		WT_STAT_DATA_INCR(session, compress_read);
+	WT_STAT_CONN_INCRV(session, cache_bytes_read, dsk->mem_size);
+	WT_STAT_DATA_INCRV(session, cache_bytes_read, dsk->mem_size);
 
 	if (0) {
 corrupt:	if (ret == 0)
@@ -171,6 +171,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
     uint8_t *addr, size_t *addr_sizep,
     bool checkpoint, bool checkpoint_io, bool compressed)
 {
+	struct timespec start, stop;
 	WT_BM *bm;
 	WT_BTREE *btree;
 	WT_DECL_ITEM(ctmp);
@@ -182,7 +183,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	size_t dst_len, len, result_len, size, src_len;
 	int compression_failed;		/* Extension API, so not a bool. */
 	uint8_t *dst, *src;
-	bool data_cksum, encrypted;
+	bool data_checksum, encrypted;
 
 	btree = S2BT(session);
 	bm = btree->bm;
@@ -234,7 +235,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		ip = buf;
 	else if (buf->size <= btree->allocsize) {
 		ip = buf;
-		WT_STAT_FAST_DATA_INCR(session, compress_write_too_small);
+		WT_STAT_DATA_INCR(session, compress_write_too_small);
 	} else {
 		/* Skip the header bytes of the source data. */
 		src = (uint8_t *)buf->mem + WT_BLOCK_COMPRESS_SKIP;
@@ -283,10 +284,10 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		    buf->size / btree->allocsize <=
 		    result_len / btree->allocsize) {
 			ip = buf;
-			WT_STAT_FAST_DATA_INCR(session, compress_write_fail);
+			WT_STAT_DATA_INCR(session, compress_write_fail);
 		} else {
 			compressed = true;
-			WT_STAT_FAST_DATA_INCR(session, compress_write);
+			WT_STAT_DATA_INCR(session, compress_write);
 
 			/*
 			 * Copy in the skipped header bytes, set the final data
@@ -344,30 +345,40 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	 * Checksum the data if the buffer isn't compressed or checksums are
 	 * configured.
 	 */
-	data_cksum = true;		/* -Werror=maybe-uninitialized */
+	data_checksum = true;		/* -Werror=maybe-uninitialized */
 	switch (btree->checksum) {
 	case CKSUM_ON:
-		data_cksum = true;
+		data_checksum = true;
 		break;
 	case CKSUM_OFF:
-		data_cksum = false;
+		data_checksum = false;
 		break;
 	case CKSUM_UNCOMPRESSED:
-		data_cksum = !compressed;
+		data_checksum = !compressed;
 		break;
 	}
+	if (!F_ISSET(session, WT_SESSION_INTERNAL))
+		__wt_epoch(session, &start);
 
 	/* Call the block manager to write the block. */
 	WT_ERR(checkpoint ?
-	    bm->checkpoint(bm, session, ip, btree->ckpt, data_cksum) :
+	    bm->checkpoint(bm, session, ip, btree->ckpt, data_checksum) :
 	    bm->write(
-	    bm, session, ip, addr, addr_sizep, data_cksum, checkpoint_io));
+	    bm, session, ip, addr, addr_sizep, data_checksum, checkpoint_io));
 
-	WT_STAT_FAST_CONN_INCR(session, cache_write);
-	WT_STAT_FAST_DATA_INCR(session, cache_write);
+	/* Update some statistics now that the write is done */
+	if (!F_ISSET(session, WT_SESSION_INTERNAL)) {
+		__wt_epoch(session, &stop);
+		WT_STAT_CONN_INCR(session, cache_write_app_count);
+		WT_STAT_CONN_INCRV(session, cache_write_app_time,
+		    WT_TIMEDIFF_US(stop, start));
+	}
+
+	WT_STAT_CONN_INCR(session, cache_write);
+	WT_STAT_DATA_INCR(session, cache_write);
 	S2C(session)->cache->bytes_written += dsk->mem_size;
-	WT_STAT_FAST_CONN_INCRV(session, cache_bytes_write, dsk->mem_size);
-	WT_STAT_FAST_DATA_INCRV(session, cache_bytes_write, dsk->mem_size);
+	WT_STAT_CONN_INCRV(session, cache_bytes_write, dsk->mem_size);
+	WT_STAT_DATA_INCRV(session, cache_bytes_write, dsk->mem_size);
 
 err:	__wt_scr_free(session, &ctmp);
 	__wt_scr_free(session, &etmp);

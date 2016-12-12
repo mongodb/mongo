@@ -140,6 +140,27 @@ public:
                 me->matchType() == MatchExpression::LTE);
     }
 
+    /**
+     * Returns true if 'elt' is a BSONType for which exact index bounds can be generated.
+     */
+    static bool isExactBoundsGenerating(BSONElement elt) {
+        switch (elt.type()) {
+            case BSONType::NumberLong:
+            case BSONType::NumberDouble:
+            case BSONType::NumberInt:
+            case BSONType::NumberDecimal:
+            case BSONType::String:
+            case BSONType::Bool:
+            case BSONType::Date:
+            case BSONType::bsonTimestamp:
+            case BSONType::jstOID:
+            case BSONType::BinData:
+                return true;
+            default:
+                return false;
+        }
+    }
+
 private:
     /**
      * Returns true if 'me' is "sargable" but is not a negation and

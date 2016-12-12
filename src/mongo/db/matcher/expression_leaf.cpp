@@ -32,8 +32,8 @@
 
 #include <cmath>
 #include <pcrecpp.h>
-#include <unordered_map>
 
+#include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/config.h"
@@ -78,7 +78,9 @@ bool ComparisonMatchExpression::equivalent(const MatchExpression* other) const {
         return false;
     }
 
-    return path() == realOther->path() && _rhs.valuesEqual(realOther->_rhs);
+    const StringData::ComparatorInterface* stringComparator = nullptr;
+    BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore, stringComparator);
+    return path() == realOther->path() && eltCmp.evaluate(_rhs == realOther->_rhs);
 }
 
 
@@ -109,8 +111,6 @@ Status ComparisonMatchExpression::init(StringData path, const BSONElement& rhs) 
 
 
 bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e) const {
-    // log() << "\t ComparisonMatchExpression e: " << e << " _rhs: " << _rhs << "\n"
-    //<< toString() << std::endl;
 
     if (e.canonicalType() != _rhs.canonicalType()) {
         // some special cases
@@ -149,8 +149,6 @@ bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e) const
     }
 
     int x = compareElementValues(e, _rhs, _collator);
-
-    // log() << "\t\t" << x << endl;
 
     switch (matchType()) {
         case LT:
@@ -407,7 +405,7 @@ bool ExistsMatchExpression::equivalent(const MatchExpression* other) const {
 
 const std::string TypeMatchExpression::kMatchesAllNumbersAlias = "number";
 
-const std::unordered_map<std::string, BSONType> TypeMatchExpression::typeAliasMap = {
+const stdx::unordered_map<std::string, BSONType> TypeMatchExpression::typeAliasMap = {
     {typeName(NumberDouble), NumberDouble},
     {typeName(String), String},
     {typeName(Object), Object},

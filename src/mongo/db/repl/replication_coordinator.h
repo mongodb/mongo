@@ -275,10 +275,12 @@ public:
                                          bool slaveOk) = 0;
 
     /**
-     * Returns true if this node should ignore unique index constraints on new documents.
-     * Currently this is needed for nodes in STARTUP2, RECOVERING, and ROLLBACK states.
+     * Returns true if this node should ignore index constraints for idempotency reasons.
+     *
+     * The namespace "ns" is passed in because the "local" database is usually writable
+     * and we need to enforce the constraints for it.
      */
-    virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx) = 0;
+    virtual bool shouldRelaxIndexConstraints(const NamespaceString& ns) = 0;
 
     /**
      * Updates our internal tracking of the last OpTime applied for the given slave
@@ -440,10 +442,14 @@ public:
     virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand(
         ReplSetUpdatePositionCommandStyle commandStyle) const = 0;
 
+    enum class ReplSetGetStatusResponseStyle { kBasic, kInitialSync };
+
     /**
-     * Handles an incoming replSetGetStatus command. Adds BSON to 'result'.
+     * Handles an incoming replSetGetStatus command. Adds BSON to 'result'. If kInitialSync is
+     * requested but initial sync is not running, kBasic will be used.
      */
-    virtual Status processReplSetGetStatus(BSONObjBuilder* result) = 0;
+    virtual Status processReplSetGetStatus(BSONObjBuilder* result,
+                                           ReplSetGetStatusResponseStyle responseStyle) = 0;
 
     /**
      * Does an initial sync of data, after dropping existing data.
@@ -509,7 +515,9 @@ public:
      * returns Status::OK if the sync target could be set and an ErrorCode indicating why it
      * couldn't otherwise.
      */
-    virtual Status processReplSetSyncFrom(const HostAndPort& target, BSONObjBuilder* resultObj) = 0;
+    virtual Status processReplSetSyncFrom(OperationContext* txn,
+                                          const HostAndPort& target,
+                                          BSONObjBuilder* resultObj) = 0;
 
     /**
      * Handles an incoming replSetFreeze command. Adds BSON to 'resultObj'

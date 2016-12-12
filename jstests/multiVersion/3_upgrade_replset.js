@@ -1,5 +1,5 @@
 //
-// Tests upgrading a replica set
+// Tests upgrading then downgrading a replica set
 //
 
 load('./jstests/multiVersion/libs/multi_rs.js');
@@ -64,6 +64,13 @@ var primary = rst.getPrimary();
 printjson(rst.status());
 
 // Allow more valid writes to go through
+sleep(10 * 1000);
+
+jsTest.log("Downgrading replica set...");
+rst.upgradeSet({binVersion: oldVersion});
+jsTest.log("Replica set downgraded.");
+
+// Allow even more valid writes to go through
 sleep(10 * 1000);
 
 joinFindInsert();

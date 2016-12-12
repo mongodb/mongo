@@ -114,14 +114,12 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         new MongoRunner.VersionSub(extractMajorVersionFromVersionString(shellVersion()),
                                    shellVersion()),
         // To-be-updated when we branch for the next release.
-        new MongoRunner.VersionSub("last-stable", "3.2")
+        new MongoRunner.VersionSub("last-stable", "3.4")
     ];
 
     MongoRunner.getBinVersionFor = function(version) {
-
-        // If this is a version iterator, iterate the version via toString()
         if (version instanceof MongoRunner.versionIterator.iterator) {
-            version = version.toString();
+            version = version.current();
         }
 
         if (version == null)
@@ -227,11 +225,11 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     MongoRunner.toRealFile = MongoRunner.toRealDir;
 
     /**
-     * Returns an iterator object which yields successive versions on toString(), starting from a
-     * random initial position, from an array of versions.
+     * Returns an iterator object which yields successive versions on calls to advance(), starting
+     * from a random initial position, from an array of versions.
      *
      * If passed a single version string or an already-existing version iterator, just returns the
-     * object itself, since it will yield correctly on toString()
+     * object itself, since it will yield correctly on calls to advance().
      *
      * @param {Array.<String>}|{String}|{versionIterator}
      */
@@ -253,12 +251,21 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     };
 
     MongoRunner.versionIterator.iterator = function(i, arr) {
+        if (!Array.isArray(arr)) {
+            throw new Error("Expected an array for the second argument, but got: " + tojson(arr));
+        }
 
-        this.toString = function() {
-            i = i % arr.length;
-            print("Returning next version : " + i + " (" + arr[i] + ") from " + tojson(arr) +
-                  "...");
-            return arr[i++];
+        this.current = function current() {
+            return arr[i];
+        };
+
+        // We define the toString() method as an alias for current() so that concatenating a version
+        // iterator with a string returns the next version in the list without introducing any
+        // side-effects.
+        this.toString = this.current;
+
+        this.advance = function advance() {
+            i = (i + 1) % arr.length;
         };
 
         this.isVersionIterator = true;
@@ -428,6 +435,13 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
 
         // Normalize and get the binary version to use
         if (opts.hasOwnProperty('binVersion')) {
+            if (opts.binVersion instanceof MongoRunner.versionIterator.iterator) {
+                // Advance the version iterator so that subsequent calls to
+                // MongoRunner.mongoOptions() use the next version in the list.
+                const iterator = opts.binVersion;
+                opts.binVersion = iterator.current();
+                iterator.advance();
+            }
             opts.binVersion = MongoRunner.getBinVersionFor(opts.binVersion);
         }
 
@@ -453,6 +467,48 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         return opts;
     };
 
+    // Returns an array of integers representing the version provided.
+    // Ex: "3.3.12" => [3, 3, 12]
+    var _convertVersionToIntegerArray = function(version) {
+        var versionParts =
+            convertVersionStringToArray(version).slice(0, 3).map(part => parseInt(part, 10));
+        if (versionParts.length === 2) {
+            versionParts.push(Infinity);
+        }
+        return versionParts;
+    };
+
+    // Returns if version2 is equal to, or came after, version 1.
+    var _isMongodVersionEqualOrAfter = function(version1, version2) {
+        if (version2 === "latest") {
+            return true;
+        }
+
+        var versionParts1 = _convertVersionToIntegerArray(version1);
+        var versionParts2 = _convertVersionToIntegerArray(version2);
+        if (versionParts2[0] > versionParts1[0] ||
+            (versionParts2[0] === versionParts1[0] && versionParts2[1] > versionParts1[1]) ||
+            (versionParts2[0] === versionParts1[0] && versionParts2[1] === versionParts1[1] &&
+             versionParts2[2] >= versionParts1[2])) {
+            return true;
+        }
+
+        return false;
+    };
+
+    // Removes a setParameter parameter from mongods running a version that won't recognize them.
+    var _removeSetParameterIfBeforeVersion = function(opts, parameterName, requiredVersion) {
+        var versionCompatible = (opts.binVersion === "" || opts.binVersion === undefined ||
+                                 _isMongodVersionEqualOrAfter(requiredVersion, opts.binVersion));
+        if (!versionCompatible && opts.setParameter &&
+            opts.setParameter[parameterName] != undefined) {
+            print("Removing '" + parameterName + "' setParameter with value " +
+                  opts.setParameter[parameterName] +
+                  " because it isn't compatibile with mongod running version " + opts.binVersion);
+            delete opts.setParameter[parameterName];
+        }
+    };
+
     /**
      * @option {object} opts
      *
@@ -475,6 +531,10 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
         opts.dbpath = MongoRunner.toRealDir(opts.dbpath || "$dataDir/mongod-$port", opts.pathOpts);
 
         opts.pathOpts = Object.merge(opts.pathOpts, {dbpath: opts.dbpath});
+
+        _removeSetParameterIfBeforeVersion(opts, "writePeriodicNoops", "3.3.12");
+        _removeSetParameterIfBeforeVersion(opts, "numInitialSyncAttempts", "3.3.12");
+        _removeSetParameterIfBeforeVersion(opts, "numInitialSyncConnectAttempts", "3.3.12");
 
         if (!opts.logFile && opts.useLogFiles) {
             opts.logFile = opts.dbpath + "/mongod.log";
@@ -599,6 +659,12 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
 
         if (!opts.hasOwnProperty('binVersion') && testOptions.mongosBinVersion) {
             opts.binVersion = MongoRunner.getBinVersionFor(testOptions.mongosBinVersion);
+        }
+
+        // If the mongos is being restarted with a newer version, make sure we remove any options
+        // that no longer exist in the newer version.
+        if (opts.restart && MongoRunner.areBinVersionsTheSame('latest', opts.binVersion)) {
+            delete opts.noAutoSplit;
         }
 
         return opts;
@@ -822,7 +888,15 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
     MongoRunner.runMongoTool = function(binaryName, opts, ...positionalArgs) {
 
         var opts = opts || {};
+
         // Normalize and get the binary version to use
+        if (opts.binVersion instanceof MongoRunner.versionIterator.iterator) {
+            // Advance the version iterator so that subsequent calls to MongoRunner.runMongoTool()
+            // use the next version in the list.
+            const iterator = opts.binVersion;
+            opts.binVersion = iterator.current();
+            iterator.advance();
+        }
         opts.binVersion = MongoRunner.getBinVersionFor(opts.binVersion);
 
         // Recent versions of the mongo tools support a --dialTimeout flag to set for how
@@ -906,11 +980,24 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
      * Returns a new argArray with any test-specific arguments added.
      */
     function appendSetParameterArgs(argArray) {
+        // programName includes the version, e.g., mongod-3.2.
+        // baseProgramName is the program name without any version information, e.g., mongod.
         var programName = argArray[0];
-        if (programName.endsWith('mongod') || programName.endsWith('mongos') ||
-            programName.startsWith('mongod-') || programName.startsWith('mongos-')) {
+        var [baseProgramName, programVersion] = programName.split("-");
+        if (baseProgramName === 'mongod' || baseProgramName === 'mongos') {
             if (jsTest.options().enableTestCommands) {
                 argArray.push(...['--setParameter', "enableTestCommands=1"]);
+                if (!programVersion || (parseInt(programVersion.split(".")[0]) >= 3 &&
+                                        parseInt(programVersion.split(".")[1]) >= 3)) {
+                    if (argArray
+                            .filter((val) => {
+                                return typeof val === "string" &&
+                                    val.indexOf("logComponentVerbosity") === 0;
+                            })
+                            .length === 0) {
+                        argArray.push(...['--setParameter', "logComponentVerbosity={tracking:1}"]);
+                    }
+                }
             }
             if (jsTest.options().authMechanism && jsTest.options().authMechanism != "SCRAM-SHA-1") {
                 var hasAuthMechs = false;
@@ -931,7 +1018,8 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                 argArray.push(...['--setParameter', "enableLocalhostAuthBypass=false"]);
             }
 
-            // mongos only options. Note: excludes mongos with version suffix (ie. mongos-3.0).
+            // Since options may not be backward compatible, mongos options are not
+            // set on older versions, e.g., mongos-3.0.
             if (programName.endsWith('mongos')) {
                 // apply setParameters for mongos
                 if (jsTest.options().setParametersMongos) {
@@ -943,45 +1031,50 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                         });
                     }
                 }
-            }
-            // mongod only options. Note: excludes mongos with version suffix (ie. mongos-3.0).
-            else if (programName.endsWith('mongod')) {
-                // set storageEngine for mongod
-                if (jsTest.options().storageEngine) {
+            } else if (baseProgramName === 'mongod') {
+                // Set storageEngine for mongod. There was no storageEngine parameter before 3.0.
+                if (jsTest.options().storageEngine &&
+                    (!programVersion || parseInt(programVersion.split(".")[0]) >= 3)) {
                     if (argArray.indexOf("--storageEngine") < 0) {
                         argArray.push(...['--storageEngine', jsTest.options().storageEngine]);
                     }
                 }
-                if (jsTest.options().storageEngineCacheSizeGB) {
-                    if (jsTest.options().storageEngine === "rocksdb") {
-                        argArray.push(
-                            ...['--rocksdbCacheSizeGB', jsTest.options().storageEngineCacheSizeGB]);
-                    } else if (jsTest.options().storageEngine === "wiredTiger" ||
-                               !jsTest.options().storageEngine) {
-                        argArray.push(...['--wiredTigerCacheSizeGB',
-                                          jsTest.options().storageEngineCacheSizeGB]);
+                // Since options may not be backward compatible, mongod options are not
+                // set on older versions, e.g., mongod-3.0.
+                if (programName.endsWith('mongod')) {
+                    if (jsTest.options().storageEngine === "wiredTiger" ||
+                        !jsTest.options().storageEngine) {
+                        if (jsTest.options().storageEngineCacheSizeGB) {
+                            argArray.push(...['--wiredTigerCacheSizeGB',
+                                              jsTest.options().storageEngineCacheSizeGB]);
+                        }
+                        if (jsTest.options().wiredTigerEngineConfigString) {
+                            argArray.push(...['--wiredTigerEngineConfigString',
+                                              jsTest.options().wiredTigerEngineConfigString]);
+                        }
+                        if (jsTest.options().wiredTigerCollectionConfigString) {
+                            argArray.push(...['--wiredTigerCollectionConfigString',
+                                              jsTest.options().wiredTigerCollectionConfigString]);
+                        }
+                        if (jsTest.options().wiredTigerIndexConfigString) {
+                            argArray.push(...['--wiredTigerIndexConfigString',
+                                              jsTest.options().wiredTigerIndexConfigString]);
+                        }
+                    } else if (jsTest.options().storageEngine === "rocksdb") {
+                        if (jsTest.options().storageEngineCacheSizeGB) {
+                            argArray.push(...['--rocksdbCacheSizeGB',
+                                              jsTest.options().storageEngineCacheSizeGB]);
+                        }
                     }
-                }
-                if (jsTest.options().wiredTigerEngineConfigString) {
-                    argArray.push(...['--wiredTigerEngineConfigString',
-                                      jsTest.options().wiredTigerEngineConfigString]);
-                }
-                if (jsTest.options().wiredTigerCollectionConfigString) {
-                    argArray.push(...['--wiredTigerCollectionConfigString',
-                                      jsTest.options().wiredTigerCollectionConfigString]);
-                }
-                if (jsTest.options().wiredTigerIndexConfigString) {
-                    argArray.push(...['--wiredTigerIndexConfigString',
-                                      jsTest.options().wiredTigerIndexConfigString]);
-                }
-                // apply setParameters for mongod
-                if (jsTest.options().setParameters) {
-                    var params = jsTest.options().setParameters.split(",");
-                    if (params && params.length > 0) {
-                        params.forEach(function(p) {
-                            if (p)
-                                argArray.push(...['--setParameter', p]);
-                        });
+                    // apply setParameters for mongod
+                    if (jsTest.options().setParameters) {
+                        var params = jsTest.options().setParameters.split(",");
+                        if (params && params.length > 0) {
+                            params.forEach(function(p) {
+                                if (p)
+                                    argArray.push(...['--setParameter', p]);
+                            });
+                        }
                     }
                 }
             }

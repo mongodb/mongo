@@ -77,6 +77,9 @@ endif
 if HAVE_BUILTIN_EXTENSION_ZLIB
 libwiredtiger_la_LIBADD += ext/compressors/zlib/libwiredtiger_zlib.la
 endif
+if HAVE_BUILTIN_EXTENSION_ZSTD
+libwiredtiger_la_LIBADD += ext/compressors/zstd/libwiredtiger_zstd.la
+endif
 
 libwiredtiger_static_la_LIBADD=$(libwiredtiger_la_LIBADD)
 libwiredtiger_static_la_SOURCES=$(libwiredtiger_la_SOURCES)

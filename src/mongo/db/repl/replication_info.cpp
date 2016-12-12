@@ -279,15 +279,22 @@ public:
         appendReplicationInfo(txn, result, 0);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            result.append("configsvr", 1);
+            // If we have feature compatibility version 3.4, use a config server mode that 3.2
+            // mongos won't understand. This should prevent a 3.2 mongos from joining the cluster or
+            // making a connection to the config servers.
+            int configServerModeNumber = (serverGlobalParams.featureCompatibility.version.load() ==
+                                          ServerGlobalParams::FeatureCompatibility::Version::k34)
+                ? 2
+                : 1;
+            result.append("configsvr", configServerModeNumber);
         }
 
         result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
         result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
         result.appendNumber("maxWriteBatchSize", BatchedCommandRequest::kMaxWriteBatchSize);
         result.appendDate("localTime", jsTime());
-        result.append("maxWireVersion", WireSpec::instance().maxWireVersionIncoming);
-        result.append("minWireVersion", WireSpec::instance().minWireVersionIncoming);
+        result.append("maxWireVersion", WireSpec::instance().incoming.maxWireVersion);
+        result.append("minWireVersion", WireSpec::instance().incoming.minWireVersion);
         result.append("readOnly", storageGlobalParams.readOnly);
 
         const auto parameter = mapFindWithDefault(ServerParameterSet::getGlobal()->getMap(),

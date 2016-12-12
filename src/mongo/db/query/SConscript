@@ -99,6 +99,19 @@ env.Library(
 )
 
 env.CppUnitTest(
+    target="parsed_distinct_test",
+    source=[
+        "parsed_distinct_test.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/pipeline/aggregation_request",
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        "query_test_service_context",
+        "query_common",
+    ],
+)
+
+env.CppUnitTest(
     target="get_executor_test",
     source=[
         "get_executor_test.cpp"
@@ -163,8 +176,10 @@ env.CppUnitTest(
         'getmore_request_test.cpp',
         'killcursors_request_test.cpp',
         'killcursors_response_test.cpp',
+        'view_response_formatter_test.cpp',
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/db/pipeline/aggregation_request",
         'command_request_response',
     ]
 )
@@ -279,6 +294,7 @@ env.CppUnitTest(
         "query_request_test.cpp"
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/db/pipeline/aggregation_request",
         "query_request",
     ],
 )

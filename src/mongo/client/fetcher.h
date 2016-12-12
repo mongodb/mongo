@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <iosfwd>
 #include <memory>
 #include <string>
 #include <vector>
@@ -188,14 +189,23 @@ public:
      */
     void join();
 
+    // State transitions:
+    // PreStart --> Running --> ShuttingDown --> Complete
+    // It is possible to skip intermediate states. For example,
+    // Calling shutdown() when the cloner has not started will transition from PreStart directly
+    // to Complete.
+    // This enum class is made public for testing.
+    enum class State { kPreStart, kRunning, kShuttingDown, kComplete };
+
     /**
-     * Returns whether the fetcher is in shutdown.
-     *
+     * Returns current fetcher state.
      * For testing only.
      */
-    bool inShutdown_forTest() const;
+    State getState_forTest() const;
 
 private:
+    bool _isActive_inlock() const;
+
     /**
      * Schedules getMore command to be run by the executor
      */
@@ -222,7 +232,8 @@ private:
     /**
      * Returns whether the fetcher is in shutdown.
      */
-    bool _isInShutdown() const;
+    bool _isShuttingDown() const;
+    bool _isShuttingDown_inlock() const;
 
     // Not owned by us.
     executor::TaskExecutor* _executor;
@@ -238,15 +249,12 @@ private:
 
     mutable stdx::condition_variable _condition;
 
-    // _active is true when Fetcher is scheduled to be run by the executor.
-    bool _active = false;
+    // Current fetcher state. See comments for State enum class for details.
+    State _state = State::kPreStart;
 
     // _first is true for first query response and false for subsequent responses.
     // Using boolean instead of a counter to avoid issues with wrap around.
     bool _first = true;
-
-    // _inShutdown is true after cancel() is called.
-    bool _inShutdown = false;
 
     // Callback handle to the scheduled getMore command.
     executor::TaskExecutor::CallbackHandle _getMoreCallbackHandle;
@@ -257,5 +265,11 @@ private:
     // First remote command scheduler.
     RemoteCommandRetryScheduler _firstRemoteCommandScheduler;
 };
+
+/**
+ * Insertion operator for Fetcher::State. Formats fetcher state for output stream.
+ * For testing only.
+ */
+std::ostream& operator<<(std::ostream& os, const Fetcher::State& state);
 
 }  // namespace mongo

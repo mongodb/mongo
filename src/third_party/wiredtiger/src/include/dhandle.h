@@ -62,6 +62,8 @@ struct __wt_data_handle {
 	const char *checkpoint;		/* Checkpoint name (or NULL) */
 	const char **cfg;		/* Configuration information */
 
+	bool compact_skip;		/* If the handle failed to compact */
+
 	WT_DATA_SOURCE *dsrc;		/* Data source for this handle */
 	void *handle;			/* Generic handle */
 
@@ -75,7 +77,7 @@ struct __wt_data_handle {
 
 					/* Data-source statistics */
 	WT_DSRC_STATS *stats[WT_COUNTER_SLOTS];
-	WT_DSRC_STATS  stat_array[WT_COUNTER_SLOTS];
+	WT_DSRC_STATS *stat_array;
 
 	/* Flags values over 0xff are reserved for WT_BTREE_* */
 #define	WT_DHANDLE_DEAD		        0x01	/* Dead, awaiting discard */

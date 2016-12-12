@@ -262,20 +262,20 @@ err:	__wt_logrec_free(session, &logrec);
  *	Read a log record for a checkpoint operation.
  */
 int
-__wt_txn_checkpoint_logread(
-    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
-    WT_LSN *ckpt_lsn)
+__wt_txn_checkpoint_logread(WT_SESSION_IMPL *session,
+    const uint8_t **pp, const uint8_t *end, WT_LSN *ckpt_lsn)
 {
-	WT_ITEM ckpt_snapshot;
+	WT_DECL_RET;
+	WT_ITEM ckpt_snapshot_unused;
 	uint32_t ckpt_file, ckpt_offset;
-	u_int ckpt_nsnapshot;
+	u_int ckpt_nsnapshot_unused;
 	const char *fmt = WT_UNCHECKED_STRING(IIIU);
 
-	WT_RET(__wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), fmt,
+	if ((ret = __wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), fmt,
 	    &ckpt_file, &ckpt_offset,
-	    &ckpt_nsnapshot, &ckpt_snapshot));
-	WT_UNUSED(ckpt_nsnapshot);
-	WT_UNUSED(ckpt_snapshot);
+	    &ckpt_nsnapshot_unused, &ckpt_snapshot_unused)) != 0)
+		WT_RET_MSG(session,
+		    ret, "txn_checkpoint_logread: unpack failure");
 	WT_SET_LSN(ckpt_lsn, ckpt_file, ckpt_offset);
 	*pp = end;
 	return (0);
@@ -376,7 +376,7 @@ __wt_txn_checkpoint_log(
 		 * that case.
 		 */
 		if (!S2C(session)->hot_backup && txn->full_ckpt)
-			WT_ERR(__wt_log_ckpt(session, ckpt_lsn));
+			__wt_log_ckpt(session, ckpt_lsn);
 
 		/* FALLTHROUGH */
 	case WT_TXN_LOG_CKPT_CLEANUP:
@@ -450,11 +450,10 @@ __wt_txn_truncate_log(
  * __wt_txn_truncate_end --
  *	Finish truncating a range of a file.
  */
-int
+void
 __wt_txn_truncate_end(WT_SESSION_IMPL *session)
 {
 	F_CLR(session, WT_SESSION_LOGGING_INMEM);
-	return (0);
 }
 
 /*
@@ -552,6 +551,7 @@ __txn_printlog(WT_SESSION_IMPL *session,
  */
 int
 __wt_txn_printlog(WT_SESSION *wt_session, uint32_t flags)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_SESSION_IMPL *session;
 	WT_TXN_PRINTLOG_ARGS args;

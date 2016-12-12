@@ -37,6 +37,7 @@
 #include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/tick_source.h"
@@ -47,9 +48,9 @@ class AbstractMessagingPort;
 class Client;
 class OperationContext;
 class OpObserver;
+class ServiceEntryPoint;
 
 namespace transport {
-class Session;
 class TransportLayer;
 class TransportLayerManager;
 }  // namespace transport
@@ -215,7 +216,7 @@ public:
      *
      * If supplied, "session" is the transport::Session used for communicating with the client.
      */
-    UniqueClient makeClient(std::string desc, transport::Session* session = nullptr);
+    UniqueClient makeClient(std::string desc, transport::SessionHandle session = nullptr);
 
     /**
      * Creates a new OperationContext on "client".
@@ -318,6 +319,13 @@ public:
     transport::TransportLayer* getTransportLayer() const;
 
     /**
+     * Get the service entry point for the service context.
+     *
+     * See ServiceEntryPoint for more details.
+     */
+    ServiceEntryPoint* getServiceEntryPoint() const;
+
+    /**
      * Add a new TransportLayer to this service context. The new TransportLayer will
      * be added to the TransportLayerManager accessible via getTransportLayer().
      *
@@ -373,6 +381,11 @@ public:
      */
     void setPreciseClockSource(std::unique_ptr<ClockSource> newSource);
 
+    /**
+     * Binds the service entry point implementation to the service context
+     */
+    void setServiceEntryPoint(std::unique_ptr<ServiceEntryPoint> sep);
+
 protected:
     ServiceContext();
 
@@ -400,6 +413,11 @@ private:
      * The TransportLayerManager.
      */
     std::unique_ptr<transport::TransportLayerManager> _transportLayerManager;
+
+    /**
+     * The service entry point
+     */
+    std::unique_ptr<ServiceEntryPoint> _serviceEntryPoint;
 
     /**
      * Vector of registered observers.

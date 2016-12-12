@@ -32,12 +32,14 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/logger/redaction.h"
 
 namespace mongo {
 namespace {
 
 const char kMoveChunk[] = "moveChunk";
 const char kEpoch[] = "epoch";
+const char kChunkVersion[] = "chunkVersion";
 const char kConfigServerConnectionString[] = "configdb";
 const char kFromShardId[] = "fromShard";
 const char kToShardId[] = "toShard";
@@ -105,6 +107,16 @@ StatusWith<MoveChunkRequest> MoveChunkRequest::createFromCommand(NamespaceString
     }
 
     {
+        auto statusWithChunkVersion =
+            ChunkVersion::parseFromBSONWithFieldForCommands(obj, kChunkVersion);
+        if (statusWithChunkVersion.isOK()) {
+            request._chunkVersion = std::move(statusWithChunkVersion.getValue());
+        } else if (statusWithChunkVersion != ErrorCodes::NoSuchKey) {
+            return statusWithChunkVersion.getStatus();
+        }
+    }
+
+    {
         Status status =
             bsonExtractBooleanFieldWithDefault(obj, kWaitForDelete, false, &request._waitForDelete);
         if (!status.isOK()) {
@@ -135,11 +147,12 @@ StatusWith<MoveChunkRequest> MoveChunkRequest::createFromCommand(NamespaceString
 
 void MoveChunkRequest::appendAsCommand(BSONObjBuilder* builder,
                                        const NamespaceString& nss,
-                                       const ChunkVersion& shardVersion,
+                                       ChunkVersion collectionVersion,
                                        const ConnectionString& configServerConnectionString,
                                        const ShardId& fromShardId,
                                        const ShardId& toShardId,
                                        const ChunkRange& range,
+                                       ChunkVersion chunkVersion,
                                        int64_t maxChunkSizeBytes,
                                        const MigrationSecondaryThrottleOptions& secondaryThrottle,
                                        bool waitForDelete,
@@ -148,12 +161,13 @@ void MoveChunkRequest::appendAsCommand(BSONObjBuilder* builder,
     invariant(nss.isValid());
 
     builder->append(kMoveChunk, nss.ns());
-    shardVersion.appendForCommands(builder);
-    builder->append(kEpoch, shardVersion.epoch());
+    collectionVersion.appendForCommands(builder);
+    builder->append(kEpoch, collectionVersion.epoch());
     builder->append(kConfigServerConnectionString, configServerConnectionString.toString());
     builder->append(kFromShardId, fromShardId.toString());
     builder->append(kToShardId, toShardId.toString());
     range.append(builder);
+    chunkVersion.appendWithFieldForCommands(builder, kChunkVersion);
     builder->append(kMaxChunkSizeBytes, static_cast<long long>(maxChunkSizeBytes));
     secondaryThrottle.append(builder);
     builder->append(kWaitForDelete, waitForDelete);
@@ -171,20 +185,20 @@ bool MoveChunkRequest::operator==(const MoveChunkRequest& other) const {
         return false;
     if (_range != other._range)
         return false;
-    if (_maxChunkSizeBytes != other._maxChunkSizeBytes)
-        return false;
-    if (_secondaryThrottle != other._secondaryThrottle)
-        return false;
-    if (_waitForDelete != other._waitForDelete)
-        return false;
-    if (_takeDistLock != other._takeDistLock)
-        return false;
 
     return true;
 }
 
 bool MoveChunkRequest::operator!=(const MoveChunkRequest& other) const {
     return !(*this == other);
+}
+
+std::string MoveChunkRequest::toString() const {
+    std::stringstream ss;
+    ss << "ns: " << getNss().ns() << ", " << redact(ChunkRange(getMinKey(), getMaxKey()).toString())
+       << ", fromShard: " << getFromShardId() << ", toShard: " << getToShardId();
+
+    return ss.str();
 }
 
 }  // namespace mongo

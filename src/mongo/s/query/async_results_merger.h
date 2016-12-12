@@ -154,6 +154,12 @@ public:
      * Also invalid to call if there is an outstanding event, created by a previous call to this
      * function, that has not yet been signaled. If there is an outstanding unsignaled event,
      * returns an error.
+     *
+     * Conditions when event can be signaled:
+     * - Finished collecting results from all remotes.
+     * - One of the host failed with a retriable error. In this case, if ready() is false, then
+     *   the caller should call nextEvent() to retry the request on the hosts that errored. If
+     *   ready() is true, then either the error was not retriable or it has exhausted max retries.
      */
     StatusWith<executor::TaskExecutor::EventHandle> nextEvent();
 

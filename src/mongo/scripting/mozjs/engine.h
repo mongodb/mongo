@@ -29,11 +29,11 @@
 #pragma once
 
 #include <jsapi.h>
-#include <unordered_map>
 
 #include "mongo/scripting/deadline_monitor.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
@@ -69,6 +69,9 @@ public:
     void enableJavaScriptProtection(bool value) override;
     bool isJavaScriptProtectionEnabled() const override;
 
+    int getJSHeapLimitMB() const override;
+    void setJSHeapLimitMB(int limit) override;
+
     void registerOperation(OperationContext* ctx, MozJSImplScope* scope);
     void unregisterOperation(unsigned int opId);
 
@@ -89,7 +92,7 @@ private:
      */
     stdx::mutex _globalInterruptLock;
 
-    using OpIdToScopeMap = std::unordered_map<unsigned, MozJSImplScope*>;
+    using OpIdToScopeMap = stdx::unordered_map<unsigned, MozJSImplScope*>;
     OpIdToScopeMap _opToScopeMap;  // map of mongo op ids to scopes (protected by
                                    // _globalInterruptLock).
 

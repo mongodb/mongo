@@ -32,6 +32,7 @@
 #include <boost/config.hpp>
 #include <boost/intrusive_ptr.hpp>
 
+#include "mongo/base/static_assert.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -358,6 +359,6 @@ public:
         long long i64[2];
     };
 };
-static_assert(sizeof(ValueStorage) == 16, "sizeof(ValueStorage) == 16");
+MONGO_STATIC_ASSERT(sizeof(ValueStorage) == 16);
 #pragma pack()
 }

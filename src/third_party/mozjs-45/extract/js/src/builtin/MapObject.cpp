@@ -504,7 +504,7 @@ MapObject::construct(JSContext* cx, unsigned argc, Value* vp)
                 }
                 WriteBarrierPost(cx->runtime(), map, key);
             } else {
-                if (!args2.init(2))
+                if (!args2.init(cx, 2))
                     return false;
 
                 args2.setCallee(adderVal);
@@ -1148,7 +1148,7 @@ SetObject::construct(JSContext* cx, unsigned argc, Value* vp)
                 }
                 WriteBarrierPost(cx->runtime(), set, keyVal);
             } else {
-                if (!args2.init(1))
+                if (!args2.init(cx, 1))
                     return false;
 
                 args2.setCallee(adderVal);
@@ -1426,7 +1426,7 @@ forEach(const char* funcName, JSContext *cx, HandleObject obj, HandleValue callb
     if (!forEachFunc)
         return false;
     InvokeArgs args(cx);
-    if (!args.init(2))
+    if (!args.init(cx, 2))
         return false;
     args.setCallee(JS::ObjectValue(*forEachFunc));
     args.setThis(JS::ObjectValue(*obj));

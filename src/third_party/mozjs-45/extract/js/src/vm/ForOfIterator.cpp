@@ -51,7 +51,7 @@ ForOfIterator::init(HandleValue iterable, NonIterableBehavior nonIterableBehavio
 
     // The iterator is the result of calling obj[@@iterator]().
     InvokeArgs args(cx);
-    if (!args.init(0))
+    if (!args.init(cx, 0))
         return false;
     args.setThis(iterable);
 
@@ -142,7 +142,7 @@ ForOfIterator::next(MutableHandleValue vp, bool* done)
         return false;
 
     InvokeArgs args(cx_);
-    if (!args.init(0))
+    if (!args.init(cx_, 0))
         return false;
     args.setCallee(method);
     args.setThis(ObjectValue(*iterator));
@@ -174,7 +174,7 @@ ForOfIterator::materializeArrayIterator()
         return false;
 
     InvokeArgs args(cx_);
-    if (!args.init(1))
+    if (!args.init(cx_, 1))
         return false;
     args.setCallee(val);
     args.setThis(ObjectValue(*iterator));

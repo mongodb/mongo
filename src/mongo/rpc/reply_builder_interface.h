@@ -79,6 +79,7 @@ public:
      * reply will be set to the contained BSONObj, augmented with the element {ok, 1.0} if it
      * does not already have an "ok" field. If a disengaged StatusWith<BSONObj> is passed, the
      * command reply will be set to {ok: 0.0, code: <code of status>,
+     *                               codeName: <name of status code>,
      *                               errmsg: <reason of status>}
      */
     ReplyBuilderInterface& setCommandReply(StatusWith<BSONObj> commandReply);
@@ -86,7 +87,8 @@ public:
     /**
      * Sets the reply for this command. The status parameter must be non-OK. The reply for
      * this command will be set to an object containing all the fields in extraErrorInfo,
-     * augmented with {ok: 0.0} , {code: <code of status>}, and {errmsg: <reason of status>}.
+     * augmented with {ok: 0.0} , {code: <code of status>}, {codeName: <name of status code>},
+     * and {errmsg: <reason of status>}.
      * If any of the fields "ok", "code", or "errmsg" already exist in extraErrorInfo, they
      * will be left as-is in the command reply. This use of this form is intended for
      * interfacing with legacy code that adds additional data to a failed command reply and

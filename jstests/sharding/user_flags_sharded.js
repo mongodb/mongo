@@ -8,8 +8,8 @@
         var coll = "userFlagsColl";
         var ns = dbname + "." + coll;
 
-        // First create fresh collection on a new standalone mongod
-        var newShardConn = MongoRunner.runMongod({});
+        // First create fresh collection on a new standalone mongod that will become a shard.
+        var newShardConn = MongoRunner.runMongod({"shardsvr": ""});
         var db1 = newShardConn.getDB(dbname);
         var t = db1.getCollection(coll);
         print(t);

@@ -14,6 +14,7 @@ Supports Linux, MacOS X, Solaris, and Windows.
 
 import StringIO
 import csv
+import glob
 import itertools
 import os
 import platform
@@ -112,7 +113,7 @@ class WindowsDumper(object):
                 return os.path.join(pathToTest, "cdb.exe")
         return None
 
-    def dump_info(self, pid, process_name, stream):
+    def dump_info(self, pid, process_name, stream, take_dump = False):
         """Dump useful information to the console"""
         dbg = self.__find_debugger()
 
@@ -124,12 +125,13 @@ class WindowsDumper(object):
 
         cmds = [
             ".symfix",  # Fixup symbol path
+            ".symopt +0x10", # Enable line loading (off by default in CDB, on by default in WinDBG)
             ".reload",  # Reload symbols
             "!peb",     # Dump current exe, & environment variables
             "lm",       # Dump loaded modules
-            "~* k 100", # Dump All Threads
-            ".dump /ma /u dump_" + process_name + ".mdmp",
-                        # Dump to file, dump_<process name>_<time stamp>_<pid in hex>.mdmp
+            "~* kp 100", # Dump All Threads with function arguments
+            ".dump /ma /u dump_" + process_name + "." + str(pid) + "." + self.get_dump_ext() if take_dump else "",
+                        # Dump to file, dump_<process name>_<time stamp>_<pid in hex>.<pid>.mdmp
             ".detach",  # Detach
             "q"         # Quit
             ]
@@ -137,6 +139,9 @@ class WindowsDumper(object):
         call([dbg, '-c', ";".join(cmds), '-p', str(pid)])
 
         stream.write("INFO: Done analyzing process\n")
+
+    def get_dump_ext(self):
+        return "mdmp"
 
     def dump_core(self, pid, output_file):
         """Take a dump of pid to specified file"""
@@ -182,7 +187,7 @@ class LLDBDumper(object):
         """Finds the installed debugger"""
         return find_program('lldb', ['/usr/bin'])
 
-    def dump_info(self, pid, process_name, stream):
+    def dump_info(self, pid, process_name, stream, take_dump = False):
         dbg = self.__find_debugger()
 
         if dbg is None:
@@ -213,6 +218,7 @@ class LLDBDumper(object):
             "attach -p %d" % pid,
             "target modules list",
             "thread backtrace all",
+            "process save-core dump_" + process_name + "." + str(pid) + "." + self.get_dump_ext() if take_dump else "",
             "settings set interpreter.prompt-on-quit false",
             "quit",
             ]
@@ -230,6 +236,9 @@ class LLDBDumper(object):
         call([dbg, '--source', tf.name])
 
         stream.write("INFO: Done analyzing process\n")
+
+    def get_dump_ext(self):
+        return "core"
 
     def dump_core(self, pid, output_file):
         """Take a dump of pid to specified file"""
@@ -263,9 +272,9 @@ class GDBDumper(object):
 
     def __find_debugger(self):
         """Finds the installed debugger"""
-        return find_program('gdb', ['/opt/mongodbtoolchain/bin', '/usr/bin'])
+        return find_program('gdb', ['/opt/mongodbtoolchain/gdb/bin', '/usr/bin'])
 
-    def dump_info(self, pid, process_name, stream):
+    def dump_info(self, pid, process_name, stream, take_dump = False):
         dbg = self.__find_debugger()
 
         if dbg is None:
@@ -276,16 +285,31 @@ class GDBDumper(object):
 
         call([dbg, "--version"])
 
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        print("dir %s" % script_dir);
+        gdb_dir = os.path.join(script_dir, "gdb")
+        printers_script = os.path.join(gdb_dir, "mongo.py")
+
         cmds = [
+            "set pagination off",
             "attach %d" % pid,
+            "info sharedlibrary",
+            "info threads", # Dump a simple list of commands to get the thread name
+            "set python print-stack full",
+            "source " + printers_script,
             "thread apply all bt",
+            "gcore dump_" + process_name + "." + str(pid) + "." + self.get_dump_ext() if take_dump else "",
+            "mongodb-analyze",
             "set confirm off",
             "quit",
             ]
 
-        call([dbg, "--quiet"] + list( itertools.chain.from_iterable([['-ex', b] for b in cmds])))
+        call([dbg, "--quiet", "--nx"] + list( itertools.chain.from_iterable([['-ex', b] for b in cmds])))
 
         stream.write("INFO: Done analyzing process\n")
+
+    def get_dump_ext(self):
+        return "core"
 
     def _find_gcore(self):
         """Finds the installed gcore"""
@@ -365,7 +389,7 @@ class JstackDumper(object):
         """Finds the installed jstack debugger"""
         return find_program('jstack', ['/usr/bin'])
 
-    def dump_info(self, pid, process_name, stream):
+    def dump_info(self, pid, process_name, stream, take_dump = False):
         """Dump java thread stack traces to the console"""
         jstack = self.__find_debugger()
 
@@ -414,19 +438,29 @@ def get_hang_analyzers():
         ps = DarwinProcessList()
     return [ps, dbg, jstack]
 
+def check_dump_quota(quota, ext):
+    """Check if sum of the files with ext is within the specified quota in megabytes"""
 
-def signal_process(pid):
-    """Signal python process with SIGUSR1, N/A on Windows"""
+    files = glob.glob("*." + ext)
+
+    size_sum = 0
+    for file_name in files:
+        size_sum += os.path.getsize(file_name)
+
+    return (size_sum <= quota)
+
+def signal_process(pid, signalnum):
+    """Signal process with signal, N/A on Windows"""
     try:
-        os.kill(pid, signal.SIGUSR1)
+        os.kill(pid, signalnum)
 
-        print "Waiting for python process to report"
+        print "Waiting for process to report"
         time.sleep(5)
     except OSError,e:
-        print "Hit OS error trying to signal python process: " + str(e)
+        print "Hit OS error trying to signal process: " + str(e)
 
     except AttributeError:
-        print "Cannot send signal to python on Windows"
+        print "Cannot send signal to a process on Windows"
 
 
 def timeout_protector():
@@ -465,11 +499,21 @@ def main():
         print "Cannot determine Unix Current Login, not supported on Windows"
 
     interesting_processes = ["mongo", "mongod", "mongos", "_test", "dbtest", "python", "java"]
+    go_processes = []
+
     parser = OptionParser(description=__doc__)
     parser.add_option('-p', '--process_names', dest='process_names', help='List of process names to analyze')
+    parser.add_option('-g', '--go_process_names', dest='go_process_names', help='List of go process names to analyze')
+    parser.add_option('-s', '--max_core_dumps_size', dest='max_core_dumps_size', default=10000, help='Maximum total size of core dumps to keep in megabytes')
+
     (options, args) = parser.parse_args()
+
     if options.process_names is not None:
         interesting_processes = options.process_names.split(',')
+
+    if options.go_process_names is not None:
+        go_processes = options.go_process_names.split(',')
+        interesting_processes += go_processes
 
     [ps, dbg, jstack] = get_hang_analyzers()
 
@@ -483,31 +527,42 @@ def main():
 
     processes_orig = ps.dump_processes()
 
-    # Find all running interesting processes.
+    # Find all running interesting processes by doing a substring match.
     processes = [a for a in processes_orig
                     if any([a[1].find(ip) >= 0 for ip in interesting_processes]) and a[0] != os.getpid()]
 
     sys.stdout.write("Found %d interesting processes\n" % len(processes))
 
+    max_dump_size_bytes = int(options.max_core_dumps_size) * 1024 * 1024
+
     if( len(processes) == 0):
         for process in processes_orig:
             sys.stdout.write("Ignoring process %d of %s\n" % (process[0], process[1]))
     else:
-        # Dump all other processes, except python & java.
+        # Dump all other processes including go programs, except python & java.
         for process in [a for a in processes if not re.match("^(java|python)", a[1])]:
             sys.stdout.write("Dumping process %d of %s\n" % (process[0], process[1]))
-            dbg.dump_info(process[0], process[1], sys.stdout)
+            dbg.dump_info(process[0], process[1], sys.stdout, check_dump_quota(max_dump_size_bytes, dbg.get_dump_ext()))
 
         # Dump java processes using jstack.
         for process in [a for a in processes if a[1].startswith("java")]:
             sys.stdout.write("Dumping process %d of %s\n" % (process[0], process[1]))
             jstack.dump_info(process[0], process[1], sys.stdout)
 
+        # Signal go processes to ensure they print out stack traces, and die on POSIX OSes.
+        # On Windows, this will simply kill the process since python emulates SIGABRT as
+        # TerminateProcess.
+        # Note: The stacktrace output may be captured elsewhere (i.e. resmoke).
+        for process in [a for a in processes if a[1] in go_processes]:
+            sys.stdout.write("Sending signal SIGABRT to go process %d of %s\n" % (process[0], process[1]))
+            signal_process(process[0], signal.SIGABRT)
+
         # Dump python processes after signalling them.
         for process in [a for a in processes if a[1].startswith("python")]:
-            signal_process(process[0])
+            sys.stdout.write("Sending signal SIGUSR1 to python process %d of %s\n" % (process[0], process[1]))
+            signal_process(process[0], signal.SIGUSR1)
 
-            dbg.dump_info(process[0], process[1], sys.stdout)
+            dbg.dump_info(process[0], process[1], sys.stdout, check_dump_quota(max_dump_size_bytes, dbg.get_dump_ext()))
 
     # Suspend the timer so we can exit cleanly
     timer.cancel()

@@ -2,6 +2,15 @@
 
 Import("env")
 
+env.Library(
+    target=[
+        'max_log_size'
+    ],
+    source=[
+        'max_log_size.cpp',
+    ],
+)
+
 env.Library('parse_log_component_settings',
             ['parse_log_component_settings.cpp'],
             LIBDEPS=['$BUILD_DIR/mongo/base',])
@@ -12,6 +21,10 @@ env.Library('parse_log_component_settings',
 env.Program('console_test', 'console_test.cpp',
                 LIBDEPS=['$BUILD_DIR/mongo/base',
                          '$BUILD_DIR/mongo/unittest/unittest_main'])
+
+env.CppUnitTest('log_component_settings_test', 'log_component_settings_test.cpp',
+                LIBDEPS=['$BUILD_DIR/mongo/base',
+                         '$BUILD_DIR/mongo/unittest/concurrency'])
 
 env.CppUnitTest('log_test', 'log_test.cpp',
                 LIBDEPS=['$BUILD_DIR/mongo/base'])

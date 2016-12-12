@@ -256,7 +256,9 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
 
             if (!serverGlobalParams.logAppend && boost::filesystem::is_regular(absoluteLogpath)) {
                 std::string renameTarget = absoluteLogpath + "." + terseCurrentTime(false);
-                if (0 == rename(absoluteLogpath.c_str(), renameTarget.c_str())) {
+                boost::system::error_code ec;
+                boost::filesystem::rename(absoluteLogpath, renameTarget, ec);
+                if (!ec) {
                     log() << "log file \"" << absoluteLogpath << "\" exists; moved to \""
                           << renameTarget << "\".";
                 } else {
@@ -267,7 +269,7 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
                                       << "\" to \""
                                       << renameTarget
                                       << "\"; run with --logappend or manually remove file: "
-                                      << errnoWithDescription());
+                                      << ec.message());
                 }
             }
         }
@@ -289,7 +291,7 @@ MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
                     new MessageEventDetailsEncoder, writer.getValue())));
 
         if (serverGlobalParams.logAppend && exists) {
-            log() << "***** SERVER RESTARTED *****" << endl;
+            log() << "***** SERVER RESTARTED *****";
             Status status = logger::RotatableFileWriter::Use(writer.getValue()).status();
             if (!status.isOK())
                 return status;

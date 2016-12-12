@@ -99,6 +99,8 @@ public:
         return _id;
     }
 
+    stdx::thread::id getThreadId() const override;
+
     virtual LockResult lockGlobal(LockMode mode, unsigned timeoutMs = UINT_MAX);
     virtual LockResult lockGlobalBegin(LockMode mode);
     virtual LockResult lockGlobalComplete(unsigned timeoutMs);
@@ -223,6 +225,9 @@ private:
     // Indicates whether the client is active reader/writer or is queued.
     AtomicWord<ClientState> _clientState{kInactive};
 
+    // Track the thread who owns the lock for debugging purposes
+    stdx::thread::id _threadId;
+
     //////////////////////////////////////////////////////////////////////////////////////////
     //
     // Methods merged from LockState, which should eventually be removed or changed to methods
@@ -244,16 +249,6 @@ public:
     virtual bool hasLockPending() const {
         return getWaitingResource().isValid();
     }
-
-    virtual void setIsBatchWriter(bool newValue) {
-        _batchWriter = newValue;
-    }
-    virtual bool isBatchWriter() const {
-        return _batchWriter;
-    }
-
-private:
-    bool _batchWriter;
 };
 
 typedef LockerImpl<false> DefaultLockerImpl;

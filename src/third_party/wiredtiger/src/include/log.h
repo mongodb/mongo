@@ -180,9 +180,9 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_logslot {
 
 #define	WT_SLOT_INIT_FLAGS	0
 
-#define	WT_WITH_SLOT_LOCK(session, log, ret, op) do {			\
+#define	WT_WITH_SLOT_LOCK(session, log, op) do {			\
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SLOT));	\
-	WT_WITH_LOCK(session, ret,					\
+	WT_WITH_LOCK_WAIT(session,					\
 	    &log->log_slot_lock, WT_SESSION_LOCKED_SLOT, op);		\
 } while (0)
 
@@ -256,7 +256,9 @@ struct __wt_log {
 #ifdef HAVE_DIAGNOSTIC
 	uint64_t	 write_calls;		/* Calls to log_write */
 #endif
-#define	WT_LOG_OPENED	0x01		/* Log subsystem successfully open */
+
+#define	WT_LOG_OPENED		0x01	/* Log subsystem successfully open */
+#define	WT_LOG_TRUNCATE_NOTSUP	0x02	/* File system truncate not supported */
 	uint32_t	flags;
 };
 

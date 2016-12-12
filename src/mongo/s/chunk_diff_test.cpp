@@ -33,6 +33,7 @@
 #include <utility>
 #include <vector>
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/platform/random.h"
@@ -57,8 +58,7 @@ PseudoRandom rand(1);
  */
 class DefaultDiffAdapter : public ConfigDiffTracker<BSONObj> {
 public:
-    DefaultDiffAdapter() {}
-    virtual ~DefaultDiffAdapter() {}
+    using ConfigDiffTracker<BSONObj>::ConfigDiffTracker;
 
     virtual bool isTracked(const ChunkType& chunk) const {
         return true;
@@ -78,8 +78,7 @@ public:
  */
 class InverseDiffAdapter : public DefaultDiffAdapter {
 public:
-    InverseDiffAdapter() {}
-    virtual ~InverseDiffAdapter() {}
+    using DefaultDiffAdapter::DefaultDiffAdapter;
 
     virtual bool isMinKeyIndexed() const {
         return false;
@@ -104,7 +103,7 @@ void convertBSONArrayToChunkTypes(const vector<BSONObj>& chunksArray,
 
 class ChunkDiffUnitTest : public mongo::unittest::Test {
 protected:
-    typedef map<BSONObj, BSONObj, BSONObjCmp> RangeMap;
+    typedef BSONObjIndexedMap<BSONObj> RangeMap;
     typedef map<ShardId, ChunkVersion> VersionMap;
 
     ChunkDiffUnitTest() = default;
@@ -163,14 +162,14 @@ protected:
         vector<BSONObj> chunks(std::move(chunksB));
 
         // Setup the empty ranges and versions first
-        RangeMap ranges;
+        RangeMap ranges = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>();
         ChunkVersion maxVersion = ChunkVersion(0, 0, OID());
         VersionMap maxShardVersions;
 
         // Create a differ which will track our progress
-        std::shared_ptr<DefaultDiffAdapter> differ(isInverse ? new InverseDiffAdapter()
-                                                             : new DefaultDiffAdapter());
-        differ->attach("test", ranges, maxVersion, maxShardVersions);
+        std::shared_ptr<DefaultDiffAdapter> differ(
+            isInverse ? new InverseDiffAdapter("test", &ranges, &maxVersion, &maxShardVersions)
+                      : new DefaultDiffAdapter("test", &ranges, &maxVersion, &maxShardVersions));
 
         std::vector<ChunkType> chunksVector;
         convertBSONArrayToChunkTypes(chunks, &chunksVector);

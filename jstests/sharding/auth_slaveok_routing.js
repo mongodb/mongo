@@ -11,6 +11,7 @@
  */
 (function() {
     'use strict';
+    load("jstests/replsets/rslib.js");
 
     /**
      * Checks if a query to the given collection will be routed to the secondary. Returns true if
@@ -56,7 +57,7 @@
      * state, which will make the ReplicaSetMonitor mark them as
      * ok = false and not eligible for slaveOk queries.
      */
-    ReplSetTest.awaitRSClientHosts(mongos, replTest.getSecondaries(), {ok: true, secondary: true});
+    awaitRSClientHosts(mongos, replTest.getSecondaries(), {ok: true, secondary: true});
 
     var bulk = coll.initializeUnorderedBulkOp();
     for (var x = 0; x < 20; x++) {
@@ -87,12 +88,12 @@
      * A node that is previously labeled as secondary can now be a primary, so we
      * wait for the replSetMonitorWatcher thread to refresh the nodes information.
      */
-    ReplSetTest.awaitRSClientHosts(mongos, replTest.getSecondaries(), {ok: true, secondary: true});
+    awaitRSClientHosts(mongos, replTest.getSecondaries(), {ok: true, secondary: true});
     //
     // We also need to wait for the primary, it's possible that the mongos may think a node is a
     // secondary but it actually changed to a primary before we send our final query.
     //
-    ReplSetTest.awaitRSClientHosts(mongos, replTest.getPrimary(), {ok: true, ismaster: true});
+    awaitRSClientHosts(mongos, replTest.getPrimary(), {ok: true, ismaster: true});
 
     // Recheck if we can still query secondaries after refreshing connections.
     jsTest.log('Final query to SEC');

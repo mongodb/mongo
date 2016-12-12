@@ -574,10 +574,11 @@ TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {
 
     // Descriptive test. The childCq's filter should be the relevant $or clause, rather than the
     // entire query predicate.
-    ASSERT_EQ(childCq->getQueryRequest().getFilter(), baseCq->getQueryRequest().getFilter());
+    ASSERT_BSONOBJ_EQ(childCq->getQueryRequest().getFilter(),
+                      baseCq->getQueryRequest().getFilter());
 
-    ASSERT_EQ(childCq->getQueryRequest().getProj(), baseCq->getQueryRequest().getProj());
-    ASSERT_EQ(childCq->getQueryRequest().getSort(), baseCq->getQueryRequest().getSort());
+    ASSERT_BSONOBJ_EQ(childCq->getQueryRequest().getProj(), baseCq->getQueryRequest().getProj());
+    ASSERT_BSONOBJ_EQ(childCq->getQueryRequest().getSort(), baseCq->getQueryRequest().getSort());
     ASSERT_TRUE(childCq->getQueryRequest().isExplain());
 }
 

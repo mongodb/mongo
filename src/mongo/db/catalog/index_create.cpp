@@ -47,6 +47,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/fail_point_service.h"
@@ -63,6 +64,31 @@ using std::endl;
 
 MONGO_FP_DECLARE(crashAfterStartingIndexBuild);
 MONGO_FP_DECLARE(hangAfterStartingIndexBuild);
+MONGO_FP_DECLARE(hangAfterStartingIndexBuildUnlocked);
+
+std::atomic<std::int32_t> maxIndexBuildMemoryUsageMegabytes(500);  // NOLINT
+
+class ExportedMaxIndexBuildMemoryUsageParameter
+    : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {
+public:
+    ExportedMaxIndexBuildMemoryUsageParameter()
+        : ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime>(
+              ServerParameterSet::getGlobal(),
+              "maxIndexBuildMemoryUsageMegabytes",
+              &maxIndexBuildMemoryUsageMegabytes) {}
+
+    virtual Status validate(const std::int32_t& potentialNewValue) {
+        if (potentialNewValue < 100) {
+            return Status(
+                ErrorCodes::BadValue,
+                "maxIndexBuildMemoryUsageMegabytes must be greater than or equal to 100 MB");
+        }
+
+        return Status::OK();
+    }
+
+} exportedMaxIndexBuildMemoryUsageParameter;
+
 
 /**
  * On rollback sets MultiIndexBlock::_needToCleanup to true.
@@ -125,7 +151,7 @@ MultiIndexBlock::~MultiIndexBlock() {
         } catch (const DBException& e) {
             if (e.toStatus() == ErrorCodes::ExceededMemoryLimit)
                 continue;
-            error() << "Caught exception while cleaning up partially built indexes: " << e.what();
+            error() << "Caught exception while cleaning up partially built indexes: " << redact(e);
         } catch (const std::exception& e) {
             error() << "Caught exception while cleaning up partially built indexes: " << e.what();
         } catch (...) {
@@ -147,12 +173,12 @@ void MultiIndexBlock::removeExistingIndexes(std::vector<BSONObj>* specs) const {
     }
 }
 
-Status MultiIndexBlock::init(const BSONObj& spec) {
+StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(const BSONObj& spec) {
     const auto indexes = std::vector<BSONObj>(1, spec);
     return init(indexes);
 }
 
-Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
+StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
     WriteUnitOfWork wunit(_txn);
 
     invariant(_indexes.empty());
@@ -182,6 +208,14 @@ Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
         _buildInBackground = (_buildInBackground && info["background"].trueValue());
     }
 
+    std::vector<BSONObj> indexInfoObjs;
+    indexInfoObjs.reserve(indexSpecs.size());
+    std::size_t eachIndexBuildMaxMemoryUsageBytes = 0;
+    if (!indexSpecs.empty()) {
+        eachIndexBuildMaxMemoryUsageBytes =
+            std::size_t(maxIndexBuildMemoryUsageMegabytes) * 1024 * 1024 / indexSpecs.size();
+    }
+
     for (size_t i = 0; i < indexSpecs.size(); i++) {
         BSONObj info = indexSpecs[i];
         StatusWith<BSONObj> statusWithInfo =
@@ -190,6 +224,7 @@ Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
         if (!status.isOK())
             return status;
         info = statusWithInfo.getValue();
+        indexInfoObjs.push_back(info);
 
         IndexToBuild index;
         index.block.reset(new IndexCatalog::IndexBuildBlock(_txn, _collection, info));
@@ -205,18 +240,21 @@ Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
         if (!_buildInBackground) {
             // Bulk build process requires foreground building as it assumes nothing is changing
             // under it.
-            index.bulk = index.real->initiateBulk();
+            index.bulk = index.real->initiateBulk(eachIndexBuildMaxMemoryUsageBytes);
         }
 
         const IndexDescriptor* descriptor = index.block->getEntry()->descriptor();
 
-        index.options.logIfError = false;  // logging happens elsewhere if needed.
-        index.options.dupsAllowed = !descriptor->unique() || _ignoreUnique ||
-            repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(descriptor);
+        IndexCatalog::prepareInsertDeleteOptions(_txn, descriptor, &index.options);
+        index.options.dupsAllowed = index.options.dupsAllowed || _ignoreUnique;
+        if (_ignoreUnique) {
+            index.options.getKeysMode = IndexAccessMethod::GetKeysMode::kRelaxConstraints;
+        }
 
         log() << "build index on: " << ns << " properties: " << descriptor->toString();
         if (index.bulk)
-            log() << "\t building index using bulk method";
+            log() << "\t building index using bulk method; build may temporarily use up to "
+                  << eachIndexBuildMaxMemoryUsageBytes / 1024 / 1024 << " megabytes of RAM";
 
         index.filterExpression = index.block->getEntry()->getFilterExpression();
 
@@ -241,7 +279,7 @@ Status MultiIndexBlock::init(const std::vector<BSONObj>& indexSpecs) {
         }
     }
 
-    return Status::OK();
+    return indexInfoObjs;
 }
 
 Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<RecordId>* dupsOut) {
@@ -324,11 +362,30 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<RecordId>* dupsO
                 WorkingSetCommon::toStatusString(objToIndex.value()),
             state == PlanExecutor::IS_EOF);
 
-    // Need the index build to hang before the progress meter is marked as finished so we can
-    // reliably check that the index build has actually started in js tests.
-    while (MONGO_FAIL_POINT(hangAfterStartingIndexBuild)) {
-        log() << "Hanging index build due to 'hangAfterStartingIndexBuild' failpoint";
-        sleepmillis(1000);
+    if (MONGO_FAIL_POINT(hangAfterStartingIndexBuild)) {
+        // Need the index build to hang before the progress meter is marked as finished so we can
+        // reliably check that the index build has actually started in js tests.
+        while (MONGO_FAIL_POINT(hangAfterStartingIndexBuild)) {
+            log() << "Hanging index build due to 'hangAfterStartingIndexBuild' failpoint";
+            sleepmillis(1000);
+        }
+
+        // Check for interrupt to allow for killop prior to index build completion.
+        _txn->checkForInterrupt();
+    }
+
+    if (MONGO_FAIL_POINT(hangAfterStartingIndexBuildUnlocked)) {
+        // Unlock before hanging so replication recognizes we've completed.
+        Locker::LockSnapshot lockInfo;
+        _txn->lockState()->saveLockStateAndUnlock(&lockInfo);
+        while (MONGO_FAIL_POINT(hangAfterStartingIndexBuildUnlocked)) {
+            log() << "Hanging index build with no locks due to "
+                     "'hangAfterStartingIndexBuildUnlocked' failpoint";
+            sleepmillis(1000);
+        }
+        // If we want to support this, we'd need to regrab the lock and be sure that all callers are
+        // ok with us yielding. They should be for BG indexes, but not for foreground.
+        invariant(!"the hangAfterStartingIndexBuildUnlocked failpoint can't be turned off");
     }
 
     progress->finished();
@@ -337,8 +394,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<RecordId>* dupsO
     if (!ret.isOK())
         return ret;
 
-    log() << "build index done.  scanned " << n << " total records. " << t.seconds() << " secs"
-          << endl;
+    log() << "build index done.  scanned " << n << " total records. " << t.seconds() << " secs";
 
     return Status::OK();
 }

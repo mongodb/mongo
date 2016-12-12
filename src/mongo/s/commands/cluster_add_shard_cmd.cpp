@@ -89,12 +89,12 @@ public:
         auto parsedRequest = uassertStatusOK(AddShardRequest::parseFromMongosCommand(cmdObj));
 
         auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
-        auto cmdResponseStatus =
-            uassertStatusOK(configShard->runCommand(txn,
-                                                    kPrimaryOnlyReadPreference,
-                                                    "admin",
-                                                    parsedRequest.toCommandForConfig(),
-                                                    Shard::RetryPolicy::kIdempotent));
+        auto cmdResponseStatus = uassertStatusOK(
+            configShard->runCommandWithFixedRetryAttempts(txn,
+                                                          kPrimaryOnlyReadPreference,
+                                                          "admin",
+                                                          parsedRequest.toCommandForConfig(),
+                                                          Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(cmdResponseStatus.commandStatus);
 
         string shardAdded;
@@ -104,7 +104,7 @@ public:
 
         // Ensure the added shard is visible to this process.
         auto shardRegistry = Grid::get(txn)->shardRegistry();
-        if (!shardRegistry->getShard(txn, shardAdded)) {
+        if (!shardRegistry->getShard(txn, shardAdded).isOK()) {
             return appendCommandStatus(result,
                                        {ErrorCodes::OperationFailed,
                                         "Could not find shard metadata for shard after adding it. "

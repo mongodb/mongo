@@ -29,6 +29,9 @@
 #include "mongo/dbtests/dbtests.h"
 
 namespace IndexCatalogTests {
+namespace {
+const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
+}  // namespace
 
 static const char* const _ns = "unittests.indexcatalog";
 
@@ -135,12 +138,13 @@ public:
         OldClientWriteContext ctx(&txn, _ns);
         const std::string indexName = "x_1";
 
-        ASSERT_OK(dbtests::createIndexFromSpec(&txn,
-                                               _ns,
-                                               BSON("name" << indexName << "ns" << _ns << "key"
-                                                           << BSON("x" << 1)
-                                                           << "expireAfterSeconds"
-                                                           << 5)));
+        ASSERT_OK(dbtests::createIndexFromSpec(
+            &txn,
+            _ns,
+            BSON("name" << indexName << "ns" << _ns << "key" << BSON("x" << 1) << "v"
+                        << static_cast<int>(kIndexVersion)
+                        << "expireAfterSeconds"
+                        << 5)));
 
         const IndexDescriptor* desc = _catalog->findIndexByName(&txn, indexName);
         ASSERT(desc);

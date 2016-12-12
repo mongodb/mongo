@@ -94,6 +94,12 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
+
+        if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+            uassertStatusOK({ErrorCodes::NoShardingEnabled,
+                             "Cannot accept sharding commands if not started with --shardsvr"});
+        }
+
         // Steps
         // 1. check basic config
         // 2. extract params from command
@@ -133,11 +139,6 @@ public:
             }
         }
 
-        // check shard name is correct
-        // The shard host is also sent when using setShardVersion, report this host if there is
-        // an error or mismatch.
-        shardingState->setShardName(shardName);
-
         if (!_checkConfigOrInit(txn, configDBStr, shardName, authoritative, errmsg, result)) {
             return false;
         }
@@ -148,8 +149,8 @@ public:
 
             // TODO: SERVER-21397 remove post v3.3.
             // Send back wire version to let mongos know what protocol we can speak
-            result.append("minWireVersion", WireSpec::instance().minWireVersionIncoming);
-            result.append("maxWireVersion", WireSpec::instance().maxWireVersionIncoming);
+            result.append("minWireVersion", WireSpec::instance().incoming.minWireVersion);
+            result.append("maxWireVersion", WireSpec::instance().incoming.maxWireVersion);
 
             return true;
         }
@@ -187,7 +188,8 @@ public:
             autoDb.emplace(txn, nss.db(), MODE_IS);
 
             // Views do not require a shard version check.
-            if (autoDb->getDb() && autoDb->getDb()->getViewCatalog()->lookup(txn, nss.ns())) {
+            if (autoDb->getDb() && !autoDb->getDb()->getCollection(nss.ns()) &&
+                autoDb->getDb()->getViewCatalog()->lookup(txn, nss.ns())) {
                 return true;
             }
 
@@ -313,7 +315,7 @@ public:
                 errmsg = str::stream()
                     << "could not refresh metadata for " << ns << " with requested shard version "
                     << requestedVersion.toString() << ", stored shard version is "
-                    << currVersion.toString() << causedBy(status.reason());
+                    << currVersion.toString() << causedBy(redact(status));
 
                 warning() << errmsg;
 
@@ -436,7 +438,7 @@ private:
             return false;
         }
 
-        ShardingState::get(txn)->initializeFromConfigConnString(txn, configdb);
+        ShardingState::get(txn)->initializeFromConfigConnString(txn, configdb, shardName);
         return true;
     }
 

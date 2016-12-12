@@ -27,7 +27,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wtscenario, wttest
-from helper import simple_populate
 
 # test_lsm02.py
 #    Test LSM schema level operations

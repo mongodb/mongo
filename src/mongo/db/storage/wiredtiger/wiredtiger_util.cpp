@@ -257,6 +257,11 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
     ErrorAccumulator eventHandler(&errors);
 
     StringData config = configElem.valueStringData();
+    // Do NOT allow embedded null characters
+    if (config.size() != strlen(config.rawData())) {
+        return {ErrorCodes::FailedToParse, "malformed 'configString' value."};
+    }
+
     Status status = wtRCToStatus(
         wiredtiger_config_validate(nullptr, &eventHandler, "WT_SESSION.create", config.rawData()));
     if (!status.isOK()) {
@@ -352,7 +357,7 @@ int mdb_handle_error(WT_EVENT_HANDLER* handler,
                      int errorCode,
                      const char* message) {
     try {
-        error() << "WiredTiger (" << errorCode << ") " << message;
+        error() << "WiredTiger error (" << errorCode << ") " << redact(message);
         fassert(28558, errorCode != WT_PANIC);
     } catch (...) {
         std::terminate();
@@ -362,7 +367,7 @@ int mdb_handle_error(WT_EVENT_HANDLER* handler,
 
 int mdb_handle_message(WT_EVENT_HANDLER* handler, WT_SESSION* session, const char* message) {
     try {
-        log() << "WiredTiger " << message;
+        log() << "WiredTiger message " << redact(message);
     } catch (...) {
         std::terminate();
     }
@@ -374,7 +379,7 @@ int mdb_handle_progress(WT_EVENT_HANDLER* handler,
                         const char* operation,
                         uint64_t progress) {
     try {
-        log() << "WiredTiger progress " << operation << " " << progress;
+        log() << "WiredTiger progress " << redact(operation) << " " << progress;
     } catch (...) {
         std::terminate();
     }

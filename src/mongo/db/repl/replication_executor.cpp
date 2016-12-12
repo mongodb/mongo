@@ -69,7 +69,7 @@ ReplicationExecutor::~ReplicationExecutor() {
     invariant(!_executorThread.joinable());
 }
 
-BSONObj ReplicationExecutor::getDiagnosticBSON() {
+BSONObj ReplicationExecutor::getDiagnosticBSON() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     BSONObjBuilder builder;
 
@@ -104,7 +104,7 @@ BSONObj ReplicationExecutor::getDiagnosticBSON() {
     return builder.obj();
 }
 
-std::string ReplicationExecutor::getDiagnosticString() {
+std::string ReplicationExecutor::getDiagnosticString() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _getDiagnosticString_inlock();
 }
@@ -540,6 +540,10 @@ StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::enqueueWork
     work.readyDate = Date_t();
     queue->splice(queue->end(), _freeQueue, iter);
     return StatusWith<CallbackHandle>(work.callback);
+}
+
+void ReplicationExecutor::waitForDBWork_forTest() {
+    _dblockTaskRunner.join();
 }
 
 ReplicationExecutor::WorkItem::WorkItem() : generation(0U), isNetworkOperation(false) {}

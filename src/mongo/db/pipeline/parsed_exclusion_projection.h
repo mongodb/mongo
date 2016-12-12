@@ -30,10 +30,10 @@
 
 #include <memory>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
@@ -71,6 +71,7 @@ public:
      */
     ExclusionNode* addOrGetChild(FieldPath field);
 
+    void addModifiedPaths(std::set<std::string>* modifiedPaths) const;
 
 private:
     // Helpers for addOrGetChild above.
@@ -81,10 +82,10 @@ private:
     Value applyProjectionToValue(Value val) const;
 
     // Fields excluded at this level.
-    std::unordered_set<std::string> _excludedFields;
+    stdx::unordered_set<std::string> _excludedFields;
 
     std::string _pathToNode;
-    std::unordered_map<std::string, std::unique_ptr<ExclusionNode>> _children;
+    stdx::unordered_map<std::string, std::unique_ptr<ExclusionNode>> _children;
 };
 
 /**
@@ -116,8 +117,14 @@ public:
      */
     Document applyProjection(Document inputDoc) const final;
 
-    DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const {
+    DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const final {
         return DocumentSource::SEE_NEXT;
+    }
+
+    DocumentSource::GetModPathsReturn getModifiedPaths() const final {
+        std::set<std::string> modifiedPaths;
+        _root->addModifiedPaths(&modifiedPaths);
+        return {DocumentSource::GetModPathsReturn::Type::kFiniteSet, std::move(modifiedPaths)};
     }
 
 private:

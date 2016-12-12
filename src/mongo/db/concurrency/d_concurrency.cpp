@@ -26,16 +26,22 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/concurrency/d_concurrency.h"
 
 #include <string>
+#include <vector>
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stacktrace.h"
 
@@ -54,13 +60,72 @@ Lock::TempRelease::~TempRelease() {
 }
 
 namespace {
-AtomicWord<uint64_t> lastResourceMutexHash{0};
+
+/**
+ * ResourceMutexes can be constructed during initialization, thus the code must ensure the vector
+ * of labels is constructed before items are added to it. This factory encapsulates all members
+ * that need to be initialized before first use. A pointer is allocated to an instance of this
+ * factory and the first call will construct an instance.
+ */
+class ResourceIdFactory {
+public:
+    static ResourceId newResourceIdForMutex(std::string resourceLabel) {
+        ensureInitialized();
+        return resourceIdFactory->_newResourceIdForMutex(std::move(resourceLabel));
+    }
+
+    static std::string nameForId(ResourceId resourceId) {
+        stdx::lock_guard<stdx::mutex> lk(resourceIdFactory->labelsMutex);
+        return resourceIdFactory->labels.at(resourceId.getHashId());
+    }
+
+    /**
+     * Must be called in a single-threaded context (e.g: program initialization) before the factory
+     * is safe to use in a multi-threaded context.
+     */
+    static void ensureInitialized() {
+        if (!resourceIdFactory) {
+            resourceIdFactory = stdx::make_unique<ResourceIdFactory>();
+        }
+    }
+
+private:
+    ResourceId _newResourceIdForMutex(std::string resourceLabel) {
+        stdx::lock_guard<stdx::mutex> lk(labelsMutex);
+        invariant(nextId == labels.size());
+        labels.push_back(std::move(resourceLabel));
+
+        return ResourceId(RESOURCE_MUTEX, nextId++);
+    }
+
+    static std::unique_ptr<ResourceIdFactory> resourceIdFactory;
+
+    std::uint64_t nextId = 0;
+    std::vector<std::string> labels;
+    stdx::mutex labelsMutex;
+};
+
+std::unique_ptr<ResourceIdFactory> ResourceIdFactory::resourceIdFactory;
+
+/**
+ * Guarantees `ResourceIdFactory::ensureInitialized` is called at least once during initialization.
+ */
+struct ResourceIdFactoryInitializer {
+    ResourceIdFactoryInitializer() {
+        ResourceIdFactory::ensureInitialized();
+    }
+} resourceIdFactoryInitializer;
+
 }  // namespace
 
-Lock::ResourceMutex::ResourceMutex() : _rid(RESOURCE_MUTEX, lastResourceMutexHash.fetchAndAdd(1)) {}
 
-Lock::GlobalLock::GlobalLock(Locker* locker)
-    : _locker(locker), _result(LOCK_INVALID), _pbwm(locker, resourceIdParallelBatchWriterMode) {}
+Lock::ResourceMutex::ResourceMutex(std::string resourceLabel)
+    : _rid(ResourceIdFactory::newResourceIdForMutex(std::move(resourceLabel))) {}
+
+std::string Lock::ResourceMutex::getName(ResourceId resourceId) {
+    invariant(resourceId.getType() == RESOURCE_MUTEX);
+    return ResourceIdFactory::nameForId(resourceId);
+}
 
 Lock::GlobalLock::GlobalLock(Locker* locker, LockMode lockMode, unsigned timeoutMs)
     : GlobalLock(locker, lockMode, EnqueueOnly()) {
@@ -73,7 +138,7 @@ Lock::GlobalLock::GlobalLock(Locker* locker, LockMode lockMode, EnqueueOnly enqu
 }
 
 void Lock::GlobalLock::_enqueue(LockMode lockMode) {
-    if (!_locker->isBatchWriter()) {
+    if (_locker->shouldConflictWithSecondaryBatchApplication()) {
         _pbwm.lock(MODE_IS);
     }
 
@@ -85,7 +150,7 @@ void Lock::GlobalLock::waitForLock(unsigned timeoutMs) {
         _result = _locker->lockGlobalComplete(timeoutMs);
     }
 
-    if (_result != LOCK_OK && !_locker->isBatchWriter()) {
+    if (_result != LOCK_OK && _locker->shouldConflictWithSecondaryBatchApplication()) {
         _pbwm.unlock();
     }
 }
@@ -185,13 +250,14 @@ void Lock::OplogIntentWriteLock::serializeIfNeeded() {
 }
 
 Lock::ParallelBatchWriterMode::ParallelBatchWriterMode(Locker* lockState)
-    : _pbwm(lockState, resourceIdParallelBatchWriterMode, MODE_X), _lockState(lockState) {
-    invariant(!_lockState->isBatchWriter());  // Otherwise we couldn't clear in destructor.
-    _lockState->setIsBatchWriter(true);
+    : _pbwm(lockState, resourceIdParallelBatchWriterMode, MODE_X),
+      _lockState(lockState),
+      _orginalShouldConflict(_lockState->shouldConflictWithSecondaryBatchApplication()) {
+    _lockState->setShouldConflictWithSecondaryBatchApplication(false);
 }
 
 Lock::ParallelBatchWriterMode::~ParallelBatchWriterMode() {
-    _lockState->setIsBatchWriter(false);
+    _lockState->setShouldConflictWithSecondaryBatchApplication(_orginalShouldConflict);
 }
 
 void Lock::ResourceLock::lock(LockMode mode) {

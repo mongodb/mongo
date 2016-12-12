@@ -1,0 +1,47 @@
+selector:
+  js_test:
+    roots:
+    - jstests/aggregation/*.js
+    - jstests/aggregation/bugs/*.js
+    - jstests/aggregation/expressions/*.js
+    - jstests/aggregation/sources/*/*.js
+    exclude_files:
+    # The following tests start their own ShardingTest.
+    - jstests/aggregation/bugs/server19095.js
+    - jstests/aggregation/bugs/server6118.js
+    - jstests/aggregation/bugs/server6179.js
+    - jstests/aggregation/bugs/server7781.js
+    - jstests/aggregation/mongos_slaveok.js
+    - jstests/aggregation/sources/addFields/use_cases.js
+    - jstests/aggregation/sources/addFields/weather.js
+    - jstests/aggregation/sources/facet/use_cases.js
+    - jstests/aggregation/sources/graphLookup/sharded.js
+    - jstests/aggregation/sources/replaceRoot/address.js
+    - jstests/aggregation/testshard1.js
+    # The following tests start their own ReplSetTest.
+    - jstests/aggregation/testSlave.js
+    # The following tests start their own mongod.
+    - jstests/aggregation/bugs/cursor_timeout.js
+    - jstests/aggregation/bugs/lookup_unwind_getmore.js
+    - jstests/aggregation/bugs/lookup_unwind_killcursor.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        readMode: commands
+        eval: load("jstests/libs/override_methods/implicitly_shard_accessed_collections.js")
+    hooks:
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: ShardedClusterFixture
+      mongos_options:
+        set_parameters:
+          enableTestCommands: 1
+      mongod_options:
+        nopreallocj: ''
+        set_parameters:
+          enableTestCommands: 1
+          numInitialSyncAttempts: 1

@@ -167,7 +167,7 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
 
     ss << "block_compressor=" << wiredTigerGlobalOptions.indexBlockCompressor << ",";
     ss << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
-              ->getOpenConfig(desc.parentNS());
+              ->getTableCreateConfig(desc.parentNS());
     ss << sysIndexConfig << ",";
     ss << collIndexConfig << ",";
 
@@ -194,10 +194,16 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(const std::string&
     // Indexes need to store the metadata for collation to work as expected.
     ss << ",key_format=u,value_format=u";
 
+    // We build v=2 indexes when the featureCompatibilityVersion is 3.4. This means that the server
+    // supports new index features and we can therefore use KeyString::Version::V1.
+    const int keyStringVersion = desc.version() >= IndexDescriptor::IndexVersion::kV2
+        ? kKeyStringV1Version
+        : kKeyStringV0Version;
+
     // Index metadata
     ss << ",app_metadata=("
-       << "formatVersion=" << (enableBSON1_1 ? kKeyStringV1Version : kKeyStringV0Version) << ','
-       << "infoObj=" << desc.infoObj().jsonString() << "),";
+       << "formatVersion=" << keyStringVersion << ',' << "infoObj=" << desc.infoObj().jsonString()
+       << "),";
 
     LOG(3) << "index create string: " << ss.ss.str();
     return StatusWith<std::string>(ss);
@@ -485,9 +491,13 @@ protected:
 
         // Not using cursor cache since we need to set "bulk".
         WT_CURSOR* cursor;
-        // We use our own session to ensure we aren't in a transaction.
+        // Use a different session to ensure we don't hijack an existing transaction.
+        // Configure the bulk cursor open to fail quickly if it would wait on a checkpoint
+        // completing - since checkpoints can take a long time, and waiting can result in
+        // an unexpected pause in building an index.
         WT_SESSION* session = _session->getSession();
-        int err = session->open_cursor(session, idx->uri().c_str(), NULL, "bulk", &cursor);
+        int err = session->open_cursor(
+            session, idx->uri().c_str(), NULL, "bulk,checkpoint_wait=false", &cursor);
         if (!err)
             return cursor;
 
@@ -879,9 +889,9 @@ protected:
 
             if (nextNotIncreasing) {
                 // Our new key is less than the old key which means the next call moved to !next.
-                log() << "WTIndex::updatePosition -- the new key ( " << toHex(item.data, item.size)
-                      << ") is less than the previous key (" << _key.toString()
-                      << "), which is a bug.";
+                log() << "WTIndex::updatePosition -- the new key ( "
+                      << redact(toHex(item.data, item.size)) << ") is less than the previous key ("
+                      << redact(_key.toString()) << "), which is a bug.";
 
                 // Force a retry of the operation from our last known position by acting as-if
                 // we received a WT_ROLLBACK error.
@@ -960,7 +970,7 @@ public:
 
         if (!br.atEof()) {
             severe() << "Unique index cursor seeing multiple records for key "
-                     << curr(kWantKey)->key;
+                     << redact(curr(kWantKey)->key) << " in index " << _idx.indexName();
             fassertFailed(28608);
         }
     }
@@ -1125,7 +1135,7 @@ void WiredTigerIndexUnique::_unindex(WT_CURSOR* c,
     }
 
     if (!foundId) {
-        warning().stream() << id << " not found in the index for key " << key;
+        warning().stream() << id << " not found in the index for key " << redact(key);
         return;  // nothing to do
     }
 

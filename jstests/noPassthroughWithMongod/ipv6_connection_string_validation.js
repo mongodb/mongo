@@ -40,39 +40,54 @@ var goodStrings = [
     "localhost:27999/test",
     "[::1]:27999/test",
     "[0:0:0:0:0:0:0:1]:27999/test",
-    "[0000:0000:0000:0000:0000:0000:0000:0001]:27999/test"
+    "[0000:0000:0000:0000:0000:0000:0000:0001]:27999/test",
+    "localhost:27999",
+    "[::1]:27999",
+    "[0:0:0:0:0:0:0:1]:27999",
+    "[0000:0000:0000:0000:0000:0000:0000:0001]:27999",
 ];
 
+var missingConnString = /^Missing connection string$/;
+var incorrectType = /^Incorrect type/;
+var emptyConnString = /^Empty connection string$/;
+var badHost = /^Failed to parse mongodb/;
+var emptyHost = /^Empty host component/;
+var noPort = /^No digits/;
+var badPort = /^Bad digit/;
+var invalidPort = /^Port number \d+ out of range/;
+var moreThanOneColon = /^More than one ':' detected/;
+var charBeforeSquareBracket = /^'\[' present, but not first character/;
+var noCloseBracket = /^ipv6 address is missing closing '\]'/;
+var noOpenBracket = /^'\]' present without '\['/;
+var noColonPrePort = /^missing colon after '\]' before the port/;
 var badStrings = [
-    {s: undefined, r: /^Missing connection string$/},
-    {s: 7, r: /^Incorrect type/},
-    {s: null, r: /^Incorrect type/},
-    {s: "", r: /^Empty connection string$/},
-    {s: "    ", r: /^Empty connection string$/},
-    {s: ":", r: /^Missing host name/},
-    {s: "/", r: /^Missing host name/},
-    {s: ":/", r: /^Missing host name/},
-    {s: ":/test", r: /^Missing host name/},
-    {s: ":27999/", r: /^Missing host name/},
-    {s: ":27999/test", r: /^Missing host name/},
-    {s: "/test", r: /^Missing host name/},
-    {s: "localhost:/test", r: /^Missing port number/},
-    {s: "::1:/test", r: /^Missing port number/},
-    {s: "::1:cat/test", r: /^Invalid port number/},
-    {s: "::1:1cat/test", r: /^Invalid port number/},
-    {s: "::1:123456/test", r: /^Invalid port number/},
-    {s: "::1:65536/test", r: /^Invalid port number/},
-    {s: "127.0.0.1:65536/test", r: /^Invalid port number/},
-    {s: "::1:27999/", r: /^Missing database name/},
-    {s: "127.0.0.1:27999/", r: /^Missing database name/},
-    {s: "::1:27999/test", r: /^More than one ':'/},
-    {s: "0:0::0:0:1:27999/test", r: /^More than one ':'/},
-    {s: "0000:0000:0000:0000:0000:0000:0000:0001:27999/test", r: /^More than one ':'/},
-    {s: "a[127.0.0.1]:27999/", r: /^Missing database name/},
-    {s: "a[::1:]27999/", r: /^Invalid port number/},
-    {s: "[::1:27999/", r: /^Missing database name/},
-    {s: "[::1:]27999/", r: /^Invalid port number/},
-    {s: "::1]:27999/", r: /^Missing database name/}
+    {s: undefined, r: missingConnString},
+    {s: 7, r: incorrectType},
+    {s: null, r: incorrectType},
+    {s: "", r: emptyConnString},
+    {s: "    ", r: emptyConnString},
+    {s: ":", r: emptyHost},
+    {s: "/", r: badHost},
+    {s: ":/", r: emptyHost},
+    {s: ":/test", r: emptyHost},
+    {s: ":27999/", r: emptyHost},
+    {s: ":27999/test", r: emptyHost},
+    {s: "/test", r: badHost},
+    {s: "localhost:/test", r: noPort},
+    {s: "[::1]:/test", r: noPort},
+    {s: "[::1]:cat/test", r: badPort},
+    {s: "[::1]:1cat/test", r: badPort},
+    {s: "[::1]:123456/test", r: invalidPort},
+    {s: "[::1]:65536/test", r: invalidPort},
+    {s: "127.0.0.1:65536/test", r: invalidPort},
+    {s: "::1:27999/test", r: moreThanOneColon},
+    {s: "0:0::0:0:1:27999/test", r: moreThanOneColon},
+    {s: "0000:0000:0000:0000:0000:0000:0000:0001:27999/test", r: moreThanOneColon},
+    {s: "a[127.0.0.1]:27999/", r: charBeforeSquareBracket},
+    {s: "a[::1:]27999/", r: charBeforeSquareBracket},
+    {s: "[::1:27999/", r: noCloseBracket},
+    {s: "[::1:]27999/", r: noColonPrePort},
+    {s: "::1]:27999/", r: noOpenBracket},
 ];
 
 var substitutePort = function(connectionString) {

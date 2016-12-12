@@ -57,15 +57,13 @@ assert.eq(398, x.executionStats.nReturned, "BC1");
 assert.eq(398, x.executionStats.totalKeysExamined, "BC2");
 assert.eq(398, x.executionStats.totalDocsExamined, "BC3");
 
-// Check proper nscannedObjects count when using a query optimizer cursor.
+// Test that a distinct over a trailing field of the index can be covered.
 t.dropIndexes();
 t.ensureIndex({a: 1, b: 1});
 x = d("b", {a: {$gt: 5}, b: {$gt: 5}});
 printjson(x);
-// 171 is the # of results we happen to scan when we don't use a distinct
-// hack.  When we use the distinct hack we scan 16, currently.
 assert.lte(x.executionStats.nReturned, 171);
-assert.eq(171, x.executionStats.totalDocsExamined, "BD3");
+assert.eq(0, x.executionStats.totalDocsExamined, "BD3");
 
 // Should use an index scan over the hashed index.
 t.dropIndexes();

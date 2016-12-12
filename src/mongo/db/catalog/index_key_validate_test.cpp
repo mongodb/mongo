@@ -34,106 +34,205 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
 namespace {
 
+using IndexVersion = IndexDescriptor::IndexVersion;
+using index_key_validate::validateKeyPattern;
+
 TEST(IndexKeyValidateTest, KeyElementValueOfSmallPositiveIntSucceeds) {
-    ASSERT_OK(validateKeyPattern(BSON("x" << 1)));
-    ASSERT_OK(validateKeyPattern(BSON("x" << 5)));
+    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+        ASSERT_OK(validateKeyPattern(BSON("x" << 1), indexVersion));
+        ASSERT_OK(validateKeyPattern(BSON("x" << 5), indexVersion));
+    }
 }
 
 TEST(IndexKeyValidateTest, KeyElementValueOfSmallNegativeIntSucceeds) {
-    ASSERT_OK(validateKeyPattern(BSON("x" << -1)));
-    ASSERT_OK(validateKeyPattern(BSON("x" << -5)));
+    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+        ASSERT_OK(validateKeyPattern(BSON("x" << -1), indexVersion));
+        ASSERT_OK(validateKeyPattern(BSON("x" << -5), indexVersion));
+    }
 }
 
-TEST(IndexKeyValidateTest, KeyElementValueOfZeroFails) {
-    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << 0)));
-    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << 0.0)));
-    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << -0.0)));
+TEST(IndexKeyValidateTest, KeyElementValueOfZeroFailsForV2Indexes) {
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << 0), IndexVersion::kV2));
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+              validateKeyPattern(BSON("x" << 0.0), IndexVersion::kV2));
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+              validateKeyPattern(BSON("x" << -0.0), IndexVersion::kV2));
 }
 
-TEST(IndexKeyValidateTest, KeyElementValueOfNaNFails) {
+TEST(IndexKeyValidateTest, KeyElementValueOfZeroSucceedsForV0AndV1Indexes) {
+    for (auto indexVersion : {IndexVersion::kV0, IndexVersion::kV1}) {
+        ASSERT_OK(validateKeyPattern(BSON("x" << 0), indexVersion));
+        ASSERT_OK(validateKeyPattern(BSON("x" << 0.0), indexVersion));
+        ASSERT_OK(validateKeyPattern(BSON("x" << -0.0), indexVersion));
+    }
+}
+
+TEST(IndexKeyValidateTest, KeyElementValueOfNaNFailsForV2Indexes) {
     if (std::numeric_limits<double>::has_quiet_NaN) {
         double nan = std::numeric_limits<double>::quiet_NaN();
-        ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << nan)));
+        ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+                  validateKeyPattern(BSON("x" << nan), IndexVersion::kV2));
         ASSERT_EQ(ErrorCodes::CannotCreateIndex,
                   validateKeyPattern(BSON("a" << nan << "b"
-                                              << "2d")));
+                                              << "2d"),
+                                     IndexVersion::kV2));
+    }
+}
+
+TEST(IndexKeyValidateTest, KeyElementValueOfNaNSucceedsForV0AndV1Indexes) {
+    if (std::numeric_limits<double>::has_quiet_NaN) {
+        for (auto indexVersion : {IndexVersion::kV0, IndexVersion::kV1}) {
+            double nan = std::numeric_limits<double>::quiet_NaN();
+            ASSERT_OK(validateKeyPattern(BSON("x" << nan), indexVersion));
+            ASSERT_OK(validateKeyPattern(BSON("a" << nan << "b"
+                                                  << "2d"),
+                                         indexVersion));
+        }
     }
 }
 
 TEST(IndexKeyValidateTest, KeyElementValuePositiveFloatingPointSucceeds) {
-    ASSERT_OK(validateKeyPattern(BSON("x" << 0.1)));
+    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+        ASSERT_OK(validateKeyPattern(BSON("x" << 0.1), indexVersion));
+    }
 }
 
 TEST(IndexKeyValidateTest, KeyElementValueNegativeFloatingPointSucceeds) {
-    ASSERT_OK(validateKeyPattern(BSON("x" << -0.1)));
+    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+        ASSERT_OK(validateKeyPattern(BSON("x" << -0.1), indexVersion));
+    }
 }
 
 TEST(IndexKeyValidateTest, KeyElementValueOfBadPluginStringFails) {
-    auto status = validateKeyPattern(BSON("x"
-                                          << "foobar"));
-    ASSERT_NOT_OK(status);
-    ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
+    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+        auto status = validateKeyPattern(BSON("x"
+                                              << "foobar"),
+                                         indexVersion);
+        ASSERT_NOT_OK(status);
+        ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
+    }
 }
 
-TEST(IndexKeyValidateTest, KeyElementBooleanValueFails) {
-    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << true)));
-    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << false)));
+TEST(IndexKeyValidateTest, KeyElementBooleanValueFailsForV2Indexes) {
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+              validateKeyPattern(BSON("x" << true), IndexVersion::kV2));
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+              validateKeyPattern(BSON("x" << false), IndexVersion::kV2));
     ASSERT_EQ(ErrorCodes::CannotCreateIndex,
               validateKeyPattern(BSON("a"
                                       << "2dsphere"
                                       << "b"
-                                      << true)));
+                                      << true),
+                                 IndexVersion::kV2));
 }
 
-TEST(IndexKeyValidateTest, KeyElementNullValueFails) {
-    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << BSONNULL)));
+TEST(IndexKeyValidateTest, KeyElementBooleanValueSucceedsForV0AndV1Indexes) {
+    for (auto indexVersion : {IndexVersion::kV0, IndexVersion::kV1}) {
+        ASSERT_OK(validateKeyPattern(BSON("x" << true), indexVersion));
+        ASSERT_OK(validateKeyPattern(BSON("x" << false), indexVersion));
+        ASSERT_OK(validateKeyPattern(BSON("a"
+                                          << "2dsphere"
+                                          << "b"
+                                          << true),
+                                     indexVersion));
+    }
 }
 
-TEST(IndexKeyValidateTest, KeyElementUndefinedValueFails) {
-    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << BSONUndefined)));
+TEST(IndexKeyValidateTest, KeyElementNullValueFailsForV2Indexes) {
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+              validateKeyPattern(BSON("x" << BSONNULL), IndexVersion::kV2));
 }
 
-TEST(IndexKeyValidateTest, KeyElementMinKeyValueFails) {
-    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << MINKEY)));
+TEST(IndexKeyValidateTest, KeyElementNullValueSucceedsForV0AndV1Indexes) {
+    for (auto indexVersion : {IndexVersion::kV0, IndexVersion::kV1}) {
+        ASSERT_OK(validateKeyPattern(BSON("x" << BSONNULL), indexVersion));
+    }
 }
 
-TEST(IndexKeyValidateTest, KeyElementMaxKeyValueFails) {
-    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << MAXKEY)));
+TEST(IndexKeyValidateTest, KeyElementUndefinedValueFailsForV2Indexes) {
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+              validateKeyPattern(BSON("x" << BSONUndefined), IndexVersion::kV2));
+}
+
+TEST(IndexKeyValidateTest, KeyElementUndefinedValueSucceedsForV0AndV1Indexes) {
+    for (auto indexVersion : {IndexVersion::kV0, IndexVersion::kV1}) {
+        ASSERT_OK(validateKeyPattern(BSON("x" << BSONUndefined), indexVersion));
+    }
+}
+
+TEST(IndexKeyValidateTest, KeyElementMinKeyValueFailsForV2Indexes) {
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+              validateKeyPattern(BSON("x" << MINKEY), IndexVersion::kV2));
+}
+
+TEST(IndexKeyValidateTest, KeyElementMinKeyValueSucceedsForV0AndV1Indexes) {
+    for (auto indexVersion : {IndexVersion::kV0, IndexVersion::kV1}) {
+        ASSERT_OK(validateKeyPattern(BSON("x" << MINKEY), indexVersion));
+    }
+}
+
+TEST(IndexKeyValidateTest, KeyElementMaxKeyValueFailsForV2Indexes) {
+    ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+              validateKeyPattern(BSON("x" << MAXKEY), IndexVersion::kV2));
+}
+
+TEST(IndexKeyValidateTest, KeyElementMaxKeyValueSucceedsForV0AndV1Indexes) {
+    for (auto indexVersion : {IndexVersion::kV0, IndexVersion::kV1}) {
+        ASSERT_OK(validateKeyPattern(BSON("x" << MAXKEY), indexVersion));
+    }
 }
 
 TEST(IndexKeyValidateTest, KeyElementObjectValueFails) {
-    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << BSON("y" << 1))));
+    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+        ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+                  validateKeyPattern(BSON("x" << BSON("y" << 1)), indexVersion));
+    }
 }
 
 TEST(IndexKeyValidateTest, KeyElementArrayValueFails) {
-    ASSERT_EQ(ErrorCodes::CannotCreateIndex, validateKeyPattern(BSON("x" << BSON_ARRAY(1))));
+    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+        ASSERT_EQ(ErrorCodes::CannotCreateIndex,
+                  validateKeyPattern(BSON("x" << BSON_ARRAY(1)), indexVersion));
+    }
 }
 
 TEST(IndexKeyValidateTest, CompoundKeySucceedsOn2dGeoIndex) {
-    ASSERT_OK(validateKeyPattern(BSON("a" << 1 << "b"
-                                          << "2d")));
+    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+        ASSERT_OK(validateKeyPattern(BSON("a" << 1 << "b"
+                                              << "2d"),
+                                     indexVersion));
+    }
 }
 
 TEST(IndexKeyValidateTest, CompoundKeySucceedsOn2dsphereGeoIndex) {
-    ASSERT_OK(validateKeyPattern(BSON("a" << 1 << "b"
-                                          << "2dsphere")));
+    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+        ASSERT_OK(validateKeyPattern(BSON("a" << 1 << "b"
+                                              << "2dsphere"),
+                                     indexVersion));
+    }
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameTextFailsOnNonTextIndex) {
-    auto status = validateKeyPattern(BSON("_fts" << 1));
-    ASSERT_NOT_OK(status);
-    ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
+    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+        auto status = validateKeyPattern(BSON("_fts" << 1), indexVersion);
+        ASSERT_NOT_OK(status);
+        ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
+    }
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameTextSucceedsOnTextIndex) {
-    ASSERT_OK(validateKeyPattern(BSON("a" << 1 << "_fts"
-                                          << "text")));
+    for (auto indexVersion : IndexDescriptor::getSupportedIndexVersions()) {
+        ASSERT_OK(validateKeyPattern(BSON("a" << 1 << "_fts"
+                                              << "text"),
+                                     indexVersion));
+    }
 }
 
 }  // namespace

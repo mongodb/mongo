@@ -97,8 +97,6 @@ private:
     virtual std::streamsize xsputn(const char* s, std::streamsize count);
     virtual int_type overflow(int_type ch = traits_type::eof());
 
-    std::streamsize writeToFile(const char* s, std::streamsize count);
-
     HANDLE _fileHandle;
 };
 
@@ -163,7 +161,8 @@ bool Win32FileStreambuf::open(StringData fileName, bool append) {
     return false;
 }
 
-std::streamsize Win32FileStreambuf::writeToFile(const char* s, std::streamsize count) {
+// Called when strings are written to ostream
+std::streamsize Win32FileStreambuf::xsputn(const char* s, std::streamsize count) {
     DWORD totalBytesWritten = 0;
 
     while (count > totalBytesWritten) {
@@ -171,32 +170,8 @@ std::streamsize Win32FileStreambuf::writeToFile(const char* s, std::streamsize c
         if (!WriteFile(_fileHandle, s, count - totalBytesWritten, &bytesWritten, NULL)) {
             break;
         }
+
         totalBytesWritten += bytesWritten;
-    }
-
-    return totalBytesWritten;
-}
-
-// Called when strings are written to ostream
-std::streamsize Win32FileStreambuf::xsputn(const char* s, std::streamsize count) {
-    DWORD totalBytesWritten = 0;
-
-    // Scan for embedded newlines before end
-    // this should be rare since the newline should only be at the end
-    const char* startPos = s;
-    for (int i = 0; i < count; i++) {
-        if (s[i] == '\n') {
-            totalBytesWritten += writeToFile(startPos, i - (startPos - s));
-            writeToFile("\r\n", 2);
-            totalBytesWritten += 1;  // Caller expected we only wrote 1 char, so tell them so
-            startPos = &s[i + 1];
-        }
-    }
-
-    // Did the string not end on "\n"? Write the remaining, no need for CRLF
-    // as upper layers are responsible for it
-    if ((startPos - s) != count) {
-        totalBytesWritten += writeToFile(startPos, count - (startPos - s));
     }
 
     return totalBytesWritten;
@@ -210,21 +185,6 @@ Win32FileStreambuf::int_type Win32FileStreambuf::overflow(int_type ch) {
     if (1 == xsputn(&toPut, 1))
         return ch;
     return traits_type::eof();
-}
-
-// Win32 implementation of renameFile that handles non-ascii file names.
-int renameFile(const std::string& oldName, const std::string& newName) {
-    return _wrename(utf8ToWide(oldName).c_str(), utf8ToWide(newName).c_str());
-}
-
-}  // namespace
-#else
-
-namespace {
-
-// *nix implementation of renameFile that assumes the OS is encoding file names in UTF-8.
-int renameFile(const std::string& oldName, const std::string& newName) {
-    return rename(oldName.c_str(), newName.c_str());
 }
 
 }  // namespace
@@ -264,17 +224,16 @@ Status RotatableFileWriter::Use::rotate(bool renameOnRotate, const std::string& 
                                               << e.what());
             }
 
-            if (0 != renameFile(_writer->_fileName, renameTarget)) {
+            boost::system::error_code ec;
+            boost::filesystem::rename(_writer->_fileName, renameTarget, ec);
+            if (ec) {
                 return Status(ErrorCodes::FileRenameFailed,
                               mongoutils::str::stream() << "Failed  to rename \""
                                                         << _writer->_fileName
                                                         << "\" to \""
                                                         << renameTarget
                                                         << "\": "
-                                                        << strerror(errno)
-                                                        << " ("
-                                                        << errno
-                                                        << ')');
+                                                        << ec.message());
                 // TODO(schwerin): Make errnoWithDescription() available in the logger library, and
                 // use it here.
             }

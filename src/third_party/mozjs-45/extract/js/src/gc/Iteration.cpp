@@ -130,8 +130,6 @@ JS_PUBLIC_API(void)
 JS_IterateCompartments(JSRuntime* rt, void* data,
                        JSIterateCompartmentCallback compartmentCallback)
 {
-    MOZ_ASSERT(!rt->isHeapBusy());
-
     AutoTraceSession session(rt);
 
     for (CompartmentsIter c(rt, WithAtoms); !c.done(); c.next())

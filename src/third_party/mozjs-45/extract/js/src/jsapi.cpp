@@ -5781,6 +5781,18 @@ JS_ErrorFromException(JSContext* cx, HandleObject obj)
     return ErrorFromException(cx, obj);
 }
 
+void
+JSErrorReport::initLinebuf(const char16_t* linebuf, size_t linebufLength, size_t tokenOffset)
+{
+    MOZ_ASSERT(linebuf);
+    MOZ_ASSERT(tokenOffset <= linebufLength);
+    MOZ_ASSERT(linebuf[linebufLength] == '\0');
+
+    linebuf_ = linebuf;
+    linebufLength_ = linebufLength;
+    tokenOffset_ = tokenOffset;
+}
+
 JS_PUBLIC_API(bool)
 JS_ThrowStopIteration(JSContext* cx)
 {

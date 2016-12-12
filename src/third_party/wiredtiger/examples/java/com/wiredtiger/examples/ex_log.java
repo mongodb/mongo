@@ -35,7 +35,7 @@ import java.util.*;
 
 class Lsn {
     int file;
-    long offset;
+    int offset;
 }
 
 public class ex_log {
@@ -57,7 +57,7 @@ public class ex_log {
 
         conn = wiredtiger.open(home2, CONN_CONFIG);
         Session session = conn.open_session(null);
-        session.create(uri, "key_format=U,value_format=U");
+        session.create(uri, "key_format=S,value_format=S");
         return (session);
     }
 
@@ -72,17 +72,17 @@ public class ex_log {
 
         while ((ret = cursor.next()) == 0) {
             ret = curs_copy.next();
-            byte[] key = cursor.getKeyByteArray();
-            byte[] value = cursor.getValueByteArray();
-            byte[] key_copy = curs_copy.getKeyByteArray();
-            byte[] value_copy = curs_copy.getValueByteArray();
-            if (!Arrays.equals(key, key_copy) ||
-                !Arrays.equals(value, value_copy)) {
+            String key = cursor.getKeyString();
+            String value = cursor.getValueString();
+            String key_copy = curs_copy.getKeyString();
+            String value_copy = curs_copy.getValueString();
+            if (!key.equals(key_copy) ||
+                !value.equals(value_copy)) {
                 System.err.println(
-                    "Mismatched: key " + new String(key) +
-                    ", key_copy " + new String(key_copy) +
-                    ", value " + new String(value) +
-                    ", value_copy " + new String(value_copy));
+                    "Mismatched: key " + key + ", key_copy " + key_copy +
+                    ", value " + value + ", value_copy " + value_copy);
+                ret = cursor.close();
+                ret = curs_copy.close();
                 return (1);
             }
         }
@@ -121,7 +121,7 @@ public class ex_log {
      *	A simple walk of the log.
      */
     static int
-    simple_walk_log(Session session)
+    simple_walk_log(Session session, int count_min)
         throws WiredTigerException
     {
         Cursor cursor;
@@ -129,16 +129,18 @@ public class ex_log {
         byte[] logrec_key, logrec_value;
         long txnid;
         int fileid, opcount, optype, rectype;
-        int ret;
+        int count, ret;
 
         /*! [log cursor open] */
         cursor = session.open_cursor("log:", null, null);
         /*! [log cursor open] */
 
+        count = 0;
         while ((ret = cursor.next()) == 0) {
+            count++;
             /*! [log cursor get_key] */
             lsn.file = cursor.getKeyInt();
-            lsn.offset = cursor.getKeyLong();
+            lsn.offset = cursor.getKeyInt();
             opcount = cursor.getKeyInt();
             /*! [log cursor get_key] */
             /*! [log cursor get_value] */
@@ -156,6 +158,11 @@ public class ex_log {
         if (ret == wiredtiger.WT_NOTFOUND)
             ret = 0;
         ret = cursor.close();
+	if (count < count_min) {
+            System.err.println("Expected minimum " + count_min +
+                               " records, found " + count);
+            return (1);
+        }
         return (ret);
     }
     /*! [log cursor walk] */
@@ -185,7 +192,7 @@ public class ex_log {
         lsnsave = new Lsn();
         while ((ret = cursor.next()) == 0) {
             lsn.file = cursor.getKeyInt();
-            lsn.offset = cursor.getKeyLong();
+            lsn.offset = cursor.getKeyInt();
             opcount = cursor.getKeyInt();
 
             /*
@@ -194,8 +201,10 @@ public class ex_log {
              * that LSN to the end (where the multi-step transaction
              * was performed).  Just choose the record that is MAX_KEYS.
              */
-            if (++i == MAX_KEYS)
-                lsnsave = lsn;
+            if (++i == MAX_KEYS) {
+                lsnsave.file = lsn.file;
+                lsnsave.offset = lsn.offset;
+            }
             txnid = cursor.getValueLong();
             rectype = cursor.getValueInt();
             optype = cursor.getValueInt();
@@ -217,10 +226,10 @@ public class ex_log {
 
             /*
              * If the operation is a put, replay it here on the backup
-             * connection.  Note, we cheat by looking only for fileid 1
-             * in this example.  The metadata is fileid 0.
+             * connection.  Note, we cheat by looking at the fileid.
+             * The metadata is fileid 0, skip its records.
              */
-            if (fileid == 1 && rectype == wiredtiger.WT_LOGREC_COMMIT &&
+            if (fileid != 0 && rectype == wiredtiger.WT_LOGREC_COMMIT &&
                 optype == wiredtiger.WT_LOGOP_ROW_PUT) {
                 if (!in_txn) {
                     ret = session2.begin_transaction(null);
@@ -238,15 +247,20 @@ public class ex_log {
         /*
          * Compare the tables after replay.  They should be identical.
          */
-        if (compare_tables(session, session2) != 0)
-            System.out.println("compare failed");
+        if (compare_tables(session, session2) != 0) {
+            cursor.close();
+            session2.close(null);
+            wt_conn2.close(null);
+            return (ret);
+        }
         ret = session2.close(null);
         ret = wt_conn2.close(null);
 
         ret = cursor.reset();
         /*! [log cursor set_key] */
         cursor.putKeyInt(lsnsave.file);
-        cursor.putKeyLong(lsnsave.offset);
+        cursor.putKeyInt(lsnsave.offset);
+        cursor.putKeyInt(0);
         /*! [log cursor set_key] */
         /*! [log cursor search] */
         ret = cursor.search();
@@ -256,9 +270,9 @@ public class ex_log {
          * Walk all records starting with this key.
          */
         first = true;
-        while (ret == 0) {  /*TODO: not quite right*/
+        while (ret == 0) {
             lsn.file = cursor.getKeyInt();
-            lsn.offset = cursor.getKeyLong();
+            lsn.offset = cursor.getKeyInt();
             opcount = cursor.getKeyInt();
             if (first) {
                 first = false;
@@ -293,8 +307,9 @@ public class ex_log {
         Connection wt_conn;
         Cursor cursor;
         Session session;
-        int i, record_count, ret;
+        int count_min, i, record_count, ret;
 
+        count_min = 0;
         try {
             String command = "/bin/rm -rf " + home1 + " " + home2;
             Process proc = Runtime.getRuntime().exec(command);
@@ -317,6 +332,7 @@ public class ex_log {
 
         session = wt_conn.open_session(null);
         ret = session.create(uri, "key_format=S,value_format=S");
+        count_min++;
 
         cursor = session.open_cursor(uri, null, null);
         /*
@@ -328,6 +344,7 @@ public class ex_log {
             cursor.putKeyString(k);
             cursor.putValueString(v);
             ret = cursor.insert();
+            count_min++;
         }
         ret = session.begin_transaction(null);
         /*
@@ -341,10 +358,12 @@ public class ex_log {
             ret = cursor.insert();
         }
         ret = session.commit_transaction(null);
+        count_min++;
         ret = cursor.close();
 
         /*! [log cursor printf] */
         ret = session.log_printf("Wrote " + record_count + " records");
+        count_min++;
         /*! [log cursor printf] */
 
         session.close(null);
@@ -360,7 +379,7 @@ public class ex_log {
         }
 
         session = wt_conn.open_session(null);
-        ret = simple_walk_log(session);
+        ret = simple_walk_log(session, count_min);
         ret = walk_log(session);
         ret = session.close(null);
         ret = wt_conn.close(null);

@@ -133,7 +133,7 @@ TEST(KillCursorsRequestTest, toBSON) {
                                << "coll"
                                << "cursors"
                                << BSON_ARRAY(CursorId(123) << CursorId(456)));
-    ASSERT_EQ(requestObj, expectedObj);
+    ASSERT_BSONOBJ_EQ(requestObj, expectedObj);
 }
 
 }  // namespace

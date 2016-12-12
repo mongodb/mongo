@@ -42,6 +42,24 @@ using std::vector;
 namespace str = mongoutils::str;
 
 BSONObj DepsTracker::toProjection() const {
+    if (fields.empty() && !needWholeDocument) {
+        if (_needTextScore) {
+            // We only need the text score, but there is no easy way to express this in the query
+            // projection language. We use $noFieldsNeeded with a textScore meta-projection since
+            // this is an inclusion projection which will exclude all existing fields but add the
+            // textScore metadata.
+            return BSON("_id" << 0 << "$noFieldsNeeded" << 1 << Document::metaFieldTextScore
+                              << BSON("$meta"
+                                      << "textScore"));
+        } else {
+            // We truly need no information (we are doing a count or something similar). In this
+            // case, the DocumentSourceCursor will know there aren't any dependencies, and we can
+            // ignore the documents returned from the query system. We pass an empty object as the
+            // projection so that we have a chance of using the COUNT_SCAN optimization.
+            return BSONObj();
+        }
+    }
+
     BSONObjBuilder bb;
 
     if (_needTextScore)
@@ -51,10 +69,6 @@ BSONObj DepsTracker::toProjection() const {
 
     if (needWholeDocument)
         return bb.obj();
-
-    if (fields.empty()) {
-        return BSONObj();
-    }
 
     bool needId = false;
     string last;
@@ -116,7 +130,7 @@ boost::optional<ParsedDeps> DepsTracker::toParsedDeps() const {
 
 namespace {
 // Mutually recursive with arrayHelper
-Document documentHelper(const BSONObj& bson, const Document& neededFields);
+Document documentHelper(const BSONObj& bson, const Document& neededFields, int nFieldsNeeded = -1);
 
 // Handles array-typed values for ParsedDeps::extractFields
 Value arrayHelper(const BSONObj& bson, const Document& neededFields) {
@@ -139,33 +153,37 @@ Value arrayHelper(const BSONObj& bson, const Document& neededFields) {
 }
 
 // Handles object-typed values including the top-level for ParsedDeps::extractFields
-Document documentHelper(const BSONObj& bson, const Document& neededFields) {
-    MutableDocument md(neededFields.size());
+Document documentHelper(const BSONObj& bson, const Document& neededFields, int nFieldsNeeded) {
+    // We cache the number of top level fields, so don't need to re-compute it every time. For
+    // sub-documents, just scan for the number of fields.
+    if (nFieldsNeeded == -1) {
+        nFieldsNeeded = neededFields.size();
+    }
+    MutableDocument md(nFieldsNeeded);
 
     BSONObjIterator it(bson);
-    while (it.more()) {
-        BSONElement bsonElement(it.next());
+    while (it.more() && nFieldsNeeded > 0) {
+        auto bsonElement = it.next();
         StringData fieldName = bsonElement.fieldNameStringData();
         Value isNeeded = neededFields[fieldName];
 
         if (isNeeded.missing())
             continue;
 
+        --nFieldsNeeded;  // Found a needed field.
         if (isNeeded.getType() == Bool) {
             md.addField(fieldName, Value(bsonElement));
-            continue;
-        }
+        } else {
+            dassert(isNeeded.getType() == Object);
 
-        dassert(isNeeded.getType() == Object);
-
-        if (bsonElement.type() == Object) {
-            Document sub = documentHelper(bsonElement.embeddedObject(), isNeeded.getDocument());
-            md.addField(fieldName, Value(sub));
-        }
-
-        if (bsonElement.type() == Array) {
-            md.addField(fieldName,
-                        arrayHelper(bsonElement.embeddedObject(), isNeeded.getDocument()));
+            if (bsonElement.type() == BSONType::Object) {
+                md.addField(
+                    fieldName,
+                    Value(documentHelper(bsonElement.embeddedObject(), isNeeded.getDocument())));
+            } else if (bsonElement.type() == BSONType::Array) {
+                md.addField(fieldName,
+                            arrayHelper(bsonElement.embeddedObject(), isNeeded.getDocument()));
+            }
         }
     }
 
@@ -174,6 +192,6 @@ Document documentHelper(const BSONObj& bson, const Document& neededFields) {
 }  // namespace
 
 Document ParsedDeps::extractFields(const BSONObj& input) const {
-    return documentHelper(input, _fields);
+    return documentHelper(input, _fields, _nFields);
 }
 }

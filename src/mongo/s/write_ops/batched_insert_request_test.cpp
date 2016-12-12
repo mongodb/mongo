@@ -56,7 +56,7 @@ TEST(BatchedInsertRequest, Basic) {
 
     ASSERT_EQ("foo.test", request.getNS().ns());
 
-    ASSERT_EQUALS(origInsertRequestObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(origInsertRequestObj, request.toBSON());
 }
 
 TEST(BatchedInsertRequest, GenIDAll) {

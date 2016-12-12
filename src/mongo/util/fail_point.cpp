@@ -30,9 +30,11 @@
 
 #include "mongo/util/fail_point.h"
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/threadlocal.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/time_support.h"
@@ -175,6 +177,79 @@ FailPoint::RetCode FailPoint::slowShouldFailOpenBlock() {
             error() << "FailPoint Mode not supported: " << static_cast<int>(_mode);
             fassertFailed(16444);
     }
+}
+
+StatusWith<std::tuple<FailPoint::Mode, FailPoint::ValType, BSONObj>> FailPoint::parseBSON(
+    const BSONObj& obj) {
+    Mode mode = FailPoint::alwaysOn;
+    ValType val = 0;
+    const BSONElement modeElem(obj["mode"]);
+    if (modeElem.eoo()) {
+        return {ErrorCodes::IllegalOperation, "When setting a failpoint, you must supply a 'mode'"};
+    } else if (modeElem.type() == String) {
+        const std::string modeStr(modeElem.valuestr());
+
+        if (modeStr == "off") {
+            mode = FailPoint::off;
+        } else if (modeStr == "alwaysOn") {
+            mode = FailPoint::alwaysOn;
+        } else {
+            return {ErrorCodes::BadValue, str::stream() << "unknown mode: " << modeStr};
+        }
+    } else if (modeElem.type() == Object) {
+        const BSONObj modeObj(modeElem.Obj());
+
+        if (modeObj.hasField("times")) {
+            mode = FailPoint::nTimes;
+
+            long long longVal;
+            auto status = bsonExtractIntegerField(modeObj, "times", &longVal);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            if (longVal < 0) {
+                return {ErrorCodes::BadValue, "'times' option to 'mode' must be positive"};
+            }
+
+            if (longVal > std::numeric_limits<int>::max()) {
+                return {ErrorCodes::BadValue, "'times' option to 'mode' is too large"};
+            }
+            val = static_cast<int>(longVal);
+        } else if (modeObj.hasField("activationProbability")) {
+            mode = FailPoint::random;
+
+            if (!modeObj["activationProbability"].isNumber()) {
+                return {ErrorCodes::TypeMismatch,
+                        "the 'activationProbability' option to 'mode' must be a double between 0 "
+                        "and 1"};
+            }
+
+            const double activationProbability = modeObj["activationProbability"].numberDouble();
+            if (activationProbability < 0 || activationProbability > 1) {
+                return {ErrorCodes::BadValue,
+                        str::stream() << "activationProbability must be between 0.0 and 1.0; found "
+                                      << activationProbability};
+            }
+            val = static_cast<int32_t>(std::numeric_limits<int32_t>::max() * activationProbability);
+        } else {
+            return {
+                ErrorCodes::BadValue,
+                "'mode' must be one of 'off', 'alwaysOn', 'times', and 'activationProbability'"};
+        }
+    } else {
+        return {ErrorCodes::TypeMismatch, "'mode' must be a string or JSON object"};
+    }
+
+    BSONObj data;
+    if (obj.hasField("data")) {
+        if (!obj["data"].isABSONObj()) {
+            return {ErrorCodes::TypeMismatch, "the 'data' option must be a JSON object"};
+        }
+        data = obj["data"].Obj().getOwned();
+    }
+
+    return std::make_tuple(mode, val, data);
 }
 
 BSONObj FailPoint::toBSON() const {

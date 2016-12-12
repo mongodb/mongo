@@ -8,6 +8,8 @@ selector:
     exclude_files:
     - jstests/aggregation/bugs/server18198.js # Uses a mocked mongo client to test read preference.
     - jstests/aggregation/mongos_slaveok.js # Majority read on secondary requires afterOpTime.
+    - jstests/aggregation/sources/facet/use_cases.js # Cannot specify write concern when
+                                                     # secondaryThrottle is not set.
     - jstests/aggregation/testSlave.js # Majority read on secondary requires afterOpTime.
 
 executor:
@@ -21,6 +23,7 @@ executor:
         readMode: commands
     hooks:
     - class: ValidateCollections
+    - class: CheckReplOplogs
     - class: CheckReplDBHash
     fixture:
       class: ReplicaSetFixture
@@ -28,6 +31,7 @@ executor:
         enableMajorityReadConcern: ''
         set_parameters:
           enableTestCommands: 1
+          numInitialSyncAttempts: 1
       num_nodes: 2
       # Needs to be set for any ephemeral or no-journaling storage engine
       write_concern_majority_journal_default: false

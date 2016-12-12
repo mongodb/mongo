@@ -55,6 +55,14 @@ public:
                           shardingState->getConfigServer(txn).toString());
 
             Grid::get(txn)->configOpTime().append(&result, "lastSeenConfigServerOpTime");
+
+            // Get a migration status report if a migration is active for which this is the source
+            // shard. ShardingState::getActiveMigrationStatusReport will take an IS lock on the
+            // namespace of the active migration if there is one that is active.
+            BSONObj migrationStatus = ShardingState::get(txn)->getActiveMigrationStatusReport(txn);
+            if (!migrationStatus.isEmpty()) {
+                result.append("migrations", migrationStatus);
+            }
         }
 
         return result.obj();

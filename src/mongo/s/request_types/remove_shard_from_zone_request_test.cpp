@@ -64,11 +64,11 @@ TEST(RemoveShardFromZoneRequest, CommandBuilderShouldAlwaysCreateConfigCommand) 
     request.appendAsConfigCommand(&builder);
     auto cmdObj = builder.obj();
 
-    ASSERT_EQ(BSON("_configsvrRemoveShardFromZone"
-                   << "a"
-                   << "zone"
-                   << "z"),
-              cmdObj);
+    ASSERT_BSONOBJ_EQ(BSON("_configsvrRemoveShardFromZone"
+                           << "a"
+                           << "zone"
+                           << "z"),
+                      cmdObj);
 }
 
 TEST(RemoveShardFromZoneRequest, MissingZoneErrors) {
@@ -123,11 +123,11 @@ TEST(CfgRemoveShardFromZoneRequest, BasicValidConfigCommand) {
     request.appendAsConfigCommand(&builder);
     auto cmdObj = builder.obj();
 
-    ASSERT_EQ(BSON("_configsvrRemoveShardFromZone"
-                   << "a"
-                   << "zone"
-                   << "z"),
-              cmdObj);
+    ASSERT_BSONOBJ_EQ(BSON("_configsvrRemoveShardFromZone"
+                           << "a"
+                           << "zone"
+                           << "z"),
+                      cmdObj);
 }
 
 TEST(CfgRemoveShardFromZoneRequest, MissingZoneErrors) {

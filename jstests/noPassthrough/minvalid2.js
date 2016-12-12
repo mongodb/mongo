@@ -37,6 +37,11 @@ var master = replTest.getPrimary();
 var masterId = replTest.getNodeId(master);
 var slave = slaves[0];
 var slaveId = replTest.getNodeId(slave);
+
+// Wait for primary to detect that the arbiter is up so that it won't step down when we later take
+// the secondary offline.
+replTest.waitForState(replTest.nodes[2], ReplSetTest.State.ARBITER);
+
 var mdb = master.getDB("foo");
 
 mdb.foo.save({a: 1000});
@@ -74,9 +79,15 @@ print("8: start up former master");
 clearRawMongoProgramOutput();
 replTest.restart(masterId);
 
-print("9: check former master does not roll back");
+print("9: check former master " + replTest.nodes[masterId].host + " does not select former slave " +
+      slave.host + " as sync source");
+replTest.waitForState(replTest.nodes[masterId], ReplSetTest.State.RECOVERING, 90000);
+
+// Sync source selection will log this message if it does not detect min valid in the sync
+// source candidate's oplog.
 assert.soon(function() {
-    return rawMongoProgramOutput().match("need to rollback, but in inconsistent state");
+    return rawMongoProgramOutput().match(
+        'it does not contain the necessary operations for us to reach a consistent state');
 });
 
 replTest.stopSet(undefined, undefined, {allowedExitCodes: [MongoRunner.EXIT_ABRUPT]});

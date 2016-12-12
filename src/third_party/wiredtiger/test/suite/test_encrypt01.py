@@ -57,6 +57,7 @@ class test_encrypt01(wttest.WiredTigerTestCase):
         ('lz4', dict(log_compress='lz4', block_compress='lz4')),
         ('snappy', dict(log_compress='snappy', block_compress='snappy')),
         ('zlib', dict(log_compress='zlib', block_compress='zlib')),
+        ('zstd', dict(log_compress='zstd', block_compress='zstd')),
         ('none-snappy', dict(log_compress=None, block_compress='snappy')),
         ('snappy-lz4', dict(log_compress='snappy', block_compress='lz4')),
     ]
@@ -137,7 +138,6 @@ class test_encrypt01(wttest.WiredTigerTestCase):
             self.assertEqual(cursor.search(), 0)
             self.assertEquals(cursor.get_value(), val)
         cursor.close()
-
 
 if __name__ == '__main__':
     wttest.run()

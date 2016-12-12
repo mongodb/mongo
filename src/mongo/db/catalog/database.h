@@ -156,7 +156,8 @@ public:
     Collection* createCollection(OperationContext* txn,
                                  StringData ns,
                                  const CollectionOptions& options = CollectionOptions(),
-                                 bool createDefaultIndexes = true);
+                                 bool createDefaultIndexes = true,
+                                 const BSONObj& idIndex = BSONObj());
 
     Status createView(OperationContext* txn, StringData viewName, const CollectionOptions& options);
 
@@ -192,15 +193,6 @@ public:
      * Must be called with the specified database locked in X mode.
      */
     static void dropDatabase(OperationContext* txn, Database* db);
-
-    /**
-     * @return name of an existing database with same text name but different
-     * casing, if one exists.  Otherwise the empty std::string is returned.  If
-     * 'duplicates' is specified, it is filled with all duplicate names.
-     // TODO move???
-     */
-    static std::string duplicateUncasedName(const std::string& name,
-                                            std::set<std::string>* duplicates = 0);
 
     static Status validateDBName(StringData dbname);
 
@@ -258,10 +250,17 @@ private:
 
 void dropAllDatabasesExceptLocal(OperationContext* txn);
 
+/**
+ * Creates the namespace 'ns' in the database 'db' according to 'options'. If 'createDefaultIndexes'
+ * is true, creates the _id index for the collection (and the system indexes, in the case of system
+ * collections). Creates the collection's _id index according to 'idIndex', if it is non-empty. When
+ * 'idIndex' is empty, creates the default _id index.
+ */
 Status userCreateNS(OperationContext* txn,
                     Database* db,
                     StringData ns,
                     BSONObj options,
-                    bool createDefaultIndexes = true);
+                    bool createDefaultIndexes = true,
+                    const BSONObj& idIndex = BSONObj());
 
 }  // namespace mongo

@@ -56,46 +56,56 @@ assert.eq([{a: {b: 2}}, {a: {b: 3}}], t.findOne({_id: 7}).x);
 var doc8 = {_id: 8, x: [{a: 1}, {a: 2}]};
 t.save(doc8);
 var res = t.update({_id: 8}, {$push: {x: {$sort: {a: -1}}}});
-assert.writeError(res);
+assert.writeErrorWithCode(res, ErrorCodes.DollarPrefixedFieldName);
 assert.docEq(t.findOne({_id: 8}), doc8);  // ensure doc was not changed
 
 t.save({_id: 100, x: [{a: 1}]});
 
-// For now, elements of the $each vector need to be objects. In here, '2' is an invalide $each.
-assert.throws(t.update({_id: 100}, {$push: {x: {$each: [2], $slice: -2, $sort: {a: 1}}}}));
+// Elements of the $each vector can be integers. In here, '2' is a valid $each.
+assert.writeOK(t.update({_id: 100}, {$push: {x: {$each: [2], $slice: -2, $sort: {a: 1}}}}));
 
-// For the same reason as above, '1' is an invalid $each element.
-assert.throws(t.update({_id: 100}, {$push: {x: {$each: [{a: 2}, 1], $slice: -2, $sort: {a: 1}}}}));
+// For the same reason as above, '1' is an valid $each element.
+assert.writeOK(t.update({_id: 100}, {$push: {x: {$each: [{a: 2}, 1], $slice: -2, $sort: {a: 1}}}}));
 
 // The sort key pattern cannot be empty.
-assert.throws(t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: -2, $sort: {}}}}));
+assert.writeErrorWithCode(
+    t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: -2, $sort: {}}}}),
+    ErrorCodes.BadValue);
 
-// For now, we do not support positive $slice's (ie, trimming from the array's front).
-assert.throws(t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: 2, $sort: {a: 1}}}}));
+// Support positive $slice's (ie, trimming from the array's front).
+assert.writeOK(t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: 2, $sort: {a: 1}}}}));
 
 // A $slice cannot be a fractional value.
-assert.throws(t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: -2.1, $sort: {a: 1}}}}));
+assert.writeErrorWithCode(
+    t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: -2.1, $sort: {a: 1}}}}),
+    ErrorCodes.BadValue);
 
 // The sort key pattern's value must be either 1 or -1. In here, {a:-2} is an invalid value.
-assert.throws(t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: -2, $sort: {a: -2}}}}));
+assert.writeErrorWithCode(
+    t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: -2, $sort: {a: -2}}}}),
+    ErrorCodes.BadValue);
 
-// For now, we are not supporting sorting of basic elements (non-object, non-arrays). In here,
-// the $sort clause would need to have a key pattern value rather than 1.
-assert.throws(t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: -2, $sort: 1}}}));
+// Support sorting array alements that are not documents.
+assert.writeOK(t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: -2, $sort: 1}}}));
 
 // The key pattern 'a.' is an invalid value for $sort.
-assert.throws(t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: -2, $sort: {'a.': 1}}}}));
+assert.writeErrorWithCode(
+    t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: -2, $sort: {'a.': 1}}}}),
+    ErrorCodes.BadValue);
 
 // An empty key pattern is not a valid $sort value.
-assert.throws(t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: -2, $sort: {'': 1}}}}));
+assert.writeErrorWithCode(
+    t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: -2, $sort: {'': 1}}}}),
+    ErrorCodes.BadValue);
 
 // If a $slice is used, the only other $sort clause that's accepted is $sort. In here, $xxx
 // is not a valid clause.
-assert.throws(t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: -2, $xxx: {s: 1}}}}));
+assert.writeErrorWithCode(
+    t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: -2, $xxx: {s: 1}}}}),
+    ErrorCodes.BadValue);
 
 t.remove({});
 
-// Ensure that existing values are validated in the array as objects during a $sort with $each,
-// not only the elements in the $each array.
+// Existing values are validated in the array do not have to be objects during a $sort with $each.
 t.save({_id: 100, x: [1, "foo"]});
-assert.throws(t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: -2, $sort: {a: 1}}}}));
+assert.writeOK(t.update({_id: 100}, {$push: {x: {$each: [{a: 2}], $slice: -2, $sort: {a: 1}}}}));

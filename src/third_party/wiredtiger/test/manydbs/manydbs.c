@@ -68,8 +68,6 @@ usage(void)
 extern int __wt_optind;
 extern char *__wt_optarg;
 
-void (*custom_die)(void) = NULL;
-
 static WT_CONNECTION **connections = NULL;
 static WT_CURSOR **cursors = NULL;
 static WT_RAND_STATE rnd;
@@ -93,7 +91,7 @@ get_stat(WT_SESSION *stat_session, int stat_field, uint64_t *valuep)
 	return (ret);
 }
 
-static int
+static void
 run_ops(int dbs)
 {
 	WT_ITEM data;
@@ -119,7 +117,6 @@ run_ops(int dbs)
 			testutil_check(cursors[db]->insert(cursors[db]));
 		}
 	}
-	return (0);
 }
 
 int
@@ -211,7 +208,7 @@ main(int argc, char *argv[])
 		    WT_STAT_CONN_COND_AUTO_WAIT_RESET, &cond_reset_orig[i]));
 	for (i = 0; i < MAX_IDLE_TIME; i += IDLE_INCR) {
 		if (!idle)
-			testutil_check(run_ops(dbs));
+			run_ops(dbs);
 		printf("Sleep %d (%d of %d)\n", IDLE_INCR, i, MAX_IDLE_TIME);
 		sleep(IDLE_INCR);
 	}

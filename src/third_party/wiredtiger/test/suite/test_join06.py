@@ -37,8 +37,10 @@ class test_join06(wttest.WiredTigerTestCase):
     nentries = 1000
 
     isoscen = [
-        ('isolation_read_uncommitted', dict(uncommitted=True)),
-        ('isolation_default', dict(uncommitted=False))
+        ('isolation_read_uncommitted', dict(isolation='read-uncommitted')),
+        ('isolation_read_committed', dict(isolation='read-committed')),
+        ('isolation_default', dict(isolation='')),
+        ('isolation_snapshot', dict(isolation='snapshot'))
     ]
 
     bloomscen = [
@@ -79,8 +81,8 @@ class test_join06(wttest.WiredTigerTestCase):
         # TODO: needed?
         #self.reopen_conn()
 
-        if self.uncommitted:
-            self.session.begin_transaction('isolation=read-uncommitted')
+        if self.isolation != '':
+            self.session.begin_transaction('isolation=' + self.isolation)
 
         jc = self.session.open_cursor('join:table:join06', None, None)
         c0 = self.session.open_cursor('index:join06:index0', None, None)
@@ -96,7 +98,7 @@ class test_join06(wttest.WiredTigerTestCase):
         self.assertEquals(0, c1.search())
         self.session.join(jc, c1, joinconfig)
 
-        if self.uncommitted and self.bloom:
+        if self.isolation == 'read-uncommitted' and self.bloom:
             # Make sure that read-uncommitted with Bloom is not allowed.
             # This is detected on the first next() operation.
             msg = '/cannot be used with read-uncommitted/'
@@ -106,7 +108,7 @@ class test_join06(wttest.WiredTigerTestCase):
 
         # Changes made in another session may or may not be visible to us,
         # depending on the isolation level.
-        if self.uncommitted:
+        if self.isolation == 'read-uncommitted':
             # isolation level is read-uncommitted, so we will see
             # additions deletions made in our other session.
             mbr = set(range(525,1000,10)) | set(range(55,100,10)) | set([520])
@@ -116,12 +118,11 @@ class test_join06(wttest.WiredTigerTestCase):
             mbr = set(range(520,600)) | set(range(53,60))
 
         altered = False
-
         while jc.next() == 0:
             [k] = jc.get_keys()
             [v0,v1] = jc.get_values()
             #self.tty('GOT: ' + str(k) + ': ' + str(jc.get_values()))
-            if altered and self.uncommitted:
+            if altered and self.isolation == 'read-uncommitted':
                 self.assertEquals(self.gen_values2(k), [v0, v1])
             else:
                 self.assertEquals(self.gen_values(k), [v0, v1])
@@ -150,7 +151,7 @@ class test_join06(wttest.WiredTigerTestCase):
         jc.close()
         c1.close()
         c0.close()
-        if self.uncommitted:
+        if self.isolation != '':
             self.session.commit_transaction()
         self.session.drop('table:join06')
 

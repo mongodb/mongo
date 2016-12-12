@@ -37,6 +37,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
@@ -54,6 +55,7 @@
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_database.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
@@ -76,7 +78,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_planner.h"
@@ -89,12 +91,14 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
+#include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/request_interface.h"
 #include "mongo/s/chunk_version.h"
@@ -115,41 +119,6 @@ using std::ostringstream;
 using std::string;
 using std::stringstream;
 using std::unique_ptr;
-
-namespace {
-/**
- * Checks for additional required privileges when creating or modifying a view. Call this function
- * after verifying that the user has the "createCollection" or "collMod" action, respectively.
- *
- * 'cmdObj' must have a String field named 'viewOn'.
- */
-Status canCreateOrModifyView(Client* client,
-                             const std::string& dbname,
-                             const BSONObj& cmdObj,
-                             ResourcePattern resource) {
-    AuthorizationSession* authzSession = AuthorizationSession::get(client);
-
-    // It's safe to allow a user to create or modify a view if they can't read it anyway.
-    if (!authzSession->isAuthorizedForActionsOnResource(resource, ActionType::find)) {
-        return Status::OK();
-    }
-
-    // The user can read the view they're trying to create/modify, so we must ensure that they also
-    // have the find action on all namespaces in "viewOn" and "pipeline". If "pipeline" is not
-    // specified, default to the empty pipeline.
-    auto viewPipeline =
-        cmdObj.hasField("pipeline") ? BSONArray(cmdObj["pipeline"].Obj()) : BSONArray();
-
-    // This check ignores some invalid pipeline specifications. For example, if a user specifies a
-    // view definition with an invalid specification like {$lookup: "blah"}, the authorization check
-    // will succeed but the pipeline will fail to parse later in Command::run().
-    return Pipeline::checkAuthForCommand(
-        client,
-        dbname,
-        BSON("aggregate" << cmdObj["viewOn"].checkAndGetStringData() << "pipeline"
-                         << viewPipeline));
-}
-}  // namespace
 
 class CmdShutdownMongoD : public CmdShutdown {
 public:
@@ -292,9 +261,23 @@ public:
             return false;
         }
 
-        // TODO: SERVER-4328 Don't lock globally
+        // Closing a database requires a global lock.
         ScopedTransaction transaction(txn, MODE_X);
         Lock::GlobalWrite lk(txn->lockState());
+        if (!dbHolder().get(txn, dbname)) {
+            // If the name doesn't make an exact match, check for a case insensitive match.
+            std::set<std::string> otherCasing = dbHolder().getNamesWithConflictingCasing(dbname);
+            if (otherCasing.empty()) {
+                // Database doesn't exist. Treat this as a success (historical behavior).
+                return true;
+            }
+
+            // Database exists with a differing case. Treat this as an error. Report the casing
+            // conflict.
+            errmsg = str::stream() << "Database exists with a different case. Given: `" << dbname
+                                   << "` Found: `" << *otherCasing.begin() << "`";
+            return false;
+        }
 
         // TODO (Kal): OldClientContext legacy, needs to be removed
         {
@@ -474,7 +457,7 @@ public:
         int was = _diaglog.setLevel(cmdObj.firstElement().numberInt());
         _diaglog.flush();
         if (!serverGlobalParams.quiet) {
-            LOG(0) << "CMD: diagLogging set to " << _diaglog.getLevel() << " from: " << was << endl;
+            LOG(0) << "CMD: diagLogging set to " << _diaglog.getLevel() << " from: " << was;
         }
         result.append("was", was);
         result.append("note", deprecationWarning);
@@ -556,50 +539,111 @@ public:
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
-        AuthorizationSession* authzSession = AuthorizationSession::get(client);
-        auto cmdNsResource = parseResourcePattern(dbname, cmdObj);
-        if (cmdObj["capped"].trueValue()) {
-            if (!authzSession->isAuthorizedForActionsOnResource(cmdNsResource,
-                                                                ActionType::convertToCapped)) {
-                return Status(ErrorCodes::Unauthorized, "unauthorized");
-            }
-        }
-
-        const bool hasCreateCollectionAction = authzSession->isAuthorizedForActionsOnResource(
-            cmdNsResource, ActionType::createCollection);
-
-        // If attempting to create a view, check for additional required privileges.
-        if (cmdObj["viewOn"]) {
-            // You need the createCollection action on this namespace; the insert action is not
-            // sufficient.
-            if (!hasCreateCollectionAction) {
-                return Status(ErrorCodes::Unauthorized, "unauthorized");
-            }
-            return canCreateOrModifyView(client, dbname, cmdObj, cmdNsResource);
-        }
-
-        // To create a regular collection, ActionType::createCollection or ActionType::insert are
-        // both acceptable.
-        if (hasCreateCollectionAction ||
-            authzSession->isAuthorizedForActionsOnResource(cmdNsResource, ActionType::insert)) {
-            return Status::OK();
-        }
-
-        return Status(ErrorCodes::Unauthorized, "unauthorized");
+        const NamespaceString nss(parseNs(dbname, cmdObj));
+        return AuthorizationSession::get(client)->checkAuthForCreate(nss, cmdObj);
     }
+
     virtual bool run(OperationContext* txn,
                      const string& dbname,
                      BSONObj& cmdObj,
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
+        const NamespaceString ns(parseNsCollectionRequired(dbname, cmdObj));
+
         if (cmdObj.hasField("autoIndexId")) {
             const char* deprecationWarning =
                 "the autoIndexId option is deprecated and will be removed in a future release";
             warning() << deprecationWarning;
             result.append("note", deprecationWarning);
         }
-        return appendCommandStatus(result, createCollection(txn, dbname, cmdObj));
+
+        auto featureCompatibilityVersion = serverGlobalParams.featureCompatibility.version.load();
+        auto validateFeaturesAsMaster =
+            serverGlobalParams.featureCompatibility.validateFeaturesAsMaster.load();
+        if (ServerGlobalParams::FeatureCompatibility::Version::k32 == featureCompatibilityVersion &&
+            validateFeaturesAsMaster && cmdObj.hasField("collation")) {
+            return appendCommandStatus(
+                result,
+                {ErrorCodes::InvalidOptions,
+                 "The featureCompatibilityVersion must be 3.4 to create a collection or "
+                 "view with a default collation. See "
+                 "http://dochub.mongodb.org/core/3.4-feature-compatibility."});
+        }
+
+        // Validate _id index spec and fill in missing fields.
+        if (auto idIndexElem = cmdObj["idIndex"]) {
+            if (cmdObj["viewOn"]) {
+                return appendCommandStatus(
+                    result,
+                    {ErrorCodes::InvalidOptions,
+                     str::stream() << "'idIndex' is not allowed with 'viewOn': " << idIndexElem});
+            }
+            if (cmdObj["autoIndexId"]) {
+                return appendCommandStatus(result,
+                                           {ErrorCodes::InvalidOptions,
+                                            str::stream()
+                                                << "'idIndex' is not allowed with 'autoIndexId': "
+                                                << idIndexElem});
+            }
+
+            if (idIndexElem.type() != BSONType::Object) {
+                return appendCommandStatus(
+                    result,
+                    {ErrorCodes::TypeMismatch,
+                     str::stream() << "'idIndex' has to be a document: " << idIndexElem});
+            }
+
+            auto idIndexSpec = idIndexElem.Obj();
+
+            // Perform index spec validation.
+            idIndexSpec = uassertStatusOK(index_key_validate::validateIndexSpec(
+                idIndexSpec, ns, serverGlobalParams.featureCompatibility));
+            uassertStatusOK(index_key_validate::validateIdIndexSpec(idIndexSpec));
+
+            // Validate or fill in _id index collation.
+            std::unique_ptr<CollatorInterface> defaultCollator;
+            if (auto collationElem = cmdObj["collation"]) {
+                if (collationElem.type() != BSONType::Object) {
+                    return appendCommandStatus(
+                        result,
+                        {ErrorCodes::TypeMismatch,
+                         str::stream() << "'collation' has to be a document: " << collationElem});
+                }
+                auto collatorStatus = CollatorFactoryInterface::get(txn->getServiceContext())
+                                          ->makeFromBSON(collationElem.Obj());
+                if (!collatorStatus.isOK()) {
+                    return appendCommandStatus(result, collatorStatus.getStatus());
+                }
+                defaultCollator = std::move(collatorStatus.getValue());
+            }
+            idIndexSpec = uassertStatusOK(index_key_validate::validateIndexSpecCollation(
+                txn, idIndexSpec, defaultCollator.get()));
+            std::unique_ptr<CollatorInterface> idIndexCollator;
+            if (auto collationElem = idIndexSpec["collation"]) {
+                auto collatorStatus = CollatorFactoryInterface::get(txn->getServiceContext())
+                                          ->makeFromBSON(collationElem.Obj());
+                // validateIndexSpecCollation() should have checked that the _id index collation
+                // spec is valid.
+                invariant(collatorStatus.isOK());
+                idIndexCollator = std::move(collatorStatus.getValue());
+            }
+            if (!CollatorInterface::collatorsMatch(defaultCollator.get(), idIndexCollator.get())) {
+                return appendCommandStatus(
+                    result,
+                    {ErrorCodes::BadValue,
+                     "'idIndex' must have the same collation as the collection."});
+            }
+
+            // Remove "idIndex" field from command.
+            auto resolvedCmdObj = cmdObj.removeField("idIndex");
+
+            return appendCommandStatus(result,
+                                       createCollection(txn, dbname, resolvedCmdObj, idIndexSpec));
+        }
+
+        BSONObj idIndexSpec;
+        return appendCommandStatus(result, createCollection(txn, dbname, cmdObj, idIndexSpec));
     }
 } cmdCreate;
 
@@ -622,7 +666,13 @@ public:
     }
 
     virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
-        std::string collectionName = cmdObj.getStringField("root");
+        std::string collectionName;
+        if (const auto rootElt = cmdObj["root"]) {
+            uassert(ErrorCodes::InvalidNamespace,
+                    "'root' must be of type String",
+                    rootElt.type() == BSONType::String);
+            collectionName = rootElt.str();
+        }
         if (collectionName.empty())
             collectionName = "fs";
         collectionName += ".chunks";
@@ -641,7 +691,7 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        const std::string ns = parseNs(dbname, jsobj);
+        const NamespaceString nss(parseNs(dbname, jsobj));
 
         md5digest d;
         md5_state_t st;
@@ -669,7 +719,7 @@ public:
         BSONObj sort = BSON("files_id" << 1 << "n" << 1);
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            auto qr = stdx::make_unique<QueryRequest>(NamespaceString(ns));
+            auto qr = stdx::make_unique<QueryRequest>(nss);
             qr->setFilter(query);
             qr->setSort(sort);
 
@@ -684,7 +734,7 @@ public:
             // Check shard version at startup.
             // This will throw before we've done any work if shard version is outdated
             // We drop and re-acquire these locks every document because md5'ing is expensive
-            unique_ptr<AutoGetCollectionForRead> ctx(new AutoGetCollectionForRead(txn, ns));
+            unique_ptr<AutoGetCollectionForRead> ctx(new AutoGetCollectionForRead(txn, nss));
             Collection* coll = ctx->getCollection();
 
             auto statusWithPlanExecutor = getExecutor(txn,
@@ -711,8 +761,8 @@ public:
                     if (partialOk) {
                         break;  // skipped chunk is probably on another shard
                     }
-                    log() << "should have chunk: " << n << " have:" << myn << endl;
-                    dumpChunks(txn, ns, query, sort);
+                    log() << "should have chunk: " << n << " have:" << myn;
+                    dumpChunks(txn, nss.ns(), query, sort);
                     uassert(10040, "chunks out of order", n == myn);
                 }
 
@@ -730,7 +780,7 @@ public:
 
                 try {
                     // RELOCKED
-                    ctx.reset(new AutoGetCollectionForRead(txn, ns));
+                    ctx.reset(new AutoGetCollectionForRead(txn, nss));
                 } catch (const SendStaleConfigException& ex) {
                     LOG(1) << "chunk metadata changed during filemd5, will retarget and continue";
                     break;
@@ -883,7 +933,7 @@ public:
                                               idx,
                                               min,
                                               max,
-                                              false,  // endKeyInclusive
+                                              BoundInclusion::kIncludeStartKeyOnly,
                                               PlanExecutor::YIELD_MANUAL);
         }
 
@@ -913,7 +963,7 @@ public:
         }
 
         if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
-            warning() << "Internal error while reading " << ns << endl;
+            warning() << "Internal error while reading " << ns;
             return appendCommandStatus(
                 result,
                 Status(ErrorCodes::OperationFailed,
@@ -965,80 +1015,19 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        int scale = 1;
-        if (jsobj["scale"].isNumber()) {
-            scale = jsobj["scale"].numberInt();
-            if (scale <= 0) {
-                errmsg = "scale has to be >= 1";
-                return false;
-            }
-        } else if (jsobj["scale"].trueValue()) {
-            errmsg = "scale has to be a number >= 1";
-            return false;
-        }
-
-        bool verbose = jsobj["verbose"].trueValue();
-
-        const NamespaceString nss(parseNs(dbname, jsobj));
+        const NamespaceString nss(parseNsCollectionRequired(dbname, jsobj));
 
         if (nss.coll().empty()) {
             errmsg = "No collection name specified";
             return false;
         }
 
-        AutoGetCollectionForRead ctx(txn, nss);
-        if (!ctx.getDb()) {
-            errmsg = "Database [" + nss.db().toString() + "] not found.";
-            return false;
-        }
-
-        Collection* collection = ctx.getCollection();
-        if (!collection) {
-            errmsg = "Collection [" + nss.toString() + "] not found.";
-            return false;
-        }
-
         result.append("ns", nss.ns());
-
-        long long size = collection->dataSize(txn) / scale;
-        long long numRecords = collection->numRecords(txn);
-        result.appendNumber("count", numRecords);
-        result.appendNumber("size", size);
-        if (numRecords)
-            result.append("avgObjSize", collection->averageObjectSize(txn));
-
-        result.appendNumber("storageSize",
-                            static_cast<long long>(collection->getRecordStore()->storageSize(
-                                txn, &result, verbose ? 1 : 0)) /
-                                scale);
-
-        collection->getRecordStore()->appendCustomStats(txn, &result, scale);
-
-        IndexCatalog* indexCatalog = collection->getIndexCatalog();
-        result.append("nindexes", indexCatalog->numIndexesReady(txn));
-
-        // indexes
-        BSONObjBuilder indexDetails;
-
-        IndexCatalog::IndexIterator i = indexCatalog->getIndexIterator(txn, false);
-        while (i.more()) {
-            const IndexDescriptor* descriptor = i.next();
-            IndexAccessMethod* iam = indexCatalog->getIndex(descriptor);
-            invariant(iam);
-
-            BSONObjBuilder bob;
-            if (iam->appendCustomStats(txn, &bob, scale)) {
-                indexDetails.append(descriptor->indexName(), bob.obj());
-            }
+        Status status = appendCollectionStorageStats(txn, nss, jsobj, &result);
+        if (!status.isOK()) {
+            errmsg = status.reason();
+            return false;
         }
-
-        result.append("indexDetails", indexDetails.done());
-
-        BSONObjBuilder indexSizes;
-        long long indexSize = collection->getIndexSize(txn, &indexSizes, scale);
-
-        result.appendNumber("totalIndexSize", indexSize / scale);
-        result.append("indexSizes", indexSizes.obj());
 
         return true;
     }
@@ -1065,19 +1054,8 @@ public:
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) {
-        AuthorizationSession* authzSession = AuthorizationSession::get(client);
-        if (!authzSession->isAuthorizedForActionsOnResource(parseResourcePattern(dbname, cmdObj),
-                                                            ActionType::collMod)) {
-            return Status(ErrorCodes::Unauthorized, "unauthorized");
-        }
-
-        // Check for additional required privileges if attempting to modify a view.
-        if (cmdObj["viewOn"] || cmdObj["pipeline"]) {
-            return canCreateOrModifyView(
-                client, dbname, cmdObj, parseResourcePattern(dbname, cmdObj));
-        }
-
-        return Status::OK();
+        const NamespaceString nss(parseNs(dbname, cmdObj));
+        return AuthorizationSession::get(client)->checkAuthForCollMod(nss, cmdObj);
     }
 
     bool run(OperationContext* txn,
@@ -1086,7 +1064,7 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        const NamespaceString nss = parseNsCollectionRequired(dbname, jsobj);
+        const NamespaceString nss(parseNsCollectionRequired(dbname, jsobj));
         return appendCommandStatus(result, collMod(txn, nss, jsobj, &result));
     }
 
@@ -1135,6 +1113,9 @@ public:
         }
 
         const string ns = parseNs(dbname, jsobj);
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Invalid db name: " << ns,
+                NamespaceString::validDBName(ns, NamespaceString::DollarInDbNameBehavior::Allow));
 
         // TODO (Kal): OldClientContext legacy, needs to be removed
         {
@@ -1159,6 +1140,7 @@ public:
             // is not needed for the missing DB case, we can just do the same that's done in
             // CollectionStats.
             result.appendNumber("collections", 0);
+            result.appendNumber("views", 0);
             result.appendNumber("objects", 0);
             result.append("avgObjSize", 0);
             result.appendNumber("dataSize", 0);
@@ -1330,6 +1312,7 @@ void Command::execCommand(OperationContext* txn,
         // TODO: move this back to runCommands when mongos supports OperationContext
         // see SERVER-18515 for details.
         uassertStatusOK(rpc::readRequestMetadata(txn, request.getMetadata()));
+        rpc::TrackingMetadata::get(txn).initWithOperName(command->getName());
 
         dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kCommandReply);
 
@@ -1351,8 +1334,7 @@ void Command::execCommand(OperationContext* txn,
         }
 
         ImpersonationSessionGuard guard(txn);
-        uassertStatusOK(
-            _checkAuthorization(command, txn->getClient(), dbname, request.getCommandArgs()));
+        uassertStatusOK(checkAuthorization(command, txn, dbname, request.getCommandArgs()));
 
         repl::ReplicationCoordinator* replCoord =
             repl::ReplicationCoordinator::get(txn->getClient()->getServiceContext());
@@ -1433,19 +1415,30 @@ void Command::execCommand(OperationContext* txn,
             oss.initializeShardVersion(commandNS, extractedFields[kShardVersionFieldIdx]);
 
             auto shardingState = ShardingState::get(txn);
+
+            if (oss.hasShardVersion()) {
+                if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+                    uassertStatusOK(
+                        {ErrorCodes::NoShardingEnabled,
+                         "Cannot accept sharding commands if not started with --shardsvr"});
+                } else if (!shardingState->enabled()) {
+                    // TODO(esha): Once 3.4 ships, we no longer need to support initializing
+                    // sharding awareness through commands, so just reject all sharding commands.
+                    if (!shardingState->commandInitializesShardingAwareness(
+                            request.getCommandName().toString())) {
+                        uassertStatusOK({ErrorCodes::NoShardingEnabled,
+                                         str::stream()
+                                             << "Received a command with sharding chunk version "
+                                                "information but this node is not sharding aware: "
+                                             << request.getCommandArgs().jsonString()});
+                    }
+                }
+            }
+
             if (shardingState->enabled()) {
                 // TODO(spencer): Do this unconditionally once all nodes are sharding aware
                 // by default.
                 uassertStatusOK(shardingState->updateConfigServerOpTimeFromMetadata(txn));
-            } else {
-                massert(
-                    34422,
-                    str::stream()
-                        << "Received a command with sharding chunk version information but this "
-                           "node is not sharding aware: "
-                        << request.getCommandArgs().jsonString(),
-                    !oss.hasShardVersion() ||
-                        ChunkVersion::isIgnoredVersion(oss.getShardVersion(commandNS)));
             }
         }
 
@@ -1458,6 +1451,13 @@ void Command::execCommand(OperationContext* txn,
 
         command->_commandsExecuted.increment();
 
+        if (logger::globalLogDomain()->shouldLog(logger::LogComponent::kTracking,
+                                                 logger::LogSeverity::Debug(1)) &&
+            rpc::TrackingMetadata::get(txn).getParentOperId()) {
+            MONGO_LOG_COMPONENT(1, logger::LogComponent::kTracking)
+                << rpc::TrackingMetadata::get(txn).toString();
+            rpc::TrackingMetadata::get(txn).setIsLogged(true);
+        }
         retval = command->run(txn, request, replyBuilder);
 
         dassert(replyBuilder->getState() == rpc::ReplyBuilderInterface::State::kOutputDocs);
@@ -1468,9 +1468,11 @@ void Command::execCommand(OperationContext* txn,
     } catch (const DBException& e) {
         // If we got a stale config, wait in case the operation is stuck in a critical section
         if (e.getCode() == ErrorCodes::SendStaleConfig) {
-            auto& sce = static_cast<const StaleConfigException&>(e);
+            auto sce = dynamic_cast<const StaleConfigException*>(&e);
+            invariant(sce);  // do not upcasts from DBException created by uassert variants.
+
             ShardingState::get(txn)->onStaleShardVersion(
-                txn, NamespaceString(sce.getns()), sce.getVersionReceived());
+                txn, NamespaceString(sce->getns()), sce->getVersionReceived());
         }
 
         BSONObjBuilder metadataBob;
@@ -1520,7 +1522,7 @@ bool Command::run(OperationContext* txn,
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 0 : 2;
             LOG(debugLevel) << "Command on database " << db
                             << " timed out waiting for read concern to be satisfied. Command: "
-                            << getRedactedCopyForLogging(request.getCommandArgs());
+                            << redact(getRedactedCopyForLogging(request.getCommandArgs()));
         }
 
         auto result = appendCommandStatus(inPlaceReplyBob, rcStatus);
@@ -1528,19 +1530,30 @@ bool Command::run(OperationContext* txn,
         replyBuilder->setMetadata(rpc::makeEmptyMetadata());
         return result;
     }
-    auto wcResult = extractWriteConcern(txn, cmd, db, supportsWriteConcern(cmd));
-    if (!wcResult.isOK()) {
-        auto result = appendCommandStatus(inPlaceReplyBob, wcResult.getStatus());
-        inPlaceReplyBob.doneFast();
-        replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-        return result;
-    }
+
     std::string errmsg;
     bool result;
     if (!supportsWriteConcern(cmd)) {
+        if (commandSpecifiesWriteConcern(cmd)) {
+            auto result = appendCommandStatus(
+                inPlaceReplyBob,
+                {ErrorCodes::InvalidOptions, "Command does not support writeConcern"});
+            inPlaceReplyBob.doneFast();
+            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+            return result;
+        }
+
         // TODO: remove queryOptions parameter from command's run method.
         result = run(txn, db, cmd, 0, errmsg, inPlaceReplyBob);
     } else {
+        auto wcResult = extractWriteConcern(txn, cmd, db);
+        if (!wcResult.isOK()) {
+            auto result = appendCommandStatus(inPlaceReplyBob, wcResult.getStatus());
+            inPlaceReplyBob.doneFast();
+            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+            return result;
+        }
+
         // Change the write concern while running the command.
         const auto oldWC = txn->getWriteConcern();
         ON_BLOCK_EXIT([&] { txn->setWriteConcern(oldWC); });
@@ -1549,7 +1562,8 @@ bool Command::run(OperationContext* txn,
         result = run(txn, db, cmd, 0, errmsg, inPlaceReplyBob);
 
         // Nothing in run() should change the writeConcern.
-        dassert(txn->getWriteConcern().toBSON() == wcResult.getValue().toBSON());
+        dassert(SimpleBSONObjComparator::kInstance.evaluate(txn->getWriteConcern().toBSON() ==
+                                                            wcResult.getValue().toBSON()));
 
         WriteConcernResult res;
         auto waitForWCStatus =

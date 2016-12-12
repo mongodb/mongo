@@ -29,13 +29,13 @@
 #pragma once
 
 #include <memory>
-#include <unordered_map>
-#include <unordered_set>
 
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/parsed_aggregation_projection.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
@@ -121,6 +121,11 @@ public:
 
     void injectExpressionContext(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
+    /**
+     * Recursively add all paths that are preserved by this inclusion projection.
+     */
+    void addPreservedPaths(std::set<std::string>* preservedPaths) const;
+
 private:
     // Helpers for the Document versions above. These will apply the transformation recursively to
     // each element of any arrays, and ensure non-documents are handled appropriately.
@@ -155,10 +160,10 @@ private:
     std::vector<std::string> _orderToProcessAdditionsAndChildren;
 
     StringMap<boost::intrusive_ptr<Expression>> _expressions;
-    std::unordered_set<std::string> _inclusions;
+    stdx::unordered_set<std::string> _inclusions;
 
     // TODO use StringMap once SERVER-23700 is resolved.
-    std::unordered_map<std::string, std::unique_ptr<InclusionNode>> _children;
+    stdx::unordered_map<std::string, std::unique_ptr<InclusionNode>> _children;
 };
 
 /**
@@ -212,6 +217,12 @@ public:
     DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const final {
         _root->addDependencies(deps);
         return DocumentSource::EXHAUSTIVE_FIELDS;
+    }
+
+    DocumentSource::GetModPathsReturn getModifiedPaths() const final {
+        std::set<std::string> preservedPaths;
+        _root->addPreservedPaths(&preservedPaths);
+        return {DocumentSource::GetModPathsReturn::Type::kAllExcept, std::move(preservedPaths)};
     }
 
     /**

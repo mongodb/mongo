@@ -35,7 +35,6 @@
 #include <string>
 #include <vector>
 
-
 #include "mongo/base/string_data.h"
 
 namespace mongo {
@@ -99,5 +98,11 @@ private:
 // TODO: Sane-ify core std::string functionality
 // For now, this needs to be near the LexNumCmp or else
 int versionCmp(const StringData rhs, const StringData lhs);
+
+/**
+ * A method to escape whitespace and control characters in strings. For example, the string "\t"
+ * goes to "\\t". If `escape_slash` is true, then "/" goes to "\\/".
+ */
+std::string escape(StringData s, bool escape_slash = false);
 
 }  // namespace mongo

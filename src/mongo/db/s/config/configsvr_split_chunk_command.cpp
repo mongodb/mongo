@@ -36,6 +36,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/request_types/split_chunk_request_type.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -50,7 +52,7 @@ using std::string;
  *
  * Format:
  * {
- *   _configsvrSplitChunk: <string namespace>,
+ *   _configsvrCommitChunkSplit: <string namespace>,
  *   collEpoch: <OID epoch>,
  *   min: <BSONObj chunkToSplitMin>,
  *   max: <BSONObj chunkToSplitMax>,
@@ -61,11 +63,11 @@ using std::string;
  */
 class ConfigSvrSplitChunkCommand : public Command {
 public:
-    ConfigSvrSplitChunkCommand() : Command("_configsvrSplitChunk") {}
+    ConfigSvrSplitChunkCommand() : Command("_configsvrCommitChunkSplit") {}
 
     void help(std::stringstream& help) const override {
         help << "Internal command, which is sent by a shard to the sharding config server. Do "
-                "not call directly. Receives, validates, and processes a SplitChunkRequest."
+                "not call directly. Receives, validates, and processes a SplitChunkRequest.";
     }
 
     bool slaveOk() const override {
@@ -80,7 +82,7 @@ public:
         return true;
     }
 
-    Status checkAuthForCommand(ClientBasic* client,
+    Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) override {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
@@ -102,7 +104,7 @@ public:
              BSONObjBuilder& result) override {
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
             uasserted(ErrorCodes::IllegalOperation,
-                      "_configsvrSplitChunk can only be run on config servers");
+                      "_configsvrCommitChunkSplit can only be run on config servers");
         }
 
         auto parsedRequest = uassertStatusOK(SplitChunkRequest::parseFromConfigCommand(cmdObj));
@@ -114,7 +116,9 @@ public:
                                                                parsedRequest.getChunkRange(),
                                                                parsedRequest.getSplitPoints(),
                                                                parsedRequest.getShardName());
-        uassertStatusOK(splitChunkResult);
+        if (!splitChunkResult.isOK()) {
+            return appendCommandStatus(result, splitChunkResult);
+        }
 
         return true;
     }

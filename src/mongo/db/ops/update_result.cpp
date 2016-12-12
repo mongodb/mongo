@@ -52,7 +52,7 @@ UpdateResult::UpdateResult(bool existing_,
     if (!existing && numMatched == 0 && !id.eoo()) {
         upserted = id.wrap(kUpsertedFieldName);
     }
-    LOG(4) << "UpdateResult -- " << toString();
+    LOG(4) << "UpdateResult -- " << redact(toString());
 }
 
 }  // namespace mongo

@@ -75,5 +75,11 @@ if os.path.isfile(system_id_path):
 
         print "scons_cache_path: {0}".format(default_cache_path)
 
+        scons_cache_mode = os.getenv("SCONS_CACHE_MODE")
+
+        if scons_cache_mode in (None, ""):
+            scons_cache_mode = "nolinked"
+
         if os.getenv("USE_SCONS_CACHE") not in (None, False, "false", ""):
-            print "scons_cache_args: --cache --cache-dir='{0}'".format(default_cache_path)
+            print "scons_cache_args: --cache={0} --cache-dir='{1}'".format(scons_cache_mode,
+                                                                           default_cache_path)

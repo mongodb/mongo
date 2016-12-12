@@ -24,7 +24,7 @@ assert.throws(function() {
     assert.eq(2,
               t.find({$or: [{loc: {$nearSphere: p}}, {loc: {$nearSphere: q}}]}).itcount(),
               'geo query not supported by $or. index type: ' + indexname);
-}, null, '$or with multiple $near clauses');
+}, [], '$or with multiple $near clauses');
 
 // the following tests should match the points in the collection
 

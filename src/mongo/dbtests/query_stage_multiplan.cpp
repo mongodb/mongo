@@ -147,7 +147,7 @@ public:
         ixparams.bounds.isSimpleRange = true;
         ixparams.bounds.startKey = BSON("" << 7);
         ixparams.bounds.endKey = BSON("" << 7);
-        ixparams.bounds.endKeyInclusive = true;
+        ixparams.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         ixparams.direction = 1;
 
         unique_ptr<WorkingSet> sharedWs(new WorkingSet());

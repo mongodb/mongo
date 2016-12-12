@@ -217,7 +217,7 @@ TEST(GetMoreRequestTest, toBSONHasBatchSize) {
                                              << "testcoll"
                                              << "batchSize"
                                              << 99);
-    ASSERT_EQ(requestObj, expectedRequest);
+    ASSERT_BSONOBJ_EQ(requestObj, expectedRequest);
 }
 
 TEST(GetMoreRequestTest, toBSONMissingMatchSize) {
@@ -230,7 +230,7 @@ TEST(GetMoreRequestTest, toBSONMissingMatchSize) {
     BSONObj requestObj = request.toBSON();
     BSONObj expectedRequest = BSON("getMore" << CursorId(123) << "collection"
                                              << "testcoll");
-    ASSERT_EQ(requestObj, expectedRequest);
+    ASSERT_BSONOBJ_EQ(requestObj, expectedRequest);
 }
 
 TEST(GetMoreRequestTest, toBSONHasTerm) {
@@ -243,7 +243,7 @@ TEST(GetMoreRequestTest, toBSONHasTerm) {
                                              << 99
                                              << "term"
                                              << 1);
-    ASSERT_EQ(requestObj, expectedRequest);
+    ASSERT_BSONOBJ_EQ(requestObj, expectedRequest);
 }
 
 TEST(GetMoreRequestTest, toBSONHasCommitLevel) {
@@ -262,7 +262,7 @@ TEST(GetMoreRequestTest, toBSONHasCommitLevel) {
                                              << 1
                                              << "lastKnownCommittedOpTime"
                                              << BSON("ts" << Timestamp(0, 10) << "t" << 2LL));
-    ASSERT_EQ(requestObj, expectedRequest);
+    ASSERT_BSONOBJ_EQ(requestObj, expectedRequest);
 }
 
 TEST(GetMoreRequestTest, toBSONHasMaxTimeMS) {
@@ -277,7 +277,7 @@ TEST(GetMoreRequestTest, toBSONHasMaxTimeMS) {
                                              << "testcoll"
                                              << "maxTimeMS"
                                              << 789);
-    ASSERT_EQ(requestObj, expectedRequest);
+    ASSERT_BSONOBJ_EQ(requestObj, expectedRequest);
 }
 
 }  // namespace

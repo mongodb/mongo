@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include <vector>
 
 #include "mongo/base/init.h"
@@ -34,6 +36,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/util/fail_point_service.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -102,64 +105,14 @@ public:
             return false;
         }
 
-        FailPoint::Mode mode = FailPoint::alwaysOn;
-        FailPoint::ValType val = 0;
+        FailPoint::Mode mode;
+        FailPoint::ValType val;
+        BSONObj data;
+        std::tie(mode, val, data) = uassertStatusOK(FailPoint::parseBSON(cmdObj));
 
-        const BSONElement modeElem(cmdObj["mode"]);
-        if (modeElem.eoo()) {
-            result.appendElements(failPoint->toBSON());
-            return true;
-        } else if (modeElem.type() == String) {
-            const string modeStr(modeElem.valuestr());
+        failPoint->setMode(mode, val, data);
+        warning() << "failpoint: " << failPointName << " set to: " << failPoint->toBSON();
 
-            if (modeStr == "off") {
-                mode = FailPoint::off;
-            } else if (modeStr == "alwaysOn") {
-                mode = FailPoint::alwaysOn;
-            } else {
-                errmsg = "unknown mode: " + modeStr;
-                return false;
-            }
-        } else if (modeElem.type() == Object) {
-            const BSONObj modeObj(modeElem.Obj());
-
-            if (modeObj.hasField("times")) {
-                mode = FailPoint::nTimes;
-                const int intVal = modeObj["times"].numberInt();
-
-                if (intVal < 0) {
-                    errmsg = "times should be positive";
-                    return false;
-                }
-
-                val = intVal;
-            } else if (modeObj.hasField("activationProbability")) {
-                mode = FailPoint::random;
-                const double activationProbability =
-                    modeObj["activationProbability"].numberDouble();
-                if (activationProbability < 0 || activationProbability > 1) {
-                    errmsg = str::stream()
-                        << "activationProbability must be between 0.0 and 1.0; found "
-                        << activationProbability;
-                    return false;
-                }
-                val = static_cast<int32_t>(std::numeric_limits<int32_t>::max() *
-                                           activationProbability);
-            } else {
-                errmsg = "invalid mode object";
-                return false;
-            }
-        } else {
-            errmsg = "invalid mode format";
-            return false;
-        }
-
-        BSONObj dataObj;
-        if (cmdObj.hasField("data")) {
-            dataObj = cmdObj["data"].Obj();
-        }
-
-        failPoint->setMode(mode, val, dataObj);
         return true;
     }
 };

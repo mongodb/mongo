@@ -28,9 +28,13 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/document_source_count.h"
+
 #include "mongo/db/jsobj.h"
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_group.h"
+#include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 
 namespace mongo {
 
@@ -38,7 +42,9 @@ using boost::intrusive_ptr;
 using std::vector;
 using std::string;
 
-REGISTER_DOCUMENT_SOURCE_ALIAS(count, DocumentSourceCount::createFromBson);
+REGISTER_MULTI_STAGE_ALIAS(count,
+                           LiteParsedDocumentSourceDefault::parse,
+                           DocumentSourceCount::createFromBson);
 
 vector<intrusive_ptr<DocumentSource>> DocumentSourceCount::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
@@ -66,7 +72,7 @@ vector<intrusive_ptr<DocumentSource>> DocumentSourceCount::createFromBson(
     BSONObj projectObj = BSON("$project" << BSON("_id" << 0 << elemString << 1));
 
     auto groupSource = DocumentSourceGroup::createFromBson(groupObj.firstElement(), pExpCtx);
-    auto projectSource = DocumentSourceProject::create(projectObj.firstElement(), pExpCtx);
+    auto projectSource = DocumentSourceProject::createFromBson(projectObj.firstElement(), pExpCtx);
 
     return {groupSource, projectSource};
 }

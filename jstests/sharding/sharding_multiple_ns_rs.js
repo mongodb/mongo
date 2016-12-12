@@ -1,4 +1,5 @@
 (function() {
+    load("jstests/replsets/rslib.js");
 
     var s = new ShardingTest(
         {name: "Sharding multiple ns", shards: 1, mongos: 1, other: {rs: true, chunkSize: 1}});
@@ -35,7 +36,7 @@
     var primary = s._rs[0].test.getPrimary();
 
     // Wait for the mongos to recognize the new primary...
-    ReplSetTest.awaitRSClientHosts(db.getMongo(), primary, {ismaster: true});
+    awaitRSClientHosts(db.getMongo(), primary, {ismaster: true});
 
     assert.eq(5, db.foo.findOne({_id: 5}).x);
     assert.eq(5, db.bar.findOne({_id: 5}).x);

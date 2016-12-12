@@ -77,20 +77,7 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
             if (!shard->isConfig()) {
                 return Status::OK();
             }
-            long long remoteMaxWireVersion;
-            status = bsonExtractIntegerFieldWithDefault(isMasterReply.data,
-                                                        "maxWireVersion",
-                                                        RELEASE_2_4_AND_BEFORE,
-                                                        &remoteMaxWireVersion);
-            if (!status.isOK()) {
-                return status;
-            }
-            if (remoteMaxWireVersion < FIND_COMMAND) {
-                // Prior to the introduction of the find command and the 3.1 release series, it was
-                // not possible to distinguish a config server from a shard server from its ismaster
-                // response. As such, we must assume that the system is properly configured.
-                return Status::OK();
-            }
+
             return {ErrorCodes::InvalidOptions,
                     str::stream() << "Surprised to discover that " << remoteHost.toString()
                                   << " does not believe it is a config server"};

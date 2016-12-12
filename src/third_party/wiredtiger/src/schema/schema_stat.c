@@ -83,7 +83,7 @@ __curstat_size_only(WT_SESSION_IMPL *session,
 	 * we determine that neither of those conditions can be satisfied.
 	 */
 	WT_ERR(__wt_config_getones(session, tableconf, "columns", &colconf));
-	WT_ERR(__wt_config_subinit(session, &cparser, &colconf));
+	__wt_config_subinit(session, &cparser, &colconf);
 	if ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
 		goto err;
 
@@ -137,7 +137,7 @@ __wt_curstat_table_init(WT_SESSION_IMPL *session,
 	 * If only gathering table size statistics, try a fast path that
 	 * avoids the schema and table list locks.
 	 */
-	if (F_ISSET(cst, WT_CONN_STAT_SIZE)) {
+	if (F_ISSET(cst, WT_STAT_TYPE_SIZE)) {
 		WT_RET(__curstat_size_only(session, uri, &was_fast, cst));
 		if (was_fast)
 			return (0);

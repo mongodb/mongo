@@ -20,7 +20,8 @@ var signalCollection = 'keepRunning';
 function createPersistentConnection() {
     assert.soon(function() {
         try {
-            return new Mongo(db.getMongo().host);
+            permConns.push(new Mongo(db.getMongo().host));
+            return true;
         } catch (x) {
             return false;
         }
@@ -94,8 +95,5 @@ for (var i = 0; i < tempConns.length; i++) {
 jsTestLog("Testing that current connections counter went down after temporary connections closed");
 waitForConnections(originalConnInfo.current + numPerTypeToCreate,
                    originalConnInfo.totalCreated + numPerTypeToCreate * 2);
-
-persistent = null;
-gc();
 
 MongoRunner.stopMongod(mongo);

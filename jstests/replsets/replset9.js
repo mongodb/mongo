@@ -69,4 +69,4 @@ assert.writeOK(bulk.execute());
 
 print("finished");
 // Wait for replication to catch up.
-rt.awaitReplication(640000);
+rt.awaitReplication();

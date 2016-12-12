@@ -34,8 +34,6 @@
 
 namespace mongo {
 
-bool enableBSON1_1 = true;
-
 const char kMaxKeyData[] = {7, 0, 0, 0, static_cast<char>(MaxKey), 0, 0};
 const BSONObj kMaxBSONKey(kMaxKeyData);
 
@@ -93,6 +91,10 @@ const char* typeName(BSONType type) {
         default:
             return "invalid";
     }
+}
+
+std::ostream& operator<<(std::ostream& stream, BSONType type) {
+    return stream << typeName(type);
 }
 
 bool isValidBSONType(int type) {

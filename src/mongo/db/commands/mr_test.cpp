@@ -224,7 +224,7 @@ TEST(ConfigTest, ParseCollation) {
     bob.append("collation", collation);
     BSONObj cmdObj = bob.obj();
     mr::Config config(dbname, cmdObj);
-    ASSERT_EQUALS(config.collation, collation);
+    ASSERT_BSONOBJ_EQ(config.collation, collation);
 }
 
 TEST(ConfigTest, ParseNoCollation) {
@@ -236,7 +236,7 @@ TEST(ConfigTest, ParseNoCollation) {
     bob.append("out", "outCollection");
     BSONObj cmdObj = bob.obj();
     mr::Config config(dbname, cmdObj);
-    ASSERT_EQUALS(config.collation, BSONObj());
+    ASSERT_BSONOBJ_EQ(config.collation, BSONObj());
 }
 
 TEST(ConfigTest, CollationNotAnObjectFailsToParse) {

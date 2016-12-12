@@ -2248,11 +2248,11 @@ BaselineCompiler::emit_JSOP_BINDGNAME()
                 frame.push(ObjectValue(*globalLexical));
                 return true;
             }
-        }
-
-        // We can bind name to the global object if the property exists on the
-        // global and is non-configurable, as then it cannot be shadowed.
-        if (Shape* shape = script->global().lookup(cx, name)) {
+        } else if (Shape* shape = script->global().lookup(cx, name)) {
+            // If the property does not currently exist on the global lexical
+            // scope, we can bind name to the global object if the property
+            // exists on the global and is non-configurable, as then it cannot
+            // be shadowed.
             if (!shape->configurable()) {
                 frame.push(ObjectValue(script->global()));
                 return true;

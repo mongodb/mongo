@@ -62,32 +62,33 @@ PoolForHost::~PoolForHost() {
 }
 
 void PoolForHost::clear() {
-    while (!_pool.empty()) {
-        StoredConnection sc = _pool.top();
-        delete sc.conn;
-        _pool.pop();
-    }
+    _pool = decltype(_pool){};
 }
 
-void PoolForHost::done(DBConnectionPool* pool, DBClientBase* c) {
-    bool isFailed = c->isFailed();
+void PoolForHost::done(DBConnectionPool* pool, DBClientBase* c_raw) {
+    std::unique_ptr<DBClientBase> c{c_raw};
+    const bool isFailed = c->isFailed();
 
     --_checkedOut;
 
     // Remember that this host had a broken connection for later
-    if (isFailed)
+    if (isFailed) {
         reportBadConnectionAt(c->getSockCreationMicroSec());
+    }
 
-    if (isFailed ||
-        // Another (later) connection was reported as broken to this host
-        (c->getSockCreationMicroSec() < _minValidCreationTimeMicroSec) ||
+    // Another (later) connection was reported as broken to this host
+    bool isBroken = c->getSockCreationMicroSec() < _minValidCreationTimeMicroSec;
+    if (isFailed || isBroken) {
+        _badConns++;
+    }
+
+    if (isFailed || isBroken ||
         // We have a pool size that we need to enforce
         (_maxPoolSize >= 0 && static_cast<int>(_pool.size()) >= _maxPoolSize)) {
-        pool->onDestroy(c);
-        delete c;
+        pool->onDestroy(c.get());
     } else {
         // The connection is probably fine, save for later
-        _pool.push(c);
+        _pool.push(std::move(c));
     }
 }
 
@@ -108,61 +109,53 @@ bool PoolForHost::isBadSocketCreationTime(uint64_t microSec) {
 }
 
 DBClientBase* PoolForHost::get(DBConnectionPool* pool, double socketTimeout) {
-    time_t now = time(0);
-
     while (!_pool.empty()) {
-        StoredConnection sc = _pool.top();
+        auto sc = std::move(_pool.top());
         _pool.pop();
 
-        if (!sc.ok(now)) {
-            pool->onDestroy(sc.conn);
-            delete sc.conn;
+        if (!sc.ok()) {
+            _badConns++;
+            pool->onDestroy(sc.conn.get());
             continue;
         }
 
         verify(sc.conn->getSoTimeout() == socketTimeout);
 
         ++_checkedOut;
-        return sc.conn;
+        return sc.conn.release();
     }
 
-    return NULL;
+    return nullptr;
 }
 
 void PoolForHost::flush() {
-    while (!_pool.empty()) {
-        StoredConnection c = _pool.top();
-        _pool.pop();
-        delete c.conn;
-    }
+    clear();
 }
 
 void PoolForHost::getStaleConnections(vector<DBClientBase*>& stale) {
-    time_t now = time(0);
-
     vector<StoredConnection> all;
     while (!_pool.empty()) {
-        StoredConnection c = _pool.top();
+        StoredConnection c = std::move(_pool.top());
         _pool.pop();
 
-        if (c.ok(now))
-            all.push_back(c);
-        else
-            stale.push_back(c.conn);
+        if (c.ok()) {
+            all.push_back(std::move(c));
+        } else {
+            _badConns++;
+            stale.emplace_back(c.conn.release());
+        }
     }
 
-    for (size_t i = 0; i < all.size(); i++) {
-        _pool.push(all[i]);
+    for (auto& conn : all) {
+        _pool.push(std::move(conn));
     }
 }
 
 
-PoolForHost::StoredConnection::StoredConnection(DBClientBase* c) {
-    conn = c;
-    when = time(0);
-}
+PoolForHost::StoredConnection::StoredConnection(std::unique_ptr<DBClientBase> c)
+    : conn(std::move(c)), when(time(nullptr)) {}
 
-bool PoolForHost::StoredConnection::ok(time_t now) {
+bool PoolForHost::StoredConnection::ok() {
     // Poke the connection to see if we're still ok
     return conn->isStillConnected();
 }
@@ -200,14 +193,14 @@ DBClientBase* DBConnectionPool::_get(const string& ident, double socketTimeout) 
     return p.get(this, socketTimeout);
 }
 
-DBClientBase* DBConnectionPool::_finishCreate(const string& host,
+DBClientBase* DBConnectionPool::_finishCreate(const string& ident,
                                               double socketTimeout,
                                               DBClientBase* conn) {
     {
         stdx::lock_guard<stdx::mutex> L(_mutex);
-        PoolForHost& p = _pools[PoolKey(host, socketTimeout)];
+        PoolForHost& p = _pools[PoolKey(ident, socketTimeout)];
         p.setMaxPoolSize(_maxPoolSize);
-        p.initializeHostName(host);
+        p.initializeHostName(ident);
         p.createdOne(conn);
     }
 
@@ -263,6 +256,32 @@ DBClientBase* DBConnectionPool::get(const string& host, double socketTimeout) {
                               11002,
                               str::stream() << _name << " error: " << errmsg);
     return _finishCreate(host, socketTimeout, c);
+}
+
+DBClientBase* DBConnectionPool::get(const MongoURI& uri, double socketTimeout) {
+    std::unique_ptr<DBClientBase> c(_get(uri.toString(), socketTimeout));
+    if (c) {
+        onHandedOut(c.get());
+        return c.release();
+    }
+
+    string errmsg;
+    c = std::unique_ptr<DBClientBase>(uri.connect(StringData(), errmsg, socketTimeout));
+    uassert(40356, _name + ": connect failed " + uri.toString() + " : " + errmsg, c);
+
+    return _finishCreate(uri.toString(), socketTimeout, c.release());
+}
+
+int DBConnectionPool::getNumAvailableConns(const string& host, double socketTimeout) const {
+    stdx::lock_guard<stdx::mutex> L(_mutex);
+    auto it = _pools.find(PoolKey(host, socketTimeout));
+    return (it == _pools.end()) ? 0 : it->second.numAvailable();
+}
+
+int DBConnectionPool::getNumBadConns(const string& host, double socketTimeout) const {
+    stdx::lock_guard<stdx::mutex> L(_mutex);
+    auto it = _pools.find(PoolKey(host, socketTimeout));
+    return (it == _pools.end()) ? 0 : it->second.getNumBadConns();
 }
 
 void DBConnectionPool::onRelease(DBClientBase* conn) {
@@ -361,11 +380,11 @@ void DBConnectionPool::appendConnectionStats(executor::ConnectionPoolStats* stat
             invariant(uri.isOK());
             HostAndPort host = uri.getValue().getServers().front();
 
-            executor::ConnectionStatsPerHost hostStats{
-                static_cast<size_t>(i->second.numInUse()),
-                static_cast<size_t>(i->second.numAvailable()),
-                static_cast<size_t>(i->second.numCreated())};
-            stats->updateStatsForHost(host, hostStats);
+            executor::ConnectionStatsPer hostStats{static_cast<size_t>(i->second.numInUse()),
+                                                   static_cast<size_t>(i->second.numAvailable()),
+                                                   static_cast<size_t>(i->second.numCreated()),
+                                                   0};
+            stats->updateStatsForHost("global", host, hostStats);
         }
     }
 }
@@ -458,6 +477,13 @@ ScopedDbConnection::ScopedDbConnection(const std::string& host, double socketTim
 ScopedDbConnection::ScopedDbConnection(const ConnectionString& host, double socketTimeout)
     : _host(host.toString()),
       _conn(globalConnPool.get(host, socketTimeout)),
+      _socketTimeout(socketTimeout) {
+    _setSocketTimeout();
+}
+
+ScopedDbConnection::ScopedDbConnection(const MongoURI& uri, double socketTimeout)
+    : _host(uri.toString()),
+      _conn(globalConnPool.get(uri, socketTimeout)),
       _socketTimeout(socketTimeout) {
     _setSocketTimeout();
 }

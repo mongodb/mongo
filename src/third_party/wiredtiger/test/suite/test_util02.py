@@ -29,8 +29,8 @@
 import string, os
 import wiredtiger, wttest
 from suite_subprocess import suite_subprocess
+from wtdataset import ComplexDataSet
 from wtscenario import make_scenarios
-from helper import complex_populate
 
 # test_util02.py
 #    Utilities: wt load
@@ -162,7 +162,6 @@ class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
     def test_load_process_hex(self):
         self.load_process(True)
 
-
 # test_load_commandline --
 #       Test the command-line processing.
 class test_load_commandline(wttest.WiredTigerTestCase, suite_subprocess):
@@ -170,7 +169,7 @@ class test_load_commandline(wttest.WiredTigerTestCase, suite_subprocess):
 
     def load_commandline(self, args, fail):
         errfile= "errfile"
-        complex_populate(self, self.uri, "key_format=S,value_format=S", 20)
+        ComplexDataSet(self, self.uri, 20).populate()
         self.runWt(["dump", self.uri], outfilename="dump.out")
         loadargs = ["load", "-f", "dump.out"] + args
         self.runWt(loadargs, errfilename=errfile, failure=fail)
@@ -219,7 +218,6 @@ class test_load_commandline(wttest.WiredTigerTestCase, suite_subprocess):
         self.load_commandline(["table", "filename=bar"], False)
         self.load_commandline(["table", "source=bar"], False)
         self.load_commandline(["table", "version=(100,200)"], False)
-
 
 if __name__ == '__main__':
     wttest.run()

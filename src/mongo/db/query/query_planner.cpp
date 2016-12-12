@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/client/dbclientinterface.h"  // For QueryOption_foobar
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/matcher/expression_algo.h"
@@ -253,7 +254,7 @@ QuerySolution* buildWholeIXSoln(const IndexEntry& index,
 }
 
 bool providesSort(const CanonicalQuery& query, const BSONObj& kp) {
-    return query.getQueryRequest().getSort().isPrefixOf(kp);
+    return query.getQueryRequest().getSort().isPrefixOf(kp, SimpleBSONElementComparator::kInstance);
 }
 
 // static
@@ -401,8 +402,8 @@ Status QueryPlanner::planFromCache(const CanonicalQuery& query,
 
     LOG(5) << "Tagging the match expression according to cache data: " << endl
            << "Filter:" << endl
-           << clone->toString() << "Cache data:" << endl
-           << winnerCacheData.toString();
+           << redact(clone->toString()) << "Cache data:" << endl
+           << redact(winnerCacheData.toString());
 
     // Map from index name to index number.
     // TODO: can we assume that the index numbering has the same lifetime
@@ -411,7 +412,7 @@ Status QueryPlanner::planFromCache(const CanonicalQuery& query,
     for (size_t i = 0; i < params.indices.size(); ++i) {
         const IndexEntry& ie = params.indices[i];
         indexMap[ie.name] = i;
-        LOG(5) << "Index " << i << ": " << ie.name << endl;
+        LOG(5) << "Index " << i << ": " << ie.name;
     }
 
     Status s = tagAccordingToCache(clone.get(), winnerCacheData.tree.get(), indexMap);
@@ -422,7 +423,7 @@ Status QueryPlanner::planFromCache(const CanonicalQuery& query,
     // The planner requires a defined sort order.
     sortUsingTags(clone.get());
 
-    LOG(5) << "Tagged tree:" << endl << clone->toString();
+    LOG(5) << "Tagged tree:" << endl << redact(clone->toString());
 
     // Use the cached index assignments to build solnRoot.
     QuerySolutionNode* solnRoot = QueryPlannerAccess::buildIndexedDataAccess(
@@ -442,7 +443,7 @@ Status QueryPlanner::planFromCache(const CanonicalQuery& query,
                                     << query.toStringShort());
     }
 
-    LOG(5) << "Planner: solution constructed from the cache:\n" << soln->toString();
+    LOG(5) << "Planner: solution constructed from the cache:\n" << redact(soln->toString());
     *out = soln;
     return Status::OK();
 }
@@ -455,10 +456,10 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
            << "=============================" << endl
            << "Options = " << optionString(params.options) << endl
            << "Canonical query:" << endl
-           << query.toString() << "=============================" << endl;
+           << redact(query.toString()) << "=============================";
 
     for (size_t i = 0; i < params.indices.size(); ++i) {
-        LOG(5) << "Index " << i << " is " << params.indices[i].toString() << endl;
+        LOG(5) << "Index " << i << " is " << params.indices[i].toString();
     }
 
     const bool canTableScan = !(params.options & QueryPlannerParams::NO_TABLE_SCAN);
@@ -491,7 +492,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
         // A hint overrides a $natural sort. This means that we don't force a table
         // scan if there is a $natural sort with a non-$natural hint.
         if (!naturalHint.eoo() || (!naturalSort.eoo() && hintObj.isEmpty())) {
-            LOG(5) << "Forcing a table scan due to hinted $natural\n";
+            LOG(5) << "Forcing a table scan due to hinted $natural";
             // min/max are incompatible with $natural.
             if (canTableScan && query.getQueryRequest().getMin().isEmpty() &&
                 query.getQueryRequest().getMax().isEmpty()) {
@@ -509,7 +510,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     QueryPlannerIXSelect::getFields(query.root(), "", &fields);
 
     for (unordered_set<string>::const_iterator it = fields.begin(); it != fields.end(); ++it) {
-        LOG(5) << "Predicate over field '" << *it << "'" << endl;
+        LOG(5) << "Predicate over field '" << *it << "'";
     }
 
     // Filter our indices so we only look at indices that are over our predicates.
@@ -564,7 +565,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
             for (size_t i = 0; i < params.indices.size(); ++i) {
                 if (params.indices[i].name == hintName) {
                     LOG(5) << "Hint by name specified, restricting indices to "
-                           << params.indices[i].keyPattern.toString() << endl;
+                           << params.indices[i].keyPattern.toString();
                     relevantIndices.clear();
                     relevantIndices.push_back(params.indices[i]);
                     hintIndexNumber = i;
@@ -577,8 +578,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
                 if (0 == params.indices[i].keyPattern.woCompare(hintIndex)) {
                     relevantIndices.clear();
                     relevantIndices.push_back(params.indices[i]);
-                    LOG(5) << "Hint specified, restricting indices to " << hintIndex.toString()
-                           << endl;
+                    LOG(5) << "Hint specified, restricting indices to " << hintIndex.toString();
                     if (hintIndexNumber) {
                         return Status(ErrorCodes::IndexNotFound,
                                       str::stream() << "Hint matched multiple indexes, "
@@ -677,7 +677,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
             return Status(ErrorCodes::BadValue, "unable to find relevant index for max/min query");
         }
 
-        LOG(5) << "Max/min query using index " << params.indices[idxNo].toString() << endl;
+        LOG(5) << "Max/min query using index " << params.indices[idxNo].toString();
 
         // Make our scan and output.
         QuerySolutionNode* solnRoot = QueryPlannerAccess::makeIndexScan(
@@ -692,7 +692,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     }
 
     for (size_t i = 0; i < relevantIndices.size(); ++i) {
-        LOG(2) << "Relevant index " << i << " is " << relevantIndices[i].toString() << endl;
+        LOG(2) << "Relevant index " << i << " is " << relevantIndices[i].toString();
     }
 
     // Figure out how useful each index is to each predicate.
@@ -714,7 +714,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     }
 
     // query.root() is now annotated with RelevantTag(s).
-    LOG(5) << "Rated tree:" << endl << query.root()->toString();
+    LOG(5) << "Rated tree:" << endl << redact(query.root()->toString());
 
     // If there is a GEO_NEAR it must have an index it can use directly.
     const MatchExpression* gnNode = NULL;
@@ -722,13 +722,13 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
         // No index for GEO_NEAR?  No query.
         RelevantTag* tag = static_cast<RelevantTag*>(gnNode->getTag());
         if (!tag || (0 == tag->first.size() && 0 == tag->notFirst.size())) {
-            LOG(5) << "Unable to find index for $geoNear query." << endl;
+            LOG(5) << "Unable to find index for $geoNear query.";
             // Don't leave tags on query tree.
             query.root()->resetTag();
             return Status(ErrorCodes::BadValue, "unable to find index for $geoNear query");
         }
 
-        LOG(5) << "Rated tree after geonear processing:" << query.root()->toString();
+        LOG(5) << "Rated tree after geonear processing:" << redact(query.root()->toString());
     }
 
     // Likewise, if there is a TEXT it must have an index it can use directly.
@@ -764,7 +764,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
         // assigned to it.
         invariant(1 == tag->first.size() + tag->notFirst.size());
 
-        LOG(5) << "Rated tree after text processing:" << query.root()->toString();
+        LOG(5) << "Rated tree after text processing:" << redact(query.root()->toString());
     }
 
     // If we have any relevant indices, we try to create indexed plans.
@@ -780,7 +780,8 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
 
         MatchExpression* rawTree;
         while (isp.getNext(&rawTree) && (out->size() < params.maxIndexedSolutions)) {
-            LOG(5) << "About to build solntree from tagged tree:" << endl << rawTree->toString();
+            LOG(5) << "About to build solntree from tagged tree:" << endl
+                   << redact(rawTree->toString());
 
             // Store the plan cache index tree before sorting using index tags, so that the
             // PlanCacheIndexTree has the same sort as the MatchExpression used to generate the plan
@@ -790,7 +791,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
             Status indexTreeStatus =
                 cacheDataFromTaggedTree(clone.get(), relevantIndices, &cacheData);
             if (!indexTreeStatus.isOK()) {
-                LOG(5) << "Query is not cachable: " << indexTreeStatus.reason() << endl;
+                LOG(5) << "Query is not cachable: " << redact(indexTreeStatus.reason());
             }
             unique_ptr<PlanCacheIndexTree> autoData(cacheData);
 
@@ -806,7 +807,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
 
             QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, solnRoot);
             if (NULL != soln) {
-                LOG(5) << "Planner: adding solution:" << endl << soln->toString();
+                LOG(5) << "Planner: adding solution:" << endl << redact(soln->toString());
                 if (indexTreeStatus.isOK()) {
                     SolutionCacheData* scd = new SolutionCacheData();
                     scd->tree.reset(autoData.release());
@@ -820,7 +821,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     // Don't leave tags on query tree.
     query.root()->resetTag();
 
-    LOG(5) << "Planner: outputted " << out->size() << " indexed solutions.\n";
+    LOG(5) << "Planner: outputted " << out->size() << " indexed solutions.";
 
     // Produce legible error message for failed OR planning with a TEXT child.
     // TODO: support collection scan for non-TEXT children of OR.
@@ -842,7 +843,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
         if (0 == out->size()) {
             QuerySolution* soln = buildWholeIXSoln(params.indices[*hintIndexNumber], query, params);
             verify(NULL != soln);
-            LOG(5) << "Planner: outputting soln that uses hinted index as scan." << endl;
+            LOG(5) << "Planner: outputting soln that uses hinted index as scan.";
             out->push_back(soln);
         }
         return Status::OK();
@@ -903,7 +904,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
 
                 const BSONObj kp = QueryPlannerAnalysis::getSortPattern(index.keyPattern);
                 if (providesSort(query, kp)) {
-                    LOG(5) << "Planner: outputting soln that uses index to provide sort." << endl;
+                    LOG(5) << "Planner: outputting soln that uses index to provide sort.";
                     QuerySolution* soln = buildWholeIXSoln(params.indices[i], query, params);
                     if (NULL != soln) {
                         PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
@@ -920,7 +921,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
                 }
                 if (providesSort(query, QueryPlannerCommon::reverseSortObj(kp))) {
                     LOG(5) << "Planner: outputting soln that uses (reverse) index "
-                           << "to provide sort." << endl;
+                           << "to provide sort.";
                     QuerySolution* soln = buildWholeIXSoln(params.indices[i], query, params, -1);
                     if (NULL != soln) {
                         PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
@@ -958,7 +959,7 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
             scd->solnType = SolutionCacheData::COLLSCAN_SOLN;
             collscan->cacheData.reset(scd);
             out->push_back(collscan);
-            LOG(5) << "Planner: outputting a collscan:" << endl << collscan->toString();
+            LOG(5) << "Planner: outputting a collscan:" << endl << redact(collscan->toString());
         }
     }
 

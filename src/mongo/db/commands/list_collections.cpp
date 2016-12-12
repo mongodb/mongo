@@ -31,6 +31,9 @@
 #include <vector>
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
@@ -39,9 +42,11 @@
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/query/cursor_request.h"
 #include "mongo/db/query/cursor_response.h"
@@ -128,8 +133,15 @@ BSONObj buildViewBson(const ViewDefinition& view) {
     BSONObjBuilder b;
     b.append("name", view.name().coll());
     b.append("type", "view");
-    BSONObj options = BSON("viewOn" << view.viewOn().coll() << "pipeline" << view.pipeline());
-    b.append("options", options);
+
+    BSONObjBuilder optionsBuilder(b.subobjStart("options"));
+    optionsBuilder.append("viewOn", view.viewOn().coll());
+    optionsBuilder.append("pipeline", view.pipeline());
+    if (view.defaultCollator()) {
+        optionsBuilder.append("collation", view.defaultCollator()->getSpec().toBSON());
+    }
+    optionsBuilder.doneFast();
+
     BSONObj info = BSON("readOnly" << true);
     b.append("info", info);
     return b.obj();
@@ -155,6 +167,11 @@ BSONObj buildCollectionBson(OperationContext* txn, const Collection* collection)
 
     BSONObj info = BSON("readOnly" << storageGlobalParams.readOnly);
     b.append("info", info);
+
+    auto idIndex = collection->getIndexCatalog()->findIdIndex(txn);
+    if (idIndex) {
+        b.append("idIndex", idIndex->infoObj());
+    }
 
     return b.obj();
 }
@@ -256,23 +273,25 @@ public:
                     }
                 }
             }
-            auto viewCatalog = db->getViewCatalog();
-            if (viewCatalog) {
-                for (auto& view : *viewCatalog) {
-                    BSONObj viewBson = buildViewBson(*(view.second.get()));
+
+            // Skipping views is only necessary for internal cloning operations.
+            bool skipViews = filterElt.type() == mongo::Object &&
+                SimpleBSONObjComparator::kInstance.evaluate(
+                    filterElt.Obj() == ListCollectionsFilter::makeTypeCollectionFilter());
+            if (!skipViews) {
+                db->getViewCatalog()->iterate(txn, [&](const ViewDefinition& view) {
+                    BSONObj viewBson = buildViewBson(view);
                     if (!viewBson.isEmpty()) {
                         _addWorkingSetMember(txn, viewBson, matcher.get(), ws.get(), root.get());
                     }
-                }
+                });
             }
         }
 
-        const std::string cursorNamespace = str::stream() << dbname << ".$cmd." << getName();
-        dassert(NamespaceString(cursorNamespace).isValid());
-        dassert(NamespaceString(cursorNamespace).isListCollectionsCursorNS());
+        const NamespaceString cursorNss = NamespaceString::makeListCollectionsNSS(dbname);
 
         auto statusWithPlanExecutor = PlanExecutor::make(
-            txn, std::move(ws), std::move(root), cursorNamespace, PlanExecutor::YIELD_MANUAL);
+            txn, std::move(ws), std::move(root), cursorNss.ns(), PlanExecutor::YIELD_MANUAL);
         if (!statusWithPlanExecutor.isOK()) {
             return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
@@ -301,15 +320,14 @@ public:
         if (!exec->isEOF()) {
             exec->saveState();
             exec->detachFromOperationContext();
-            ClientCursor* cursor =
-                new ClientCursor(CursorManager::getGlobalCursorManager(),
-                                 exec.release(),
-                                 cursorNamespace,
-                                 txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot());
-            cursorId = cursor->cursorid();
+            auto pinnedCursor = CursorManager::getGlobalCursorManager()->registerCursor(
+                {exec.release(),
+                 cursorNss.ns(),
+                 txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot()});
+            cursorId = pinnedCursor.getCursor()->cursorid();
         }
 
-        appendCursorResponseObject(cursorId, cursorNamespace, firstBatch.arr(), &result);
+        appendCursorResponseObject(cursorId, cursorNss.ns(), firstBatch.arr(), &result);
 
         return true;
     }

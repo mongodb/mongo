@@ -34,17 +34,20 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/unittest/unittest.h"
 
 using mongo::AllowedIndicesFilter;
 using mongo::BSONObj;
 using mongo::IndexEntry;
+using mongo::SimpleBSONObjComparator;
 using mongo::fromjson;
 
 namespace {
 TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByName) {
-    AllowedIndicesFilter filter({fromjson("{a:1}")}, {"a_1"});
+    SimpleBSONObjComparator bsonCmp;
+    AllowedIndicesFilter filter(bsonCmp.makeBSONObjSet({fromjson("{a:1}")}), {"a_1"});
     IndexEntry a_idx(fromjson("{a:1, b:1}"), false, false, false, "a_1", nullptr, BSONObj());
     IndexEntry ab_idx(fromjson("{a:1, b:1}"), false, false, false, "a_1:2", nullptr, BSONObj());
 
@@ -53,7 +56,8 @@ TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByName) {
 }
 
 TEST(QuerySettingsTest, AllowedIndicesFilterAllowsIndexesByKeyPattern) {
-    AllowedIndicesFilter filter({fromjson("{a:1}")}, {"a"});
+    SimpleBSONObjComparator bsonCmp;
+    AllowedIndicesFilter filter(bsonCmp.makeBSONObjSet({fromjson("{a:1}")}), {"a"});
     IndexEntry a_idx(fromjson("{a:1}"), false, false, false, "foo", nullptr, BSONObj());
     IndexEntry ab_idx(fromjson("{a:1, b:1}"), false, false, false, "bar", nullptr, BSONObj());
 

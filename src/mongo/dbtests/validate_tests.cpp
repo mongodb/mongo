@@ -46,6 +46,10 @@ namespace ValidateTests {
 
 using std::unique_ptr;
 
+namespace {
+const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
+}  // namespace
+
 static const char* const _ns = "unittests.validate_tests";
 
 /**
@@ -175,6 +179,8 @@ public:
                                                         << coll->ns().ns()
                                                         << "key"
                                                         << BSON("a" << 1)
+                                                        << "v"
+                                                        << static_cast<int>(kIndexVersion)
                                                         << "background"
                                                         << false));
 
@@ -236,6 +242,8 @@ public:
                                                         << coll->ns().ns()
                                                         << "key"
                                                         << BSON("a" << 1)
+                                                        << "v"
+                                                        << static_cast<int>(kIndexVersion)
                                                         << "background"
                                                         << false));
 
@@ -369,6 +377,8 @@ public:
                                                         << coll->ns().ns()
                                                         << "key"
                                                         << BSON("a.b" << 1)
+                                                        << "v"
+                                                        << static_cast<int>(kIndexVersion)
                                                         << "background"
                                                         << false));
 
@@ -433,6 +443,8 @@ public:
                                                         << coll->ns().ns()
                                                         << "key"
                                                         << BSON("a" << 1)
+                                                        << "v"
+                                                        << static_cast<int>(kIndexVersion)
                                                         << "background"
                                                         << false
                                                         << "sparse"
@@ -491,6 +503,8 @@ public:
                                                         << coll->ns().ns()
                                                         << "key"
                                                         << BSON("a" << 1)
+                                                        << "v"
+                                                        << static_cast<int>(kIndexVersion)
                                                         << "background"
                                                         << false
                                                         << "partialFilterExpression"
@@ -545,6 +559,8 @@ public:
                                                         << "key"
                                                         << BSON("x"
                                                                 << "2dsphere")
+                                                        << "v"
+                                                        << static_cast<int>(kIndexVersion)
                                                         << "background"
                                                         << false
                                                         << "partialFilterExpression"
@@ -561,6 +577,8 @@ public:
                                                         << "key"
                                                         << BSON("x"
                                                                 << "2dsphere")
+                                                        << "v"
+                                                        << static_cast<int>(kIndexVersion)
                                                         << "background"
                                                         << false
                                                         << "partialFilterExpression"
@@ -606,6 +624,8 @@ public:
                                                         << coll->ns().ns()
                                                         << "key"
                                                         << BSON("a" << 1 << "b" << -1)
+                                                        << "v"
+                                                        << static_cast<int>(kIndexVersion)
                                                         << "background"
                                                         << false));
         ASSERT_OK(status);
@@ -618,6 +638,8 @@ public:
                                                    << coll->ns().ns()
                                                    << "key"
                                                    << BSON("a" << -1 << "b" << 1)
+                                                   << "v"
+                                                   << static_cast<int>(kIndexVersion)
                                                    << "background"
                                                    << false));
 
@@ -666,7 +688,8 @@ public:
         auto status = dbtests::createIndexFromSpec(
             &_txn,
             coll->ns().ns(),
-            BSON("name" << indexName << "ns" << coll->ns().ns() << "key" << BSON("a" << 1)
+            BSON("name" << indexName << "ns" << coll->ns().ns() << "key" << BSON("a" << 1) << "v"
+                        << static_cast<int>(kIndexVersion)
                         << "background"
                         << false));
 
@@ -727,7 +750,8 @@ public:
         auto status = dbtests::createIndexFromSpec(
             &_txn,
             coll->ns().ns(),
-            BSON("name" << indexName << "ns" << coll->ns().ns() << "key" << BSON("a" << 1)
+            BSON("name" << indexName << "ns" << coll->ns().ns() << "key" << BSON("a" << 1) << "v"
+                        << static_cast<int>(kIndexVersion)
                         << "background"
                         << false));
 

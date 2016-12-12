@@ -47,10 +47,16 @@ BSONObj ListCollectionsFilter::makeTypeViewFilter() {
 }
 
 BSONObj ListCollectionsFilter::addTypeCollectionFilter(const BSONObj& filter) {
+    if (filter.isEmpty())
+        return makeTypeCollectionFilter();
+
     return BSON("$and" << BSON_ARRAY(filter << makeTypeCollectionFilter()));
 }
 
 BSONObj ListCollectionsFilter::addTypeViewFilter(const BSONObj& filter) {
+    if (filter.isEmpty())
+        return makeTypeViewFilter();
+
     return BSON("$and" << BSON_ARRAY(filter << makeTypeViewFilter()));
 }
 

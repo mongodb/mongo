@@ -56,7 +56,7 @@
     assert.eq(2, countNodes(), "A1");
 
     var rs = s.rs0;
-    rs.add();
+    rs.add({'shardsvr': ""});
     try {
         rs.reInitiate();
     } catch (e) {
@@ -139,10 +139,9 @@
     assert.eq(100, ts.find().itcount(), "B5");
     assert.eq(100, ts.find().batchSize(5).itcount(), "B6");
 
-    t.find().batchSize(3).next();
-    gc();
-    gc();
-    gc();
+    var cursor = t.find().batchSize(3);
+    cursor.next();
+    cursor.close();
 
     // --- sharded ----
 

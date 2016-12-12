@@ -157,7 +157,14 @@ public:
      */
     void connectToSyncSource(OperationContext* txn,
                              const OpTime& lastOpTimeFetched,
+                             const OpTime& requiredOpTime,
                              ReplicationCoordinator* replCoord);
+
+private:
+    /**
+     * Checks query response for required optime.
+     */
+    Status _compareRequiredOpTimeWithQueryResponse(const OpTime& requiredOpTime);
 };
 
 }  // namespace repl

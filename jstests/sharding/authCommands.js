@@ -3,15 +3,13 @@
  */
 (function() {
     'use strict';
+    load("jstests/replsets/rslib.js");
 
     var st = new ShardingTest({
         shards: 2,
         rs: {oplogSize: 10, useHostname: false},
-        other: {
-            keyFile: 'jstests/libs/key1',
-            useHostname: false,
-            chunkSize: 2,
-        },
+        other:
+            {keyFile: 'jstests/libs/key1', useHostname: false, chunkSize: 2, enableAutoSplit: true},
     });
 
     var mongos = st.s;
@@ -31,8 +29,8 @@
 
     // Secondaries should be up here, since we awaitReplication in the ShardingTest, but we *don't*
     // wait for the mongos to explicitly detect them.
-    ReplSetTest.awaitRSClientHosts(mongos, st.rs0.getSecondaries(), {ok: true, secondary: true});
-    ReplSetTest.awaitRSClientHosts(mongos, st.rs1.getSecondaries(), {ok: true, secondary: true});
+    awaitRSClientHosts(mongos, st.rs0.getSecondaries(), {ok: true, secondary: true});
+    awaitRSClientHosts(mongos, st.rs1.getSecondaries(), {ok: true, secondary: true});
 
     testDB.createUser({user: rwUser, pwd: password, roles: jsTest.basicUserRoles});
     testDB.createUser({user: roUser, pwd: password, roles: jsTest.readOnlyUserRoles});

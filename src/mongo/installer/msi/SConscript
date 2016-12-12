@@ -45,7 +45,7 @@ if 'enterprise' in env['MONGO_MODULES']:
   msi_edition = 'Enterprise'
   msi_flavor = '2008R2Plus'
   msi_platform = 'x64'
-  upgrade_code = 'E7FE8DF3-00F1-4434-97DF-2721E7F712FA'
+  upgrade_code = '822C75A4-40BA-456B-91D3-C339155F0F90'
 # Community
 else:
   if has_option('ssl'):
@@ -55,18 +55,18 @@ else:
   if env['TARGET_ARCH'] == 'i386':
     msi_platform = 'x86'
     msi_flavor = ''
-    upgrade_code = 'B2E70C13-483E-4E16-B6AA-FCCA7983B767'
+    upgrade_code = '480C63DF-8F9F-46BE-BD24-F16E9E992F4D'
   else:
     msi_platform = 'x64'
     if env.get('WIN_VERSION_MIN') == 'ws08r2' or env.get('WIN_VERSION_MIN') == 'win7':
       msi_flavor = '2008R2Plus'
       if msi_edition == 'SSL':
-        upgrade_code = '86CB92A1-E631-4C63-89D2-40A7159B938B'
+        upgrade_code = 'FDAA2775-060E-4C54-9C19-A84197F3070D'
       else:
-        upgrade_code = '448C9172-C5E7-42E0-81CB-00DAA191DD98'
+        upgrade_code = '7BCCBD4E-AC8A-48BC-9922-E9EBB158A060'
     else:
       msi_flavor = 'Legacy'
-      upgrade_code = '54BEB8CC-C8F7-4292-A411-BDE0A9F21CA3'
+      upgrade_code = '3433D310-B4A0-4E5B-BB38-34FC140F06F1'
 
 if 'msi' in BUILD_TARGETS and msi_edition == 'SSL' and msi_flavor != '2008R2Plus':
   print "Building the MongoDB SSL MSI is only supported on Windows 2008 R2+ or Windows 7+ platforms."
@@ -87,6 +87,23 @@ full_version = env['MONGO_VERSION'].partition('-')[0]
 major_version = full_version
 mv = major_version.split('.')
 major_version = "%s.%s" % (mv[0], mv[1])
+
+# We must regenerate the upgrade codes for each major release.
+# i.e., 3.0, 3.2, 3.4 need new codes but not 3.2.1, 3.2.2, etc
+# The build will now fail when the major version is bumped to prevent mistakes.
+# When the upgrade codes are bumped, remember to raise the version number to the next major version.
+# On each update to the upgrade codes:
+# 1. Generate new GUIDs
+# 2. Ensure each MSI gets a different GUID. This is used to identify products.
+#    It allows upgrade from 3.2.0 to 3.2.1 in place instead of side-by-side.
+# 3. Update the check for the next major release below so we bump the GUIDs in the future.
+#
+if float(major_version) > 3.6:
+    # If you are troubleshooting this error, see the comment above
+    env.FatalError("The upgrade codes are out of date for this release. Please \n" +
+    "replace the existing GUIDs listed in this file with new GUIDs so " +
+    "side-by-side installation of major versions (i.e. 3.2, and 3.4) is " +
+    "supported.")
 
 # Currently, we are planning to key the same upgrade code for each
 # (msi_edition, msi_platform, msi_flavor) combination
@@ -125,7 +142,7 @@ env.Command(objects,
             ' -dTargetFileName=${SERVER_ARCHIVE}'
             r' -dSaslSource=c:\sasl\bin'
             r' -dSnmpSource=c:\snmp\bin'
-            r' -dSslSource=c:\openssl\bin'
+            r' -dSslSource=' + env['WINDOWS_OPENSSL_BIN'] +
             ' -out ' + buildDir + r'\msi\\'
             ' -arch ' + msi_platform +
             ' -ext "$WIXUIEXT"'
@@ -149,6 +166,7 @@ pre_msi_cmd = env.Command(pre_msi,
 
 if 'enterprise' in env['MONGO_MODULES']:
     env.Depends(pre_msi_cmd, "#" + enterpriseToolBuildDir + "/mongodecrypt.exe")
+    env.Depends(pre_msi_cmd, "#" + enterpriseToolBuildDir + "/mongoldap.exe")
 
 msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.msi"
 env.Command(msi,

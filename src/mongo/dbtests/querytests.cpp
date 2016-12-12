@@ -40,6 +40,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_timestamp.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/query/find.h"
@@ -55,6 +56,10 @@ using std::cout;
 using std::endl;
 using std::string;
 using std::vector;
+
+namespace {
+const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
+}  // namespace
 
 class Base {
 public:
@@ -89,7 +94,8 @@ protected:
     }
 
     void addIndex(const BSONObj& key) {
-        Helpers::ensureIndex(&_txn, _collection, key, false, key.firstElementFieldName());
+        Helpers::ensureIndex(
+            &_txn, _collection, key, kIndexVersion, false, key.firstElementFieldName());
     }
 
     void insert(const char* s) {
@@ -136,7 +142,7 @@ public:
         ASSERT(Helpers::findOne(&_txn, _collection, query, ret, true));
         ASSERT_EQUALS(string("b"), ret.firstElement().fieldName());
         // Cross check with findOne() returning location.
-        ASSERT_EQUALS(
+        ASSERT_BSONOBJ_EQ(
             ret,
             _collection->docFor(&_txn, Helpers::findOne(&_txn, _collection, query, true)).value());
     }
@@ -152,7 +158,7 @@ public:
         // Check findOne() returning object, allowing unindexed scan.
         ASSERT(Helpers::findOne(&_txn, _collection, query, ret, false));
         // Check findOne() returning location, allowing unindexed scan.
-        ASSERT_EQUALS(
+        ASSERT_BSONOBJ_EQ(
             ret,
             _collection->docFor(&_txn, Helpers::findOne(&_txn, _collection, query, false)).value());
 
@@ -166,7 +172,7 @@ public:
         // Check findOne() returning object, requiring indexed scan with index.
         ASSERT(Helpers::findOne(&_txn, _collection, query, ret, true));
         // Check findOne() returning location, requiring indexed scan with index.
-        ASSERT_EQUALS(
+        ASSERT_BSONOBJ_EQ(
             ret,
             _collection->docFor(&_txn, Helpers::findOne(&_txn, _collection, query, true)).value());
     }
@@ -208,7 +214,7 @@ public:
         BSONObj ret;
         ASSERT(Helpers::findOne(&_txn, _collection, query, ret, false));
         ASSERT(ret.isEmpty());
-        ASSERT_EQUALS(
+        ASSERT_BSONOBJ_EQ(
             ret,
             _collection->docFor(&_txn, Helpers::findOne(&_txn, _collection, query, false)).value());
     }
@@ -274,8 +280,9 @@ public:
         {
             // Check internal server handoff to getmore.
             OldClientWriteContext ctx(&_txn, ns);
-            ClientCursorPin clientCursor(ctx.getCollection()->getCursorManager(), cursorId);
-            ASSERT_EQUALS(2, clientCursor.c()->pos());
+            auto pinnedCursor =
+                unittest::assertGet(ctx.getCollection()->getCursorManager()->pinCursor(cursorId));
+            ASSERT_EQUALS(2, pinnedCursor.getCursor()->pos());
         }
 
         cursor = _client.getMore(ns, cursorId);
@@ -373,7 +380,7 @@ public:
         {
             AutoGetCollectionForRead ctx(&_txn, ns);
             ASSERT(1 == ctx.getCollection()->getCursorManager()->numCursors());
-            ASSERT(ctx.getCollection()->getCursorManager()->find(cursorId, false));
+            ASSERT_OK(ctx.getCollection()->getCursorManager()->pinCursor(cursorId).getStatus());
         }
 
         // Check that the cursor can be iterated until all documents are returned.
@@ -407,31 +414,6 @@ public:
         ASSERT_EQUALS(_client.query(ns, BSONObj(), 1000)->itcount(), 1000);
         ASSERT_EQUALS(_client.query(ns, BSONObj(), 1001)->itcount(), 1000);
         ASSERT_EQUALS(_client.query(ns, BSONObj(), 0)->itcount(), 1000);
-    }
-};
-
-class ReturnOneOfManyAndTail : public ClientBase {
-public:
-    ~ReturnOneOfManyAndTail() {
-        _client.dropCollection("unittests.querytests.ReturnOneOfManyAndTail");
-    }
-    void run() {
-        const char* ns = "unittests.querytests.ReturnOneOfManyAndTail";
-        _client.createCollection(ns, 1024, true);
-        insert(ns, BSON("a" << 0));
-        insert(ns, BSON("a" << 1));
-        insert(ns, BSON("a" << 2));
-        unique_ptr<DBClientCursor> c =
-            _client.query(ns,
-                          QUERY("a" << GT << 0).hint(BSON("$natural" << 1)),
-                          1,
-                          0,
-                          0,
-                          QueryOption_CursorTailable);
-        // If only one result requested, a cursor is not saved.
-        ASSERT_EQUALS(0, c->getCursorId());
-        ASSERT(c->more());
-        ASSERT_EQUALS(1, c->next().getIntField("a"));
     }
 };
 
@@ -704,8 +686,9 @@ public:
         ASSERT_EQUALS(two, c->next()["ts"].Date());
         long long cursorId = c->getCursorId();
 
-        ClientCursorPin clientCursor(ctx.db()->getCollection(ns)->getCursorManager(), cursorId);
-        ASSERT_EQUALS(three.toULL(), clientCursor.c()->getSlaveReadTill().asULL());
+        auto pinnedCursor = unittest::assertGet(
+            ctx.db()->getCollection(ns)->getCursorManager()->pinCursor(cursorId));
+        ASSERT_EQUALS(three.toULL(), pinnedCursor.getCursor()->getSlaveReadTill().asULL());
     }
 };
 
@@ -1200,7 +1183,7 @@ public:
         unique_ptr<DBClientCursor> cursor = _client.query(ns, Query().sort("7"));
         while (cursor->more()) {
             BSONObj o = cursor->next();
-            verify(o.valid());
+            verify(o.valid(BSONVersion::kLatest));
             // cout << " foo " << o << endl;
         }
     }
@@ -1663,8 +1646,9 @@ public:
         ClientCursor* clientCursor = 0;
         {
             AutoGetCollectionForRead ctx(&_txn, ns());
-            ClientCursorPin clientCursorPointer(ctx.getCollection()->getCursorManager(), cursorId);
-            clientCursor = clientCursorPointer.c();
+            auto clientCursorPin =
+                unittest::assertGet(ctx.getCollection()->getCursorManager()->pinCursor(cursorId));
+            clientCursor = clientCursorPin.getCursor();
             // clientCursorPointer destructor unpins the cursor.
         }
         ASSERT(clientCursor->shouldTimeout(600001));
@@ -1714,7 +1698,8 @@ public:
 
         {
             OldClientWriteContext ctx(&_txn, ns());
-            ClientCursorPin pinCursor(ctx.db()->getCollection(ns())->getCursorManager(), cursorId);
+            auto pinnedCursor = unittest::assertGet(
+                ctx.db()->getCollection(ns())->getCursorManager()->pinCursor(cursorId));
             string expectedAssertion = str::stream() << "Cannot kill pinned cursor: " << cursorId;
             ASSERT_THROWS_WHAT(CursorManager::eraseCursorGlobal(&_txn, cursorId),
                                MsgAssertionException,
@@ -1730,11 +1715,11 @@ namespace queryobjecttests {
 class names1 {
 public:
     void run() {
-        ASSERT_EQUALS(BSON("x" << 1), QUERY("query" << BSON("x" << 1)).getFilter());
-        ASSERT_EQUALS(BSON("x" << 1), QUERY("$query" << BSON("x" << 1)).getFilter());
+        ASSERT_BSONOBJ_EQ(BSON("x" << 1), QUERY("query" << BSON("x" << 1)).getFilter());
+        ASSERT_BSONOBJ_EQ(BSON("x" << 1), QUERY("$query" << BSON("x" << 1)).getFilter());
     }
 };
-}
+}  // namespace queryobjecttests
 
 class OrderingTest {
 public:
@@ -1777,7 +1762,6 @@ public:
         add<GetMoreKillOp>();
         add<GetMoreInvalidRequest>();
         add<PositiveLimit>();
-        add<ReturnOneOfManyAndTail>();
         add<TailNotAtEnd>();
         add<EmptyTail>();
         add<TailableDelete>();

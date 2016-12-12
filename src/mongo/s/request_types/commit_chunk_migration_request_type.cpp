@@ -40,17 +40,26 @@ const char kFromShard[] = "fromShard";
 const char kToShard[] = "toShard";
 const char kMigratedChunk[] = "migratedChunk";
 const char kControlChunk[] = "controlChunk";
+const char kFromShardCollectionVersion[] = "fromShardCollectionVersion";
+const char kShardHasDistributedLock[] = "shardHasDistributedLock";
 
 /**
- * Attempts to parse a ChunkRange from "field" in "source".
+ * Attempts to parse a (range-only!) ChunkType from "field" in "source".
  */
-StatusWith<ChunkRange> extractChunkRange(const BSONObj& source, StringData field) {
+StatusWith<ChunkType> extractChunk(const BSONObj& source, StringData field) {
     BSONElement fieldElement;
     auto status = bsonExtractTypedField(source, field, BSONType::Object, &fieldElement);
     if (!status.isOK())
         return status;
 
-    return ChunkRange::fromBSON(fieldElement.Obj());
+    auto rangeWith = ChunkRange::fromBSON(fieldElement.Obj());
+    if (!rangeWith.isOK())
+        return rangeWith.getStatus();
+
+    ChunkType chunk;
+    chunk.setMin(rangeWith.getValue().getMin());
+    chunk.setMax(rangeWith.getValue().getMax());
+    return chunk;
 }
 
 /**
@@ -77,12 +86,12 @@ StatusWith<ShardId> extractShardId(const BSONObj& source, StringData field) {
 StatusWith<CommitChunkMigrationRequest> CommitChunkMigrationRequest::createFromCommand(
     const NamespaceString& nss, const BSONObj& obj) {
 
-    auto migratedChunkRange = extractChunkRange(obj, kMigratedChunk);
-    if (!migratedChunkRange.isOK()) {
-        return migratedChunkRange.getStatus();
+    auto migratedChunk = extractChunk(obj, kMigratedChunk);
+    if (!migratedChunk.isOK()) {
+        return migratedChunk.getStatus();
     }
 
-    CommitChunkMigrationRequest request(nss, std::move(migratedChunkRange.getValue()));
+    CommitChunkMigrationRequest request(nss, std::move(migratedChunk.getValue()));
 
     {
         auto fromShard = extractShardId(obj, kFromShard);
@@ -105,45 +114,57 @@ StatusWith<CommitChunkMigrationRequest> CommitChunkMigrationRequest::createFromC
     {
         // controlChunk is optional, so parse it if present.
         if (obj.hasField(kControlChunk)) {
-            auto controlChunkRange = extractChunkRange(obj, kControlChunk);
-            if (!controlChunkRange.isOK()) {
-                return controlChunkRange.getStatus();
+            auto controlChunk = extractChunk(obj, kControlChunk);
+            if (!controlChunk.isOK()) {
+                return controlChunk.getStatus();
             }
 
-            request._controlChunkRange = std::move(controlChunkRange.getValue());
+            request._controlChunk = std::move(controlChunk.getValue());
+        }
+    }
+
+    {
+        auto statusWithChunkVersion =
+            ChunkVersion::parseFromBSONWithFieldForCommands(obj, kFromShardCollectionVersion);
+        if (!statusWithChunkVersion.isOK()) {
+            return statusWithChunkVersion.getStatus();
+        }
+
+        request._collectionEpoch = statusWithChunkVersion.getValue().epoch();
+    }
+
+    {
+        Status shardHasDistLockStatus = bsonExtractBooleanField(
+            obj, kShardHasDistributedLock, &request._shardHasDistributedLock);
+        if (!shardHasDistLockStatus.isOK()) {
+            return shardHasDistLockStatus;
         }
     }
 
     return request;
 }
 
-void CommitChunkMigrationRequest::appendAsCommand(
-    BSONObjBuilder* builder,
-    const NamespaceString& nss,
-    const ShardId& fromShard,
-    const ShardId& toShard,
-    const ChunkType& migratedChunkType,
-    const boost::optional<ChunkType>& controlChunkType) {
+void CommitChunkMigrationRequest::appendAsCommand(BSONObjBuilder* builder,
+                                                  const NamespaceString& nss,
+                                                  const ShardId& fromShard,
+                                                  const ShardId& toShard,
+                                                  const ChunkType& migratedChunk,
+                                                  const boost::optional<ChunkType>& controlChunk,
+                                                  const ChunkVersion& fromShardCollectionVersion,
+                                                  const bool& shardHasDistributedLock) {
     invariant(builder->asTempObj().isEmpty());
     invariant(nss.isValid());
 
     builder->append(kConfigSvrCommitChunkMigration, nss.ns());
     builder->append(kFromShard, fromShard.toString());
     builder->append(kToShard, toShard.toString());
-    builder->append(kMigratedChunk, migratedChunkType.toBSON());
+    builder->append(kMigratedChunk, migratedChunk.toBSON());
+    fromShardCollectionVersion.appendWithFieldForCommands(builder, kFromShardCollectionVersion);
+    builder->append(kShardHasDistributedLock, shardHasDistributedLock);
 
-    if (controlChunkType) {
-        builder->append(kControlChunk, controlChunkType->toBSON());
+    if (controlChunk) {
+        builder->append(kControlChunk, controlChunk->toBSON());
     }
 }
-
-const ChunkRange& CommitChunkMigrationRequest::getControlChunkRange() const {
-    invariant(_controlChunkRange);
-    return _controlChunkRange.get();
-}
-
-CommitChunkMigrationRequest::CommitChunkMigrationRequest(const NamespaceString& nss,
-                                                         const ChunkRange& range)
-    : _nss(nss), _migratedChunkRange(range) {}
 
 }  // namespace mongo

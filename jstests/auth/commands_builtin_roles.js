@@ -11,8 +11,10 @@ load("jstests/auth/lib/commands_lib.js");
 
 var roles = [
     {key: "read", role: "read", dbname: firstDbName},
+    {key: "readLocal", role: {role: "read", db: "local"}, dbname: adminDbName},
     {key: "readAnyDatabase", role: "readAnyDatabase", dbname: adminDbName},
     {key: "readWrite", role: "readWrite", dbname: firstDbName},
+    {key: "readWriteLocal", role: {role: "readWrite", db: "local"}, dbname: adminDbName},
     {key: "readWriteAnyDatabase", role: "readWriteAnyDatabase", dbname: adminDbName},
     {key: "userAdmin", role: "userAdmin", dbname: firstDbName},
     {key: "userAdminAnyDatabase", role: "userAdminAnyDatabase", dbname: adminDbName},
@@ -47,10 +49,10 @@ function testProperAuthorization(conn, t, testcase, r) {
 
     var runOnDb = conn.getDB(testcase.runOnDb);
     authCommandsLib.setup(conn, t, runOnDb);
-    assert(r.db.auth("user|" + r.role, "password"));
+    assert(r.db.auth("user|" + r.key, "password"));
     var res = runOnDb.runCommand(t.command);
 
-    if (testcase.roles[r.role]) {
+    if (testcase.roles[r.key]) {
         if (res.ok == 0 && res.code == authErrCode) {
             out = "expected authorization success" + " but received " + tojson(res) + " on db " +
                 testcase.runOnDb + " with role " + r.key;
@@ -104,7 +106,7 @@ function createUsers(conn) {
     for (var i = 0; i < roles.length; i++) {
         r = roles[i];
         r.db = conn.getDB(r.dbname);
-        r.db.createUser({user: "user|" + r.role, pwd: "password", roles: [r.role]});
+        r.db.createUser({user: "user|" + r.key, pwd: "password", roles: [r.role]});
     }
     adminDb.logout();
 }
@@ -122,7 +124,7 @@ function checkForNonExistentRoles() {
             for (role in testcase.roles) {
                 var roleExists = false;
                 for (var k = 0; k < roles.length; k++) {
-                    if (roles[k].role === role) {
+                    if (roles[k].key === role) {
                         roleExists = true;
                         break;
                     }

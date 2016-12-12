@@ -32,6 +32,7 @@
 
 #include "mongo/db/service_context.h"
 #include "mongo/executor/network_test_env.h"
+#include "mongo/transport/session.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/message_port_mock.h"
 
@@ -41,8 +42,6 @@ class BSONObj;
 class CatalogCache;
 class ShardingCatalogClient;
 class ShardingCatalogClientImpl;
-class ShardingCatalogManager;
-class ShardingCatalogManagerImpl;
 struct ChunkVersion;
 class CollectionType;
 class DistLockManagerMock;
@@ -84,8 +83,6 @@ protected:
 
     ShardingCatalogClient* catalogClient() const;
 
-    ShardingCatalogManager* catalogManager() const;
-
     /**
      * Prefer catalogClient() method over this as much as possible.
      */
@@ -101,7 +98,7 @@ protected:
 
     executor::TaskExecutor* executor() const;
 
-    transport::Session* getTransportSession() const;
+    const transport::SessionHandle& getTransportSession() const;
 
     DistLockManagerMock* distLock() const;
 
@@ -113,8 +110,6 @@ protected:
      * single request + response or find tests.
      */
     void onCommand(executor::NetworkTestEnv::OnCommandFunction func);
-    // Same as onCommand but run against _addShardNetworkTestEnv
-    void onCommandForAddShard(executor::NetworkTestEnv::OnCommandFunction func);
     void onCommandWithMetadata(executor::NetworkTestEnv::OnCommandWithMetadataFunction func);
     void onFindCommand(executor::NetworkTestEnv::OnFindCommandFunction func);
     void onFindWithMetadataCommand(
@@ -214,19 +209,16 @@ private:
     ServiceContext::UniqueClient _client;
     ServiceContext::UniqueOperationContext _opCtx;
     transport::TransportLayerMock* _transportLayer;
-    std::unique_ptr<transport::Session> _transportSession;
+    transport::SessionHandle _transportSession;
 
     RemoteCommandTargeterFactoryMock* _targeterFactory;
     RemoteCommandTargeterMock* _configTargeter;
 
     executor::NetworkInterfaceMock* _mockNetwork;
     executor::TaskExecutor* _executor;
-    executor::TaskExecutor* _executorForAddShard;
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;
-    std::unique_ptr<executor::NetworkTestEnv> _addShardNetworkTestEnv;
     DistLockManagerMock* _distLockManager = nullptr;
     ShardingCatalogClientImpl* _catalogClient = nullptr;
-    ShardingCatalogManagerImpl* _catalogManager = nullptr;
 };
 
 }  // namespace mongo

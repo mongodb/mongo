@@ -33,9 +33,6 @@
 #include "mongo/db/pipeline/pipeline_optimizations.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/jsobj.h"
@@ -43,6 +40,11 @@
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_geo_near.h"
+#include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_out.h"
+#include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/mongoutils/str.h"
@@ -128,100 +130,17 @@ void Pipeline::optimizePipeline() {
     stitch();
 }
 
-namespace {
-
-void addPrivilegesForStage(const std::string& db,
-                           const BSONObj& cmdObj,
-                           PrivilegeVector* requiredPrivileges,
-                           BSONObj stageSpec,
-                           bool haveRecursed = false) {
-    StringData stageName = stageSpec.firstElementFieldName();
-    if (stageName == "$out" && stageSpec.firstElementType() == BSONType::String) {
-        NamespaceString outputNs(db, stageSpec.firstElement().str());
-        uassert(17139,
-                mongoutils::str::stream() << "Invalid $out target namespace, " << outputNs.ns(),
-                outputNs.isValid());
-
-        ActionSet actions;
-        actions.addAction(ActionType::remove);
-        actions.addAction(ActionType::insert);
-        if (shouldBypassDocumentValidationForCommand(cmdObj)) {
-            actions.addAction(ActionType::bypassDocumentValidation);
-        }
-        Privilege::addPrivilegeToPrivilegeVector(
-            requiredPrivileges, Privilege(ResourcePattern::forExactNamespace(outputNs), actions));
-    } else if (stageName == "$lookup" && stageSpec.firstElementType() == BSONType::Object) {
-        NamespaceString fromNs(db, stageSpec.firstElement()["from"].str());
-        Privilege::addPrivilegeToPrivilegeVector(
-            requiredPrivileges,
-            Privilege(ResourcePattern::forExactNamespace(fromNs), ActionType::find));
-    } else if (stageName == "$graphLookup" && stageSpec.firstElementType() == BSONType::Object) {
-        NamespaceString fromNs(db, stageSpec.firstElement()["from"].str());
-        Privilege::addPrivilegeToPrivilegeVector(
-            requiredPrivileges,
-            Privilege(ResourcePattern::forExactNamespace(fromNs), ActionType::find));
-    } else if (stageName == "$facet" && stageSpec.firstElementType() == BSONType::Object &&
-               !haveRecursed) {
-        // Add privileges of sub-stages, but only if we haven't recursed already. We don't want to
-        // get a stack overflow while checking privileges. If we ever allow a $facet stage inside of
-        // a $facet stage, this code will have to be modified to avoid causing a stack overflow, but
-        // still check all required privileges of nested stages.
-        for (auto&& subPipeline : stageSpec.firstElement().embeddedObject()) {
-            if (subPipeline.type() == BSONType::Array) {
-                for (auto&& subPipeStageSpec : subPipeline.embeddedObject()) {
-                    addPrivilegesForStage(db,
-                                          cmdObj,
-                                          requiredPrivileges,
-                                          subPipeStageSpec.embeddedObjectUserCheck(),
-                                          true);
-                }
-            }
-        }
-    }
-}
-
-}  // namespace
-
-Status Pipeline::checkAuthForCommand(Client* client, const std::string& db, const BSONObj& cmdObj) {
-    NamespaceString inputNs(db, cmdObj.firstElement().str());
-    auto inputResource = ResourcePattern::forExactNamespace(inputNs);
-    uassert(17138,
-            mongoutils::str::stream() << "Invalid input namespace, " << inputNs.ns(),
-            inputNs.isValid());
-
-    PrivilegeVector privileges;
-
-    if (dps::extractElementAtPath(cmdObj, "pipeline.0.$indexStats")) {
-        Privilege::addPrivilegeToPrivilegeVector(
-            &privileges,
-            Privilege(ResourcePattern::forAnyNormalResource(), ActionType::indexStats));
-    } else if (dps::extractElementAtPath(cmdObj, "pipeline.0.$collStats")) {
-        Privilege::addPrivilegeToPrivilegeVector(&privileges,
-                                                 Privilege(inputResource, ActionType::collStats));
-    } else {
-        // If no source requiring an alternative permission scheme is specified then default to
-        // requiring find() privileges on the given namespace.
-        Privilege::addPrivilegeToPrivilegeVector(&privileges,
-                                                 Privilege(inputResource, ActionType::find));
-    }
-
-    BSONObj pipeline = cmdObj.getObjectField("pipeline");
-    for (auto&& stageElem : pipeline) {
-        addPrivilegesForStage(db, cmdObj, &privileges, stageElem.embeddedObjectUserCheck());
-    }
-
-    if (AuthorizationSession::get(client)->isAuthorizedForPrivileges(privileges))
-        return Status::OK();
-    return Status(ErrorCodes::Unauthorized, "unauthorized");
-}
-
 bool Pipeline::aggSupportsWriteConcern(const BSONObj& cmd) {
-    if (cmd.hasField("pipeline") == false) {
+    auto pipelineElement = cmd["pipeline"];
+    if (pipelineElement.type() != BSONType::Array) {
         return false;
     }
 
-    auto stages = cmd["pipeline"].Array();
-    for (auto stage : stages) {
+    for (auto stage : pipelineElement.Obj()) {
+        if (stage.type() != BSONType::Object) {
+            return false;
+        }
+
         if (stage.Obj().hasField("$out")) {
             return true;
         }
@@ -239,7 +158,6 @@ void Pipeline::detachFromOperationContext() {
 }
 
 void Pipeline::reattachToOperationContext(OperationContext* opCtx) {
-    invariant(pCtx->opCtx == nullptr);
     pCtx->opCtx = opCtx;
 
     for (auto&& source : _sources) {
@@ -336,7 +254,7 @@ void Pipeline::Optimizations::Sharded::limitFieldsSentFromShardsToMerger(Pipelin
             return;
     }
     // if we get here, add the project.
-    boost::intrusive_ptr<DocumentSource> project = DocumentSourceProject::create(
+    boost::intrusive_ptr<DocumentSource> project = DocumentSourceProject::createFromBson(
         BSON("$project" << mergeDeps.toProjection()).firstElement(), shardPipe->pCtx);
     shardPipe->_sources.push_back(project);
 }
@@ -406,13 +324,12 @@ void Pipeline::run(BSONObjBuilder& result) {
     // the array in which the aggregation results reside
     // cant use subArrayStart() due to error handling
     BSONArrayBuilder resultArray;
-    DocumentSource* finalSource = _sources.back().get();
-    while (boost::optional<Document> next = finalSource->getNext()) {
-        // add the document to the result set
+    while (auto next = getNext()) {
+        // Add the document to the result set.
         BSONObjBuilder documentBuilder(resultArray.subobjStart());
         next->toBson(&documentBuilder);
         documentBuilder.doneFast();
-        // object will be too large, assert. the extra 1KB is for headers
+        // Object will be too large, assert. The extra 1KB is for headers.
         uassert(16389,
                 str::stream() << "aggregation result exceeds maximum document size ("
                               << BSONObjMaxUserSize / (1024 * 1024)
@@ -422,6 +339,16 @@ void Pipeline::run(BSONObjBuilder& result) {
 
     resultArray.done();
     result.appendArray("result", resultArray.arr());
+}
+
+boost::optional<Document> Pipeline::getNext() {
+    invariant(!_sources.empty());
+    auto nextResult = _sources.back()->getNext();
+    while (nextResult.isPaused()) {
+        nextResult = _sources.back()->getNext();
+    }
+    return nextResult.isEOF() ? boost::none
+                              : boost::optional<Document>{nextResult.releaseDocument()};
 }
 
 vector<Value> Pipeline::writeExplainOps() const {

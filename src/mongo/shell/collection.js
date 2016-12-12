@@ -272,6 +272,11 @@ DBCollection.prototype.find = function(query, fields, limit, skip, batchSize, op
         cursor.readPref(readPrefMode, connObj.getReadPrefTagSet());
     }
 
+    var rc = connObj.getReadConcern();
+    if (rc) {
+        cursor.readConcern(rc);
+    }
+
     return cursor;
 };
 
@@ -766,6 +771,19 @@ DBCollection.prototype.findAndModify = function(args) {
 };
 
 DBCollection.prototype.renameCollection = function(newName, dropTarget) {
+    if (arguments.length === 1 && typeof newName === 'object') {
+        if (newName.hasOwnProperty('dropTarget')) {
+            dropTarget = newName['dropTarget'];
+        }
+        newName = newName['to'];
+    }
+    if (typeof dropTarget === 'undefined') {
+        dropTarget = false;
+    }
+    if (typeof newName !== 'string' || typeof dropTarget !== 'boolean') {
+        throw Error(
+            'renameCollection must either take a string and an optional boolean or an object.');
+    }
     return this._db._adminCommand({
         renameCollection: this._fullName,
         to: this._db._name + "." + newName,
@@ -1028,7 +1046,7 @@ DBCollection.prototype._getIndexesCommand = function(filter) {
         throw _getErrorWithCode(res, "listIndexes failed: " + tojson(res));
     }
 
-    return new DBCommandCursor(this._mongo, res).toArray();
+    return new DBCommandCursor(res._mongo, res).toArray();
 };
 
 DBCollection.prototype.getIndexes = function(filter) {
@@ -1203,7 +1221,7 @@ DBCollection.prototype.convertToCapped = function(bytes) {
 DBCollection.prototype.exists = function() {
     var res = this._db.runCommand("listCollections", {filter: {name: this._shortName}});
     if (res.ok) {
-        var cursor = new DBCommandCursor(this._mongo, res);
+        var cursor = new DBCommandCursor(res._mongo, res);
         if (!cursor.hasNext())
             return null;
         return cursor.next();
@@ -1301,7 +1319,10 @@ DBCollection.prototype.aggregate = function(pipeline, aggregateOptions) {
     assert.commandWorked(res, "aggregate failed");
 
     if ("cursor" in res) {
-        return new DBCommandCursor(this._mongo, res);
+        if (cmd["cursor"]["batchSize"] > 0) {
+            var batchSizeValue = cmd["cursor"]["batchSize"];
+        }
+        return new DBCommandCursor(res._mongo, res, batchSizeValue);
     }
 
     return res;
@@ -1673,35 +1694,10 @@ DBCollection.prototype.unsetWriteConcern = function() {
 * @return {number}
 */
 DBCollection.prototype.count = function(query, options) {
-    var opts = Object.extend({}, options || {});
+    query = this.find(query);
 
-    var query = this.find(query);
-    if (typeof opts.skip == 'number') {
-        query.skip(opts.skip);
-    }
-
-    if (typeof opts.limit == 'number') {
-        query.limit(opts.limit);
-    }
-
-    if (typeof opts.maxTimeMS == 'number') {
-        query.maxTimeMS(opts.maxTimeMS);
-    }
-
-    if (opts.hint) {
-        query.hint(opts.hint);
-    }
-
-    if (typeof opts.readConcern == 'string') {
-        query.readConcern(opts.readConcern);
-    }
-
-    if (typeof opts.collation == 'object') {
-        query.collation(opts.collation);
-    }
-
-    // Return the result of the find
-    return query.count(true);
+    // Apply options and return the result of the find
+    return QueryHelpers._applyCountOptions(query, options).count(true);
 };
 
 /**
@@ -1756,8 +1752,9 @@ DBCollection.prototype._distinct = function(keyString, query) {
     return this._dbReadCommand({distinct: this._shortName, key: keyString, query: query || {}});
 };
 
-DBCollection.prototype.latencyStats = function() {
-    return this.aggregate([{$collStats: {latencyStats: {}}}]);
+DBCollection.prototype.latencyStats = function(options) {
+    options = options || {};
+    return this.aggregate([{$collStats: {latencyStats: options}}]);
 };
 
 /**

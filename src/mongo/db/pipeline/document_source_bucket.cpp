@@ -26,14 +26,21 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_bucket.h"
+
+#include "mongo/db/pipeline/document_source_group.h"
+#include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
 using std::vector;
 
-REGISTER_DOCUMENT_SOURCE_ALIAS(bucket, DocumentSourceBucket::createFromBson);
+REGISTER_MULTI_STAGE_ALIAS(bucket,
+                           LiteParsedDocumentSourceDefault::parse,
+                           DocumentSourceBucket::createFromBson);
 
 namespace {
 intrusive_ptr<ExpressionConstant> getExpressionConstant(BSONElement expressionElem,
@@ -121,8 +128,6 @@ vector<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
                                       << typeName(upper.getType())
                                       << ".",
                         lowerCanonicalType == upperCanonicalType);
-                // TODO SERVER-25038: This check must be deferred so that it respects the final
-                // collator, which is not necessarily the same as the collator at parse time.
                 uassert(40194,
                         str::stream()
                             << "The 'boundaries' option to $bucket must be sorted, but elements "
@@ -178,9 +183,6 @@ vector<intrusive_ptr<DocumentSource>> DocumentSourceBucket::createFromBson(
         // If the default has the same canonical type as the bucket's boundaries, then make sure the
         // default is less than the lowest boundary or greater than or equal to the highest
         // boundary.
-        //
-        // TODO SERVER-25038: This check must be deferred so that it respects the final collator,
-        // which is not necessarily the same as the collator at parse time.
         const auto& valueCmp = pExpCtx->getValueComparator();
         const bool hasValidDefault = valueCmp.evaluate(defaultValue < lowerValue) ||
             valueCmp.evaluate(defaultValue >= upperValue);

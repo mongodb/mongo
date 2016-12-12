@@ -86,7 +86,7 @@ CountScan::CountScan(OperationContext* txn, const CountScanParams& params, Worki
     _specificStats.isUnique = _params.descriptor->unique();
     _specificStats.isSparse = _params.descriptor->isSparse();
     _specificStats.isPartial = _params.descriptor->isPartial();
-    _specificStats.indexVersion = _params.descriptor->version();
+    _specificStats.indexVersion = static_cast<int>(_params.descriptor->version());
 
     // endKey must be after startKey in index order since we only do forward scans.
     dassert(_params.startKey.woCompare(_params.endKey,

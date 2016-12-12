@@ -34,6 +34,7 @@
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/init.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/config.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
@@ -51,17 +52,14 @@ using namespace mongo::sorter;
 using std::make_shared;
 using std::pair;
 
-// Stub to avoid including the server_options library
-// TODO: This should go away once we can do these checks at compile time
-bool isMongos() {
-    return false;
-}
+namespace {
 
 // Stub to avoid including the server environment library.
 MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
     setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
     return Status::OK();
 }
+}  // namespace
 
 //
 // Sorter framework testing utilities
@@ -488,10 +486,8 @@ public:
 
     SortOptions adjustSortOptions(SortOptions opts) {
         // Make sure we use a reasonable number of files when we spill
-        static_assert((NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT > 50,
-                      "(NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT > 50");
-        static_assert((NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT < 500,
-                      "(NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT < 500");
+        MONGO_STATIC_ASSERT((NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT > 50);
+        MONGO_STATIC_ASSERT((NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT < 500);
 
         return opts.MaxMemoryUsageBytes(MEM_LIMIT).ExtSortAllowed();
     }
@@ -527,17 +523,13 @@ class LotsOfDataWithLimit : public LotsOfDataLittleMemory<Random> {
     typedef LotsOfDataLittleMemory<Random> Parent;
     SortOptions adjustSortOptions(SortOptions opts) {
         // Make sure our tests will spill or not as desired
-        static_assert(MEM_LIMIT / 2 > (100 * sizeof(IWPair)),
-                      "MEM_LIMIT / 2 > (100 * sizeof(IWPair))");
-        static_assert(MEM_LIMIT < (5000 * sizeof(IWPair)), "MEM_LIMIT < (5000 * sizeof(IWPair))");
-        static_assert(MEM_LIMIT * 2 > (5000 * sizeof(IWPair)),
-                      "MEM_LIMIT * 2 > (5000 * sizeof(IWPair))");
+        MONGO_STATIC_ASSERT(MEM_LIMIT / 2 > (100 * sizeof(IWPair)));
+        MONGO_STATIC_ASSERT(MEM_LIMIT < (5000 * sizeof(IWPair)));
+        MONGO_STATIC_ASSERT(MEM_LIMIT * 2 > (5000 * sizeof(IWPair)));
 
         // Make sure we use a reasonable number of files when we spill
-        static_assert((Parent::NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT > 100,
-                      "(Parent::NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT > 100");
-        static_assert((Parent::NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT < 500,
-                      "(Parent::NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT < 500");
+        MONGO_STATIC_ASSERT((Parent::NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT > 100);
+        MONGO_STATIC_ASSERT((Parent::NUM_ITEMS * sizeof(IWPair)) / MEM_LIMIT < 500);
 
         return opts.MaxMemoryUsageBytes(MEM_LIMIT).ExtSortAllowed().Limit(Limit);
     }

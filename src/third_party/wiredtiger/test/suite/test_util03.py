@@ -69,6 +69,5 @@ class test_util03(wttest.WiredTigerTestCase, suite_subprocess):
             self.fail('table should be empty')
         cursor.close()
 
-
 if __name__ == '__main__':
     wttest.run()

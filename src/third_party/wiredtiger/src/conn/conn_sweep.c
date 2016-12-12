@@ -17,7 +17,7 @@
  *	Mark idle handles with a time of death, and note if we see dead
  *	handles.
  */
-static int
+static void
 __sweep_mark(WT_SESSION_IMPL *session, time_t now)
 {
 	WT_CONNECTION_IMPL *conn;
@@ -26,7 +26,7 @@ __sweep_mark(WT_SESSION_IMPL *session, time_t now)
 	conn = S2C(session);
 
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
-		if (WT_IS_METADATA(session, dhandle))
+		if (WT_IS_METADATA(dhandle))
 			continue;
 
 		/*
@@ -48,10 +48,8 @@ __sweep_mark(WT_SESSION_IMPL *session, time_t now)
 			continue;
 
 		dhandle->timeofdeath = now;
-		WT_STAT_FAST_CONN_INCR(session, dh_sweep_tod);
+		WT_STAT_CONN_INCR(session, dh_sweep_tod);
 	}
-
-	return (0);
 }
 
 /*
@@ -97,7 +95,7 @@ __sweep_expire_one(WT_SESSION_IMPL *session)
 	 */
 	ret = __wt_conn_btree_sync_and_close(session, false, true);
 
-err:	WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
+err:	__wt_writeunlock(session, dhandle->rwlock);
 
 	return (ret);
 }
@@ -124,7 +122,7 @@ __sweep_expire(WT_SESSION_IMPL *session, time_t now)
 		if (conn->open_btree_count < conn->sweep_handles_min)
 			break;
 
-		if (WT_IS_METADATA(session, dhandle) ||
+		if (WT_IS_METADATA(dhandle) ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN) ||
 		    dhandle->session_inuse != 0 ||
 		    dhandle->timeofdeath == 0 ||
@@ -169,10 +167,10 @@ __sweep_discard_trees(WT_SESSION_IMPL *session, u_int *dead_handlesp)
 
 		/* We closed the btree handle. */
 		if (ret == 0) {
-			WT_STAT_FAST_CONN_INCR(session, dh_sweep_close);
+			WT_STAT_CONN_INCR(session, dh_sweep_close);
 			++*dead_handlesp;
 		} else
-			WT_STAT_FAST_CONN_INCR(session, dh_sweep_ref);
+			WT_STAT_CONN_INCR(session, dh_sweep_ref);
 
 		WT_RET_BUSY_OK(ret);
 	}
@@ -207,7 +205,7 @@ __sweep_remove_one(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
 	 * don't retry the discard until it times out again.
 	 */
 	if (ret != 0) {
-err:		WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
+err:		__wt_writeunlock(session, dhandle->rwlock);
 	}
 
 	return (ret);
@@ -230,7 +228,7 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
 	    dhandle != NULL;
 	    dhandle = dhandle_next) {
 		dhandle_next = TAILQ_NEXT(dhandle, q);
-		if (WT_IS_METADATA(session, dhandle))
+		if (WT_IS_METADATA(dhandle))
 			continue;
 		if (!WT_DHANDLE_CAN_DISCARD(dhandle))
 			continue;
@@ -238,9 +236,9 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
 		WT_WITH_HANDLE_LIST_LOCK(session,
 		    ret = __sweep_remove_one(session, dhandle));
 		if (ret == 0)
-			WT_STAT_FAST_CONN_INCR(session, dh_sweep_remove);
+			WT_STAT_CONN_INCR(session, dh_sweep_remove);
 		else
-			WT_STAT_FAST_CONN_INCR(session, dh_sweep_ref);
+			WT_STAT_CONN_INCR(session, dh_sweep_ref);
 		WT_RET_BUSY_OK(ret);
 	}
 
@@ -258,10 +256,12 @@ __sweep_server(void *arg)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	time_t now;
+	uint64_t last_las_sweep_id, oldest_id;
 	u_int dead_handles;
 
 	session = arg;
 	conn = S2C(session);
+	last_las_sweep_id = WT_TXN_NONE;
 
 	/*
 	 * Sweep for dead and excess handles.
@@ -269,18 +269,31 @@ __sweep_server(void *arg)
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
 	    F_ISSET(conn, WT_CONN_SERVER_SWEEP)) {
 		/* Wait until the next event. */
-		WT_ERR(__wt_cond_wait(session,
-		    conn->sweep_cond, conn->sweep_interval * WT_MILLION));
-		WT_ERR(__wt_seconds(session, &now));
+		__wt_cond_wait(session,
+		    conn->sweep_cond, conn->sweep_interval * WT_MILLION);
+		__wt_seconds(session, &now);
 
-		WT_STAT_FAST_CONN_INCR(session, dh_sweeps);
+		WT_STAT_CONN_INCR(session, dh_sweeps);
 
 		/*
 		 * Sweep the lookaside table. If the lookaside table hasn't yet
 		 * been written, there's no work to do.
+		 *
+		 * Don't sweep the lookaside table if the cache is stuck full.
+		 * The sweep uses the cache and can exacerbate the problem.
+		 * If we try to sweep when the cache is full or we aren't
+		 * making progress in eviction, sweeping can wind up constantly
+		 * bringing in and evicting pages from the lookaside table,
+		 * which will stop the cache from moving into the stuck state.
 		 */
-		if (__wt_las_is_written(session))
-			WT_ERR(__wt_las_sweep(session));
+		if (__wt_las_is_written(session) &&
+		    !__wt_cache_stuck(session)) {
+			oldest_id = __wt_txn_oldest_id(session);
+			if (WT_TXNID_LT(last_las_sweep_id, oldest_id)) {
+				WT_ERR(__wt_las_sweep(session));
+				last_las_sweep_id = oldest_id;
+			}
+		}
 
 		/*
 		 * Mark handles with a time of death, and report whether any
@@ -288,7 +301,7 @@ __sweep_server(void *arg)
 		 * never become idle.
 		 */
 		if (conn->sweep_idle_time != 0)
-			WT_ERR(__sweep_mark(session, now));
+			__sweep_mark(session, now);
 
 		/*
 		 * Close handles if we have reached the configured limit.
@@ -401,7 +414,7 @@ __wt_sweep_destroy(WT_SESSION_IMPL *session)
 
 	F_CLR(conn, WT_CONN_SERVER_SWEEP);
 	if (conn->sweep_tid_set) {
-		WT_TRET(__wt_cond_signal(session, conn->sweep_cond));
+		__wt_cond_signal(session, conn->sweep_cond);
 		WT_TRET(__wt_thread_join(session, conn->sweep_tid));
 		conn->sweep_tid_set = 0;
 	}

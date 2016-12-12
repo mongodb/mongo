@@ -45,17 +45,17 @@ namespace mongo {
 class SplitChunkRequest {
 public:
     SplitChunkRequest(NamespaceString nss,
+                      std::string shardName,
                       OID epoch,
                       ChunkRange chunkRange,
-                      std::vector<BSONObj> splitPoints,
-                      std::string shardName);
+                      std::vector<BSONObj> splitPoints);
 
     /**
-     * Parses the provided BSON content as the internal _configsvrSplitChunk command, and if
+     * Parses the provided BSON content as the internal _configsvrCommitChunkSplit command, and if
      * it contains the correct types, constructs a SplitChunkRequest object from it.
      *
      * {
-     *   _configsvrSplitChunk: <NamespaceString nss>,
+     *   _configsvrCommitChunkSplit: <NamespaceString nss>,
      *   collEpoch: <OID epoch>,
      *   min: <BSONObj chunkToSplitMin>,
      *   max: <BSONObj chunkToSplitMax>,
@@ -73,7 +73,7 @@ public:
     BSONObj toConfigCommandBSON(const BSONObj& writeConcern);
 
     /**
-     * Creates a serialized BSONObj of the internal _configsvrSplitChunk command from this
+     * Creates a serialized BSONObj of the internal _configsvrCommitChunkSplit command from this
      * SplitChunkRequest instance.
      */
     void appendAsConfigCommand(BSONObjBuilder* cmdBuilder);

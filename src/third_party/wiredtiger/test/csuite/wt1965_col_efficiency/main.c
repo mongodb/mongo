@@ -35,8 +35,6 @@
  * it is demonstrating an inefficiency rather than a correctness bug.
  */
 
-void (*custom_die)(void) = NULL;
-
 /* If changing field count also need to change set_value and get_value calls */
 #define	NR_FIELDS 8
 #define	NR_OBJECTS 100
@@ -181,6 +179,5 @@ main(int argc, char *argv[])
 	testutil_assert(ret == WT_NOTFOUND);
 
 	testutil_cleanup(opts);
-
-	return (0);
+	return (EXIT_SUCCESS);
 }

@@ -98,10 +98,8 @@ public:
 
     /**
      * Pushes operations in the iterator range [begin, end) into the oplog buffer without blocking.
-     *
-     * Returns false if there is insufficient space to complete this operation successfully.
      */
-    virtual bool pushAllNonBlocking(OperationContext* txn,
+    virtual void pushAllNonBlocking(OperationContext* txn,
                                     Batch::const_iterator begin,
                                     Batch::const_iterator end) = 0;
 
@@ -146,17 +144,11 @@ public:
     virtual bool tryPop(OperationContext* txn, Value* value) = 0;
 
     /**
-     * Pops the last operation in the oplog buffer.
-     * If the oplog buffer is empty, waits until an operation is pushed.
-     */
-    virtual Value blockingPop(OperationContext* txn) = 0;
-
-    /**
      * Waits "waitDuration" for an operation to be pushed into the oplog buffer.
      * Returns false if oplog buffer is still empty after "waitDuration".
-     * Otherwise, returns true and sets "value" to last item in oplog buffer.
+     * Otherwise, returns true.
      */
-    virtual bool blockingPeek(OperationContext* txn, Value* value, Seconds waitDuration) = 0;
+    virtual bool waitForData(Seconds waitDuration) = 0;
 
     /**
      * Returns false if oplog buffer is empty.

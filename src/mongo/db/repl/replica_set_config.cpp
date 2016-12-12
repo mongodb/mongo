@@ -37,6 +37,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/server_options.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 namespace repl {
@@ -50,8 +51,7 @@ const std::string ReplicaSetConfig::kMajorityWriteConcernModeName = "$majority";
 const Milliseconds ReplicaSetConfig::kDefaultHeartbeatInterval(2000);
 const Seconds ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
 const Milliseconds ReplicaSetConfig::kDefaultElectionTimeoutPeriod(10000);
-// TODO(siyuan): Change the default catch up timeout to 5000 milliseconds;
-const Milliseconds ReplicaSetConfig::kDefaultCatchUpTimeoutPeriod(0);
+const Milliseconds ReplicaSetConfig::kDefaultCatchUpTimeoutPeriod(2000);
 const bool ReplicaSetConfig::kDefaultChainingAllowed(true);
 
 namespace {

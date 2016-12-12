@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/record_id.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
@@ -47,6 +48,8 @@ using std::string;
 namespace RollbackTests {
 
 namespace {
+const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
+
 void dropDatabase(OperationContext* txn, const NamespaceString& nss) {
     ScopedTransaction transaction(txn, MODE_X);
     Lock::GlobalWrite globalWriteLock(txn->lockState());
@@ -97,7 +100,7 @@ void assertOnlyRecord(OperationContext* txn, const NamespaceString& nss, const B
 
     auto record = cursor->next();
     ASSERT(record);
-    ASSERT_EQ(data, record->data.releaseToBson());
+    ASSERT_BSONOBJ_EQ(data, record->data.releaseToBson());
 
     ASSERT(!cursor->next());
 }
@@ -141,7 +144,7 @@ void dropIndex(OperationContext* txn, const NamespaceString& nss, const string& 
 }
 }  // namespace
 
-template <bool rollback, bool defaultIndexes>
+template <bool rollback, bool defaultIndexes, bool capped>
 class CreateCollection {
 public:
     void run() {
@@ -157,7 +160,8 @@ public:
         {
             WriteUnitOfWork uow(&txn);
             ASSERT(!collectionExists(&ctx, ns));
-            ASSERT_OK(userCreateNS(&txn, ctx.db(), ns, BSONObj(), defaultIndexes));
+            auto options = capped ? BSON("capped" << true << "size" << 1000) : BSONObj();
+            ASSERT_OK(userCreateNS(&txn, ctx.db(), ns, options, defaultIndexes));
             ASSERT(collectionExists(&ctx, ns));
             if (!rollback) {
                 uow.commit();
@@ -171,7 +175,7 @@ public:
     }
 };
 
-template <bool rollback, bool defaultIndexes>
+template <bool rollback, bool defaultIndexes, bool capped>
 class DropCollection {
 public:
     void run() {
@@ -187,7 +191,8 @@ public:
         {
             WriteUnitOfWork uow(&txn);
             ASSERT(!collectionExists(&ctx, ns));
-            ASSERT_OK(userCreateNS(&txn, ctx.db(), ns, BSONObj(), defaultIndexes));
+            auto options = capped ? BSON("capped" << true << "size" << 1000) : BSONObj();
+            ASSERT_OK(userCreateNS(&txn, ctx.db(), ns, options, defaultIndexes));
             uow.commit();
         }
         ASSERT(collectionExists(&ctx, ns));
@@ -477,7 +482,8 @@ public:
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
-        BSONObj spec = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxName);
+        BSONObj spec = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxName << "v"
+                                 << static_cast<int>(kIndexVersion));
 
         // END SETUP / START TEST
 
@@ -518,7 +524,8 @@ public:
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
-        BSONObj spec = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxName);
+        BSONObj spec = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxName << "v"
+                                 << static_cast<int>(kIndexVersion));
 
         {
             WriteUnitOfWork uow(&txn);
@@ -571,7 +578,8 @@ public:
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
-        BSONObj spec = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxName);
+        BSONObj spec = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxName << "v"
+                                 << static_cast<int>(kIndexVersion));
 
         // END SETUP / START TEST
 
@@ -615,7 +623,8 @@ public:
         IndexCatalog* catalog = coll->getIndexCatalog();
 
         string idxName = "a";
-        BSONObj spec = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxName);
+        BSONObj spec = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxName << "v"
+                                 << static_cast<int>(kIndexVersion));
 
         {
             WriteUnitOfWork uow(&txn);
@@ -677,9 +686,12 @@ public:
         string idxNameA = "indexA";
         string idxNameB = "indexB";
         string idxNameC = "indexC";
-        BSONObj specA = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxNameA);
-        BSONObj specB = BSON("ns" << ns << "key" << BSON("b" << 1) << "name" << idxNameB);
-        BSONObj specC = BSON("ns" << ns << "key" << BSON("c" << 1) << "name" << idxNameC);
+        BSONObj specA = BSON("ns" << ns << "key" << BSON("a" << 1) << "name" << idxNameA << "v"
+                                  << static_cast<int>(kIndexVersion));
+        BSONObj specB = BSON("ns" << ns << "key" << BSON("b" << 1) << "name" << idxNameB << "v"
+                                  << static_cast<int>(kIndexVersion));
+        BSONObj specC = BSON("ns" << ns << "key" << BSON("c" << 1) << "name" << idxNameC << "v"
+                                  << static_cast<int>(kIndexVersion));
 
         // END SETUP / START TEST
 
@@ -724,9 +736,20 @@ public:
     template <template <bool, bool> class T>
     void addAll() {
         add<T<false, false>>();
-        add<T<true, false>>();
         add<T<false, true>>();
+        add<T<true, false>>();
         add<T<true, true>>();
+    }
+    template <template <bool, bool, bool> class T>
+    void addAll() {
+        add<T<false, false, false>>();
+        add<T<false, false, true>>();
+        add<T<false, true, false>>();
+        add<T<false, true, true>>();
+        add<T<true, false, false>>();
+        add<T<true, false, true>>();
+        add<T<true, true, false>>();
+        add<T<true, true, true>>();
     }
 
     void setupTests() {

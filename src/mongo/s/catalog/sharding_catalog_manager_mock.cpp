@@ -98,11 +98,24 @@ Status ShardingCatalogManagerMock::commitChunkMerge(OperationContext* txn,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
+StatusWith<BSONObj> ShardingCatalogManagerMock::commitChunkMigration(
+    OperationContext* txn,
+    const NamespaceString&,
+    const ChunkType&,
+    const boost::optional<ChunkType>&,
+    const OID& collectionEpoch,
+    const ShardId&,
+    const ShardId&) {
+    return {ErrorCodes::InternalError, "Method not implemented"};
+}
+
 void ShardingCatalogManagerMock::appendConnectionStats(executor::ConnectionPoolStats* stats) {}
 
 Status ShardingCatalogManagerMock::initializeConfigDatabaseIfNeeded(OperationContext* txn) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
+
+void ShardingCatalogManagerMock::discardCachedConfigDatabaseInitializationState() {}
 
 Status ShardingCatalogManagerMock::initializeShardingAwarenessOnUnawareShards(
     OperationContext* txn) {
@@ -120,6 +133,11 @@ BSONObj ShardingCatalogManagerMock::createShardIdentityUpsertForAddShard(
 }
 
 void ShardingCatalogManagerMock::cancelAddShardTaskIfNeeded(const ShardId& shardId) {
+    MONGO_UNREACHABLE;
+}
+
+Status ShardingCatalogManagerMock::setFeatureCompatibilityVersionOnShards(
+    OperationContext* txn, const std::string& version) {
     MONGO_UNREACHABLE;
 }
 

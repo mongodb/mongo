@@ -56,10 +56,6 @@ class AbstractMessagingPort;
 class Collection;
 class OperationContext;
 
-namespace transport {
-class Session;
-}  // namespace transport
-
 typedef long long ConnectionId;
 
 /**
@@ -73,13 +69,12 @@ public:
      * An unowned pointer to a transport::Session may optionally be provided. If 'session'
      * is non-null, then it will be used to augment the thread name, and for reporting purposes.
      *
-     * If provided, 'session' must outlive the newly-created Client object. Client::destroy() may
-     * be used to help enforce that the Client does not outlive 'session.'
+     * If provided, session's ref count will be bumped by this Client.
      */
-    static void initThread(const char* desc, transport::Session* session = nullptr);
+    static void initThread(const char* desc, transport::SessionHandle session = nullptr);
     static void initThread(const char* desc,
                            ServiceContext* serviceContext,
-                           transport::Session* session);
+                           transport::SessionHandle session);
 
     static Client* getCurrent();
 
@@ -91,7 +86,7 @@ public:
     }
 
     bool hasRemote() const {
-        return _session;
+        return (_session != nullptr);
     }
 
     HostAndPort getRemote() const {
@@ -109,8 +104,12 @@ public:
     /**
      * Returns the Session to which this client is bound, if any.
      */
-    transport::Session* session() const {
+    const transport::SessionHandle& session() const& {
         return _session;
+    }
+
+    transport::SessionHandle session() && {
+        return std::move(_session);
     }
 
     /**
@@ -202,10 +201,12 @@ public:
 
 private:
     friend class ServiceContext;
-    Client(std::string desc, ServiceContext* serviceContext, transport::Session* session = nullptr);
+    explicit Client(std::string desc,
+                    ServiceContext* serviceContext,
+                    transport::SessionHandle session);
 
     ServiceContext* const _serviceContext;
-    transport::Session* const _session;
+    const transport::SessionHandle _session;
 
     // Description for the client (e.g. conn8)
     const std::string _desc;

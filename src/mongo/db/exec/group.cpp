@@ -86,7 +86,8 @@ GroupStage::GroupStage(OperationContext* txn,
       _specificStats(),
       _groupState(GroupState_Initializing),
       _reduceFunction(0),
-      _keyFunction(0) {
+      _keyFunction(0),
+      _groupMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<int>()) {
     _children.emplace_back(child);
 }
 
@@ -95,9 +96,8 @@ Status GroupStage::initGroupScripting() {
     const std::string userToken =
         AuthorizationSession::get(Client::getCurrent())->getAuthenticatedUserNamesToken();
 
-    const NamespaceString nss(_request.ns);
-    _scope =
-        globalScriptEngine->getPooledScope(getOpCtx(), nss.db().toString(), "group" + userToken);
+    _scope = getGlobalScriptEngine()->getPooledScope(
+        getOpCtx(), _request.ns.db().toString(), "group" + userToken);
     if (!_request.reduceScope.isEmpty()) {
         _scope->init(&_request.reduceScope);
     }

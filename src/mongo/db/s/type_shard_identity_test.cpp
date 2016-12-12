@@ -61,7 +61,7 @@ TEST(ShardIdentityType, RoundTrip) {
     ASSERT_TRUE(shardIdentity.isClusterIdSet());
     ASSERT_EQ(clusterId, shardIdentity.getClusterId());
 
-    ASSERT_EQ(doc, shardIdentity.toBSON());
+    ASSERT_BSONOBJ_EQ(doc, shardIdentity.toBSON());
 }
 
 TEST(ShardIdentityType, ParseMissingId) {
@@ -144,7 +144,7 @@ TEST(ShardIdentityType, CreateUpdateObject) {
     auto updateObj = ShardIdentityType::createConfigServerUpdateObject("test/a:1,b:2");
     auto expectedObj = BSON("$set" << BSON("configsvrConnectionString"
                                            << "test/a:1,b:2"));
-    ASSERT_EQ(expectedObj, updateObj);
+    ASSERT_BSONOBJ_EQ(expectedObj, updateObj);
 }
 
 }  // namespace mongo

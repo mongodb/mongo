@@ -28,11 +28,13 @@
 
 #include "mongo/platform/basic.h"
 
+#include <algorithm>
 #include <boost/optional.hpp>
 #include <boost/optional/optional_io.hpp>
 
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/unittest/unittest.h"
 
@@ -231,7 +233,7 @@ TEST(QueryRequestTest, AllowTailableWithNaturalSort) {
     auto result = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
     ASSERT_OK(result.getStatus());
     ASSERT_TRUE(result.getValue()->isTailable());
-    ASSERT_EQ(result.getValue()->getSort(), BSON("$natural" << 1));
+    ASSERT_BSONOBJ_EQ(result.getValue()->getSort(), BSON("$natural" << 1));
 }
 
 TEST(QueryRequestTest, IsIsolatedReturnsTrueWithIsolated) {
@@ -398,9 +400,9 @@ TEST(QueryRequestTest, ParseFromCommandHintAsString) {
         assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
 
     BSONObj hintObj = qr->getHint();
-    ASSERT_EQUALS(BSON("$hint"
-                       << "foo_1"),
-                  hintObj);
+    ASSERT_BSONOBJ_EQ(BSON("$hint"
+                           << "foo_1"),
+                      hintObj);
 }
 
 TEST(QueryRequestTest, ParseFromCommandValidSortProj) {
@@ -824,7 +826,7 @@ TEST(QueryRequestTest, ParseFromCommandSkipIsZero) {
     bool isExplain = false;
     unique_ptr<QueryRequest> qr(
         assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
-    ASSERT_EQ(BSON("a" << 3), qr->getFilter());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 3), qr->getFilter());
     ASSERT_FALSE(qr->getSkip());
 }
 
@@ -848,7 +850,7 @@ TEST(QueryRequestTest, ParseFromCommandLimitIsZero) {
     bool isExplain = false;
     unique_ptr<QueryRequest> qr(
         assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
-    ASSERT_EQ(BSON("a" << 3), qr->getFilter());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 3), qr->getFilter());
     ASSERT_FALSE(qr->getLimit());
 }
 
@@ -1091,6 +1093,217 @@ TEST(QueryRequestTest, ParseMaxTimeMSPositiveInRangeSucceeds) {
     auto maxTime = QueryRequest::parseMaxTimeMS(maxTimeObj[QueryRequest::cmdOptionMaxTimeMS]);
     ASSERT_OK(maxTime);
     ASSERT_EQ(maxTime.getValue(), 300);
+}
+
+TEST(QueryRequestTest, ConvertToAggregationSucceeds) {
+    QueryRequest qr(testns);
+    auto agg = qr.asAggregationCommand();
+    ASSERT_OK(agg);
+
+    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    ASSERT_OK(ar.getStatus());
+    ASSERT(!ar.getValue().isExplain());
+    ASSERT(ar.getValue().getPipeline().empty());
+    ASSERT(ar.getValue().isCursorCommand());
+    ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithExplainSucceeds) {
+    QueryRequest qr(testns);
+    qr.setExplain(true);
+    auto agg = qr.asAggregationCommand();
+    ASSERT_OK(agg);
+
+    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    ASSERT_OK(ar.getStatus());
+    ASSERT(ar.getValue().isExplain());
+    ASSERT(ar.getValue().getPipeline().empty());
+    ASSERT(ar.getValue().isCursorCommand());
+    ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithMinFails) {
+    QueryRequest qr(testns);
+    qr.setMin(fromjson("{a: 1}"));
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithMaxFails) {
+    QueryRequest qr(testns);
+    qr.setMax(fromjson("{a: 1}"));
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithNoWantMoreFails) {
+    QueryRequest qr(testns);
+    qr.setWantMore(false);
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithNoWantMoreAndLimitFails) {
+    QueryRequest qr(testns);
+    qr.setWantMore(false);
+    qr.setLimit(7);
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithNoWantMoreLimitOneSucceeds) {
+    QueryRequest qr(testns);
+    qr.setWantMore(false);
+    qr.setLimit(1);
+    ASSERT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithMaxScanFails) {
+    QueryRequest qr(testns);
+    qr.setMaxScan(7);
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithReturnKeyFails) {
+    QueryRequest qr(testns);
+    qr.setReturnKey(true);
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithHintFails) {
+    QueryRequest qr(testns);
+    qr.setHint(fromjson("{a_1: -1}"));
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithCommentFails) {
+    QueryRequest qr(testns);
+    qr.setComment("test");
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithShowRecordIdFails) {
+    QueryRequest qr(testns);
+    qr.setShowRecordId(true);
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithSnapshotFails) {
+    QueryRequest qr(testns);
+    qr.setSnapshot(true);
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithTailableFails) {
+    QueryRequest qr(testns);
+    qr.setTailable(true);
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithOplogReplayFails) {
+    QueryRequest qr(testns);
+    qr.setOplogReplay(true);
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithNoCursorTimeoutFails) {
+    QueryRequest qr(testns);
+    qr.setNoCursorTimeout(true);
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithAwaitDataFails) {
+    QueryRequest qr(testns);
+    qr.setAwaitData(true);
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithAllowPartialResultsFails) {
+    QueryRequest qr(testns);
+    qr.setAllowPartialResults(true);
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithNToReturnFails) {
+    QueryRequest qr(testns);
+    qr.setNToReturn(7);
+    ASSERT_NOT_OK(qr.asAggregationCommand());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithPipeline) {
+    QueryRequest qr(testns);
+    qr.setFilter(BSON("x" << 1));
+    qr.setSort(BSON("y" << -1));
+    qr.setLimit(3);
+    qr.setSkip(7);
+    qr.setProj(BSON("z" << 0));
+
+    auto agg = qr.asAggregationCommand();
+    ASSERT_OK(agg);
+
+    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    ASSERT_OK(ar.getStatus());
+    ASSERT(!ar.getValue().isExplain());
+    ASSERT(ar.getValue().isCursorCommand());
+    ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
+
+    std::vector<BSONObj> expectedPipeline{BSON("$match" << BSON("x" << 1)),
+                                          BSON("$sort" << BSON("y" << -1)),
+                                          BSON("$skip" << 7),
+                                          BSON("$limit" << 3),
+                                          BSON("$project" << BSON("z" << 0))};
+    ASSERT(std::equal(expectedPipeline.begin(),
+                      expectedPipeline.end(),
+                      ar.getValue().getPipeline().begin(),
+                      SimpleBSONObjComparator::kInstance.makeEqualTo()));
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithBatchSize) {
+    QueryRequest qr(testns);
+    qr.setBatchSize(4);
+
+    auto agg = qr.asAggregationCommand();
+    ASSERT_OK(agg);
+
+    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    ASSERT_OK(ar.getStatus());
+    ASSERT(ar.getValue().isCursorCommand());
+    ASSERT(!ar.getValue().isExplain());
+    ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
+    ASSERT_EQ(ar.getValue().getBatchSize(), 4LL);
+    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithMaxTimeMS) {
+    QueryRequest qr(testns);
+    qr.setMaxTimeMS(9);
+
+    auto agg = qr.asAggregationCommand();
+    ASSERT_OK(agg);
+
+    const BSONObj cmdObj = agg.getValue();
+    ASSERT_EQ(cmdObj["maxTimeMS"].Int(), 9);
+
+    auto ar = AggregationRequest::parseFromBSON(testns, cmdObj);
+    ASSERT_OK(ar.getStatus());
+    ASSERT(!ar.getValue().isExplain());
+    ASSERT(ar.getValue().isCursorCommand());
+    ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
+}
+
+TEST(QueryRequestTest, ConvertToAggregationWithCollationSucceeds) {
+    QueryRequest qr(testns);
+    qr.setCollation(BSON("f" << 1));
+    auto agg = qr.asAggregationCommand();
+    ASSERT_OK(agg);
+
+    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    ASSERT_OK(ar.getStatus());
+    ASSERT(!ar.getValue().isExplain());
+    ASSERT(ar.getValue().getPipeline().empty());
+    ASSERT(ar.getValue().isCursorCommand());
+    ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSON("f" << 1));
 }
 
 }  // namespace mongo

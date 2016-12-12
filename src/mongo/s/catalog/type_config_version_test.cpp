@@ -104,7 +104,7 @@ TEST(Validity, NewVersionRoundTrip) {
     ASSERT_EQUALS(versionInfo.getCurrentVersion(), 4);
     ASSERT_EQUALS(versionInfo.getClusterId(), clusterId);
     ASSERT_EQUALS(versionInfo.getUpgradeId(), upgradeId);
-    ASSERT_EQUALS(versionInfo.getUpgradeState(), upgradeState);
+    ASSERT_BSONOBJ_EQ(versionInfo.getUpgradeState(), upgradeState);
 
     ASSERT_OK(versionInfo.validate());
 }

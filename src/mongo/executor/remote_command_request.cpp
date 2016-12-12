@@ -32,6 +32,7 @@
 
 #include <ostream>
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -95,8 +96,10 @@ bool RemoteCommandRequest::operator==(const RemoteCommandRequest& rhs) const {
     if (this == &rhs) {
         return true;
     }
-    return target == rhs.target && dbname == rhs.dbname && cmdObj == rhs.cmdObj &&
-        metadata == rhs.metadata && timeout == rhs.timeout;
+    return target == rhs.target && dbname == rhs.dbname &&
+        SimpleBSONObjComparator::kInstance.evaluate(cmdObj == rhs.cmdObj) &&
+        SimpleBSONObjComparator::kInstance.evaluate(metadata == rhs.metadata) &&
+        timeout == rhs.timeout;
 }
 
 bool RemoteCommandRequest::operator!=(const RemoteCommandRequest& rhs) const {

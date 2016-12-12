@@ -127,7 +127,7 @@ void checkNS(OperationContext* txn, const std::list<std::string>& nsToCheck) {
             indexer.commit();
             wunit.commit();
         } catch (const DBException& e) {
-            error() << "Index rebuilding did not complete: " << e.toString();
+            error() << "Index rebuilding did not complete: " << redact(e);
             log() << "note: restart the server with --noIndexBuildRetry to skip index rebuilds";
             // If anything went wrong, leave the indexes partially built so that we pick them up
             // again on restart.
@@ -164,9 +164,9 @@ void restartInProgressIndexesFromLastShutdown(OperationContext* txn) {
         }
         checkNS(txn, collNames);
     } catch (const DBException& e) {
-        error() << "Index verification did not complete: " << e.toString();
+        error() << "Index verification did not complete: " << redact(e);
         fassertFailedNoTrace(18643);
     }
-    LOG(1) << "checking complete" << endl;
+    LOG(1) << "checking complete";
 }
 }

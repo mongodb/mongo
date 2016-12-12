@@ -107,7 +107,7 @@ unique_ptr<PlanStageStats> PipelineProxyStage::getStats() {
 }
 
 boost::optional<BSONObj> PipelineProxyStage::getNextBson() {
-    if (boost::optional<Document> next = _pipeline->output()->getNext()) {
+    if (auto next = _pipeline->getNext()) {
         if (_includeMetaData) {
             return next->toBsonWithMetaData();
         } else {

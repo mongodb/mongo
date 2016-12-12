@@ -33,7 +33,6 @@
 
 #include "mongo/db/stats/top.h"
 
-#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
@@ -84,8 +83,6 @@ void Top::record(OperationContext* txn,
         return;
 
     auto hashedNs = UsageMap::HashedKey(ns);
-
-    // cout << "record: " << ns << "\t" << op << "\t" << command << endl;
     stdx::lock_guard<SimpleMutex> lk(_lock);
 
     if ((command || logicalOp == LogicalOp::opQuery) && ns == _lastDropped) {
@@ -142,10 +139,14 @@ void Top::_record(OperationContext* txn,
     }
 }
 
-void Top::collectionDropped(StringData ns) {
+void Top::collectionDropped(StringData ns, bool databaseDropped) {
     stdx::lock_guard<SimpleMutex> lk(_lock);
     _usage.erase(ns);
-    _lastDropped = ns.toString();
+    if (!databaseDropped) {
+        // If a collection drop occurred, there will be a subsequent call to record for this
+        // collection namespace which must be ignored. This does not apply to a database drop.
+        _lastDropped = ns.toString();
+    }
 }
 
 void Top::cloneMap(Top::UsageMap& out) const {
@@ -196,11 +197,11 @@ void Top::_appendStatsEntry(BSONObjBuilder& b, const char* statsName, const Usag
     bb.done();
 }
 
-void Top::appendLatencyStats(StringData ns, BSONObjBuilder* builder) {
+void Top::appendLatencyStats(StringData ns, bool includeHistograms, BSONObjBuilder* builder) {
     auto hashedNs = UsageMap::HashedKey(ns);
     stdx::lock_guard<SimpleMutex> lk(_lock);
     BSONObjBuilder latencyStatsBuilder;
-    _usage[hashedNs].opLatencyHistogram.append(&latencyStatsBuilder);
+    _usage[hashedNs].opLatencyHistogram.append(includeHistograms, &latencyStatsBuilder);
     builder->append("ns", ns);
     builder->append("latencyStats", latencyStatsBuilder.obj());
 }
@@ -212,9 +213,9 @@ void Top::incrementGlobalLatencyStats(OperationContext* txn,
     _incrementHistogram(txn, latency, &_globalHistogramStats, readWriteType);
 }
 
-void Top::appendGlobalLatencyStats(BSONObjBuilder* builder) {
+void Top::appendGlobalLatencyStats(bool includeHistograms, BSONObjBuilder* builder) {
     stdx::lock_guard<SimpleMutex> guard(_lock);
-    _globalHistogramStats.append(builder);
+    _globalHistogramStats.append(includeHistograms, builder);
 }
 
 void Top::_incrementHistogram(OperationContext* txn,
@@ -227,17 +228,4 @@ void Top::_incrementHistogram(OperationContext* txn,
         histogram->increment(latency, readWriteType);
     }
 }
-
-/**
- * Appends the global histogram to the server status.
- */
-class GlobalHistogramServerStatusMetric : public ServerStatusMetric {
-public:
-    GlobalHistogramServerStatusMetric() : ServerStatusMetric(".metrics.latency") {}
-    virtual void appendAtLeaf(BSONObjBuilder& builder) const {
-        BSONObjBuilder latencyBuilder;
-        Top::get(getGlobalServiceContext()).appendGlobalLatencyStats(&latencyBuilder);
-        builder.append("latency", latencyBuilder.obj());
-    }
-} globalHistogramServerStatusMetric;
 }  // namespace mongo

@@ -74,8 +74,7 @@ S2AccessMethod::S2AccessMethod(IndexCatalogEntry* btreeState, SortedDataInterfac
             geoFields >= 1);
 
     if (descriptor->isSparse()) {
-        warning() << "Sparse option ignored for index spec " << descriptor->keyPattern().toString()
-                  << "\n";
+        warning() << "Sparse option ignored for index spec " << descriptor->keyPattern().toString();
     }
 }
 
@@ -140,9 +139,9 @@ StatusWith<BSONObj> S2AccessMethod::fixSpec(const BSONObj& specObj) {
     return specObj;
 }
 
-void S2AccessMethod::getKeys(const BSONObj& obj,
-                             BSONObjSet* keys,
-                             MultikeyPaths* multikeyPaths) const {
+void S2AccessMethod::doGetKeys(const BSONObj& obj,
+                               BSONObjSet* keys,
+                               MultikeyPaths* multikeyPaths) const {
     ExpressionKeysPrivate::getS2Keys(obj, _descriptor->keyPattern(), _params, keys, multikeyPaths);
 }
 

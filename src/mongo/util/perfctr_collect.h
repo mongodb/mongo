@@ -33,7 +33,6 @@
 #include <pdh.h>
 #include <pdhmsg.h>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
@@ -41,6 +40,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 
@@ -124,10 +124,10 @@ private:
 
 private:
     // Vector of counters which are not sub-grouped by instance name.
-    std::unordered_map<std::string, std::vector<std::string>> _counters;
+    stdx::unordered_map<std::string, std::vector<std::string>> _counters;
 
     // Vector of counters sub grouped by instance name.
-    std::unordered_map<std::string, std::vector<std::string>> _nestedCounters;
+    stdx::unordered_map<std::string, std::vector<std::string>> _nestedCounters;
 };
 
 /**
@@ -148,11 +148,13 @@ public:
     static StatusWith<std::unique_ptr<PerfCounterCollector>> create(PerfCounterCollection builder);
 
     /**
-     * Collect the counters from PDH, and output their raw values into builder.
+     * Collect the counters from PDH, and output their raw values into builder. The exception is
+     * elapsed time counters which returns computed values instead of raw values.
      *
-     * For each counters, if the counter is a delta, rate, or fraction counter, the second value is
-     * output under the name "<counter> Base". Also, a single field is output called "timebase" if
-     * any counter depends on system ticks per second.
+     * For each counters, if the counter is a precision counter (see PERF_COUNTER_PRECISION), the
+     * second value is output under the name "<counter> Base". Also, a single field is output called
+     * "timebase" if any counter depends on system ticks per second. See counterHasTickBasedTimeBase
+     * for more details about timebase.
      */
     Status collect(BSONObjBuilder* builder);
 
@@ -169,14 +171,14 @@ private:
         std::string firstName;
 
         /**
-         * The name of the second value of a counter if the counter is a delta, rate, or fraction
-         * counter. This is output as: "\<Object Name>\<Counter Name> Base".
+         * The name of the second value of a counter if the counter is a precision counter. This is
+         * output as: "\<Object Name>\<Counter Name> Base".
          */
         std::string secondName;
 
         /**
-         * True if the counter is a delta, rate, or fraction counter, and its value should be output
-         * in the output BSON document.
+         * True if the counter is a precision counter, and its value should be output in the output
+         * BSON document.
          */
         bool hasSecondValue;
 

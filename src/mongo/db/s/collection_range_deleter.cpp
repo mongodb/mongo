@@ -169,15 +169,16 @@ int CollectionRangeDeleter::_doDeletion(OperationContext* txn,
         return -1;
     }
 
-    std::unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,
-                                                                  collection,
-                                                                  desc,
-                                                                  min,
-                                                                  max,
-                                                                  false,
-                                                                  PlanExecutor::YIELD_MANUAL,
-                                                                  InternalPlanner::FORWARD,
-                                                                  InternalPlanner::IXSCAN_FETCH));
+    std::unique_ptr<PlanExecutor> exec(
+        InternalPlanner::indexScan(txn,
+                                   collection,
+                                   desc,
+                                   min,
+                                   max,
+                                   BoundInclusion::kIncludeStartKeyOnly,
+                                   PlanExecutor::YIELD_MANUAL,
+                                   InternalPlanner::FORWARD,
+                                   InternalPlanner::IXSCAN_FETCH));
     int numDeleted = 0;
     const int maxItersBeforeYield = std::max(static_cast<int>(internalQueryExecYieldIterations), 1);
 

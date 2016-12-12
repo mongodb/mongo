@@ -63,7 +63,7 @@ TEST(BatchedUpdateRequest, Basic) {
 
     ASSERT_EQ("foo.test", request.getNS().ns());
 
-    ASSERT_EQUALS(origUpdateRequestObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(origUpdateRequestObj, request.toBSON());
 }
 
 TEST(BatchedUpdateRequest, CloneBatchedUpdateDocCopiesAllFields) {
@@ -78,17 +78,17 @@ TEST(BatchedUpdateRequest, CloneBatchedUpdateDocCopiesAllFields) {
     BatchedUpdateDocument cloneToDoc;
     updateDoc.cloneTo(&cloneToDoc);
     ASSERT_TRUE(cloneToDoc.isQuerySet());
-    ASSERT_EQ(BSON("a" << 1), cloneToDoc.getQuery());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 1), cloneToDoc.getQuery());
     ASSERT_TRUE(cloneToDoc.isUpdateExprSet());
-    ASSERT_EQ(BSON("$set" << BSON("a" << 2)), cloneToDoc.getUpdateExpr());
+    ASSERT_BSONOBJ_EQ(BSON("$set" << BSON("a" << 2)), cloneToDoc.getUpdateExpr());
     ASSERT_TRUE(cloneToDoc.isMultiSet());
     ASSERT_TRUE(cloneToDoc.getMulti());
     ASSERT_TRUE(cloneToDoc.isUpsertSet());
     ASSERT_TRUE(cloneToDoc.getUpsert());
     ASSERT_TRUE(cloneToDoc.isCollationSet());
-    ASSERT_EQ(BSON("locale"
-                   << "en_US"),
-              cloneToDoc.getCollation());
+    ASSERT_BSONOBJ_EQ(BSON("locale"
+                           << "en_US"),
+                      cloneToDoc.getCollation());
 }
 
 TEST(BatchedUpdateRequest, CanSetAndRetrieveCollationField) {
@@ -100,9 +100,9 @@ TEST(BatchedUpdateRequest, CanSetAndRetrieveCollationField) {
     updateDoc.setCollation(BSON("locale"
                                 << "en_US"));
     ASSERT_TRUE(updateDoc.isCollationSet());
-    ASSERT_EQ(BSON("locale"
-                   << "en_US"),
-              updateDoc.getCollation());
+    ASSERT_BSONOBJ_EQ(BSON("locale"
+                           << "en_US"),
+                      updateDoc.getCollation());
     updateDoc.unsetCollation();
     ASSERT_FALSE(updateDoc.isCollationSet());
 }
@@ -132,7 +132,7 @@ TEST(BatchedUpdateRequest, CollationFieldSerializesToBSONCorrectly) {
              << BatchedUpdateDocument::collation(BSON("locale"
                                                       << "en_US")));
 
-    ASSERT_EQUALS(expectedUpdateObj, updateDoc.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedUpdateObj, updateDoc.toBSON());
 }
 
 TEST(BatchedUpdateRequest, CollationFieldParsesFromBSONCorrectly) {
@@ -151,12 +151,12 @@ TEST(BatchedUpdateRequest, CollationFieldParsesFromBSONCorrectly) {
 
     ASSERT_EQ(1U, request.sizeUpdates());
     ASSERT_TRUE(request.getUpdatesAt(0)->isCollationSet());
-    ASSERT_EQ(BSON("locale"
-                   << "en_US"),
-              request.getUpdatesAt(0)->getCollation());
+    ASSERT_BSONOBJ_EQ(BSON("locale"
+                           << "en_US"),
+                      request.getUpdatesAt(0)->getCollation());
 
     // Ensure we re-serialize to the original BSON request.
-    ASSERT_EQUALS(origUpdateRequestObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(origUpdateRequestObj, request.toBSON());
 }
 
 }  // namespace

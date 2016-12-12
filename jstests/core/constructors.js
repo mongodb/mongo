@@ -32,6 +32,8 @@ function clientEvalConstructorTest(constructorList) {
 }
 
 function dbEvalConstructorTest(constructorList) {
+    assert.writeOK(db.evalConstructors.insert({}), "db must exist for eval to succeed");
+    assert(db.evalConstructors.drop());
     constructorList = addConstructorsWithNew(constructorList);
     constructorList.valid.forEach(function(constructor) {
         try {
@@ -164,6 +166,12 @@ var timestampConstructors = {
         'Timestamp(true,true)',
         'Timestamp(true,0)',
         'Timestamp(0,true)',
+        'Timestamp(Math.pow(2,32),Math.pow(2,32))',
+        'Timestamp(0,Math.pow(2,32))',
+        'Timestamp(Math.pow(2,32),0)',
+        'Timestamp(-1,-1)',
+        'Timestamp(-1,0)',
+        'Timestamp(0,-1)'
     ]
 };
 

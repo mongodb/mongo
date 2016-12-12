@@ -44,9 +44,9 @@ using mongo::BSONObj;
 using mongo::LogBuilder;
 using mongo::ModifierCurrentDate;
 using mongo::ModifierInterface;
-using mongo::Timestamp;
 using mongo::Status;
 using mongo::StringData;
+using mongo::Timestamp;
 using mongo::fromjson;
 using mongo::mutablebson::ConstElement;
 using mongo::mutablebson::Document;
@@ -177,7 +177,7 @@ TEST(BoolInput, EmptyStartDoc) {
 
     BSONObj olderDateObj = fromjson("{ a : { $date : 0 } }");
     ASSERT_OK(mod.apply());
-    ASSERT_LESS_THAN(olderDateObj, doc.getObject());
+    ASSERT_BSONOBJ_LT(olderDateObj, doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
     Document logDoc;
@@ -198,7 +198,7 @@ TEST(DateInput, EmptyStartDoc) {
 
     BSONObj olderDateObj = fromjson("{ a : { $date : 0 } }");
     ASSERT_OK(mod.apply());
-    ASSERT_LESS_THAN(olderDateObj, doc.getObject());
+    ASSERT_BSONOBJ_LT(olderDateObj, doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
     Document logDoc;
@@ -221,7 +221,7 @@ TEST(TimestampInput, EmptyStartDoc) {
     BSONObj olderDateObj = BSON("a" << ts);
     ASSERT_OK(mod.apply());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_LESS_THAN(olderDateObj, doc.getObject());
+    ASSERT_BSONOBJ_LT(olderDateObj, doc.getObject());
 
     Document logDoc;
     LogBuilder logBuilder(logDoc.root());
@@ -241,7 +241,7 @@ TEST(BoolInput, ExistingStringDoc) {
 
     BSONObj olderDateObj = fromjson("{ a : { $date : 0 } }");
     ASSERT_OK(mod.apply());
-    ASSERT_LESS_THAN(olderDateObj, doc.getObject());
+    ASSERT_BSONOBJ_LT(olderDateObj, doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
     Document logDoc;
@@ -262,7 +262,7 @@ TEST(BoolInput, ExistingDateDoc) {
 
     BSONObj olderDateObj = fromjson("{ a : { $date : 0 } }");
     ASSERT_OK(mod.apply());
-    ASSERT_LESS_THAN(olderDateObj, doc.getObject());
+    ASSERT_BSONOBJ_LT(olderDateObj, doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
     Document logDoc;
@@ -283,7 +283,7 @@ TEST(DateInput, ExistingDateDoc) {
 
     BSONObj olderDateObj = fromjson("{ a : { $date : 0 } }");
     ASSERT_OK(mod.apply());
-    ASSERT_LESS_THAN(olderDateObj, doc.getObject());
+    ASSERT_BSONOBJ_LT(olderDateObj, doc.getObject());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());
 
     Document logDoc;
@@ -306,7 +306,7 @@ TEST(TimestampInput, ExistingDateDoc) {
     BSONObj olderDateObj = BSON("a" << ts);
     ASSERT_OK(mod.apply());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());  // Same Size as Date
-    ASSERT_LESS_THAN(olderDateObj, doc.getObject());
+    ASSERT_BSONOBJ_LT(olderDateObj, doc.getObject());
 
     Document logDoc;
     LogBuilder logBuilder(logDoc.root());
@@ -328,7 +328,7 @@ TEST(TimestampInput, ExistingEmbeddedDateDoc) {
     BSONObj olderDateObj = BSON("a" << BSON("b" << ts));
     ASSERT_OK(mod.apply());
     ASSERT_TRUE(doc.isInPlaceModeEnabled());  // Same Size as Date
-    ASSERT_LESS_THAN(olderDateObj, doc.getObject());
+    ASSERT_BSONOBJ_LT(olderDateObj, doc.getObject());
 
     Document logDoc;
     LogBuilder logBuilder(logDoc.root());
@@ -350,7 +350,7 @@ TEST(DottedTimestampInput, EmptyStartDoc) {
     BSONObj olderDateObj = BSON("a" << BSON("b" << ts));
     ASSERT_OK(mod.apply());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
-    ASSERT_LESS_THAN(olderDateObj, doc.getObject());
+    ASSERT_BSONOBJ_LT(olderDateObj, doc.getObject());
 
     Document logDoc;
     LogBuilder logBuilder(logDoc.root());

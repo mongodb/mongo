@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 # -*- makefile -*-
-TOOLS=bsondump mongodecrypt mongodump mongoexport mongofiles mongoimport mongooplog mongoperf mongorestore mongostat mongotop
+TOOLS=bsondump mongodecrypt mongodump mongoexport mongofiles mongoimport mongoldap mongooplog mongoperf mongorestore mongostat mongotop
 
 # Uncomment this to turn on verbose mode.
 export DH_VERBOSE=1

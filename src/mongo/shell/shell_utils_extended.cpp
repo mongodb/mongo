@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem/fstream.hpp>
 #include <fstream>
 
 #include "mongo/scripting/engine.h"
@@ -196,8 +197,23 @@ BSONObj mkdir(const BSONObj& args, void* data) {
     uassert(16834,
             "mkdir requires a string argument -- mkdir(directory)",
             args.firstElement().type() == String);
-    boost::filesystem::create_directories(args.firstElement().String());
-    return BSON("" << true);
+
+    // Boost bug 12495 (https://svn.boost.org/trac/boost/ticket/12495):
+    // create_directories crashes on empty string. We expect mkdir("") to
+    // fail on the OS level anyway, so catch it here instead.
+    uassert(40315, "mkdir requires a non-empty string", args.firstElement().String() != "");
+
+    boost::system::error_code ec;
+    auto created = boost::filesystem::create_directories(args.firstElement().String(), ec);
+
+    uassert(40316, "mkdir() failed: " + ec.message(), !ec);
+
+    BSONObjBuilder wrapper;
+    BSONObjBuilder res(wrapper.subobjStart(""));
+    res.append("exists", true);
+    res.append("created", created);
+    res.done();
+    return wrapper.obj();
 }
 
 BSONObj removeFile(const BSONObj& args, void* data) {
@@ -231,6 +247,51 @@ BSONObj copyFile(const BSONObj& args, void* data) {
     return undefinedReturn;
 }
 
+BSONObj writeFile(const BSONObj& args, void* data) {
+    // Parse the arguments.
+
+    uassert(
+        40340, "writeFile requires 2 arguments: writeFile(filePath, content)", args.nFields() == 2);
+
+    BSONObjIterator it(args);
+
+    auto filePathElem = it.next();
+    uassert(40341,
+            "the first argument to writeFile() must be a string containing the path to the file",
+            filePathElem.type() == mongo::String);
+
+    auto fileContentElem = it.next();
+    uassert(40342,
+            "the second argument to writeFile() must be a string to write to the file",
+            fileContentElem.type() == mongo::String);
+
+    // Limit the capability to writing only new, regular files in existing directories.
+
+    const boost::filesystem::path originalFilePath{filePathElem.String()};
+    const boost::filesystem::path normalizedFilePath{originalFilePath.lexically_normal()};
+
+    uassert(40343,
+            "writeFile() can only write a file in a directory which already exists",
+            boost::filesystem::exists(normalizedFilePath.parent_path()));
+    uassert(40344,
+            "writeFile() can only write to a file which does not yet exist",
+            !boost::filesystem::exists(normalizedFilePath));
+    uassert(40345,
+            "the file name must be compatible with POSIX and Windows",
+            boost::filesystem::portable_name(normalizedFilePath.filename().string()));
+
+    boost::filesystem::ofstream ofs{normalizedFilePath};
+    uassert(40346,
+            str::stream() << "failed to open file " << normalizedFilePath.string()
+                          << " for writing",
+            ofs);
+
+    ofs << fileContentElem.String();
+    uassert(40347, str::stream() << "failed to write to file " << normalizedFilePath.string(), ofs);
+
+    return undefinedReturn;
+}
+
 BSONObj getHostName(const BSONObj& a, void* data) {
     uassert(13411, "getHostName accepts no arguments", a.nFields() == 0);
     char buf[260];  // HOST_NAME_MAX is usually 255
@@ -243,6 +304,7 @@ void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("getHostName", getHostName);
     scope.injectNative("removeFile", removeFile);
     scope.injectNative("copyFile", copyFile);
+    scope.injectNative("writeFile", writeFile);
     scope.injectNative("listFiles", listFiles);
     scope.injectNative("ls", ls);
     scope.injectNative("pwd", pwd);

@@ -34,13 +34,13 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
 
 namespace transport {
 
-class Session;
 class TransportLayer;
 
 }  // namespace transport
@@ -63,10 +63,10 @@ public:
      *
      * ...repeat until wait() returns an error.
      */
-    void startSession(transport::Session&& session) override;
+    void startSession(transport::SessionHandle session) override;
 
 private:
-    void run(transport::Session&& session);
+    void run(transport::SessionHandle session);
 
     transport::TransportLayer* _tl;
 

@@ -32,6 +32,7 @@
 #include <utility>
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/client/mongo_uri.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -60,7 +61,8 @@ public:
     DBClientReplicaSet(const std::string& name,
                        const std::vector<HostAndPort>& servers,
                        StringData applicationName,
-                       double so_timeout = 0);
+                       double so_timeout = 0,
+                       MongoURI uri = {});
     virtual ~DBClientReplicaSet();
 
     /**
@@ -189,6 +191,12 @@ public:
                                             const BSONObj& metadata,
                                             const BSONObj& commandArgs) final;
 
+    std::tuple<rpc::UniqueReply, DBClientWithCommands*> runCommandWithMetadataAndTarget(
+        StringData database,
+        StringData command,
+        const BSONObj& metadata,
+        const BSONObj& commandArgs) final;
+
     void setRequestMetadataWriter(rpc::RequestMetadataWriter writer) final;
 
     void setReplyMetadataReader(rpc::ReplyMetadataReader reader) final;
@@ -261,9 +269,10 @@ private:
     bool checkLastHost(const ReadPreferenceSetting* readPref);
 
     /**
-     * Destroys all cached information about the last slaveOk operation.
+     * Destroys all cached information about the last slaveOk operation and reports the host as
+     * failed in the replica set monitor with the specified 'status'.
      */
-    void invalidateLastSlaveOkCache();
+    void _invalidateLastSlaveOkCache(const Status& status);
 
     void _authConnection(DBClientConnection* conn);
 
@@ -282,12 +291,6 @@ private:
      * Clears the slaveOk connection and returns it to the pool if not the same as _master.
      */
     void resetSlaveOkConn();
-
-    /**
-     * Maximum number of retries to make for auto-retry logic when performing a slave ok
-     * operation.
-     */
-    static const size_t MAX_RETRY;
 
     // TODO: remove this when processes other than mongos uses the driver version.
     static bool _authPooledSecondaryConn;
@@ -318,6 +321,8 @@ private:
     // this could be a security issue, as the password is stored in memory
     // not sure if/how we should handle
     std::map<std::string, BSONObj> _auths;  // dbName -> auth parameters
+
+    MongoURI _uri;
 
 protected:
     /**

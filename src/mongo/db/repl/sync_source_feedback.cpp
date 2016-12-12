@@ -135,7 +135,11 @@ Status SyncSourceFeedback::_updateUpstream(OperationContext* txn, BackgroundSync
             // Blacklist sync target for .5 seconds and find a new one.
             stdx::lock_guard<stdx::mutex> lock(_mtx);
             auto replCoord = repl::ReplicationCoordinator::get(txn);
-            replCoord->blacklistSyncSource(syncTarget, Date_t::now() + Milliseconds(500));
+            const auto blacklistDuration = Milliseconds{500};
+            const auto until = Date_t::now() + blacklistDuration;
+            log() << "Blacklisting " << syncTarget << " due to error: '" << status << "' for "
+                  << blacklistDuration << " until: " << until;
+            replCoord->blacklistSyncSource(syncTarget, until);
             bgsync->clearSyncTarget();
         }
     }

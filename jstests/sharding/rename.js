@@ -1,6 +1,7 @@
 (function() {
 
     'use strict';
+    load("jstests/replsets/rslib.js");
 
     var s = new ShardingTest({name: "rename", shards: 2, mongos: 1, rs: {oplogSize: 10}});
 
@@ -62,8 +63,7 @@
     replTest.stop(0);
 
     replTest.awaitSecondaryNodes();
-    ReplSetTest.awaitRSClientHosts(
-        s.s, replTest.getPrimary(), {ok: true, ismaster: true}, replTest.name);
+    awaitRSClientHosts(s.s, replTest.getPrimary(), {ok: true, ismaster: true}, replTest.name);
 
     assert.writeOK(db.foo.insert({_id: 4}));
     assert.commandWorked(db.foo.renameCollection('bar', true));

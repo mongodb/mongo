@@ -29,7 +29,6 @@
 #pragma once
 
 #include <memory>
-#include <unordered_map>
 #include <vector>
 
 #include "mongo/db/cursor_id.h"
@@ -37,6 +36,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/s/query/cluster_client_cursor.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -361,7 +361,7 @@ public:
 
 private:
     class CursorEntry;
-    using CursorEntryMap = std::unordered_map<CursorId, CursorEntry>;
+    using CursorEntryMap = stdx::unordered_map<CursorId, CursorEntry>;
 
     /**
      * Transfers ownership of the given pinned cursor back to the manager, and moves the cursor to
@@ -528,13 +528,13 @@ private:
     //
     // Entries are added when the first cursor on the given namespace is registered, and removed
     // when the last cursor on the given namespace is destroyed.
-    std::unordered_map<uint32_t, NamespaceString> _cursorIdPrefixToNamespaceMap;
+    stdx::unordered_map<uint32_t, NamespaceString> _cursorIdPrefixToNamespaceMap;
 
     // Map from namespace to the CursorEntryContainer for that namespace.
     //
     // Entries are added when the first cursor on the given namespace is registered, and removed
     // when the last cursor on the given namespace is destroyed.
-    std::unordered_map<NamespaceString, CursorEntryContainer, NamespaceString::Hasher>
+    stdx::unordered_map<NamespaceString, CursorEntryContainer, NamespaceString::Hasher>
         _namespaceToContainerMap;
 
     size_t _cursorsTimedOut = 0;

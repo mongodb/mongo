@@ -2,7 +2,7 @@
 
 # Complain about unused statistics fields.
 t=__wt.$$
-trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+trap 'rm -f $t' 0 1 2 3 13 15
 
 # List of files to search: skip stat.c, it lists all of the fields by
 # definition.
@@ -19,6 +19,25 @@ search=`sed \
     -e 's/^	int64_t \([a-z_*]*\);$/\1/p' \
     -e d ../src/include/stat.h |
     sort`
+
+# There are some fields that are used, but we can't detect it.
+cat << UNUSED_STAT_FIELDS
+lock_checkpoint_count
+lock_checkpoint_wait_application
+lock_checkpoint_wait_internal
+lock_handle_list_count
+lock_handle_list_wait_application
+lock_handle_list_wait_internal
+lock_metadata_count
+lock_metadata_wait_application
+lock_metadata_wait_internal
+lock_schema_count
+lock_schema_wait_application
+lock_schema_wait_internal
+lock_table_count
+lock_table_wait_application
+lock_table_wait_internal
+UNUSED_STAT_FIELDS
 
 echo "$search"
 fgrep -who "$search" $l) | sort | uniq -u > $t

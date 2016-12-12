@@ -42,6 +42,7 @@ env.Library('authcore', ['action_set.cpp',
                      '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
                      '$BUILD_DIR/mongo/bson/util/bson_extract',
                      '$BUILD_DIR/mongo/crypto/scramauth',
+                     '$BUILD_DIR/mongo/db/catalog/document_validation',
                      '$BUILD_DIR/mongo/db/common',
                      '$BUILD_DIR/mongo/db/ops/update_driver',
                      '$BUILD_DIR/mongo/db/namespace_string',
@@ -188,3 +189,10 @@ env.CppUnitTest('authorization_manager_test', 'authorization_manager_test.cpp',
                     'saslauth'])
 env.CppUnitTest('authorization_session_test', 'authorization_session_test.cpp',
                 LIBDEPS=['authcore', 'authmocks', 'saslauth'])
+env.CppUnitTest('sasl_scramsha1_test',
+                'sasl_scramsha1_test.cpp',
+                LIBDEPS=[
+                    'saslauth',
+                    '$BUILD_DIR/mongo/client/sasl_client',
+                ])
+

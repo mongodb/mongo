@@ -15,6 +15,15 @@
 (function() {
     'use strict';
 
+    if (jsTest.options().storageEngine === "mmapv1" && db.isMaster().msg === "isdbgrid") {
+        // SERVER-10747 MMAPv1's journal thread can block behind a long-running and non-yielding
+        // $where operations. This causes subsequent operations on the collection, such as
+        // setShardVersion, to block behind MMAPv1's journal thread.  We therefore cannot expect
+        // to always be able to see *both* count operations running on a shard at the same time.
+        jsTest.log("Skipping test when running in a sharded cluster with mmapv1 shards");
+        return;
+    }
+
     var t = db.jstests_killop;
     t.save({x: 1});
 

@@ -9,12 +9,13 @@
     var config = replTest.getReplSetConfigFromNode();
 
     var runTest = function(testDB, primaryConn) {
-        primaryConn.getDB('test').user.insert({x: 1}, {writeConcern: {w: 2}});
+        var dbName = testDB.getName();
+        assert.writeOK(primaryConn.getDB(dbName).user.insert({x: 1}, {writeConcern: {w: 2}}));
 
         var localDB = primaryConn.getDB('local');
 
         var oplogTS = localDB.oplog.rs.find().sort({$natural: -1}).limit(1).next();
-        var twoSecTS = new Timestamp(oplogTS.ts.getTime() + 2, 0);
+        var twoKSecTS = new Timestamp(oplogTS.ts.getTime() + 2000, 0);
 
         var term = -1;
         if (config.protocolVersion === 1) {
@@ -26,7 +27,7 @@
             assert.commandFailedWithCode(testDB.runCommand({
                 find: 'user',
                 filter: {x: 1},
-                readConcern: {afterOpTime: {ts: twoSecTS, t: term}},
+                readConcern: {afterOpTime: {ts: twoKSecTS, t: term}},
                 maxTimeMS: 5000,
             }),
                                          ErrorCodes.ExceededTimeLimit);
@@ -76,9 +77,19 @@
         checkLog(msg, 2);
 
         // Test read on future afterOpTime that will eventually occur.
-        var insertFunc = startParallelShell(
-            "sleep(2100); db.user.insert({ y: 1 }, { writeConcern: { w: 2 }});", primaryConn.port);
+        primaryConn.getDB(dbName).parallelShellStarted.drop();
+        var insertFunc =
+            startParallelShell('let testDB = db.getSiblingDB("' + dbName + '"); ' +
+                                   'testDB.parallelShellStarted.insert({}); ' +
+                                   'sleep(2100); ' +
+                                   'testDB.user.insert({y: 1}, { writeConcern: { w: 2 }});',
+                               primaryConn.port);
+        assert.soon(function() {
+            return primaryConn.getDB(dbName).parallelShellStarted.count();
+        });
 
+        oplogTS = localDB.oplog.rs.find().sort({$natural: -1}).limit(1).next();
+        var twoSecTS = new Timestamp(oplogTS.ts.getTime() + 2, 0);
         var res = assert.commandWorked(testDB.runCommand({
             find: 'user',
             filter: {x: 1},
@@ -94,9 +105,8 @@
     };
 
     var primary = replTest.getPrimary();
-    runTest(primary.getDB('test'), primary);
-    runTest(replTest.getSecondary().getDB('test'), primary);
+    runTest(primary.getDB('test1'), primary);
+    runTest(replTest.getSecondary().getDB('test2'), primary);
 
     replTest.stopSet();
-
 })();

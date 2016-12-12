@@ -60,6 +60,9 @@ public:
     static const Status SessionUnknownStatus;
     static const Status ShutdownStatus;
     static const Status TicketSessionUnknownStatus;
+    static const Status TicketSessionClosedStatus;
+
+    friend class Session;
 
     /**
      * Stats for sessions open in the Transport Layer.
@@ -98,7 +101,7 @@ public:
      * TransportLayer is unable to source a Message, this will be a failed status,
      * and the passed-in Message buffer may be left in an invalid state.
      */
-    virtual Ticket sourceMessage(Session& session,
+    virtual Ticket sourceMessage(const SessionHandle& session,
                                  Message* message,
                                  Date_t expiration = Ticket::kNoExpirationDate) = 0;
 
@@ -117,7 +120,7 @@ public:
      * This method does NOT take ownership of the sunk Message, which must be cleaned
      * up by the caller.
      */
-    virtual Ticket sinkMessage(Session& session,
+    virtual Ticket sinkMessage(const SessionHandle& session,
                                const Message& message,
                                Date_t expiration = Ticket::kNoExpirationDate) = 0;
 
@@ -145,19 +148,10 @@ public:
     virtual void asyncWait(Ticket&& ticket, TicketCallback callback) = 0;
 
     /**
-     * Tag this Session within the TransportLayer with the tags currently assigned to the
-     * Session. If endAllSessions() is called with a matching
-     * Session::TagMask, this Session will not be ended.
-     *
-     * Before calling this method, use Session::replaceTags() to set the desired TagMask.
-     */
-    virtual void registerTags(const Session& session) = 0;
-
-    /**
      * Return the stored X509 peer information for this session. If the session does not
      * exist in this TransportLayer, returns a default constructed object.
      */
-    virtual SSLPeerInfo getX509PeerInfo(const Session& session) const = 0;
+    virtual SSLPeerInfo getX509PeerInfo(const ConstSessionHandle& session) const = 0;
 
     /**
      * Returns the number of sessions currently open in the transport layer.
@@ -175,17 +169,17 @@ public:
      *
      * This method is idempotent and synchronous.
      */
-    virtual void end(Session& session) = 0;
+    virtual void end(const SessionHandle& session) = 0;
 
     /**
      * End all active sessions in the TransportLayer. Tickets that have already been started via
      * wait() or asyncWait() will complete, but may return a failed Status.  This method is
      * asynchronous and will return after all sessions have been notified to end.
      *
-     * If a TagMask is provided, endAllSessions() will skip over sessions with matching
+     * If a non-empty TagMask is provided, endAllSessions() will skip over sessions with matching
      * tags and leave them open.
      */
-    virtual void endAllSessions(Session::TagMask tags = Session::kEmptyTagMask) = 0;
+    virtual void endAllSessions(Session::TagMask tags) = 0;
 
     /**
      * Start the TransportLayer. After this point, the TransportLayer will begin accepting active

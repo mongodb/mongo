@@ -2226,7 +2226,7 @@ class MOZ_STACK_CLASS StringRegExpGuard
         if (obj_->is<RegExpObject>()) {
             RegExpObject* nobj = &obj_->as<RegExpObject>();
             if (nobj->lookup(cx, cx->names().lastIndex)->writable()) {
-                nobj->zeroLastIndex();
+                nobj->zeroLastIndex(cx);
                 return true;
             }
         }
@@ -2795,7 +2795,7 @@ FindReplaceLength(JSContext* cx, RegExpStatics* res, ReplaceData& rdata, size_t*
         unsigned argc = 1 + p + 2;
 
         InvokeArgs& args = rdata.fig.args();
-        if (!args.init(argc))
+        if (!args.init(cx, argc))
             return false;
 
         args.setCallee(ObjectValue(*lambda));
@@ -3431,7 +3431,7 @@ str_replace_flat_lambda(JSContext* cx, const CallArgs& outerArgs, ReplaceData& r
 
     /* lambda(matchStr, matchStart, textstr) */
     static const uint32_t lambdaArgc = 3;
-    if (!rdata.fig.args().init(lambdaArgc))
+    if (!rdata.fig.args().init(cx, lambdaArgc))
         return false;
 
     CallArgs& args = rdata.fig.args();

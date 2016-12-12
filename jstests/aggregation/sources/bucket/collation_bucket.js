@@ -49,4 +49,53 @@
     assert.throws(
         () => coll.aggregate([{$bucket: {groupBy: "$num", boundaries: ["1", "10", "100", "1000"]}}],
                              {collation: {locale: "simple"}}));
+
+    // Test that $bucket rejects boundaries that are not sorted according to the collation.
+    assert.throws(
+        () => coll.aggregate([{$bucket: {groupBy: "$num", boundaries: ["100", "20", "4"]}}]));
+
+    assert.throws(() =>
+                      coll.aggregate([{$bucket: {groupBy: "$num", boundaries: ["4", "20", "100"]}}],
+                                     {collation: {locale: "simple"}}));
+
+    // Test that $bucket rejects a default value that falls within the boundaries.
+    assert.throws(
+        () => coll.aggregate(
+            [{$bucket: {groupBy: "$num", boundaries: ["1", "10", "100"], default: "40"}}]));
+
+    assert.throws(() => coll.aggregate(
+                      [{$bucket: {groupBy: "$num", boundaries: ["100", "999"], default: "2"}}],
+                      {collation: {locale: "simple"}}));
+
+    // Test that $bucket accepts a default value that falls outside the boundaries according to the
+    // collation.
+    results =
+        coll.aggregate([{
+                $bucket: {
+                    groupBy: "$num",
+                    boundaries: ["100", "999"],
+                    default: "2"  // Would fall between 100 and 999 if using the simple collation.
+                }
+            }])
+            .toArray();
+    assert.eq(2, results.length);
+    assert.eq({_id: "2", count: 6}, results[0]);
+    assert.eq({_id: "100", count: 3}, results[1]);  // "100", "200", and "500".
+
+    results =
+        coll.aggregate(
+                [{
+                   $bucket: {
+                       groupBy: "$num",
+                       boundaries: ["1", "19999"],  // Will include all numbers that start with "1"
+                       default: "2"                 // Would fall between boundaries if using the
+                                                    // collection-default collation with numeric
+                                                    // ordering.
+                   }
+                }],
+                {collation: {locale: "simple"}})
+            .toArray();
+    assert.eq(2, results.length);
+    assert.eq({_id: "1", count: 3}, results[0]);  // "1", "10", and "100".
+    assert.eq({_id: "2", count: 6}, results[1]);
 })();

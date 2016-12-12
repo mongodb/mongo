@@ -105,4 +105,16 @@ StatusWith<OID> ClusterIdentityLoader::_fetchClusterIdFromConfig(
     return loadResult.getValue().getClusterId();
 }
 
+void ClusterIdentityLoader::discardCachedClusterId() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+
+    if (_initializationState == InitializationState::kUninitialized) {
+        return;
+    }
+    invariant(_initializationState == InitializationState::kInitialized);
+    _lastLoadResult = {
+        Status{ErrorCodes::InternalError, "cluster ID never re-loaded after rollback"}};
+    _initializationState = InitializationState::kUninitialized;
+}
+
 }  // namespace mongo

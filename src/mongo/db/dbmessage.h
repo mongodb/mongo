@@ -30,20 +30,18 @@
 
 #pragma once
 
+#include "mongo/base/static_assert.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/client/constants.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/server_options.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
 
 class OperationContext;
-
-namespace transport {
-class Session;
-}  // namespace transport
 
 /* db response format
 
@@ -138,6 +136,10 @@ public:
         return storage().view(sizeof(Layout));
     }
 
+    int32_t dataLen() const {
+        return msgdata().getLen() - sizeof(Layout);
+    }
+
 protected:
     const ConstDataView& storage() const {
         return _storage;
@@ -198,7 +200,7 @@ private:
 class Value : public EncodedValueStorage<Layout, ConstView, View> {
 public:
     Value() {
-        static_assert(sizeof(Value) == sizeof(Layout), "sizeof(Value) == sizeof(Layout)");
+        MONGO_STATIC_ASSERT(sizeof(Value) == sizeof(Layout));
     }
 
     Value(ZeroInitTag_t zit) : EncodedValueStorage<Layout, ConstView, View>(zit) {}
@@ -213,7 +215,7 @@ public:
 */
 class DbMessage {
     // Assume sizeof(int) == 4 bytes
-    static_assert(sizeof(int) == 4, "sizeof(int) == 4");
+    MONGO_STATIC_ASSERT(sizeof(int) == 4);
 
 public:
     // Note: DbMessage constructor reads the first 4 bytes and stores it in reserved
@@ -358,7 +360,7 @@ public:
     /**
      * Finishes the reply and sends the message out to 'destination'.
      */
-    void send(transport::Session* session,
+    void send(const transport::SessionHandle& session,
               int queryResultFlags,
               const Message& requestMsg,
               int nReturned,
@@ -368,14 +370,14 @@ public:
     /**
      * Similar to send() but used for replying to a command.
      */
-    void sendCommandReply(transport::Session* session, const Message& requestMsg);
+    void sendCommandReply(const transport::SessionHandle& session, const Message& requestMsg);
 
 private:
     BufBuilder _buffer;
 };
 
 void replyToQuery(int queryResultFlags,
-                  transport::Session* session,
+                  const transport::SessionHandle& session,
                   Message& requestMsg,
                   const void* data,
                   int size,
@@ -385,7 +387,7 @@ void replyToQuery(int queryResultFlags,
 
 /* object reply helper. */
 void replyToQuery(int queryResultFlags,
-                  transport::Session* session,
+                  const transport::SessionHandle& session,
                   Message& requestMsg,
                   const BSONObj& responseObj);
 

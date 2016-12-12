@@ -2494,7 +2494,7 @@ date_toJSON(JSContext* cx, unsigned argc, Value* vp)
 
     /* Step 6. */
     InvokeArgs args2(cx);
-    if (!args2.init(0))
+    if (!args2.init(cx, 0))
         return false;
 
     args2.setCallee(toISO);

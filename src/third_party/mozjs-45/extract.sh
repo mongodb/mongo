@@ -193,6 +193,7 @@ cp extract/mfbt/MemoryReporting.h include/mozilla
 cp extract/mfbt/Move.h include/mozilla
 cp extract/mfbt/NullPtr.h include/mozilla
 cp extract/mfbt/NumericLimits.h include/mozilla
+cp extract/mfbt/Opaque.h include/mozilla
 cp extract/mfbt/Pair.h include/mozilla
 cp extract/mfbt/PodOperations.h include/mozilla
 cp extract/mfbt/Poison.h include/mozilla
@@ -226,6 +227,6 @@ cp extract/mfbt/XorShift128PlusRNG.h include/mozilla
 
 # Apply a local patch
 git apply \
-    mongodb_patches/SERVER-23358.patch \
-    mongodb_patches/SERVER-24400.patch \
-    mongodb_patches/SERVER-22927-x86_64.patch
+    mongo_patches/SERVER-23358.patch \
+    mongo_patches/SERVER-24400.patch \
+    mongo_patches/SERVER-22927-x86_64.patch

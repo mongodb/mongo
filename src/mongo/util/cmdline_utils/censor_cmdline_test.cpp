@@ -238,7 +238,7 @@ TEST(BSONObjCensorTests, Strings) {
                        << false);
 
     cmdline_utils::censorBSONObj(&obj);
-    ASSERT_EQUALS(res, obj);
+    ASSERT_BSONOBJ_EQ(res, obj);
 }
 
 TEST(BSONObjCensorTests, Arrays) {
@@ -275,7 +275,7 @@ TEST(BSONObjCensorTests, Arrays) {
                        << false);
 
     cmdline_utils::censorBSONObj(&obj);
-    ASSERT_EQUALS(res, obj);
+    ASSERT_BSONOBJ_EQ(res, obj);
 }
 
 TEST(BSONObjCensorTests, SubObjects) {
@@ -311,7 +311,7 @@ TEST(BSONObjCensorTests, SubObjects) {
                        << false);
 
     cmdline_utils::censorBSONObj(&obj);
-    ASSERT_EQUALS(res, obj);
+    ASSERT_BSONOBJ_EQ(res, obj);
 }
 
 }  // namespace

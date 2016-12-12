@@ -42,8 +42,8 @@ typedef union {				/* Read/write lock */
 	struct {
 		uint16_t writers;	/* Now serving for writers */
 		uint16_t readers;	/* Now serving for readers */
-		uint16_t users;		/* Next available ticket number */
-		uint16_t __notused;	/* Padding */
+		uint16_t next;		/* Next available ticket number */
+		uint16_t writers_active;/* Count of active writers */
 	} s;
 } wt_rwlock_t;
 
@@ -56,24 +56,6 @@ struct __wt_rwlock {
 	const char *name;		/* Lock name for debugging */
 
 	wt_rwlock_t rwlock;		/* Read/write lock */
-};
-
-/*
- * A light weight lock that can be used to replace spinlocks if fairness is
- * necessary. Implements a ticket-based back off spin lock.
- * The fields are available as a union to allow for atomically setting
- * the state of the entire lock.
- */
-struct __wt_fair_lock {
-	union {
-		uint32_t lock;
-		struct {
-			uint16_t owner;		/* Ticket for current owner */
-			uint16_t waiter;	/* Last allocated ticket */
-		} s;
-	} u;
-#define	fair_lock_owner u.s.owner
-#define	fair_lock_waiter u.s.waiter
 };
 
 /*
@@ -92,6 +74,16 @@ struct __wt_fair_lock {
 
 struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_spinlock {
 	volatile int lock;
+
+	/*
+	 * We track acquisitions and time spent waiting for some locks. For
+	 * performance reasons and to make it possible to write generic code
+	 * that tracks statistics for different locks, we store the offset
+	 * of the statistics fields to be updated during lock acquisition.
+	 */
+	int16_t stat_count_off;		/* acquisitions offset */
+	int16_t stat_app_usecs_off;	/* waiting application threads offset */
+	int16_t stat_int_usecs_off;	/* waiting server threads offset */
 };
 
 #elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||\
@@ -101,7 +93,17 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_spinlock {
 struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_spinlock {
 	wt_mutex_t lock;
 
-	const char *name;		/* Statistics: mutex name */
+	const char *name;		/* Mutex name */
+
+	/*
+	 * We track acquisitions and time spent waiting for some locks. For
+	 * performance reasons and to make it possible to write generic code
+	 * that tracks statistics for different locks, we store the offset
+	 * of the statistics fields to be updated during lock acquisition.
+	 */
+	int16_t stat_count_off;		/* acquisitions offset */
+	int16_t stat_app_usecs_off;	/* waiting application threads offset */
+	int16_t stat_int_usecs_off;	/* waiting server threads offset */
 
 	int8_t initialized;		/* Lock initialized, for cleanup */
 };

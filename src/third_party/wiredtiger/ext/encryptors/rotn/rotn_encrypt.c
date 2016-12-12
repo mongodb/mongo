@@ -68,7 +68,7 @@
 typedef struct {
 	WT_ENCRYPTOR encryptor;		/* Must come first */
 
-	WT_EXTENSION_API *wtext;	/* Extension API */
+	WT_EXTENSION_API *wt_api;	/* Extension API */
 
 	int rot_N;			/* rotN value */
 	char *keyid;			/* Saved keyid */
@@ -76,7 +76,7 @@ typedef struct {
 	u_char *shift_forw;		/* Encrypt shift data from secretkey */
 	u_char *shift_back;		/* Decrypt shift data from secretkey */
 	size_t shift_len;		/* Length of shift* byte arrays */
-	int force_error;		/* Force a decrypt error for testing */
+	bool force_error;		/* Force a decrypt error for testing */
 
 } ROTN_ENCRYPTOR;
 /*! [WT_ENCRYPTOR initialization structure] */
@@ -89,24 +89,25 @@ typedef struct {
  *	Display an error from this module in a standard way.
  */
 static int
-rotn_error(ROTN_ENCRYPTOR *encryptor, WT_SESSION *session, int err,
-    const char *msg)
+rotn_error(
+    ROTN_ENCRYPTOR *encryptor, WT_SESSION *session, int err, const char *msg)
 {
-	WT_EXTENSION_API *wtext;
+	WT_EXTENSION_API *wt_api;
 
-	wtext = encryptor->wtext;
-	(void)wtext->err_printf(wtext, session,
-	    "rotn encryption: %s: %s", msg, wtext->strerror(wtext, NULL, err));
+	wt_api = encryptor->wt_api;
+	(void)wt_api->err_printf(wt_api, session,
+	    "rotn encryption: %s: %s",
+	    msg, wt_api->strerror(wt_api, NULL, err));
 	return (err);
 }
 
 /*
- * make_cksum --
+ * make_checksum --
  *	This is where one would call a checksum function on the encrypted
  *	buffer.  Here we just put a constant value in it.
  */
 static void
-make_cksum(uint8_t *dst)
+make_checksum(uint8_t *dst)
 {
 	int i;
 	/*
@@ -189,7 +190,8 @@ rotn_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	(void)session;		/* Unused */
 
 	if (dst_len < src_len + CHKSUM_LEN + IV_LEN)
-		return (ENOMEM);
+		return (rotn_error(rotn_encryptor, session,
+		    ENOMEM, "encrypt buffer not big enough"));
 
 	/*
 	 * !!! Most implementations would verify any needed
@@ -212,7 +214,7 @@ rotn_encrypt(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * Checksum the encrypted buffer and add the IV.
 	 */
 	i = 0;
-	make_cksum(&dst[i]);
+	make_checksum(&dst[i]);
 	i += CHKSUM_LEN;
 	make_iv(&dst[i]);
 	*result_lenp = dst_len;
@@ -308,7 +310,7 @@ rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	const ROTN_ENCRYPTOR *orig;
 	ROTN_ENCRYPTOR *rotn_encryptor;
 	WT_CONFIG_ITEM keyid, secret;
-	WT_EXTENSION_API *wtext;
+	WT_EXTENSION_API *wt_api;
 	size_t i, len;
 	int ret, keyid_val;
 	u_char base;
@@ -317,7 +319,7 @@ rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	keyid_val = 0;
 
 	orig = (const ROTN_ENCRYPTOR *)encryptor;
-	wtext = orig->wtext;
+	wt_api = orig->wt_api;
 
 	if ((rotn_encryptor = calloc(1, sizeof(ROTN_ENCRYPTOR))) == NULL)
 		return (errno);
@@ -327,13 +329,14 @@ rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	/*
 	 * Stash the keyid from the configuration string.
 	 */
-	if ((ret = wtext->config_get(wtext, session, encrypt_config,
+	if ((ret = wt_api->config_get(wt_api, session, encrypt_config,
 	    "keyid", &keyid)) == 0 && keyid.len != 0) {
 		/*
 		 * In this demonstration, we expect keyid to be a number.
 		 */
 		if ((keyid_val = atoi(keyid.str)) < 0) {
-			ret = EINVAL;
+			ret = rotn_error(rotn_encryptor,
+			    NULL, EINVAL, "rotn_customize: invalid keyid");
 			goto err;
 		}
 		if ((rotn_encryptor->keyid = malloc(keyid.len + 1)) == NULL) {
@@ -349,7 +352,7 @@ rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 	 * We stash the secret key from the configuration string
 	 * and build some shift bytes to make encryption/decryption easy.
 	 */
-	if ((ret = wtext->config_get(wtext, session, encrypt_config,
+	if ((ret = wt_api->config_get(wt_api, session, encrypt_config,
 	    "secretkey", &secret)) == 0 && secret.len != 0) {
 		len = secret.len;
 		if ((rotn_encryptor->secretkey = malloc(len + 1)) == NULL ||
@@ -364,7 +367,8 @@ rotn_customize(WT_ENCRYPTOR *encryptor, WT_SESSION *session,
 			else if ('A' <= secret.str[i] && secret.str[i] <= 'Z')
 				base = 'A';
 			else {
-				ret = EINVAL;
+				ret = rotn_error(rotn_encryptor, NULL,
+				    EINVAL, "rotn_customize: invalid key");
 				goto err;
 			}
 			base -= (u_char)keyid_val;
@@ -425,42 +429,19 @@ rotn_terminate(WT_ENCRYPTOR *encryptor, WT_SESSION *session)
 static int
 rotn_configure(ROTN_ENCRYPTOR *rotn_encryptor, WT_CONFIG_ARG *config)
 {
-	WT_CONFIG_ITEM k, v;
-	WT_CONFIG_PARSER *config_parser;
-	WT_EXTENSION_API *wtext;	/* Extension API */
-	int ret, t_ret;
+	WT_CONFIG_ITEM v;
+	WT_EXTENSION_API *wt_api;	/* Extension API */
+	int ret;
 
-	wtext = rotn_encryptor->wtext;
+	wt_api = rotn_encryptor->wt_api;
 
 	/* Get the configuration string. */
-	if ((ret = wtext->config_get(wtext, NULL, config, "config", &v)) != 0)
-		return (rotn_error(rotn_encryptor, NULL, ret,
-		    "WT_EXTENSION_API.config_get"));
-
-	/* Step through the list of configuration options. */
-	if ((ret = wtext->config_parser_open(
-	    wtext, NULL, v.str, v.len, &config_parser)) != 0)
-		return (rotn_error(rotn_encryptor, NULL, ret,
-		    "WT_EXTENSION_API.config_parser_open"));
-
-	while ((ret = config_parser->next(config_parser, &k, &v)) == 0) {
-		if (strncmp("rotn_force_error", k.str, k.len) == 0 &&
-		    strlen("rotn_force_error") == k.len) {
-			rotn_encryptor->force_error = v.val == 0 ? 0 : 1;
-			continue;
-		}
-		else {
-			(void)config_parser->close(config_parser);
-			return (rotn_error(rotn_encryptor, NULL, EINVAL,
-			    "unknown config key"));
-		}
-	}
-	if ((t_ret = config_parser->close(config_parser)) != 0)
-		return (rotn_error(rotn_encryptor, NULL, t_ret,
-		    "WT_CONFIG_PARSER.close"));
-	if (ret != WT_NOTFOUND)
-		return (rotn_error(rotn_encryptor, NULL, ret,
-		    "WT_CONFIG_PARSER.next"));
+	if ((ret = wt_api->config_get(
+	    wt_api, NULL, config, "rotn_force_error", &v)) == 0)
+		rotn_encryptor->force_error = v.val != 0;
+	else if (ret != WT_NOTFOUND)
+		return (rotn_error(rotn_encryptor, NULL, EINVAL,
+		    "error parsing config"));
 
 	return (0);
 }
@@ -491,7 +472,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	rotn_encryptor->encryptor.sizing = rotn_sizing;
 	rotn_encryptor->encryptor.customize = rotn_customize;
 	rotn_encryptor->encryptor.terminate = rotn_terminate;
-	rotn_encryptor->wtext = connection->get_extension_api(connection);
+	rotn_encryptor->wt_api = connection->get_extension_api(connection);
 
 	if ((ret = rotn_configure(rotn_encryptor, config)) != 0) {
 		free(rotn_encryptor);

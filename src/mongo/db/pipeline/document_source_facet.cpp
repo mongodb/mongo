@@ -30,42 +30,118 @@
 
 #include "mongo/db/pipeline/document_source_facet.h"
 
+#include <memory>
 #include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source_tee_consumer.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/tee_buffer.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
+using std::pair;
+using std::string;
 using std::vector;
 
-DocumentSourceFacet::DocumentSourceFacet(StringMap<intrusive_ptr<Pipeline>> facetPipelines,
+DocumentSourceFacet::DocumentSourceFacet(std::vector<FacetPipeline> facetPipelines,
                                          const intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSourceNeedsMongod(expCtx), _facetPipelines(std::move(facetPipelines)) {
-
-    // Build the tee stage, and the consumers of the tee.
-    _teeBuffer = TeeBuffer::create();
-    for (auto&& facet : _facetPipelines) {
-        auto pipeline = facet.second;
-        pipeline->addInitialSource(DocumentSourceTeeConsumer::create(pExpCtx, _teeBuffer));
+    : DocumentSourceNeedsMongod(expCtx),
+      _teeBuffer(TeeBuffer::create(facetPipelines.size())),
+      _facets(std::move(facetPipelines)) {
+    for (size_t facetId = 0; facetId < _facets.size(); ++facetId) {
+        auto& facet = _facets[facetId];
+        facet.pipeline->addInitialSource(
+            DocumentSourceTeeConsumer::create(pExpCtx, facetId, _teeBuffer));
     }
 }
 
-REGISTER_DOCUMENT_SOURCE(facet, DocumentSourceFacet::createFromBson);
+namespace {
+/**
+ * Extracts the names of the facets and the vectors of raw BSONObjs representing the stages within
+ * that facet's pipeline.
+ *
+ * Throws a UserException if it fails to parse for any reason.
+ */
+vector<pair<string, vector<BSONObj>>> extractRawPipelines(const BSONElement& elem) {
+    uassert(40169,
+            str::stream() << "the $facet specification must be a non-empty object, but found: "
+                          << elem,
+            elem.type() == BSONType::Object && !elem.embeddedObject().isEmpty());
+
+    vector<pair<string, vector<BSONObj>>> rawFacetPipelines;
+    for (auto&& facetElem : elem.embeddedObject()) {
+        const auto facetName = facetElem.fieldNameStringData();
+        FieldPath::uassertValidFieldName(facetName);
+        uassert(40170,
+                str::stream() << "arguments to $facet must be arrays, " << facetName << " is type "
+                              << typeName(facetElem.type()),
+                facetElem.type() == BSONType::Array);
+
+        vector<BSONObj> rawPipeline;
+        for (auto&& subPipeElem : facetElem.Obj()) {
+            uassert(40171,
+                    str::stream() << "elements of arrays in $facet spec must be non-empty objects, "
+                                  << facetName
+                                  << " argument contained an element of type "
+                                  << typeName(subPipeElem.type())
+                                  << ": "
+                                  << subPipeElem,
+                    subPipeElem.type() == BSONType::Object);
+            auto stageName = subPipeElem.Obj().firstElementFieldName();
+            uassert(
+                40331,
+                str::stream() << "specified stage is not allowed to be used within a $facet stage: "
+                              << subPipeElem,
+                !str::equals(stageName, "$out") && !str::equals(stageName, "$facet"));
+
+            rawPipeline.push_back(subPipeElem.embeddedObject());
+        }
+
+        rawFacetPipelines.emplace_back(facetName.toString(), std::move(rawPipeline));
+    }
+    return rawFacetPipelines;
+}
+}  // namespace
+
+std::unique_ptr<DocumentSourceFacet::LiteParsed> DocumentSourceFacet::LiteParsed::parse(
+    const AggregationRequest& request, const BSONElement& spec) {
+    std::vector<LiteParsedPipeline> liteParsedPipelines;
+    for (auto&& rawPipeline : extractRawPipelines(spec)) {
+        liteParsedPipelines.emplace_back(
+            AggregationRequest(request.getNamespaceString(), rawPipeline.second));
+    }
+    return std::unique_ptr<DocumentSourceFacet::LiteParsed>(
+        new DocumentSourceFacet::LiteParsed(std::move(liteParsedPipelines)));
+}
+
+stdx::unordered_set<NamespaceString> DocumentSourceFacet::LiteParsed::getInvolvedNamespaces()
+    const {
+    stdx::unordered_set<NamespaceString> involvedNamespaces;
+    for (auto&& liteParsedPipeline : _liteParsedPipelines) {
+        auto involvedInSubPipe = liteParsedPipeline.getInvolvedNamespaces();
+        involvedNamespaces.insert(involvedInSubPipe.begin(), involvedInSubPipe.end());
+    }
+    return involvedNamespaces;
+}
+
+REGISTER_DOCUMENT_SOURCE(facet,
+                         DocumentSourceFacet::LiteParsed::parse,
+                         DocumentSourceFacet::createFromBson);
 
 intrusive_ptr<DocumentSourceFacet> DocumentSourceFacet::create(
-    StringMap<intrusive_ptr<Pipeline>> facetPipelines,
-    const intrusive_ptr<ExpressionContext>& expCtx) {
+    std::vector<FacetPipeline> facetPipelines, const intrusive_ptr<ExpressionContext>& expCtx) {
     return new DocumentSourceFacet(std::move(facetPipelines), expCtx);
 }
 
@@ -73,64 +149,69 @@ void DocumentSourceFacet::setSource(DocumentSource* source) {
     _teeBuffer->setSource(source);
 }
 
-boost::optional<Document> DocumentSourceFacet::getNext() {
+DocumentSource::GetNextResult DocumentSourceFacet::getNext() {
     pExpCtx->checkForInterrupt();
 
     if (_done) {
-        return boost::none;
+        return GetNextResult::makeEOF();
     }
-    _done = true;  // We will only ever produce one result.
 
-    // Build the results by executing each pipeline serially, one at a time.
-    MutableDocument results;
-    for (auto&& facet : _facetPipelines) {
-        auto facetName = facet.first;
-        auto facetPipeline = facet.second;
-
-        std::vector<Value> facetResults;
-        while (auto next = facetPipeline->getSources().back()->getNext()) {
-            facetResults.emplace_back(std::move(*next));
+    vector<vector<Value>> results(_facets.size());
+    bool allPipelinesEOF = false;
+    while (!allPipelinesEOF) {
+        allPipelinesEOF = true;  // Set this to false if any pipeline isn't EOF.
+        for (size_t facetId = 0; facetId < _facets.size(); ++facetId) {
+            const auto& pipeline = _facets[facetId].pipeline;
+            auto next = pipeline->getSources().back()->getNext();
+            for (; next.isAdvanced(); next = pipeline->getSources().back()->getNext()) {
+                results[facetId].emplace_back(next.releaseDocument());
+            }
+            allPipelinesEOF = allPipelinesEOF && next.isEOF();
         }
-        results[facetName] = Value(std::move(facetResults));
     }
 
-    _teeBuffer->dispose();  // Clear the buffer since we'll no longer need it.
-    return results.freeze();
+    MutableDocument resultDoc;
+    for (size_t facetId = 0; facetId < _facets.size(); ++facetId) {
+        resultDoc[_facets[facetId].name] = Value(std::move(results[facetId]));
+    }
+
+    _done = true;  // We will only ever produce one result.
+    return resultDoc.freeze();
 }
 
 Value DocumentSourceFacet::serialize(bool explain) const {
     MutableDocument serialized;
-    for (auto&& facet : _facetPipelines) {
-        serialized[facet.first] =
-            Value(explain ? facet.second->writeExplainOps() : facet.second->serialize());
+    for (auto&& facet : _facets) {
+        serialized[facet.name] =
+            Value(explain ? facet.pipeline->writeExplainOps() : facet.pipeline->serialize());
     }
     return Value(Document{{"$facet", serialized.freezeToValue()}});
 }
 
-void DocumentSourceFacet::addInvolvedCollections(std::vector<NamespaceString>* collections) const {
-    for (auto&& facet : _facetPipelines) {
-        for (auto&& source : facet.second->getSources()) {
+void DocumentSourceFacet::addInvolvedCollections(vector<NamespaceString>* collections) const {
+    for (auto&& facet : _facets) {
+        for (auto&& source : facet.pipeline->getSources()) {
             source->addInvolvedCollections(collections);
         }
     }
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceFacet::optimize() {
-    for (auto&& facet : _facetPipelines) {
-        facet.second->optimizePipeline();
+    for (auto&& facet : _facets) {
+        facet.pipeline->optimizePipeline();
     }
     return this;
 }
 
 void DocumentSourceFacet::doInjectExpressionContext() {
-    for (auto&& facet : _facetPipelines) {
-        facet.second->injectExpressionContext(pExpCtx);
+    for (auto&& facet : _facets) {
+        facet.pipeline->injectExpressionContext(pExpCtx);
     }
 }
 
 void DocumentSourceFacet::doInjectMongodInterface(std::shared_ptr<MongodInterface> mongod) {
-    for (auto&& facet : _facetPipelines) {
-        for (auto&& stage : facet.second->getSources()) {
+    for (auto&& facet : _facets) {
+        for (auto&& stage : facet.pipeline->getSources()) {
             if (auto stageNeedingMongod = dynamic_cast<DocumentSourceNeedsMongod*>(stage.get())) {
                 stageNeedingMongod->injectMongodInterface(mongod);
             }
@@ -139,20 +220,32 @@ void DocumentSourceFacet::doInjectMongodInterface(std::shared_ptr<MongodInterfac
 }
 
 void DocumentSourceFacet::doDetachFromOperationContext() {
-    for (auto&& facet : _facetPipelines) {
-        facet.second->detachFromOperationContext();
+    for (auto&& facet : _facets) {
+        facet.pipeline->detachFromOperationContext();
     }
 }
 
 void DocumentSourceFacet::doReattachToOperationContext(OperationContext* opCtx) {
-    for (auto&& facet : _facetPipelines) {
-        facet.second->reattachToOperationContext(opCtx);
+    for (auto&& facet : _facets) {
+        facet.pipeline->reattachToOperationContext(opCtx);
     }
 }
 
+bool DocumentSourceFacet::needsPrimaryShard() const {
+    // Currently we don't split $facet to have a merger part and a shards part (see SERVER-24154).
+    // This means that if any stage in any of the $facet pipelines requires the primary shard, then
+    // the entire $facet must happen on the merger, and the merger must be the primary shard.
+    for (auto&& facet : _facets) {
+        if (facet.pipeline->needsPrimaryShardMerger()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 DocumentSource::GetDepsReturn DocumentSourceFacet::getDependencies(DepsTracker* deps) const {
-    for (auto&& facet : _facetPipelines) {
-        auto subDepsTracker = facet.second->getDependencies(deps->getMetadataAvailable());
+    for (auto&& facet : _facets) {
+        auto subDepsTracker = facet.pipeline->getDependencies(deps->getMetadataAvailable());
 
         deps->fields.insert(subDepsTracker.fields.begin(), subDepsTracker.fields.end());
 
@@ -171,53 +264,28 @@ DocumentSource::GetDepsReturn DocumentSourceFacet::getDependencies(DepsTracker* 
 
 intrusive_ptr<DocumentSource> DocumentSourceFacet::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
-    uassert(40169,
-            str::stream() << "the $facet specification must be a non-empty object, but found: "
-                          << elem,
-            elem.type() == BSONType::Object && !elem.embeddedObject().isEmpty());
 
-    StringMap<intrusive_ptr<Pipeline>> facetPipelines;
-    for (auto&& facetElem : elem.embeddedObject()) {
-        const auto facetName = facetElem.fieldNameStringData();
-        FieldPath::uassertValidFieldName(facetName);
-        uassert(40170,
-                str::stream() << "arguments to $facet must be arrays, " << facetName << " is type "
-                              << typeName(facetElem.type()),
-                facetElem.type() == BSONType::Array);
+    std::vector<FacetPipeline> facetPipelines;
+    for (auto&& rawFacet : extractRawPipelines(elem)) {
+        const auto facetName = rawFacet.first;
 
-        vector<BSONObj> rawPipeline;
-        for (auto&& subPipeElem : facetElem.Obj()) {
-            uassert(40171,
-                    str::stream() << "elements of arrays in $facet spec must be objects, "
-                                  << facetName
-                                  << " argument contained an element of type "
-                                  << typeName(subPipeElem.type()),
-                    subPipeElem.type() == BSONType::Object);
-
-            rawPipeline.push_back(subPipeElem.embeddedObject());
-        }
-
-        auto pipeline = uassertStatusOK(Pipeline::parse(rawPipeline, expCtx));
+        auto pipeline = uassertStatusOK(Pipeline::parse(rawFacet.second, expCtx));
 
         uassert(40172,
-                str::stream() << "sub-pipelines in $facet stage cannot be empty: "
-                              << facetElem.toString(),
+                str::stream() << "sub-pipeline in $facet stage cannot be empty: " << facetName,
                 !pipeline->getSources().empty());
 
-        // Disallow $out stages, $facet stages, and any stages that need to be the first stage in
-        // the pipeline.
+        // Disallow any stages that need to be the first stage in the pipeline.
         for (auto&& stage : pipeline->getSources()) {
-            if ((dynamic_cast<DocumentSourceOut*>(stage.get())) ||
-                (dynamic_cast<DocumentSourceFacet*>(stage.get())) ||
-                (stage->isValidInitialSource())) {
+            if (stage->isValidInitialSource()) {
                 uasserted(40173,
                           str::stream() << stage->getSourceName()
                                         << " is not allowed to be used within a $facet stage: "
-                                        << facetElem.toString());
+                                        << elem.toString());
             }
         }
 
-        facetPipelines[facetName] = pipeline;
+        facetPipelines.emplace_back(facetName, std::move(pipeline));
     }
 
     return new DocumentSourceFacet(std::move(facetPipelines), expCtx);

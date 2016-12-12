@@ -40,7 +40,9 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
@@ -95,6 +97,15 @@ typedef std::multiset<BSONElement, BSONElementCmpWithoutField> BSONElementMSet;
  */
 class BSONObj {
 public:
+    // Declared in bsonobj_comparator_interface.h.
+    class ComparatorInterface;
+
+    /**
+     * Operator overloads for relops return a DeferredComparison which can subsequently be evaluated
+     * by a BSONObj::ComparatorInterface.
+     */
+    using DeferredComparison = BSONComparatorInterfaceBase<BSONObj>::DeferredComparison;
+
     static const char kMinBSONLength = 5;
 
     /** Construct an empty BSONObj -- that is, {}. */
@@ -394,6 +405,15 @@ public:
     /** Alternative output format */
     std::string hexDump() const;
 
+    //
+    // Comparison API.
+    //
+    // BSONObj instances can be compared either using woCompare() or via operator overloads. Most
+    // callers should prefer operator overloads. Note that the operator overloads return a
+    // DeferredComparison, which must be subsequently evaluated by a BSONObj::ComparatorInterface.
+    // See bsonobj_comparator_interface.h for details.
+    //
+
     /**wo='well ordered'.  fields must be in same order in each object.
        Ordering is with respect to the signs of the elements
        and allows ascending / descending key mixing.
@@ -416,37 +436,38 @@ public:
                   bool considerFieldName = true,
                   const StringData::ComparatorInterface* comparator = nullptr) const;
 
-    bool operator<(const BSONObj& other) const {
-        return woCompare(other) < 0;
-    }
-    bool operator<=(const BSONObj& other) const {
-        return woCompare(other) <= 0;
-    }
-    bool operator>(const BSONObj& other) const {
-        return woCompare(other) > 0;
-    }
-    bool operator>=(const BSONObj& other) const {
-        return woCompare(other) >= 0;
+    DeferredComparison operator<(const BSONObj& other) const {
+        return DeferredComparison(DeferredComparison::Type::kLT, *this, other);
     }
 
-    bool equal(const BSONObj& r) const;
+    DeferredComparison operator<=(const BSONObj& other) const {
+        return DeferredComparison(DeferredComparison::Type::kLTE, *this, other);
+    }
+
+    DeferredComparison operator>(const BSONObj& other) const {
+        return DeferredComparison(DeferredComparison::Type::kGT, *this, other);
+    }
+
+    DeferredComparison operator>=(const BSONObj& other) const {
+        return DeferredComparison(DeferredComparison::Type::kGTE, *this, other);
+    }
+
+    DeferredComparison operator==(const BSONObj& other) const {
+        return DeferredComparison(DeferredComparison::Type::kEQ, *this, other);
+    }
+
+    DeferredComparison operator!=(const BSONObj& other) const {
+        return DeferredComparison(DeferredComparison::Type::kNE, *this, other);
+    }
 
     /**
-     * Functor compatible with std::hash for std::unordered_{map,set}
-     * Warning: The hash function is subject to change. Do not use in cases where hashes need
-     *          to be consistent across versions.
+     * Returns true if 'this' is a prefix of otherObj- in other words if otherObj contains the same
+     * field names and field vals in the same order as 'this', plus optionally some additional
+     * elements.
+     *
+     * All comparisons between elements are made using 'eltCmp'.
      */
-    struct Hasher {
-        size_t operator()(const BSONObj& obj) const;
-    };
-
-    /**
-     * @param otherObj
-     * @return true if 'this' is a prefix of otherObj- in other words if
-     * otherObj contains the same field names and field vals in the same
-     * order as 'this', plus optionally some additional elements.
-     */
-    bool isPrefixOf(const BSONObj& otherObj) const;
+    bool isPrefixOf(const BSONObj& otherObj, const BSONElement::ComparatorInterface& eltCmp) const;
 
     /**
      * @param otherObj
@@ -502,15 +523,11 @@ public:
         passed object. */
     BSONObj replaceFieldNames(const BSONObj& obj) const;
 
-    /** true unless corrupt */
-    bool valid() const;
-
-    bool operator==(const BSONObj& other) const {
-        return equal(other);
-    }
-    bool operator!=(const BSONObj& other) const {
-        return !operator==(other);
-    }
+    /**
+     * Returns true if this object is valid according to the specified BSON version, and returns
+     * false otherwise.
+     */
+    bool valid(BSONVersion version) const;
 
     enum MatchType {
         Equality = 0,

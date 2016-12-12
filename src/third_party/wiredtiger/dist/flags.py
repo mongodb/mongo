@@ -80,6 +80,7 @@ flags = {
         'VERB_SHARED_CACHE',
         'VERB_SPLIT',
         'VERB_TEMPORARY',
+        'VERB_THREAD_GROUP',
         'VERB_TRANSACTION',
         'VERB_VERIFY',
         'VERB_VERSION',
@@ -113,7 +114,6 @@ flags = {
     'session' : [
         'SESSION_CAN_WAIT',
         'SESSION_INTERNAL',
-        'SESSION_LOCK_NO_WAIT',
         'SESSION_LOCKED_CHECKPOINT',
         'SESSION_LOCKED_HANDLE_LIST',
         'SESSION_LOCKED_METADATA',
@@ -131,6 +131,16 @@ flags = {
         'SESSION_NO_SCHEMA_LOCK',
         'SESSION_QUIET_CORRUPT_FILE',
         'SESSION_SERVER_ASYNC',
+    ],
+    'stat' : [
+        'STAT_CLEAR',
+        'STAT_JSON',
+        'STAT_ON_CLOSE',
+        'STAT_TYPE_ALL',
+        'STAT_TYPE_CACHE_WALK',
+        'STAT_TYPE_FAST',
+        'STAT_TYPE_SIZE',
+        'STAT_TYPE_TREE_WALK',
     ],
 }
 

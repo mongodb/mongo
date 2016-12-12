@@ -27,7 +27,8 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper import copy_wiredtiger_home, key_populate, simple_populate
+from wtdataset import SimpleDataSet
+from helper import copy_wiredtiger_home
 
 # test_bug014.py
 #    JIRA WT-2115: fast-delete pages can be incorrectly lost due to a crash.
@@ -35,8 +36,9 @@ class test_bug014(wttest.WiredTigerTestCase):
     def test_bug014(self):
         # Populate a table with 1000 keys on small pages.
         uri = 'table:test_bug014'
-        simple_populate(self, uri,
-            'allocation_size=512,leaf_page_max=512,key_format=S', 1000)
+        ds = SimpleDataSet(self, uri, 1000,
+                           config='allocation_size=512,leaf_page_max=512')
+        ds.populate()
 
         # Reopen it so we can fast-delete pages.
         self.reopen_conn()
@@ -44,9 +46,9 @@ class test_bug014(wttest.WiredTigerTestCase):
         # Truncate a chunk of the key/value pairs inside a transaction.
         self.session.begin_transaction(None)
         start = self.session.open_cursor(uri, None)
-        start.set_key(key_populate(start, 250))
+        start.set_key(ds.key(250))
         end = self.session.open_cursor(uri, None)
-        end.set_key(key_populate(end, 500))
+        end.set_key(ds.key(500))
         self.session.truncate(None, start, end, None)
         start.close()
         end.close()
@@ -66,7 +68,7 @@ class test_bug014(wttest.WiredTigerTestCase):
 
         # Confirm all of the records are there.
         for i in range(1, 1001):
-            cursor.set_key(key_populate(cursor, i))
+            cursor.set_key(ds.key(i))
             self.assertEqual(cursor.search(), 0)
 
         conn.close()

@@ -215,7 +215,7 @@ LegacyGeneratorObject::close(JSContext* cx, HandleObject obj)
     MOZ_ASSERT(closeValue.toObject().is<JSFunction>());
 
     InvokeArgs args(cx);
-    if (!args.init(0))
+    if (!args.init(cx, 0))
         return false;
 
     args.setCallee(closeValue);

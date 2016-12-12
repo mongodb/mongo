@@ -1120,7 +1120,7 @@ CallSelfHostedNonGenericMethod(JSContext* cx, const CallArgs& args)
     MOZ_ASSERT(selfHostedFun.toObject().is<JSFunction>());
 
     InvokeArgs args2(cx);
-    if (!args2.init(args.length() - 1))
+    if (!args2.init(cx, args.length() - 1))
         return false;
 
     args2.setCallee(selfHostedFun);

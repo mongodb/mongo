@@ -34,15 +34,13 @@ static int  handle_error(WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
 static int  handle_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
 static void onint(int)
     WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
-static int  cleanup(void);
+static void cleanup(void);
 static int  usage(void);
 static int  wt_connect(const char *);
 static int  wt_shutdown(void);
 
 extern int __wt_optind;
 extern char *__wt_optarg;
-
-void (*custom_die)(void) = NULL;
 
 int
 main(int argc, char *argv[])
@@ -139,7 +137,7 @@ main(int argc, char *argv[])
 		printf("    %d: %d workers, %d tables\n",
 		    cnt, g.nworkers, g.ntables);
 
-		(void)cleanup();		/* Clean up previous runs */
+		cleanup();			/* Clean up previous runs */
 
 		/* Setup a fresh set of cookies in the global array. */
 		if ((g.cookies = calloc(
@@ -240,14 +238,13 @@ wt_shutdown(void)
  * cleanup --
  *	Clean up from previous runs.
  */
-static int
+static void
 cleanup(void)
 {
 	g.running = 0;
 	g.ntables_created = 0;
 
 	testutil_clean_work_dir(g.home);
-	return (0);
 }
 
 static int
@@ -283,7 +280,7 @@ onint(int signo)
 {
 	WT_UNUSED(signo);
 
-	(void)cleanup();
+	cleanup();
 
 	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);

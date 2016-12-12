@@ -70,7 +70,6 @@ public:
         then perhaps stop.
     */
     int objsLeftInBatch() const {
-        _assertIfNull();
         return _putBack.size() + batch.nReturned - batch.pos;
     }
     bool moreInCurrentBatch() {
@@ -148,7 +147,6 @@ public:
         ResultFlag_ErrSet is the possible exception to that
     */
     bool hasResultFlag(int flag) {
-        _assertIfNull();
         return (resultFlags & flag) != 0;
     }
 
@@ -214,6 +212,7 @@ public:
         int nReturned{0};
         int pos{0};
         const char* data{nullptr};
+        int remainingBytes{0};
 
     public:
         Batch() = default;
@@ -268,6 +267,7 @@ private:
     std::string _scopedHost;
     std::string _lazyHost;
     bool wasError;
+    BSONVersion _enabledBSONVersion;
 
     void dataReceived() {
         bool retry;
@@ -284,11 +284,6 @@ private:
     void commandDataReceived();
 
     void requestMore();
-
-    // Don't call from a virtual function
-    void _assertIfNull() const {
-        uassert(13348, "connection died", this);
-    }
 
     // init pieces
     void _assembleInit(Message& toSend);

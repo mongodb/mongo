@@ -31,6 +31,8 @@
 #include <map>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobj_comparator_interface.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/ns_targeter.h"
 
@@ -43,9 +45,12 @@ class Shard;
 struct ChunkVersion;
 
 struct TargeterStats {
+    TargeterStats()
+        : chunkSizeDelta(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<int>()) {}
+
     // Map of chunk shard minKey -> approximate delta. This is used for deciding
     // whether a chunk might need splitting or not.
-    std::map<BSONObj, int> chunkSizeDelta;
+    BSONObjIndexedMap<int> chunkSizeDelta;
 };
 
 /**
@@ -123,6 +128,8 @@ private:
      * Returns a vector of ShardEndpoints where a document might need to be placed.
      *
      * Returns !OK with message if replacement could not be targeted
+     *
+     * If 'collation' is empty, we use the collection default collation for targeting.
      */
     Status targetDoc(OperationContext* txn,
                      const BSONObj& doc,
@@ -133,6 +140,8 @@ private:
      * Returns a vector of ShardEndpoints for a potentially multi-shard query.
      *
      * Returns !OK with message if query could not be targeted.
+     *
+     * If 'collation' is empty, we use the collection default collation for targeting.
      */
     Status targetQuery(OperationContext* txn,
                        const BSONObj& query,
@@ -144,10 +153,12 @@ private:
      *
      * Also has the side effect of updating the chunks stats with an estimate of the amount of
      * data targeted at this shard key.
+     *
+     * If 'collation' is empty, we use the collection default collation for targeting.
      */
     Status targetShardKey(OperationContext* txn,
                           const BSONObj& doc,
-                          const CollatorInterface* collator,
+                          const BSONObj& collation,
                           long long estDataSize,
                           ShardEndpoint** endpoint) const;
 

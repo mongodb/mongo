@@ -3,6 +3,9 @@ doassert = function(msg, obj) {
     if (typeof(msg) == "function")
         msg = msg();
 
+    if (typeof(msg) == "object")
+        msg = tojson(msg);
+
     if (typeof(msg) == "string" && msg.indexOf("assert") == 0)
         print(msg);
     else
@@ -146,7 +149,30 @@ assert.contains = function(o, arr, msg) {
     }
 };
 
-assert.soon = function(f, msg, timeout /*ms*/, interval) {
+/*
+ * This function transforms a given function, 'func', into a function 'safeFunc',
+ * where 'safeFunc' matches the behavior of 'func', except that it returns false
+ * in any instance where 'func' throws an exception. 'safeFunc' also prints
+ * message 'excMsg' upon catching such a thrown exception.
+ */
+function _convertExceptionToReturnStatus(func, excMsg) {
+    var safeFunc = () => {
+        try {
+            return func();
+        } catch (e) {
+            print(excMsg + ", exception: " + e);
+            return false;
+        }
+    };
+    return safeFunc;
+}
+
+/*
+ * Calls a function 'func' at repeated intervals until either func() returns true
+ * or more than 'timeout' milliseconds have elapsed. Throws an exception with
+ * message 'msg' after timing out.
+ */
+assert.soon = function(func, msg, timeout, interval) {
     if (assert._debug && msg)
         print("in assert for: " + msg);
 
@@ -155,19 +181,19 @@ assert.soon = function(f, msg, timeout /*ms*/, interval) {
             msg = "assert.soon failed, msg:" + msg;
         }
     } else {
-        msg = "assert.soon failed: " + f;
+        msg = "assert.soon failed: " + func;
     }
 
     var start = new Date();
-    timeout = timeout || 30000;
+    timeout = timeout || 5 * 60 * 1000;
     interval = interval || 200;
     var last;
     while (1) {
-        if (typeof(f) == "string") {
-            if (eval(f))
+        if (typeof(func) == "string") {
+            if (eval(func))
                 return;
         } else {
-            if (f())
+            if (func())
                 return;
         }
 
@@ -179,24 +205,49 @@ assert.soon = function(f, msg, timeout /*ms*/, interval) {
     }
 };
 
-/**
- * Wraps assert.soon to try...catch any function passed in.
+/*
+ * Calls a function 'func' at repeated intervals until either func() returns true without
+ * throwing an exception or more than 'timeout' milliseconds have elapsed. Throws an exception
+ * with message 'msg' after timing out.
  */
-assert.soonNoExcept = function(func, msg, timeout /*ms*/) {
-    /**
-     * Surrounds a function call by a try...catch to convert any exception to a print statement
-     * and return false.
-     */
-    function _convertExceptionToReturnStatus(func) {
-        try {
-            return func();
-        } catch (e) {
-            print("caught exception " + e);
-            return false;
+assert.soonNoExcept = function(func, msg, timeout) {
+    var safeFunc = _convertExceptionToReturnStatus(func, "assert.soonNoExcept caught exception");
+    assert.soon(safeFunc, msg, timeout);
+};
+
+/*
+ * Calls the given function 'func' repeatedly at time intervals specified by
+ * 'intervalMS' (milliseconds) until either func() returns true or the number of
+ * attempted function calls is equal to 'num_attempts'. Throws an exception with
+ * message 'msg' after all attempts are used up. If no 'intervalMS' argument is passed,
+ * it defaults to 0.
+ */
+assert.retry = function(func, msg, num_attempts, intervalMS) {
+    var intervalMS = intervalMS || 0;
+    var attempts_made = 0;
+    while (attempts_made < num_attempts) {
+        if (func()) {
+            return;
+        } else {
+            attempts_made += 1;
+            print("assert.retry failed on attempt " + attempts_made + " of " + num_attempts);
+            sleep(intervalMS);
         }
     }
+    // Used up all attempts
+    doassert(msg);
+};
 
-    assert.soon((() => _convertExceptionToReturnStatus(func)), msg, timeout);
+/*
+ * Calls the given function 'func' repeatedly at time intervals specified by
+ * 'intervalMS' (milliseconds) until either func() returns true without throwing
+ * an exception or the number of attempted function calls is equal to 'num_attempts'.
+ * Throws an exception with message 'msg' after all attempts are used up. If no 'intervalMS'
+ * argument is passed, it defaults to 0.
+ */
+assert.retryNoExcept = function(func, msg, num_attempts, intervalMS) {
+    var safeFunc = _convertExceptionToReturnStatus(func, "assert.retryNoExcept caught exception");
+    assert.retry(safeFunc, msg, num_attempts, intervalMS);
 };
 
 assert.time = function(f, msg, timeout /*ms*/) {
@@ -218,40 +269,95 @@ assert.time = function(f, msg, timeout /*ms*/) {
     return res;
 };
 
-assert.throws = function(func, params, msg) {
-    if (assert._debug && msg)
-        print("in assert for: " + msg);
-    if (params && typeof(params) == "string") {
-        throw("2nd argument to assert.throws has to be an array, not " + params);
-    }
-    try {
-        func.apply(null, params);
-    } catch (e) {
-        return e;
-    }
-    doassert("did not throw exception: " + msg);
-};
+(function() {
+    // Wrapping the helper function in an IIFE to avoid polluting the global namespace.
+    function assertThrowsHelper(func, params) {
+        if (typeof func !== "function")
+            throw new Error('1st argument must be a function');
 
-assert.doesNotThrow = function(func, params, msg) {
-    if (assert._debug && msg)
-        print("in assert for: " + msg);
-    if (params && typeof(params) == "string") {
-        throw("2nd argument to assert.throws has to be an array, not " + params);
+        if (arguments.length >= 2 && !Array.isArray(params) &&
+            Object.prototype.toString.call(params) !== "[object Arguments]")
+            throw new Error("2nd argument must be an Array or Arguments object");
+
+        let thisKeywordWasUsed = false;
+
+        const thisSpy = new Proxy({}, {
+            has: () => {
+                thisKeywordWasUsed = true;
+                return false;
+            },
+
+            get: () => {
+                thisKeywordWasUsed = true;
+                return undefined;
+            },
+
+            set: () => {
+                thisKeywordWasUsed = true;
+                return false;
+            },
+
+            deleteProperty: () => {
+                thisKeywordWasUsed = true;
+                return false;
+            }
+        });
+
+        let error = null;
+        let res = null;
+        try {
+            res = func.apply(thisSpy, params);
+        } catch (e) {
+            error = e;
+        }
+
+        if (thisKeywordWasUsed) {
+            doassert("Attempted to access 'this' during function call in" +
+                     " assert.throws/doesNotThrow. Instead, wrap the function argument in" +
+                     " another function.");
+        }
+
+        return {error: error, res: res};
     }
-    var res;
-    try {
-        res = func.apply(null, params);
-    } catch (e) {
-        doassert("threw unexpected exception: " + e + " : " + msg);
-    }
-    return res;
-};
+
+    assert.throws = function(func, params, msg) {
+        if (assert._debug && msg)
+            print("in assert for: " + msg);
+
+        // Use .apply() instead of calling the function directly with explicit arguments to
+        // preserve the length of the `arguments` object.
+        const {error} = assertThrowsHelper.apply(null, arguments);
+
+        if (!error)
+            doassert("did not throw exception: " + msg);
+
+        return error;
+    };
+
+    assert.doesNotThrow = function(func, params, msg) {
+        if (assert._debug && msg)
+            print("in assert for: " + msg);
+
+        // Use .apply() instead of calling the function directly with explicit arguments to
+        // preserve the length of the `arguments` object.
+        const {error, res} = assertThrowsHelper.apply(null, arguments);
+
+        if (error)
+            doassert("threw unexpected exception: " + error + " : " + msg);
+
+        return res;
+    };
+})();
 
 assert.throws.automsg = function(func, params) {
+    if (arguments.length === 1)
+        params = [];
     assert.throws(func, params, func.toString());
 };
 
 assert.doesNotThrow.automsg = function(func, params) {
+    if (arguments.length === 1)
+        params = [];
     assert.doesNotThrow(func, params, func.toString());
 };
 
@@ -426,16 +532,33 @@ assert.writeOK = function(res, msg) {
 };
 
 assert.writeError = function(res, msg) {
+    return assert.writeErrorWithCode(res, null, msg);
+};
+
+assert.writeErrorWithCode = function(res, expectedCode, msg) {
 
     var errMsg = null;
+    var foundCode = null;
 
     if (res instanceof WriteResult) {
-        if (!res.hasWriteError() && !res.hasWriteConcernError()) {
+        if (res.hasWriteError()) {
+            foundCode = res.getWriteError().code;
+        } else if (res.hasWriteConcernError()) {
+            foundCode = res.getWriteConcernError().code;
+        } else {
             errMsg = "no write error: " + tojson(res);
         }
     } else if (res instanceof BulkWriteResult) {
         // Can only happen with bulk inserts
-        if (!res.hasWriteErrors() && !res.hasWriteConcernError()) {
+        if (res.hasWriteErrors()) {
+            if (res.getWriteErrorCount() > 1 && expectedCode != null) {
+                errMsg = "can't check for specific code when there was more than one write error";
+            } else {
+                foundCode = res.getWriteErrorAt(0).code;
+            }
+        } else if (res.hasWriteConcernError()) {
+            foundCode = res.getWriteConcernError().code;
+        } else {
             errMsg = "no write errors: " + tojson(res);
         }
     } else if (res instanceof WriteCommandError) {
@@ -444,6 +567,12 @@ assert.writeError = function(res, msg) {
     } else {
         if (!res || res.ok) {
             errMsg = "unknown type of write result, cannot check error: " + tojson(res);
+        }
+    }
+
+    if (!errMsg && expectedCode) {
+        if (foundCode != expectedCode) {
+            errMsg = "found code " + foundCode + " does not match expected code " + expectedCode;
         }
     }
 

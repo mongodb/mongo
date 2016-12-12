@@ -45,9 +45,19 @@ void QueryPlannerCommon::reverseScans(QuerySolutionNode* node) {
 
         if (isn->bounds.isSimpleRange) {
             std::swap(isn->bounds.startKey, isn->bounds.endKey);
-            // XXX: Not having a startKeyInclusive means that if we reverse a max/min query
-            // we have different results with and without the reverse...
-            isn->bounds.endKeyInclusive = true;
+            // If only one bound is included, swap which one is included.
+            switch (isn->bounds.boundInclusion) {
+                case BoundInclusion::kIncludeStartKeyOnly:
+                    isn->bounds.boundInclusion = BoundInclusion::kIncludeEndKeyOnly;
+                    break;
+                case BoundInclusion::kIncludeEndKeyOnly:
+                    isn->bounds.boundInclusion = BoundInclusion::kIncludeStartKeyOnly;
+                    break;
+                case BoundInclusion::kIncludeBothStartAndEndKeys:
+                case BoundInclusion::kExcludeBothStartAndEndKeys:
+                    // These are both symmetric so no change needed.
+                    break;
+            }
         } else {
             for (size_t i = 0; i < isn->bounds.fields.size(); ++i) {
                 std::vector<Interval>& iv = isn->bounds.fields[i].intervals;
@@ -61,7 +71,7 @@ void QueryPlannerCommon::reverseScans(QuerySolutionNode* node) {
         }
 
         if (!isn->bounds.isValidFor(isn->index.keyPattern, isn->direction)) {
-            LOG(5) << "Invalid bounds: " << isn->bounds.toString() << std::endl;
+            LOG(5) << "Invalid bounds: " << redact(isn->bounds.toString());
             invariant(0);
         }
 

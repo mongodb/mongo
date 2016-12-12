@@ -72,11 +72,7 @@ withMongod({auth: ""}, function runTest(mongod) {
     cursor.next();
     expectNumLiveCursors(mongod, 1);
 
-    cursor = null;
-    // NOTE(schwerin): We assume that after setting cursor = null, there are no remaining
-    // references
-    // to the cursor, and that gc() will deterministically garbage collect it.
-    gc();
+    cursor.close();
 
     // NOTE(schwerin): dbKillCursors gets piggybacked on subsequent messages on the
     // connection, so we

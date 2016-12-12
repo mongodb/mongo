@@ -106,14 +106,15 @@ public:
     void removeExistingIndexes(std::vector<BSONObj>* specs) const;
 
     /**
-     * Prepares the index(es) for building.
+     * Prepares the index(es) for building and returns the canonicalized form of the requested index
+     * specifications.
      *
      * Does not need to be called inside of a WriteUnitOfWork (but can be due to nesting).
      *
      * Requires holding an exclusive database lock.
      */
-    Status init(const std::vector<BSONObj>& specs);
-    Status init(const BSONObj& spec);
+    StatusWith<std::vector<BSONObj>> init(const std::vector<BSONObj>& specs);
+    StatusWith<std::vector<BSONObj>> init(const BSONObj& spec);
 
     /**
      * Inserts all documents in the Collection into the indexes and logs with timing info.

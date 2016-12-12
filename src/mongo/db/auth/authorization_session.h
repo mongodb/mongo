@@ -155,7 +155,8 @@ public:
 
     // Checks if this connection has the privileges necessary to perform the given update on the
     // given namespace.
-    Status checkAuthForUpdate(const NamespaceString& ns,
+    Status checkAuthForUpdate(OperationContext* txn,
+                              const NamespaceString& ns,
                               const BSONObj& query,
                               const BSONObj& update,
                               bool upsert);
@@ -163,16 +164,32 @@ public:
     // Checks if this connection has the privileges necessary to insert the given document
     // to the given namespace.  Correctly interprets inserts to system.indexes and performs
     // the proper auth checks for index building.
-    Status checkAuthForInsert(const NamespaceString& ns, const BSONObj& document);
+    Status checkAuthForInsert(OperationContext* txn,
+                              const NamespaceString& ns,
+                              const BSONObj& document);
 
     // Checks if this connection has the privileges necessary to perform a delete on the given
     // namespace.
-    Status checkAuthForDelete(const NamespaceString& ns, const BSONObj& query);
+    Status checkAuthForDelete(OperationContext* txn,
+                              const NamespaceString& ns,
+                              const BSONObj& query);
 
     // Checks if this connection has the privileges necessary to perform a killCursor on
     // the identified cursor, supposing that cursor is associated with the supplied namespace
     // identifier.
     Status checkAuthForKillCursors(const NamespaceString& ns, long long cursorID);
+
+    // Checks if this connection has the privileges necessary to run the aggregation pipeline
+    // specified in 'cmdObj' on the namespace 'ns'.
+    Status checkAuthForAggregate(const NamespaceString& ns, const BSONObj& cmdObj);
+
+    // Checks if this connection has the privileges necessary to create 'ns' with the options
+    // supplied in 'cmdObj'.
+    Status checkAuthForCreate(const NamespaceString& ns, const BSONObj& cmdObj);
+
+    // Checks if this connection has the privileges necessary to modify 'ns' with the options
+    // supplied in 'cmdObj'.
+    Status checkAuthForCollMod(const NamespaceString& ns, const BSONObj& cmdObj);
 
     // Checks if this connection has the privileges necessary to grant the given privilege
     // to a role.
@@ -273,6 +290,13 @@ private:
     // we should even be doing authorization checks in general.  Note: this may acquire a read
     // lock on the admin database (to update out-of-date user privilege information).
     bool _isAuthorizedForPrivilege(const Privilege& privilege);
+
+    // Helper for recursively checking for privileges in an aggregation pipeline.
+    void _addPrivilegesForStage(const std::string& db,
+                                const BSONObj& cmdObj,
+                                PrivilegeVector* requiredPrivileges,
+                                BSONObj stageSpec,
+                                bool haveRecursed = false);
 
     std::unique_ptr<AuthzSessionExternalState> _externalState;
 

@@ -34,8 +34,10 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/fetcher.h"
+#include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/base_cloner.h"
@@ -47,6 +49,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/progress_meter.h"
 
 namespace mongo {
 
@@ -61,14 +64,20 @@ class CollectionCloner : public BaseCloner {
 
 public:
     struct Stats {
+        static constexpr StringData kDocumentsToCopyFieldName = "documentsToCopy"_sd;
+        static constexpr StringData kDocumentsCopiedFieldName = "documentsCopied"_sd;
+
+        std::string ns;
         Date_t start;
         Date_t end;
-        size_t documents{0};
+        size_t documentToCopy{0};
+        size_t documentsCopied{0};
         size_t indexes{0};
         size_t fetchBatches{0};
 
         std::string toString() const;
         BSONObj toBSON() const;
+        void append(BSONObjBuilder* builder) const;
     };
     /**
      * Type of function to schedule storage interface tasks with the executor.
@@ -103,7 +112,7 @@ public:
 
     bool isActive() const override;
 
-    Status startup() override;
+    Status startup() noexcept override;
 
     void shutdown() override;
 
@@ -131,6 +140,13 @@ public:
     void setScheduleDbWorkFn_forTest(const ScheduleDbWorkFn& scheduleDbWorkFn);
 
 private:
+    bool _isActive_inlock() const;
+
+    /**
+     * Read number of documents in collection from count result.
+     */
+    void _countCallback(const executor::TaskExecutor::RemoteCommandCallbackArgs& args);
+
     /**
      * Read index specs from listIndexes result.
      */
@@ -191,18 +207,27 @@ private:
     NamespaceString _destNss;                           // (R)
     CollectionOptions _options;                         // (R)
     std::unique_ptr<CollectionBulkLoader> _collLoader;  // (M)
-    CallbackFn _onCompletion;             // (R) Invoked once when cloning completes or fails.
+    CallbackFn _onCompletion;             // (M) Invoked once when cloning completes or fails.
     StorageInterface* _storageInterface;  // (R) Not owned by us.
-    bool _active;                         // (M) true when Collection Cloner is started.
-    Fetcher _listIndexesFetcher;          // (S)
-    Fetcher _findFetcher;                 // (S)
-    std::vector<BSONObj> _indexSpecs;     // (M)
-    BSONObj _idIndexSpec;                 // (M)
-    std::vector<BSONObj> _documents;      // (M) Documents read from fetcher to insert.
-    TaskRunner _dbWorkTaskRunner;         // (R)
+    RemoteCommandRetryScheduler _countScheduler;  // (S)
+    Fetcher _listIndexesFetcher;                  // (S)
+    Fetcher _findFetcher;                         // (S)
+    std::vector<BSONObj> _indexSpecs;             // (M)
+    BSONObj _idIndexSpec;                         // (M)
+    std::vector<BSONObj> _documents;              // (M) Documents read from fetcher to insert.
+    TaskRunner _dbWorkTaskRunner;                 // (R)
     ScheduleDbWorkFn
-        _scheduleDbWorkFn;  // (RT) Function for scheduling database work using the executor.
-    Stats _stats;           // (M) stats for this instance.
+        _scheduleDbWorkFn;         // (RT) Function for scheduling database work using the executor.
+    Stats _stats;                  // (M) stats for this instance.
+    ProgressMeter _progressMeter;  // (M) progress meter for this instance.
+
+    // State transitions:
+    // PreStart --> Running --> ShuttingDown --> Complete
+    // It is possible to skip intermediate states. For example,
+    // Calling shutdown() when the cloner has not started will transition from PreStart directly
+    // to Complete.
+    enum class State { kPreStart, kRunning, kShuttingDown, kComplete };
+    State _state = State::kPreStart;  // (M)
 };
 
 }  // namespace repl

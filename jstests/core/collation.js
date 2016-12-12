@@ -3,6 +3,7 @@
     'use strict';
 
     load("jstests/libs/analyze_plan.js");
+    load("jstests/libs/get_index_helpers.js");
 
     var coll = db.collation;
     coll.drop();
@@ -16,27 +17,12 @@
     var isMongos = (isMaster.msg === "isdbgrid");
 
     var assertIndexHasCollation = function(keyPattern, collation) {
-        var foundIndex = false;
         var indexSpecs = coll.getIndexes();
-        for (var i = 0; i < indexSpecs.length; ++i) {
-            if (bsonWoCompare(indexSpecs[i].key, keyPattern) === 0) {
-                foundIndex = true;
-                // We assume that the key pattern is unique, even though indices with different
-                // collations but the same key pattern are allowed.
-                if (collation.locale === "simple") {
-                    // The simple collation is not explicitly stored in the catalog, so we expect
-                    // the "collation" field to be absent.
-                    assert(!indexSpecs[i].hasOwnProperty("collation"),
-                           "Expected the simple collation in: " + tojson(indexSpecs[i]));
-                } else {
-                    assert.eq(indexSpecs[i].collation,
-                              collation,
-                              "Expected collation " + tojson(collation) + " in: " +
-                                  tojson(indexSpecs[i]));
-                }
-            }
-        }
-        assert(foundIndex, "index with key pattern " + tojson(keyPattern) + " not found");
+        var found = GetIndexHelpers.findByKeyPattern(indexSpecs, keyPattern, collation);
+        assert.neq(null,
+                   found,
+                   "Index with key pattern " + tojson(keyPattern) + " and collation " +
+                       tojson(collation) + " not found: " + tojson(indexSpecs));
     };
 
     var getQueryCollation = function(explainRes) {
@@ -128,6 +114,44 @@
         version: "57.1",
     });
 
+    // Ensure that an index which specifies the "simple" collation as an overriding collation still
+    // does not use the collection default.
+    assert.commandWorked(coll.ensureIndex({d: 1}, {collation: {locale: "simple"}}));
+    assertIndexHasCollation({d: 1}, {locale: "simple"});
+
+    // Ensure that a v=1 index doesn't inherit the collection-default collation.
+    assert.commandWorked(coll.ensureIndex({c: 1}, {v: 1}));
+    assertIndexHasCollation({c: 1}, {locale: "simple"});
+
+    // Test that all indexes retain their current collation when the collection is re-indexed.
+    assert.commandWorked(coll.reIndex());
+    assertIndexHasCollation({a: 1}, {
+        locale: "fr_CA",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 3,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: true,
+        version: "57.1",
+    });
+    assertIndexHasCollation({b: 1}, {
+        locale: "en_US",
+        caseLevel: false,
+        caseFirst: "off",
+        strength: 3,
+        numericOrdering: false,
+        alternate: "non-ignorable",
+        maxVariable: "punct",
+        normalization: false,
+        backwards: false,
+        version: "57.1",
+    });
+    assertIndexHasCollation({d: 1}, {locale: "simple"});
+    assertIndexHasCollation({c: 1}, {locale: "simple"});
+
     coll.drop();
 
     //
@@ -212,15 +236,12 @@
         assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "fr_CA"}}));
         assert.commandWorked(coll.createIndex({b: 1}));
         assert.writeOK(coll.insert({a: "foo", b: "foo"}));
-        assert.eq(
-            1, coll.find({}, {_id: 0, a: 1}).collation({locale: "fr_CA"}).hint({a: 1}).itcount());
-        assert.neq(
-            "foo",
-            coll.find({}, {_id: 0, a: 1}).collation({locale: "fr_CA"}).hint({a: 1}).next().a);
-        assert.eq(
-            1, coll.find({}, {_id: 0, b: 1}).collation({locale: "fr_CA"}).hint({b: 1}).itcount());
+        assert.eq(1, coll.find().collation({locale: "fr_CA"}).hint({a: 1}).returnKey().itcount());
+        assert.neq("foo",
+                   coll.find().collation({locale: "fr_CA"}).hint({a: 1}).returnKey().next().a);
+        assert.eq(1, coll.find().collation({locale: "fr_CA"}).hint({b: 1}).returnKey().itcount());
         assert.eq("foo",
-                  coll.find({}, {_id: 0, b: 1}).collation({locale: "fr_CA"}).hint({b: 1}).next().b);
+                  coll.find().collation({locale: "fr_CA"}).hint({b: 1}).returnKey().next().b);
     }
 
     // Test that a query with a string comparison can use an index with a non-simple collation if it
@@ -410,6 +431,15 @@
         version: "57.1",
     });
 
+    // Should be able to use COUNT_SCAN for queries over strings.
+    coll.drop();
+    assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "fr_CA"}}));
+    assert.commandWorked(coll.createIndex({a: 1}));
+    explainRes = coll.explain("executionStats").find({a: "foo"}).count();
+    assert.commandWorked(explainRes);
+    assert(planHasStage(explainRes.executionStats.executionStages, "COUNT_SCAN"));
+    assert(!planHasStage(explainRes.executionStats.executionStages, "FETCH"));
+
     //
     // Collation tests for distinct.
     //
@@ -464,6 +494,27 @@
     assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "en_US"}}));
     var explain = coll.explain("queryPlanner").distinct("a");
     assert(planHasStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
+    assert(planHasStage(explain.queryPlanner.winningPlan, "FETCH"));
+
+    // Distinct scan on strings can be used over an index with a collation when the predicate has
+    // exact bounds.
+    explain = coll.explain("queryPlanner").distinct("a", {a: {$gt: "foo"}});
+    assert(planHasStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
+    assert(planHasStage(explain.queryPlanner.winningPlan, "FETCH"));
+    assert(!planHasStage(explain.queryPlanner.winningPlan, "PROJECTION"));
+
+    // Distinct scan cannot be used over an index with a collation when the predicate has inexact
+    // bounds.
+    explain = coll.explain("queryPlanner").distinct("a", {a: {$exists: true}});
+    assert(planHasStage(explain.queryPlanner.winningPlan, "IXSCAN"));
+    assert(planHasStage(explain.queryPlanner.winningPlan, "FETCH"));
+    assert(!planHasStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
+
+    // Distinct scan can be used without a fetch when predicate has exact non-string bounds.
+    explain = coll.explain("queryPlanner").distinct("a", {a: {$gt: 3}});
+    assert(planHasStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
+    assert(planHasStage(explain.queryPlanner.winningPlan, "PROJECTION"));
+    assert(!planHasStage(explain.queryPlanner.winningPlan, "FETCH"));
 
     // Distinct should not use index when no collation specified and collection default collation is
     // incompatible with index collation.
@@ -1902,7 +1953,7 @@
         // Create a collection with a non-simple default collation.
         assert.commandWorked(
             sourceDB.runCommand({create: coll.getName(), collation: {locale: "en", strength: 2}}));
-        const sourceCollectionInfos = sourceDB.getCollectionInfos({name: coll.getName()});
+        var sourceCollectionInfos = sourceDB.getCollectionInfos({name: coll.getName()});
 
         assert.writeOK(sourceDB[coll.getName()].insert({_id: "FOO"}));
         assert.writeOK(sourceDB[coll.getName()].insert({_id: "bar"}));
@@ -1912,7 +1963,13 @@
 
         assert.commandWorked(
             sourceDB.adminCommand({copydb: 1, fromdb: sourceDB.getName(), todb: destDB.getName()}));
-        const destCollectionInfos = destDB.getCollectionInfos({name: coll.getName()});
+        var destCollectionInfos = destDB.getCollectionInfos({name: coll.getName()});
+
+        // The namespace for the _id index will differ since the source and destination collections
+        // are in different databases.
+        delete sourceCollectionInfos[0].idIndex.ns;
+        delete destCollectionInfos[0].idIndex.ns;
+
         assert.eq(sourceCollectionInfos, destCollectionInfos);
         assert.eq([{_id: "FOO"}], destDB[coll.getName()].find({_id: "foo"}).toArray());
     }

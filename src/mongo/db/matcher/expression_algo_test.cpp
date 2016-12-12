@@ -815,8 +815,8 @@ TEST(SplitMatchExpression, AndWithSplittableChildrenIsSplittable) {
     BSONObjBuilder secondBob;
     splitExpr.second->serialize(&secondBob);
 
-    ASSERT_EQUALS(firstBob.obj(), fromjson("{a: {$eq: 1}}"));
-    ASSERT_EQUALS(secondBob.obj(), fromjson("{b: {$eq: 1}}"));
+    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{a: {$eq: 1}}"));
+    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{b: {$eq: 1}}"));
 }
 
 TEST(SplitMatchExpression, NorWithIndependentChildrenIsSplittable) {
@@ -837,8 +837,8 @@ TEST(SplitMatchExpression, NorWithIndependentChildrenIsSplittable) {
     BSONObjBuilder secondBob;
     splitExpr.second->serialize(&secondBob);
 
-    ASSERT_EQUALS(firstBob.obj(), fromjson("{$nor: [{a: {$eq: 1}}]}"));
-    ASSERT_EQUALS(secondBob.obj(), fromjson("{$nor: [{b: {$eq: 1}}]}"));
+    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{$nor: [{a: {$eq: 1}}]}"));
+    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{$nor: [{b: {$eq: 1}}]}"));
 }
 
 TEST(SplitMatchExpression, NotWithIndependentChildIsSplittable) {
@@ -855,7 +855,7 @@ TEST(SplitMatchExpression, NotWithIndependentChildIsSplittable) {
     BSONObjBuilder firstBob;
     splitExpr.first->serialize(&firstBob);
 
-    ASSERT_EQUALS(firstBob.obj(), fromjson("{$nor: [{$and: [{x: {$gt: 4}}]}]}"));
+    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{$nor: [{$and: [{x: {$gt: 4}}]}]}"));
     ASSERT_FALSE(splitExpr.second);
 }
 
@@ -874,7 +874,7 @@ TEST(SplitMatchExpression, OrWithOnlyIndependentChildrenIsNotSplittable) {
     splitExpr.second->serialize(&bob);
 
     ASSERT_FALSE(splitExpr.first);
-    ASSERT_EQUALS(bob.obj(), fromjson("{$or: [{a: {$eq: 1}}, {b: {$eq: 1}}]}"));
+    ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{$or: [{a: {$eq: 1}}, {b: {$eq: 1}}]}"));
 }
 
 TEST(SplitMatchExpression, ComplexMatchExpressionSplitsCorrectly) {
@@ -898,12 +898,34 @@ TEST(SplitMatchExpression, ComplexMatchExpressionSplitsCorrectly) {
     BSONObjBuilder secondBob;
     splitExpr.second->serialize(&secondBob);
 
-    ASSERT_EQUALS(firstBob.obj(), fromjson("{$or: [{'a.b': {$eq: 3}}, {'a.b.c': {$eq: 4}}]}"));
-    ASSERT_EQUALS(
+    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{$or: [{'a.b': {$eq: 3}}, {'a.b.c': {$eq: 4}}]}"));
+    ASSERT_BSONOBJ_EQ(
         secondBob.obj(),
         fromjson("{$and: [{$nor: [{$and: [{x: {$size: 2}}]}]}, {$nor: [{x: {$gt: 4}}, {$and: "
                  "[{$nor: [{$and: [{x: "
                  "{$eq: 1}}]}]}, {y: {$eq: 3}}]}]}]}"));
+}
+
+TEST(SplitMatchExpression, ShouldNotExtractPrefixOfDottedPathAsIndependent) {
+    BSONObj matchPredicate = fromjson("{$and: [{a: 1}, {'a.b': 1}, {'a.c': 1}]}");
+    const CollatorInterface* collator = nullptr;
+    StatusWithMatchExpression status =
+        MatchExpressionParser::parse(matchPredicate, ExtensionsCallbackNoop(), collator);
+    ASSERT_OK(status.getStatus());
+
+    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(status.getValue()), {"a.b"});
+
+    ASSERT_TRUE(splitExpr.first.get());
+    BSONObjBuilder firstBob;
+    splitExpr.first->serialize(&firstBob);
+
+    ASSERT_TRUE(splitExpr.second.get());
+    BSONObjBuilder secondBob;
+    splitExpr.second->serialize(&secondBob);
+
+    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{'a.c': {$eq: 1}}"));
+    ASSERT_BSONOBJ_EQ(secondBob.obj(), fromjson("{$and: [{a: {$eq: 1}}, {'a.b': {$eq: 1}}]}"));
 }
 
 TEST(MapOverMatchExpression, DoesMapOverLogicalNodes) {

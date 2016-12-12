@@ -32,13 +32,13 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
 
 class BSONObj;
 class Database;
-class NamespaceString;
 class OperationContext;
 
 /**
@@ -49,7 +49,7 @@ class OperationContext;
 class DurableViewCatalog {
 public:
     static constexpr StringData viewsCollectionName() {
-        return "system.views"_sd;
+        return NamespaceString::kSystemDotViewsCollectionName;
     }
 
     /**
@@ -58,7 +58,7 @@ public:
      */
     static void onExternalChange(OperationContext* txn, const NamespaceString& name);
 
-    using Callback = stdx::function<void(const BSONObj& view)>;
+    using Callback = stdx::function<Status(const BSONObj& view)>;
     virtual Status iterate(OperationContext* txn, Callback callback) = 0;
     virtual void upsert(OperationContext* txn,
                         const NamespaceString& name,

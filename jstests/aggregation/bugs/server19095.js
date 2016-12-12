@@ -375,7 +375,7 @@ load("jstests/aggregation/extras/utils.js");
         // All four fields must be specified.
         assertErrorCode(coll, [{$lookup: {foreignField: "b", from: "from", as: "same"}}], 4572);
         assertErrorCode(coll, [{$lookup: {localField: "a", from: "from", as: "same"}}], 4572);
-        assertErrorCode(coll, [{$lookup: {localField: "a", foreignField: "b", as: "same"}}], 4572);
+        assertErrorCode(coll, [{$lookup: {localField: "a", foreignField: "b", as: "same"}}], 40320);
         assertErrorCode(
             coll, [{$lookup: {localField: "a", foreignField: "b", from: "from"}}], 4572);
 
@@ -385,12 +385,15 @@ load("jstests/aggregation/extras/utils.js");
         assertErrorCode(
             coll, [{$lookup: {localField: "a", foreignField: 1, from: "from", as: "as"}}], 4570);
         assertErrorCode(
-            coll, [{$lookup: {localField: "a", foreignField: "b", from: 1, as: "as"}}], 4570);
+            coll, [{$lookup: {localField: "a", foreignField: "b", from: 1, as: "as"}}], 40321);
         assertErrorCode(
             coll, [{$lookup: {localField: "a", foreignField: "b", from: "from", as: 1}}], 4570);
 
+        // The foreign collection must be a valid namespace.
+        assertErrorCode(
+            coll, [{$lookup: {localField: "a", foreignField: "b", from: "", as: "as"}}], 40322);
         // $lookup's field must be an object.
-        assertErrorCode(coll, [{$lookup: "string"}], 4569);
+        assertErrorCode(coll, [{$lookup: "string"}], 40319);
     }
 
     // Run tests on single node.

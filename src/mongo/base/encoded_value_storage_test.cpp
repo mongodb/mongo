@@ -31,6 +31,7 @@
 #include <cstring>
 
 #include "mongo/base/data_type_endian.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/platform/endian.h"
 #include "mongo/unittest/unittest.h"
 
@@ -110,7 +111,7 @@ private:
 class Value : public EncodedValueStorage<Layout, ConstView, View> {
 public:
     Value() {
-        static_assert(sizeof(Value) == sizeof(Layout), "sizeof(Value) == sizeof(Layout)");
+        MONGO_STATIC_ASSERT(sizeof(Value) == sizeof(Layout));
     }
 
     Value(ZeroInitTag_t zit) : EncodedValueStorage<Layout, ConstView, View>(zit) {}

@@ -116,7 +116,7 @@ IndexCatalogEntry::IndexCatalogEntry(OperationContext* txn,
         invariantOK(statusWithMatcher.getStatus());
         _filterExpression = std::move(statusWithMatcher.getValue());
         LOG(2) << "have filter expression for " << _ns << " " << _descriptor->indexName() << " "
-               << filter;
+               << redact(filter);
     }
 }
 

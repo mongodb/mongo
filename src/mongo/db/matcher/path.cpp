@@ -90,7 +90,6 @@ BSONElementIterator::BSONElementIterator() {
 BSONElementIterator::BSONElementIterator(const ElementPath* path, const BSONObj& context)
     : _path(path), _context(context) {
     _state = BEGIN;
-    // log() << "path: " << path.fieldRef().dottedField() << " context: " << context << endl;
 }
 
 BSONElementIterator::~BSONElementIterator() {}

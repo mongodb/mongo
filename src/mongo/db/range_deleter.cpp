@@ -116,7 +116,8 @@ static void logCursorsWaiting(RangeDeleteEntry* entry) {
     }
 
     log() << "waiting for open cursors before removing range "
-          << "[" << entry->options.range.minKey << ", " << entry->options.range.maxKey << ") "
+          << "[" << redact(entry->options.range.minKey) << ", "
+          << redact(entry->options.range.maxKey) << ") "
           << "in " << entry->options.range.ns
           << (entry->lastLoggedTS == Date_t()
                   ? string("")
@@ -493,7 +494,7 @@ void RangeDeleter::doWork() {
 
                 nextTask->stats.waitForReplEndTS = jsTime();
             } else {
-                warning() << "Error encountered while trying to delete range: " << errMsg << endl;
+                warning() << "Error encountered while trying to delete range: " << redact(errMsg);
             }
         }
 

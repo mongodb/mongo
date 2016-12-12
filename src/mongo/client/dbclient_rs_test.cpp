@@ -34,7 +34,6 @@
 #include <map>
 #include <memory>
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "mongo/base/string_data.h"
@@ -46,6 +45,7 @@
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -106,7 +106,7 @@ void assertOneOfNodesSelected(MockReplicaSet* replSet,
     // We need the command to be a "SecOk command"
     auto res = replConn.runCommandWithMetadata(
         "foo", "dbStats", makeMetadata(rp, tagSet, secondaryOk), BSON("dbStats" << 1));
-    std::unordered_set<HostAndPort> hostSet;
+    stdx::unordered_set<HostAndPort> hostSet;
     for (const auto& hostName : hostNames) {
         hostSet.emplace(hostName);
     }
@@ -691,7 +691,8 @@ TEST_F(TaggedFiveMemberRS, ConnShouldNotPinIfHostMarkedAsFailed) {
     // This is the only difference from ConnShouldPinIfSameSettings which tests that we *do* pin
     // in if the host is still marked as up. Note that this only notifies the RSM, and does not
     // directly effect the DBClientRS.
-    ReplicaSetMonitor::get(replSet->getSetName())->failedHost(HostAndPort(dest));
+    ReplicaSetMonitor::get(replSet->getSetName())
+        ->failedHost(HostAndPort(dest), {ErrorCodes::InternalError, "Test error"});
 
     {
         Query query;

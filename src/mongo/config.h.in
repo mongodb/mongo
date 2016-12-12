@@ -34,9 +34,6 @@
 // Define if building a debug build
 @mongo_config_debug_build@
 
-// Defined if thread_local storage class is available
-@mongo_config_have_thread_local@
-
 // Defined if __declspec(thread) is available
 @mongo_config_have___declspec_thread@
 
@@ -58,17 +55,23 @@
 // Defined if a POSIX monotonic clock is available
 @mongo_config_have_posix_monotonic_clock@
 
+// Defined if pthread.h and pthread_setname_np are available
+@mongo_config_have_pthread_setname_np@
+
+// Defined if std::align is available
+@mongo_config_have_std_align@
+
 // Defined if std::is_trivially_copyable is available
 @mongo_config_have_std_is_trivially_copyable@
 
 // Defined if std::make_unique is available
 @mongo_config_have_std_make_unique@
 
-// Defined if std::align is available
-@mongo_config_have_std_align@
-
 // Defined if strnlen is available
 @mongo_config_have_strnlen@
+
+// Defined if thread_local storage class is available
+@mongo_config_have_thread_local@
 
 // Defined if building an optimized build
 @mongo_config_optimized_build@

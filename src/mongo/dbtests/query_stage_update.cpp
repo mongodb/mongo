@@ -234,7 +234,7 @@ public:
 
             // Expect a single document, {_id: 0, x: 1, y: 2}.
             ASSERT_EQUALS(1U, objs.size());
-            ASSERT_EQUALS(objs[0], fromjson("{_id: 0, x: 1, y: 2}"));
+            ASSERT_BSONOBJ_EQ(objs[0], fromjson("{_id: 0, x: 1, y: 2}"));
         }
     }
 };
@@ -429,13 +429,13 @@ public:
         ASSERT_TRUE(resultMember->obj.value().isOwned());
 
         // Should be the old value.
-        ASSERT_EQUALS(resultMember->obj.value(), oldDoc);
+        ASSERT_BSONOBJ_EQ(resultMember->obj.value(), oldDoc);
 
         // Should have done the update.
         BSONObj newDoc = BSON("_id" << targetDocIndex << "foo" << targetDocIndex << "x" << 0);
         vector<BSONObj> objs;
         getCollContents(coll, &objs);
-        ASSERT_EQUALS(objs[targetDocIndex], newDoc);
+        ASSERT_BSONOBJ_EQ(objs[targetDocIndex], newDoc);
 
         // That should be it.
         id = WorkingSet::INVALID_ID;
@@ -518,12 +518,12 @@ public:
 
         // Should be the new value.
         BSONObj newDoc = BSON("_id" << targetDocIndex << "foo" << targetDocIndex << "x" << 0);
-        ASSERT_EQUALS(resultMember->obj.value(), newDoc);
+        ASSERT_BSONOBJ_EQ(resultMember->obj.value(), newDoc);
 
         // Should have done the update.
         vector<BSONObj> objs;
         getCollContents(coll, &objs);
-        ASSERT_EQUALS(objs[targetDocIndex], newDoc);
+        ASSERT_BSONOBJ_EQ(objs[targetDocIndex], newDoc);
 
         // That should be it.
         id = WorkingSet::INVALID_ID;

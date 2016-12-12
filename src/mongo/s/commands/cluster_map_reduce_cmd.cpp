@@ -35,12 +35,13 @@
 #include <string>
 #include <vector>
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/connpool.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/mr.h"
 #include "mongo/db/query/collation/collation_spec.h"
-#include "mongo/s/balancer/balancer_configuration.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -289,7 +290,9 @@ public:
         if (!shardedInput && !shardedOutput && !customOutDB) {
             LOG(1) << "simple MR, just passthrough";
 
-            const auto shard = grid.shardRegistry()->getShard(txn, confIn->getPrimaryId());
+            const auto shard =
+                uassertStatusOK(grid.shardRegistry()->getShard(txn, confIn->getPrimaryId()));
+
             ShardConnection conn(shard->getConnString(), "");
 
             BSONObj res;
@@ -325,7 +328,7 @@ public:
         BSONObjBuilder shardResultsB;
         BSONObjBuilder shardCountsB;
         map<string, int64_t> countsMap;
-        set<BSONObj> splitPts;
+        auto splitPts = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
 
         {
             bool ok = true;
@@ -347,7 +350,8 @@ public:
                 // Need to gather list of all servers even if an error happened
                 string server;
                 {
-                    const auto shard = grid.shardRegistry()->getShard(txn, mrResult.shardTargetId);
+                    const auto shard = uassertStatusOK(
+                        grid.shardRegistry()->getShard(txn, mrResult.shardTargetId));
                     server = shard->getConnString().toString();
                 }
                 servers.insert(server);
@@ -440,7 +444,9 @@ public:
         bool hasWCError = false;
 
         if (!shardedOutput) {
-            const auto shard = grid.shardRegistry()->getShard(txn, confOut->getPrimaryId());
+            const auto shard =
+                uassertStatusOK(grid.shardRegistry()->getShard(txn, confOut->getPrimaryId()));
+
             LOG(1) << "MR with single shard output, NS=" << outputCollNss.ns()
                    << " primary=" << shard->toString();
 
@@ -509,12 +515,11 @@ public:
                 confOut->getChunkManager(txn, outputCollNss.ns(), true /* force */);
             }
 
-            map<BSONObj, int> chunkSizes;
+            auto chunkSizes = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<int>();
             {
                 // Take distributed lock to prevent split / migration.
-                auto scopedDistLock = grid.catalogClient(txn)->distLock(
+                auto scopedDistLock = grid.catalogClient(txn)->getDistLockManager()->lock(
                     txn, outputCollNss.ns(), "mr-post-process", kNoDistLockTimeout);
-
                 if (!scopedDistLock.isOK()) {
                     return appendCommandStatus(result, scopedDistLock.getStatus());
                 }
@@ -524,15 +529,13 @@ public:
 
                 try {
                     const BSONObj query;
-                    const BSONObj simpleCollation =
-                        BSON(CollationSpec::kLocaleField << CollationSpec::kSimpleBinaryComparison);
                     Strategy::commandOp(txn,
                                         outDB,
                                         finalCmdObj,
                                         0,
                                         outputCollNss.ns(),
                                         query,
-                                        simpleCollation,
+                                        CollationSpec::kSimpleSpec,
                                         &mrCommandResults);
                     ok = true;
                 } catch (DBException& e) {
@@ -546,8 +549,8 @@ public:
                 for (const auto& mrResult : mrCommandResults) {
                     string server;
                     {
-                        const auto shard =
-                            grid.shardRegistry()->getShard(txn, mrResult.shardTargetId);
+                        const auto shard = uassertStatusOK(
+                            grid.shardRegistry()->getShard(txn, mrResult.shardTargetId));
                         server = shard->getConnString().toString();
                     }
                     singleResult = mrResult.result;

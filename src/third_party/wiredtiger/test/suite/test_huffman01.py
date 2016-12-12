@@ -72,7 +72,6 @@ class test_huffman01(wttest.WiredTigerTestCase, suite_subprocess):
         config=self.huffkey + self.huffval
         self.session.create(self.table_name, config)
 
-
 # Test Huffman encoding ranges.
 class test_huffman_range(wttest.WiredTigerTestCase):
     table_name = 'table:test_huff'
@@ -122,7 +121,6 @@ class test_huffman_range(wttest.WiredTigerTestCase):
         msg = '/duplicate symbol/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.create(self.table_name, config), msg)
-
 
 if __name__ == '__main__':
     wttest.run()

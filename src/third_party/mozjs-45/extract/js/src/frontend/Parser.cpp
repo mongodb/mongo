@@ -524,6 +524,9 @@ ParseContext<ParseHandler>::generateBindings(ExclusiveContext* cx, TokenStream& 
     if (UINT32_MAX - args_.length() <= vars_.length() + bodyLevelLexicals_.length())
         return ts.reportError(JSMSG_TOO_MANY_LOCALS);
 
+    if (blockScopeDepth >= Bindings::BLOCK_SCOPED_LIMIT)
+        return ts.reportError(JSMSG_TOO_MANY_LOCALS);
+
     // Fix up slots in non-global contexts. In global contexts all body-level
     // names are dynamically defined and do not live in either frame or
     // CallObject slots.
@@ -760,6 +763,7 @@ FunctionBox::FunctionBox(ExclusiveContext* cx, ObjectBox* traceListHead, JSFunct
     usesArguments(false),
     usesApply(false),
     usesThis(false),
+    usesReturn(false),
     funCxFlags()
 {
     // Functions created at parse time may be set singleton after parsing and
@@ -2702,8 +2706,8 @@ Parser<SyntaxParseHandler>::finishFunctionDefinition(Node pn, FunctionBox* funbo
     if (pc->sc->strict())
         lazy->setStrict();
     lazy->setGeneratorKind(funbox->generatorKind());
-    if (funbox->usesArguments && funbox->usesApply && funbox->usesThis)
-        lazy->setUsesArgumentsApplyAndThis();
+    if (funbox->isLikelyConstructorWrapper())
+        lazy->setLikelyConstructorWrapper();
     if (funbox->isDerivedClassConstructor())
         lazy->setIsDerivedClassConstructor();
     if (funbox->needsHomeObject())
@@ -5940,6 +5944,7 @@ Parser<ParseHandler>::returnStatement(YieldHandling yieldHandling)
     uint32_t begin = pos().begin;
 
     MOZ_ASSERT(pc->sc->isFunctionBox());
+    pc->sc->asFunctionBox()->usesReturn = true;
 
     // Parse an optional operand.
     //
@@ -8176,8 +8181,10 @@ Parser<ParseHandler>::generatorComprehensionLambda(GeneratorKind comprehensionKi
      * kid and could be removed from pc->sc.
      */
     genFunbox->anyCxFlags = outerpc->sc->anyCxFlags;
-    if (outerpc->sc->isFunctionBox())
-        genFunbox->funCxFlags = outerpc->sc->asFunctionBox()->funCxFlags;
+    if (outerpc->sc->isFunctionBox()) {
+        genFunbox->funCxFlags =
+            outerpc->sc->asFunctionBox()->flagsForNestedGeneratorComprehensionLambda();
+    }
 
     MOZ_ASSERT(genFunbox->generatorKind() == comprehensionKind);
     handler.setBlockId(genfn, genpc.bodyid);

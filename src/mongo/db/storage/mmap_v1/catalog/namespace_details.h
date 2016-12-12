@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/base/static_assert.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/mmap_v1/catalog/index_details.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace.h"
@@ -240,12 +241,11 @@ private:
 
     /** Update cappedLastDelRecLastExtent() after capExtent changed in cappedTruncateAfter() */
     void cappedTruncateLastDelUpdate();
-    static_assert(NIndexesMax <= NIndexesBase + NIndexesExtra * 2,
-                  "NIndexesMax <= NIndexesBase + NIndexesExtra * 2");
-    static_assert(NIndexesMax <= 64, "NIndexesMax <= 64");  // multiKey bits
-    static_assert(sizeof(NamespaceDetails::Extra) == 496, "sizeof(NamespaceDetails::Extra) == 496");
+    MONGO_STATIC_ASSERT(NIndexesMax <= NIndexesBase + NIndexesExtra * 2);
+    MONGO_STATIC_ASSERT(NIndexesMax <= 64);  // multiKey bits
+    MONGO_STATIC_ASSERT(sizeof(NamespaceDetails::Extra) == 496);
 };  // NamespaceDetails
-static_assert(sizeof(NamespaceDetails) == 496, "sizeof(NamespaceDetails) == 496");
+MONGO_STATIC_ASSERT(sizeof(NamespaceDetails) == 496);
 #pragma pack()
 
 }  // namespace mongo

@@ -42,8 +42,8 @@
 #include "mongo/s/client/dbclient_multi_command.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_last_error_info.h"
-#include "mongo/s/cluster_write.h"
 #include "mongo/s/commands/cluster_explain.h"
+#include "mongo/s/commands/cluster_write.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batch_upconvert.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -150,7 +150,6 @@ public:
             // Disable the last error object for the duration of the write
             LastError::Disabled disableLastError(cmdLastError);
 
-            // TODO: if we do namespace parsing, push this to the type
             if (!request.parseBSON(dbname, cmdObj, &errmsg) || !request.isValid(&errmsg)) {
                 // Batch parse failure
                 response.setOk(false);
@@ -267,12 +266,11 @@ private:
             const ShardEndpoint* endpoint = *it;
 
             const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
-            auto shard = grid.shardRegistry()->getShard(txn, endpoint->shardName);
-            if (!shard) {
-                return Status(ErrorCodes::ShardNotFound,
-                              "Could not find shard with id " + endpoint->shardName.toString());
+            auto shardStatus = grid.shardRegistry()->getShard(txn, endpoint->shardName);
+            if (!shardStatus.isOK()) {
+                return shardStatus.getStatus();
             }
-            auto swHostAndPort = shard->getTargeter()->findHost(readPref);
+            auto swHostAndPort = shardStatus.getValue()->getTargeter()->findHostNoWait(readPref);
             if (!swHostAndPort.isOK()) {
                 return swHostAndPort.getStatus();
             }
@@ -300,8 +298,11 @@ private:
             Strategy::CommandResult result;
             result.target = host;
             {
-                const auto shard = grid.shardRegistry()->getShard(txn, host.toString());
-                result.shardTargetId = shard->getId();
+                auto shardStatus = grid.shardRegistry()->getShard(txn, host.toString());
+                if (!shardStatus.isOK()) {
+                    return shardStatus.getStatus();
+                }
+                result.shardTargetId = shardStatus.getValue()->getId();
             }
             result.result = response.toBSON();
 

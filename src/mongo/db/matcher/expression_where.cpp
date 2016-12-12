@@ -58,7 +58,7 @@ WhereMatchExpression::WhereMatchExpression(OperationContext* txn, WhereParams pa
 }
 
 Status WhereMatchExpression::init(StringData dbName) {
-    if (!globalScriptEngine) {
+    if (!getGlobalScriptEngine()) {
         return Status(ErrorCodes::BadValue, "no globalScriptEngine in $where parsing");
     }
 
@@ -72,7 +72,7 @@ Status WhereMatchExpression::init(StringData dbName) {
         AuthorizationSession::get(Client::getCurrent())->getAuthenticatedUserNamesToken();
 
     try {
-        _scope = globalScriptEngine->getPooledScope(_txn, _dbName, "where" + userToken);
+        _scope = getGlobalScriptEngine()->getPooledScope(_txn, _dbName, "where" + userToken);
         _func = _scope->createFunction(getCode().c_str());
     } catch (...) {
         return exceptionToStatus();

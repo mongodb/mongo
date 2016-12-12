@@ -45,7 +45,7 @@ class AggregationRequest;
 class ResolvedView {
 public:
     ResolvedView(const NamespaceString& collectionNs, const std::vector<BSONObj>& pipeline)
-        : _namespace(std::move(collectionNs)), _pipeline(std::move(pipeline)) {}
+        : _namespace(collectionNs), _pipeline(pipeline) {}
 
     /**
      * Returns whether 'commandResponseObj' contains a CommandOnShardedViewNotSupportedOnMongod

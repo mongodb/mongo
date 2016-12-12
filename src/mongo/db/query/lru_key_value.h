@@ -30,9 +30,9 @@
 
 #include <list>
 #include <memory>
-#include <unordered_map>
 
 #include "mongo/base/status.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -47,9 +47,8 @@ namespace mongo {
  * for protecting concurrent access to the LRU store if used in a threaded
  * context.
  *
- * Implemented as a doubly-linked list (std::list) with a hash map
- * (boost::unordered_map) for quickly locating the kv-store entries. The
- * add(), get(), and remove() operations are all O(1).
+ * Implemented as a doubly-linked list with a hash map for quickly locating the kv-store entries.
+ * The add(), get(), and remove() operations are all O(1).
  *
  * The keys of generic type K map to values of type V*. The V*
  * pointers are owned by the kv-store.
@@ -72,7 +71,7 @@ public:
     typedef typename KVList::iterator KVListIt;
     typedef typename KVList::const_iterator KVListConstIt;
 
-    typedef std::unordered_map<K, KVListIt> KVMap;
+    typedef stdx::unordered_map<K, KVListIt> KVMap;
     typedef typename KVMap::const_iterator KVMapConstIt;
 
     /**

@@ -35,8 +35,6 @@
 #include <memory>
 #include <string>
 #include <system_error>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "mongo/base/status.h"
@@ -56,6 +54,8 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/util/net/message.h"
 
@@ -183,28 +183,7 @@ private:
      */
     class AsyncCommand {
     public:
-        /**
-         * Describes the variant of AsyncCommand this object represents.
-         */
-        enum class CommandType {
-            /**
-             * An ordinary command of an unspecified Protocol.
-             */
-            kRPC,
-
-            /**
-             * A 'find' command that has been downconverted to an OP_QUERY.
-             */
-            kDownConvertedFind,
-
-            /**
-             * A 'getMore' command that has been downconverted to an OP_GET_MORE.
-             */
-            kDownConvertedGetMore,
-        };
-
         AsyncCommand(AsyncConnection* conn,
-                     CommandType type,
                      Message&& command,
                      Date_t now,
                      const HostAndPort& target);
@@ -222,8 +201,6 @@ private:
 
     private:
         NetworkInterfaceASIO::AsyncConnection* const _conn;
-
-        const CommandType _type;
 
         Message _toSend;
         Message _toRecv;
@@ -305,9 +282,7 @@ private:
 
         // This form of beginCommand takes a raw message. It is needed if the caller
         // has to form the command manually (e.g. to use a specific requestBuilder).
-        Status beginCommand(Message&& newCommand,
-                            AsyncCommand::CommandType,
-                            const HostAndPort& target);
+        Status beginCommand(Message&& newCommand, const HostAndPort& target);
 
         AsyncCommand* command();
 
@@ -506,8 +481,8 @@ private:
     // If it is necessary to hold this lock while accessing a particular operation with
     // an AccessControl object, take this lock first, always.
     stdx::mutex _inProgressMutex;
-    std::unordered_map<AsyncOp*, std::unique_ptr<AsyncOp>> _inProgress;
-    std::unordered_set<TaskExecutor::CallbackHandle> _inGetConnection;
+    stdx::unordered_map<AsyncOp*, std::unique_ptr<AsyncOp>> _inProgress;
+    stdx::unordered_set<TaskExecutor::CallbackHandle> _inGetConnection;
 
     // Operation counters
     AtomicUInt64 _numCanceledOps;

@@ -45,7 +45,7 @@ public:
     void shutdown(OperationContext* txn) override;
     void pushEvenIfFull(OperationContext* txn, const Value& value) override;
     void push(OperationContext* txn, const Value& value) override;
-    bool pushAllNonBlocking(OperationContext* txn,
+    void pushAllNonBlocking(OperationContext* txn,
                             Batch::const_iterator begin,
                             Batch::const_iterator end) override;
     void waitForSpace(OperationContext* txn, std::size_t size) override;
@@ -55,8 +55,7 @@ public:
     std::size_t getCount() const override;
     void clear(OperationContext* txn) override;
     bool tryPop(OperationContext* txn, Value* value) override;
-    Value blockingPop(OperationContext* txn) override;
-    bool blockingPeek(OperationContext* txn, Value* value, Seconds waitDuration) override;
+    bool waitForData(Seconds waitDuration) override;
     bool peek(OperationContext* txn, Value* value) override;
     boost::optional<Value> lastObjectPushed(OperationContext* txn) const override;
 

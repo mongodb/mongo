@@ -12,8 +12,7 @@
     let dbpath = MongoRunner.dataPath + '_durable_view_catalog';
     resetDbpath(dbpath);
 
-    let mongodArgs =
-        {dbpath: dbpath, noCleanData: true, journal: '', setParameter: "enableViews=1"};
+    let mongodArgs = {dbpath: dbpath, noCleanData: true, journal: ''};
 
     // Start a mongod.
     let conn = MongoRunner.runMongod(mongodArgs);
@@ -56,5 +55,39 @@
                               };
                           }));
     assert.eq(listedViews, expectedViews, "persisted view definitions not correctly loaded");
+
+    // Insert an invalid view definition directly into system.views to bypass normal validation.
+    assert.writeOK(viewsDB.system.views.insert({_id: "badView", pipeline: "badType"}));
+
+    // Restarting the mongod should succeed despite the presence of invalid view definitions.
+    MongoRunner.stopMongod(conn);
+    conn = MongoRunner.runMongod(mongodArgs);
+    assert.neq(
+        null,
+        conn,
+        "after inserting bad views, failed to restart mongod with options: " + tojson(mongodArgs));
+
+    // Now that the database's view catalog has been marked as invalid, all view operations in that
+    // database should fail.
+    viewsDB = conn.getDB("test");
+    assert.commandFailedWithCode(viewsDB.runCommand({find: "view2"}),
+                                 ErrorCodes.InvalidViewDefinition);
+    assert.commandFailedWithCode(viewsDB.runCommand({create: "view4", viewOn: "collection"}),
+                                 ErrorCodes.InvalidViewDefinition);
+    assert.commandFailedWithCode(viewsDB.runCommand({collMod: "view2", viewOn: "view4"}),
+                                 ErrorCodes.InvalidViewDefinition);
+    assert.commandFailedWithCode(viewsDB.runCommand({drop: "view4"}),
+                                 ErrorCodes.InvalidViewDefinition);
+    assert.commandFailedWithCode(viewsDB.runCommand({listCollections: 1}),
+                                 ErrorCodes.InvalidViewDefinition);
+
+    // Manually remove the invalid view definition from system.views, and then verify that view
+    // operations work successfully without requiring a server restart.
+    assert.writeOK(viewsDB.system.views.remove({_id: "badView"}));
+    assert.commandWorked(viewsDB.runCommand({find: "view2"}));
+    assert.commandWorked(viewsDB.runCommand({create: "view4", viewOn: "collection"}));
+    assert.commandWorked(viewsDB.runCommand({collMod: "view2", viewOn: "view4"}));
+    assert.commandWorked(viewsDB.runCommand({drop: "view4"}));
+    assert.commandWorked(viewsDB.runCommand({listCollections: 1}));
     MongoRunner.stopMongod(conn);
 })();

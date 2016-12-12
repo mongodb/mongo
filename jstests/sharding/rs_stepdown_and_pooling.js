@@ -3,6 +3,7 @@
 //
 (function() {
     "use strict";
+    load("jstests/replsets/rslib.js");
 
     var st = new ShardingTest({shards: {rs0: {nodes: 2}}, mongos: 1});
 
@@ -68,12 +69,11 @@
 
         jsTest.log("Waiting for mongos to acknowledge stepdown...");
 
-        ReplSetTest.awaitRSClientHosts(
-            mongos,
-            secondary,
-            {ismaster: true},
-            st.rs0,
-            2 * 60 * 1000);  // slow hosts can take longer to recognize sd
+        awaitRSClientHosts(mongos,
+                           secondary,
+                           {ismaster: true},
+                           st.rs0,
+                           2 * 60 * 1000);  // slow hosts can take longer to recognize sd
 
         jsTest.log("Stepping back up...");
 
@@ -81,7 +81,7 @@
 
         jsTest.log("Waiting for mongos to acknowledge step up...");
 
-        ReplSetTest.awaitRSClientHosts(mongos, primary, {ismaster: true}, st.rs0, 2 * 60 * 1000);
+        awaitRSClientHosts(mongos, primary, {ismaster: true}, st.rs0, 2 * 60 * 1000);
 
         jsTest.log("Waiting for socket timeout time...");
 

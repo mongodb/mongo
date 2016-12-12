@@ -39,7 +39,7 @@ load("jstests/replsets/rslib.js");
 
     reconfig(replTest, confDoc);
 
-    ReplSetTest.awaitRSClientHosts(mongos, {host: targetHostName}, {ok: true, ismaster: true});
+    awaitRSClientHosts(mongos, {host: targetHostName}, {ok: true, ismaster: true});
 
     // Remove first node from set
     confDoc.members.shift();

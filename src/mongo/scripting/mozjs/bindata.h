@@ -46,13 +46,14 @@ struct BinDataInfo : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(base64);
         MONGO_DECLARE_JS_FUNCTION(hex);
         MONGO_DECLARE_JS_FUNCTION(toString);
+        MONGO_DECLARE_JS_FUNCTION(toJSON);
 
         MONGO_DECLARE_JS_FUNCTION(HexData);
         MONGO_DECLARE_JS_FUNCTION(MD5);
         MONGO_DECLARE_JS_FUNCTION(UUID);
     };
 
-    static const JSFunctionSpec methods[4];
+    static const JSFunctionSpec methods[5];
     static const JSFunctionSpec freeFunctions[4];
 
     static const char* const className;

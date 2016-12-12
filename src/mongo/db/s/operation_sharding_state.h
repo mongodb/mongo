@@ -93,6 +93,11 @@ public:
     void setShardVersion(NamespaceString nss, ChunkVersion newVersion);
 
     /**
+     * Undoes setting the shard version for the given namespace. Needed for views.
+     */
+    void unsetShardVersion(NamespaceString nss);
+
+    /**
      * This call is a no op if there isn't a currently active migration critical section. Otherwise
      * it will wait for the critical section to complete up to the remaining operation time.
      *
@@ -116,7 +121,7 @@ private:
     void _clear();
 
     bool _hasVersion = false;
-    ChunkVersion _shardVersion;
+    ChunkVersion _shardVersion{ChunkVersion::UNSHARDED()};
     NamespaceString _ns;
 
     // This value will only be non-null if version check during the operation execution failed due

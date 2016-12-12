@@ -30,10 +30,6 @@ var res = mongos.adminCommand("listDatabases");
 var dbArray = res.databases;
 dbInConfigEntryCheck(getDBSection(dbArray, "config"));
 
-// Should not have admin entry if it doesn't exists.
-var adminSection = getDBSection(dbArray, 'admin');
-assert(!adminSection);
-
 // Local database should never be returned
 var localSection = getDBSection(dbArray, 'local');
 assert(!localSection);

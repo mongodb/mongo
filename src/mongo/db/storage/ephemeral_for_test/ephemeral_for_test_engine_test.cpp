@@ -29,9 +29,13 @@
  */
 
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_engine.h"
+
+#include "mongo/base/init.h"
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
+namespace {
 
 class EphemeralForTestKVHarnessHelper : public KVHarnessHelper {
 public:
@@ -51,7 +55,14 @@ private:
     std::unique_ptr<EphemeralForTestEngine> _engine;
 };
 
-KVHarnessHelper* KVHarnessHelper::create() {
-    return new EphemeralForTestKVHarnessHelper();
+std::unique_ptr<KVHarnessHelper> makeHelper() {
+    return stdx::make_unique<EphemeralForTestKVHarnessHelper>();
 }
+
+MONGO_INITIALIZER(RegisterKVHarnessFactory)(InitializerContext*) {
+    KVHarnessHelper::registerFactory(makeHelper);
+    return Status::OK();
 }
+
+}  // namespace
+}  // namespace mongo

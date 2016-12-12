@@ -9,6 +9,7 @@ var blacklist = [
     'distinct.js',             // SERVER-13116 distinct isn't sharding aware
     'distinct_noindex.js',     // SERVER-13116 distinct isn't sharding aware
     'distinct_projection.js',  // SERVER-13116 distinct isn't sharding aware
+    'create_database.js',      // SERVER-17397 Drops of sharded namespaces may not fully succeed
     'drop_database.js',        // SERVER-17397 Drops of sharded namespaces may not fully succeed
     'remove_where.js',  // SERVER-14669 Multi-removes that use $where miscount removed documents
 
@@ -19,8 +20,9 @@ var blacklist = [
     'count_limit_skip.js',
     'count_noindex.js',
 
-    // $graphLookup does not support sharded clusters.
+    // $lookup and $graphLookup are not supported on sharded collections.
     'agg_graph_lookup.js',
+    'view_catalog_cycle_lookup.js',
 
     // Disabled due to SERVER-20057, 'Concurrent, sharded mapReduces can fail when temporary
     // namespaces collide across mongos processes'
@@ -58,6 +60,7 @@ var blacklist = [
     'findAndModify_remove_queue.js',            // remove cannot be {} for findAndModify
     'findAndModify_remove_queue_unindexed.js',  // findAndModify requires a shard key
     'findAndModify_update_collscan.js',         // findAndModify requires a shard key
+    'findAndModify_update_grow.js',             // can cause OOM kills on test hosts
     'findAndModify_update_queue.js',            // findAndModify requires a shard key
     'findAndModify_update_queue_unindexed.js',  // findAndModify requires a shard key
     'group.js',                // the group command cannot be issued against a sharded cluster
@@ -87,6 +90,11 @@ var blacklist = [
     'rename_collection_dbname_droptarget.js',
     'rename_collection_droptarget.js',
 
+    // This workload assumes that the distributed lock can always be acquired when running the split
+    // command in its setup() function; however, a LockBusy error may be returned if the balancer is
+    // running.
+    'sharded_moveChunk_drop_shard_key_index.js',
+
     'update_simple_eval.js',           // eval doesn't work with sharded collections
     'update_simple_eval_nolock.js',    // eval doesn't work with sharded collections
     'update_upsert_multi.js',          // our update queries lack shard keys
@@ -98,7 +106,8 @@ var blacklist = [
     return dir + '/' + file;
 });
 
-runWorkloadsSerially(ls(dir).filter(function(file) {
-    return !Array.contains(blacklist, file);
-}),
-                     {sharded: true, replication: true, enableBalancer: true});
+runWorkloadsSerially(
+    ls(dir).filter(function(file) {
+        return !Array.contains(blacklist, file);
+    }),
+    {sharded: {enabled: true, enableBalancer: true}, replication: {enabled: true}});

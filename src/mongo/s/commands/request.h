@@ -30,16 +30,13 @@
 #pragma once
 
 #include "mongo/db/dbmessage.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
 
 class Client;
 class OperationContext;
-
-namespace transport {
-class Session;
-}  // namespace transport
 
 class Request {
     MONGO_DISALLOW_COPYING(Request);
@@ -76,7 +73,7 @@ public:
         return _d;
     }
 
-    transport::Session* session() const;
+    const transport::SessionHandle& session() const;
 
     void process(OperationContext* txn, int attempt = 0);
 

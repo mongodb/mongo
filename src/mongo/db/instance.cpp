@@ -142,7 +142,7 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
     curop->debug().exceptionInfo = exception->getInfo();
 
     log(LogComponent::kQuery) << "assertion " << exception->toString() << " ns:" << queryMessage.ns
-                              << " query:" << (queryMessage.query.valid()
+                              << " query:" << (queryMessage.query.valid(BSONVersion::kLatest)
                                                    ? queryMessage.query.toString()
                                                    : "query object is corrupt");
     if (queryMessage.ntoskip || queryMessage.ntoreturn) {
@@ -392,7 +392,7 @@ void receivedKillCursors(OperationContext* txn, Message& m) {
     uassert(13004, str::stream() << "sent negative cursors to kill: " << n, n >= 1);
 
     if (n > 2000) {
-        (n < 30000 ? warning() : error()) << "receivedKillCursors, n=" << n << endl;
+        (n < 30000 ? warning() : error()) << "receivedKillCursors, n=" << n;
         verify(n < 30000);
     }
 
@@ -401,7 +401,7 @@ void receivedKillCursors(OperationContext* txn, Message& m) {
     int found = CursorManager::eraseCursorGlobalIfAuthorized(txn, n, cursorArray);
 
     if (shouldLog(logger::LogSeverity::Debug(1)) || found != n) {
-        LOG(found == n ? 1 : 0) << "killcursors: found " << found << " of " << n << endl;
+        LOG(found == n ? 1 : 0) << "killcursors: found " << found << " of " << n;
     }
 }
 
@@ -410,7 +410,7 @@ void receivedInsert(OperationContext* txn, const NamespaceString& nsString, Mess
     invariant(insertOp.ns == nsString);
     for (const auto& obj : insertOp.documents) {
         Status status =
-            AuthorizationSession::get(txn->getClient())->checkAuthForInsert(nsString, obj);
+            AuthorizationSession::get(txn->getClient())->checkAuthForInsert(txn, nsString, obj);
         audit::logInsertAuthzCheck(txn->getClient(), nsString, obj, status.code());
         uassertStatusOK(status);
     }
@@ -422,9 +422,10 @@ void receivedUpdate(OperationContext* txn, const NamespaceString& nsString, Mess
     auto& singleUpdate = updateOp.updates[0];
     invariant(updateOp.ns == nsString);
 
-    Status status = AuthorizationSession::get(txn->getClient())
-                        ->checkAuthForUpdate(
-                            nsString, singleUpdate.query, singleUpdate.update, singleUpdate.upsert);
+    Status status =
+        AuthorizationSession::get(txn->getClient())
+            ->checkAuthForUpdate(
+                txn, nsString, singleUpdate.query, singleUpdate.update, singleUpdate.upsert);
     audit::logUpdateAuthzCheck(txn->getClient(),
                                nsString,
                                singleUpdate.query,
@@ -443,7 +444,7 @@ void receivedDelete(OperationContext* txn, const NamespaceString& nsString, Mess
     invariant(deleteOp.ns == nsString);
 
     Status status = AuthorizationSession::get(txn->getClient())
-                        ->checkAuthForDelete(nsString, singleDelete.query);
+                        ->checkAuthForDelete(txn, nsString, singleDelete.query);
     audit::logDeleteAuthzCheck(txn->getClient(), nsString, singleDelete.query, status.code());
     uassertStatusOK(status);
 
@@ -531,7 +532,7 @@ void (*reportEventToSystem)(const char* msg) = 0;
 void mongoAbort(const char* msg) {
     if (reportEventToSystem)
         reportEventToSystem(msg);
-    severe() << msg;
+    severe() << redact(msg);
     ::abort();
 }
 
@@ -604,7 +605,7 @@ void assembleResponse(OperationContext* txn,
 
     OpDebug& debug = currentOp.debug();
 
-    long long logThreshold = serverGlobalParams.slowMS;
+    long long logThresholdMs = serverGlobalParams.slowMS;
     bool shouldLogOpDebug = shouldLog(logger::LogSeverity::Debug(1));
 
     if (op == dbQuery) {
@@ -624,7 +625,7 @@ void assembleResponse(OperationContext* txn,
 
         int len = strlen(p);
         if (len > 400)
-            log() << curTimeMillis64() % 10000 << " long msg received, len:" << len << endl;
+            log() << curTimeMillis64() % 10000 << " long msg received, len:" << len;
 
         if (strcmp("end", p) == 0)
             dbresponse.response.setData(opReply, "dbMsg end no longer supported");
@@ -637,10 +638,10 @@ void assembleResponse(OperationContext* txn,
         try {
             if (op == dbKillCursors) {
                 currentOp.ensureStarted();
-                logThreshold = 10;
+                logThresholdMs = 10;
                 receivedKillCursors(txn, m);
             } else if (op != dbInsert && op != dbUpdate && op != dbDelete) {
-                log() << "    operation isn't supported: " << static_cast<int>(op) << endl;
+                log() << "    operation isn't supported: " << static_cast<int>(op);
                 currentOp.done();
                 shouldLogOpDebug = true;
             } else {
@@ -672,37 +673,38 @@ void assembleResponse(OperationContext* txn,
         } catch (const UserException& ue) {
             LastError::get(c).setLastError(ue.getCode(), ue.getInfo().msg);
             LOG(3) << " Caught Assertion in " << networkOpToString(op) << ", continuing "
-                   << ue.toString() << endl;
+                   << redact(ue);
             debug.exceptionInfo = ue.getInfo();
         } catch (const AssertionException& e) {
             LastError::get(c).setLastError(e.getCode(), e.getInfo().msg);
             LOG(3) << " Caught Assertion in " << networkOpToString(op) << ", continuing "
-                   << e.toString() << endl;
+                   << redact(e);
             debug.exceptionInfo = e.getInfo();
             shouldLogOpDebug = true;
         }
     }
     currentOp.ensureStarted();
     currentOp.done();
-    debug.executionTime = currentOp.totalTimeMillis();
+    debug.executionTimeMicros = currentOp.totalTimeMicros();
 
-    logThreshold += currentOp.getExpectedLatencyMs();
+    logThresholdMs += currentOp.getExpectedLatencyMs();
     Top::get(txn->getServiceContext())
         .incrementGlobalLatencyStats(
             txn, currentOp.totalTimeMicros(), currentOp.getReadWriteType());
 
-    if (shouldLogOpDebug || debug.executionTime > logThreshold) {
+    if (shouldLogOpDebug || debug.executionTimeMicros > logThresholdMs * 1000LL) {
         Locker::LockerInfo lockerInfo;
         txn->lockState()->getLockerInfo(&lockerInfo);
-
         log() << debug.report(&c, currentOp, lockerInfo.stats);
     }
 
-    if (currentOp.shouldDBProfile(debug.executionTime)) {
+    if (currentOp.shouldDBProfile()) {
         // Performance profiling is on
         if (txn->lockState()->isReadLocked()) {
             LOG(1) << "note: not profiling because recursive read lock";
         } else if (lockedForWriting()) {
+            // TODO SERVER-26825: Fix race condition where fsyncLock is acquired post
+            // lockedForWriting() call but prior to profile collection lock acquisition.
             LOG(1) << "note: not profiling because doing fsync+lock";
         } else if (storageGlobalParams.readOnly) {
             LOG(1) << "note: not profiling because server is read-only";
@@ -729,14 +731,14 @@ void DiagLog::openFile() {
         log() << msg.ss.str();
         uasserted(ErrorCodes::FileStreamFailed, msg.ss.str());
     } else {
-        log() << "diagLogging using file " << name << endl;
+        log() << "diagLogging using file " << name;
     }
 }
 
 int DiagLog::setLevel(int newLevel) {
     stdx::lock_guard<stdx::mutex> lk(mutex);
     int old = level;
-    log() << "diagLogging level=" << newLevel << endl;
+    log() << "diagLogging level=" << newLevel;
     if (f == 0) {
         openFile();
     }
@@ -746,7 +748,7 @@ int DiagLog::setLevel(int newLevel) {
 
 void DiagLog::flush() {
     if (level) {
-        log() << "flushing diag log" << endl;
+        log() << "flushing diag log";
         stdx::lock_guard<stdx::mutex> lk(mutex);
         f->flush();
     }

@@ -56,7 +56,7 @@ const char kMongoDBURL[] =
     "(?:([^:]+)(?::([^@]+))?@)?"
 
     // servers: grabs all host:port or UNIX socket names
-    "((?:[^\\/]+|/.+\\.sock)(?:(?:[^\\/]+|/.+\\.sock),)*)"
+    "((?:[^\\/]+|/.+\\.sock)(?:,(?:[^\\/]+|/.+\\.sock))*)"
 
     // database and options are grouped together
     "(?:/"

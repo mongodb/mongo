@@ -215,7 +215,7 @@ public:
         ASSERT_EQUALS("999", sb.str());
     }
 };
-}
+}  // namespace stringbuildertests
 
 class sleeptest {
 public:

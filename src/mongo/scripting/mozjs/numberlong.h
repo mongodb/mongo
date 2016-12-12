@@ -56,6 +56,7 @@ struct NumberLongInfo : public BaseInfo {
     struct Functions {
         MONGO_DECLARE_JS_FUNCTION(toNumber);
         MONGO_DECLARE_JS_FUNCTION(toString);
+        MONGO_DECLARE_JS_FUNCTION(toJSON);
         MONGO_DECLARE_JS_FUNCTION(valueOf);
         MONGO_DECLARE_JS_FUNCTION(compare);
         MONGO_DECLARE_JS_FUNCTION(floatApprox);
@@ -63,7 +64,7 @@ struct NumberLongInfo : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(bottom);
     };
 
-    static const JSFunctionSpec methods[5];
+    static const JSFunctionSpec methods[6];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_HAS_PRIVATE;

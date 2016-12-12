@@ -30,8 +30,8 @@
 
 #include <vector>
 
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/multikey_paths.h"
 

@@ -32,6 +32,7 @@
 
 #include "mongo/s/chunk_diff.h"
 
+#include "mongo/db/s/collection_metadata.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/util/log.h"
@@ -40,28 +41,18 @@
 namespace mongo {
 
 template <class ValType>
-ConfigDiffTracker<ValType>::ConfigDiffTracker() {
-    _ns.clear();
-    _currMap = NULL;
-    _maxVersion = NULL;
-    _maxShardVersions = NULL;
-    _validDiffs = 0;
+ConfigDiffTracker<ValType>::ConfigDiffTracker(const std::string& ns,
+                                              RangeMap* currMap,
+                                              ChunkVersion* maxVersion,
+                                              MaxChunkVersionMap* maxShardVersions)
+    : _ns(ns), _currMap(currMap), _maxVersion(maxVersion), _maxShardVersions(maxShardVersions) {
+    invariant(_currMap);
+    invariant(_maxVersion);
+    invariant(_maxShardVersions);
 }
 
 template <class ValType>
 ConfigDiffTracker<ValType>::~ConfigDiffTracker() = default;
-
-template <class ValType>
-void ConfigDiffTracker<ValType>::attach(const std::string& ns,
-                                        RangeMap& currMap,
-                                        ChunkVersion& maxVersion,
-                                        MaxChunkVersionMap& maxShardVersions) {
-    _ns = ns;
-    _currMap = &currMap;
-    _maxVersion = &maxVersion;
-    _maxShardVersions = &maxShardVersions;
-    _validDiffs = 0;
-}
 
 template <class ValType>
 bool ConfigDiffTracker<ValType>::_isOverlapping(const BSONObj& min, const BSONObj& max) {
@@ -73,8 +64,6 @@ bool ConfigDiffTracker<ValType>::_isOverlapping(const BSONObj& min, const BSONOb
 template <class ValType>
 typename ConfigDiffTracker<ValType>::RangeOverlap ConfigDiffTracker<ValType>::_overlappingRange(
     const BSONObj& min, const BSONObj& max) {
-    _assertAttached();
-
     typename RangeMap::iterator low;
     typename RangeMap::iterator high;
 
@@ -102,8 +91,6 @@ typename ConfigDiffTracker<ValType>::RangeOverlap ConfigDiffTracker<ValType>::_o
 template <class ValType>
 int ConfigDiffTracker<ValType>::calculateConfigDiff(OperationContext* txn,
                                                     const std::vector<ChunkType>& chunks) {
-    _assertAttached();
-
     // Apply the chunk changes to the ranges and versions
     //
     // Overall idea here is to work in two steps :
@@ -120,10 +107,9 @@ int ConfigDiffTracker<ValType>::calculateConfigDiff(OperationContext* txn,
     _validDiffs = 0;
 
     for (const ChunkType& chunk : chunks) {
-        ChunkVersion chunkVersion =
-            ChunkVersion::fromBSON(chunk.toBSON(), ChunkType::DEPRECATED_lastmod());
+        const ChunkVersion& chunkVersion = chunk.getVersion();
 
-        if (!chunkVersion.isSet() || !chunkVersion.hasEqualEpoch(currEpoch)) {
+        if (!chunkVersion.hasEqualEpoch(currEpoch)) {
             warning() << "got invalid chunk version " << chunkVersion << " in document "
                       << redact(chunk.toString())
                       << " when trying to load differing chunks at version "
@@ -186,8 +172,6 @@ int ConfigDiffTracker<ValType>::calculateConfigDiff(OperationContext* txn,
 template <class ValType>
 typename ConfigDiffTracker<ValType>::QueryAndSort ConfigDiffTracker<ValType>::configDiffQuery()
     const {
-    _assertAttached();
-
     // The query has to find all the chunks $gte the current max version. Currently, any splits and
     // merges will increment the current max version.
     BSONObjBuilder queryB;
@@ -213,13 +197,6 @@ typename ConfigDiffTracker<ValType>::QueryAndSort ConfigDiffTracker<ValType>::co
     return queryObj;
 }
 
-template <class ValType>
-void ConfigDiffTracker<ValType>::_assertAttached() const {
-    invariant(_currMap);
-    invariant(_maxVersion);
-    invariant(_maxShardVersions);
-}
-
 std::string ConfigDiffTrackerBase::QueryAndSort::toString() const {
     return str::stream() << "query: " << query << ", sort: " << sort;
 }
@@ -228,6 +205,7 @@ std::string ConfigDiffTrackerBase::QueryAndSort::toString() const {
 class Chunk;
 
 template class ConfigDiffTracker<BSONObj>;
+template class ConfigDiffTracker<CachedChunkInfo>;
 template class ConfigDiffTracker<std::shared_ptr<Chunk>>;
 
 }  // namespace mongo

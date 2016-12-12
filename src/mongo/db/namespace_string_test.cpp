@@ -128,6 +128,11 @@ TEST(NamespaceStringTest, DatabaseValidNames) {
     ASSERT(!NamespaceString::validDBName("foo?bar"));
 #endif
 
+    ASSERT(NamespaceString::validDBName(
+        "ThisIsADatabaseNameThatBrokeAllRecordsForValidLengthForDBName63"));
+    ASSERT(!NamespaceString::validDBName(
+        "WhileThisDatabaseNameExceedsTheMaximumLengthForDatabaseNamesof63"));
+
     ASSERT(NamespaceString::normal("asdads"));
     ASSERT(!NamespaceString::normal("asda$ds"));
     ASSERT(NamespaceString::normal("local.oplog.$main"));
@@ -202,35 +207,6 @@ TEST(NamespaceStringTest, DBHash) {
     ASSERT_NOT_EQUALS(nsDBHash("foo.d"), nsDBHash("food"));
 }
 
-#define testEqualsBothWays(X, Y)       \
-    ASSERT_TRUE(nsDBEquals((X), (Y))); \
-    ASSERT_TRUE(nsDBEquals((Y), (X)));
-#define testNotEqualsBothWays(X, Y)     \
-    ASSERT_FALSE(nsDBEquals((X), (Y))); \
-    ASSERT_FALSE(nsDBEquals((Y), (X)));
-
-TEST(NamespaceStringTest, DBEquals) {
-    testEqualsBothWays("foo", "foo");
-    testEqualsBothWays("foo", "foo.a");
-    testEqualsBothWays("foo.a", "foo.a");
-    testEqualsBothWays("foo.a", "foo.b");
-
-    testEqualsBothWays("", "");
-    testEqualsBothWays("", ".");
-    testEqualsBothWays("", ".x");
-
-    testNotEqualsBothWays("foo", "bar");
-    testNotEqualsBothWays("foo", "food");
-    testNotEqualsBothWays("foo.", "food");
-
-    testNotEqualsBothWays("", "x");
-    testNotEqualsBothWays("", "x.");
-    testNotEqualsBothWays("", "x.y");
-    testNotEqualsBothWays(".", "x");
-    testNotEqualsBothWays(".", "x.");
-    testNotEqualsBothWays(".", "x.y");
-}
-
 TEST(NamespaceStringTest, nsToDatabase1) {
     ASSERT_EQUALS("foo", nsToDatabaseSubstring("foo.bar"));
     ASSERT_EQUALS("foo", nsToDatabaseSubstring("foo"));
@@ -278,5 +254,22 @@ TEST(NamespaceStringTest, NamespaceStringParse4) {
     NamespaceString ns("abc.");
     ASSERT_EQUALS((string) "abc", ns.db());
     ASSERT_EQUALS((string) "", ns.coll());
+}
+
+TEST(NamespaceStringTest, makeListCollectionsNSIsCorrect) {
+    NamespaceString ns = NamespaceString::makeListCollectionsNSS("DB");
+    ASSERT_EQUALS("DB", ns.db());
+    ASSERT_EQUALS("$cmd.listCollections", ns.coll());
+    ASSERT(ns.isValid());
+    ASSERT(ns.isListCollectionsCursorNS());
+}
+
+TEST(NamespaceStringTest, makeListIndexesNSIsCorrect) {
+    NamespaceString ns = NamespaceString::makeListIndexesNSS("DB", "COLL");
+    ASSERT_EQUALS("DB", ns.db());
+    ASSERT_EQUALS("$cmd.listIndexes.COLL", ns.coll());
+    ASSERT(ns.isValid());
+    ASSERT(ns.isListIndexesCursorNS());
+    ASSERT_EQUALS(NamespaceString("DB.COLL"), ns.getTargetNSForListIndexes());
 }
 }

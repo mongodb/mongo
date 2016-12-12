@@ -10,7 +10,7 @@ ops = [
     {op: "update", ns: t.getFullName(), query: {_id: 1}, update: {$inc: {x: 1}}}
 ];
 
-seconds = 2;
+seconds = 10;
 
 benchArgs = {
     ops: ops,
@@ -21,8 +21,8 @@ benchArgs = {
 
 if (jsTest.options().auth) {
     benchArgs['db'] = 'admin';
-    benchArgs['username'] = jsTest.options().adminUser;
-    benchArgs['password'] = jsTest.options().adminPassword;
+    benchArgs['username'] = jsTest.options().authUser;
+    benchArgs['password'] = jsTest.options().authPassword;
 }
 res = benchRun(benchArgs);
 

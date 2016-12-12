@@ -130,7 +130,10 @@ Bindings::initWithTemporaryStorage(ExclusiveContext* cx, MutableHandle<Bindings>
     // any time, such accesses are mediated by DebugScopeProxy (see
     // DebugScopeProxy::handleUnaliasedAccess).
     uint32_t nslots = CallObject::RESERVED_SLOTS;
-    uint32_t aliasedBodyLevelLexicalBegin = UINT16_MAX;
+
+    // Unless there are aliased body-level lexical bindings at all, set the
+    // begin index to an impossible slot number.
+    uint32_t aliasedBodyLevelLexicalBegin = LOCALNO_LIMIT;
     for (BindingIter bi(self); bi; bi++) {
         if (bi->aliased()) {
             // Per ES6, lexical bindings cannot be accessed until
@@ -1705,7 +1708,7 @@ ScriptSourceObject::create(ExclusiveContext* cx, ScriptSource* source)
 ScriptSourceObject::initFromOptions(JSContext* cx, HandleScriptSource source,
                                     const ReadOnlyCompileOptions& options)
 {
-    assertSameCompartment(cx, source);
+    releaseAssertSameCompartment(cx, source);
     MOZ_ASSERT(source->getReservedSlot(ELEMENT_SLOT).isMagic(JS_GENERIC_MAGIC));
     MOZ_ASSERT(source->getReservedSlot(ELEMENT_PROPERTY_SLOT).isMagic(JS_GENERIC_MAGIC));
     MOZ_ASSERT(source->getReservedSlot(INTRODUCTION_SCRIPT_SLOT).isMagic(JS_GENERIC_MAGIC));
@@ -4304,7 +4307,7 @@ LazyScript::CreateRaw(ExclusiveContext* cx, HandleFunction fun,
     p.bindingsAccessedDynamically = false;
     p.hasDebuggerStatement = false;
     p.hasDirectEval = false;
-    p.usesArgumentsApplyAndThis = false;
+    p.isLikelyConstructorWrapper = false;
     p.isDerivedClassConstructor = false;
     p.needsHomeObject = false;
 

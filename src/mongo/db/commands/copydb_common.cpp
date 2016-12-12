@@ -44,9 +44,18 @@ namespace mongo {
 namespace copydb {
 
 Status checkAuthForCopydbCommand(Client* client, const std::string& dbname, const BSONObj& cmdObj) {
+    const auto fromdbElt = cmdObj["fromdb"];
+    if (fromdbElt.type() != BSONType::String) {
+        return Status(ErrorCodes::TypeMismatch, "'fromdb' must be of type String");
+    }
+    const auto todbElt = cmdObj["todb"];
+    if (todbElt.type() != BSONType::String) {
+        return Status(ErrorCodes::TypeMismatch, "'todb' must be of type String");
+    }
+
     bool fromSelf = StringData(cmdObj.getStringField("fromhost")).empty();
-    StringData fromdb = cmdObj.getStringField("fromdb");
-    StringData todb = cmdObj.getStringField("todb");
+    const StringData fromdb = fromdbElt.valueStringData();
+    const StringData todb = todbElt.valueStringData();
 
     // get system collections
     std::vector<std::string> legalClientSystemCollections;

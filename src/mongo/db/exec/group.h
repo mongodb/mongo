@@ -28,8 +28,9 @@
 
 #pragma once
 
-
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/scripting/engine.h"
 
 namespace mongo {
@@ -41,7 +42,7 @@ class Collection;
  */
 struct GroupRequest {
     // Namespace to operate on (e.g. "foo.bar").
-    std::string ns;
+    NamespaceString ns;
 
     // A predicate describing the set of documents to group.
     BSONObj query;
@@ -155,7 +156,7 @@ private:
 
     // Map from group key => group index.  The group index is used to index into "$arr", a
     // variable owned by _scope which contains the group data for this key.
-    std::map<BSONObj, int, BSONObjCmp> _groupMap;
+    BSONObjIndexedMap<int> _groupMap;
 };
 
 }  // namespace mongo

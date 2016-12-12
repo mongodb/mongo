@@ -42,6 +42,5 @@ class test_util08(wttest.WiredTigerTestCase, suite_subprocess):
             text = f.read(1000)
             self.assertTrue('Copyright' in text)
 
-
 if __name__ == '__main__':
     wttest.run()

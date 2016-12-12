@@ -38,14 +38,14 @@ static void usage(void)
 extern int __wt_optind;
 extern char *__wt_optarg;
 
-void (*custom_die)(void) = format_die;		/* Local death handler. */
-
 int
 main(int argc, char *argv[])
 {
 	time_t start;
-	int ch, i, onerun, reps;
+	int ch, onerun, reps;
 	const char *config, *home;
+
+	custom_die = format_die;		/* Local death handler. */
 
 	config = NULL;
 
@@ -114,14 +114,8 @@ main(int argc, char *argv[])
 	argc -= __wt_optind;
 	argv += __wt_optind;
 
-	/*
-	 * Initialize the global RNG. Start with the standard seeds, and then
-	 * use seconds since the Epoch modulo a prime to run the RNG for some
-	 * number of steps, so we don't start with the same values every time.
-	 */
-	__wt_random_init(&g.rnd);
-	for (i = (int)time(NULL) % 10007; i > 0; --i)
-		(void)__wt_random(&g.rnd);
+	/* Initialize the global RNG. */
+	__wt_random_init_seed(NULL, &g.rnd);
 
 	/* Set up paths. */
 	path_setup(home);

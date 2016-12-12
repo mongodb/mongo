@@ -250,6 +250,7 @@ public:
                 if (electionId != OID()) {
                     errmsg = "wElectionId passed but no replication active";
                     result.append("code", ErrorCodes::BadValue);
+                    result.append("codeName", ErrorCodes::errorString(ErrorCodes::BadValue));
                     return false;
                 }
             } else {
@@ -258,6 +259,8 @@ public:
                            << repl::getGlobalReplicationCoordinator()->getElectionId();
                     errmsg = "election occurred after write";
                     result.append("code", ErrorCodes::WriteConcernFailed);
+                    result.append("codeName",
+                                  ErrorCodes::errorString(ErrorCodes::WriteConcernFailed));
                     return false;
                 }
             }
@@ -278,6 +281,7 @@ public:
             dassert(!status.isOK());
             result.append("errmsg", "timed out waiting for slaves");
             result.append("code", status.code());
+            result.append("codeName", ErrorCodes::errorString(status.code()));
             return true;
         }
 

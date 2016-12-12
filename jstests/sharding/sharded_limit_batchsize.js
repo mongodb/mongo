@@ -41,6 +41,39 @@
         assert.eq(2, cursor.next()["_id"]);
         assert.eq(3, cursor.next()["_id"]);
         assert(!cursor.hasNext());
+
+        // Ensure that in the limit 1 case, which is special when in legacy readMode, the server
+        // does not leave a cursor open.
+        var openCursorsBefore =
+            assert.commandWorked(coll.getDB().serverStatus()).metrics.cursor.open.total;
+        cursor = coll.find().sort({x: 1}).limit(1);
+        assert(cursor.hasNext());
+        assert.eq(-10, cursor.next()["_id"]);
+        var openCursorsAfter =
+            assert.commandWorked(coll.getDB().serverStatus()).metrics.cursor.open.total;
+        assert.eq(openCursorsBefore, openCursorsAfter);
+    }
+
+    /**
+     * Test correctness of queries run with singleBatch=true.
+     */
+    function testSingleBatch(coll, numShards) {
+        // Ensure that singleBatch queries that require multiple batches from individual shards
+        // return complete results.
+        var batchSize = 5;
+        var res = assert.commandWorked(coll.getDB().runCommand({
+            find: coll.getName(),
+            filter: {x: {$lte: 10}},
+            skip: numShards * batchSize,
+            singleBatch: true,
+            batchSize: batchSize
+        }));
+        assert.eq(batchSize, res.cursor.firstBatch.length);
+        assert.eq(0, res.cursor.id);
+        var cursor = coll.find().skip(numShards * batchSize).limit(-1 * batchSize);
+        assert.eq(batchSize, cursor.itcount());
+        cursor = coll.find().skip(numShards * batchSize).batchSize(-1 * batchSize);
+        assert.eq(batchSize, cursor.itcount());
     }
 
     //
@@ -77,6 +110,13 @@
         assert.writeOK(unshardedCol.insert({_id: i, x: i}));
         assert.writeOK(unshardedCol.insert({_id: -i, x: -i}));
     }
+
+    //
+    // Run tests for singleBatch queries.
+    //
+
+    testSingleBatch(shardedCol, 2);
+    testSingleBatch(unshardedCol, 1);
 
     //
     // Run tests for batch size. These should issue getmores.

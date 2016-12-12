@@ -38,7 +38,7 @@
 #include "mongo/db/commands/find_and_modify.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/s/balancer/balancer_configuration.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_connection.h"
@@ -98,7 +98,11 @@ public:
         shared_ptr<Shard> shard;
 
         if (!conf->isShardingEnabled() || !conf->isSharded(nss.ns())) {
-            shard = Grid::get(txn)->shardRegistry()->getShard(txn, conf->getPrimaryId());
+            auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, conf->getPrimaryId());
+            if (!shardStatus.isOK()) {
+                return shardStatus.getStatus();
+            }
+            shard = shardStatus.getValue();
         } else {
             chunkMgr = _getChunkManager(txn, conf, nss);
 
@@ -120,24 +124,20 @@ public:
             }
 
             BSONObj shardKey = status.getValue();
+            auto chunk = chunkMgr->findIntersectingChunk(txn, shardKey, collation);
 
-            // Construct collator for targeting.
-            std::unique_ptr<CollatorInterface> collator;
-            if (!collation.isEmpty()) {
-                auto statusWithCollator = CollatorFactoryInterface::get(txn->getServiceContext())
-                                              ->makeFromBSON(collation);
-                if (!statusWithCollator.isOK()) {
-                    return statusWithCollator.getStatus();
-                }
-                collator = std::move(statusWithCollator.getValue());
+            if (!chunk.isOK()) {
+                uasserted(ErrorCodes::ShardKeyNotFound,
+                          "findAndModify must target a single shard, but was not able to due "
+                          "to non-simple collation");
             }
 
-            auto chunk = chunkMgr->findIntersectingChunk(
-                txn,
-                shardKey,
-                !collation.isEmpty() ? collator.get() : chunkMgr->getDefaultCollator());
-
-            shard = Grid::get(txn)->shardRegistry()->getShard(txn, chunk->getShardId());
+            auto shardStatus =
+                Grid::get(txn)->shardRegistry()->getShard(txn, chunk.getValue()->getShardId());
+            if (!shardStatus.isOK()) {
+                return shardStatus.getStatus();
+            }
+            shard = shardStatus.getValue();
         }
 
         BSONObjBuilder explainCmd;
@@ -208,25 +208,19 @@ public:
         }
 
         BSONObj shardKey = status.getValue();
+        auto chunk = chunkMgr->findIntersectingChunk(txn, shardKey, collation);
 
-        // Construct collator for targeting.
-        std::unique_ptr<CollatorInterface> collator;
-        if (!collation.isEmpty()) {
-            auto statusWithCollator =
-                CollatorFactoryInterface::get(txn->getServiceContext())->makeFromBSON(collation);
-            if (!statusWithCollator.isOK()) {
-                return appendCommandStatus(result, statusWithCollator.getStatus());
-            }
-            collator = std::move(statusWithCollator.getValue());
+        if (!chunk.isOK()) {
+            uasserted(ErrorCodes::ShardKeyNotFound,
+                      "findAndModify must target a single shard, but was not able to due to "
+                      "non-simple collation");
         }
 
-        auto chunk = chunkMgr->findIntersectingChunk(
-            txn, shardKey, !collation.isEmpty() ? collator.get() : chunkMgr->getDefaultCollator());
-
-        bool ok = _runCommand(txn, conf, chunkMgr, chunk->getShardId(), nss, cmdObj, result);
+        bool ok =
+            _runCommand(txn, conf, chunkMgr, chunk.getValue()->getShardId(), nss, cmdObj, result);
         if (ok) {
             // check whether split is necessary (using update object for size heuristic)
-            chunk->splitIfShould(txn, cmdObj.getObjectField("update").objsize());
+            chunk.getValue()->splitIfShould(txn, cmdObj.getObjectField("update").objsize());
         }
 
         return ok;
@@ -272,7 +266,8 @@ private:
                      BSONObjBuilder& result) const {
         BSONObj res;
 
-        const auto shard = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
+        const auto shard = uassertStatusOK(Grid::get(txn)->shardRegistry()->getShard(txn, shardId));
+
         ShardConnection conn(shard->getConnString(), nss.ns(), chunkManager);
         bool ok = conn->runCommand(conf->name(), cmdObj, res);
         conn.done();

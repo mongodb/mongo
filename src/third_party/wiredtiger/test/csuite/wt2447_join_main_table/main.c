@@ -49,8 +49,6 @@
  * table.
  */
 
-void (*custom_die)(void) = NULL;
-
 #define	N_RECORDS	10000
 
 static void
@@ -184,6 +182,5 @@ main(int argc, char *argv[])
 	testutil_assert(maincount == 2);
 
 	testutil_cleanup(opts);
-
-	return (0);
+	return (EXIT_SUCCESS);
 }

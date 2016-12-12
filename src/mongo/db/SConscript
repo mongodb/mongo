@@ -47,7 +47,6 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/write_concern_options',
-        '$BUILD_DIR/mongo/util/foundation',
     ]
 )
 
@@ -197,7 +196,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/md5',
     ]
 )
@@ -210,7 +208,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/foundation',
     ],
 )
 
@@ -241,7 +238,7 @@ env.Library(
         'namespace_string.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -262,7 +259,6 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/util/foundation",
     ],
 )
 
@@ -399,10 +395,12 @@ env.Library(
         "dbwebserver.cpp",
         "initialize_server_global_state.cpp",
         "server_extra_log_context.cpp",
+        "server_options_init.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/client/clientdriver",
         "$BUILD_DIR/mongo/db/auth/authservercommon",
+        "$BUILD_DIR/mongo/logger/max_log_size",
         "$BUILD_DIR/mongo/rpc/command_reply",
         "$BUILD_DIR/mongo/rpc/command_request",
         "$BUILD_DIR/mongo/rpc/metadata",
@@ -504,7 +502,6 @@ env.Library(
         "lasterror.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/foundation',
         'service_context',
     ],
 )
@@ -527,6 +524,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
         '$BUILD_DIR/mongo/db/auth/authcore',
+        '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/rpc/rpc',
         '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
@@ -550,6 +548,20 @@ env.Library(
     ],
     LIBDEPS=[
         "commands",
+    ],
+)
+
+env.CppUnitTest(
+    target="commands_test",
+    source=[
+        "commands_test.cpp",
+    ],
+    LIBDEPS=[
+        "commands",
+        "commands_test_crutch",
+        "service_context_noop_init",
+        "auth/authorization_manager_mock_init",
+        "repl/replmocks",
     ],
 )
 
@@ -623,7 +635,7 @@ serverOnlyFiles = [
     "index_rebuilder.cpp",
     "instance.cpp",
     "introspect.cpp",
-    "op_observer.cpp",
+    "op_observer_impl.cpp",
     "operation_context_impl.cpp",
     "prefetch.cpp",
     "range_deleter_db_env.cpp",
@@ -641,8 +653,8 @@ serveronlyLibdeps = [
     "$BUILD_DIR/mongo/client/parallel",
     "$BUILD_DIR/mongo/db/bson/dotted_path_support",
     "$BUILD_DIR/mongo/executor/network_interface_factory",
-    "$BUILD_DIR/mongo/s/catalog/replset/sharding_catalog_client_impl",
-    "$BUILD_DIR/mongo/s/catalog/replset/sharding_catalog_manager_impl",
+    "$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl",
+    "$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager_impl",
     "$BUILD_DIR/mongo/s/client/sharding_connection_hook",
     "$BUILD_DIR/mongo/s/coreshard",
     "$BUILD_DIR/mongo/s/shard_id",
@@ -685,8 +697,10 @@ serveronlyLibdeps = [
     "query/query",
     "range_deleter",
     "repl/bgsync",
+    "repl/initial_sync_common",
     "repl/oplog_buffer_collection",
     "repl/oplog_buffer_blocking_queue",
+    "repl/oplog_buffer_proxy",
     "repl/repl_coordinator_global",
     "repl/repl_coordinator_impl",
     "repl/repl_settings",
@@ -726,11 +740,21 @@ env.Library(
 )
 
 env.Library(
+    target= 'op_observer_noop',
+    source= [
+        'op_observer_noop.cpp',
+    ],
+    LIBDEPS= [
+    ],
+)
+
+env.Library(
     target= 'service_context_d_test_fixture',
     source= [
         'service_context_d_test_fixture.cpp',
     ],
     LIBDEPS= [
+        'op_observer_noop',
         '$BUILD_DIR/mongo/db/serveronly',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/unittest/unittest',
@@ -770,5 +794,15 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
+    ],
+)
+
+env.Library(
+    target='wire_version',
+    source=[
+        'wire_version.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
     ],
 )

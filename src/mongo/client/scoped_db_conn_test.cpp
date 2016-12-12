@@ -87,18 +87,24 @@ public:
         }
     }
 
-    void startSession(transport::Session&& session) override {
+    void startSession(transport::SessionHandle session) override {
         _threads.emplace_back(&DummyServiceEntryPoint::run, this, std::move(session));
     }
 
+    void setReplyDelay(Milliseconds delay) {
+        _replyDelay = delay;
+    }
+
 private:
-    void run(transport::Session&& session) {
+    void run(transport::SessionHandle session) {
         Message inMessage;
-        if (!session.sourceMessage(&inMessage).wait().isOK()) {
+        if (!session->sourceMessage(&inMessage).wait().isOK()) {
             return;
         }
 
         auto request = rpc::makeRequest(&inMessage);
+        commandRequestHook(request.get());
+
         auto reply = rpc::makeReplyBuilder(request->getProtocol());
 
         BSONObjBuilder commandResponse;
@@ -115,12 +121,22 @@ private:
 
         response.header().setResponseToMsgId(inMessage.header().getId());
 
-        if (!session.sinkMessage(response).wait().isOK()) {
+        if (_replyDelay.count() > 0) {
+            log() << "Delaying response for " << _replyDelay;
+            sleepFor(_replyDelay);
+        }
+        if (!session->sinkMessage(response).wait().isOK()) {
             return;
         }
     }
 
+    /**
+     * Subclasses can override this in order to make assertions about the command request.
+     */
+    virtual void commandRequestHook(const rpc::RequestInterface* request) const {}
+
     std::vector<stdx::thread> _threads;
+    Milliseconds _replyDelay{0};
 };
 
 // TODO: Take this out and make it as a reusable class in a header file. The only
@@ -155,7 +171,7 @@ public:
      * @param messageHandler the message handler to use for this server. Ownership
      *     of this object is passed to this server.
      */
-    void run(std::shared_ptr<ServiceEntryPoint> serviceEntryPoint) {
+    void run(ServiceEntryPoint* serviceEntryPoint) {
         if (_server) {
             return;
         }
@@ -214,11 +230,13 @@ private:
 class DummyServerFixture : public unittest::Test {
 public:
     void setUp() {
+        WireSpec::instance().isInternalClient = isInternalClient();
+
         _maxPoolSizePerHost = globalConnPool.getMaxPoolSize();
         _dummyServer = stdx::make_unique<DummyServer>(TARGET_PORT);
 
-        auto dummyHandler = std::make_shared<DummyServiceEntryPoint>();
-        _dummyServer->run(std::move(dummyHandler));
+        _dummyServiceEntryPoint = makeServiceEntryPoint();
+        _dummyServer->run(_dummyServiceEntryPoint.get());
         DBClientConnection conn;
         Timer timer;
 
@@ -238,6 +256,7 @@ public:
     void tearDown() {
         ScopedDbConnection::clearPool();
         _dummyServer.reset();
+        _dummyServiceEntryPoint.reset();
 
         globalConnPool.setMaxPoolSize(_maxPoolSizePerHost);
     }
@@ -251,6 +270,10 @@ protected:
         ASSERT_NOT_EQUALS(a, b);
     }
 
+    void setReplyDelay(Milliseconds delay) {
+        _dummyServiceEntryPoint->setReplyDelay(delay);
+    }
+
     /**
      * Tries to grab a series of connections from the pool, perform checks on
      * them, then put them back into the globalConnPool. After that, it checks these
@@ -262,31 +285,59 @@ protected:
      */
     void checkNewConns(void (*checkFunc)(uint64_t, uint64_t),
                        uint64_t arg2,
-                       size_t newConnsToCreate) {
+                       const int newConnsToCreate) {
         vector<ScopedDbConnection*> newConnList;
-        for (size_t x = 0; x < newConnsToCreate; x++) {
+
+        for (int x = 0; x < newConnsToCreate; x++) {
             ScopedDbConnection* newConn = new ScopedDbConnection(TARGET_HOST);
             checkFunc(newConn->get()->getSockCreationMicroSec(), arg2);
             newConnList.push_back(newConn);
         }
 
-        const uint64_t oldCreationTime = curTimeMicros64();
-
+        std::set<long long> connIds;
+        int prevNumBadConns = globalConnPool.getNumBadConns(TARGET_HOST);
         for (vector<ScopedDbConnection*>::iterator iter = newConnList.begin();
              iter != newConnList.end();
              ++iter) {
+
+            connIds.insert((*iter)->get()->getConnectionId());
+
+            // ScopedDbConnection::done() may not successfuly add the connection back to
+            // the pool if the connection has failed. If the connection is not addded back
+            // to the pool, we increment the number of bad connections in the pool by one
+            // (see PoolForHost::done()). We then use the number of bad connections to
+            // verify the number of connections successfully added back to the pool.
             (*iter)->done();
             delete *iter;
         }
+        int numBadConns = globalConnPool.getNumBadConns(TARGET_HOST) - prevNumBadConns;
+        const int numConnsInPool = globalConnPool.getNumAvailableConns(TARGET_HOST);
+        ASSERT_EQ(numConnsInPool, newConnsToCreate - numBadConns);
 
         newConnList.clear();
 
-        // Check that connections created after the purge was put back to the pool.
-        for (size_t x = 0; x < newConnsToCreate; x++) {
+        // Check that connections created after the purge were put back to the pool.
+        int numReusedConns = 0;
+        prevNumBadConns = globalConnPool.getNumBadConns(TARGET_HOST);
+        for (int x = 0; x < newConnsToCreate; x++) {
+            // ScopedDBConnection will attempt to reuse a connection from the pool if
+            // the pool is not empty. It may fail to reuse that connection if that
+            // connection has gone bad, in that case, it'll try to get another connection
+            // from the pool and increment the number of bad connections in the pool
+            // If the pool is empty however, it'll create a new connection.
+            // See PoolForHost::get() and DBConnectionPool::get().
             ScopedDbConnection* newConn = new ScopedDbConnection(TARGET_HOST);
-            ASSERT_LESS_THAN(newConn->get()->getSockCreationMicroSec(), oldCreationTime);
             newConnList.push_back(newConn);
+            if (connIds.count(newConn->get()->getConnectionId())) {
+                numReusedConns++;
+            }
         }
+        numBadConns = globalConnPool.getNumBadConns(TARGET_HOST) - prevNumBadConns;
+        // Each bad connection is not a reused connection. Therefore the number of reused
+        // connections plus the number of bad ones should be equal to the number of connections
+        // that were in the pool.
+        ASSERT_EQ(numConnsInPool, numReusedConns + numBadConns);
+        ASSERT_EQ(globalConnPool.getNumAvailableConns(TARGET_HOST), 0);
 
         for (vector<ScopedDbConnection*>::iterator iter = newConnList.begin();
              iter != newConnList.end();
@@ -302,7 +353,23 @@ private:
         server->start();
     }
 
+    /**
+     * Subclasses can override this in order to use a specialized service entry point.
+     */
+    virtual std::unique_ptr<DummyServiceEntryPoint> makeServiceEntryPoint() const {
+        return stdx::make_unique<DummyServiceEntryPoint>();
+    }
+
+    /**
+     * Subclasses can override this to make the client code behave like an internal client (e.g.
+     * mongod or mongos) as opposed to an external one (e.g. the shell).
+     */
+    virtual bool isInternalClient() const {
+        return false;
+    }
+
     std::unique_ptr<DummyServer> _dummyServer;
+    std::unique_ptr<DummyServiceEntryPoint> _dummyServiceEntryPoint;
     uint32_t _maxPoolSizePerHost;
 };
 
@@ -318,6 +385,42 @@ TEST_F(DummyServerFixture, BasicScopedDbConnection) {
 
     conn2.done();
     conn3.done();
+}
+
+TEST_F(DummyServerFixture, ScopedDbConnectionWithTimeout) {
+    auto delay = Milliseconds{8000};
+    auto uri_sw = MongoURI::parse("mongodb://" + TARGET_HOST + "/?socketTimeoutMS=4000");
+    ASSERT_OK(uri_sw.getStatus());
+    auto uri = uri_sw.getValue();
+    Date_t start, end;
+    const auto uriTimeout = Seconds{4};
+    const auto overrideTimeout = Seconds{1};
+
+    ScopedDbConnection conn1(TARGET_HOST);
+
+    setReplyDelay(delay);
+
+    log() << "Testing ConnectionString timeouts";
+    start = Date_t::now();
+    ASSERT_THROWS(ScopedDbConnection conn2(TARGET_HOST, overrideTimeout.count()), SocketException);
+    end = Date_t::now();
+    ASSERT_GTE(end - start, overrideTimeout);
+    ASSERT_LT(end - start, uriTimeout);
+
+    log() << "Testing MongoURI with explicit timeout";
+    start = Date_t::now();
+    ASSERT_THROWS(ScopedDbConnection conn4(uri, overrideTimeout.count()), UserException);
+    end = Date_t::now();
+    ASSERT_GTE(end - start, overrideTimeout);
+    ASSERT_LT(end - start, uriTimeout);
+
+    log() << "Testing MongoURI doesn't timeout";
+    start = Date_t::now();
+    ScopedDbConnection conn5(uri);
+    end = Date_t::now();
+    ASSERT_GREATER_THAN(end - start, uriTimeout);
+
+    setReplyDelay(Milliseconds{0});
 }
 
 TEST_F(DummyServerFixture, InvalidateBadConnInPool) {
@@ -417,6 +520,71 @@ TEST_F(DummyServerFixture, DontReturnConnGoneBadToPool) {
     checkNewConns(assertNotEqual, conn2CreationTime, 10);
 
     conn1Again.done();
+}
+
+class DummyServiceEntryPointWithInternalClientInfoCheck final : public DummyServiceEntryPoint {
+private:
+    void commandRequestHook(const rpc::RequestInterface* request) const final {
+        if (request->getCommandName() != "isMaster") {
+            // It's not an isMaster request. Nothing to do.
+            return;
+        }
+
+        BSONObj commandArgs = request->getCommandArgs();
+        auto internalClientElem = commandArgs["internalClient"];
+        ASSERT_EQ(internalClientElem.type(), BSONType::Object);
+        auto minWireVersionElem = internalClientElem.Obj()["minWireVersion"];
+        auto maxWireVersionElem = internalClientElem.Obj()["maxWireVersion"];
+        ASSERT_EQ(minWireVersionElem.type(), BSONType::NumberInt);
+        ASSERT_EQ(maxWireVersionElem.type(), BSONType::NumberInt);
+        ASSERT_EQ(minWireVersionElem.numberInt(), WireSpec::instance().outgoing.minWireVersion);
+        ASSERT_EQ(maxWireVersionElem.numberInt(), WireSpec::instance().outgoing.maxWireVersion);
+    }
+};
+
+class DummyServerFixtureWithInternalClientInfoCheck : public DummyServerFixture {
+private:
+    std::unique_ptr<DummyServiceEntryPoint> makeServiceEntryPoint() const final {
+        return stdx::make_unique<DummyServiceEntryPointWithInternalClientInfoCheck>();
+    }
+
+    bool isInternalClient() const final {
+        return true;
+    }
+};
+
+TEST_F(DummyServerFixtureWithInternalClientInfoCheck, VerifyIsMasterRequestOnConnectionOpen) {
+    // The isMaster handshake will occur on connection open. The request is verified by the test
+    // fixture.
+    ScopedDbConnection conn(TARGET_HOST);
+    conn.done();
+}
+
+class DummyServiceEntryPointWithInternalClientMissingCheck final : public DummyServiceEntryPoint {
+private:
+    void commandRequestHook(const rpc::RequestInterface* request) const final {
+        if (request->getCommandName() != "isMaster") {
+            // It's not an isMaster request. Nothing to do.
+            return;
+        }
+
+        BSONObj commandArgs = request->getCommandArgs();
+        ASSERT_FALSE(commandArgs["internalClient"]);
+    }
+};
+
+class DummyServerFixtureWithInternalClientMissingCheck : public DummyServerFixture {
+private:
+    std::unique_ptr<DummyServiceEntryPoint> makeServiceEntryPoint() const final {
+        return stdx::make_unique<DummyServiceEntryPointWithInternalClientMissingCheck>();
+    }
+};
+
+TEST_F(DummyServerFixtureWithInternalClientMissingCheck, VerifyIsMasterRequestOnConnectionOpen) {
+    // The isMaster handshake will occur on connection open. The request is verified by the test
+    // fixture.
+    ScopedDbConnection conn(TARGET_HOST);
+    conn.done();
 }
 
 }  // namespace

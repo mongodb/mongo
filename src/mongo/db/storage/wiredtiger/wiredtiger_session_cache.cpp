@@ -176,6 +176,12 @@ void WiredTigerSessionCache::shuttingDown() {
 }
 
 void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint) {
+    // For inMemory storage engines, the data is "as durable as it's going to get".
+    // That is, a restart is equivalent to a complete node failure.
+    if (isEphemeral()) {
+        return;
+    }
+
     const int shuttingDown = _shuttingDown.fetchAndAdd(1);
     ON_BLOCK_EXIT([this] { _shuttingDown.fetchAndSubtract(1); });
 
@@ -219,7 +225,7 @@ void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint) {
     JournalListener::Token token = _journalListener->getToken();
 
     // Use the journal when available, or a checkpoint otherwise.
-    if (_engine->isDurable()) {
+    if (_engine && _engine->isDurable()) {
         invariantWTOK(s->log_flush(s, "sync=on"));
         LOG(4) << "flushed journal";
     } else {
@@ -287,20 +293,26 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
     ON_BLOCK_EXIT([this] { _shuttingDown.fetchAndSubtract(1); });
 
     if (shuttingDown & kShuttingDownMask) {
-        // Leak the session in order to avoid race condition with clean shutdown, where the
-        // storage engine is ripped from underneath transactions, which are not "active"
-        // (i.e., do not have any locks), but are just about to delete the recovery unit.
-        // See SERVER-16031 for more information.
+        // There is a race condition with clean shutdown, where the storage engine is ripped from
+        // underneath OperationContexts, which are not "active" (i.e., do not have any locks), but
+        // are just about to delete the recovery unit. See SERVER-16031 for more information. Since
+        // shutting down the WT_CONNECTION will close all WT_SESSIONS, we shouldn't also try to
+        // directly close this session.
+        session->_session = nullptr;  // Prevents calling _session->close() in destructor.
+        delete session;
         return;
     }
 
-    // This checks that we are only caching idle sessions and not something which might hold
-    // locks or otherwise prevent truncation.
     {
         WT_SESSION* ss = session->getSession();
         uint64_t range;
+        // This checks that we are only caching idle sessions and not something which might hold
+        // locks or otherwise prevent truncation.
         invariantWTOK(ss->transaction_pinned_range(ss, &range));
         invariant(range == 0);
+
+        // Release resources in the session we're about to cache.
+        invariantWTOK(ss->reset(ss));
     }
 
     // If the cursor epoch has moved on, close all cursors in the session.

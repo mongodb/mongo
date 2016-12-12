@@ -109,6 +109,14 @@ void translateElement(StringData fieldName,
             ctxStack->emplace(element.Obj().begin(), &out->subarrayStart(fieldName));
             return;
         }
+        case BSONType::Symbol: {
+            uasserted(ErrorCodes::CannotBuildIndexKeys,
+                      str::stream()
+                          << "Cannot index type Symbol with a collation. Failed to index element: "
+                          << element
+                          << ". Index collation: "
+                          << collator->getSpec().toBSON());
+        }
         default:
             out->appendAs(element, fieldName);
     }
@@ -135,13 +143,6 @@ void translate(BSONObj obj, const CollatorInterface* collator, BufBuilder* out) 
             element.fieldNameStringData(), element, collator, &ctx.getBuilder(), &ctxStack);
     }
 }
-}
-
-// TODO SERVER-24674: We may want to check that objects and arrays actually do contain strings
-// before returning true.
-bool CollationIndexKey::shouldUseCollationIndexKey(BSONElement elt,
-                                                   const CollatorInterface* collator) {
-    return collator && isCollatableType(elt.type());
 }
 
 void CollationIndexKey::collationAwareIndexKeyAppend(BSONElement elt,

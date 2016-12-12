@@ -31,6 +31,7 @@
 #include <memory>
 #include <string>
 
+#include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_interface.h"
 
 namespace mongo {
@@ -54,7 +55,8 @@ std::unique_ptr<NetworkInterface> makeNetworkInterface(std::string instanceName)
 std::unique_ptr<NetworkInterface> makeNetworkInterface(
     std::string instanceName,
     std::unique_ptr<NetworkConnectionHook> hook,
-    std::unique_ptr<rpc::EgressMetadataHook> metadataHook);
+    std::unique_ptr<rpc::EgressMetadataHook> metadataHook,
+    ConnectionPool::Options options = ConnectionPool::Options());
 
 }  // namespace executor
 }  // namespace mongo

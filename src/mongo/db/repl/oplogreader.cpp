@@ -34,13 +34,11 @@
 
 #include <string>
 
-#include "mongo/base/counter.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/internal_user_auth.h"
-#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/oplog.h"
@@ -60,13 +58,6 @@ namespace repl {
 
 const BSONObj reverseNaturalObj = BSON("$natural" << -1);
 
-// number of readers created;
-//  this happens when the source source changes, a reconfig/network-error or the cursor dies
-static Counter64 readersCreatedStats;
-static ServerStatusMetricField<Counter64> displayReadersCreated("repl.network.readersCreated",
-                                                                &readersCreatedStats);
-
-
 bool replAuthenticate(DBClientBase* conn) {
     if (isInternalAuthSet())
         return conn->authenticateInternalUser();
@@ -83,8 +74,6 @@ OplogReader::OplogReader() {
 
     /* TODO: slaveOk maybe shouldn't use? */
     _tailingQueryOptions |= QueryOption_AwaitData;
-
-    readersCreatedStats.increment();
 }
 
 bool OplogReader::connect(const HostAndPort& host) {
@@ -120,7 +109,7 @@ void OplogReader::query(
 
 void OplogReader::tailingQuery(const char* ns, const BSONObj& query) {
     verify(!haveCursor());
-    LOG(2) << ns << ".find(" << query.toString() << ')' << endl;
+    LOG(2) << ns << ".find(" << redact(query) << ')' << endl;
     cursor.reset(_conn->query(ns, query, 0, 0, nullptr, _tailingQueryOptions).release());
 }
 
@@ -136,8 +125,36 @@ HostAndPort OplogReader::getHost() const {
     return _host;
 }
 
+Status OplogReader::_compareRequiredOpTimeWithQueryResponse(const OpTime& requiredOpTime) {
+    auto containsMinValid = more();
+    if (!containsMinValid) {
+        return Status(
+            ErrorCodes::NoMatchingDocument,
+            "remote oplog does not contain entry with optime matching our required optime");
+    }
+    auto doc = nextSafe();
+    const auto opTime = fassertStatusOK(40351, OpTime::parseFromOplogEntry(doc));
+    if (requiredOpTime != opTime) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "remote oplog contain entry with matching timestamp "
+                                    << opTime.getTimestamp().toString()
+                                    << " but optime "
+                                    << opTime.toString()
+                                    << " does not "
+                                       "match our required optime");
+    }
+    if (requiredOpTime.getTerm() != opTime.getTerm()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "remote oplog contain entry with term " << opTime.getTerm()
+                                    << " that does not "
+                                       "match the term in our required optime");
+    }
+    return Status::OK();
+}
+
 void OplogReader::connectToSyncSource(OperationContext* txn,
                                       const OpTime& lastOpTimeFetched,
+                                      const OpTime& requiredOpTime,
                                       ReplicationCoordinator* replCoord) {
     const Timestamp sentinelTimestamp(duration_cast<Seconds>(Date_t::now().toDurationSinceEpoch()),
                                       0);
@@ -147,7 +164,7 @@ void OplogReader::connectToSyncSource(OperationContext* txn,
     invariant(conn() == NULL);
 
     while (true) {
-        HostAndPort candidate = replCoord->chooseNewSyncSource(lastOpTimeFetched.getTimestamp());
+        HostAndPort candidate = replCoord->chooseNewSyncSource(lastOpTimeFetched);
 
         if (candidate.empty()) {
             if (oldestOpTimeSeen == sentinel) {
@@ -165,10 +182,9 @@ void OplogReader::connectToSyncSource(OperationContext* txn,
             log() << "our last optime : " << lastOpTimeFetched;
             log() << "oldest available is " << oldestOpTimeSeen;
             log() << "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember";
-            StorageInterface::get(txn)->setMinValid(txn, {lastOpTimeFetched, oldestOpTimeSeen});
             auto status = replCoord->setMaintenanceMode(true);
             if (!status.isOK()) {
-                warning() << "Failed to transition into maintenance mode.";
+                warning() << "Failed to transition into maintenance mode: " << status;
             }
             bool worked = replCoord->setFollowerMode(MemberState::RS_RECOVERING);
             if (!worked) {
@@ -204,6 +220,29 @@ void OplogReader::connectToSyncSource(OperationContext* txn,
             continue;
         }
 
+        // Check if sync source contains required optime.
+        if (!requiredOpTime.isNull()) {
+            // This query is structured so that it is executed on the sync source using the oplog
+            // start hack (oplogReplay=true and $gt/$gte predicate over "ts").
+            auto ts = requiredOpTime.getTimestamp();
+            tailingQuery(rsOplogName.c_str(), BSON("ts" << BSON("$gte" << ts << "$lte" << ts)));
+            auto status = _compareRequiredOpTimeWithQueryResponse(requiredOpTime);
+            if (!status.isOK()) {
+                const auto blacklistDuration = Seconds(60);
+                const auto until = Date_t::now() + blacklistDuration;
+                warning() << "We cannot use " << candidate.toString()
+                          << " as a sync source because it does not contain the necessary "
+                             "operations for us to reach a consistent state: "
+                          << status << " last fetched optime: " << lastOpTimeFetched
+                          << ". required optime: " << requiredOpTime
+                          << ". Blacklisting this sync source for " << blacklistDuration
+                          << " until: " << until;
+                resetConnection();
+                replCoord->blacklistSyncSource(candidate, until);
+                continue;
+            }
+            resetCursor();
+        }
 
         // TODO: If we were too stale (recovering with maintenance mode on), then turn it off, to
         //       allow becoming secondary/etc.

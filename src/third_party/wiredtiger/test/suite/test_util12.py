@@ -86,6 +86,5 @@ class test_util12(wttest.WiredTigerTestCase, suite_subprocess):
                     'def', '456', 'abc'], errfilename=errfile, failure=True)
         self.check_file_contains(errfile, 'usage:')
 
-
 if __name__ == '__main__':
     wttest.run()

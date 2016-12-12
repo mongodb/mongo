@@ -31,7 +31,9 @@
 #include <set>
 #include <vector>
 
+#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -124,8 +126,11 @@ void assertBSONElementSetsAreEqual(const std::vector<BSONObj>& expectedObjs,
     auto expectedIt = expectedElements.begin();
     auto actualIt = actualElements.begin();
 
+
+    BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore,
+                                 &SimpleStringDataComparator::kInstance);
     for (size_t i = 0; i < expectedElements.size(); ++i) {
-        if (!expectedIt->valuesEqual(*actualIt)) {
+        if (eltCmp.evaluate(*expectedIt != *actualIt)) {
             StringBuilder sb;
             sb << "Element '" << *expectedIt << "' doesn't have the same value as element '"
                << *actualIt << "'; Expected set: ";

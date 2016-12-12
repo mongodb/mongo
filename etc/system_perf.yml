@@ -5,9 +5,44 @@ pre:
     - command: shell.track
 
 post:
+    - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+          source ./dsienv.sh
+          $DSI_PATH/bin/make_artifact.sh
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: work/reports.tgz
+        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/${task_name}-${build_id}.${ext|tgz}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: test-log
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: work/reports/graphs/timeseries-p1.html
+        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-p1-${task_name}-${build_id}.html
+        bucket: mciuploads
+        permissions: public-read
+        content_type: text/html
+        display_name: timeseries-p1.html
     - command: attach.results
       params:
         file_location: work/report.json
+    - command: shell.exec
+      params:
+        working_dir: work
+        script: |
+          source ./dsienv.sh
+          if [ -e $HOME/infrastructure_provisioning/terraform/provisioned.${cluster} ]; then
+            $DSI_PATH/bin/mark_idle.sh
+          fi
+
     - command: shell.exec
       params:
         working_dir: src
@@ -29,7 +64,6 @@ functions:
           mkdir src
           mkdir work
           mkdir bin
-          mkdir keys
           pwd
           ls
     - command: manifest.load
@@ -45,13 +79,61 @@ functions:
         directory: src
     - command: shell.exec
       params:
-        silent: true
+        working_dir: work
         script: |
-          # generate aws private key file
-          echo "${terraform_secret}" > secret
-          chmod 400 secret
-          echo "${ec2_pem}" > keys/aws.pem
-          chmod 400 keys/aws.pem
+          cat > bootstrap.yml <<EOF
+          cluster_type: ${cluster}
+          platform: ${platform}
+          setup: ${setup}
+          storageEngine: ${storageEngine}
+          test: ${test}
+          production: true
+          EOF
+
+          cat > runtime.yml <<EOF
+          # evergreen default expansions
+          is_patch: ${is_patch}
+          task_id: ${task_id}
+          task_name: ${task_name}
+          execution: ${execution}
+          build_id: ${build_id}
+          build_variant: ${build_variant}
+          version_id: ${version_id}
+          workdir: ${workdir}
+          revision: ${revision}
+          project: ${project}
+          branch_name: ${branch_name}
+
+          # sys-perf expansions
+          # Shouldn't be needed: testList: ${testList}
+          ext: ${ext}
+          script_flags : ${script_flags}
+          dsi_rev: ${dsi_rev}
+          compare_task: ${compare_task}
+          workloads_rev: ${workloads_rev}
+          YCSB_rev: ${YCSB_rev}
+
+          # compositions of expansions
+          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz"
+          EOF
+    - command: shell.exec
+      params:
+        silent: true
+        working_dir: work
+        script: |
+          # AWS ssh secret key
+          echo "${ec2_pem}" > aws_ssh_key.pem
+          chmod 400 aws_ssh_key.pem
+
+          cat > runtime_secret.yml <<EOF
+          # Note that inside system_perf.yml we have ${aws_key} & ${aws_secret}, which are used for
+          # Evergreen resources. The below are used for dsi resources, and are NOT the same!
+          aws_access_key: "${terraform_key}"
+          aws_secret_key: "${terraform_secret}"
+          perf_jira_user: "${perf_jira_user}"
+          perf_jira_pw: "${perf_jira_pw}"
+          EOF
+          chmod 400 runtime_secret.yml
     - command: shell.exec
       params:
         working_dir: work
@@ -61,7 +143,7 @@ functions:
           virtualenv ./venv
           source ./venv/bin/activate
           pip install -r ../src/dsi/dsi/requirements.txt
-          python ../src/dsi/dsi/bin/setup_work_env.py --cluster-type ${cluster} --aws-key-name ${terraform_key} --ssh-keyfile-path ../keys/aws.pem --aws-secret-file ../secret --mongo-download-url https://s3.amazonaws.com/mciuploads/dsi/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz --production
+          python ../src/dsi/dsi/bin/setup_work_env.py --production
           ls
           pwd
     - command: shell.exec
@@ -110,7 +192,7 @@ functions:
             echo "No existing resources found"
           fi
     - command: shell.exec
-      # call setup-cluster.sh, in most cases this only updates expire-on tag
+      # call setup-cluster.sh, in most cases this only updates tags
       params:
         working_dir: work
         script: |
@@ -118,21 +200,17 @@ functions:
           set -o verbose
           source ./dsienv.sh
           if [ ! -e $HOME/infrastructure_provisioning/terraform/provisioned.${cluster} ]; then
-            echo "Provisinging new resources."
-            $DSI_PATH/bin/setup-cluster.sh ${cluster} ../terraform
+            EXISTING="false"
           else
-            # on host with pre-existing resources, call terraform directly to
-            # avoid recreating instances due to terraform apply concurrency limitation
-            echo "Update expire-on tag for existing resources."
-            ./terraform apply -var-file=cluster.json
-            # call env.sh to generate ips.sh, etc. for downstream modules
-            $DSI_PATH/bin/env.sh
+            EXISTING="true"
           fi
+
+          $DSI_PATH/bin/setup-cluster.sh ${cluster} $EXISTING
           # handle the case when setup-cluster.sh fail
           if [ $? -eq 0 ]; then
             echo "Resource provisioned/updated."
             # copy terraform information needed for teardown
-            cp {terraform.tfstate,cluster.tf,terraform.tfvars,security.tf,variables.tf} $HOME/infrastructure_provisioning/terraform/.
+            cp {terraform.tfstate,cluster.tf,terraform.tfvars,security.tf} $HOME/infrastructure_provisioning/terraform/.
             rsync -vr ../modules $HOME/infrastructure_provisioning/modules
             cd $HOME/infrastructure_provisioning/terraform
             ./terraform get
@@ -162,8 +240,8 @@ functions:
           source ./dsienv.sh
           source ./venv/bin/activate
           cp mongodb_setup.${setup}.${storageEngine}.yml mongodb_setup.yml
-          $DSI_PATH/bin/mongodb_setup.py --mongodb-binary-archive https://s3.amazonaws.com/mciuploads/dsi/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz --config && echo "${cluster} MongoDB Cluster STARTED."
- 
+          $DSI_PATH/bin/mongodb_setup.py && echo "${cluster} MongoDB Cluster STARTED."
+
   "run test":
     - command: shell.exec
       params:
@@ -198,49 +276,8 @@ functions:
       params:
         working_dir: work
         script: |
-          set -e
-          set -o verbose
           source ./dsienv.sh
-          cd reports
-          # move additional file here
-          cp ../infrastructure_provisioning.out.yml .
-          cp ../ips.sh .
-          cp ../ips.py .
-          if [ -f "../terraform.log" ]; then cp ../terraform.log .; fi
-          cp ../perf.json .
-          cd ..
-          mkdir -p ./reports/graphs
-          touch ./reports/graphs/timeseries-p1.html
-          $DSI_PATH/bin/retrieve-diag-data.sh
-          $DSI_PATH/bin/generate-timeseries-html.sh || true
-    - command: archive.targz_pack
-      params:
-        target: "reports.tgz"
-        source_dir: work
-        include:
-          - "reports/**"
-
-  "upload log file":
-    - command: s3.put
-      params:
-            aws_key: ${aws_key}
-            aws_secret: ${aws_secret}
-            local_file: reports.tgz
-            remote_file: dsi/${build_variant}/${revision}/${task_id}/${version_id}/logs/${test}-${build_id}.${ext|tgz}
-            bucket: mciuploads
-            permissions: public-read
-            content_type: ${content_type|application/x-gzip}
-            display_name: ${test}-test-log
-    - command: s3.put
-      params:
-            aws_key: ${aws_key}
-            aws_secret: ${aws_secret}
-            local_file: work/reports/graphs/timeseries-p1.html
-            remote_file: dsi/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-p1-${test}-${build_id}.html
-            bucket: mciuploads
-            permissions: public-read
-            content_type: text/html
-            display_name: timeseries-p1.html
+          $DSI_PATH/bin/make_artifact.sh
 
   "analyze":
     - command: json.get_history
@@ -262,8 +299,9 @@ functions:
         silent: true
         script: |
           set -o errexit
-          set -o verbose
-          python -u ../src/dsi/dsi/analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag 3.2.3-Baseline 3.2.1-Baseline 3.1.8-Baseline 3.0.9-Baseline --overrideFile ../src/dsi/dsi/analysis/master/system_perf_override.json --project_id sys-perf --task_name ${task_name} --variant ${build_variant} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
+          TAGS="3.3.10-Baseline 3.2.9-Baseline 3.2.3-Baseline 3.2.1-Baseline 3.1.8-Baseline 3.0.9-Baseline"
+          OVERRIDEFILE="../src/dsi/dsi/analysis/master/system_perf_override.json"
+          python -u ../src/dsi/dsi/analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag $TAGS --overrideFile $OVERRIDEFILE --project_id sys-perf --variant ${build_variant} --task ${task_name} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
     - command: "json.send"
       params:
          name: "dashboard"
@@ -276,7 +314,9 @@ functions:
         script: |
           set -o errexit
           set -o verbose
-          python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --log-analysis .. --perf-file reports/perf.json --rev ${revision} -f history.json -t tags.json --refTag 3.2.1-Baseline --overrideFile ../src/dsi/dsi/analysis/master/system_perf_override.json --project_id sys-perf --task_name ${task_name} --variant ${build_variant}
+          TAG="3.2.9-Baseline"
+          OVERRIDEFILE="../src/dsi/dsi/analysis/master/system_perf_override.json"
+          python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --reports-analysis reports --perf-file reports/perf.json --rev ${revision} -f history.json -t tags.json --refTag $TAG --overrideFile $OVERRIDEFILE --project_id sys-perf --variant ${build_variant} --task ${task_name}
 
   "compare":
     - command: shell.exec
@@ -358,9 +398,15 @@ tasks:
           set -o verbose
           ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo${extension} mongod${extension} mongos${extension} MONGO_VERSION=${version}
           mkdir -p mongodb/bin
+          mkdir -p mongodb/jstests/hooks
           mv mongo${extension|} mongodb/bin
           mv mongod${extension|} mongodb/bin
           mv mongos${extension|} mongodb/bin
+          if [ -d jstests/hooks ]
+          then
+            echo "Fetching JS test DB correctness checks from directory jstests/hooks"
+            cp -a jstests/hooks/* mongodb/jstests/hooks
+          fi
           tar cvf mongodb.tar mongodb
           gzip mongodb.tar
     - command: s3.put
@@ -368,7 +414,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongodb.tar.gz
-        remote_file: dsi/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz
+        remote_file: ${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -390,9 +436,6 @@ tasks:
         test: "ycsb"
         testList: "default"
     - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "ycsb"
     - func: "analyze"
       vars:
         script_flags: --ycsb-throughput-analysis reports
@@ -413,9 +456,6 @@ tasks:
         test: "ycsb"
         testList: "default"
     - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "ycsb"
     - func: "analyze"
       vars:
         script_flags: --ycsb-throughput-analysis reports
@@ -436,9 +476,6 @@ tasks:
         test: "benchRun"
         testList: "default"
     - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "core_workloads_WT"
     - func: "analyze"
 
 - name: core_workloads_MMAPv1
@@ -457,9 +494,44 @@ tasks:
         test: "benchRun"
         testList: "default"
     - func: "make test log artifact"
-    - func: "upload log file"
+    - func: "analyze"
+
+- name: secondary_performance_WT
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
       vars:
-        test: "core_workloads_MMAPv1"
+        storageEngine: "wiredTiger"
+        setup: "replica-2node"
+    - func: "run test"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "benchRun"
+        testList: "secondary_performance"
+    - func: "make test log artifact"
+    - func: "analyze"
+
+- name: secondary_performance_MMAPv1
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "mmapv1"
+        setup: "replica-2node"
+    - func: "run test"
+      vars:
+        storageEngine: "mmapv1"
+        test: "benchRun"
+        testList: "secondary_performance"
+    - func: "make test log artifact"
     - func: "analyze"
 
 - name: industry_benchmarks_WT_oplog_comp
@@ -542,9 +614,6 @@ tasks:
         test: "initialSync"
         testList: "default"
     - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "initialsync_WT"
     - func: "analyze"
 
 - name: initialsync_MMAPv1
@@ -563,9 +632,6 @@ tasks:
         test: "initialSync"
         testList: "default"
     - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "initialsync_MMAPv1"
     - func: "analyze"
 
 - name: initialsync_WT_dr
@@ -585,9 +651,6 @@ tasks:
         test: "initialSync"
         testList: "default"
     - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "initialsync_WT"
     - func: "analyze"
 
 - name: initialsync_MMAPv1_dr
@@ -607,9 +670,6 @@ tasks:
         test: "initialSync"
         testList: "default"
     - func: "make test log artifact"
-    - func: "upload log file"
-      vars:
-        test: "initialsync_MMAPv1"
     - func: "analyze"
 
 
@@ -654,6 +714,7 @@ buildvariants:
     cluster: single
     platform: linux
     use_scons_cache: true
+    project: &project dsi
   run_on:
       - "rhel70-perf-single"
   tasks:
@@ -672,6 +733,7 @@ buildvariants:
     cluster: single
     platform: linux
     use_scons_cache: true
+    project: *project
   run_on:
       - "rhel70-perf-single"
   tasks:
@@ -693,6 +755,7 @@ buildvariants:
     cluster: shard
     platform: linux
     use_scons_cache: true
+    project: *project
   run_on:
       - "rhel70-perf-shard"
   tasks:
@@ -710,6 +773,7 @@ buildvariants:
     setup: replica
     cluster: replica
     platform: linux
+    project: *project
   run_on:
       - "rhel70-perf-replset"
   tasks:
@@ -717,6 +781,8 @@ buildvariants:
     - name: core_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: core_workloads_MMAPv1
+    - name: secondary_performance_WT
+    - name: secondary_performance_MMAPv1
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
@@ -728,6 +794,7 @@ buildvariants:
     cluster: replica
     platform: linux
     use_scons_cache: true
+    project: *project
   run_on:
       - "rhel70-perf-replset"
   tasks:
@@ -743,6 +810,7 @@ buildvariants:
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     use_scons_cache: true
+    project: *project
   run_on:
       - "rhel70-perf-single"
   tasks:

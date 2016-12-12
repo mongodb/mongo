@@ -32,12 +32,11 @@
 
 #include <sstream>
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
-#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -48,6 +47,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/log.h"
 
 
@@ -56,20 +56,6 @@ namespace {
 using std::string;
 using std::vector;
 using namespace mongo;
-
-/**
- * Utility function to extract error code and message from status
- * and append to BSON results.
- */
-void addStatus(const Status& status, BSONObjBuilder& builder) {
-    builder.append("ok", status.isOK() ? 1.0 : 0.0);
-    if (!status.isOK()) {
-        builder.append("code", status.code());
-    }
-    if (!status.reason().empty()) {
-        builder.append("errmsg", status.reason());
-    }
-}
 
 /**
  * Retrieves a collection's query settings and plan cache from the database.
@@ -134,16 +120,9 @@ bool IndexFilterCommand::run(OperationContext* txn,
                              int options,
                              string& errmsg,
                              BSONObjBuilder& result) {
-    string ns = parseNs(dbname, cmdObj);
-
-    Status status = runIndexFilterCommand(txn, ns, cmdObj, &result);
-
-    if (!status.isOK()) {
-        addStatus(status, result);
-        return false;
-    }
-
-    return true;
+    const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
+    Status status = runIndexFilterCommand(txn, nss.ns(), cmdObj, &result);
+    return appendCommandStatus(result, status);
 }
 
 
@@ -290,7 +269,7 @@ Status ClearFilters::clear(OperationContext* txn,
         // Remove entry from plan cache
         planCache->remove(*cq);
 
-        LOG(0) << "Removed index filter on " << ns << " " << cq->toStringShort();
+        LOG(0) << "Removed index filter on " << ns << " " << redact(cq->toStringShort());
 
         return Status::OK();
     }
@@ -386,8 +365,8 @@ Status SetFilter::set(OperationContext* txn,
         return Status(ErrorCodes::BadValue,
                       "required field indexes must contain at least one index");
     }
-    BSONObjSet indexes;
-    std::unordered_set<std::string> indexNames;
+    BSONObjSet indexes = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
+    stdx::unordered_set<std::string> indexNames;
     for (vector<BSONElement>::const_iterator i = indexesEltArray.begin();
          i != indexesEltArray.end();
          ++i) {
@@ -417,7 +396,8 @@ Status SetFilter::set(OperationContext* txn,
     // Remove entry from plan cache.
     planCache->remove(*cq);
 
-    LOG(0) << "Index filter set on " << ns << " " << cq->toStringShort() << " " << indexesElt;
+    LOG(0) << "Index filter set on " << ns << " " << redact(cq->toStringShort()) << " "
+           << indexesElt;
 
     return Status::OK();
 }

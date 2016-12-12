@@ -24,23 +24,22 @@ __fhandle_method_finalize(
 		    "a WT_FILE_HANDLE.%s method must be configured", #name)
 
 	WT_HANDLE_METHOD_REQ(close);
-	/* not required: fadvise */
-	/* not required: fallocate */
-	/* not required: fallocate_nolock */
+	/* not required: fh_advise */
+	/* not required: fh_extend */
+	/* not required: fh_extend_nolock */
 	WT_HANDLE_METHOD_REQ(fh_lock);
-	/* not required: map */
-	/* not required: map_discard */
-	/* not required: map_preload */
-	/* not required: map_unmap */
+	/* not required: fh_map */
+	/* not required: fh_map_discard */
+	/* not required: fh_map_preload */
+	/* not required: fh_unmap */
 	WT_HANDLE_METHOD_REQ(fh_read);
 	WT_HANDLE_METHOD_REQ(fh_size);
 	if (!readonly)
 		WT_HANDLE_METHOD_REQ(fh_sync);
-	/* not required: sync_nowait */
-	if (!readonly) {
-		WT_HANDLE_METHOD_REQ(fh_truncate);
+	/* not required: fh_sync_nowait */
+	/* not required: fh_truncate */
+	if (!readonly)
 		WT_HANDLE_METHOD_REQ(fh_write);
-	}
 
 	return (0);
 }
@@ -188,7 +187,7 @@ __open_verbose(
 	if (tmp->size != 0)
 		WT_ERR(__wt_buf_catfmt(session, tmp, ")"));
 
-	ret = __wt_verbose(session, WT_VERB_FILEOPS,
+	__wt_verbose(session, WT_VERB_FILEOPS,
 	    "%s: file-open: type %s%s",
 	    name, file_type_tag, tmp->size == 0 ? "" : (char *)tmp->data);
 
@@ -301,8 +300,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH **fhp)
 	*fhp = NULL;
 
 	/* Track handle-close as a file operation, so open and close match. */
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_FILEOPS, "%s: file-close", fh->name));
+	__wt_verbose(session, WT_VERB_FILEOPS, "%s: file-close", fh->name);
 
 	/*
 	 * If the reference count hasn't gone to 0, or if it's an in-memory

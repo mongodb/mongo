@@ -28,43 +28,53 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/document_source_mock.h"
+
 #include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
+using std::deque;
 
-DocumentSourceMock::DocumentSourceMock(std::deque<Document> docs)
-    : DocumentSource(NULL), queue(std::move(docs)) {}
+DocumentSourceMock::DocumentSourceMock(deque<GetNextResult> results)
+    : DocumentSource(nullptr),
+      queue(std::move(results)),
+      sorts(SimpleBSONObjComparator::kInstance.makeBSONObjSet()) {}
 
-DocumentSourceMock::DocumentSourceMock(std::deque<Document> docs,
+DocumentSourceMock::DocumentSourceMock(deque<GetNextResult> results,
                                        const boost::intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSource(expCtx), queue(std::move(docs)) {}
+    : DocumentSource(expCtx),
+      queue(std::move(results)),
+      sorts(SimpleBSONObjComparator::kInstance.makeBSONObjSet()) {}
 
 const char* DocumentSourceMock::getSourceName() const {
     return "mock";
 }
 
 Value DocumentSourceMock::serialize(bool explain) const {
-    return Value(DOC(getSourceName() << Document()));
+    return Value(Document{{getSourceName(), Document()}});
 }
 
 void DocumentSourceMock::dispose() {
     isDisposed = true;
 }
 
-intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create(std::deque<Document> docs) {
-    return new DocumentSourceMock(std::move(docs));
+intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create(Document doc) {
+    return new DocumentSourceMock({std::move(doc)});
+}
+
+intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create(deque<GetNextResult> results) {
+    return new DocumentSourceMock(std::move(results));
 }
 
 intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create() {
-    return new DocumentSourceMock(std::deque<Document>());
+    return new DocumentSourceMock(deque<GetNextResult>());
 }
 
-intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create(const Document& doc) {
-    std::deque<Document> docs = {doc};
-    return new DocumentSourceMock(std::move(docs));
+intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create(const GetNextResult& result) {
+    deque<GetNextResult> results = {result};
+    return new DocumentSourceMock(std::move(results));
 }
 
 intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create(const char* json) {
@@ -73,23 +83,23 @@ intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create(const char* json) {
 
 intrusive_ptr<DocumentSourceMock> DocumentSourceMock::create(
     const std::initializer_list<const char*>& jsons) {
-    std::deque<Document> docs;
+    deque<GetNextResult> results;
     for (auto&& json : jsons) {
-        docs.push_back(Document(fromjson(json)));
+        results.emplace_back(Document(fromjson(json)));
     }
-    return new DocumentSourceMock(std::move(docs));
+    return new DocumentSourceMock(std::move(results));
 }
 
-boost::optional<Document> DocumentSourceMock::getNext() {
+DocumentSource::GetNextResult DocumentSourceMock::getNext() {
     invariant(!isDisposed);
     invariant(!isDetachedFromOpCtx);
 
     if (queue.empty()) {
-        return {};
+        return GetNextResult::makeEOF();
     }
 
-    Document doc = std::move(queue.front());
+    auto next = std::move(queue.front());
     queue.pop_front();
-    return {std::move(doc)};
+    return next;
 }
 }

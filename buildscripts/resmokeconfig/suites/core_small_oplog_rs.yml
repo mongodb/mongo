@@ -1,7 +1,7 @@
 selector:
   js_test:
     roots:
-    - jstests/core/*.js
+    - jstests/core/**/*.js
     exclude_files:
     # These tests are not expected to pass with replica-sets:
     - jstests/core/dbadmin.js
@@ -17,6 +17,7 @@ executor:
         readMode: commands
     hooks:
     - class: ValidateCollections
+    - class: CheckReplOplogs
     - class: CheckReplDBHash
     - class: CleanEveryN
       n: 20
@@ -26,4 +27,5 @@ executor:
         oplogSize: 511
         set_parameters:
           enableTestCommands: 1
+          numInitialSyncAttempts: 1
       num_nodes: 2

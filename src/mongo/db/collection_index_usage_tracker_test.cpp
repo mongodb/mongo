@@ -87,7 +87,7 @@ TEST_F(CollectionIndexUsageTrackerTest, IndexKey) {
     getTracker()->registerIndex("foo", BSON("foo" << 1));
     CollectionIndexUsageMap statsMap = getTracker()->getUsageStats();
     ASSERT(statsMap.find("foo") != statsMap.end());
-    ASSERT_EQUALS(BSON("foo" << 1), statsMap["foo"].indexKey);
+    ASSERT_BSONOBJ_EQ(BSON("foo" << 1), statsMap["foo"].indexKey);
 }
 
 // Test that index registration generates an entry in the stats map.

@@ -1149,6 +1149,29 @@ class MacroAssemblerMIPSCompat : public MacroAssemblerMIPS
         load32(Address(address.base, address.offset + HIGH_32_OFFSET), dest.high);
     }
 
+    void branch64(Condition cond, const Address& lhs, Imm64 val, Label* label) {
+        MOZ_ASSERT(cond == Assembler::NotEqual,
+                   "other condition codes not supported");
+
+        branch32(cond, lhs, val.firstHalf(), label);
+        branch32(cond, Address(lhs.base, lhs.offset + sizeof(uint32_t)), val.secondHalf(), label);
+    }
+
+    void branch64(Condition cond, const Address& lhs, const Address& rhs, Register scratch,
+                  Label* label)
+    {
+        MOZ_ASSERT(cond == Assembler::NotEqual,
+                   "other condition codes not supported");
+        MOZ_ASSERT(lhs.base != scratch);
+        MOZ_ASSERT(rhs.base != scratch);
+
+        load32(rhs, scratch);
+        branch32(cond, lhs, scratch, label);
+
+        load32(Address(rhs.base, rhs.offset + sizeof(uint32_t)), scratch);
+        branch32(cond, Address(lhs.base, lhs.offset + sizeof(uint32_t)), scratch, label);
+    }
+
     void loadPtr(const Address& address, Register dest);
     void loadPtr(const BaseIndex& src, Register dest);
     void loadPtr(AbsoluteAddress address, Register dest);

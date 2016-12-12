@@ -1,0 +1,21 @@
+# Copyright (c) 2015 The Chromium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# {sudo: required, dist: trusty} is the magic incantation to pick the trusty
+# beta environment, which is the only environment we can get that has >4GB
+# memory. Currently the `go test -race` tests that we run will peak at just
+# over 4GB, which results in everything getting OOM-killed.
+sudo: required
+dist: trusty
+
+language: go
+
+go:
+- 1.4.2
+
+before_install:
+  - go get github.com/maruel/pre-commit-go/cmd/pcg
+
+script:
+  - pcg

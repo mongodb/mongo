@@ -49,7 +49,6 @@
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
@@ -141,6 +140,12 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(const QueryReq
     newQR->setSkip(boost::none);
     newQR->setLimit(newLimit);
     newQR->setNToReturn(newNToReturn);
+
+    // Even if the client sends us singleBatch=true (wantMore=false), we may need to retrieve
+    // multiple batches from a shard in order to return the single requested batch to the client.
+    // Therefore, we must always send singleBatch=false (wantMore=true) to the shards.
+    newQR->setWantMore(true);
+
     invariantOK(newQR->validate());
     return std::move(newQR);
 }
@@ -152,7 +157,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
                                              std::shared_ptr<Shard> primary,
                                              std::vector<BSONObj>* results,
                                              BSONObj* viewDefinition) {
-    auto shardRegistry = grid.shardRegistry();
+    auto shardRegistry = Grid::get(txn)->shardRegistry();
 
     // Get the set of shards on which we will run the query.
     std::vector<std::shared_ptr<Shard>> shards;
@@ -168,12 +173,11 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
                                           &shardIds);
 
         for (auto id : shardIds) {
-            auto shard = shardRegistry->getShard(txn, id);
-            if (!shard) {
-                return {ErrorCodes::ShardNotFound,
-                        str::stream() << "Shard with id:  " << id << " is not found."};
+            auto shardStatus = shardRegistry->getShard(txn, id);
+            if (!shardStatus.isOK()) {
+                return shardStatus.getStatus();
             }
-            shards.emplace_back(shard);
+            shards.emplace_back(shardStatus.getValue());
         }
     }
 
@@ -284,7 +288,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     }
 
     // Register the cursor with the cursor manager.
-    auto cursorManager = grid.getCursorManager();
+    auto cursorManager = Grid::get(txn)->getCursorManager();
     const auto cursorType = chunkManager ? ClusterCursorManager::CursorType::NamespaceSharded
                                          : ClusterCursorManager::CursorType::NamespaceNotSharded;
     const auto cursorLifetime = query.getQueryRequest().isNoCursorTimeout()
@@ -314,7 +318,7 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
                               << query.getQueryRequest().getProj()};
     }
 
-    auto dbConfig = grid.catalogCache()->getDatabase(txn, query.nss().db().toString());
+    auto dbConfig = Grid::get(txn)->catalogCache()->getDatabase(txn, query.nss().db().toString());
     if (dbConfig.getStatus() == ErrorCodes::NamespaceNotFound) {
         // If the database doesn't exist, we successfully return an empty result set without
         // creating a cursor.
@@ -372,7 +376,7 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
 
 StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* txn,
                                                    const GetMoreRequest& request) {
-    auto cursorManager = grid.getCursorManager();
+    auto cursorManager = Grid::get(txn)->getCursorManager();
 
     auto pinnedCursor = cursorManager->checkOutCursor(request.nss, request.cursorid, txn);
     if (!pinnedCursor.isOK()) {

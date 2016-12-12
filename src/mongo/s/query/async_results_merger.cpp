@@ -313,6 +313,14 @@ Status AsyncResultsMerger::askForNextBatch_inlock(size_t remoteIndex) {
     return Status::OK();
 }
 
+/*
+ * Note: When nextEvent() is called to do retries, only the remotes with retriable errors will
+ * be rescheduled because:
+ *
+ * 1. Other pending remotes still have callback assigned to them.
+ * 2. Remotes that already has some result will have a non-empty buffer.
+ * 3. Remotes that reached maximum retries will be in 'exhausted' state.
+ */
 StatusWith<executor::TaskExecutor::EventHandle> AsyncResultsMerger::nextEvent() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -465,6 +473,12 @@ void AsyncResultsMerger::handleBatchResponse(
             remote.docBuffer.push(result);
             remote.cursorId = 0;
             remote.status = Status::OK();
+
+            if (!_params.sort.isEmpty()) {
+                // Push the index of this remote to the merge queue so that the resolved view is
+                // visible to nextReadySorted().
+                _mergeQueue.push(remoteIndex);
+            }
             return;
         }
 
@@ -477,29 +491,31 @@ void AsyncResultsMerger::handleBatchResponse(
         } else {
             shard->updateReplSetMonitor(remote.getTargetHost(), cursorResponseStatus.getStatus());
 
-            // Retry initial cursor establishment if possible.  Never retry getMores to avoid
+            // If we can still retry the initial cursor establishment, reset the state so it can be
+            // retried the next time nextEvent is called. Never retry getMores to avoid
             // accidentally skipping results.
             if (!remote.cursorId && remote.retryCount < kMaxNumFailedHostRetryAttempts &&
                 shard->isRetriableError(cursorResponseStatus.getStatus().code(),
                                         Shard::RetryPolicy::kIdempotent)) {
                 invariant(remote.shardId);
+                invariant(remote.docBuffer.empty());
+
                 LOG(1) << "Initial cursor establishment failed with retriable error and will be "
                           "retried"
                        << causedBy(redact(cursorResponseStatus.getStatus()));
 
                 ++remote.retryCount;
+                remote.status = Status::OK();  // Reset status so it can be retried.
 
-                // Since we potentially updated the targeter that the last host it chose might be
-                // faulty, the call below may end up getting a different host.
-                remote.status = askForNextBatch_inlock(remoteIndex);
-                if (remote.status.isOK()) {
-                    return;
+                // Signal the merger thread to make it retry this remote again.
+                if (_currentEvent.isValid()) {
+                    // To prevent ourselves from signalling the event twice,
+                    // we set '_currentEvent' as invalid after signalling it.
+                    _executor->signalEvent(_currentEvent);
+                    _currentEvent = executor::TaskExecutor::EventHandle();
                 }
 
-                // If we end up here, it means we failed to schedule the retry request, which is a
-                // more
-                // severe error that should not be retried. Just pass through to the error handling
-                // logic below.
+                return;
             } else {
                 remote.status = cursorResponseStatus.getStatus();
             }
@@ -685,8 +701,7 @@ Status AsyncResultsMerger::RemoteCursorData::resolveShardIdToHostAndPort(
     }
 
     // TODO: Pass down an OperationContext* to use here.
-    auto findHostStatus = shard->getTargeter()->findHost(
-        readPref, RemoteCommandTargeter::selectFindHostMaxWaitTime(nullptr));
+    auto findHostStatus = shard->getTargeter()->findHostWithMaxWait(readPref, Seconds{20});
     if (!findHostStatus.isOK()) {
         return findHostStatus.getStatus();
     }

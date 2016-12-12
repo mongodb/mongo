@@ -36,46 +36,10 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/util/md5.hpp"
 
 namespace mongo {
 
 typedef int HashSeed;
-typedef unsigned char HashDigest[16];
-
-class Hasher {
-    MONGO_DISALLOW_COPYING(Hasher);
-
-public:
-    explicit Hasher(HashSeed seed);
-    ~Hasher(){};
-
-    // pointer to next part of input key, length in bytes to read
-    void addData(const void* keyData, size_t numBytes);
-
-    // finish computing the hash, put the result in the digest
-    // only call this once per Hasher
-    void finish(HashDigest out);
-
-private:
-    md5_state_t _md5State;
-    HashSeed _seed;
-};
-
-class HasherFactory {
-    MONGO_DISALLOW_COPYING(HasherFactory);
-
-public:
-    /* Eventually this may be a more sophisticated factory
-     * for creating other hashers, but for now use MD5.
-     */
-    static Hasher* createHasher(HashSeed seed) {
-        return new Hasher(seed);
-    }
-
-private:
-    HasherFactory();
-};
 
 class BSONElementHasher {
     MONGO_DISALLOW_COPYING(BSONElementHasher);
@@ -103,16 +67,6 @@ public:
      * hashindex type is changed accordingly.
      */
     static long long int hash64(const BSONElement& e, HashSeed seed);
-
-    /* This incrementally computes the hash of BSONElement "e"
-     * using hash function "h".  If "includeFieldName" is true,
-     * then the name of the field is hashed in between the type of
-     * the element and the element value.  The hash function "h"
-     * is applied recursively to any sub-elements (arrays/sub-documents),
-     * squashing elements of the same canonical type.
-     * Used as a helper for hash64 above.
-     */
-    static void recursiveHash(Hasher* h, const BSONElement& e, bool includeFieldName);
 
 private:
     BSONElementHasher();

@@ -30,15 +30,21 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/document_source_geo_near.h"
+
 #include "mongo/db/pipeline/document.h"
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
 using boost::intrusive_ptr;
 
-REGISTER_DOCUMENT_SOURCE(geoNear, DocumentSourceGeoNear::createFromBson);
+REGISTER_DOCUMENT_SOURCE(geoNear,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceGeoNear::createFromBson);
 
 const long long DocumentSourceGeoNear::kDefaultLimit = 100;
 
@@ -46,14 +52,14 @@ const char* DocumentSourceGeoNear::getSourceName() const {
     return "$geoNear";
 }
 
-boost::optional<Document> DocumentSourceGeoNear::getNext() {
+DocumentSource::GetNextResult DocumentSourceGeoNear::getNext() {
     pExpCtx->checkForInterrupt();
 
     if (!resultsIterator)
         runCommand();
 
     if (!resultsIterator->more())
-        return boost::none;
+        return GetNextResult::makeEOF();
 
     // each result from the geoNear command is wrapped in a wrapper object with "obj",
     // "dis" and maybe "loc" fields. We want to take the object from "obj" and inject the
@@ -67,7 +73,7 @@ boost::optional<Document> DocumentSourceGeoNear::getNext() {
     return output.freeze();
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceGeoNear::optimizeAt(
+Pipeline::SourceContainer::iterator DocumentSourceGeoNear::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
@@ -147,10 +153,7 @@ BSONObj DocumentSourceGeoNear::buildGeoNearCmd() const {
     if (pExpCtx->getCollator()) {
         geoNear.append("collation", pExpCtx->getCollator()->getSpec().toBSON());
     } else {
-        BSONObjBuilder collationBuilder(geoNear.subobjStart("collation"));
-        collationBuilder.append(CollationSpec::kLocaleField,
-                                CollationSpec::kSimpleBinaryComparison);
-        collationBuilder.doneFast();
+        geoNear.append("collation", CollationSpec::kSimpleSpec);
     }
 
     geoNear.append("spherical", spherical);

@@ -30,6 +30,8 @@
 
 #include "mongo/db/pipeline/value_comparator.h"
 
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
@@ -267,6 +269,46 @@ TEST(ValueComparatorTest, UnorderedMapOfValueRespectsCollation) {
     ASSERT_EQ(map.size(), 2U);
     ASSERT_EQ(map[Value("FoO")], 2);
     ASSERT_EQ(map[Value("fooZ")], 3);
+}
+
+TEST(ValueComparatorTest, ComparingCodeWScopeShouldNotRespectCollation) {
+    const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const ValueComparator comparator(&collator);
+    const Value val1{BSONCodeWScope("js code",
+                                    BSON("foo"
+                                         << "bar"))};
+    const Value val2{BSONCodeWScope("js code",
+                                    BSON("foo"
+                                         << "not bar"))};
+    ASSERT_TRUE(comparator.evaluate(val1 != val2));
+}
+
+TEST(ValueComparatorTest, HashingCodeWScopeShouldNotRespectCollation) {
+    const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const ValueComparator comparator(&collator);
+    const Value val1{BSONCodeWScope("js code",
+                                    BSON("foo"
+                                         << "bar"))};
+    const Value val2{BSONCodeWScope("js code",
+                                    BSON("foo"
+                                         << "not bar"))};
+    ASSERT_NE(comparator.hash(val1), comparator.hash(val2));
+}
+
+TEST(ValueComparatorTest, ComparingCodeShouldNotRespectCollation) {
+    const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const ValueComparator comparator(&collator);
+    const Value val1{BSONCode("js code")};
+    const Value val2{BSONCode("other js code")};
+    ASSERT_TRUE(comparator.evaluate(val1 != val2));
+}
+
+TEST(ValueComparatorTest, HashingCodeShouldNotRespectCollation) {
+    const CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    const ValueComparator comparator(&collator);
+    const Value val1{BSONCode("js code")};
+    const Value val2{BSONCode("other js code")};
+    ASSERT_NE(comparator.hash(val1), comparator.hash(val2));
 }
 
 }  // namespace

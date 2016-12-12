@@ -340,6 +340,10 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
             }
 
             if (scope->getProto<DBPointerInfo>().getJSClass() == jsclass) {
+                uassert(ErrorCodes::BadValue,
+                        "can't serialize DBPointer prototype",
+                        scope->getProto<DBPointerInfo>().getProto() != obj);
+
                 JS::RootedValue id(_context);
                 o.getValue("id", &id);
 
@@ -350,6 +354,8 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
 
             if (scope->getProto<BinDataInfo>().getJSClass() == jsclass) {
                 auto str = static_cast<std::string*>(JS_GetPrivate(obj));
+
+                uassert(ErrorCodes::BadValue, "Cannot call getter on BinData prototype", str);
 
                 auto binData = base64::decode(*str);
 

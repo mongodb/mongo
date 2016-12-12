@@ -41,6 +41,10 @@ namespace repl {
 
 namespace {
 
+OpTime getOpTime(const OplogInterface::Iterator::Value& oplogValue) {
+    return fassertStatusOK(40298, OpTime::parseFromOplogEntry(oplogValue.first));
+}
+
 Timestamp getTimestamp(const BSONObj& operation) {
     return operation["ts"].timestamp();
 }
@@ -116,7 +120,7 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations
         _scanned++;
         if (getHash(_localOplogValue) == getHash(operation)) {
             return StatusWith<RollbackCommonPoint>(
-                std::make_pair(getTimestamp(_localOplogValue), _localOplogValue.second));
+                std::make_pair(getOpTime(_localOplogValue), _localOplogValue.second));
         }
         auto status = _rollbackOperation(_localOplogValue.first);
         if (!status.isOK()) {
@@ -139,14 +143,11 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations
             "Need to process additional remote operations.");
     }
 
-    if (getTimestamp(_localOplogValue) < getTimestamp(operation)) {
-        _scanned++;
-        return StatusWith<RollbackCommonPoint>(ErrorCodes::NoSuchKey,
-                                               "Unable to determine common point. "
-                                               "Need to process additional remote operations.");
-    }
-
-    return RollbackCommonPoint(Timestamp(Seconds(1), 0), RecordId());
+    invariant(getTimestamp(_localOplogValue) < getTimestamp(operation));
+    _scanned++;
+    return StatusWith<RollbackCommonPoint>(ErrorCodes::NoSuchKey,
+                                           "Unable to determine common point. "
+                                           "Need to process additional remote operations.");
 }
 
 StatusWith<RollBackLocalOperations::RollbackCommonPoint> syncRollBackLocalOperations(

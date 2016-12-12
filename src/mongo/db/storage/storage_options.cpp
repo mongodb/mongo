@@ -49,6 +49,7 @@ const char* StorageGlobalParams::kDefaultConfigDbPath = "/data/configdb";
 #endif
 
 const int StorageGlobalParams::kMaxJournalCommitIntervalMs = 500;
+const double StorageGlobalParams::kMaxSyncdelaySecs = 9.0 * 1000.0 * 1000.0;
 
 /**
  * Specify whether all queries must use indexes.
@@ -63,8 +64,25 @@ ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime> NoTableSc
  * working memory to disk. By default, mongod flushes memory to disk every 60 seconds.
  * In almost every situation you should not set this value and use the default setting.
  */
-ExportedServerParameter<double, ServerParameterType::kStartupAndRuntime> SyncdelaySetting(
-    ServerParameterSet::getGlobal(), "syncdelay", &storageGlobalParams.syncdelay);
+class SyncdelaySetting
+    : public ExportedServerParameter<double, ServerParameterType::kStartupAndRuntime> {
+public:
+    SyncdelaySetting()
+        : ExportedServerParameter<double, ServerParameterType::kStartupAndRuntime>(
+              ServerParameterSet::getGlobal(), "syncdelay", &storageGlobalParams.syncdelay) {}
+
+    virtual Status validate(const double& potentialNewValue) {
+        if (potentialNewValue < 0.0 || potentialNewValue > StorageGlobalParams::kMaxSyncdelaySecs) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "syncdelay must be between 0 and "
+                                        << StorageGlobalParams::kMaxSyncdelaySecs
+                                        << ", but attempted to set to: "
+                                        << potentialNewValue);
+        }
+
+        return Status::OK();
+    }
+} syncdelaySetting;
 
 /**
  * Specify an integer between 1 and kMaxJournalCommitInterval signifying the number of milliseconds

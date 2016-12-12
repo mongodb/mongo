@@ -159,11 +159,6 @@ struct Interval {
 
     IntervalComparison compare(const Interval& other) const;
 
-    /**
-     * toString for IntervalComparison
-     */
-    static std::string cmpstr(IntervalComparison c);
-
     //
     // Mutation of intervals
     //

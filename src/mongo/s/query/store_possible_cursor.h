@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include "mongo/db/namespace_string.h"
+
 namespace mongo {
 
 class BSONObj;
@@ -45,6 +47,10 @@ class TaskExecutor;
  * must be the response object generated upon creation of the cursor. The newly created cursor will
  * use 'executor' to retrieve batches of results from the shards and is stored with 'cursorManager'.
  *
+ * 'requestedNss' is used to store the ClusterClientCursor for future lookup. It is also the
+ * namespace represented in the cursor response for the returned BSONObj. For views 'requestedNss'
+ * may be different then the underlying collection namespace.
+ *
  * If 'cmdResult' does not describe a command cursor response document or no cursor is specified,
  * returns 'cmdResult'. If a parsing error occurs, returns an error Status. Otherwise, returns a
  * BSONObj response document describing the newly-created cursor, which is suitable for returning to
@@ -52,6 +58,7 @@ class TaskExecutor;
  */
 StatusWith<BSONObj> storePossibleCursor(const HostAndPort& server,
                                         const BSONObj& cmdResult,
+                                        const NamespaceString& requestedNss,
                                         executor::TaskExecutor* executor,
                                         ClusterCursorManager* cursorManager);
 

@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#include <memory>
+
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_engine.h"
 
 #include "mongo/db/index/index_descriptor.h"
@@ -35,6 +37,7 @@
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_record_store.h"
 #include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
 #include "mongo/db/storage/journal_listener.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
@@ -54,19 +57,18 @@ Status EphemeralForTestEngine::createRecordStore(OperationContext* opCtx,
     return Status::OK();
 }
 
-RecordStore* EphemeralForTestEngine::getRecordStore(OperationContext* opCtx,
-                                                    StringData ns,
-                                                    StringData ident,
-                                                    const CollectionOptions& options) {
+std::unique_ptr<RecordStore> EphemeralForTestEngine::getRecordStore(
+    OperationContext* opCtx, StringData ns, StringData ident, const CollectionOptions& options) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (options.capped) {
-        return new EphemeralForTestRecordStore(ns,
-                                               &_dataMap[ident],
-                                               true,
-                                               options.cappedSize ? options.cappedSize : 4096,
-                                               options.cappedMaxDocs ? options.cappedMaxDocs : -1);
+        return stdx::make_unique<EphemeralForTestRecordStore>(
+            ns,
+            &_dataMap[ident],
+            true,
+            options.cappedSize ? options.cappedSize : 4096,
+            options.cappedMaxDocs ? options.cappedMaxDocs : -1);
     } else {
-        return new EphemeralForTestRecordStore(ns, &_dataMap[ident]);
+        return stdx::make_unique<EphemeralForTestRecordStore>(ns, &_dataMap[ident]);
     }
 }
 

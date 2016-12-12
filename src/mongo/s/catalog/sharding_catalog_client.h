@@ -244,6 +244,7 @@ public:
      * @param optime an out parameter that will contain the opTime of the config server.
      *      Can be null. Note that chunks can be fetched in multiple batches and each batch
      *      can have a unique opTime. This opTime will be the one from the last batch.
+     * @param readConcern The readConcern to use while querying for chunks.
      *
      * Returns a !OK status if an error occurs.
      */
@@ -252,7 +253,8 @@ public:
                              const BSONObj& sort,
                              boost::optional<int> limit,
                              std::vector<ChunkType>* chunks,
-                             repl::OpTime* opTime) = 0;
+                             repl::OpTime* opTime,
+                             repl::ReadConcernLevel readConcern) = 0;
 
     /**
      * Retrieves all tags for the specified collection.
@@ -260,14 +262,6 @@ public:
     virtual Status getTagsForCollection(OperationContext* txn,
                                         const std::string& collectionNs,
                                         std::vector<TagsType>* tags) = 0;
-
-    /**
-     * Retrieves the most appropriate tag, which overlaps with the specified chunk. If no tags
-     * overlap, returns an empty string.
-     */
-    virtual StatusWith<std::string> getTagForChunk(OperationContext* txn,
-                                                   const std::string& collectionNs,
-                                                   const ChunkType& chunk) = 0;
 
     /**
      * Retrieves all shards in this sharded cluster.
@@ -309,6 +303,8 @@ public:
      * @param nss: namespace string for the chunks collection.
      * @param lastChunkVersion: version of the last document being written to the chunks
      * collection.
+     * @param writeConcern: writeConcern to use for applying documents.
+     * @param readConcern: readConcern to use for verifying that documents have been applied.
      *
      * 'nss' and 'lastChunkVersion' uniquely identify the last document being written, which is
      * expected to appear in the chunks collection on success. This is important for the
@@ -320,7 +316,9 @@ public:
                                            const BSONArray& updateOps,
                                            const BSONArray& preCondition,
                                            const std::string& nss,
-                                           const ChunkVersion& lastChunkVersion) = 0;
+                                           const ChunkVersion& lastChunkVersion,
+                                           const WriteConcernOptions& writeConcern,
+                                           repl::ReadConcernLevel readConcern) = 0;
 
     /**
      * Writes a diagnostic event to the action log.
@@ -336,7 +334,8 @@ public:
     virtual Status logChange(OperationContext* txn,
                              const std::string& what,
                              const std::string& ns,
-                             const BSONObj& detail) = 0;
+                             const BSONObj& detail,
+                             const WriteConcernOptions& writeConcern) = 0;
 
     /**
      * Reads global sharding settings from the confing.settings collection. The key parameter is
@@ -435,13 +434,6 @@ public:
     virtual Status appendInfoForConfigServerDatabases(OperationContext* txn,
                                                       BSONArrayBuilder* builder) = 0;
 
-
-    virtual StatusWith<DistLockManager::ScopedDistLock> distLock(
-        OperationContext* txn,
-        StringData name,
-        StringData whyMessage,
-        Milliseconds waitFor = DistLockManager::kSingleLockAttemptTimeout) = 0;
-
     /**
      * Obtains a reference to the distributed lock manager instance to use for synchronizing
      * system-wide changes.
@@ -450,7 +442,6 @@ public:
      * be cached.
      */
     virtual DistLockManager* getDistLockManager() = 0;
-
 
 protected:
     ShardingCatalogClient() = default;

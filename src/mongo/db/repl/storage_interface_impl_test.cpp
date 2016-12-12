@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <algorithm>
 #include <boost/optional.hpp>
 #include <memory>
 
@@ -41,6 +42,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
@@ -60,13 +62,17 @@ namespace {
 using namespace mongo;
 using namespace mongo::repl;
 
+const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
+
 BSONObj makeIdIndexSpec(const NamespaceString& nss) {
     return BSON("ns" << nss.toString() << "name"
                      << "_id_"
                      << "key"
                      << BSON("_id" << 1)
                      << "unique"
-                     << true);
+                     << true
+                     << "v"
+                     << static_cast<int>(kIndexVersion));
 }
 
 /**
@@ -158,7 +164,6 @@ int64_t getIndexKeyCount(OperationContext* txn, IndexCatalog* cat, IndexDescript
     idx->validate(txn, &numKeys, &fullRes);
     return numKeys;
 }
-
 
 class StorageInterfaceImplTest : public ServiceContextMongoDTest {
 protected:
@@ -274,9 +279,9 @@ TEST_F(StorageInterfaceImplTest, GetMinValidAfterSettingInitialSyncFlagWorks) {
     storageInterface.setInitialSyncFlag(txn.get());
     ASSERT_TRUE(storageInterface.getInitialSyncFlag(txn.get()));
 
-    auto minValid = storageInterface.getMinValid(txn.get());
-    ASSERT_TRUE(minValid.start.isNull());
-    ASSERT_TRUE(minValid.end.isNull());
+    ASSERT(storageInterface.getMinValid(txn.get()).isNull());
+    ASSERT(storageInterface.getAppliedThrough(txn.get()).isNull());
+    ASSERT(storageInterface.getOplogDeleteFromPoint(txn.get()).isNull());
 }
 
 TEST_F(StorageInterfaceImplTest, MinValid) {
@@ -285,18 +290,30 @@ TEST_F(StorageInterfaceImplTest, MinValid) {
     StorageInterfaceImpl storageInterface(nss);
     auto txn = getClient()->makeOperationContext();
 
-    // MinValid boundaries should be {null optime, null optime} after initializing a new storage
-    // engine.
-    auto minValid = storageInterface.getMinValid(txn.get());
-    ASSERT_TRUE(minValid.start.isNull());
-    ASSERT_TRUE(minValid.end.isNull());
+    // MinValid boundaries should all be null after initializing a new storage engine.
+    ASSERT(storageInterface.getMinValid(txn.get()).isNull());
+    ASSERT(storageInterface.getAppliedThrough(txn.get()).isNull());
+    ASSERT(storageInterface.getOplogDeleteFromPoint(txn.get()).isNull());
 
     // Setting min valid boundaries should affect getMinValid() result.
     OpTime startOpTime({Seconds(123), 0}, 1LL);
     OpTime endOpTime({Seconds(456), 0}, 1LL);
-    storageInterface.setMinValid(txn.get(), {startOpTime, endOpTime});
-    minValid = storageInterface.getMinValid(txn.get());
-    ASSERT_EQUALS(BatchBoundaries(startOpTime, endOpTime), minValid);
+    storageInterface.setAppliedThrough(txn.get(), startOpTime);
+    storageInterface.setMinValid(txn.get(), endOpTime);
+    storageInterface.setOplogDeleteFromPoint(txn.get(), endOpTime.getTimestamp());
+
+    ASSERT_EQ(storageInterface.getAppliedThrough(txn.get()), startOpTime);
+    ASSERT_EQ(storageInterface.getMinValid(txn.get()), endOpTime);
+    ASSERT_EQ(storageInterface.getOplogDeleteFromPoint(txn.get()), endOpTime.getTimestamp());
+
+
+    // setMinValid always changes minValid, but setMinValidToAtLeast only does if higher.
+    storageInterface.setMinValid(txn.get(), startOpTime);  // Forcibly lower it.
+    ASSERT_EQ(storageInterface.getMinValid(txn.get()), startOpTime);
+    storageInterface.setMinValidToAtLeast(txn.get(), endOpTime);  // Higher than current (sets it).
+    ASSERT_EQ(storageInterface.getMinValid(txn.get()), endOpTime);
+    storageInterface.setMinValidToAtLeast(txn.get(), startOpTime);  // Lower than current (no-op).
+    ASSERT_EQ(storageInterface.getMinValid(txn.get()), endOpTime);
 
     // Check min valid document using storage engine interface.
     auto minValidDocument = getMinValidDocument(txn.get(), nss);
@@ -306,6 +323,9 @@ TEST_F(StorageInterfaceImplTest, MinValid) {
                   unittest::assertGet(OpTime::parseFromOplogEntry(
                       minValidDocument[StorageInterfaceImpl::kBeginFieldName].Obj())));
     ASSERT_EQUALS(endOpTime, unittest::assertGet(OpTime::parseFromOplogEntry(minValidDocument)));
+    ASSERT_EQUALS(
+        endOpTime.getTimestamp(),
+        minValidDocument[StorageInterfaceImpl::kOplogDeleteFromPointFieldName].timestamp());
 
     // Recovery unit will be owned by "txn".
     RecoveryUnitWithDurabilityTracking* recoveryUnit = new RecoveryUnitWithDurabilityTracking();
@@ -313,19 +333,11 @@ TEST_F(StorageInterfaceImplTest, MinValid) {
 
     // Set min valid without waiting for the changes to be durable.
     OpTime endOpTime2({Seconds(789), 0}, 1LL);
-    storageInterface.setMinValid(txn.get(), endOpTime2, DurableRequirement::None);
-    minValid = storageInterface.getMinValid(txn.get());
-    ASSERT_TRUE(minValid.start.isNull());
-    ASSERT_EQUALS(endOpTime2, minValid.end);
+    storageInterface.setMinValid(txn.get(), endOpTime2);
+    storageInterface.setAppliedThrough(txn.get(), {});
+    ASSERT_EQUALS(storageInterface.getAppliedThrough(txn.get()), OpTime());
+    ASSERT_EQUALS(storageInterface.getMinValid(txn.get()), endOpTime2);
     ASSERT_FALSE(recoveryUnit->waitUntilDurableCalled);
-
-    // Set min valid and wait for the changes to be durable.
-    OpTime endOpTime3({Seconds(999), 0}, 1LL);
-    storageInterface.setMinValid(txn.get(), endOpTime3, DurableRequirement::Strong);
-    minValid = storageInterface.getMinValid(txn.get());
-    ASSERT_TRUE(minValid.start.isNull());
-    ASSERT_EQUALS(endOpTime3, minValid.end);
-    ASSERT_TRUE(recoveryUnit->waitUntilDurableCalled);
 }
 
 TEST_F(StorageInterfaceImplTest, SnapshotSupported) {
@@ -334,13 +346,12 @@ TEST_F(StorageInterfaceImplTest, SnapshotSupported) {
     ASSERT(status.isOK());
 }
 
-TEST_F(StorageInterfaceImplTest,
-       InsertDocumentsReturnsEmptyArrayOperationWhenNoOperationsAreGiven) {
-    NamespaceString nss("local." + _agent.getTestName());
-    StorageInterfaceImpl storageInterface(nss);
+TEST_F(StorageInterfaceImplTest, InsertDocumentsReturnsOKWhenNoOperationsAreGiven) {
     auto txn = getClient()->makeOperationContext();
-    ASSERT_EQUALS(ErrorCodes::EmptyArrayOperation,
-                  storageInterface.insertDocuments(txn.get(), nss, {}));
+    NamespaceString nss("local." + _agent.getTestName());
+    createCollection(txn.get(), nss);
+    StorageInterfaceImpl storageInterface(nss);
+    ASSERT_OK(storageInterface.insertDocuments(txn.get(), nss, {}));
 }
 
 TEST_F(StorageInterfaceImplTest,
@@ -359,6 +370,38 @@ TEST_F(StorageInterfaceImplTest,
     ASSERT_STRING_CONTAINS(status.reason(), "Collection::insertDocument got document without _id");
 }
 
+TEST_F(StorageInterfaceImplTest,
+       InsertDocumentsInsertsDocumentsOneAtATimeWhenAllAtOnceInsertingFails) {
+    // Create a collection that does not support all-at-once inserting.
+    auto txn = getClient()->makeOperationContext();
+    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    CollectionOptions options;
+    options.capped = true;
+    options.cappedSize = 1024 * 1024;
+    createCollection(txn.get(), nss, options);
+    // StorageInterfaceImpl::insertDocuments should fall back on inserting the batch one at a time.
+    StorageInterfaceImpl storageInterface(nss);
+    auto doc1 = BSON("_id" << 1);
+    auto doc2 = BSON("_id" << 2);
+    std::vector<BSONObj> docs({doc1, doc2});
+    // Confirm that Collection::insertDocuments fails to insert the batch all at once.
+    {
+        AutoGetCollection autoCollection(txn.get(), nss, MODE_IX);
+        WriteUnitOfWork wunit(txn.get());
+        ASSERT_EQUALS(ErrorCodes::OperationCannotBeBatched,
+                      autoCollection.getCollection()->insertDocuments(
+                          txn.get(), docs.begin(), docs.cend(), nullptr, false));
+    }
+    ASSERT_OK(storageInterface.insertDocuments(txn.get(), nss, docs));
+
+    // Check collection contents. OplogInterface returns documents in reverse natural order.
+    OplogInterfaceLocal oplog(txn.get(), nss.ns());
+    auto iter = oplog.makeIterator();
+    ASSERT_BSONOBJ_EQ(doc2, unittest::assertGet(iter->next()).first);
+    ASSERT_BSONOBJ_EQ(doc1, unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
 TEST_F(StorageInterfaceImplTest, InsertDocumentsSavesOperationsReturnsOpTimeOfLastOperation) {
     // Create fake oplog collection to hold operations.
     auto txn = getClient()->makeOperationContext();
@@ -375,8 +418,8 @@ TEST_F(StorageInterfaceImplTest, InsertDocumentsSavesOperationsReturnsOpTimeOfLa
     // Check contents of oplog. OplogInterface iterates over oplog collection in reverse.
     repl::OplogInterfaceLocal oplog(txn.get(), nss.ns());
     auto iter = oplog.makeIterator();
-    ASSERT_EQUALS(op2, unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(op1, unittest::assertGet(iter->next()).first);
+    ASSERT_BSONOBJ_EQ(op2, unittest::assertGet(iter->next()).first);
+    ASSERT_BSONOBJ_EQ(op1, unittest::assertGet(iter->next()).first);
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
 }
 
@@ -537,32 +580,51 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, DropCollectionWorksWithMissingColl
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     NamespaceString nss("foo.bar");
+    ASSERT_FALSE(AutoGetDb(txn, nss.db(), MODE_IS).getDb());
     ASSERT_OK(storage.dropCollection(txn, nss));
-    AutoGetCollectionForRead autoColl(txn, nss);
-    ASSERT_FALSE(autoColl.getCollection());
+    ASSERT_FALSE(AutoGetCollectionForRead(txn, nss).getCollection());
+    // Database should not be created after running dropCollection.
+    ASSERT_FALSE(AutoGetDb(txn, nss.db(), MODE_IS).getDb());
 }
 
-TEST_F(StorageInterfaceImplWithReplCoordTest, FindOneReturnsInvalidNamespaceIfCollectionIsMissing) {
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       FindDocumentsReturnsInvalidNamespaceIfCollectionIsMissing) {
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
     auto indexName = "_id_"_sd;
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
-                  storage.findOne(txn, nss, indexName, StorageInterface::ScanDirection::kForward));
+                  storage
+                      .findDocuments(txn,
+                                     nss,
+                                     indexName,
+                                     StorageInterface::ScanDirection::kForward,
+                                     {},
+                                     BoundInclusion::kIncludeStartKeyOnly,
+                                     1U)
+                      .getStatus());
 }
 
-TEST_F(StorageInterfaceImplWithReplCoordTest, FindOneReturnsIndexNotFoundIfIndexIsMissing) {
+TEST_F(StorageInterfaceImplWithReplCoordTest, FindDocumentsReturnsIndexNotFoundIfIndexIsMissing) {
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
     auto indexName = "nonexistent"_sd;
     ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
     ASSERT_EQUALS(ErrorCodes::IndexNotFound,
-                  storage.findOne(txn, nss, indexName, StorageInterface::ScanDirection::kForward));
+                  storage
+                      .findDocuments(txn,
+                                     nss,
+                                     indexName,
+                                     StorageInterface::ScanDirection::kForward,
+                                     {},
+                                     BoundInclusion::kIncludeStartKeyOnly,
+                                     1U)
+                      .getStatus());
 }
 
 TEST_F(StorageInterfaceImplWithReplCoordTest,
-       FindOneReturnsIndexOptionsConflictIfIndexIsAPartialIndex) {
+       FindDocumentsReturnsIndexOptionsConflictIfIndexIsAPartialIndex) {
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     storage.startup();
@@ -580,217 +642,785 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
     ASSERT_OK(loader->commit());
     auto indexName = "x_1"_sd;
     ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict,
-                  storage.findOne(txn, nss, indexName, StorageInterface::ScanDirection::kForward));
+                  storage
+                      .findDocuments(txn,
+                                     nss,
+                                     indexName,
+                                     StorageInterface::ScanDirection::kForward,
+                                     {},
+                                     BoundInclusion::kIncludeStartKeyOnly,
+                                     1U)
+                      .getStatus());
 }
 
-TEST_F(StorageInterfaceImplWithReplCoordTest, FindOneReturnsCollectionIsEmptyIfCollectionIsEmpty) {
+TEST_F(StorageInterfaceImplWithReplCoordTest, FindDocumentsReturnsEmptyVectorIfCollectionIsEmpty) {
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
     auto indexName = "_id_"_sd;
     ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty,
-                  storage.findOne(txn, nss, indexName, StorageInterface::ScanDirection::kForward));
+    ASSERT_TRUE(unittest::assertGet(storage.findDocuments(txn,
+                                                          nss,
+                                                          indexName,
+                                                          StorageInterface::ScanDirection::kForward,
+                                                          {},
+                                                          BoundInclusion::kIncludeStartKeyOnly,
+                                                          1U))
+                    .empty());
+}
+
+std::string _toString(const std::vector<BSONObj>& docs) {
+    str::stream ss;
+    ss << "[";
+    bool first = true;
+    for (const auto& doc : docs) {
+        if (first) {
+            ss << doc;
+            first = false;
+        } else {
+            ss << ", " << doc;
+        }
+    }
+    ss << "]";
+    return ss;
+}
+
+/**
+ * Check collection contents. OplogInterface returns documents in reverse natural order.
+ */
+void _assertDocumentsInCollectionEquals(OperationContext* txn,
+                                        const NamespaceString& nss,
+                                        const std::vector<BSONObj>& docs) {
+    std::vector<BSONObj> reversedDocs(docs);
+    std::reverse(reversedDocs.begin(), reversedDocs.end());
+    OplogInterfaceLocal oplog(txn, nss.ns());
+    auto iter = oplog.makeIterator();
+    for (const auto& doc : reversedDocs) {
+        ASSERT_BSONOBJ_EQ(doc, unittest::assertGet(iter->next()).first);
+    }
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
+/**
+ * Check StatusWith<std::vector<BSONObj>> value.
+ */
+void _assertDocumentsEqual(const StatusWith<std::vector<BSONObj>>& statusWithDocs,
+                           const std::vector<BSONObj>& expectedDocs) {
+    const auto actualDocs = unittest::assertGet(statusWithDocs);
+    auto iter = actualDocs.cbegin();
+    std::string msg = str::stream() << "expected: " << _toString(expectedDocs)
+                                    << "; actual: " << _toString(actualDocs);
+    for (const auto& doc : expectedDocs) {
+        ASSERT_TRUE(iter != actualDocs.cend()) << msg;
+        ASSERT_BSONOBJ_EQ(doc, *(iter++));
+    }
+    ASSERT_TRUE(iter == actualDocs.cend()) << msg;
+}
+
+/**
+ * Returns first BSONObj from a StatusWith<std::vector<BSONObj>>.
+ */
+BSONObj _assetGetFront(const StatusWith<std::vector<BSONObj>>& statusWithDocs) {
+    auto&& docs = statusWithDocs.getValue();
+    ASSERT_FALSE(docs.empty());
+    return docs.front();
 }
 
 TEST_F(StorageInterfaceImplWithReplCoordTest,
-       FindOneReturnsDocumentWithLowestKeyValueIfScanDirectionIsForward) {
+       FindDocumentsReturnsDocumentWithLowestKeyValueIfScanDirectionIsForward) {
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
     auto indexName = "_id_"_sd;
     ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
-    ASSERT_OK(
-        storage.insertDocuments(txn, nss, {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)}));
-    ASSERT_EQUALS(BSON("_id" << 0),
-                  storage.findOne(txn, nss, indexName, StorageInterface::ScanDirection::kForward));
+    ASSERT_OK(storage.insertDocuments(txn,
+                                      nss,
+                                      {BSON("_id" << 0),
+                                       BSON("_id" << 1),
+                                       BSON("_id" << 2),
+                                       BSON("_id" << 3),
+                                       BSON("_id" << 4)}));
 
-    // Check collection contents. OplogInterface returns documents in reverse natural order.
-    OplogInterfaceLocal oplog(txn, nss.ns());
-    auto iter = oplog.makeIterator();
-    ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
-}
-
-TEST_F(StorageInterfaceImplWithReplCoordTest,
-       FindOneReturnsDocumentWithHighestKeyValueIfScanDirectionIsBackward) {
-    auto txn = getOperationContext();
-    StorageInterfaceImpl storage;
-    auto nss = makeNamespace(_agent);
-    auto indexName = "_id_"_sd;
-    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
-    ASSERT_OK(
-        storage.insertDocuments(txn, nss, {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)}));
-    ASSERT_EQUALS(BSON("_id" << 2),
-                  storage.findOne(txn, nss, indexName, StorageInterface::ScanDirection::kBackward));
-
-    // Check collection contents. OplogInterface returns documents in reverse natural order.
-    OplogInterfaceLocal oplog(txn, nss.ns());
-    auto iter = oplog.makeIterator();
-    ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
-}
-
-TEST_F(StorageInterfaceImplWithReplCoordTest,
-       FindOneCollectionScanReturnsFirstDocumentInsertedIfScanDirectionIsForward) {
-    auto txn = getOperationContext();
-    StorageInterfaceImpl storage;
-    auto nss = makeNamespace(_agent);
-    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
-    ASSERT_OK(
-        storage.insertDocuments(txn, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
-    ASSERT_EQUALS(
-        BSON("_id" << 1),
-        storage.findOne(txn, nss, boost::none, StorageInterface::ScanDirection::kForward));
-
-    // Check collection contents. OplogInterface returns documents in reverse natural order.
-    OplogInterfaceLocal oplog(txn, nss.ns());
-    auto iter = oplog.makeIterator();
-    ASSERT_EQUALS(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
-}
-
-TEST_F(StorageInterfaceImplWithReplCoordTest,
-       FindOneCollectionScanReturnsLastDocumentInsertedIfScanDirectionIsBackward) {
-    auto txn = getOperationContext();
-    StorageInterfaceImpl storage;
-    auto nss = makeNamespace(_agent);
-    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
-    ASSERT_OK(
-        storage.insertDocuments(txn, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
-    ASSERT_EQUALS(
+    // startKey not provided
+    ASSERT_BSONOBJ_EQ(
         BSON("_id" << 0),
-        storage.findOne(txn, nss, boost::none, StorageInterface::ScanDirection::kBackward));
+        _assetGetFront(storage.findDocuments(txn,
+                                             nss,
+                                             indexName,
+                                             StorageInterface::ScanDirection::kForward,
+                                             {},
+                                             BoundInclusion::kIncludeStartKeyOnly,
+                                             1U)));
 
-    // Check collection contents. OplogInterface returns documents in reverse natural order.
-    OplogInterfaceLocal oplog(txn, nss.ns());
-    auto iter = oplog.makeIterator();
-    ASSERT_EQUALS(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+    // startKey not provided. limit is 0.
+    _assertDocumentsEqual(storage.findDocuments(txn,
+                                                nss,
+                                                indexName,
+                                                StorageInterface::ScanDirection::kForward,
+                                                {},
+                                                BoundInclusion::kIncludeStartKeyOnly,
+                                                0U),
+                          {});
+
+    // startKey not provided. limit of 2.
+    _assertDocumentsEqual(storage.findDocuments(txn,
+                                                nss,
+                                                indexName,
+                                                StorageInterface::ScanDirection::kForward,
+                                                {},
+                                                BoundInclusion::kIncludeStartKeyOnly,
+                                                2U),
+                          {BSON("_id" << 0), BSON("_id" << 1)});
+
+    // startKey provided; include start key
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << 0),
+        _assetGetFront(storage.findDocuments(txn,
+                                             nss,
+                                             indexName,
+                                             StorageInterface::ScanDirection::kForward,
+                                             BSON("" << 0),
+                                             BoundInclusion::kIncludeStartKeyOnly,
+                                             1U)));
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << 1),
+        _assetGetFront(storage.findDocuments(txn,
+                                             nss,
+                                             indexName,
+                                             StorageInterface::ScanDirection::kForward,
+                                             BSON("" << 1),
+                                             BoundInclusion::kIncludeStartKeyOnly,
+                                             1U)));
+
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << 1),
+        _assetGetFront(storage.findDocuments(txn,
+                                             nss,
+                                             indexName,
+                                             StorageInterface::ScanDirection::kForward,
+                                             BSON("" << 0.5),
+                                             BoundInclusion::kIncludeStartKeyOnly,
+                                             1U)));
+
+    // startKey provided; include both start and end keys
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << 1),
+        _assetGetFront(storage.findDocuments(txn,
+                                             nss,
+                                             indexName,
+                                             StorageInterface::ScanDirection::kForward,
+                                             BSON("" << 1),
+                                             BoundInclusion::kIncludeStartKeyOnly,
+                                             1U)));
+
+    // startKey provided; exclude start key
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << 2),
+        _assetGetFront(storage.findDocuments(txn,
+                                             nss,
+                                             indexName,
+                                             StorageInterface::ScanDirection::kForward,
+                                             BSON("" << 1),
+                                             BoundInclusion::kIncludeEndKeyOnly,
+                                             1U)));
+
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << 2),
+        _assetGetFront(storage.findDocuments(txn,
+                                             nss,
+                                             indexName,
+                                             StorageInterface::ScanDirection::kForward,
+                                             BSON("" << 1.5),
+                                             BoundInclusion::kIncludeEndKeyOnly,
+                                             1U)));
+
+    // startKey provided; exclude both start and end keys
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << 2),
+        _assetGetFront(storage.findDocuments(txn,
+                                             nss,
+                                             indexName,
+                                             StorageInterface::ScanDirection::kForward,
+                                             BSON("" << 1),
+                                             BoundInclusion::kExcludeBothStartAndEndKeys,
+                                             1U)));
+
+    // startKey provided; exclude both start and end keys.
+    // A limit of 3 should return 2 documents because we reached the end of the collection.
+    _assertDocumentsEqual(storage.findDocuments(txn,
+                                                nss,
+                                                indexName,
+                                                StorageInterface::ScanDirection::kForward,
+                                                BSON("" << 2),
+                                                BoundInclusion::kExcludeBothStartAndEndKeys,
+                                                3U),
+                          {BSON("_id" << 3), BSON("_id" << 4)});
+
+    _assertDocumentsInCollectionEquals(
+        txn,
+        nss,
+        {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 3), BSON("_id" << 4)});
 }
 
 TEST_F(StorageInterfaceImplWithReplCoordTest,
-       DeleteOneReturnsInvalidNamespaceIfCollectionIsMissing) {
+       FindDocumentsReturnsDocumentWithHighestKeyValueIfScanDirectionIsBackward) {
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
     auto indexName = "_id_"_sd;
-    ASSERT_EQUALS(
-        ErrorCodes::NamespaceNotFound,
-        storage.deleteOne(txn, nss, indexName, StorageInterface::ScanDirection::kForward));
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(storage.insertDocuments(txn,
+                                      nss,
+                                      {BSON("_id" << 0),
+                                       BSON("_id" << 1),
+                                       BSON("_id" << 2),
+                                       BSON("_id" << 3),
+                                       BSON("_id" << 4)}));
+
+    // startKey not provided
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << 4),
+        _assetGetFront(storage.findDocuments(txn,
+                                             nss,
+                                             indexName,
+                                             StorageInterface::ScanDirection::kBackward,
+                                             {},
+                                             BoundInclusion::kIncludeStartKeyOnly,
+                                             1U)));
+
+    // startKey not provided. limit is 0.
+    _assertDocumentsEqual(storage.findDocuments(txn,
+                                                nss,
+                                                indexName,
+                                                StorageInterface::ScanDirection::kBackward,
+                                                {},
+                                                BoundInclusion::kIncludeStartKeyOnly,
+                                                0U),
+                          {});
+
+    // startKey not provided. limit of 2.
+    _assertDocumentsEqual(storage.findDocuments(txn,
+                                                nss,
+                                                indexName,
+                                                StorageInterface::ScanDirection::kBackward,
+                                                {},
+                                                BoundInclusion::kIncludeStartKeyOnly,
+                                                2U),
+                          {BSON("_id" << 4), BSON("_id" << 3)});
+
+    // startKey provided; include start key
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << 4),
+        _assetGetFront(storage.findDocuments(txn,
+                                             nss,
+                                             indexName,
+                                             StorageInterface::ScanDirection::kBackward,
+                                             BSON("" << 4),
+                                             BoundInclusion::kIncludeStartKeyOnly,
+                                             1U)));
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << 3),
+        _assetGetFront(storage.findDocuments(txn,
+                                             nss,
+                                             indexName,
+                                             StorageInterface::ScanDirection::kBackward,
+                                             BSON("" << 3),
+                                             BoundInclusion::kIncludeStartKeyOnly,
+                                             1U)));
+
+    // startKey provided; include both start and end keys
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << 4),
+        _assetGetFront(storage.findDocuments(txn,
+                                             nss,
+                                             indexName,
+                                             StorageInterface::ScanDirection::kBackward,
+                                             BSON("" << 4),
+                                             BoundInclusion::kIncludeBothStartAndEndKeys,
+                                             1U)));
+
+    // startKey provided; exclude start key
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << 2),
+        _assetGetFront(storage.findDocuments(txn,
+                                             nss,
+                                             indexName,
+                                             StorageInterface::ScanDirection::kBackward,
+                                             BSON("" << 3),
+                                             BoundInclusion::kIncludeEndKeyOnly,
+                                             1U)));
+
+    // startKey provided; exclude both start and end keys
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << 2),
+        _assetGetFront(storage.findDocuments(txn,
+                                             nss,
+                                             indexName,
+                                             StorageInterface::ScanDirection::kBackward,
+                                             BSON("" << 3),
+                                             BoundInclusion::kExcludeBothStartAndEndKeys,
+                                             1U)));
+
+    // startKey provided; exclude both start and end keys.
+    // A limit of 3 should return 2 documents because we reached the beginning of the collection.
+    _assertDocumentsEqual(storage.findDocuments(txn,
+                                                nss,
+                                                indexName,
+                                                StorageInterface::ScanDirection::kBackward,
+                                                BSON("" << 2),
+                                                BoundInclusion::kExcludeBothStartAndEndKeys,
+                                                3U),
+                          {BSON("_id" << 1), BSON("_id" << 0)});
+
+    _assertDocumentsInCollectionEquals(
+        txn,
+        nss,
+        {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 3), BSON("_id" << 4)});
 }
 
-TEST_F(StorageInterfaceImplWithReplCoordTest, DeleteOneReturnsIndexNotFoundIfIndexIsMissing) {
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       FindDocumentsCollScanReturnsFirstDocumentInsertedIfScanDirectionIsForward) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(
+        storage.insertDocuments(txn, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << 1),
+        _assetGetFront(storage.findDocuments(txn,
+                                             nss,
+                                             boost::none,
+                                             StorageInterface::ScanDirection::kForward,
+                                             {},
+                                             BoundInclusion::kIncludeStartKeyOnly,
+                                             1U)));
+
+    // Check collection contents. OplogInterface returns documents in reverse natural order.
+    OplogInterfaceLocal oplog(txn, nss.ns());
+    auto iter = oplog.makeIterator();
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       FindDocumentsCollScanReturnsLastDocumentInsertedIfScanDirectionIsBackward) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(
+        storage.insertDocuments(txn, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << 0),
+        _assetGetFront(storage.findDocuments(txn,
+                                             nss,
+                                             boost::none,
+                                             StorageInterface::ScanDirection::kBackward,
+                                             {},
+                                             BoundInclusion::kIncludeStartKeyOnly,
+                                             1U)));
+
+    _assertDocumentsInCollectionEquals(
+        txn, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)});
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       FindDocumentsCollScanReturnsNoSuchKeyIfStartKeyIsNotEmpty) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(
+        storage.insertDocuments(txn, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey,
+                  storage
+                      .findDocuments(txn,
+                                     nss,
+                                     boost::none,
+                                     StorageInterface::ScanDirection::kForward,
+                                     BSON("" << 1),
+                                     BoundInclusion::kIncludeStartKeyOnly,
+                                     1U)
+                      .getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       FindDocumentsCollScanReturnsInvalidOptionsIfBoundIsNotStartKeyOnly) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(
+        storage.insertDocuments(txn, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
+    ASSERT_EQUALS(ErrorCodes::InvalidOptions,
+                  storage
+                      .findDocuments(txn,
+                                     nss,
+                                     boost::none,
+                                     StorageInterface::ScanDirection::kForward,
+                                     {},
+                                     BoundInclusion::kIncludeEndKeyOnly,
+                                     1U)
+                      .getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       DeleteDocumentsReturnsInvalidNamespaceIfCollectionIsMissing) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    auto indexName = "_id_"_sd;
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+                  storage
+                      .deleteDocuments(txn,
+                                       nss,
+                                       indexName,
+                                       StorageInterface::ScanDirection::kForward,
+                                       {},
+                                       BoundInclusion::kIncludeStartKeyOnly,
+                                       1U)
+                      .getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest, DeleteDocumentsReturnsIndexNotFoundIfIndexIsMissing) {
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
     auto indexName = "nonexistent"_sd;
     ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
-    ASSERT_EQUALS(
-        ErrorCodes::IndexNotFound,
-        storage.deleteOne(txn, nss, indexName, StorageInterface::ScanDirection::kForward));
+    ASSERT_EQUALS(ErrorCodes::IndexNotFound,
+                  storage
+                      .deleteDocuments(txn,
+                                       nss,
+                                       indexName,
+                                       StorageInterface::ScanDirection::kForward,
+                                       {},
+                                       BoundInclusion::kIncludeStartKeyOnly,
+                                       1U)
+                      .getStatus());
 }
 
 TEST_F(StorageInterfaceImplWithReplCoordTest,
-       DeleteOneReturnsCollectionIsEmptyIfCollectionIsEmpty) {
+       DeleteDocumentsReturnsEmptyVectorIfCollectionIsEmpty) {
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
     auto indexName = "_id_"_sd;
     ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
-    ASSERT_EQUALS(
-        ErrorCodes::CollectionIsEmpty,
-        storage.deleteOne(txn, nss, indexName, StorageInterface::ScanDirection::kForward));
+    ASSERT_TRUE(
+        unittest::assertGet(storage.deleteDocuments(txn,
+                                                    nss,
+                                                    indexName,
+                                                    StorageInterface::ScanDirection::kForward,
+                                                    {},
+                                                    BoundInclusion::kIncludeStartKeyOnly,
+                                                    1U))
+            .empty());
 }
 
 TEST_F(StorageInterfaceImplWithReplCoordTest,
-       DeleteOneReturnsDocumentWithLowestKeyValueIfScanDirectionIsForward) {
+       DeleteDocumentsReturnsDocumentWithLowestKeyValueIfScanDirectionIsForward) {
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
     auto indexName = "_id_"_sd;
     ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
-    ASSERT_OK(
-        storage.insertDocuments(txn, nss, {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)}));
-    ASSERT_EQUALS(
+    ASSERT_OK(storage.insertDocuments(txn,
+                                      nss,
+                                      {BSON("_id" << 0),
+                                       BSON("_id" << 1),
+                                       BSON("_id" << 2),
+                                       BSON("_id" << 3),
+                                       BSON("_id" << 4),
+                                       BSON("_id" << 5),
+                                       BSON("_id" << 6),
+                                       BSON("_id" << 7)}));
+
+    // startKey not provided
+    ASSERT_BSONOBJ_EQ(
         BSON("_id" << 0),
-        storage.deleteOne(txn, nss, indexName, StorageInterface::ScanDirection::kForward));
+        _assetGetFront(storage.deleteDocuments(txn,
+                                               nss,
+                                               indexName,
+                                               StorageInterface::ScanDirection::kForward,
+                                               {},
+                                               BoundInclusion::kIncludeStartKeyOnly,
+                                               1U)));
 
-    // Check collection contents. OplogInterface returns documents in reverse natural order.
-    OplogInterfaceLocal oplog(txn, nss.ns());
-    auto iter = oplog.makeIterator();
-    ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
-}
+    _assertDocumentsInCollectionEquals(txn,
+                                       nss,
+                                       {BSON("_id" << 1),
+                                        BSON("_id" << 2),
+                                        BSON("_id" << 3),
+                                        BSON("_id" << 4),
+                                        BSON("_id" << 5),
+                                        BSON("_id" << 6),
+                                        BSON("_id" << 7)});
 
-TEST_F(StorageInterfaceImplWithReplCoordTest,
-       DeleteOneReturnsDocumentWithHighestKeyValueIfScanDirectionIsBackward) {
-    auto txn = getOperationContext();
-    StorageInterfaceImpl storage;
-    auto nss = makeNamespace(_agent);
-    auto indexName = "_id_"_sd;
-    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
-    ASSERT_OK(
-        storage.insertDocuments(txn, nss, {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 2)}));
-    ASSERT_EQUALS(
+    // startKey not provided. limit is 0.
+    _assertDocumentsEqual(storage.deleteDocuments(txn,
+                                                  nss,
+                                                  indexName,
+                                                  StorageInterface::ScanDirection::kForward,
+                                                  {},
+                                                  BoundInclusion::kIncludeStartKeyOnly,
+                                                  0U),
+                          {});
+
+    _assertDocumentsInCollectionEquals(txn,
+                                       nss,
+                                       {BSON("_id" << 1),
+                                        BSON("_id" << 2),
+                                        BSON("_id" << 3),
+                                        BSON("_id" << 4),
+                                        BSON("_id" << 5),
+                                        BSON("_id" << 6),
+                                        BSON("_id" << 7)});
+
+    // startKey provided; include start key
+    ASSERT_BSONOBJ_EQ(
         BSON("_id" << 2),
-        storage.deleteOne(txn, nss, indexName, StorageInterface::ScanDirection::kBackward));
+        _assetGetFront(storage.deleteDocuments(txn,
+                                               nss,
+                                               indexName,
+                                               StorageInterface::ScanDirection::kForward,
+                                               BSON("" << 2),
+                                               BoundInclusion::kIncludeStartKeyOnly,
+                                               1U)));
 
-    // Check collection contents. OplogInterface returns documents in reverse natural order.
-    OplogInterfaceLocal oplog(txn, nss.ns());
-    auto iter = oplog.makeIterator();
-    ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+    _assertDocumentsInCollectionEquals(txn,
+                                       nss,
+                                       {BSON("_id" << 1),
+                                        BSON("_id" << 3),
+                                        BSON("_id" << 4),
+                                        BSON("_id" << 5),
+                                        BSON("_id" << 6),
+                                        BSON("_id" << 7)});
+
+    // startKey provided; exclude start key
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << 5),
+        _assetGetFront(storage.deleteDocuments(txn,
+                                               nss,
+                                               indexName,
+                                               StorageInterface::ScanDirection::kForward,
+                                               BSON("" << 4),
+                                               BoundInclusion::kIncludeEndKeyOnly,
+                                               1U)));
+
+    _assertDocumentsInCollectionEquals(
+        txn,
+        nss,
+        {BSON("_id" << 1), BSON("_id" << 3), BSON("_id" << 4), BSON("_id" << 6), BSON("_id" << 7)});
+
+    // startKey provided; exclude start key.
+    // A limit of 3 should return 2 documents because we reached the end of the collection.
+    _assertDocumentsEqual(storage.deleteDocuments(txn,
+                                                  nss,
+                                                  indexName,
+                                                  StorageInterface::ScanDirection::kForward,
+                                                  BSON("" << 4),
+                                                  BoundInclusion::kIncludeEndKeyOnly,
+                                                  3U),
+                          {BSON("_id" << 6), BSON("_id" << 7)});
+
+    _assertDocumentsInCollectionEquals(
+        txn, nss, {BSON("_id" << 1), BSON("_id" << 3), BSON("_id" << 4)});
 }
 
 TEST_F(StorageInterfaceImplWithReplCoordTest,
-       DeleteOneCollectionScanReturnsFirstDocumentInsertedIfScanDirectionIsForward) {
+       DeleteDocumentsReturnsDocumentWithHighestKeyValueIfScanDirectionIsBackward) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    auto indexName = "_id_"_sd;
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(storage.insertDocuments(txn,
+                                      nss,
+                                      {BSON("_id" << 0),
+                                       BSON("_id" << 1),
+                                       BSON("_id" << 2),
+                                       BSON("_id" << 3),
+                                       BSON("_id" << 4),
+                                       BSON("_id" << 5),
+                                       BSON("_id" << 6),
+                                       BSON("_id" << 7)}));
+
+    // startKey not provided
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << 7),
+        _assetGetFront(storage.deleteDocuments(txn,
+                                               nss,
+                                               indexName,
+                                               StorageInterface::ScanDirection::kBackward,
+                                               {},
+                                               BoundInclusion::kIncludeStartKeyOnly,
+                                               1U)));
+
+    _assertDocumentsInCollectionEquals(txn,
+                                       nss,
+                                       {BSON("_id" << 0),
+                                        BSON("_id" << 1),
+                                        BSON("_id" << 2),
+                                        BSON("_id" << 3),
+                                        BSON("_id" << 4),
+                                        BSON("_id" << 5),
+                                        BSON("_id" << 6)});
+
+    // startKey not provided. limit is 0.
+    _assertDocumentsEqual(storage.deleteDocuments(txn,
+                                                  nss,
+                                                  indexName,
+                                                  StorageInterface::ScanDirection::kBackward,
+                                                  {},
+                                                  BoundInclusion::kIncludeStartKeyOnly,
+                                                  0U),
+                          {});
+
+    _assertDocumentsInCollectionEquals(txn,
+                                       nss,
+                                       {BSON("_id" << 0),
+                                        BSON("_id" << 1),
+                                        BSON("_id" << 2),
+                                        BSON("_id" << 3),
+                                        BSON("_id" << 4),
+                                        BSON("_id" << 5),
+                                        BSON("_id" << 6)});
+
+    // startKey provided; include start key
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << 5),
+        _assetGetFront(storage.deleteDocuments(txn,
+                                               nss,
+                                               indexName,
+                                               StorageInterface::ScanDirection::kBackward,
+                                               BSON("" << 5),
+                                               BoundInclusion::kIncludeStartKeyOnly,
+                                               1U)));
+
+    _assertDocumentsInCollectionEquals(txn,
+                                       nss,
+                                       {BSON("_id" << 0),
+                                        BSON("_id" << 1),
+                                        BSON("_id" << 2),
+                                        BSON("_id" << 3),
+                                        BSON("_id" << 4),
+                                        BSON("_id" << 6)});
+
+    // startKey provided; exclude start key
+    ASSERT_BSONOBJ_EQ(
+        BSON("_id" << 2),
+        _assetGetFront(storage.deleteDocuments(txn,
+                                               nss,
+                                               indexName,
+                                               StorageInterface::ScanDirection::kBackward,
+                                               BSON("" << 3),
+                                               BoundInclusion::kIncludeEndKeyOnly,
+                                               1U)));
+
+    _assertDocumentsInCollectionEquals(
+        txn,
+        nss,
+        {BSON("_id" << 0), BSON("_id" << 1), BSON("_id" << 3), BSON("_id" << 4), BSON("_id" << 6)});
+
+    // startKey provided; exclude start key.
+    // A limit of 3 should return 2 documents because we reached the beginning of the collection.
+    _assertDocumentsEqual(storage.deleteDocuments(txn,
+                                                  nss,
+                                                  indexName,
+                                                  StorageInterface::ScanDirection::kBackward,
+                                                  BSON("" << 3),
+                                                  BoundInclusion::kIncludeEndKeyOnly,
+                                                  3U),
+                          {BSON("_id" << 1), BSON("_id" << 0)});
+
+    _assertDocumentsInCollectionEquals(
+        txn, nss, {BSON("_id" << 3), BSON("_id" << 4), BSON("_id" << 6)});
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       DeleteDocumentsCollScanReturnsFirstDocumentInsertedIfScanDirectionIsForward) {
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
     ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
     ASSERT_OK(
         storage.insertDocuments(txn, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
-    ASSERT_EQUALS(
+    ASSERT_BSONOBJ_EQ(
         BSON("_id" << 1),
-        storage.deleteOne(txn, nss, boost::none, StorageInterface::ScanDirection::kForward));
+        _assetGetFront(storage.deleteDocuments(txn,
+                                               nss,
+                                               boost::none,
+                                               StorageInterface::ScanDirection::kForward,
+                                               {},
+                                               BoundInclusion::kIncludeStartKeyOnly,
+                                               1U)));
 
-    // Check collection contents. OplogInterface returns documents in reverse natural order.
-    OplogInterfaceLocal oplog(txn, nss.ns());
-    auto iter = oplog.makeIterator();
-    ASSERT_EQUALS(BSON("_id" << 0), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+    _assertDocumentsInCollectionEquals(txn, nss, {BSON("_id" << 2), BSON("_id" << 0)});
 }
 
 TEST_F(StorageInterfaceImplWithReplCoordTest,
-       DeleteOneCollectionScanReturnsLastDocumentInsertedIfScanDirectionIsBackward) {
+       DeleteDocumentsCollScanReturnsLastDocumentInsertedIfScanDirectionIsBackward) {
     auto txn = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
     ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
     ASSERT_OK(
         storage.insertDocuments(txn, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
-    ASSERT_EQUALS(
+    ASSERT_BSONOBJ_EQ(
         BSON("_id" << 0),
-        storage.deleteOne(txn, nss, boost::none, StorageInterface::ScanDirection::kBackward));
+        _assetGetFront(storage.deleteDocuments(txn,
+                                               nss,
+                                               boost::none,
+                                               StorageInterface::ScanDirection::kBackward,
+                                               {},
+                                               BoundInclusion::kIncludeStartKeyOnly,
+                                               1U)));
 
-    // Check collection contents. OplogInterface returns documents in reverse natural order.
-    OplogInterfaceLocal oplog(txn, nss.ns());
-    auto iter = oplog.makeIterator();
-    ASSERT_EQUALS(BSON("_id" << 2), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(BSON("_id" << 1), unittest::assertGet(iter->next()).first);
-    ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, iter->next().getStatus());
+    _assertDocumentsInCollectionEquals(txn, nss, {BSON("_id" << 1), BSON("_id" << 2)});
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       DeleteDocumentsCollScanReturnsNoSuchKeyIfStartKeyIsNotEmpty) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(
+        storage.insertDocuments(txn, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey,
+                  storage
+                      .deleteDocuments(txn,
+                                       nss,
+                                       boost::none,
+                                       StorageInterface::ScanDirection::kForward,
+                                       BSON("" << 1),
+                                       BoundInclusion::kIncludeStartKeyOnly,
+                                       1U)
+                      .getStatus());
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       DeleteDocumentsCollScanReturnsInvalidOptionsIfBoundIsNotStartKeyOnly) {
+    auto txn = getOperationContext();
+    StorageInterfaceImpl storage;
+    auto nss = makeNamespace(_agent);
+    ASSERT_OK(storage.createCollection(txn, nss, CollectionOptions()));
+    ASSERT_OK(
+        storage.insertDocuments(txn, nss, {BSON("_id" << 1), BSON("_id" << 2), BSON("_id" << 0)}));
+    ASSERT_EQUALS(ErrorCodes::InvalidOptions,
+                  storage
+                      .deleteDocuments(txn,
+                                       nss,
+                                       boost::none,
+                                       StorageInterface::ScanDirection::kForward,
+                                       {},
+                                       BoundInclusion::kIncludeEndKeyOnly,
+                                       1U)
+                      .getStatus());
 }
 
 }  // namespace

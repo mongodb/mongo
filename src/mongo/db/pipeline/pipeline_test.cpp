@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -44,12 +45,6 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/dbtests/dbtests.h"
-
-namespace mongo {
-bool isMongos() {
-    return false;
-}
-}
 
 namespace PipelineTests {
 
@@ -338,6 +333,7 @@ class LookupShouldSplitMatch : public Base {
                " {$match: {asField: {$eq: 3}}}]";
     }
 };
+
 class LookupShouldNotAbsorbMatchOnAs : public Base {
     string inputPipeJson() {
         return "[{$lookup: {from: 'foo', as: 'asField', localField: 'y', foreignField: 'z'}}, "
@@ -714,6 +710,134 @@ class GraphLookupShouldNotCoalesceWithUnwindNotOnAs : public Base {
     }
 };
 
+class GraphLookupShouldSwapWithMatch : public Base {
+    string inputPipeJson() {
+        return "[{$graphLookup: {"
+               "    from: 'coll2',"
+               "    as: 'results',"
+               "    connectToField: 'to',"
+               "    connectFromField: 'from',"
+               "    startWith: '$startVal'"
+               " }},"
+               " {$match: {independent: 'x'}}"
+               "]";
+    }
+    string outputPipeJson() {
+        return "[{$match: {independent: 'x'}},"
+               " {$graphLookup: {"
+               "    from: 'coll2',"
+               "    as: 'results',"
+               "    connectToField: 'to',"
+               "    connectFromField: 'from',"
+               "    startWith: '$startVal'"
+               " }}]";
+    }
+};
+
+class ExclusionProjectShouldSwapWithIndependentMatch : public Base {
+    string inputPipeJson() final {
+        return "[{$project: {redacted: 0}}, {$match: {unrelated: 4}}]";
+    }
+    string outputPipeJson() final {
+        return "[{$match: {unrelated: 4}}, {$project: {redacted: false}}]";
+    }
+};
+
+class ExclusionProjectShouldNotSwapWithMatchOnExcludedFields : public Base {
+    string inputPipeJson() final {
+        return "[{$project: {subdoc: {redacted: false}}}, {$match: {'subdoc.redacted': 4}}]";
+    }
+    string outputPipeJson() final {
+        return inputPipeJson();
+    }
+};
+
+class MatchShouldSplitIfPartIsIndependentOfExclusionProjection : public Base {
+    string inputPipeJson() final {
+        return "[{$project: {redacted: 0}},"
+               " {$match: {redacted: 'x', unrelated: 4}}]";
+    }
+    string outputPipeJson() final {
+        return "[{$match: {unrelated: {$eq: 4}}},"
+               " {$project: {redacted: false}},"
+               " {$match: {redacted: {$eq: 'x'}}}]";
+    }
+};
+
+class InclusionProjectShouldSwapWithIndependentMatch : public Base {
+    string inputPipeJson() final {
+        return "[{$project: {included: 1}}, {$match: {included: 4}}]";
+    }
+    string outputPipeJson() final {
+        return "[{$match: {included: 4}}, {$project: {_id: true, included: true}}]";
+    }
+};
+
+class InclusionProjectShouldNotSwapWithMatchOnFieldsNotIncluded : public Base {
+    string inputPipeJson() final {
+        return "[{$project: {_id: true, included: true, subdoc: {included: true}}},"
+               " {$match: {notIncluded: 'x', unrelated: 4}}]";
+    }
+    string outputPipeJson() final {
+        return inputPipeJson();
+    }
+};
+
+class MatchShouldSplitIfPartIsIndependentOfInclusionProjection : public Base {
+    string inputPipeJson() final {
+        return "[{$project: {_id: true, included: true}},"
+               " {$match: {included: 'x', unrelated: 4}}]";
+    }
+    string outputPipeJson() final {
+        return "[{$match: {included: {$eq: 'x'}}},"
+               " {$project: {_id: true, included: true}},"
+               " {$match: {unrelated: {$eq: 4}}}]";
+    }
+};
+
+class TwoMatchStagesShouldBothPushIndependentPartsBeforeProjection : public Base {
+    string inputPipeJson() final {
+        return "[{$project: {_id: true, included: true}},"
+               " {$match: {included: 'x', unrelated: 4}},"
+               " {$match: {included: 'y', unrelated: 5}}]";
+    }
+    string outputPipeJson() final {
+        return "[{$match: {$and: [{included: {$eq: 'x'}}, {included: {$eq: 'y'}}]}},"
+               " {$project: {_id: true, included: true}},"
+               " {$match: {$and: [{unrelated: {$eq: 4}}, {unrelated: {$eq: 5}}]}}]";
+    }
+};
+
+class NeighboringMatchesShouldCoalesce : public Base {
+    string inputPipeJson() final {
+        return "[{$match: {x: 'x'}},"
+               " {$match: {y: 'y'}}]";
+    }
+    string outputPipeJson() final {
+        return "[{$match: {$and: [{x: 'x'}, {y: 'y'}]}}]";
+    }
+};
+
+class MatchShouldNotSwapBeforeLimit : public Base {
+    string inputPipeJson() final {
+        return "[{$limit: 3},"
+               " {$match: {y: 'y'}}]";
+    }
+    string outputPipeJson() final {
+        return inputPipeJson();
+    }
+};
+
+class MatchShouldNotSwapBeforeSkip : public Base {
+    string inputPipeJson() final {
+        return "[{$skip: 3},"
+               " {$match: {y: 'y'}}]";
+    }
+    string outputPipeJson() final {
+        return inputPipeJson();
+    }
+};
+
 }  // namespace Local
 
 namespace Sharded {
@@ -1071,7 +1195,7 @@ TEST(PipelineInitialSource, GeoNearInitialQuery) {
     intrusive_ptr<ExpressionContext> ctx = new ExpressionContext(
         &_opCtx, AggregationRequest(NamespaceString("a.collection"), rawPipeline));
     auto pipe = uassertStatusOK(Pipeline::parse(rawPipeline, ctx));
-    ASSERT_EQ(pipe->getInitialQuery(), BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(pipe->getInitialQuery(), BSON("a" << 1));
 }
 
 TEST(PipelineInitialSource, MatchInitialQuery) {
@@ -1081,7 +1205,7 @@ TEST(PipelineInitialSource, MatchInitialQuery) {
         &_opCtx, AggregationRequest(NamespaceString("a.collection"), rawPipeline));
 
     auto pipe = uassertStatusOK(Pipeline::parse(rawPipeline, ctx));
-    ASSERT_EQ(pipe->getInitialQuery(), BSON("a" << 4));
+    ASSERT_BSONOBJ_EQ(pipe->getInitialQuery(), BSON("a" << 4));
 }
 
 TEST(PipelineInitialSource, ParseCollation) {
@@ -1324,6 +1448,7 @@ public:
         add<Optimizations::Local::GraphLookupShouldCoalesceWithUnwindOnAsWithPreserveEmpty>();
         add<Optimizations::Local::GraphLookupShouldCoalesceWithUnwindOnAsWithIncludeArrayIndex>();
         add<Optimizations::Local::GraphLookupShouldNotCoalesceWithUnwindNotOnAs>();
+        add<Optimizations::Local::GraphLookupShouldSwapWithMatch>();
         add<Optimizations::Local::MatchShouldDuplicateItselfBeforeRedact>();
         add<Optimizations::Local::MatchShouldSwapWithUnwind>();
         add<Optimizations::Local::MatchShouldNotOptimizeWhenMatchingOnIndexField>();
@@ -1333,6 +1458,16 @@ public:
         add<Optimizations::Local::MatchWithOrDoesNotSplit>();
         add<Optimizations::Local::MatchShouldSplitOnUnwind>();
         add<Optimizations::Local::UnwindBeforeDoubleMatchShouldRepeatedlyOptimize>();
+        add<Optimizations::Local::ExclusionProjectShouldSwapWithIndependentMatch>();
+        add<Optimizations::Local::ExclusionProjectShouldNotSwapWithMatchOnExcludedFields>();
+        add<Optimizations::Local::MatchShouldSplitIfPartIsIndependentOfExclusionProjection>();
+        add<Optimizations::Local::InclusionProjectShouldSwapWithIndependentMatch>();
+        add<Optimizations::Local::InclusionProjectShouldNotSwapWithMatchOnFieldsNotIncluded>();
+        add<Optimizations::Local::MatchShouldSplitIfPartIsIndependentOfInclusionProjection>();
+        add<Optimizations::Local::TwoMatchStagesShouldBothPushIndependentPartsBeforeProjection>();
+        add<Optimizations::Local::NeighboringMatchesShouldCoalesce>();
+        add<Optimizations::Local::MatchShouldNotSwapBeforeLimit>();
+        add<Optimizations::Local::MatchShouldNotSwapBeforeSkip>();
         add<Optimizations::Sharded::Empty>();
         add<Optimizations::Sharded::coalesceLookUpAndUnwind::ShouldCoalesceUnwindOnAs>();
         add<Optimizations::Sharded::coalesceLookUpAndUnwind::

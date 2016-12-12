@@ -46,7 +46,7 @@ TEST(FindAndModifyRequest, BasicUpdate) {
             update: { y: 1 }
         })json"));
 
-    ASSERT_EQUALS(expectedObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON());
 }
 
 TEST(FindAndModifyRequest, UpdateWithUpsert) {
@@ -62,7 +62,7 @@ TEST(FindAndModifyRequest, UpdateWithUpsert) {
             upsert: true
         })json"));
 
-    ASSERT_EQUALS(expectedObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON());
 }
 
 TEST(FindAndModifyRequest, UpdateWithUpsertFalse) {
@@ -78,7 +78,7 @@ TEST(FindAndModifyRequest, UpdateWithUpsertFalse) {
             upsert: false
         })json"));
 
-    ASSERT_EQUALS(expectedObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON());
 }
 
 TEST(FindAndModifyRequest, UpdateWithProjection) {
@@ -96,7 +96,7 @@ TEST(FindAndModifyRequest, UpdateWithProjection) {
             fields: { z: 1 }
         })json"));
 
-    ASSERT_EQUALS(expectedObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON());
 }
 
 TEST(FindAndModifyRequest, UpdateWithNewTrue) {
@@ -113,7 +113,7 @@ TEST(FindAndModifyRequest, UpdateWithNewTrue) {
             new: true
         })json"));
 
-    ASSERT_EQUALS(expectedObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON());
 }
 
 TEST(FindAndModifyRequest, UpdateWithNewFalse) {
@@ -130,7 +130,7 @@ TEST(FindAndModifyRequest, UpdateWithNewFalse) {
             new: false
         })json"));
 
-    ASSERT_EQUALS(expectedObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON());
 }
 
 TEST(FindAndModifyRequest, UpdateWithSort) {
@@ -148,7 +148,7 @@ TEST(FindAndModifyRequest, UpdateWithSort) {
             sort: { z: -1 }
         })json"));
 
-    ASSERT_EQUALS(expectedObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON());
 }
 
 TEST(FindAndModifyRequest, UpdateWithCollation) {
@@ -167,7 +167,7 @@ TEST(FindAndModifyRequest, UpdateWithCollation) {
             collation: { locale: 'en_US' }
         })json"));
 
-    ASSERT_EQUALS(expectedObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON());
 }
 
 TEST(FindAndModifyRequest, UpdateWithWriteConcern) {
@@ -185,7 +185,7 @@ TEST(FindAndModifyRequest, UpdateWithWriteConcern) {
             writeConcern: { w: 2, fsync: true, wtimeout: 150 }
         })json"));
 
-    ASSERT_EQUALS(expectedObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON());
 }
 
 TEST(FindAndModifyRequest, UpdateWithFullSpec) {
@@ -217,7 +217,7 @@ TEST(FindAndModifyRequest, UpdateWithFullSpec) {
             writeConcern: { w: 2, fsync: true, wtimeout: 150 }
         })json"));
 
-    ASSERT_EQUALS(expectedObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON());
 }
 
 TEST(FindAndModifyRequest, BasicRemove) {
@@ -230,7 +230,7 @@ TEST(FindAndModifyRequest, BasicRemove) {
             remove: true
         })json"));
 
-    ASSERT_EQUALS(expectedObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON());
 }
 
 TEST(FindAndModifyRequest, RemoveWithProjection) {
@@ -247,7 +247,7 @@ TEST(FindAndModifyRequest, RemoveWithProjection) {
             fields: { z: 1 }
         })json"));
 
-    ASSERT_EQUALS(expectedObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON());
 }
 
 TEST(FindAndModifyRequest, RemoveWithSort) {
@@ -264,7 +264,7 @@ TEST(FindAndModifyRequest, RemoveWithSort) {
             sort: { z: -1 }
         })json"));
 
-    ASSERT_EQUALS(expectedObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON());
 }
 
 TEST(FindAndModifyRequest, RemoveWithCollation) {
@@ -282,7 +282,7 @@ TEST(FindAndModifyRequest, RemoveWithCollation) {
             collation: { locale: 'en_US' }
         })json"));
 
-    ASSERT_EQUALS(expectedObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON());
 }
 
 TEST(FindAndModifyRequest, RemoveWithWriteConcern) {
@@ -299,7 +299,7 @@ TEST(FindAndModifyRequest, RemoveWithWriteConcern) {
             writeConcern: { w: 2, fsync: true, wtimeout: 150 }
         })json"));
 
-    ASSERT_EQUALS(expectedObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON());
 }
 
 TEST(FindAndModifyRequest, RemoveWithFullSpec) {
@@ -326,7 +326,7 @@ TEST(FindAndModifyRequest, RemoveWithFullSpec) {
             writeConcern: { w: 2, fsync: true, wtimeout: 150 }
         })json"));
 
-    ASSERT_EQUALS(expectedObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedObj, request.toBSON());
 }
 
 TEST(FindAndModifyRequest, ParseWithUpdateOnlyRequiredFields) {
@@ -340,13 +340,13 @@ TEST(FindAndModifyRequest, ParseWithUpdateOnlyRequiredFields) {
 
     auto request = parseStatus.getValue();
     ASSERT_EQUALS(NamespaceString("a.b").toString(), request.getNamespaceString().toString());
-    ASSERT_EQUALS(BSON("x" << 1), request.getQuery());
-    ASSERT_EQUALS(BSON("y" << 1), request.getUpdateObj());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getQuery());
+    ASSERT_BSONOBJ_EQ(BSON("y" << 1), request.getUpdateObj());
     ASSERT_EQUALS(false, request.isUpsert());
     ASSERT_EQUALS(false, request.isRemove());
-    ASSERT_EQUALS(BSONObj(), request.getFields());
-    ASSERT_EQUALS(BSONObj(), request.getSort());
-    ASSERT_EQUALS(BSONObj(), request.getCollation());
+    ASSERT_BSONOBJ_EQ(BSONObj(), request.getFields());
+    ASSERT_BSONOBJ_EQ(BSONObj(), request.getSort());
+    ASSERT_BSONOBJ_EQ(BSONObj(), request.getCollation());
     ASSERT_EQUALS(false, request.shouldReturnNew());
 }
 
@@ -366,15 +366,15 @@ TEST(FindAndModifyRequest, ParseWithUpdateFullSpec) {
 
     auto request = parseStatus.getValue();
     ASSERT_EQUALS(NamespaceString("a.b").toString(), request.getNamespaceString().toString());
-    ASSERT_EQUALS(BSON("x" << 1), request.getQuery());
-    ASSERT_EQUALS(BSON("y" << 1), request.getUpdateObj());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getQuery());
+    ASSERT_BSONOBJ_EQ(BSON("y" << 1), request.getUpdateObj());
     ASSERT_EQUALS(true, request.isUpsert());
     ASSERT_EQUALS(false, request.isRemove());
-    ASSERT_EQUALS(BSON("x" << 1 << "y" << 1), request.getFields());
-    ASSERT_EQUALS(BSON("z" << -1), request.getSort());
-    ASSERT_EQUALS(BSON("locale"
-                       << "en_US"),
-                  request.getCollation());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 1 << "y" << 1), request.getFields());
+    ASSERT_BSONOBJ_EQ(BSON("z" << -1), request.getSort());
+    ASSERT_BSONOBJ_EQ(BSON("locale"
+                           << "en_US"),
+                      request.getCollation());
     ASSERT_EQUALS(true, request.shouldReturnNew());
 }
 
@@ -389,13 +389,13 @@ TEST(FindAndModifyRequest, ParseWithRemoveOnlyRequiredFields) {
 
     auto request = parseStatus.getValue();
     ASSERT_EQUALS(NamespaceString("a.b").toString(), request.getNamespaceString().toString());
-    ASSERT_EQUALS(BSON("x" << 1), request.getQuery());
-    ASSERT_EQUALS(BSONObj(), request.getUpdateObj());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getQuery());
+    ASSERT_BSONOBJ_EQ(BSONObj(), request.getUpdateObj());
     ASSERT_EQUALS(false, request.isUpsert());
     ASSERT_EQUALS(true, request.isRemove());
-    ASSERT_EQUALS(BSONObj(), request.getFields());
-    ASSERT_EQUALS(BSONObj(), request.getSort());
-    ASSERT_EQUALS(BSONObj(), request.getCollation());
+    ASSERT_BSONOBJ_EQ(BSONObj(), request.getFields());
+    ASSERT_BSONOBJ_EQ(BSONObj(), request.getSort());
+    ASSERT_BSONOBJ_EQ(BSONObj(), request.getCollation());
     ASSERT_EQUALS(false, request.shouldReturnNew());
 }
 
@@ -414,15 +414,15 @@ TEST(FindAndModifyRequest, ParseWithRemoveFullSpec) {
 
     auto request = parseStatus.getValue();
     ASSERT_EQUALS(NamespaceString("a.b").toString(), request.getNamespaceString().toString());
-    ASSERT_EQUALS(BSON("x" << 1), request.getQuery());
-    ASSERT_EQUALS(BSONObj(), request.getUpdateObj());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getQuery());
+    ASSERT_BSONOBJ_EQ(BSONObj(), request.getUpdateObj());
     ASSERT_EQUALS(false, request.isUpsert());
     ASSERT_EQUALS(true, request.isRemove());
-    ASSERT_EQUALS(BSON("x" << 1 << "y" << 1), request.getFields());
-    ASSERT_EQUALS(BSON("z" << -1), request.getSort());
-    ASSERT_EQUALS(BSON("locale"
-                       << "en_US"),
-                  request.getCollation());
+    ASSERT_BSONOBJ_EQ(BSON("x" << 1 << "y" << 1), request.getFields());
+    ASSERT_BSONOBJ_EQ(BSON("z" << -1), request.getSort());
+    ASSERT_BSONOBJ_EQ(BSON("locale"
+                           << "en_US"),
+                      request.getCollation());
     ASSERT_EQUALS(false, request.shouldReturnNew());
 }
 

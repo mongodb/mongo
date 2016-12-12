@@ -96,7 +96,7 @@ TEST(BatchedCommandRequest, InsertClone) {
     ASSERT_EQ("xyz.abc", clonedRequest.getNS().toString());
     ASSERT_EQ("xyz.abc", clonedRequest.getTargetingNSS().toString());
     ASSERT_TRUE(clonedRequest.getOrdered());
-    ASSERT_EQ(BSON("w" << 2), clonedRequest.getWriteConcern());
+    ASSERT_BSONOBJ_EQ(BSON("w" << 2), clonedRequest.getWriteConcern());
     ASSERT_TRUE(clonedRequest.shouldBypassValidation());
 
     batchedRequest.setShouldBypassValidation(false);
@@ -126,14 +126,14 @@ TEST(BatchedCommandRequest, InsertIndexClone) {
     ASSERT_EQ("xyz.system.indexes", clonedRequest.getNS().toString());
     ASSERT_EQ("xyz.user", clonedRequest.getTargetingNSS().toString());
     ASSERT_TRUE(clonedRequest.getOrdered());
-    ASSERT_EQ(BSON("w" << 2), clonedRequest.getWriteConcern());
+    ASSERT_BSONOBJ_EQ(BSON("w" << 2), clonedRequest.getWriteConcern());
 
     auto* clonedInsert = clonedRequest.getInsertRequest();
     ASSERT_TRUE(clonedInsert != nullptr);
 
     auto insertDocs = clonedInsert->getDocuments();
     ASSERT_EQ(1u, insertDocs.size());
-    ASSERT_EQ(indexSpec, insertDocs.front());
+    ASSERT_BSONOBJ_EQ(indexSpec, insertDocs.front());
 }
 
 TEST(BatchedCommandRequest, InsertCloneWithId) {
@@ -152,7 +152,7 @@ TEST(BatchedCommandRequest, InsertCloneWithId) {
     ASSERT_EQ("xyz.abc", clonedRequest->getNS().toString());
     ASSERT_EQ("xyz.abc", clonedRequest->getTargetingNSS().toString());
     ASSERT_TRUE(clonedRequest->getOrdered());
-    ASSERT_EQ(BSON("w" << 2), clonedRequest->getWriteConcern());
+    ASSERT_BSONOBJ_EQ(BSON("w" << 2), clonedRequest->getWriteConcern());
     ASSERT_TRUE(clonedRequest->shouldBypassValidation());
 
     auto* clonedInsert = clonedRequest->getInsertRequest();
@@ -181,7 +181,7 @@ TEST(BatchedCommandRequest, UpdateClone) {
     ASSERT_EQ("xyz.abc", clonedRequest.getNS().toString());
     ASSERT_EQ("xyz.abc", clonedRequest.getTargetingNSS().toString());
     ASSERT_TRUE(clonedRequest.getOrdered());
-    ASSERT_EQ(BSON("w" << 2), clonedRequest.getWriteConcern());
+    ASSERT_BSONOBJ_EQ(BSON("w" << 2), clonedRequest.getWriteConcern());
     ASSERT_TRUE(clonedRequest.shouldBypassValidation());
 }
 
@@ -199,7 +199,7 @@ TEST(BatchedCommandRequest, DeleteClone) {
     ASSERT_EQ("xyz.abc", clonedRequest.getNS().toString());
     ASSERT_EQ("xyz.abc", clonedRequest.getTargetingNSS().toString());
     ASSERT_TRUE(clonedRequest.getOrdered());
-    ASSERT_EQ(BSON("w" << 2), clonedRequest.getWriteConcern());
+    ASSERT_BSONOBJ_EQ(BSON("w" << 2), clonedRequest.getWriteConcern());
 }
 
 }  // namespace

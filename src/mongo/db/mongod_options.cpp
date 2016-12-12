@@ -350,10 +350,12 @@ Status addMongodOptions(moe::OptionSection* options) {
 
     // Deprecated option that we don't want people to use for performance reasons
     storage_options
-        .addOptionChaining(
-            "nopreallocj", "nopreallocj", moe::Switch, "don't preallocate journal files")
+        .addOptionChaining("storage.mmapv1.journal.nopreallocj",
+                           "nopreallocj",
+                           moe::Switch,
+                           "don't preallocate journal files")
         .hidden()
-        .setSources(moe::SourceAllLegacy);
+        .setSources(moe::SourceAll);
 
 #if defined(__linux__)
     general_options.addOptionChaining(
@@ -580,13 +582,13 @@ void printMongodHelp(const moe::OptionSection& options) {
 namespace {
 void sysRuntimeInfo() {
 #if defined(_SC_PAGE_SIZE)
-    log() << "  page size: " << (int)sysconf(_SC_PAGE_SIZE) << endl;
+    log() << "  page size: " << (int)sysconf(_SC_PAGE_SIZE);
 #endif
 #if defined(_SC_PHYS_PAGES)
-    log() << "  _SC_PHYS_PAGES: " << sysconf(_SC_PHYS_PAGES) << endl;
+    log() << "  _SC_PHYS_PAGES: " << sysconf(_SC_PHYS_PAGES);
 #endif
 #if defined(_SC_AVPHYS_PAGES)
-    log() << "  _SC_AVPHYS_PAGES: " << sysconf(_SC_AVPHYS_PAGES) << endl;
+    log() << "  _SC_AVPHYS_PAGES: " << sysconf(_SC_AVPHYS_PAGES);
 #endif
 }
 }  // namespace
@@ -599,8 +601,9 @@ bool handlePreValidationMongodOptions(const moe::Environment& params,
     }
     if (params.count("version") && params["version"].as<bool>() == true) {
         setPlainConsoleLogger();
-        log() << mongodVersion() << endl;
-        printBuildInfo();
+        auto&& vii = VersionInfoInterface::instance();
+        log() << mongodVersion(vii);
+        vii.logBuildInfo();
         return false;
     }
     if (params.count("sysinfo") && params["sysinfo"].as<bool>() == true) {
@@ -663,8 +666,8 @@ Status validateMongodOptions(const moe::Environment& params) {
 
     if (params.count("storage.queryableBackupMode")) {
         // Command line options that are disallowed when --queryableBackupMode is specified.
-        for (const auto& disallowedOption : {"replSet",
-                                             "configSvr",
+        for (const auto& disallowedOption : {"replication.replSet",
+                                             "configsvr",
                                              "upgrade",
                                              "repair",
                                              "profile",
@@ -673,14 +676,11 @@ Status validateMongodOptions(const moe::Environment& params) {
                                              "source",
                                              "only",
                                              "slavedelay",
-                                             "journal",
-                                             "storage.journal.enabled",
-                                             "dur",
                                              "autoresync",
                                              "fastsync"}) {
             if (params.count(disallowedOption)) {
                 return Status(ErrorCodes::BadValue,
-                              str::stream() << "Cannot specify both --queryableBackupMode and --"
+                              str::stream() << "Cannot specify both queryable backup mode and "
                                             << disallowedOption);
             }
         }
@@ -984,8 +984,8 @@ Status canonicalizeMongodOptions(moe::Environment* params) {
     return Status::OK();
 }
 
-Status storeMongodOptions(const moe::Environment& params, const std::vector<std::string>& args) {
-    Status ret = storeServerOptions(params, args);
+Status storeMongodOptions(const moe::Environment& params) {
+    Status ret = storeServerOptions(params);
     if (!ret.isOK()) {
         return ret;
     }
@@ -1048,6 +1048,13 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
 
     if (params.count("storage.syncPeriodSecs")) {
         storageGlobalParams.syncdelay = params["storage.syncPeriodSecs"].as<double>();
+        if (storageGlobalParams.syncdelay < 0 ||
+            storageGlobalParams.syncdelay > StorageGlobalParams::kMaxSyncdelaySecs) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "syncdelay out of allowed range (0-"
+                                        << StorageGlobalParams::kMaxSyncdelaySecs
+                                        << "s)");
+        }
     }
 
     if (params.count("storage.directoryPerDB")) {
@@ -1093,8 +1100,8 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
     if (params.count("storage.mmapv1.journal.debugFlags")) {
         mmapv1GlobalOptions.journalOptions = params["storage.mmapv1.journal.debugFlags"].as<int>();
     }
-    if (params.count("nopreallocj")) {
-        mmapv1GlobalOptions.preallocj = !params["nopreallocj"].as<bool>();
+    if (params.count("storage.mmapv1.journal.nopreallocj")) {
+        mmapv1GlobalOptions.preallocj = !params["storage.mmapv1.journal.nopreallocj"].as<bool>();
     }
 
     if (params.count("net.http.RESTInterfaceEnabled")) {
@@ -1257,11 +1264,6 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
                 storageGlobalParams.dur = true;
             }
 
-            if (!storageGlobalParams.dur) {
-                return Status(ErrorCodes::BadValue,
-                              "journaling cannot be turned off when configsvr is specified");
-            }
-
             if (!params.count("storage.dbPath")) {
                 storageGlobalParams.dbpath = storageGlobalParams.kDefaultConfigDbPath;
             }
@@ -1294,6 +1296,16 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
                       "****");
     }
 
+#ifdef _WIN32
+    // If dbPath is a default value, prepend with drive name so log entries are explicit
+    // We must resolve the dbpath before it stored in repairPath in the default case.
+    if (storageGlobalParams.dbpath == storageGlobalParams.kDefaultDbPath ||
+        storageGlobalParams.dbpath == storageGlobalParams.kDefaultConfigDbPath) {
+        boost::filesystem::path currentPath = boost::filesystem::current_path();
+        storageGlobalParams.dbpath = currentPath.root_name().string() + storageGlobalParams.dbpath;
+    }
+#endif
+
     // needs to be after things like --configsvr parsing, thus here.
     if (params.count("storage.repairPath")) {
         storageGlobalParams.repairpath = params["storage.repairPath"].as<string>();
@@ -1319,18 +1331,9 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
         // trying to make this stand out more like startup warnings
         log() << endl;
         warning() << "32-bit servers don't have journaling enabled by default. "
-                  << "Please use --journal if you want durability." << endl;
+                  << "Please use --journal if you want durability.";
         log() << endl;
     }
-
-#ifdef _WIN32
-    // If dbPath is a default value, prepend with drive name so log entries are explicit
-    if (storageGlobalParams.dbpath == storageGlobalParams.kDefaultDbPath ||
-        storageGlobalParams.dbpath == storageGlobalParams.kDefaultConfigDbPath) {
-        boost::filesystem::path currentPath = boost::filesystem::current_path();
-        storageGlobalParams.dbpath = currentPath.root_name().string() + storageGlobalParams.dbpath;
-    }
-#endif
 
     setGlobalReplSettings(replSettings);
     return Status::OK();

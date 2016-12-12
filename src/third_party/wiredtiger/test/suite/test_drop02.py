@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper import simple_populate
+from wtdataset import SimpleDataSet
 
 # test_drop02.py
 #    Test dropping an LSM tree on first open. There was a bug where this
@@ -38,7 +38,8 @@ class test_drop02(wttest.WiredTigerTestCase):
     # Populate an object, remove it and confirm it no longer exists.
     def test_drop(self):
         uri = 'lsm:' + self.name
-        simple_populate(self, uri, 'key_format=S', 100000)
+        ds = SimpleDataSet(self, uri, 100000)
+        ds.populate()
         self.reopen_conn()
 
         self.session.drop(uri, None)

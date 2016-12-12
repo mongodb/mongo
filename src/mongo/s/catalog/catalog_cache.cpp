@@ -63,7 +63,11 @@ StatusWith<shared_ptr<DBConfig>> CatalogCache::getDatabase(OperationContext* txn
     const auto dbOpTimePair = status.getValue();
     shared_ptr<DBConfig> db =
         std::make_shared<DBConfig>(dbName, dbOpTimePair.value, dbOpTimePair.opTime);
-    db->load(txn);
+    try {
+        db->load(txn);
+    } catch (const DBException& excep) {
+        return excep.toStatus();
+    }
 
     invariant(_databases.insert(std::make_pair(dbName, db)).second);
 

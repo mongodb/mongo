@@ -26,6 +26,7 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/exec/working_set.h"
 
 namespace mongo {
@@ -85,7 +86,8 @@ public:
         for (size_t i = 0; i < src.keyData.size(); ++i) {
             bool found = false;
             for (size_t j = 0; j < dest->keyData.size(); ++j) {
-                if (dest->keyData[j].indexKeyPattern == src.keyData[i].indexKeyPattern) {
+                if (SimpleBSONObjComparator::kInstance.evaluate(dest->keyData[j].indexKeyPattern ==
+                                                                src.keyData[i].indexKeyPattern)) {
                     found = true;
                     break;
                 }

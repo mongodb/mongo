@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/base/data_view.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/time_support.h"
 
@@ -113,8 +114,8 @@ public:
         return o;
     }
 
-    static_assert(sizeof(int64_t) == kInstanceUniqueSize + kIncrementSize,
-                  "size of term must be size of instance unique + increment");
+    MONGO_STATIC_ASSERT_MSG(sizeof(int64_t) == kInstanceUniqueSize + kIncrementSize,
+                            "size of term must be size of instance unique + increment");
 
     // Return OID initialized with a 8 byte term id and max Timestamp. Used for ElectionID.
     static OID fromTerm(int64_t term) {

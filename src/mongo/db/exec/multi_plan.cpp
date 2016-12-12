@@ -118,7 +118,7 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
     StageState state = bestPlan.root->work(out);
 
     if (PlanStage::FAILURE == state && hasBackupPlan()) {
-        LOG(5) << "Best plan errored out switching to backup\n";
+        LOG(5) << "Best plan errored out switching to backup";
         // Uncache the bad solution if we fall back
         // on the backup solution.
         //
@@ -136,7 +136,7 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
     }
 
     if (hasBackupPlan() && PlanStage::ADVANCED == state) {
-        LOG(5) << "Best plan had a blocking stage, became unblocked\n";
+        LOG(5) << "Best plan had a blocking stage, became unblocked";
         _backupPlanIdx = kNoSuchPlan;
     }
 
@@ -238,15 +238,15 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     std::list<WorkingSetID>& alreadyProduced = bestCandidate.results;
     const auto& bestSolution = bestCandidate.solution;
 
-    LOG(5) << "Winning solution:\n" << bestSolution->toString() << endl;
-    LOG(2) << "Winning plan: " << Explain::getPlanSummary(bestCandidate.root);
+    LOG(5) << "Winning solution:\n" << redact(bestSolution->toString());
+    LOG(2) << "Winning plan: " << redact(Explain::getPlanSummary(bestCandidate.root));
 
     _backupPlanIdx = kNoSuchPlan;
     if (bestSolution->hasBlockingStage && (0 == alreadyProduced.size())) {
-        LOG(5) << "Winner has blocking stage, looking for backup plan...\n";
+        LOG(5) << "Winner has blocking stage, looking for backup plan...";
         for (size_t ix = 0; ix < _candidates.size(); ++ix) {
             if (!_candidates[ix].solution->hasBlockingStage) {
-                LOG(5) << "Candidate " << ix << " is backup child\n";
+                LOG(5) << "Candidate " << ix << " is backup child";
                 _backupPlanIdx = ix;
                 break;
             }
@@ -275,11 +275,11 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             size_t runnerUpIdx = ranking->candidateOrder[1];
 
             LOG(1) << "Winning plan tied with runner-up. Not caching."
-                   << " ns: " << _collection->ns() << " " << _query->toStringShort()
-                   << " winner score: " << ranking->scores[0]
-                   << " winner summary: " << Explain::getPlanSummary(_candidates[winnerIdx].root)
+                   << " ns: " << _collection->ns() << " " << redact(_query->toStringShort())
+                   << " winner score: " << ranking->scores[0] << " winner summary: "
+                   << redact(Explain::getPlanSummary(_candidates[winnerIdx].root))
                    << " runner-up score: " << ranking->scores[1] << " runner-up summary: "
-                   << Explain::getPlanSummary(_candidates[runnerUpIdx].root);
+                   << redact(Explain::getPlanSummary(_candidates[runnerUpIdx].root));
         }
 
         if (alreadyProduced.empty()) {
@@ -289,9 +289,9 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
             size_t winnerIdx = ranking->candidateOrder[0];
             LOG(1) << "Winning plan had zero results. Not caching."
-                   << " ns: " << _collection->ns() << " " << _query->toStringShort()
-                   << " winner score: " << ranking->scores[0]
-                   << " winner summary: " << Explain::getPlanSummary(_candidates[winnerIdx].root);
+                   << " ns: " << _collection->ns() << " " << redact(_query->toStringShort())
+                   << " winner score: " << ranking->scores[0] << " winner summary: "
+                   << redact(Explain::getPlanSummary(_candidates[winnerIdx].root));
         }
     }
 
@@ -316,7 +316,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         for (size_t ix = 0; ix < solutions.size(); ++ix) {
             if (NULL == solutions[ix]->cacheData.get()) {
                 LOG(5) << "Not caching query because this solution has no cache data: "
-                       << solutions[ix]->toString();
+                       << redact(solutions[ix]->toString());
                 validSolutions = false;
                 break;
             }

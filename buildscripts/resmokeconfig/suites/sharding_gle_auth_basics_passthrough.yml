@@ -42,6 +42,7 @@ executor:
         set_parameters:
           enableTestCommands: 1
           enableLocalhostAuthBypass: false
+          numInitialSyncAttempts: 1
       num_shards: 2
       enable_sharding:
       - test

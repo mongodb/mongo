@@ -39,6 +39,8 @@
 #include "mongo/base/counter.h"
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/bson/ordering.h"
+#include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
@@ -66,11 +68,17 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 
 #include "mongo/db/auth/user_document_parser.h"  // XXX-ANDY
+#include "mongo/rpc/object_check.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
 namespace {
+
+// Used below to fail during inserts.
+MONGO_FP_DECLARE(failCollectionInserts);
+
 const auto bannedExpressionsInValidators = std::set<StringData>{
     "$geoNear", "$near", "$nearSphere", "$text", "$where",
 };
@@ -217,12 +225,13 @@ Collection::Collection(OperationContext* txn,
       _validatorDoc(_details->getCollectionOptions(txn).validator.getOwned()),
       _validator(uassertStatusOK(parseValidator(_validatorDoc))),
       _validationAction(uassertStatusOK(
-          _parseValidationAction(_details->getCollectionOptions(txn).validationAction))),
+          parseValidationAction(_details->getCollectionOptions(txn).validationAction))),
       _validationLevel(uassertStatusOK(
-          _parseValidationLevel(_details->getCollectionOptions(txn).validationLevel))),
+          parseValidationLevel(_details->getCollectionOptions(txn).validationLevel))),
       _cursorManager(fullNS),
       _cappedNotifier(_recordStore->isCapped() ? new CappedInsertNotifier() : nullptr),
       _mustTakeCappedLockOnInsert(isCapped() && !_ns.isSystemDotProfile() && !_ns.isOplog()) {
+
     _magic = 1357924;
     _indexCatalog.init(txn);
     if (isCapped())
@@ -233,10 +242,11 @@ Collection::Collection(OperationContext* txn,
 
 Collection::~Collection() {
     verify(ok());
-    _magic = 0;
-    if (_cappedNotifier) {
+    if (isCapped()) {
+        _recordStore->setCappedCallback(nullptr);
         _cappedNotifier->kill();
     }
+    _magic = 0;
 }
 
 bool Collection::requiresIdIndex() const {
@@ -301,7 +311,7 @@ Status Collection::checkValidation(OperationContext* txn, const BSONObj& documen
 
     if (_validationAction == WARN) {
         warning() << "Document would fail validation"
-                  << " collection: " << ns() << " doc: " << document;
+                  << " collection: " << ns() << " doc: " << redact(document);
         return Status::OK();
     }
 
@@ -367,6 +377,20 @@ Status Collection::insertDocuments(OperationContext* txn,
                                    OpDebug* opDebug,
                                    bool enforceQuota,
                                    bool fromMigrate) {
+
+    MONGO_FAIL_POINT_BLOCK(failCollectionInserts, extraData) {
+        const BSONObj& data = extraData.getData();
+        const auto collElem = data["collectionNS"];
+        // If the failpoint specifies no collection or matches the existing one, fail.
+        if (!collElem || _ns == collElem.str()) {
+            const std::string msg = str::stream()
+                << "Failpoint (failCollectionInserts) has been enabled (" << data
+                << "), so rejecting insert (first doc): " << *begin;
+            log() << msg;
+            return {ErrorCodes::FailPointEnabled, msg};
+        }
+    }
+
     // Should really be done in the collection object at creation and updated on index create.
     const bool hasIdIndex = _indexCatalog.findIdIndex(txn);
 
@@ -393,9 +417,7 @@ Status Collection::insertDocuments(OperationContext* txn,
         return status;
     invariant(sid == txn->recoveryUnit()->getSnapshotId());
 
-    auto opObserver = getGlobalServiceContext()->getOpObserver();
-    if (opObserver)
-        opObserver->onInserts(txn, ns(), begin, end, fromMigrate);
+    getGlobalServiceContext()->getOpObserver()->onInserts(txn, ns(), begin, end, fromMigrate);
 
     txn->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
 
@@ -416,6 +438,20 @@ Status Collection::insertDocument(OperationContext* txn,
                                   const BSONObj& doc,
                                   const std::vector<MultiIndexBlock*>& indexBlocks,
                                   bool enforceQuota) {
+
+    MONGO_FAIL_POINT_BLOCK(failCollectionInserts, extraData) {
+        const BSONObj& data = extraData.getData();
+        const auto collElem = data["collectionNS"];
+        // If the failpoint specifies no collection or matches the existing one, fail.
+        if (!collElem || _ns == collElem.str()) {
+            const std::string msg = str::stream()
+                << "Failpoint (failCollectionInserts) has been enabled (" << data
+                << "), so rejecting insert: " << doc;
+            log() << msg;
+            return {ErrorCodes::FailPointEnabled, msg};
+        }
+    }
+
     {
         auto status = checkValidation(txn, doc);
         if (!status.isOK())
@@ -443,9 +479,8 @@ Status Collection::insertDocument(OperationContext* txn,
     vector<BSONObj> docs;
     docs.push_back(doc);
 
-    auto opObserver = getGlobalServiceContext()->getOpObserver();
-    if (opObserver)
-        opObserver->onInserts(txn, ns(), docs.begin(), docs.end());
+    getGlobalServiceContext()->getOpObserver()->onInserts(
+        txn, ns(), docs.begin(), docs.end(), false);
 
     txn->recoveryUnit()->onCommit([this]() { notifyCappedWaitersIfNeeded(); });
 
@@ -537,17 +572,15 @@ Status Collection::aboutToDeleteCapped(OperationContext* txn,
 void Collection::deleteDocument(
     OperationContext* txn, const RecordId& loc, OpDebug* opDebug, bool fromMigrate, bool noWarn) {
     if (isCapped()) {
-        log() << "failing remove on a capped ns " << _ns << endl;
+        log() << "failing remove on a capped ns " << _ns;
         uasserted(10089, "cannot remove from a capped collection");
         return;
     }
 
     Snapshotted<BSONObj> doc = docFor(txn, loc);
 
-    CollectionShardingState::DeleteState deleteState;
-    auto opObserver = getGlobalServiceContext()->getOpObserver();
-    if (opObserver)
-        deleteState = opObserver->aboutToDelete(txn, ns(), doc.value());
+    auto deleteState =
+        getGlobalServiceContext()->getOpObserver()->aboutToDelete(txn, ns(), doc.value());
 
     /* check if any cursors point to us.  if so, advance them. */
     _cursorManager.invalidateDocument(txn, loc, INVALIDATION_DELETION);
@@ -560,8 +593,8 @@ void Collection::deleteDocument(
 
     _recordStore->deleteRecord(txn, loc);
 
-    if (opObserver)
-        opObserver->onDelete(txn, ns(), std::move(deleteState), fromMigrate);
+    getGlobalServiceContext()->getOpObserver()->onDelete(
+        txn, ns(), std::move(deleteState), fromMigrate);
 }
 
 Counter64 moveCounter;
@@ -605,7 +638,7 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
     SnapshotId sid = txn->recoveryUnit()->getSnapshotId();
 
     BSONElement oldId = oldDoc.value()["_id"];
-    if (!oldId.eoo() && (oldId != newDoc["_id"]))
+    if (!oldId.eoo() && SimpleBSONElementComparator::kInstance.evaluate(oldId != newDoc["_id"]))
         return StatusWith<RecordId>(
             ErrorCodes::InternalError, "in Collection::updateDocument _id mismatch", 13596);
 
@@ -636,10 +669,7 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
             IndexAccessMethod* iam = ii.accessMethod(descriptor);
 
             InsertDeleteOptions options;
-            options.logIfError = false;
-            options.dupsAllowed =
-                !(KeyPattern::isIdKeyPattern(descriptor->keyPattern()) || descriptor->unique()) ||
-                repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(descriptor);
+            IndexCatalog::prepareInsertDeleteOptions(txn, descriptor, &options);
             UpdateTicket* updateTicket = new UpdateTicket();
             updateTickets.mutableMap()[descriptor] = updateTicket;
             Status ret = iam->validateUpdate(txn,
@@ -688,9 +718,7 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
     invariant(sid == txn->recoveryUnit()->getSnapshotId());
     args->updatedDoc = newDoc;
 
-    auto opObserver = getGlobalServiceContext()->getOpObserver();
-    if (opObserver)
-        opObserver->onUpdate(txn, *args);
+    getGlobalServiceContext()->getOpObserver()->onUpdate(txn, *args);
 
     return {oldLocation};
 }
@@ -735,10 +763,7 @@ StatusWith<RecordId> Collection::_updateDocumentWithMove(OperationContext* txn,
     invariant(sid == txn->recoveryUnit()->getSnapshotId());
     args->updatedDoc = newDoc;
 
-    auto opObserver = getGlobalServiceContext()->getOpObserver();
-    if (opObserver) {
-        opObserver->onUpdate(txn, *args);
-    }
+    getGlobalServiceContext()->getOpObserver()->onUpdate(txn, *args);
 
     moveCounter.increment();
     if (opDebug) {
@@ -784,9 +809,7 @@ StatusWith<RecordData> Collection::updateDocumentWithDamages(
     if (newRecStatus.isOK()) {
         args->updatedDoc = newRecStatus.getValue().toBson();
 
-        auto opObserver = getGlobalServiceContext()->getOpObserver();
-        if (opObserver)
-            opObserver->onUpdate(txn, *args);
+        getGlobalServiceContext()->getOpObserver()->onUpdate(txn, *args);
     }
     return newRecStatus;
 }
@@ -881,7 +904,7 @@ Status Collection::truncate(OperationContext* txn) {
 
     // 4) re-create indexes
     for (size_t i = 0; i < indexSpecs.size(); i++) {
-        status = _indexCatalog.createIndexOnEmptyCollection(txn, indexSpecs[i]);
+        status = _indexCatalog.createIndexOnEmptyCollection(txn, indexSpecs[i]).getStatus();
         if (!status.isOK())
             return status;
     }
@@ -917,7 +940,7 @@ Status Collection::setValidator(OperationContext* txn, BSONObj validatorDoc) {
     return Status::OK();
 }
 
-StatusWith<Collection::ValidationLevel> Collection::_parseValidationLevel(StringData newLevel) {
+StatusWith<Collection::ValidationLevel> Collection::parseValidationLevel(StringData newLevel) {
     if (newLevel == "") {
         // default
         return STRICT_V;
@@ -933,7 +956,7 @@ StatusWith<Collection::ValidationLevel> Collection::_parseValidationLevel(String
     }
 }
 
-StatusWith<Collection::ValidationAction> Collection::_parseValidationAction(StringData newAction) {
+StatusWith<Collection::ValidationAction> Collection::parseValidationAction(StringData newAction) {
     if (newAction == "") {
         // default
         return ERROR_V;
@@ -972,7 +995,7 @@ StringData Collection::getValidationAction() const {
 Status Collection::setValidationLevel(OperationContext* txn, StringData newLevel) {
     invariant(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
 
-    StatusWith<ValidationLevel> status = _parseValidationLevel(newLevel);
+    StatusWith<ValidationLevel> status = parseValidationLevel(newLevel);
     if (!status.isOK()) {
         return status.getStatus();
     }
@@ -987,7 +1010,7 @@ Status Collection::setValidationLevel(OperationContext* txn, StringData newLevel
 Status Collection::setValidationAction(OperationContext* txn, StringData newAction) {
     invariant(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
 
-    StatusWith<ValidationAction> status = _parseValidationAction(newAction);
+    StatusWith<ValidationAction> status = parseValidationAction(newAction);
     if (!status.isOK()) {
         return status.getStatus();
     }
@@ -1022,7 +1045,17 @@ public:
 
     virtual Status validate(const RecordId& recordId, const RecordData& record, size_t* dataSize) {
         BSONObj recordBson = record.toBson();
-        const Status status = validateBSON(recordBson.objdata(), recordBson.objsize());
+
+        // Secondaries are configured to always validate using the latest enabled BSON version. But
+        // users should be able to run collection validation on a secondary in "3.2"
+        // featureCompatibilityVersion in order to be alerted to the presence of NumberDecimal.
+        auto bsonValidationVersion = (serverGlobalParams.featureCompatibility.version.load() ==
+                                      ServerGlobalParams::FeatureCompatibility::Version::k32)
+            ? BSONVersion::kV1_0
+            : Validator<BSONObj>::enabledBSONVersion();
+
+        const Status status =
+            validateBSON(recordBson.objdata(), recordBson.objsize(), bsonValidationVersion);
         if (status.isOK()) {
             *dataSize = recordBson.objsize();
         } else {
@@ -1053,11 +1086,14 @@ public:
                 }
             }
 
-            BSONObjSet documentKeySet;
+            BSONObjSet documentKeySet = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
             // There's no need to compute the prefixes of the indexed fields that cause the
             // index to be multikey when validating the index keys.
             MultikeyPaths* multikeyPaths = nullptr;
-            iam->getKeys(recordBson, &documentKeySet, multikeyPaths);
+            iam->getKeys(recordBson,
+                         IndexAccessMethod::GetKeysMode::kEnforceConstraints,
+                         &documentKeySet,
+                         multikeyPaths);
 
             if (!descriptor->isMultikey(_txn) && documentKeySet.size() > 1) {
                 string msg = str::stream() << "Index " << descriptor->indexName()

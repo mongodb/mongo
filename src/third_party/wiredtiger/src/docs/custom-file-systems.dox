@@ -9,13 +9,23 @@ in the WT_FILE_SYSTEM and WT_FILE_HANDLE structures, and documentation for
 those structures indicate which methods are optional. Methods which are not
 provided should be set to NULL.
 
-Generally, function pointers should not be changed once a handle is
-created. An exception to this are the WT_FILE_HANDLE::fallocate and
-WT_FILE_HANDLE::fallocate_nolock methods, because a file system
-implementation may not know what support the system provides until file
-allocation is attempted. See the WiredTiger POSIX file system
-implementation for an example of how the fallocate method might be
-changed after initialization.
+Function pointers should not be cleared once a handle is created.
+(WiredTiger might check for a non-NULL method and then call it, and
+clearing the function pointer could result in a core dump.)
+
+Function pointers are not expected to be cleared or set after a handle
+is created. An exception to this are the file extension methods, because
+existing file system implementations do not know the level of support
+the underlying system provides until after file extension is attempted.
+For this reason, these methods appear in both locking and non-locking
+versions.  Custom file systems needing to discover system support before
+configuring non-locking methods should initialize only the locking
+version of the method, then either set the non-locking version of the
+method and clear the locking method (or clear both methods), after
+discovery is complete. Clearing the method value is safe because calls
+are serialized until a non-locking method is set. Note it is not
+possible to downgrade from a non-locking version of these methods to a
+locking version.
 
 WT_FILE_SYSTEM and WT_FILE_HANDLE methods are expected to return POSIX
 1003.1 or ANSI C standard error codes on failure.  Custom file systems
@@ -23,13 +33,18 @@ on Windows systems can use the WT_EXTENSION_API::map_windows_error
 method to translate Windows system errors into POSIX system errors for
 return to WiredTiger.
 
-WT_FILE_SYSTEM and WT_FILE_HANDLE methods which fail but not fatally
-(for example, a WT_FILE_HANDLE::truncate method call which fails because
-the file is currently mapped into memory), should return EBUSY.
+WT_FILE_SYSTEM and WT_FILE_HANDLE methods which fail, but where future
+calls may succeed (for example, a WT_FILE_HANDLE::fh_truncate method
+call which fails because the file is currently mapped into memory),
+should return EBUSY.
 
-WT_FILE_SYSTEM and WT_FILE_HANDLE methods which fail fatally, but not
-in all cases (for example, a WT_FILE_HANDLE::fadvise method call which
-only supports ::WT_FILE_HANDLE_WILLNEED), should return ENOTSUP.
+WT_FILE_SYSTEM and WT_FILE_HANDLE methods which fail, and no future
+calls will succeed, should return ENOTSUP. This failure may describe
+either the entire method being unavailable or a particular mode failure.
+For example, a WT_FILE_HANDLE::fh_advise method call with an argument of
+::WT_FILE_HANDLE_DONTNEED, where the file handle doesn't support the
+WT_FILE_HANDLE::fh_advise method at all, or only supports the method
+argument ::WT_FILE_HANDLE_WILLNEED, should return ENOTSUP.
 
 Additionally, custom file system functions  may return ::WT_PANIC to
 shut down the system.

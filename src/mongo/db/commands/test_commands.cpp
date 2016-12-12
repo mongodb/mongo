@@ -50,6 +50,7 @@
 
 namespace mongo {
 
+using repl::UnreplicatedWritesBlock;
 using std::endl;
 using std::string;
 using std::stringstream;
@@ -80,22 +81,20 @@ public:
                      int,
                      string& errmsg,
                      BSONObjBuilder& result) {
-        string coll = cmdObj["godinsert"].valuestrsafe();
-        log() << "test only command godinsert invoked coll:" << coll << endl;
-        uassert(13049, "godinsert must specify a collection", !coll.empty());
-        string ns = dbname + "." + coll;
+        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
+        log() << "test only command godinsert invoked coll:" << nss.coll();
         BSONObj obj = cmdObj["obj"].embeddedObjectUserCheck();
 
         ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock lk(txn->lockState(), dbname, MODE_X);
-        OldClientContext ctx(txn, ns);
+        OldClientContext ctx(txn, nss.ns());
         Database* db = ctx.db();
 
         WriteUnitOfWork wunit(txn);
-        txn->setReplicatedWrites(false);
-        Collection* collection = db->getCollection(ns);
+        UnreplicatedWritesBlock unreplicatedWritesBlock(txn);
+        Collection* collection = db->getCollection(nss);
         if (!collection) {
-            collection = db->createCollection(txn, ns);
+            collection = db->createCollection(txn, nss.ns());
             if (!collection) {
                 errmsg = "could not create collection";
                 return false;
@@ -160,7 +159,7 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        log() << "test only command sleep invoked" << endl;
+        log() << "test only command sleep invoked";
         long long millis = 0;
 
         if (cmdObj["secs"] || cmdObj["millis"]) {

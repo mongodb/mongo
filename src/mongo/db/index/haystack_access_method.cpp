@@ -62,9 +62,9 @@ HaystackAccessMethod::HaystackAccessMethod(IndexCatalogEntry* btreeState,
     uassert(16774, "no non-geo fields specified", _otherFields.size());
 }
 
-void HaystackAccessMethod::getKeys(const BSONObj& obj,
-                                   BSONObjSet* keys,
-                                   MultikeyPaths* multikeyPaths) const {
+void HaystackAccessMethod::doGetKeys(const BSONObj& obj,
+                                     BSONObjSet* keys,
+                                     MultikeyPaths* multikeyPaths) const {
     ExpressionKeysPrivate::getHaystackKeys(obj, _geoField, _otherFields, _bucketSize, keys);
 }
 
@@ -77,8 +77,8 @@ void HaystackAccessMethod::searchCommand(OperationContext* txn,
                                          unsigned limit) {
     Timer t;
 
-    LOG(1) << "SEARCH near:" << nearObj << " maxDistance:" << maxDistance << " search: " << search
-           << endl;
+    LOG(1) << "SEARCH near:" << redact(nearObj) << " maxDistance:" << maxDistance
+           << " search: " << redact(search);
     int x, y;
     {
         BSONObjIterator i(nearObj);
@@ -110,13 +110,14 @@ void HaystackAccessMethod::searchCommand(OperationContext* txn,
             unordered_set<RecordId, RecordId::Hasher> thisPass;
 
 
-            unique_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn,
-                                                                     collection,
-                                                                     _descriptor,
-                                                                     key,
-                                                                     key,
-                                                                     true,  // endKeyInclusive
-                                                                     PlanExecutor::YIELD_MANUAL));
+            unique_ptr<PlanExecutor> exec(
+                InternalPlanner::indexScan(txn,
+                                           collection,
+                                           _descriptor,
+                                           key,
+                                           key,
+                                           BoundInclusion::kIncludeBothStartAndEndKeys,
+                                           PlanExecutor::YIELD_MANUAL));
             PlanExecutor::ExecState state;
             BSONObj obj;
             RecordId loc;

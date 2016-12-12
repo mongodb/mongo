@@ -191,7 +191,7 @@ TEST(StorageEngineMetadataTest, Roundtrip) {
         StorageEngineMetadata metadata(tempDir.path());
         ASSERT_OK(metadata.read());
         ASSERT_EQUALS("storageEngine1", metadata.getStorageEngine());
-        ASSERT_EQUALS(options, metadata.getStorageEngineOptions());
+        ASSERT_BSONOBJ_EQ(options, metadata.getStorageEngineOptions());
 
         metadata.reset();
         ASSERT_TRUE(metadata.getStorageEngine().empty());

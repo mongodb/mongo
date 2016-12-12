@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
@@ -76,6 +77,11 @@ public:
      * an instance of SecureRandom is used to seed the PRNG.
      */
     static void setThreadPRNGSeed(int32_t seed);
+
+    /**
+     * Parses the FailPoint::Mode, FailPoint::ValType, and data BSONObj from the BSON.
+     */
+    static StatusWith<std::tuple<Mode, ValType, BSONObj>> parseBSON(const BSONObj& obj);
 
     FailPoint();
 

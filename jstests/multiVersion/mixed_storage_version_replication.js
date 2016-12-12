@@ -5,6 +5,7 @@
  * nodes.
  */
 load('jstests/libs/parallelTester.js');
+load("jstests/replsets/rslib.js");
 
 // Seed random numbers and print the seed. To reproduce a failed test, look for the seed towards
 // the beginning of the output, and give it as an argument to randomize.
@@ -537,6 +538,10 @@ function assertDBsEq(db1, db2) {
     } else if (hash1.md5 != hash2.md5) {
         for (var i = 0; i < Math.min(collNames1.length, collNames2.length); i++) {
             var collName = collNames1[i];
+            if (collName.startsWith('system.')) {
+                // Skip system collections. These are not included in the dbhash before 3.3.10.
+                continue;
+            }
             if (hash1.collections[collName] !== hash2.collections[collName]) {
                 if (db1[collName].stats().capped) {
                     if (!db2[collName].stats().capped) {
@@ -656,28 +661,36 @@ function doMultiThreadedWork(primary, numThreads) {
     var newVersion = "latest";
     var setups = [
         {binVersion: newVersion, storageEngine: 'mmapv1'},
+        {binVersion: newVersion, storageEngine: 'mmapv1'},
         {binVersion: newVersion, storageEngine: 'wiredTiger'},
-        {binVersion: oldVersion}
+        {binVersion: newVersion, storageEngine: 'wiredTiger'},
+        {binVersion: oldVersion},
+        {binVersion: oldVersion},
+        {arbiter: true},
     ];
-    var nodes = {};
-    var node = 0;
-    // Add each one twice.
-    for (var i in setups) {
-        nodes["n" + node] = setups[i];
-        node++;
-        nodes["n" + node] = setups[i];
-        node++;
+    var replTest = new ReplSetTest({nodes: {n0: setups[0]}, name: name});
+    replTest.startSet();
+    replTest.initiate();
+
+    // We set the featureCompatibilityVersion to 3.2 so that 3.2 secondaries can successfully
+    // initial sync from a 3.4 primary. We do this prior to adding any other members to the replica
+    // set. This effectively allows us to emulate upgrading some of our nodes to the latest version
+    // while different 3.4 and 3.2 mongod processes are being elected primary.
+    assert.commandWorked(
+        replTest.getPrimary().adminCommand({setFeatureCompatibilityVersion: "3.2"}));
+
+    for (let i = 1; i < setups.length; ++i) {
+        replTest.add(setups[i]);
     }
-    nodes["n" + 2 * setups.length] = {arbiter: true};
-    var replTest = new ReplSetTest({nodes: nodes, name: name});
-    var conns = replTest.startSet();
 
     var config = replTest.getReplSetConfig();
     // Make sure everyone is syncing from the primary, to ensure we have all combinations of
     // primary/secondary syncing.
     config.settings = {chainingAllowed: false};
     config.protocolVersion = 0;
-    replTest.initiate(config);
+    config.version = 2;
+    reconfig(replTest, config);
+
     // Ensure all are synced.
     replTest.awaitSecondaryNodes(120000);
     var primary = replTest.getPrimary();
@@ -702,20 +715,16 @@ function doMultiThreadedWork(primary, numThreads) {
         }
         highestPriority++;
         printjson(config);
-        try {
-            primary.getDB("admin").runCommand({replSetReconfig: config});
-        } catch (e) {
-            // Expected to fail, as we'll have to reconnect.
-        }
-        replTest.awaitReplication(60000);  // 2 times the election period.
-        assert.soon(primaryChanged(conns, replTest, primaryIndex),
+        reconfig(replTest, config);
+        replTest.awaitReplication();
+        assert.soon(primaryChanged(replTest.nodes, replTest, primaryIndex),
                     "waiting for higher priority primary to be elected",
                     100000);
         print("New primary elected, doing a bunch of work");
         primary = replTest.getPrimary();
         doMultiThreadedWork(primary, 10);
-        replTest.awaitReplication(50000);
+        replTest.awaitReplication();
         print("Work done, checking to see all nodes match");
-        assertSameData(primary, conns);
+        assertSameData(primary, replTest.nodes);
     }
 })();

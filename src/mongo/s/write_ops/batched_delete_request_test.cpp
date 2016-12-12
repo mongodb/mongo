@@ -57,7 +57,7 @@ TEST(BatchedDeleteRequest, Basic) {
 
     ASSERT_EQ("foo.test", request.getNS().ns());
 
-    ASSERT_EQUALS(origDeleteRequestObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(origDeleteRequestObj, request.toBSON());
 }
 
 TEST(BatchedDeleteRequest, CloneBatchedDeleteDocCopiesAllFields) {
@@ -70,13 +70,13 @@ TEST(BatchedDeleteRequest, CloneBatchedDeleteDocCopiesAllFields) {
     BatchedDeleteDocument cloneToDoc;
     deleteDoc.cloneTo(&cloneToDoc);
     ASSERT_TRUE(cloneToDoc.isQuerySet());
-    ASSERT_EQ(BSON("a" << 1), cloneToDoc.getQuery());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 1), cloneToDoc.getQuery());
     ASSERT_TRUE(cloneToDoc.isLimitSet());
     ASSERT_EQ(1, cloneToDoc.getLimit());
     ASSERT_TRUE(cloneToDoc.isCollationSet());
-    ASSERT_EQ(BSON("locale"
-                   << "en_US"),
-              cloneToDoc.getCollation());
+    ASSERT_BSONOBJ_EQ(BSON("locale"
+                           << "en_US"),
+                      cloneToDoc.getCollation());
 }
 
 TEST(BatchedDeleteRequest, CanSetAndRetrieveCollationField) {
@@ -88,9 +88,9 @@ TEST(BatchedDeleteRequest, CanSetAndRetrieveCollationField) {
     deleteDoc.setCollation(BSON("locale"
                                 << "en_US"));
     ASSERT_TRUE(deleteDoc.isCollationSet());
-    ASSERT_EQ(BSON("locale"
-                   << "en_US"),
-              deleteDoc.getCollation());
+    ASSERT_BSONOBJ_EQ(BSON("locale"
+                           << "en_US"),
+                      deleteDoc.getCollation());
     deleteDoc.unsetCollation();
     ASSERT_FALSE(deleteDoc.isCollationSet());
 }
@@ -118,7 +118,7 @@ TEST(BatchedDeleteRequest, CollationFieldSerializesToBSONCorrectly) {
                                      << BatchedDeleteDocument::limit(1)
                                      << BatchedDeleteDocument::collation(BSON("locale"
                                                                               << "en_US")));
-    ASSERT_EQUALS(expectedDeleteObj, deleteDoc.toBSON());
+    ASSERT_BSONOBJ_EQ(expectedDeleteObj, deleteDoc.toBSON());
 }
 
 TEST(BatchedDeleteRequest, CollationFieldParsesFromBSONCorrectly) {
@@ -136,12 +136,12 @@ TEST(BatchedDeleteRequest, CollationFieldParsesFromBSONCorrectly) {
 
     ASSERT_EQ(1U, request.sizeDeletes());
     ASSERT_TRUE(request.getDeletesAt(0)->isCollationSet());
-    ASSERT_EQ(BSON("locale"
-                   << "en_US"),
-              request.getDeletesAt(0)->getCollation());
+    ASSERT_BSONOBJ_EQ(BSON("locale"
+                           << "en_US"),
+                      request.getDeletesAt(0)->getCollation());
 
     // Ensure we re-serialize to the original BSON request.
-    ASSERT_EQUALS(origDeleteRequestObj, request.toBSON());
+    ASSERT_BSONOBJ_EQ(origDeleteRequestObj, request.toBSON());
 }
 
 }  // namespace

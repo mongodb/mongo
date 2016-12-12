@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include "mongo/base/static_assert.h"
 #include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/db/storage/paths.h"
 #include "mongo/stdx/mutex.h"
@@ -159,13 +160,13 @@ public:
     static const unsigned long long MaxWinMemory = 128ULL * 1024 * 1024 * 1024 * 1024;
 
     // Make sure that the chunk memory covers the Max Windows user process VM space
-    static_assert(MaxChunkMemory == MaxWinMemory,
-                  "Need a larger bitset to cover max process VM space");
+    MONGO_STATIC_ASSERT_MSG(MaxChunkMemory == MaxWinMemory,
+                            "Need a larger bitset to cover max process VM space");
 
 public:
     MemoryMappedCOWBitset() {
-        static_assert(MemoryMappedCOWBitset::MaxChunkBytes == sizeof(bits),
-                      "Validate our predicted bitset size is correct");
+        MONGO_STATIC_ASSERT_MSG(MemoryMappedCOWBitset::MaxChunkBytes == sizeof(bits),
+                                "Validate our predicted bitset size is correct");
     }
 
     bool get(uintptr_t i) const {

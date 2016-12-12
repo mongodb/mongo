@@ -28,6 +28,10 @@
 
 #pragma once
 
+#include <cstddef>
+#include <iosfwd>
+#include <memory>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
@@ -36,7 +40,9 @@
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/replica_set_config.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 namespace repl {
@@ -100,12 +106,11 @@ public:
      * a buffer to be consumed by the next stage of the replication process.
      *
      * Additional information on the operations is provided in a DocumentsInfo
-     * struct and duration for how long the last remote command took to complete.
+     * struct.
      */
     using EnqueueDocumentsFn = stdx::function<void(Fetcher::Documents::const_iterator begin,
                                                    Fetcher::Documents::const_iterator end,
-                                                   const DocumentsInfo& info,
-                                                   Milliseconds remoteCommandProcessingTime)>;
+                                                   const DocumentsInfo& info)>;
 
     /**
      * Validates documents in current batch of results returned from tailing the remote oplog.
@@ -122,16 +127,17 @@ public:
      *
      * Throws a UserException if validation fails on any of the provided arguments.
      */
-    OplogFetcher(executor::TaskExecutor* exec,
+    OplogFetcher(executor::TaskExecutor* executor,
                  OpTimeWithHash lastFetched,
                  HostAndPort source,
                  NamespaceString nss,
                  ReplicaSetConfig config,
+                 std::size_t maxFetcherRestarts,
                  DataReplicatorExternalState* dataReplicatorExternalState,
                  EnqueueDocumentsFn enqueueDocumentsFn,
                  OnShutdownCallbackFn onShutdownCallbackFn);
 
-    virtual ~OplogFetcher() = default;
+    virtual ~OplogFetcher();
 
     std::string toString() const;
 
@@ -185,7 +191,28 @@ public:
      */
     Milliseconds getAwaitDataTimeout_forTest() const;
 
+    // State transitions:
+    // PreStart --> Running --> ShuttingDown --> Complete
+    // It is possible to skip intermediate states. For example,
+    // Calling shutdown() when the cloner has not started will transition from PreStart directly
+    // to Complete.
+    // This enum class is made public for testing.
+    enum class State { kPreStart, kRunning, kShuttingDown, kComplete };
+
+    /**
+     * Returns current oplog fetcher state.
+     * For testing only.
+     */
+    State getState_forTest() const;
+
 private:
+    bool _isActive_inlock() const;
+
+    /**
+     * Schedules fetcher and updates counters.
+     */
+    Status _scheduleFetcher_inlock();
+
     /**
      * Processes each batch of results from the tailable cursor started by the fetcher on the sync
      * source.
@@ -199,23 +226,59 @@ private:
      * Notifies caller that the oplog fetcher has completed processing operations from
      * the remote oplog.
      */
-    void _onShutdown(Status status);
-    void _onShutdown(Status status, OpTimeWithHash opTimeWithHash);
+    void _finishCallback(Status status);
+    void _finishCallback(Status status, OpTimeWithHash opTimeWithHash);
 
-    DataReplicatorExternalState* _dataReplicatorExternalState;
-    Fetcher _fetcher;
+    /**
+     * Creates a new instance of the fetcher to tail the remote oplog starting at the given optime.
+     */
+    std::unique_ptr<Fetcher> _makeFetcher(OpTime lastFetchedOpTime);
+
+    /**
+     * Returns whether the oplog fetcher is in shutdown.
+     */
+    bool _isShuttingDown() const;
+    bool _isShuttingDown_inlock() const;
+
+    // Protects member data of this OplogFetcher.
+    mutable stdx::mutex _mutex;
+
+    mutable stdx::condition_variable _condition;
+
+    executor::TaskExecutor* const _executor;
+    const HostAndPort _source;
+    const NamespaceString _nss;
+    const BSONObj _metadataObject;
+    const Milliseconds _remoteCommandTimeout;
+
+    // Maximum number of times to consecutively restart the fetcher on non-cancellation errors.
+    const std::size_t _maxFetcherRestarts;
+
+    DataReplicatorExternalState* const _dataReplicatorExternalState;
     const EnqueueDocumentsFn _enqueueDocumentsFn;
     const Milliseconds _awaitDataTimeout;
-    const OnShutdownCallbackFn _onShutdownCallbackFn;
-
-    // Protects member data of this Fetcher.
-    mutable stdx::mutex _mutex;
+    OnShutdownCallbackFn _onShutdownCallbackFn;
 
     // Used to validate start of first batch of results from the remote oplog
     // tailing query and to keep track of the last known operation consumed via
     // "_enqueueDocumentsFn".
     OpTimeWithHash _lastFetched;
+
+    // Current oplog fetcher state. See comments for State enum class for details.
+    State _state = State::kPreStart;
+
+    // Fetcher restarts since the last successful oplog query response.
+    std::size_t _fetcherRestarts = 0;
+
+    std::unique_ptr<Fetcher> _fetcher;
+    std::unique_ptr<Fetcher> _shuttingDownFetcher;
 };
+
+/**
+ * Insertion operator for OplogFetcher::State. Formats oplog fetcher state for output stream.
+ * For testing only.
+ */
+std::ostream& operator<<(std::ostream& os, const OplogFetcher::State& state);
 
 }  // namespace repl
 }  // namespace mongo

@@ -42,6 +42,7 @@
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/range_preserver.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/util/log.h"
 
@@ -112,6 +113,14 @@ public:
             return request.getStatus();
         }
 
+        if (!request.getValue().getCollation().isEmpty() &&
+            serverGlobalParams.featureCompatibility.version.load() ==
+                ServerGlobalParams::FeatureCompatibility::Version::k32) {
+            return Status(ErrorCodes::InvalidOptions,
+                          "The featureCompatibilityVersion must be 3.4 to use collation. See "
+                          "http://dochub.mongodb.org/core/3.4-feature-compatibility.");
+        }
+
         // Acquire the db read lock.
         AutoGetCollectionOrViewForRead ctx(txn, request.getValue().getNs());
         Collection* collection = ctx.getCollection();
@@ -159,6 +168,16 @@ public:
         auto request = CountRequest::parseFromBSON(dbname, cmdObj, isExplain);
         if (!request.isOK()) {
             return appendCommandStatus(result, request.getStatus());
+        }
+
+        if (!request.getValue().getCollation().isEmpty() &&
+            serverGlobalParams.featureCompatibility.version.load() ==
+                ServerGlobalParams::FeatureCompatibility::Version::k32) {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::InvalidOptions,
+                       "The featureCompatibilityVersion must be 3.4 to use collation. See "
+                       "http://dochub.mongodb.org/core/3.4-feature-compatibility."));
         }
 
         AutoGetCollectionOrViewForRead ctx(txn, request.getValue().getNs());
@@ -223,7 +242,7 @@ public:
         }
         curOp->debug().setPlanSummaryMetrics(summaryStats);
 
-        if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+        if (curOp->shouldDBProfile()) {
             BSONObjBuilder execStatsBob;
             Explain::getWinningPlanStats(exec.get(), &execStatsBob);
             curOp->debug().execStats = execStatsBob.obj();

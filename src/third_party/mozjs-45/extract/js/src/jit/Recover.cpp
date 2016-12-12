@@ -406,12 +406,15 @@ MMul::writeRecoverData(CompactBufferWriter& writer) const
     MOZ_ASSERT(canRecoverOnBailout());
     writer.writeUnsigned(uint32_t(RInstruction::Recover_Mul));
     writer.writeByte(specialization_ == MIRType_Float32);
+    MOZ_ASSERT(Mode(uint8_t(mode_)) == mode_);
+    writer.writeByte(uint8_t(mode_));
     return true;
 }
 
 RMul::RMul(CompactBufferReader& reader)
 {
     isFloatOperation_ = reader.readByte();
+    mode_ = reader.readByte();
 }
 
 bool
@@ -421,13 +424,19 @@ RMul::recover(JSContext* cx, SnapshotIterator& iter) const
     RootedValue rhs(cx, iter.read());
     RootedValue result(cx);
 
-    if (!js::MulValues(cx, &lhs, &rhs, &result))
-        return false;
+    if (MMul::Mode(mode_) == MMul::Normal) {
+        if (!js::MulValues(cx, &lhs, &rhs, &result))
+            return false;
 
-    // MIRType_Float32 is a specialization embedding the fact that the result is
-    // rounded to a Float32.
-    if (isFloatOperation_ && !RoundFloat32(cx, result, &result))
-        return false;
+        // MIRType_Float32 is a specialization embedding the fact that the
+        // result is rounded to a Float32.
+        if (isFloatOperation_ && !RoundFloat32(cx, result, &result))
+            return false;
+    } else {
+        MOZ_ASSERT(MMul::Mode(mode_) == MMul::Integer);
+        if (!js::math_imul_handle(cx, lhs, rhs, &result))
+            return false;
+    }
 
     iter.storeInstructionResult(result);
     return true;

@@ -48,6 +48,7 @@ public:
     static const char kDefaultMinValidNamespace[];
     static const char kInitialSyncFlagFieldName[];
     static const char kBeginFieldName[];
+    static const char kOplogDeleteFromPointFieldName[];
 
     StorageInterfaceImpl();
     explicit StorageInterfaceImpl(const NamespaceString& minValidNss);
@@ -67,13 +68,13 @@ public:
 
     void clearInitialSyncFlag(OperationContext* txn) override;
 
-    BatchBoundaries getMinValid(OperationContext* txn) const override;
-
-    void setMinValid(OperationContext* ctx,
-                     const OpTime& endOpTime,
-                     const DurableRequirement durReq) override;
-
-    void setMinValid(OperationContext* ctx, const BatchBoundaries& boundaries) override;
+    OpTime getMinValid(OperationContext* txn) const override;
+    void setMinValid(OperationContext* txn, const OpTime& minValid) override;
+    void setMinValidToAtLeast(OperationContext* txn, const OpTime& endOpTime) override;
+    void setOplogDeleteFromPoint(OperationContext* txn, const Timestamp& timestamp) override;
+    Timestamp getOplogDeleteFromPoint(OperationContext* txn) override;
+    void setAppliedThrough(OperationContext* txn, const OpTime& optime) override;
+    OpTime getAppliedThrough(OperationContext* txn) override;
 
     /**
      *  Allocates a new TaskRunner for use by the passed in collection.
@@ -95,6 +96,7 @@ public:
     Status dropReplicatedDatabases(OperationContext* txn) override;
 
     Status createOplog(OperationContext* txn, const NamespaceString& nss) override;
+    StatusWith<size_t> getOplogMaxSize(OperationContext* txn, const NamespaceString& nss) override;
 
     Status createCollection(OperationContext* txn,
                             const NamespaceString& nss,
@@ -102,19 +104,29 @@ public:
 
     Status dropCollection(OperationContext* txn, const NamespaceString& nss) override;
 
-    StatusWith<BSONObj> findOne(OperationContext* txn,
-                                const NamespaceString& nss,
-                                boost::optional<StringData> indexName,
-                                ScanDirection scanDirection) override;
+    StatusWith<std::vector<BSONObj>> findDocuments(OperationContext* txn,
+                                                   const NamespaceString& nss,
+                                                   boost::optional<StringData> indexName,
+                                                   ScanDirection scanDirection,
+                                                   const BSONObj& startKey,
+                                                   BoundInclusion boundInclusion,
+                                                   std::size_t limit) override;
 
-    StatusWith<BSONObj> deleteOne(OperationContext* txn,
-                                  const NamespaceString& nss,
-                                  boost::optional<StringData> indexName,
-                                  ScanDirection scanDirection) override;
+    StatusWith<std::vector<BSONObj>> deleteDocuments(OperationContext* txn,
+                                                     const NamespaceString& nss,
+                                                     boost::optional<StringData> indexName,
+                                                     ScanDirection scanDirection,
+                                                     const BSONObj& startKey,
+                                                     BoundInclusion boundInclusion,
+                                                     std::size_t limit) override;
 
     Status isAdminDbValid(OperationContext* txn) override;
 
 private:
+    // Returns empty document if not present.
+    BSONObj getMinValidDocument(OperationContext* txn) const;
+    void updateMinValidDocument(OperationContext* txn, const BSONObj& updateSpec);
+
     const NamespaceString _minValidNss;
 };
 

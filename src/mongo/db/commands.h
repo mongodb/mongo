@@ -216,12 +216,12 @@ public:
                            BSONObjBuilder* out) const;
 
     /**
-     * Checks if the given client is authorized to run this command on database "dbname"
-     * with the invocation described by "cmdObj".
+     * Checks if the client associated with the given OperationContext, "txn", is authorized to run
+     * this command on database "dbname" with the invocation described by "cmdObj".
      */
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj);
+    virtual Status checkAuthForOperation(OperationContext* txn,
+                                         const std::string& dbname,
+                                         const BSONObj& cmdObj);
 
     /**
      * Redacts "cmdObj" in-place to a form suitable for writing to logs.
@@ -281,18 +281,6 @@ public:
     }
 
 protected:
-    /**
-     * Appends to "*out" the privileges required to run this command on database "dbname" with
-     * the invocation described by "cmdObj".  New commands shouldn't implement this, they should
-     * implement checkAuthForCommand instead.
-     */
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        // The default implementation of addRequiredPrivileges should never be hit.
-        fassertFailed(16940);
-    }
-
     static CommandMap* _commands;
     static CommandMap* _commandsByBestName;
 
@@ -443,20 +431,43 @@ public:
      */
     static bool isUserManagementCommand(const std::string& name);
 
-private:
     /**
-     * Checks to see if the client is authorized to run the given command with the given
-     * parameters on the given named database.
+     * Checks to see if the client executing "txn" is authorized to run the given command with the
+     * given parameters on the given named database.
      *
      * Returns Status::OK() if the command is authorized.  Most likely returns
      * ErrorCodes::Unauthorized otherwise, but any return other than Status::OK implies not
      * authorized.
      */
-    static Status _checkAuthorization(Command* c,
-                                      Client* client,
-                                      const std::string& dbname,
-                                      const BSONObj& cmdObj);
+    static Status checkAuthorization(Command* c,
+                                     OperationContext* client,
+                                     const std::string& dbname,
+                                     const BSONObj& cmdObj);
 
+private:
+    /**
+     * Checks if the given client is authorized to run this command on database "dbname"
+     * with the invocation described by "cmdObj".
+     *
+     * NOTE: Implement checkAuthForOperation that takes an OperationContext* instead.
+     */
+    virtual Status checkAuthForCommand(Client* client,
+                                       const std::string& dbname,
+                                       const BSONObj& cmdObj);
+
+    /**
+     * Appends to "*out" the privileges required to run this command on database "dbname" with
+     * the invocation described by "cmdObj".  New commands shouldn't implement this, they should
+     * implement checkAuthForOperation (which takes an OperationContext*), instead.
+     */
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        // The default implementation of addRequiredPrivileges should never be hit.
+        fassertFailed(16940);
+    }
+
+private:
     // The full name of the command
     const std::string _name;
 

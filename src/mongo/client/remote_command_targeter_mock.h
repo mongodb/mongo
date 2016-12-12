@@ -54,18 +54,21 @@ public:
      * Returns the return value last set by setFindHostReturnValue.
      * Returns ErrorCodes::InternalError if setFindHostReturnValue was never called.
      */
-    StatusWith<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
-                                     Milliseconds maxWait) override;
+    StatusWith<HostAndPort> findHostWithMaxWait(const ReadPreferenceSetting& readPref,
+                                                Milliseconds maxWait) override;
+
+    StatusWith<HostAndPort> findHost(OperationContext* txn,
+                                     const ReadPreferenceSetting& readPref) override;
 
     /**
      * No-op for the mock.
      */
-    void markHostNotMaster(const HostAndPort& host) override;
+    void markHostNotMaster(const HostAndPort& host, const Status& status) override;
 
     /**
      * No-op for the mock.
      */
-    void markHostUnreachable(const HostAndPort& host) override;
+    void markHostUnreachable(const HostAndPort& host, const Status& status) override;
 
     /**
      * Sets the return value for the next call to connectionString.

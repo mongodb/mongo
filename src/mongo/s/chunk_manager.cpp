@@ -36,6 +36,7 @@
 #include <map>
 #include <set>
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
@@ -48,7 +49,7 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/balancer/balancer_configuration.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -76,14 +77,19 @@ using std::vector;
 namespace {
 
 /**
- * This is an adapter so we can use config diffs - mongos and mongod do them slightly
- * differently
+ * This is an adapter so we can use config diffs - mongos and mongod do them slightly differently.
  *
  * The mongos adapter here tracks all shards, and stores ranges by (max, Chunk) in the map.
  */
 class CMConfigDiffTracker : public ConfigDiffTracker<shared_ptr<Chunk>> {
 public:
-    CMConfigDiffTracker(ChunkManager* manager) : _manager(manager) {}
+    CMConfigDiffTracker(const std::string& ns,
+                        RangeMap* currMap,
+                        ChunkVersion* maxVersion,
+                        MaxChunkVersionMap* maxShardVersions,
+                        ChunkManager* manager)
+        : ConfigDiffTracker<shared_ptr<Chunk>>(ns, currMap, maxVersion, maxShardVersions),
+          _manager(manager) {}
 
     bool isTracked(const ChunkType& chunk) const final {
         // Mongos tracks all shards
@@ -101,14 +107,13 @@ public:
     }
 
     ShardId shardFor(OperationContext* txn, const ShardId& shardId) const final {
-        const auto shard = grid.shardRegistry()->getShard(txn, shardId);
+        const auto shard = uassertStatusOK(grid.shardRegistry()->getShard(txn, shardId));
         return shard->getId();
     }
 
 private:
     ChunkManager* const _manager;
 };
-
 
 bool allOfType(BSONType type, const BSONObj& o) {
     BSONObjIterator it(o);
@@ -143,14 +148,16 @@ bool isChunkMapValid(const ChunkMap& chunkMap) {
          ++it) {
         ChunkMap::const_iterator last = boost::prior(it);
 
-        if (!(it->second->getMin() == last->second->getMax())) {
+        if (SimpleBSONObjComparator::kInstance.evaluate(it->second->getMin() !=
+                                                        last->second->getMax())) {
             log() << last->second->toString();
             log() << it->second->toString();
             log() << it->second->getMin();
             log() << last->second->getMax();
         }
 
-        ENSURE(it->second->getMin() == last->second->getMax());
+        ENSURE(SimpleBSONObjComparator::kInstance.evaluate(it->second->getMin() ==
+                                                           last->second->getMax()));
     }
 
     return true;
@@ -170,13 +177,19 @@ ChunkManager::ChunkManager(const string& ns,
       _keyPattern(pattern.getKeyPattern()),
       _defaultCollator(std::move(defaultCollator)),
       _unique(unique),
-      _sequenceNumber(NextSequenceNumber.addAndFetch(1)) {}
+      _sequenceNumber(NextSequenceNumber.addAndFetch(1)),
+      _chunkMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<std::shared_ptr<Chunk>>()),
+      _chunkRangeMap(
+          SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<ShardAndChunkRange>()) {}
 
 ChunkManager::ChunkManager(OperationContext* txn, const CollectionType& coll)
     : _ns(coll.getNs().ns()),
       _keyPattern(coll.getKeyPattern()),
       _unique(coll.getUnique()),
-      _sequenceNumber(NextSequenceNumber.addAndFetch(1)) {
+      _sequenceNumber(NextSequenceNumber.addAndFetch(1)),
+      _chunkMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<std::shared_ptr<Chunk>>()),
+      _chunkRangeMap(
+          SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<ShardAndChunkRange>()) {
     // coll does not have correct version. Use same initial version as _load and createFirstChunks.
     _version = ChunkVersion(0, 0, coll.getEpoch());
 
@@ -192,33 +205,38 @@ ChunkManager::ChunkManager(OperationContext* txn, const CollectionType& coll)
 }
 
 void ChunkManager::loadExistingRanges(OperationContext* txn, const ChunkManager* oldManager) {
+    invariant(!_version.isSet());
+
     int tries = 3;
 
     while (tries--) {
-        ChunkMap chunkMap;
+        ChunkMap chunkMap =
+            SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<std::shared_ptr<Chunk>>();
         set<ShardId> shardIds;
         ShardVersionMap shardVersions;
 
         Timer t;
 
-        bool success = _load(txn, chunkMap, shardIds, &shardVersions, oldManager);
-        if (success) {
-            log() << "ChunkManager: time to load chunks for " << _ns << ": " << t.millis() << "ms"
-                  << " sequenceNumber: " << _sequenceNumber << " version: " << _version.toString()
-                  << " based on: "
-                  << (oldManager ? oldManager->getVersion().toString() : "(empty)");
+        log() << "ChunkManager loading chunks for " << _ns << " sequenceNumber: " << _sequenceNumber
+              << " based on: " << (oldManager ? oldManager->getVersion().toString() : "(empty)");
 
+        if (_load(txn, chunkMap, shardIds, &shardVersions, oldManager)) {
             // TODO: Merge into diff code above, so we validate in one place
             if (isChunkMapValid(chunkMap)) {
-                _chunkMap.swap(chunkMap);
-                _shardIds.swap(shardIds);
-                _shardVersions.swap(shardVersions);
+                _chunkMap = std::move(chunkMap);
+                _shardIds = std::move(shardIds);
+                _shardVersions = std::move(shardVersions);
                 _chunkRangeMap = _constructRanges(_chunkMap);
+
+                log() << "ChunkManager load took " << t.millis() << " ms and found version "
+                      << _version;
+
                 return;
             }
         }
 
-        warning() << "ChunkManager loaded an invalid config for " << _ns << ", trying again";
+        warning() << "ChunkManager load failed after " << t.millis()
+                  << " ms and will be retried up to " << tries << " more times";
 
         sleepmillis(10 * (3 - tries));
     }
@@ -270,8 +288,7 @@ bool ChunkManager::_load(OperationContext* txn,
     }
 
     // Attach a diff tracker for the versioned chunk data
-    CMConfigDiffTracker differ(this);
-    differ.attach(_ns, chunkMap, _version, *shardVersions);
+    CMConfigDiffTracker differ(_ns, &chunkMap, &_version, shardVersions, this);
 
     // Diff tracker should *always* find at least one chunk if collection exists
     // Get the diff query required
@@ -279,8 +296,14 @@ bool ChunkManager::_load(OperationContext* txn,
 
     repl::OpTime opTime;
     std::vector<ChunkType> chunks;
-    uassertStatusOK(grid.catalogClient(txn)->getChunks(
-        txn, diffQuery.query, diffQuery.sort, boost::none, &chunks, &opTime));
+    uassertStatusOK(
+        grid.catalogClient(txn)->getChunks(txn,
+                                           diffQuery.query,
+                                           diffQuery.sort,
+                                           boost::none,
+                                           &chunks,
+                                           &opTime,
+                                           repl::ReadConcernLevel::kMajorityReadConcern));
 
     invariant(opTime >= _configOpTime);
     _configOpTime = opTime;
@@ -292,11 +315,12 @@ bool ChunkManager::_load(OperationContext* txn,
 
         // Add all existing shards we find to the shards set
         for (ShardVersionMap::iterator it = shardVersions->begin(); it != shardVersions->end();) {
-            shared_ptr<Shard> shard = grid.shardRegistry()->getShard(txn, it->first);
-            if (shard) {
+            auto shardStatus = grid.shardRegistry()->getShard(txn, it->first);
+            if (shardStatus.isOK()) {
                 shardIds.insert(it->first);
                 ++it;
             } else {
+                invariant(shardStatus == ErrorCodes::ShardNotFound);
                 shardVersions->erase(it++);
             }
         }
@@ -364,15 +388,15 @@ void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
 
     if (!initPoints || initPoints->empty()) {
         // discover split points
-        const auto primaryShard = grid.shardRegistry()->getShard(txn, primaryShardId);
+        auto primaryShard = uassertStatusOK(grid.shardRegistry()->getShard(txn, primaryShardId));
         const NamespaceString nss{getns()};
 
-        auto result = uassertStatusOK(
-            primaryShard->runCommand(txn,
-                                     ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-                                     nss.db().toString(),
-                                     BSON("count" << nss.coll()),
-                                     Shard::RetryPolicy::kIdempotent));
+        auto result = uassertStatusOK(primaryShard->runCommandWithFixedRetryAttempts(
+            txn,
+            ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
+            nss.db().toString(),
+            BSON("count" << nss.coll()),
+            Shard::RetryPolicy::kIdempotent));
 
         long long numObjects = 0;
         uassertStatusOK(result.commandStatus);
@@ -395,12 +419,12 @@ void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
         shardIds->push_back(primaryShardId);
     } else {
         // make sure points are unique and ordered
-        set<BSONObj> orderedPts;
+        auto orderedPts = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
         for (unsigned i = 0; i < initPoints->size(); ++i) {
             BSONObj pt = (*initPoints)[i];
             orderedPts.insert(pt);
         }
-        for (set<BSONObj>::iterator it = orderedPts.begin(); it != orderedPts.end(); ++it) {
+        for (auto it = orderedPts.begin(); it != orderedPts.end(); ++it) {
             splitPoints->push_back(*it);
         }
 
@@ -461,15 +485,17 @@ Status ChunkManager::createFirstChunks(OperationContext* txn,
     return Status::OK();
 }
 
-shared_ptr<Chunk> ChunkManager::findIntersectingChunk(OperationContext* txn,
-                                                      const BSONObj& shardKey,
-                                                      const CollatorInterface* collator) const {
+StatusWith<shared_ptr<Chunk>> ChunkManager::findIntersectingChunk(OperationContext* txn,
+                                                                  const BSONObj& shardKey,
+                                                                  const BSONObj& collation) const {
     {
-        if (collator) {
+        const bool hasSimpleCollation = (collation.isEmpty() && !_defaultCollator) ||
+            SimpleBSONObjComparator::kInstance.evaluate(collation == CollationSpec::kSimpleSpec);
+        if (!hasSimpleCollation) {
             for (BSONElement elt : shardKey) {
                 if (CollationIndexKey::isCollatableType(elt.type())) {
-                    msgasserted(ErrorCodes::ShardKeyNotFound,
-                                "cannot target single shard due to collation");
+                    return Status(ErrorCodes::ShardKeyNotFound,
+                                  "cannot target single shard due to collation");
                 }
             }
         }
@@ -509,8 +535,12 @@ shared_ptr<Chunk> ChunkManager::findIntersectingChunk(OperationContext* txn,
 
 shared_ptr<Chunk> ChunkManager::findIntersectingChunkWithSimpleCollation(
     OperationContext* txn, const BSONObj& shardKey) const {
-    const CollatorInterface* collator = nullptr;
-    return findIntersectingChunk(txn, shardKey, collator);
+    auto chunk = findIntersectingChunk(txn, shardKey, CollationSpec::kSimpleSpec);
+
+    // findIntersectingChunk() should succeed in targeting a single shard, since we have the simple
+    // collation.
+    massertStatusOK(chunk.getStatus());
+    return chunk.getValue();
 }
 
 void ChunkManager::getShardIdsForQuery(OperationContext* txn,
@@ -538,18 +568,11 @@ void ChunkManager::getShardIdsForQuery(OperationContext* txn,
 
     // Fast path for targeting equalities on the shard key.
     auto shardKeyToFind = _keyPattern.extractShardKeyFromQuery(*cq);
-    if (shardKeyToFind.isOK() && !shardKeyToFind.getValue().isEmpty()) {
-        try {
-            auto chunk = findIntersectingChunk(txn, shardKeyToFind.getValue(), cq->getCollator());
-            shardIds->insert(chunk->getShardId());
+    if (!shardKeyToFind.isEmpty()) {
+        auto chunk = findIntersectingChunk(txn, shardKeyToFind, collation);
+        if (chunk.isOK()) {
+            shardIds->insert(chunk.getValue()->getShardId());
             return;
-        } catch (const MsgAssertionException& msg) {
-
-            // If we failed to find the intersecting chunk for a reason other than the inability to
-            // target a single shard, throw.
-            if (msg.getCode() != ErrorCodes::ShardKeyNotFound) {
-                throw msg;
-            }
         }
     }
 
@@ -758,7 +781,8 @@ string ChunkManager::toString() const {
 }
 
 ChunkManager::ChunkRangeMap ChunkManager::_constructRanges(const ChunkMap& chunkMap) {
-    ChunkRangeMap chunkRangeMap;
+    ChunkRangeMap chunkRangeMap =
+        SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<ShardAndChunkRange>();
 
     if (chunkMap.empty()) {
         return chunkRangeMap;
@@ -783,7 +807,8 @@ ChunkManager::ChunkRangeMap ChunkManager::_constructRanges(const ChunkMap& chunk
         if (insertResult.first != chunkRangeMap.begin()) {
             // Make sure there are no gaps in the ranges
             insertResult.first--;
-            invariant(insertResult.first->first == rangeMin);
+            invariant(
+                SimpleBSONObjComparator::kInstance.evaluate(insertResult.first->first == rangeMin));
         }
     }
 

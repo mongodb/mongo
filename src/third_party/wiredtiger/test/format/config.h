@@ -37,7 +37,7 @@ typedef struct {
 	/* Value is a boolean, yes if roll of 1-to-100 is <= CONFIG->min. */
 #define	C_BOOL		0x001
 
-	/* Not a simple randomization, handle outside the main loop. */ 
+	/* Not a simple randomization, handle outside the main loop. */
 #define	C_IGNORE	0x002
 
 	/* Value was set from command-line or file, ignore for all runs. */
@@ -58,7 +58,7 @@ typedef struct {
 } CONFIG;
 
 #define	COMPRESSION_LIST						\
-	"(none | lz4 | lz4-noraw | snappy | zlib | zlib-noraw)"
+	"(none | lz4 | lz4-noraw | snappy | zlib | zlib-noraw | zstd)"
 
 static CONFIG c[] = {
 	{ "abort",
@@ -70,8 +70,8 @@ static CONFIG c[] = {
 	  C_BOOL, 90, 0, 0, &g.c_auto_throttle, NULL },
 
 	{ "backups",
-	  "if backups are enabled",				/* 5% */
-	  C_BOOL, 5, 0, 0, &g.c_backups, NULL },
+	  "if backups are enabled",				/* 20% */
+	  C_BOOL, 20, 0, 0, &g.c_backups, NULL },
 
 	{ "bitcnt",
 	  "number of bits for fixed-length column-store files",
@@ -203,8 +203,8 @@ static CONFIG c[] = {
 	  C_BOOL, 0, 0, 0, &g.c_leak_memory, NULL },
 
 	{ "logging",
-	  "if logging configured",				/* 30% */
-	  C_BOOL, 30, 0, 0, &g.c_logging, NULL },
+	  "if logging configured",				/* 50% */
+	  C_BOOL, 50, 0, 0, &g.c_logging, NULL },
 
 	{ "logging_archive",
 	  "if log file archival configured",			/* 50% */

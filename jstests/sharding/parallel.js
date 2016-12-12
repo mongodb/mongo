@@ -13,7 +13,7 @@
 
     var N = 10000;
 
-    for (var i = 0; i < N; i += (N / 12)) {
+    for (var i = 0; i < N; i += (N / 10)) {
         s.adminCommand({split: "test.foo", middle: {_id: i}});
         s.s.getDB('admin').runCommand({
             moveChunk: "test.foo",

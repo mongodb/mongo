@@ -36,6 +36,5 @@ class test_version(wttest.WiredTigerTestCase):
     def test_version(self):
         version = wiredtiger.wiredtiger_version()
 
-
 if __name__ == '__main__':
     wttest.run()

@@ -32,6 +32,13 @@ post:
           fi
 
 
+modules:
+- name: enterprise
+  repo: git@github.com:10gen/mongo-enterprise-modules.git
+  prefix: src/mongo/db/modules
+  branch: master
+
+
 functions:
   "download analysis scripts":
     - command: shell.exec
@@ -51,14 +58,14 @@ functions:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: perf/${version_id}/${revision}/mongod-${version_id}
+        remote_file: ${project}/${version_id}/${revision}/mongod-${version_id}
         bucket: mciuploads
         local_file: src/mongod
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: perf/${version_id}/${revision}/mongo-${version_id}
+        remote_file: ${project}/${version_id}/${revision}/mongo-${version_id}
         bucket: mciuploads
         local_file: src/mongo
     - command: shell.exec
@@ -71,7 +78,7 @@ functions:
           chmod +x mongo
           git clone https://github.com/mongodb/mongo-perf perf
           cd perf
-          git checkout r20160127
+          git checkout r20161010
     - command: shell.exec
       params:
         background: true
@@ -148,9 +155,13 @@ functions:
         silent: true
         script: |
           set -o errexit
-          set -o verbose
           source ./venv/bin/activate
-          python -u ../dsi/analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag 3.2.1-Baseline 3.3.0-Baseline 3.3.3-Baseline 3.0.6-Baseline --overrideFile ../dsi/analysis/master/perf_override.json --project_id performance --task_name ${task_name} --variant {build_variant} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
+          REFTAGS="3.2.10-Baseline 3.0.14-Baseline" # These are project specific
+          # Project Opts are  project specific, but don't match expansion from elsewhere.
+          # We could change dsi/analysis/master to dsi/analysis/perf in DSI to get dsi/analysis/${project}/perf_override.json
+          # Note project_id performance doesn't match string perf used elsewhere for ${project}
+          PROJECT_OPTS="--overrideFile ../dsi/analysis/master/perf_override.json --project_id performance"
+          python -u ../dsi/analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag $REFTAGS $PROJECT_OPTS --variant ${build_variant} --task ${task_name} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
     - command: "json.send"
       params:
          name: "dashboard"
@@ -165,12 +176,13 @@ functions:
           source ./venv/bin/activate
 
           # Any tasks that want the analysis scripts to analyze mongod.log files should pass in
-          # `log_analysis: true` as a var to this function. The following line will select the
+          # `reports_analysis: true` as a var to this function. The following line will select the
           # appropriate flags if it's `true`.
-          log_analysis_flags="--log-analysis . --perf-file perf/perf.json"
-          cmd_flags=$([ "${log_analysis}" = "true" ] && echo "$log_analysis_flags" || echo "")
-
-          python ../dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag 3.2.1-Baseline --overrideFile ../dsi/analysis/master/perf_override.json --variant ${build_variant} --threshold 0.10 --threadThreshold 0.15
+          reports_analysis_flags="--reports-analysis . --perf-file perf/perf.json"
+          cmd_flags=$([ "${reports_analysis}" = "true" ] && echo "$reports_analysis_flags" || echo "")
+          REFTAG="3.2.10-Baseline"
+          OVERRIDE="../dsi/analysis/master/perf_override.json" # Note use of master here cannot use ${project}
+          python ../dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag $REFTAG --overrideFile $OVERRIDE --variant ${build_variant} --task ${task_name} --threshold 0.10 --threadThreshold 0.15
   "run perf tests":
     - command: shell.exec
       params:
@@ -192,6 +204,16 @@ functions:
           #  give mongod a few seconds to start up so that we can connect.
           sleep 5
           ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t ${threads} --trialCount 5 -f testcases/*.js --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongod.log
+        remote_file: ${project}/${version_id}/${revision}/mongod-${task_id}.log
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|text/html}
+        display_name: mongod.log
     - command: "json.send"
       params:
         name: "perf"
@@ -238,7 +260,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongod
-        remote_file: perf/${version_id}/${revision}/mongod-${version_id}
+        remote_file: ${project}/${version_id}/${revision}/mongod-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
@@ -247,8 +269,8 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/mongo
-        remote_file: perf/${version_id}/${revision}/mongo-${version_id}
+        local_file: src/build/cached/mongo/mongo
+        remote_file: ${project}/${version_id}/${revision}/mongo-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
@@ -268,7 +290,7 @@ tasks:
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
-        log_analysis: true
+        reports_analysis: true
 - name: where
   depends_on:
   - variant: linux-wt-standalone
@@ -284,7 +306,7 @@ tasks:
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
-        log_analysis: true
+        reports_analysis: true
 - name: update
   depends_on:
   - variant: linux-wt-standalone
@@ -300,7 +322,7 @@ tasks:
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
-        log_analysis: true
+        reports_analysis: true
 - name: insert
   depends_on:
   - variant: linux-wt-standalone
@@ -316,7 +338,7 @@ tasks:
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
-        log_analysis: true
+        reports_analysis: true
 - name: geo
   depends_on:
   - variant: linux-wt-standalone
@@ -332,7 +354,7 @@ tasks:
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
-        log_analysis: true
+        reports_analysis: true
 - name: misc
   depends_on:
   - variant: linux-wt-standalone
@@ -348,7 +370,7 @@ tasks:
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
-        log_analysis: true
+        reports_analysis: true
 - name: singleThreaded
   depends_on:
   - variant: linux-wt-standalone
@@ -364,7 +386,7 @@ tasks:
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
-        log_analysis: true
+        reports_analysis: true
 - name: singleThreaded-wt-repl-comp
   depends_on:
     - name : compile
@@ -436,204 +458,6 @@ tasks:
         compare_task : "misc"
         variant1 : "linux-wt-standalone"
         variant2 : "linux-wt-repl"
-    - func: "analyze"
-- name: singleThreaded-wt-mmap-standalone-comp
-  depends_on:
-    - name : compile
-      variant : linux-wt-standalone
-    - name : singleThreaded
-      variant : linux-wt-standalone
-      status : "*"
-    - name : singleThreaded
-      variant :  linux-mmap-standalone
-      status : "*"
-  commands:
-    - func: "download analysis scripts"
-    - func: "compare"
-      vars:
-        compare_task : "singleThreaded"
-        variant2 : "linux-wt-standalone"
-        variant1 : "linux-mmap-standalone"
-    - func: "analyze"
-- name: query-wt-mmap-standalone-comp
-  depends_on:
-    - name : compile
-      variant : linux-wt-standalone
-    - name : query
-      variant : linux-wt-standalone
-      status : "*"
-    - name : query
-      variant :  linux-mmap-standalone
-      status : "*"
-  commands:
-    - func: "download analysis scripts"
-    - func: "compare"
-      vars:
-        compare_task : "query"
-        variant2 : "linux-wt-standalone"
-        variant1 : "linux-mmap-standalone"
-    - func: "analyze"
-- name: where-wt-mmap-standalone-comp
-  depends_on:
-    - name : compile
-      variant : linux-wt-standalone
-    - name : where
-      variant : linux-wt-standalone
-      status : "*"
-    - name : where
-      variant :  linux-mmap-standalone
-      status : "*"
-  commands:
-    - func: "download analysis scripts"
-    - func: "compare"
-      vars:
-        compare_task : "where"
-        variant2 : "linux-wt-standalone"
-        variant1 : "linux-mmap-standalone"
-    - func: "analyze"
-- name: geo-wt-mmap-standalone-comp
-  depends_on:
-    - name : compile
-      variant : linux-wt-standalone
-    - name : geo
-      variant : linux-wt-standalone
-      status : "*"
-    - name : geo
-      variant :  linux-mmap-standalone
-      status : "*"
-  commands:
-    - func: "download analysis scripts"
-    - func: "compare"
-      vars:
-        compare_task : "geo"
-        variant2 : "linux-wt-standalone"
-        variant1 : "linux-mmap-standalone"
-    - func: "analyze"
-- name: insert-wt-mmap-standalone-comp
-  depends_on:
-    - name : compile
-      variant : linux-wt-standalone
-    - name : insert
-      variant : linux-wt-standalone
-      status : "*"
-    - name : insert
-      variant :  linux-mmap-standalone
-      status : "*"
-  commands:
-    - func: "download analysis scripts"
-    - func: "compare"
-      vars:
-        compare_task : "insert"
-        variant2 : "linux-wt-standalone"
-        variant1 : "linux-mmap-standalone"
-    - func: "analyze"
-- name: update-wt-mmap-standalone-comp
-  depends_on:
-    - name : compile
-      variant : linux-wt-standalone
-    - name : update
-      variant : linux-wt-standalone
-      status : "*"
-    - name : update
-      variant :  linux-mmap-standalone
-      status : "*"
-  commands:
-    - func: "download analysis scripts"
-    - func: "compare"
-      vars:
-        compare_task : "update"
-        variant2 : "linux-wt-standalone"
-        variant1 : "linux-mmap-standalone"
-    - func: "analyze"
-- name: misc-wt-mmap-standalone-comp
-  depends_on:
-    - name : compile
-      variant : linux-wt-standalone
-    - name : misc
-      variant : linux-wt-standalone
-      status : "*"
-    - name : misc
-      variant :  linux-mmap-standalone
-      status : "*"
-  commands:
-    - func: "download analysis scripts"
-    - func: "compare"
-      vars:
-        compare_task : "misc"
-        variant2 : "linux-wt-standalone"
-        variant1 : "linux-mmap-standalone"
-    - func: "analyze"
-- name: singleThreaded-wt-mmap-repl-comp
-  depends_on:
-    - name : compile
-      variant : linux-wt-standalone
-    - name : singleThreaded
-      variant : linux-wt-repl
-      status : "*"
-    - name : singleThreaded
-      variant :  linux-mmap-repl
-      status : "*"
-  commands:
-    - func: "download analysis scripts"
-    - func: "compare"
-      vars:
-        compare_task : "singleThreaded"
-        variant2 : "linux-wt-repl"
-        variant1 : "linux-mmap-repl"
-    - func: "analyze"
-- name: insert-wt-mmap-repl-comp
-  depends_on:
-    - name : compile
-      variant : linux-wt-standalone
-    - name : insert
-      variant : linux-wt-repl
-      status : "*"
-    - name : insert
-      variant :  linux-mmap-repl
-      status : "*"
-  commands:
-    - func: "download analysis scripts"
-    - func: "compare"
-      vars:
-        compare_task : "insert"
-        variant2 : "linux-wt-repl"
-        variant1 : "linux-mmap-repl"
-    - func: "analyze"
-- name: update-wt-mmap-repl-comp
-  depends_on:
-    - name : compile
-      variant : linux-wt-standalone
-    - name : update
-      variant : linux-wt-repl
-      status : "*"
-    - name : update
-      variant :  linux-mmap-repl
-      status : "*"
-  commands:
-    - func: "download analysis scripts"
-    - func: "compare"
-      vars:
-        compare_task : "update"
-        variant2 : "linux-wt-repl"
-        variant1 : "linux-mmap-repl"
-    - func: "analyze"
-- name: misc-wt-mmap-repl-comp
-  depends_on:
-    - name : compile
-      variant : linux-wt-standalone
-    - name : misc
-      variant : linux-wt-repl
-      status : "*"
-    - name : misc
-      variant :  linux-mmap-repl
-      status : "*"
-  commands:
-    - func: "download analysis scripts"
-    - func: "compare"
-      vars:
-        compare_task : "misc"
-        variant2 : "linux-wt-repl"
-        variant1 : "linux-mmap-repl"
     - func: "analyze"
 - name: singleThreaded-mmap-repl-comp
   depends_on:
@@ -707,23 +531,43 @@ tasks:
         variant1 : "linux-mmap-standalone"
         variant2 : "linux-mmap-repl"
     - func: "analyze"
+- name: aggregation
+  depends_on:
+  - variant: linux-wt-standalone
+    name: compile
+  commands:
+    - func: "start server"
+    - func: "run perf tests"
+      vars:
+        includeFilter1: "aggregation"
+        includeFilter2: "regression"
+        excludeFilter: "none"
+        threads : "1"
+    - func: "download analysis scripts"
+    - func: "analyze"
+      vars:
+        log_analysis: true
 
 buildvariants:
 - name: linux-wt-standalone
-  display_name: Standalone Linux WT
+  display_name: Standalone Linux inMemory
   batchtime: 90 # 1.5 hours
+  modules:
+    - enterprise
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy --ssl
     mongod_exec_wrapper: &exec_wrapper "numactl --physcpubind=4,5,6,7 -i 1"
     perf_exec_wrapper: &perf_wrapper "numactl --physcpubind=1,2,3 -i 0"
-    mongod_flags: "--storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false  --wiredTigerCacheSizeGB 16"
+    mongod_flags: "--storageEngine=inMemory --logpath ./mongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false  --inMemorySizeGB 16"
     use_scons_cache: true
+    project: &project perf
   run_on:
   - "centos6-perf"
   tasks:
   - name: compile
     distros:
     - rhel62-large
+  - name: aggregation
   - name: query
   - name: where
   - name: update
@@ -739,9 +583,11 @@ buildvariants:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
     mongod_flags: "--storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false"
+    project: *project
   run_on:
   - "centos6-perf"
   tasks:
+  - name: aggregation
   - name: query
   - name: where
   - name: update
@@ -751,12 +597,13 @@ buildvariants:
   - name: singleThreaded
 
 - name: linux-wt-repl
-  display_name: 1-Node ReplSet Linux WT
+  display_name: 1-Node ReplSet Linux inMemory
   batchtime: 360 # 6 hours
   expansions:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--replSet=test --storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --wiredTigerCacheSizeGB 16 --oplogSize 100000 --setParameter diagnosticDataCollectionEnabled=false "
+    mongod_flags: "--replSet=test --storageEngine=inMemory  --logpath ./mongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --inMemorySizeGB 16 --oplogSize 10000 --setParameter diagnosticDataCollectionEnabled=false "
+    project: *project
   run_on:
   - "centos6-perf"
   tasks:
@@ -772,6 +619,7 @@ buildvariants:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
     mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --oplogSize 100000 --setParameter diagnosticDataCollectionEnabled=false"
+    project: *project
   run_on:
   - "centos6-perf"
   tasks:
@@ -781,8 +629,10 @@ buildvariants:
   - name: singleThreaded
 
 - name: linux-wt-repl-compare
-  display_name: 1-Node ReplSet Linux WT Comparison Standalone
+  display_name: 1-Node ReplSet Linux inMemory Comparison Standalone
   batchtime: 360 # 6 hours
+  expansions:
+    project: *project
   run_on:
   - "centos6-perf"
 #    - "ubuntu1404-docker"
@@ -795,6 +645,8 @@ buildvariants:
 - name: linux-mmap-repl-compare
   display_name: 1-Node ReplSet Linux MMAPv1 Comparison Standalone
   batchtime: 360 # 6 hours
+  expansions:
+    project: *project
   run_on:
   - "centos6-perf"
 #    - "ubuntu1404-docker"
@@ -803,30 +655,3 @@ buildvariants:
   - name: insert-mmap-repl-comp
   - name: update-mmap-repl-comp
   - name: misc-mmap-repl-comp
-
-- name: linux-wt-mmap-standalone-compare
-  display_name: Standalone Linux WT Comparison MMAPv1
-  batchtime: 90 # 1.5 hours
-  run_on:
-  - "centos6-perf"
-#    - "ubuntu1404-docker"
-  tasks:
-  - name: singleThreaded-wt-mmap-standalone-comp
-  - name: insert-wt-mmap-standalone-comp
-  - name: update-wt-mmap-standalone-comp
-  - name: misc-wt-mmap-standalone-comp
-  - name: query-wt-mmap-standalone-comp
-  - name: where-wt-mmap-standalone-comp
-  - name: geo-wt-mmap-standalone-comp
-
-- name: linux-wt-mmap-repl-compare
-  display_name: 1-Node ReplSet Linux WT Comparison MMAPv1
-  batchtime: 360 # 6 hours
-  run_on:
-  - "centos6-perf"
-#    - "ubuntu1404-docker"
-  tasks:
-  - name: singleThreaded-wt-mmap-repl-comp
-  - name: insert-wt-mmap-repl-comp
-  - name: update-wt-mmap-repl-comp
-  - name: misc-wt-mmap-repl-comp

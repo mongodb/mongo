@@ -82,4 +82,18 @@ Status bsonCheckOnlyHasFields(StringData objectName,
     return bsonCheckOnlyHasFields(objectName, o, &legals[0], legals + N);
 }
 
+/**
+ * Throws a uassert if the type of the elem does not match that provided in expectedType
+ */
+inline void checkBSONType(BSONType expectedType, const BSONElement& elem) {
+    uassert(elem.type() == BSONType::EOO ? ErrorCodes::NoSuchKey : ErrorCodes::TypeMismatch,
+            str::stream() << "Wrong type for '" << elem.fieldNameStringData() << "'. Expected a "
+                          << typeName(expectedType)
+                          << ", got a "
+                          << typeName(elem.type())
+                          << '.',
+            elem.type() == expectedType);
+}
+
+
 }  // namespace mongo

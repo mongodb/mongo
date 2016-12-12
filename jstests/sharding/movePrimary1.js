@@ -10,6 +10,9 @@
         c.save({a: 3});
         assert.eq(3, c.count());
 
+        assert.commandWorked(
+            db.runCommand({create: "view", viewOn: "foo", pipeline: [{$match: {a: 3}}]}));
+
         return s.getPrimaryShard(name);
     };
 
@@ -18,6 +21,7 @@
 
     assert.eq(3, from.getDB("test1").foo.count(), "from doesn't have data before move");
     assert.eq(0, to.getDB("test1").foo.count(), "to has data before move");
+    assert.eq(1, s.s.getDB("test1").view.count(), "count on view incorrect before move");
 
     assert.eq(s.normalize(s.config.databases.findOne({_id: "test1"}).primary),
               s.normalize(from.name),
@@ -32,6 +36,7 @@
 
     assert.eq(0, from.getDB("test1").foo.count(), "from still has data after move");
     assert.eq(3, to.getDB("test1").foo.count(), "to doesn't have data after move");
+    assert.eq(1, s.s.getDB("test1").view.count(), "count on view incorrect after move");
 
     // move back, now using shard name instead of server address
     s.admin.runCommand({moveprimary: "test1", to: oldShardName});
@@ -42,6 +47,7 @@
 
     assert.eq(3, from.getDB("test1").foo.count(), "from doesn't have data after move back");
     assert.eq(0, to.getDB("test1").foo.count(), "to has data after move back");
+    assert.eq(1, s.s.getDB("test1").view.count(), "count on view incorrect after move back");
 
     // attempting to move primary DB to non-existent shard should error out with appropriate code
     var res = s.admin.runCommand({movePrimary: 'test1', to: 'dontexist'});

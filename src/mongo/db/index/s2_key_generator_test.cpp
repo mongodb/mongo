@@ -26,16 +26,22 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndex
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/index/expression_keys_private.h"
 
+#include <algorithm>
+
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 using namespace mongo;
@@ -69,11 +75,23 @@ std::string dumpMultikeyPaths(const MultikeyPaths& multikeyPaths) {
     return ss.str();
 }
 
-void assertKeysetsEqual(const BSONObjSet& expectedKeys, const BSONObjSet& actualKeys) {
-    if (expectedKeys != actualKeys) {
-        FAIL(str::stream() << "Expected: " << dumpKeyset(expectedKeys) << ", Actual: "
-                           << dumpKeyset(actualKeys));
+bool assertKeysetsEqual(const BSONObjSet& expectedKeys, const BSONObjSet& actualKeys) {
+    if (expectedKeys.size() != actualKeys.size()) {
+        log() << "Expected: " << dumpKeyset(expectedKeys) << ", "
+              << "Actual: " << dumpKeyset(actualKeys);
+        return false;
     }
+
+    if (!std::equal(expectedKeys.begin(),
+                    expectedKeys.end(),
+                    actualKeys.begin(),
+                    SimpleBSONObjComparator::kInstance.makeEqualTo())) {
+        log() << "Expected: " << dumpKeyset(expectedKeys) << ", "
+              << "Actual: " << dumpKeyset(actualKeys);
+        return false;
+    }
+
+    return true;
 }
 
 void assertMultikeyPathsEqual(const MultikeyPaths& expectedMultikeyPaths,
@@ -104,7 +122,7 @@ long long getCellID(int x, int y, bool multiPoint = false) {
     const CollatorInterface* collator = nullptr;
     ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
 
-    BSONObjSet keys;
+    BSONObjSet keys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     // There's no need to compute the prefixes of the indexed fields that cause the index to be
     // multikey when computing the cell id of the geo field.
     MultikeyPaths* multikeyPaths = nullptr;
@@ -125,12 +143,12 @@ TEST(S2KeyGeneratorTest, GetS2KeysFromSubobjectWithArrayOfGeoAndNonGeoSubobjects
     CollatorInterfaceMock* collator = nullptr;
     ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
 
-    BSONObjSet actualKeys;
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths actualMultikeyPaths;
     ExpressionKeysPrivate::getS2Keys(
         genKeysFrom, keyPattern, params, &actualKeys, &actualMultikeyPaths);
 
-    BSONObjSet expectedKeys;
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     expectedKeys.insert(BSON("" << 1 << "" << getCellID(0, 0)));
     expectedKeys.insert(BSON("" << 1 << "" << getCellID(3, 3)));
     expectedKeys.insert(BSON("" << 2 << "" << getCellID(0, 0)));
@@ -151,12 +169,12 @@ TEST(S2KeyGeneratorTest, GetS2KeysFromArrayOfNonGeoSubobjectsWithArrayValues) {
     CollatorInterfaceMock* collator = nullptr;
     ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
 
-    BSONObjSet actualKeys;
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths actualMultikeyPaths;
     ExpressionKeysPrivate::getS2Keys(
         genKeysFrom, keyPattern, params, &actualKeys, &actualMultikeyPaths);
 
-    BSONObjSet expectedKeys;
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     expectedKeys.insert(BSON("" << 1 << "" << getCellID(0, 0)));
     expectedKeys.insert(BSON("" << 2 << "" << getCellID(0, 0)));
     expectedKeys.insert(BSON("" << 3 << "" << getCellID(0, 0)));
@@ -174,13 +192,13 @@ TEST(S2KeyGeneratorTest, GetS2KeysFromMultiPointInGeoField) {
     CollatorInterfaceMock* collator = nullptr;
     ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
 
-    BSONObjSet actualKeys;
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths actualMultikeyPaths;
     ExpressionKeysPrivate::getS2Keys(
         genKeysFrom, keyPattern, params, &actualKeys, &actualMultikeyPaths);
 
     const bool multiPoint = true;
-    BSONObjSet expectedKeys;
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     expectedKeys.insert(BSON("" << 1 << "" << getCellID(0, 0, multiPoint)));
     expectedKeys.insert(BSON("" << 1 << "" << getCellID(1, 0, multiPoint)));
     expectedKeys.insert(BSON("" << 1 << "" << getCellID(1, 1, multiPoint)));
@@ -197,11 +215,11 @@ TEST(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldAfterGeoField) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ExpressionParams::initialize2dsphereParams(infoObj, &collator, &params);
 
-    BSONObjSet actualKeys;
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths actualMultikeyPaths;
     ExpressionKeysPrivate::getS2Keys(obj, keyPattern, params, &actualKeys, &actualMultikeyPaths);
 
-    BSONObjSet expectedKeys;
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     expectedKeys.insert(BSON("" << getCellID(0, 0) << ""
                                 << "gnirts"));
 
@@ -218,11 +236,11 @@ TEST(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldBeforeGeoField) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ExpressionParams::initialize2dsphereParams(infoObj, &collator, &params);
 
-    BSONObjSet actualKeys;
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths actualMultikeyPaths;
     ExpressionKeysPrivate::getS2Keys(obj, keyPattern, params, &actualKeys, &actualMultikeyPaths);
 
-    BSONObjSet expectedKeys;
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     expectedKeys.insert(BSON(""
                              << "gnirts"
                              << ""
@@ -241,11 +259,11 @@ TEST(S2KeyGeneratorTest, CollationAppliedToAllNonGeoStringFields) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ExpressionParams::initialize2dsphereParams(infoObj, &collator, &params);
 
-    BSONObjSet actualKeys;
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths actualMultikeyPaths;
     ExpressionKeysPrivate::getS2Keys(obj, keyPattern, params, &actualKeys, &actualMultikeyPaths);
 
-    BSONObjSet expectedKeys;
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     expectedKeys.insert(BSON(""
                              << "gnirts"
                              << ""
@@ -267,11 +285,11 @@ TEST(S2KeyGeneratorTest, CollationAppliedToNonGeoStringFieldWithMultiplePathComp
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ExpressionParams::initialize2dsphereParams(infoObj, &collator, &params);
 
-    BSONObjSet actualKeys;
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths actualMultikeyPaths;
     ExpressionKeysPrivate::getS2Keys(obj, keyPattern, params, &actualKeys, &actualMultikeyPaths);
 
-    BSONObjSet expectedKeys;
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     expectedKeys.insert(BSON("" << getCellID(0, 0) << ""
                                 << "gnirts"));
 
@@ -288,11 +306,11 @@ TEST(S2KeyGeneratorTest, CollationAppliedToStringsInArray) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ExpressionParams::initialize2dsphereParams(infoObj, &collator, &params);
 
-    BSONObjSet actualKeys;
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths actualMultikeyPaths;
     ExpressionKeysPrivate::getS2Keys(obj, keyPattern, params, &actualKeys, &actualMultikeyPaths);
 
-    BSONObjSet expectedKeys;
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     expectedKeys.insert(BSON("" << getCellID(0, 0) << ""
                                 << "gnirts"));
     expectedKeys.insert(BSON("" << getCellID(0, 0) << ""
@@ -311,11 +329,11 @@ TEST(S2KeyGeneratorTest, CollationAppliedToStringsInAllArrays) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ExpressionParams::initialize2dsphereParams(infoObj, &collator, &params);
 
-    BSONObjSet actualKeys;
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths actualMultikeyPaths;
     ExpressionKeysPrivate::getS2Keys(obj, keyPattern, params, &actualKeys, &actualMultikeyPaths);
 
-    BSONObjSet expectedKeys;
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     expectedKeys.insert(BSON("" << getCellID(0, 0) << ""
                                 << "gnirts"
                                 << ""
@@ -345,11 +363,11 @@ TEST(S2KeyGeneratorTest, CollationDoesNotAffectNonStringFields) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ExpressionParams::initialize2dsphereParams(infoObj, &collator, &params);
 
-    BSONObjSet actualKeys;
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths actualMultikeyPaths;
     ExpressionKeysPrivate::getS2Keys(obj, keyPattern, params, &actualKeys, &actualMultikeyPaths);
 
-    BSONObjSet expectedKeys;
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     expectedKeys.insert(BSON("" << getCellID(0, 0) << "" << 5));
 
     assertKeysetsEqual(expectedKeys, actualKeys);
@@ -365,11 +383,11 @@ TEST(S2KeyGeneratorTest, CollationAppliedToStringsInNestedObjects) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ExpressionParams::initialize2dsphereParams(infoObj, &collator, &params);
 
-    BSONObjSet actualKeys;
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths actualMultikeyPaths;
     ExpressionKeysPrivate::getS2Keys(obj, keyPattern, params, &actualKeys, &actualMultikeyPaths);
 
-    BSONObjSet expectedKeys;
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     expectedKeys.insert(BSON("" << getCellID(0, 0) << "" << BSON("c"
                                                                  << "gnirts")));
 
@@ -386,11 +404,11 @@ TEST(S2KeyGeneratorTest, NoCollation) {
     const CollatorInterface* collator = nullptr;
     ExpressionParams::initialize2dsphereParams(infoObj, collator, &params);
 
-    BSONObjSet actualKeys;
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     MultikeyPaths actualMultikeyPaths;
     ExpressionKeysPrivate::getS2Keys(obj, keyPattern, params, &actualKeys, &actualMultikeyPaths);
 
-    BSONObjSet expectedKeys;
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     expectedKeys.insert(BSON("" << getCellID(0, 0) << ""
                                 << "string"));
 

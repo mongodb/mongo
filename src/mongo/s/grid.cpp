@@ -32,10 +32,11 @@
 
 #include "mongo/s/grid.h"
 
+#include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/balancer/balancer_configuration.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
@@ -50,12 +51,16 @@ namespace mongo {
 // Global grid instance
 Grid grid;
 
-Grid::Grid() : _network(nullptr), _allowLocalShard(true) {}
+Grid::Grid() = default;
 
 Grid::~Grid() = default;
 
-Grid* Grid::get(OperationContext* operationContext) {
+Grid* Grid::get(ServiceContext* serviceContext) {
     return &grid;
+}
+
+Grid* Grid::get(OperationContext* operationContext) {
+    return get(operationContext->getServiceContext());
 }
 
 void Grid::init(std::unique_ptr<ShardingCatalogClient> catalogClient,

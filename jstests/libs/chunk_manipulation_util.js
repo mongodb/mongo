@@ -57,8 +57,9 @@ var moveChunkStepNames = {
     gotDistLock: 2,
     startedMoveChunk: 3,    // called _recvChunkStart on recipient
     reachedSteadyState: 4,  // recipient reports state is "steady"
-    committed: 5,
-    done: 6
+    chunkDataCommitted: 5,  // called _recvChunkCommit on recipient
+    committed: 6,
+    done: 7
 };
 
 function numberToName(names, stepNumber) {
@@ -106,8 +107,8 @@ function configureMoveChunkFailPoint(shardConnection, stepNumber, mode) {
 }
 
 //
-// Wait for moveChunk to reach a step (1 through 6). Assumes only one moveChunk
-// is in mongos's currentOp.
+// Wait for moveChunk to reach a step (1 through 6). Assumes only one active
+// moveChunk running in shardConnection.
 //
 function waitForMoveChunkStep(shardConnection, stepNumber) {
     var searchString = 'step ' + stepNumber, admin = shardConnection.getDB('admin');
@@ -126,7 +127,11 @@ function waitForMoveChunkStep(shardConnection, stepNumber) {
         for (var i = 0; i < in_progress.length; ++i) {
             var op = in_progress[i];
             if (op.query && op.query.moveChunk) {
-                return op.msg && op.msg.startsWith(searchString);
+                // Note: moveChunk in join mode will not have the "step" message. So keep on
+                // looking if searchString is not found.
+                if (op.msg && op.msg.startsWith(searchString)) {
+                    return true;
+                }
             }
         }
 

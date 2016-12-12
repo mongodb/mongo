@@ -32,8 +32,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <type_traits>
 #include <vector>
 
+#include "mongo/base/static_assert.h"
 #include "mongo/bson/inline_decls.h"
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/util/debug_util.h"
@@ -466,12 +468,12 @@ struct ElementRep {
 };
 #pragma pack(pop)
 
-static_assert(sizeof(ElementRep) == 32, "sizeof(ElementRep) == 32");
+MONGO_STATIC_ASSERT(sizeof(ElementRep) == 32);
 
 // We want ElementRep to be a POD so Document::Impl can grow the std::vector with
 // memmove.
 //
-// TODO: C++11 static_assert(std::is_pod<ElementRep>::value);
+MONGO_STATIC_ASSERT(std::is_pod<ElementRep>::value);
 
 // The ElementRep for the root element is always zero.
 const Element::RepIdx kRootRepIdx = Element::RepIdx(0);

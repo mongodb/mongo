@@ -216,7 +216,7 @@ TEST(ParsedProjectionTest, ParsedProjectionDefaults) {
 TEST(ParsedProjectionTest, SortKeyMetaProjection) {
     auto parsedProjection = createParsedProjection("{}", "{foo: {$meta: 'sortKey'}}");
 
-    ASSERT_EQ(parsedProjection->getProjObj(), fromjson("{foo: {$meta: 'sortKey'}}"));
+    ASSERT_BSONOBJ_EQ(parsedProjection->getProjObj(), fromjson("{foo: {$meta: 'sortKey'}}"));
     ASSERT_TRUE(parsedProjection->wantSortKey());
     ASSERT_TRUE(parsedProjection->requiresDocument());
 
@@ -229,7 +229,8 @@ TEST(ParsedProjectionTest, SortKeyMetaProjection) {
 TEST(ParsedProjectionTest, SortKeyMetaProjectionCovered) {
     auto parsedProjection = createParsedProjection("{}", "{a: 1, foo: {$meta: 'sortKey'}, _id: 0}");
 
-    ASSERT_EQ(parsedProjection->getProjObj(), fromjson("{a: 1, foo: {$meta: 'sortKey'}, _id: 0}"));
+    ASSERT_BSONOBJ_EQ(parsedProjection->getProjObj(),
+                      fromjson("{a: 1, foo: {$meta: 'sortKey'}, _id: 0}"));
     ASSERT_TRUE(parsedProjection->wantSortKey());
 
     ASSERT_FALSE(parsedProjection->requiresDocument());
@@ -243,8 +244,8 @@ TEST(ParsedProjectionTest, SortKeyMetaAndSlice) {
     auto parsedProjection =
         createParsedProjection("{}", "{a: 1, foo: {$meta: 'sortKey'}, _id: 0, b: {$slice: 1}}");
 
-    ASSERT_EQ(parsedProjection->getProjObj(),
-              fromjson("{a: 1, foo: {$meta: 'sortKey'}, _id: 0, b: {$slice: 1}}"));
+    ASSERT_BSONOBJ_EQ(parsedProjection->getProjObj(),
+                      fromjson("{a: 1, foo: {$meta: 'sortKey'}, _id: 0, b: {$slice: 1}}"));
     ASSERT_TRUE(parsedProjection->wantSortKey());
     ASSERT_TRUE(parsedProjection->requiresDocument());
 
@@ -258,8 +259,8 @@ TEST(ParsedProjectionTest, SortKeyMetaAndElemMatch) {
     auto parsedProjection = createParsedProjection(
         "{}", "{a: 1, foo: {$meta: 'sortKey'}, _id: 0, b: {$elemMatch: {a: 1}}}");
 
-    ASSERT_EQ(parsedProjection->getProjObj(),
-              fromjson("{a: 1, foo: {$meta: 'sortKey'}, _id: 0, b: {$elemMatch: {a: 1}}}"));
+    ASSERT_BSONOBJ_EQ(parsedProjection->getProjObj(),
+                      fromjson("{a: 1, foo: {$meta: 'sortKey'}, _id: 0, b: {$elemMatch: {a: 1}}}"));
     ASSERT_TRUE(parsedProjection->wantSortKey());
     ASSERT_TRUE(parsedProjection->requiresDocument());
 
@@ -272,7 +273,8 @@ TEST(ParsedProjectionTest, SortKeyMetaAndElemMatch) {
 TEST(ParsedProjectionTest, SortKeyMetaAndExclusion) {
     auto parsedProjection = createParsedProjection("{}", "{a: 0, foo: {$meta: 'sortKey'}, _id: 0}");
 
-    ASSERT_EQ(parsedProjection->getProjObj(), fromjson("{a: 0, foo: {$meta: 'sortKey'}, _id: 0}"));
+    ASSERT_BSONOBJ_EQ(parsedProjection->getProjObj(),
+                      fromjson("{a: 0, foo: {$meta: 'sortKey'}, _id: 0}"));
     ASSERT_TRUE(parsedProjection->wantSortKey());
     ASSERT_TRUE(parsedProjection->requiresDocument());
 

@@ -32,7 +32,10 @@
 
 #include "mongo/db/index/expression_keys_private.h"
 
+#include <algorithm>
+
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/index/2d_common.h"
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/json.h"
@@ -55,11 +58,21 @@ std::string dumpKeyset(const BSONObjSet& objs) {
 }
 
 bool assertKeysetsEqual(const BSONObjSet& expectedKeys, const BSONObjSet& actualKeys) {
-    if (expectedKeys != actualKeys) {
+    if (expectedKeys.size() != actualKeys.size()) {
         log() << "Expected: " << dumpKeyset(expectedKeys) << ", "
               << "Actual: " << dumpKeyset(actualKeys);
         return false;
     }
+
+    if (!std::equal(expectedKeys.begin(),
+                    expectedKeys.end(),
+                    actualKeys.begin(),
+                    SimpleBSONObjComparator::kInstance.makeEqualTo())) {
+        log() << "Expected: " << dumpKeyset(expectedKeys) << ", "
+              << "Actual: " << dumpKeyset(actualKeys);
+        return false;
+    }
+
     return true;
 }
 
@@ -76,11 +89,11 @@ TEST(2dKeyGeneratorTest, TrailingField) {
     BSONObj infoObj = fromjson("{key: {a: '2d', b: 1}}");
     TwoDIndexingParams params;
     ExpressionParams::parseTwoDParams(infoObj, &params);
-    BSONObjSet actualKeys;
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     std::vector<BSONObj> locs;
     ExpressionKeysPrivate::get2DKeys(obj, params, &actualKeys, &locs);
 
-    BSONObjSet expectedKeys;
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     BSONObj trailingFields = BSON("" << 5);
     expectedKeys.insert(make2DKey(params, 0, 0, trailingFields.firstElement()));
 
@@ -92,11 +105,11 @@ TEST(2dKeyGeneratorTest, ArrayTrailingField) {
     BSONObj infoObj = fromjson("{key: {a: '2d', b: 1}}");
     TwoDIndexingParams params;
     ExpressionParams::parseTwoDParams(infoObj, &params);
-    BSONObjSet actualKeys;
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     std::vector<BSONObj> locs;
     ExpressionKeysPrivate::get2DKeys(obj, params, &actualKeys, &locs);
 
-    BSONObjSet expectedKeys;
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     BSONObj trailingFields = BSON("" << BSON_ARRAY(5 << 6));
     expectedKeys.insert(make2DKey(params, 0, 0, trailingFields.firstElement()));
 
@@ -108,11 +121,11 @@ TEST(2dKeyGeneratorTest, ArrayOfObjectsTrailingField) {
     BSONObj infoObj = fromjson("{key: {a: '2d', 'b.c': 1}}");
     TwoDIndexingParams params;
     ExpressionParams::parseTwoDParams(infoObj, &params);
-    BSONObjSet actualKeys;
+    BSONObjSet actualKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     std::vector<BSONObj> locs;
     ExpressionKeysPrivate::get2DKeys(obj, params, &actualKeys, &locs);
 
-    BSONObjSet expectedKeys;
+    BSONObjSet expectedKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
     BSONObj trailingFields = BSON("" << BSON_ARRAY(5 << 6));
     expectedKeys.insert(make2DKey(params, 0, 0, trailingFields.firstElement()));
 

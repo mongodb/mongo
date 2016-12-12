@@ -47,9 +47,6 @@ class TicketImpl {
 public:
     virtual ~TicketImpl() = default;
 
-    TicketImpl(TicketImpl&&) = default;
-    TicketImpl& operator=(TicketImpl&&) = default;
-
     /**
      * Return this ticket's session id.
      */

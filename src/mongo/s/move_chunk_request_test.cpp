@@ -39,16 +39,23 @@ using unittest::assertGet;
 
 namespace {
 
-TEST(MoveChunkRequest, CreateAsCommandComplete) {
+const ConnectionString kTestConnectionString =
+    assertGet(ConnectionString::parse("TestConfigRS/CS1:12345,CS2:12345,CS3:12345"));
+
+TEST(MoveChunkRequest, Roundtrip) {
+    const ChunkVersion collectionVersion(3, 1, OID::gen());
+    const ChunkVersion chunkVersion(2, 3, OID::gen());
+
     BSONObjBuilder builder;
     MoveChunkRequest::appendAsCommand(
         &builder,
         NamespaceString("TestDB", "TestColl"),
-        ChunkVersion(2, 3, OID::gen()),
-        assertGet(ConnectionString::parse("TestConfigRS/CS1:12345,CS2:12345,CS3:12345")),
+        collectionVersion,
+        kTestConnectionString,
         ShardId("shard0001"),
         ShardId("shard0002"),
         ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
+        chunkVersion,
         1024,
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
         true,
@@ -59,11 +66,13 @@ TEST(MoveChunkRequest, CreateAsCommandComplete) {
     auto request = assertGet(
         MoveChunkRequest::createFromCommand(NamespaceString(cmdObj["moveChunk"].String()), cmdObj));
     ASSERT_EQ("TestDB.TestColl", request.getNss().ns());
-    ASSERT_EQ("TestConfigRS/CS1:12345,CS2:12345,CS3:12345", request.getConfigServerCS().toString());
+    ASSERT_EQ(kTestConnectionString.toString(), request.getConfigServerCS().toString());
     ASSERT_EQ(ShardId("shard0001"), request.getFromShardId());
     ASSERT_EQ(ShardId("shard0002"), request.getToShardId());
-    ASSERT_EQ(BSON("Key" << -100), request.getMinKey());
-    ASSERT_EQ(BSON("Key" << 100), request.getMaxKey());
+    ASSERT_BSONOBJ_EQ(BSON("Key" << -100), request.getMinKey());
+    ASSERT_BSONOBJ_EQ(BSON("Key" << 100), request.getMaxKey());
+    ASSERT(request.hasChunkVersion());
+    ASSERT_EQ(chunkVersion, request.getChunkVersion());
     ASSERT_EQ(1024, request.getMaxChunkSizeBytes());
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kOff,
               request.getSecondaryThrottle().getSecondaryThrottle());
@@ -71,16 +80,56 @@ TEST(MoveChunkRequest, CreateAsCommandComplete) {
     ASSERT_EQ(true, request.getTakeDistLock());
 }
 
+TEST(MoveChunkRequest, BackwardsCompatibilityNoChunkVersionAndDefaults) {
+    const ChunkVersion collectionVersion(3, 1, OID::gen());
+
+    auto request =
+        assertGet(MoveChunkRequest::createFromCommand(NamespaceString("TestDB", "TestColl"),
+                                                      BSON("moveChunk"
+                                                           << "TestDB.TestColl"
+                                                           << "shardVersion"
+                                                           << collectionVersion.toBSON()
+                                                           << "configdb"
+                                                           << kTestConnectionString.toString()
+                                                           << "fromShard"
+                                                           << "shard0001"
+                                                           << "toShard"
+                                                           << "shard0002"
+                                                           << "min"
+                                                           << BSON("Key" << -1)
+                                                           << "max"
+                                                           << BSON("Key" << 1)
+                                                           // Omit the chunkVersion
+                                                           << "maxChunkSizeBytes"
+                                                           << 1024)));
+
+    ASSERT_EQ("TestDB.TestColl", request.getNss().ns());
+    ASSERT_EQ(kTestConnectionString.toString(), request.getConfigServerCS().toString());
+    ASSERT_EQ(ShardId("shard0001"), request.getFromShardId());
+    ASSERT_EQ(ShardId("shard0002"), request.getToShardId());
+    ASSERT_BSONOBJ_EQ(BSON("Key" << -1), request.getMinKey());
+    ASSERT_BSONOBJ_EQ(BSON("Key" << 1), request.getMaxKey());
+    ASSERT(!request.hasChunkVersion());
+    ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault,
+              request.getSecondaryThrottle().getSecondaryThrottle());
+    ASSERT_EQ(false, request.getWaitForDelete());
+    ASSERT_EQ(true, request.getTakeDistLock());
+}
+
 TEST(MoveChunkRequest, EqualityOperatorSameValue) {
+    const ChunkVersion collectionVersion(3, 1, OID::gen());
+    const ChunkVersion chunkVersion(2, 3, OID::gen());
+
     BSONObjBuilder builder;
     MoveChunkRequest::appendAsCommand(
         &builder,
         NamespaceString("TestDB", "TestColl"),
-        ChunkVersion(2, 3, OID::gen()),
+        collectionVersion,
         assertGet(ConnectionString::parse("TestConfigRS/CS1:12345,CS2:12345,CS3:12345")),
         ShardId("shard0001"),
         ShardId("shard0002"),
         ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
+        chunkVersion,
         1024,
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
         true,
@@ -98,15 +147,19 @@ TEST(MoveChunkRequest, EqualityOperatorSameValue) {
 }
 
 TEST(MoveChunkRequest, EqualityOperatorDifferentValues) {
+    const ChunkVersion collectionVersion(3, 1, OID::gen());
+    const ChunkVersion chunkVersion(2, 3, OID::gen());
+
     BSONObjBuilder builder1;
     MoveChunkRequest::appendAsCommand(
         &builder1,
         NamespaceString("TestDB", "TestColl"),
-        ChunkVersion(2, 3, OID::gen()),
+        collectionVersion,
         assertGet(ConnectionString::parse("TestConfigRS/CS1:12345,CS2:12345,CS3:12345")),
         ShardId("shard0001"),
         ShardId("shard0002"),
         ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
+        chunkVersion,
         1024,
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
         true,
@@ -119,11 +172,12 @@ TEST(MoveChunkRequest, EqualityOperatorDifferentValues) {
     MoveChunkRequest::appendAsCommand(
         &builder2,
         NamespaceString("TestDB", "TestColl"),
-        ChunkVersion(2, 3, OID::gen()),
+        collectionVersion,
         assertGet(ConnectionString::parse("TestConfigRS/CS1:12345,CS2:12345,CS3:12345")),
         ShardId("shard0001"),
         ShardId("shard0002"),
         ChunkRange(BSON("Key" << 100), BSON("Key" << 200)),  // Different key ranges
+        chunkVersion,
         1024,
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
         true,

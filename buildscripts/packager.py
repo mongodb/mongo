@@ -447,11 +447,10 @@ def make_package(distro, build_os, arch, spec, srcdir):
     # packaging infrastructure will move the files to wherever they
     # need to go.
     unpack_binaries_into(build_os, arch, spec, sdir)
-    # Remove the mongosniff binary due to libpcap dynamic
-    # linkage.  FIXME: this removal should go away
-    # eventually.
-    if os.path.exists(sdir + "bin/mongosniff"):
-      os.unlink(sdir + "bin/mongosniff")
+    # Remove the mongoreplay binary due to libpcap dynamic
+    # linkage.
+    if os.path.exists(sdir + "bin/mongoreplay"):
+      os.unlink(sdir + "bin/mongoreplay")
     return distro.make_pkg(build_os, arch, spec, srcdir)
 
 def make_repo(repodir, distro, build_os, spec):
@@ -647,13 +646,31 @@ def make_rpm(distro, build_os, arch, spec, srcdir):
     suffix=spec.suffix()
     sdir=setupdir(distro, build_os, arch, spec)
 
-    # Use special suse init script if we're building for SUSE
+    specfile = srcdir + "rpm/mongodb%s.spec" % suffix
+    init_spec = specfile.replace(".spec", "-init.spec")
+
+    # The Debian directory is here for the manpages so we we need to remove the service file
+    # from it so that RPM packages don't end up with the Debian file.
+    os.unlink(sdir + "debian/mongod.service")
+
+    # Swap out systemd files, different systemd spec files, and init scripts as needed based on
+    # underlying os version. Arranged so that new distros moving forward automatically use
+    # systemd. Note: the SUSE init packages use a different init script than then other RPM
+    # distros.
     #
-    if distro.name() == "suse":
+    if distro.name() == "suse" and distro.repo_os_version(build_os) in ("10", "11"):
         os.unlink(sdir+"rpm/init.d-mongod")
         os.link(sdir+"rpm/init.d-mongod.suse", sdir+"rpm/init.d-mongod")
 
-    specfile=srcdir+"rpm/mongodb%s.spec" % suffix
+        os.unlink(specfile)
+        os.link(init_spec, specfile)
+    elif distro.name() == "redhat" and distro.repo_os_version(build_os) in ("5", "6"):
+        os.unlink(specfile)
+        os.link(init_spec, specfile)
+    elif distro.name() == "amazon":
+        os.unlink(specfile)
+        os.link(init_spec, specfile)
+
     topdir=ensure_dir('%s/rpmbuild/%s/' % (os.getcwd(), build_os))
     for subdir in ["BUILD", "RPMS", "SOURCES", "SPECS", "SRPMS"]:
         ensure_dir("%s/%s/" % (topdir, subdir))

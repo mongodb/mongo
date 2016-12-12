@@ -53,19 +53,6 @@ using std::string;
 using std::unique_ptr;
 using namespace mongo;
 
-/**
- * Utility function to extract error code and message from status
- * and append to BSON results.
- */
-void addStatus(const Status& status, BSONObjBuilder& builder) {
-    builder.append("ok", status.isOK() ? 1.0 : 0.0);
-    if (!status.isOK()) {
-        builder.append("code", status.code());
-    }
-    if (!status.reason().empty()) {
-        builder.append("errmsg", status.reason());
-    }
-}
 
 /**
  * Retrieves a collection's plan cache from the database.
@@ -128,16 +115,9 @@ bool PlanCacheCommand::run(OperationContext* txn,
                            int options,
                            string& errmsg,
                            BSONObjBuilder& result) {
-    string ns = parseNs(dbname, cmdObj);
-
-    Status status = runPlanCacheCommand(txn, ns, cmdObj, &result);
-
-    if (!status.isOK()) {
-        addStatus(status, result);
-        return false;
-    }
-
-    return true;
+    const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
+    Status status = runPlanCacheCommand(txn, nss.ns(), cmdObj, &result);
+    return appendCommandStatus(result, status);
 }
 
 
@@ -331,7 +311,7 @@ Status PlanCacheClear::clear(OperationContext* txn,
         if (!planCache->contains(*cq)) {
             // Log if asked to clear non-existent query shape.
             LOG(1) << ns << ": query shape doesn't exist in PlanCache - "
-                   << cq->getQueryObj().toString() << "(sort: " << cq->getQueryRequest().getSort()
+                   << redact(cq->getQueryObj()) << "(sort: " << cq->getQueryRequest().getSort()
                    << "; projection: " << cq->getQueryRequest().getProj()
                    << "; collation: " << cq->getQueryRequest().getCollation() << ")";
             return Status::OK();
@@ -342,7 +322,7 @@ Status PlanCacheClear::clear(OperationContext* txn,
             return result;
         }
 
-        LOG(1) << ns << ": removed plan cache entry - " << cq->getQueryObj().toString()
+        LOG(1) << ns << ": removed plan cache entry - " << redact(cq->getQueryObj())
                << "(sort: " << cq->getQueryRequest().getSort()
                << "; projection: " << cq->getQueryRequest().getProj()
                << "; collation: " << cq->getQueryRequest().getCollation() << ")";

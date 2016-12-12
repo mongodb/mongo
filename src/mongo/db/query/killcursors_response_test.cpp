@@ -122,7 +122,7 @@ TEST(KillCursorsResponseTest, toBSON) {
                              << BSONArray()
                              << "ok"
                              << 1.0);
-    ASSERT_EQ(responseObj, expectedResponse);
+    ASSERT_BSONOBJ_EQ(responseObj, expectedResponse);
 }
 
 }  // namespace

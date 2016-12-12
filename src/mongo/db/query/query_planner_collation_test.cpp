@@ -76,7 +76,7 @@ TEST_F(QueryPlannerTest, StringComparisonWithMatchingCollationUsesIndexWithTrans
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
-        "{fetch: {filter: {a: {$lt: 'foo'}}, collation: {locale: 'reverse'}, node: {ixscan: "
+        "{fetch: {filter: null, collation: {locale: 'reverse'}, node: {ixscan: "
         "{pattern: {a: 1}, filter: null, "
         "bounds: {a: [['', 'oof', true, false]]}}}}}");
 }
@@ -97,7 +97,7 @@ TEST_F(QueryPlannerTest, StringComparisonAndNonStringComparisonCanUseSeparateInd
     assertNumSolutions(3U);
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
-        "{fetch: {filter: {a: {$lt: 'foo'}, b: {$lte: 4}}, collation: {locale: 'reverse'}, node: "
+        "{fetch: {filter: {b: {$lte: 4}}, collation: {locale: 'reverse'}, node: "
         "{ixscan: {pattern: {a: 1}, "
         "filter: null, bounds: {a: [['', 'oof', true, false]]}}}}}");
     assertSolutionExists(
@@ -106,7 +106,24 @@ TEST_F(QueryPlannerTest, StringComparisonAndNonStringComparisonCanUseSeparateInd
         "bounds: {b: [[-Infinity, 4, true, true]]}}}}}");
 }
 
-TEST_F(QueryPlannerTest, StringComparisonsWRTCollatorCannotBeCovered) {
+TEST_F(QueryPlannerTest, StringEqWrtCollatorCannotBeCovered) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(fromjson("{a: 1}"), &collator);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {a: 'string'}, projection: {_id: 0, a: 1}, collation: "
+                 "{locale: 'reverse'}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {cscan: {dir: 1}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: {fetch: {filter: null, collation: "
+        "{locale: 'reverse'}, node: "
+        "{ixscan: {pattern: {a: 1}, filter: null, bounds: {a: [['gnirts', 'gnirts', true, "
+        "true]]}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, StringGteWrtCollatorCannotBeCovered) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     addIndex(fromjson("{a: 1}"), &collator);
 
@@ -117,10 +134,103 @@ TEST_F(QueryPlannerTest, StringComparisonsWRTCollatorCannotBeCovered) {
     assertNumSolutions(2U);
     assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {cscan: {dir: 1}}}}");
     assertSolutionExists(
-        "{proj: {spec: {_id: 0, a: 1}, node: {fetch: {filter: {a: {$gte: 'string'}}, collation: "
+        "{proj: {spec: {_id: 0, a: 1}, node: {fetch: {filter: null, collation: "
         "{locale: 'reverse'}, node: "
         "{ixscan: {pattern: {a: 1}, filter: null, bounds: {a: [['gnirts', {}, true, "
         "false]]}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, InContainingStringCannotBeCoveredWithCollator) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(fromjson("{a: 1}"), &collator);
+
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', filter: {a: {$in: [2, 'foo']}}, projection: {_id: 0, a: 1}, collation: "
+        "{locale: 'reverse'}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {cscan: {dir: 1}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: {fetch: {filter: null, collation: "
+        "{locale: 'reverse'}, node: "
+        "{ixscan: {pattern: {a: 1}, filter: null, bounds: {a: [[2,2,true,true],"
+        "['oof','oof',true,true]]}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, TypeStringCannotBeCoveredWithCollator) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(fromjson("{a: 1}"), &collator);
+
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', filter: {a: {$type: 'string'}}, projection: {_id: 0, a: 1}, collation: "
+        "{locale: 'reverse'}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {cscan: {dir: 1}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: {fetch: {filter: {a:{$type:'string'}}, collation: "
+        "{locale: 'reverse'}, node: {ixscan: {pattern: {a: 1}, filter: null, "
+        "bounds: {a: [['',{},true,true]]}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, NotWithStringBoundsCannotBeCoveredWithCollator) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(fromjson("{a: 1}"), &collator);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {a: {$ne: 2}}, projection: {_id: 0, a: 1}, collation: "
+                 "{locale: 'reverse'}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {cscan: {dir: 1}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: {fetch: {filter: null, collation: "
+        "{locale: 'reverse'}, node: {ixscan: {pattern: {a: 1}, filter: null, "
+        "bounds: {a: [['MinKey',2,true,false], [2,'MaxKey',false,true]]}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, ExistsTrueCannotBeCoveredWithSparseIndexAndCollator) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(fromjson("{a: 1}"), &collator);
+    params.indices.back().sparse = true;
+
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', filter: {a: {$exists: true}}, projection: {_id: 0, a: 1}, collation: "
+        "{locale: 'reverse'}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {cscan: {dir: 1}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: {fetch: {filter: null, collation: "
+        "{locale: 'reverse'}, node: {ixscan: {pattern: {a: 1}, filter: null, "
+        "bounds: {a: [['MinKey','MaxKey',true,true]]}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, MinMaxWithStringBoundsCannotBeCoveredWithCollator) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(fromjson("{a: 1, b: 1}"), &collator);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', min: {a: 1, b: 2}, max: {a: 2, b: 1}, "
+                 "projection: {_id: 0, a: 1, b: 1}, collation: {locale: 'reverse'}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1, b: 1}, node: {fetch: {filter: null, collation: "
+        "{locale: 'reverse'}, node: {ixscan: {pattern: {a: 1, b: 1}}}}}}}");
+}
+
+TEST_F(QueryPlannerTest, MinMaxWithoutStringBoundsBoundsCanBeCoveredWithCollator) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    addIndex(fromjson("{a: 1, b: 1}"), &collator);
+
+    runQueryAsCommand(
+        fromjson("{find: 'testns', min: {a: 1, b: 2}, max: {a: 1, b: 2}, "
+                 "projection: {_id: 0, a: 1, b: 1}, collation: {locale: 'reverse'}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1, b: 1}, node: {ixscan: {pattern: {a: 1, b: 1}}}}}");
 }
 
 TEST_F(QueryPlannerTest, SimpleRegexCanUseAnIndexWithACollatorWithLooseBounds) {
@@ -176,7 +286,7 @@ TEST_F(QueryPlannerTest, AccessPlannerCorrectlyCombinesComparisonKeyBounds) {
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
-        "{fetch: {filter: {a:{$gte:'foo',$lte:'zfoo'},b:'bar'}, collation: {locale: 'reverse'}, "
+        "{fetch: {filter: null, collation: {locale: 'reverse'}, "
         "node: {ixscan: {pattern: {a: 1, b: "
         "1}, filter: null, bounds: {a: [['oof','oofz',true,true]], b: "
         "[['rab','rab',true,true]]}}}}}");
@@ -209,9 +319,9 @@ TEST_F(QueryPlannerTest, OrQueryCanBeIndexedWhenBothBranchesHaveIndexWithMatchin
     assertNumSolutions(2U);
     assertSolutionExists("{cscan: {dir: 1}}");
     assertSolutionExists(
-        "{or: {nodes: ["
-        "{fetch: {node: {ixscan: {pattern: {a: 1}, bounds: {a: [['oof','oof',true,true]]}}}}},"
-        "{fetch: {node: {ixscan: {pattern: {b: 1}, bounds: {b: [['rab','rab',true,true]]}}}}}]}}");
+        "{fetch: {node: {or: {nodes: ["
+        "{ixscan: {pattern: {a: 1}, bounds: {a: [['oof','oof',true,true]]}}},"
+        "{ixscan: {pattern: {b: 1}, bounds: {b: [['rab','rab',true,true]]}}}]}}}}");
 }
 
 TEST_F(QueryPlannerTest, ElemMatchObjectResultsInCorrectComparisonKeyBounds) {

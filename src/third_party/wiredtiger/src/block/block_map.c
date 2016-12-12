@@ -56,7 +56,7 @@ __wt_block_map(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 */
 	ret = handle->fh_map(handle,
 	    (WT_SESSION *)session, mapped_regionp, lengthp, mapped_cookiep);
-	if (ret == ENOTSUP) {
+	if (ret == EBUSY || ret == ENOTSUP) {
 		*(void **)mapped_regionp = NULL;
 		ret = 0;
 	}

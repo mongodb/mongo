@@ -87,7 +87,7 @@ public:
         ASSERT(!_requests.empty());
         RemoteCommandRequest expected = _requests.front();
         ASSERT(expected.dbname == request.dbname);
-        ASSERT_EQ(expected.cmdObj, request.cmdObj);
+        ASSERT_BSONOBJ_EQ(expected.cmdObj, request.cmdObj);
         _requests.pop();
 
         // Then pop a response and call the handler

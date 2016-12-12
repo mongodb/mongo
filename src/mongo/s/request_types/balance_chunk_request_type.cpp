@@ -32,6 +32,8 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/s/request_types/balance_chunk_request_type.h"
 
 namespace mongo {
 namespace {
@@ -41,6 +43,10 @@ const char kMaxChunkSizeBytes[] = "maxChunkSizeBytes";
 const char kToShardId[] = "toShard";
 const char kSecondaryThrottle[] = "secondaryThrottle";
 const char kWaitForDelete[] = "waitForDelete";
+
+const WriteConcernOptions kMajorityWriteConcernNoTimeout(WriteConcernOptions::kMajority,
+                                                         WriteConcernOptions::SyncMode::UNSET,
+                                                         Seconds(15));
 
 }  // namespace
 
@@ -135,6 +141,8 @@ BSONObj BalanceChunkRequest::serializeToMoveCommandForConfig(
         secondaryThrottleBuilder.doneFast();
     }
     cmdBuilder.append(kWaitForDelete, waitForDelete);
+    cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
+                      kMajorityWriteConcernNoTimeout.toBSON());
 
     return cmdBuilder.obj();
 }
@@ -145,6 +153,8 @@ BSONObj BalanceChunkRequest::serializeToRebalanceCommandForConfig(const ChunkTyp
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append(kConfigSvrMoveChunk, 1);
     cmdBuilder.appendElements(chunk.toBSON());
+    cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
+                      kMajorityWriteConcernNoTimeout.toBSON());
 
     return cmdBuilder.obj();
 }

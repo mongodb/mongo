@@ -22,7 +22,7 @@ env.Library(
         'field_path.cpp',
         ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/util/foundation',
+        '$BUILD_DIR/mongo/base',
         ]
     )
 
@@ -45,7 +45,6 @@ env.Library(
     LIBDEPS=[
         'field_path',
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/foundation',
         '$BUILD_DIR/mongo/util/intrusive_counter',
         ]
     )
@@ -116,19 +115,38 @@ env.Library(
 
 env.CppUnitTest(
     target='document_source_test',
-    source='document_source_test.cpp',
+    source=[
+        'document_source_add_fields_test.cpp',
+        'document_source_bucket_auto_test.cpp',
+        'document_source_bucket_test.cpp',
+        'document_source_count_test.cpp',
+        'document_source_geo_near_test.cpp',
+        'document_source_group_test.cpp',
+        'document_source_limit_test.cpp',
+        'document_source_lookup_test.cpp',
+        'document_source_match_test.cpp',
+        'document_source_mock_test.cpp',
+        'document_source_project_test.cpp',
+        'document_source_redact_test.cpp',
+        'document_source_replace_root_test.cpp',
+        'document_source_sample_test.cpp',
+        'document_source_skip_test.cpp',
+        'document_source_sort_by_count_test.cpp',
+        'document_source_sort_test.cpp',
+        'document_source_test.cpp',
+        'document_source_unwind_test.cpp',
+    ],
     LIBDEPS=[
         'document_source',
         'document_source_lookup',
         'document_value_test_util',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/s/is_mongos',
         '$BUILD_DIR/mongo/util/clock_source_mock',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
-        '$BUILD_DIR/mongo/executor/network_interface_factory'
-        ],
-    )
+    ],
+)
 
 env.Library(
     target='dependencies',
@@ -157,7 +175,7 @@ env.Library(
 env.Library(
     target='accumulator',
     source=[
-        'accumulator.cpp',
+        'accumulation_statement.cpp',
         'accumulator_add_to_set.cpp',
         'accumulator_avg.cpp',
         'accumulator_first.cpp',
@@ -184,7 +202,6 @@ env.Library(
         ],
     LIBDEPS=[
         'document_value',
-        'document_value_test_util',
         'expression',
         'field_path',
     ]
@@ -219,6 +236,7 @@ docSourceEnv.Library(
         'document_source_sort.cpp',
         'document_source_sort_by_count.cpp',
         'document_source_unwind.cpp',
+        'lite_parsed_document_source.cpp',
         ],
     LIBDEPS=[
         'accumulator',
@@ -255,7 +273,6 @@ env.Library(
         'document_value',
         'expression_context',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
-        '$BUILD_DIR/mongo/db/auth/authcore',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
@@ -286,6 +303,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/s/is_mongos',
     ],
 )
 
@@ -309,6 +327,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/s/is_mongos',
         'document_source_facet',
         'document_value_test_util',
     ],
@@ -320,6 +339,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/s/is_mongos',
         'document_source_facet',
         'document_value_test_util',
     ],
@@ -347,13 +367,17 @@ env.CppUnitTest(
 
 env.CppUnitTest(
     target='pipeline_test',
-    source='pipeline_test.cpp',
+    source=[
+        'dependencies_test.cpp',
+        'pipeline_test.cpp',
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/s/is_mongos',
         'document_value_test_util',
         'document_source_lookup',
         'pipeline',
@@ -420,6 +444,7 @@ env.CppUnitTest(
         'granularity_rounder_preferred_numbers_test.cpp',
     ],
     LIBDEPS=[
+        'document_value_test_util',
         'granularity_rounder',
     ],
 )
@@ -445,5 +470,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/index/index_access_methods',
         '$BUILD_DIR/mongo/db/matcher/expressions_mongod_only',
+        '$BUILD_DIR/mongo/db/stats/serveronly',
     ],
 )

@@ -28,9 +28,8 @@
 
 #pragma once
 
-#include <unordered_map>
-
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -50,7 +49,7 @@ struct HostSettings {
     double loss = 0.0;
 };
 
-using HostSettingsMap = std::unordered_map<HostAndPort, HostSettings>;
+using HostSettingsMap = stdx::unordered_map<HostAndPort, HostSettings>;
 
 class Command {
 public:

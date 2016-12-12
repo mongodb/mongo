@@ -34,6 +34,7 @@
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/log.h"
 #include "mongo/util/startup_test.h"
@@ -649,7 +650,7 @@ bool KeyV1::woEqual(const KeyV1& right) const {
     const unsigned char* r = right._keyData;
 
     if ((*l | *r) == IsBSON) {
-        return toBson().equal(right.toBson());
+        return SimpleBSONObjComparator::kInstance.evaluate(toBson() == right.toBson());
     }
 
     while (1) {

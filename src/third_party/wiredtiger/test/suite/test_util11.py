@@ -128,6 +128,5 @@ class test_util11(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(["list"], outfilename=outfile)
         self.check_file_content(outfile, filelist)
 
-
 if __name__ == '__main__':
     wttest.run()

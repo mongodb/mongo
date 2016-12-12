@@ -64,6 +64,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_timestamp.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
@@ -102,6 +103,8 @@ using std::stringstream;
 using std::unique_ptr;
 using std::vector;
 
+using IndexVersion = IndexDescriptor::IndexVersion;
+
 namespace repl {
 std::string rsOplogName = "local.oplog.rs";
 std::string masterSlaveOplogName = "local.oplog.$main";
@@ -109,8 +112,7 @@ std::string masterSlaveOplogName = "local.oplog.$main";
 MONGO_FP_DECLARE(disableSnapshotting);
 
 namespace {
-// cached copies of these...so don't rename them, drop them, etc.!!!
-Database* _localDB = nullptr;
+// cached copy...so don't rename, drop, etc.!!!
 Collection* _localOplogCollection = nullptr;
 
 PseudoRandom hashGenerator(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64());
@@ -228,17 +230,14 @@ namespace {
 Collection* getLocalOplogCollection(OperationContext* txn, const std::string& oplogCollectionName) {
     if (_localOplogCollection)
         return _localOplogCollection;
-    Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
-    Lock::CollectionLock lk2(txn->lockState(), oplogCollectionName, MODE_IX);
 
-    OldClientContext ctx(txn, oplogCollectionName);
-    _localDB = ctx.db();
-    invariant(_localDB);
-    _localOplogCollection = _localDB->getCollection(oplogCollectionName);
+    AutoGetCollection autoColl(txn, NamespaceString(oplogCollectionName), MODE_IX);
+    _localOplogCollection = autoColl.getCollection();
     massert(13347,
             "the oplog collection " + oplogCollectionName +
                 " missing. did you drop it? if so, restart the server",
             _localOplogCollection);
+
     return _localOplogCollection;
 }
 
@@ -288,7 +287,7 @@ OplogDocWriter _logOpWriter(OperationContext* txn,
 }
 }  // end anon namespace
 
-// Truncates the oplog to but excluding the "truncateTimestamp" entry.
+// Truncates the oplog after and including the "truncateTimestamp" entry.
 void truncateOplogTo(OperationContext* txn, Timestamp truncateTimestamp) {
     const NamespaceString oplogNss(rsOplogName);
     ScopedTransaction transaction(txn, MODE_IX);
@@ -302,42 +301,41 @@ void truncateOplogTo(OperationContext* txn, Timestamp truncateTimestamp) {
     }
 
     // Scan through oplog in reverse, from latest entry to first, to find the truncateTimestamp.
-    bool foundSomethingToTruncate = false;
-    RecordId lastRecordId;
-    BSONObj lastOplogEntry;
+    RecordId oldestIDToDelete;  // Non-null if there is something to delete.
     auto oplogRs = oplogCollection->getRecordStore();
-    auto oplogReverseCursor = oplogRs->getCursor(txn, false);
-    bool first = true;
+    auto oplogReverseCursor = oplogRs->getCursor(txn, /*forward=*/false);
+    size_t count = 0;
     while (auto next = oplogReverseCursor->next()) {
-        lastOplogEntry = next->data.releaseToBson();
-        lastRecordId = next->id;
+        const BSONObj entry = next->data.releaseToBson();
+        const RecordId id = next->id;
+        count++;
 
-        const auto tsElem = lastOplogEntry["ts"];
-
-        if (first) {
+        const auto tsElem = entry["ts"];
+        if (count == 1) {
             if (tsElem.eoo())
-                LOG(2) << "Oplog tail entry: " << lastOplogEntry;
+                LOG(2) << "Oplog tail entry: " << redact(entry);
             else
                 LOG(2) << "Oplog tail entry ts field: " << tsElem;
-            first = false;
         }
 
-        if (tsElem.timestamp() == truncateTimestamp) {
-            break;
-        } else if (tsElem.timestamp() < truncateTimestamp) {
-            fassertFailedWithStatusNoTrace(34411,
-                                           Status(ErrorCodes::OplogOutOfOrder,
-                                                  str::stream() << "Can't find "
-                                                                << truncateTimestamp.toString()
-                                                                << " to truncate from!"));
+        if (tsElem.timestamp() < truncateTimestamp) {
+            // If count == 1, that means that we have nothing to delete because everything in the
+            // oplog is < truncateTimestamp.
+            if (count != 1) {
+                invariant(!oldestIDToDelete.isNull());
+                oplogCollection->temp_cappedTruncateAfter(
+                    txn, oldestIDToDelete, /*inclusive=*/true);
+            }
+            return;
         }
 
-        foundSomethingToTruncate = true;
+        oldestIDToDelete = id;
     }
 
-    if (foundSomethingToTruncate) {
-        oplogCollection->temp_cappedTruncateAfter(txn, lastRecordId, false);
-    }
+    severe() << "Reached end of oplog looking for oplog entry before "
+             << truncateTimestamp.toStringPretty()
+             << " but couldn't find any after looking through " << count << " entries.";
+    fassertFailedNoTrace(40296);
 }
 
 /* we write to local.oplog.rs:
@@ -577,13 +575,30 @@ struct ApplyOpMetadata {
 std::map<std::string, ApplyOpMetadata> opsMap = {
     {"create",
      {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
-          return createCollection(txn, NamespaceString(ns).db().toString(), cmd);
+          const NamespaceString nss(parseNs(ns, cmd));
+          if (auto idIndexElem = cmd["idIndex"]) {
+              // Remove "idIndex" field from command.
+              auto cmdWithoutIdIndex = cmd.removeField("idIndex");
+              return createCollection(
+                  txn, nss.db().toString(), cmdWithoutIdIndex, idIndexElem.Obj());
+          }
+
+          // No _id index spec was provided, so we should build a v:1 _id index.
+          BSONObjBuilder idIndexSpecBuilder;
+          idIndexSpecBuilder.append(IndexDescriptor::kIndexVersionFieldName,
+                                    static_cast<int>(IndexVersion::kV1));
+          idIndexSpecBuilder.append(IndexDescriptor::kIndexNameFieldName, "_id_");
+          idIndexSpecBuilder.append(IndexDescriptor::kNamespaceFieldName, nss.ns());
+          idIndexSpecBuilder.append(IndexDescriptor::kKeyPatternFieldName, BSON("_id" << 1));
+          return createCollection(txn, nss.db().toString(), cmd, idIndexSpecBuilder.done());
       },
       {ErrorCodes::NamespaceExists}}},
-    {"collMod", {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
-         BSONObjBuilder resultWeDontCareAbout;
-         return collMod(txn, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
-     }}},
+    {"collMod",
+     {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+          BSONObjBuilder resultWeDontCareAbout;
+          return collMod(txn, parseNs(ns, cmd), cmd, &resultWeDontCareAbout);
+      },
+      {ErrorCodes::IndexNotFound, ErrorCodes::NamespaceNotFound}}},
     {"dropDatabase",
      {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
           return dropDatabase(txn, NamespaceString(ns).db().toString());
@@ -624,9 +639,17 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"renameCollection",
      {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+          const auto sourceNsElt = cmd.firstElement();
+          const auto targetNsElt = cmd["to"];
+          uassert(ErrorCodes::TypeMismatch,
+                  "'renameCollection' must be of type String",
+                  sourceNsElt.type() == BSONType::String);
+          uassert(ErrorCodes::TypeMismatch,
+                  "'to' must be of type String",
+                  targetNsElt.type() == BSONType::String);
           return renameCollection(txn,
-                                  NamespaceString(cmd.firstElement().valuestrsafe()),
-                                  NamespaceString(cmd["to"].valuestrsafe()),
+                                  NamespaceString(sourceNsElt.valueStringData()),
+                                  NamespaceString(targetNsElt.valueStringData()),
                                   cmd["dropTarget"].trueValue(),
                                   cmd["stayTemp"].trueValue());
       },
@@ -652,9 +675,9 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
 Status applyOperation_inlock(OperationContext* txn,
                              Database* db,
                              const BSONObj& op,
-                             bool convertUpdateToUpsert,
+                             bool inSteadyStateReplication,
                              IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
-    LOG(3) << "applying op: " << op;
+    LOG(3) << "applying op: " << redact(op);
 
     OpCounters* opCounters = txn->writesAreReplicated() ? &globalOpCounters : &replOpCounters;
 
@@ -671,6 +694,9 @@ Status applyOperation_inlock(OperationContext* txn,
     if (fieldO.isABSONObj())
         o = fieldO.embeddedObject();
 
+    uassert(ErrorCodes::InvalidNamespace,
+            "'ns' must be of type String",
+            fieldNs.type() == BSONType::String);
     const StringData ns = fieldNs.valueStringData();
 
     BSONObj o2;
@@ -709,9 +735,10 @@ Status applyOperation_inlock(OperationContext* txn,
             uassert(ErrorCodes::TypeMismatch,
                     str::stream() << "Expected object for index spec in field 'o': " << op,
                     fieldO.isABSONObj());
+            BSONObj indexSpec = fieldO.embeddedObject();
 
             std::string indexNs;
-            uassertStatusOK(bsonExtractStringField(o, "ns", &indexNs));
+            uassertStatusOK(bsonExtractStringField(indexSpec, "ns", &indexNs));
             const NamespaceString indexNss(indexNs);
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid namespace in index spec: " << op,
@@ -724,24 +751,42 @@ Status applyOperation_inlock(OperationContext* txn,
                     nsToDatabaseSubstring(ns) == indexNss.db());
 
             opCounters->gotInsert();
-            if (o["background"].trueValue()) {
+
+            if (!indexSpec["v"]) {
+                // If the "v" field isn't present in the index specification, then we assume it is a
+                // v=1 index from an older version of MongoDB. This is because
+                //   (1) we haven't built v=0 indexes as the default for a long time, and
+                //   (2) the index version has been included in the corresponding oplog entry since
+                //       v=2 indexes were introduced.
+                BSONObjBuilder bob;
+
+                bob.append("v", static_cast<int>(IndexVersion::kV1));
+                bob.appendElements(indexSpec);
+
+                indexSpec = bob.obj();
+            }
+
+            bool relaxIndexConstraints =
+                ReplicationCoordinator::get(txn)->shouldRelaxIndexConstraints(indexNss);
+            if (indexSpec["background"].trueValue()) {
                 Lock::TempRelease release(txn->lockState());
                 if (txn->lockState()->isLocked()) {
                     // If TempRelease fails, background index build will deadlock.
-                    LOG(3) << "apply op: building background index " << o
+                    LOG(3) << "apply op: building background index " << indexSpec
                            << " in the foreground because temp release failed";
-                    IndexBuilder builder(o);
+                    IndexBuilder builder(indexSpec, relaxIndexConstraints);
                     Status status = builder.buildInForeground(txn, db);
                     uassertStatusOK(status);
                 } else {
-                    IndexBuilder* builder = new IndexBuilder(o);
+                    IndexBuilder* builder = new IndexBuilder(indexSpec, relaxIndexConstraints);
                     // This spawns a new thread and returns immediately.
                     builder->go();
                     // Wait for thread to start and register itself
                     IndexBuilder::waitForBgIndexStarting();
                 }
+                txn->recoveryUnit()->abandonSnapshot();
             } else {
-                IndexBuilder builder(o);
+                IndexBuilder builder(indexSpec, relaxIndexConstraints);
                 Status status = builder.buildInForeground(txn, db);
                 uassertStatusOK(status);
             }
@@ -851,7 +896,7 @@ Status applyOperation_inlock(OperationContext* txn,
         opCounters->gotUpdate();
 
         BSONObj updateCriteria = o2;
-        const bool upsert = valueB || convertUpdateToUpsert;
+        const bool upsert = valueB || inSteadyStateReplication;
 
         uassert(ErrorCodes::NoSuchKey,
                 str::stream() << "Failed to apply update due to missing _id: " << op.toString(),
@@ -872,7 +917,7 @@ Status applyOperation_inlock(OperationContext* txn,
             if (ur.modifiers) {
                 if (updateCriteria.nFields() == 1) {
                     // was a simple { _id : ... } update criteria
-                    string msg = str::stream() << "failed to apply update: " << op.toString();
+                    string msg = str::stream() << "failed to apply update: " << redact(op);
                     error() << msg;
                     return Status(ErrorCodes::OperationFailed, msg);
                 }
@@ -888,7 +933,7 @@ Status applyOperation_inlock(OperationContext* txn,
                     // capped collections won't have an _id index
                     (!indexCatalog->haveIdIndex(txn) &&
                      Helpers::findOne(txn, collection, updateCriteria, false).isNull())) {
-                    string msg = str::stream() << "couldn't find doc: " << op.toString();
+                    string msg = str::stream() << "couldn't find doc: " << redact(op);
                     error() << msg;
                     return Status(ErrorCodes::OperationFailed, msg);
                 }
@@ -900,7 +945,7 @@ Status applyOperation_inlock(OperationContext* txn,
                 // (because we are idempotent),
                 // if an regular non-mod update fails the item is (presumably) missing.
                 if (!upsert) {
-                    string msg = str::stream() << "update of non-mod failed: " << op.toString();
+                    string msg = str::stream() << "update of non-mod failed: " << redact(op);
                     error() << msg;
                     return Status(ErrorCodes::OperationFailed, msg);
                 }
@@ -946,7 +991,9 @@ Status applyOperation_inlock(OperationContext* txn,
     return Status::OK();
 }
 
-Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
+Status applyCommand_inlock(OperationContext* txn,
+                           const BSONObj& op,
+                           bool inSteadyStateReplication) {
     const char* names[] = {"o", "ns", "op"};
     BSONElement fields[3];
     op.getFields(3, names, fields);
@@ -967,16 +1014,27 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
 
     BSONObj o = fieldO.embeddedObject();
 
-    const NamespaceString nss(fieldNs.valuestrsafe());
+    uassert(ErrorCodes::InvalidNamespace,
+            "'ns' must be of type String",
+            fieldNs.type() == BSONType::String);
+    const NamespaceString nss(fieldNs.valueStringData());
     if (!nss.isValid()) {
         return {ErrorCodes::InvalidNamespace, "invalid ns: " + std::string(nss.ns())};
     }
     {
         Database* db = dbHolder().get(txn, nss.ns());
-        if (db && db->getViewCatalog()->lookup(txn, nss.ns())) {
+        if (db && !db->getCollection(nss.ns()) && db->getViewCatalog()->lookup(txn, nss.ns())) {
             return {ErrorCodes::CommandNotSupportedOnView,
                     str::stream() << "applyOps not supported on view:" << nss.ns()};
         }
+    }
+
+    // Applying renameCollection during initial sync might lead to data corruption, so we restart
+    // the initial sync.
+    if (!inSteadyStateReplication && o.firstElementFieldName() == std::string("renameCollection")) {
+        return Status(ErrorCodes::OplogOperationUnsupported,
+                      str::stream() << "Applying renameCollection not supported in initial sync: "
+                                    << redact(op));
     }
 
     // Applying commands in repl is done under Global W-lock, so it is safe to not
@@ -1025,12 +1083,12 @@ Status applyCommand_inlock(OperationContext* txn, const BSONObj& op) {
             }
             default:
                 if (_oplogCollectionName == masterSlaveOplogName) {
-                    error() << "Failed command " << o << " on " << nss.db() << " with status "
-                            << status << " during oplog application";
+                    error() << "Failed command " << redact(o) << " on " << nss.db()
+                            << " with status " << status << " during oplog application";
                 } else if (curOpToApply.acceptableErrors.find(status.code()) ==
                            curOpToApply.acceptableErrors.end()) {
-                    error() << "Failed command " << o << " on " << nss.db() << " with status "
-                            << status << " during oplog application";
+                    error() << "Failed command " << redact(o) << " on " << nss.db()
+                            << " with status " << status << " during oplog application";
                     return status;
                 }
             // fallthrough
@@ -1069,27 +1127,12 @@ void initTimestampFromOplog(OperationContext* txn, const std::string& oplogNS) {
 void oplogCheckCloseDatabase(OperationContext* txn, Database* db) {
     invariant(txn->lockState()->isW());
 
-    _localDB = nullptr;
     _localOplogCollection = nullptr;
 }
 
 void signalOplogWaiters() {
     if (_localOplogCollection) {
         _localOplogCollection->notifyCappedWaitersIfNeeded();
-    }
-}
-
-void checkForCappedOplog(OperationContext* txn) {
-    invariant(!_oplogCollectionName.empty());
-    const NamespaceString oplogNss(_oplogCollectionName);
-    ScopedTransaction transaction(txn, MODE_IX);
-    AutoGetDb autoDb(txn, oplogNss.db(), MODE_IX);
-    Lock::CollectionLock oplogCollectionLock(txn->lockState(), oplogNss.ns(), MODE_X);
-    Collection* oplogCollection = autoDb.getDb()->getCollection(oplogNss);
-    if (oplogCollection && !oplogCollection->isCapped()) {
-        severe() << "The oplog collection " << _oplogCollectionName
-                 << " is not capped; a capped oplog is a requirement for replication to function.";
-        fassertFailedNoTrace(40115);
     }
 }
 

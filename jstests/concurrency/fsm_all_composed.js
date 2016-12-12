@@ -16,6 +16,9 @@ var blacklist = [
     // is slow and the composer doesn't honor iteration counts:
     'remove_single_document_eval_nolock.js',
     'update_simple_eval_nolock.js',
+
+    // This workload assumes it is running against a sharded cluster.
+    'sharded_moveChunk_drop_shard_key_index.js',
 ].map(function(file) {
     return dir + '/' + file;
 });

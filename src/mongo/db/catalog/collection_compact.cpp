@@ -42,34 +42,41 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
-#include "mongo/util/touch_pages.h"
 
 namespace mongo {
 
 using std::endl;
 using std::vector;
 
+using IndexVersion = IndexDescriptor::IndexVersion;
+
 namespace {
 BSONObj _compactAdjustIndexSpec(const BSONObj& oldSpec) {
-    BSONObjBuilder b;
-    BSONObj::iterator i(oldSpec);
-    while (i.more()) {
-        BSONElement e = i.next();
-        if (str::equals(e.fieldName(), "v")) {
-            // Drop any preexisting index version spec.  The default index version will
-            // be used instead for the new index.
-            continue;
-        }
-        if (str::equals(e.fieldName(), "background")) {
+    BSONObjBuilder bob;
+
+    for (auto&& indexSpecElem : oldSpec) {
+        auto indexSpecElemFieldName = indexSpecElem.fieldNameStringData();
+        if (IndexDescriptor::kIndexVersionFieldName == indexSpecElemFieldName) {
+            IndexVersion indexVersion = static_cast<IndexVersion>(indexSpecElem.numberInt());
+            if (IndexVersion::kV0 == indexVersion) {
+                // We automatically upgrade v=0 indexes to v=1 indexes.
+                bob.append(IndexDescriptor::kIndexVersionFieldName,
+                           static_cast<int>(IndexVersion::kV1));
+            } else {
+                bob.append(IndexDescriptor::kIndexVersionFieldName, static_cast<int>(indexVersion));
+            }
+        } else if (IndexDescriptor::kBackgroundFieldName == indexSpecElemFieldName) {
             // Create the new index in the foreground.
             continue;
+        } else {
+            bob.append(indexSpecElem);
         }
-        // Pass the element through to the new index spec.
-        b.append(e);
     }
-    return b.obj();
+
+    return bob.obj();
 }
 
 class MyCompactAdaptor : public RecordStoreCompactAdaptor {
@@ -79,7 +86,9 @@ public:
         : _collection(collection), _multiIndexBlock(indexBlock) {}
 
     virtual bool isDataValid(const RecordData& recData) {
-        return recData.toBson().valid();
+        // Use the latest BSON validation version. We allow compaction of collections containing
+        // decimal data even if decimal is disabled.
+        return recData.toBson().valid(BSONVersion::kLatest);
     }
 
     virtual size_t dataSize(const RecordData& recData) {
@@ -145,7 +154,8 @@ StatusWith<CompactStats> Collection::compact(OperationContext* txn,
 
             const BSONObj spec = _compactAdjustIndexSpec(descriptor->infoObj());
             const BSONObj key = spec.getObjectField("key");
-            const Status keyStatus = validateKeyPattern(key);
+            const Status keyStatus =
+                index_key_validate::validateKeyPattern(key, descriptor->version());
             if (!keyStatus.isOK()) {
                 return StatusWith<CompactStats>(
                     ErrorCodes::CannotCreateIndex,
@@ -166,7 +176,7 @@ StatusWith<CompactStats> Collection::compact(OperationContext* txn,
         // note that the drop indexes call also invalidates all clientcursors for the namespace,
         // which is important and wanted here
         WriteUnitOfWork wunit(txn);
-        log() << "compact dropping indexes" << endl;
+        log() << "compact dropping indexes";
         Status status = _indexCatalog.dropAllIndexes(txn, true);
         if (!status.isOK()) {
             return StatusWith<CompactStats>(status);
@@ -180,7 +190,7 @@ StatusWith<CompactStats> Collection::compact(OperationContext* txn,
     indexer.allowInterruption();
     indexer.ignoreUniqueConstraint();  // in compact we should be doing no checking
 
-    Status status = indexer.init(indexSpecs);
+    Status status = indexer.init(indexSpecs).getStatus();
     if (!status.isOK())
         return StatusWith<CompactStats>(status);
 

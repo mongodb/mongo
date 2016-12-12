@@ -11,6 +11,12 @@
  */
 
 (function() {
+    var parameters = TestData.setParameters;
+    if (parameters && parameters.indexOf("use3dot2InitialSync=true") != -1) {
+        jsTest.log("Skipping this test because use3dot2InitialSync was provided.");
+        return;
+    }
+
     var name = 'initial_sync_update_missing_doc2';
     var replSet = new ReplSetTest({
         name: name,
@@ -64,6 +70,10 @@
     // Re-insert deleted document.
     assert.writeOK(coll.insert(doc, {writeConcern: {w: 1}}));
 
+    var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
+    assert.eq(res.initialSyncStatus.fetchedMissingDocs, 0);
+    var firstOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
+
     secondary.getDB('test').setLogLevel(1, 'replication');
     assert.commandWorked(secondary.getDB('admin').runCommand(
         {configureFailPoint: 'initialSyncHangBeforeGettingMissingDocument', mode: 'off'}));
@@ -79,6 +89,16 @@
     var coll = secondary.getDB('test').getCollection(name);
     assert.eq(1, coll.find().itcount(), 'collection successfully synced to secondary');
     assert.eq(doc, coll.findOne(), 'document on secondary matches primary');
+
+    res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));
+    assert.eq(res.initialSyncStatus.fetchedMissingDocs, 1);
+    var finalOplogEnd = res.initialSyncStatus.initialSyncOplogEnd;
+    assert(!friendlyEqual(firstOplogEnd, finalOplogEnd),
+           "minValid was not moved forward when missing document was fetched");
+
+    assert.eq(0,
+              secondary.getDB('local')['temp_oplog_buffer'].find().itcount(),
+              "Oplog buffer was not dropped after initial sync");
 
     replSet.stopSet();
 })();

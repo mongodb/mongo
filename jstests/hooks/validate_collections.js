@@ -13,6 +13,19 @@ function validateCollections(db, obj) {
         }
     }
 
+    function getFeatureCompatibilityVersion(adminDB) {
+        var res = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
+        if (res === null) {
+            return "3.2";
+        }
+        return res.version;
+    }
+
+    function setFeatureCompatibilityVersion(adminDB, version) {
+        assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: version}));
+        assert.eq(version, getFeatureCompatibilityVersion(adminDB));
+    }
+
     assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a mongod?');
     assert.eq(typeof obj, 'object', 'The `obj` argument must be an object');
     assert(obj.hasOwnProperty('full'), 'Please specify whether to use full validation');
@@ -21,11 +34,44 @@ function validateCollections(db, obj) {
 
     var success = true;
 
-    // Don't run validate on view namespaces.
-    let listCollectionsRes = db.runCommand({listCollections: 1, filter: {"type": "collection"}});
-    assert.commandWorked(listCollectionsRes);
-    let collInfo = new DBCommandCursor(db.getMongo(), listCollectionsRes).toArray();
+    var adminDB = db.getSiblingDB("admin");
 
+    // Set the featureCompatibilityVersion to its required value for performing validation. Save the
+    // original value.
+    var originalFeatureCompatibilityVersion;
+    if (jsTest.options().forceValidationWithFeatureCompatibilityVersion) {
+        try {
+            originalFeatureCompatibilityVersion = getFeatureCompatibilityVersion(adminDB);
+        } catch (e) {
+            if (jsTest.options().skipValidationOnInvalidViewDefinitions &&
+                e.code === ErrorCodes.InvalidViewDefinition) {
+                print("Reading the featureCompatibilityVersion from the admin.system.version" +
+                      " collection failed due to an invalid view definition on the admin database");
+                // The view catalog would only have been resolved if the namespace doesn't exist as
+                // a collection. The absence of the admin.system.version collection is equivalent to
+                // having featureCompatibilityVersion=3.2.
+                originalFeatureCompatibilityVersion = "3.2";
+            } else {
+                throw e;
+            }
+        }
+
+        setFeatureCompatibilityVersion(
+            adminDB, jsTest.options().forceValidationWithFeatureCompatibilityVersion);
+    }
+
+    // Don't run validate on view namespaces.
+    let filter = {type: "collection"};
+    if (jsTest.options().skipValidationOnInvalidViewDefinitions) {
+        // If skipValidationOnInvalidViewDefinitions=true, then we avoid resolving the view catalog
+        // on the admin database.
+        //
+        // TODO SERVER-25493: Remove the $exists clause once performing an initial sync from
+        // versions of MongoDB <= 3.2 is no longer supported.
+        filter = {$or: [filter, {type: {$exists: false}}]};
+    }
+
+    let collInfo = db.getCollectionInfos(filter);
     for (var collDocument of collInfo) {
         var coll = db.getCollection(collDocument["name"]);
         var res = coll.validate(full);
@@ -36,5 +82,11 @@ function validateCollections(db, obj) {
             success = false;
         }
     }
+
+    // Restore the original value for featureCompatibilityVersion.
+    if (jsTest.options().forceValidationWithFeatureCompatibilityVersion) {
+        setFeatureCompatibilityVersion(adminDB, originalFeatureCompatibilityVersion);
+    }
+
     return success;
 }

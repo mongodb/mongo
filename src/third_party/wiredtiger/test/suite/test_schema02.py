@@ -279,6 +279,5 @@ class test_schema02(wttest.WiredTigerTestCase):
         self.populate()
         self.check_entries()
 
-
 if __name__ == '__main__':
     wttest.run()

@@ -44,6 +44,5 @@ class test_create_excl(wttest.WiredTigerTestCase):
         self.assertRaises(wiredtiger.WiredTigerError,
             lambda: self.session.create(uri, "exclusive"))
 
-
 if __name__ == '__main__':
     wttest.run()

@@ -93,7 +93,11 @@ public:
     }
 
     virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
-        return cmdObj.firstElement().str();
+        const auto nsElt = cmdObj.firstElement();
+        uassert(ErrorCodes::InvalidNamespace,
+                "'movePrimary' must be of type String",
+                nsElt.type() == BSONType::String);
+        return nsElt.str();
     }
 
     virtual bool run(OperationContext* txn,
@@ -104,10 +108,10 @@ public:
                      BSONObjBuilder& result) {
         const string dbname = parseNs("", cmdObj);
 
-        if (dbname.empty() || !nsIsDbOnly(dbname)) {
-            errmsg = "invalid db name specified: " + dbname;
-            return false;
-        }
+        uassert(
+            ErrorCodes::InvalidNamespace,
+            str::stream() << "invalid db name specified: " << dbname,
+            NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
 
         if (dbname == "admin" || dbname == "config" || dbname == "local") {
             errmsg = "can't move primary for " + dbname + " database";
@@ -115,7 +119,7 @@ public:
         }
 
         // Flush all cached information. This can't be perfect, but it's better than nothing.
-        grid.catalogCache()->invalidate(dbname);
+        Grid::get(txn)->catalogCache()->invalidate(dbname);
 
         auto status = grid.catalogCache()->getDatabase(txn, dbname);
         if (!status.isOK()) {
@@ -124,23 +128,28 @@ public:
 
         shared_ptr<DBConfig> config = status.getValue();
 
-        const string to = cmdObj["to"].valuestrsafe();
+        const auto toElt = cmdObj["to"];
+        uassert(ErrorCodes::TypeMismatch,
+                "'to' must be of type String",
+                toElt.type() == BSONType::String);
+        const std::string to = toElt.str();
         if (!to.size()) {
             errmsg = "you have to specify where you want to move it";
             return false;
         }
 
-        shared_ptr<Shard> toShard = grid.shardRegistry()->getShard(txn, to);
-        if (!toShard) {
+        auto toShardStatus = grid.shardRegistry()->getShard(txn, to);
+        if (!toShardStatus.isOK()) {
             string msg(str::stream() << "Could not move database '" << dbname << "' to shard '"
                                      << to
                                      << "' because the shard does not exist");
             log() << msg;
             return appendCommandStatus(result, Status(ErrorCodes::ShardNotFound, msg));
         }
+        auto toShard = toShardStatus.getValue();
 
-        shared_ptr<Shard> fromShard = grid.shardRegistry()->getShard(txn, config->getPrimaryId());
-        invariant(fromShard);
+        auto fromShard =
+            uassertStatusOK(grid.shardRegistry()->getShard(txn, config->getPrimaryId()));
 
         if (fromShard->getId() == toShard->getId()) {
             errmsg = "it is already the primary";
@@ -151,8 +160,8 @@ public:
               << " to: " << toShard->toString();
 
         string whyMessage(str::stream() << "Moving primary shard of " << dbname);
-        auto scopedDistLock = grid.catalogClient(txn)->distLock(
-            txn, dbname + "-movePrimary", whyMessage, DistLockManager::kSingleLockAttemptTimeout);
+        auto scopedDistLock = grid.catalogClient(txn)->getDistLockManager()->lock(
+            txn, dbname + "-movePrimary", whyMessage, DistLockManager::kDefaultLockTimeout);
 
         if (!scopedDistLock.isOK()) {
             return appendCommandStatus(result, scopedDistLock.getStatus());
@@ -166,7 +175,11 @@ public:
             _buildMoveEntry(dbname, fromShard->toString(), toShard->toString(), shardedColls);
 
         auto catalogClient = grid.catalogClient(txn);
-        catalogClient->logChange(txn, "movePrimary.start", dbname, moveStartDetails);
+        catalogClient->logChange(txn,
+                                 "movePrimary.start",
+                                 dbname,
+                                 moveStartDetails,
+                                 ShardingCatalogClient::kMajorityWriteConcern);
 
         BSONArrayBuilder barr;
         barr.append(shardedColls);
@@ -204,6 +217,7 @@ public:
             errmsg = "clone failed";
             return false;
         }
+
         bool hasWCError = false;
         if (auto wcErrorElem = cloneRes["writeConcernError"]) {
             appendWriteConcernErrorToCmdResponse(toShard->getId(), wcErrorElem, result);
@@ -215,7 +229,9 @@ public:
         ScopedDbConnection fromconn(fromShard->getConnString());
 
         config->setPrimary(txn, toShard->getId());
-        config->reload(txn);
+
+        // Ensure the next attempt to retrieve the database will do a full reload
+        Grid::get(txn)->catalogCache()->invalidate(dbname);
 
         if (shardedColls.empty()) {
             // TODO: Collections can be created in the meantime, and we should handle in the future.
@@ -287,7 +303,11 @@ public:
         BSONObj moveFinishDetails =
             _buildMoveEntry(dbname, oldPrimary, toShard->toString(), shardedColls);
 
-        catalogClient->logChange(txn, "movePrimary", dbname, moveFinishDetails);
+        catalogClient->logChange(txn,
+                                 "movePrimary",
+                                 dbname,
+                                 moveFinishDetails,
+                                 ShardingCatalogClient::kMajorityWriteConcern);
         return true;
     }
 

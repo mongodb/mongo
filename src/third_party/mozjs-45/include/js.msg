@@ -146,7 +146,7 @@ MSG_DEF(JSMSG_DEPRECATED_USAGE,        1, JSEXN_REFERENCEERR, "deprecated {0} us
 MSG_DEF(JSMSG_NOT_SCRIPTED_FUNCTION,   1, JSEXN_TYPEERR, "{0} is not a scripted function")
 MSG_DEF(JSMSG_NO_REST_NAME,            0, JSEXN_SYNTAXERR, "no parameter name after ...")
 MSG_DEF(JSMSG_PARAMETER_AFTER_REST,    0, JSEXN_SYNTAXERR, "parameter after rest parameter")
-MSG_DEF(JSMSG_TOO_MANY_FUN_APPLY_ARGS, 0, JSEXN_RANGEERR, "arguments array passed to Function.prototype.apply is too large")
+MSG_DEF(JSMSG_TOO_MANY_ARGUMENTS,      0, JSEXN_RANGEERR, "too many arguments provided for a function call")
 
 // CSP
 MSG_DEF(JSMSG_CSP_BLOCKED_EVAL,        0, JSEXN_ERR, "call to eval() blocked by CSP")

@@ -428,7 +428,7 @@ public:
         return appendCode(fieldName, code.code);
     }
 
-    /** Append a std::string element.
+    /** Append a string element.
         @param sz size includes terminating null character */
     BSONObjBuilder& append(StringData fieldName, const char* str, int sz) {
         _b.appendNum((char)String);
@@ -437,15 +437,11 @@ public:
         _b.appendBuf(str, sz);
         return *this;
     }
-    /** Append a std::string element */
+    /** Append a string element */
     BSONObjBuilder& append(StringData fieldName, const char* str) {
         return append(fieldName, str, (int)strlen(str) + 1);
     }
-    /** Append a std::string element */
-    BSONObjBuilder& append(StringData fieldName, const std::string& str) {
-        return append(fieldName, str.c_str(), (int)str.size() + 1);
-    }
-    /** Append a std::string element */
+    /** Append a string element */
     BSONObjBuilder& append(StringData fieldName, StringData str) {
         _b.appendNum((char)String);
         _b.appendStr(fieldName);

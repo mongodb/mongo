@@ -100,13 +100,14 @@ StatusWith<OpTime> DataReplicatorExternalStateImpl::_multiApply(
     return _replicationCoordinatorExternalState->multiApply(txn, std::move(ops), applyOperation);
 }
 
-void DataReplicatorExternalStateImpl::_multiSyncApply(MultiApplier::OperationPtrs* ops) {
-    _replicationCoordinatorExternalState->multiSyncApply(ops);
+Status DataReplicatorExternalStateImpl::_multiSyncApply(MultiApplier::OperationPtrs* ops) {
+    return _replicationCoordinatorExternalState->multiSyncApply(ops);
 }
 
-void DataReplicatorExternalStateImpl::_multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
-                                                             const HostAndPort& source) {
-    _replicationCoordinatorExternalState->multiInitialSyncApply(ops, source);
+Status DataReplicatorExternalStateImpl::_multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
+                                                               const HostAndPort& source,
+                                                               AtomicUInt32* fetchCount) {
+    return _replicationCoordinatorExternalState->multiInitialSyncApply(ops, source, fetchCount);
 }
 
 ReplicationCoordinator* DataReplicatorExternalStateImpl::getReplicationCoordinator() const {

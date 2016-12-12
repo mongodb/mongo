@@ -45,9 +45,11 @@
 #include "mongo/s/version_mongos.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/startup_test.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -95,9 +97,6 @@ Status addMongosOptions(moe::OptionSection* options) {
 
     sharding_options.addOptionChaining("test", "test", moe::Switch, "just run unit tests")
         .setSources(moe::SourceAllLegacy);
-
-    sharding_options.addOptionChaining(
-        "sharding.chunkSize", "chunkSize", moe::Int, "maximum amount of data per chunk");
 
     sharding_options
         .addOptionChaining("net.http.JSONPEnabled",
@@ -175,8 +174,8 @@ Status canonicalizeMongosOptions(moe::Environment* params) {
     return Status::OK();
 }
 
-Status storeMongosOptions(const moe::Environment& params, const std::vector<std::string>& args) {
-    Status ret = storeServerOptions(params, args);
+Status storeMongosOptions(const moe::Environment& params) {
+    Status ret = storeServerOptions(params);
     if (!ret.isOK()) {
         return ret;
     }
@@ -218,10 +217,23 @@ Status storeMongosOptions(const moe::Environment& params, const std::vector<std:
     }
 
     std::vector<HostAndPort> seedServers;
+    bool resolvedSomeSeedSever = false;
     for (const auto& host : configdbConnectionString.getValue().getServers()) {
         seedServers.push_back(host);
         if (!seedServers.back().hasPort()) {
             seedServers.back() = HostAndPort{host.host(), ServerGlobalParams::ConfigServerPort};
+        }
+        if (!hostbyname(seedServers.back().host().c_str()).empty()) {
+            resolvedSomeSeedSever = true;
+        }
+    }
+    if (!resolvedSomeSeedSever) {
+        if (!hostbyname(configdbConnectionString.getValue().getSetName().c_str()).empty()) {
+            warning() << "The replica set name \""
+                      << escape(configdbConnectionString.getValue().getSetName())
+                      << "\" resolves as a host name, but none of the servers in the seed list do. "
+                         "Did you reverse the replica set name and the seed list in "
+                      << escape(configdbConnectionString.getValue().toString()) << "?";
         }
     }
 

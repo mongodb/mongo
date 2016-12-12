@@ -42,8 +42,6 @@
 
 #define	MILLION		1000000
 
-void (*custom_die)(void) = NULL;
-
 /* Needs to be global for signal handling. */
 static TEST_OPTS *opts, _opts;
 
@@ -104,6 +102,8 @@ main(int argc, char *argv[])
 	char buf[100];
 
 	opts = &_opts;
+	if (testutil_disable_long_tests())
+		return (0);
 	memset(opts, 0, sizeof(*opts));
 	opts->table_type = TABLE_ROW;
 	opts->n_append_threads = N_APPEND_THREADS;
@@ -111,7 +111,7 @@ main(int argc, char *argv[])
 	testutil_check(testutil_parse_opts(argc, argv, opts));
 	testutil_make_work_dir(opts->home);
 
-	snprintf(buf, sizeof(buf), 
+	snprintf(buf, sizeof(buf),
 	    "create,"
 	    "cache_size=%s,"
 	    "eviction=(threads_max=5),"
@@ -152,7 +152,5 @@ main(int argc, char *argv[])
 	    (ce - cs) / (double)CLOCKS_PER_SEC);
 
 	testutil_cleanup(opts);
-	/* NOTREACHED */
-
-	return (0);
+	return (EXIT_SUCCESS);
 }

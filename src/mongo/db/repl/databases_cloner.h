@@ -63,6 +63,15 @@ using UniqueLock = stdx::unique_lock<stdx::mutex>;
  */
 class DatabasesCloner {
 public:
+    struct Stats {
+        size_t databasesCloned{0};
+        std::vector<DatabaseCloner::Stats> databaseStats;
+
+        std::string toString() const;
+        BSONObj toBSON() const;
+        void append(BSONObjBuilder* builder) const;
+    };
+
     using IncludeDbFilterFn = stdx::function<bool(const BSONObj& dbInfo)>;
     using OnFinishFn = stdx::function<void(const Status&)>;
     DatabasesCloner(StorageInterface* si,
@@ -74,10 +83,11 @@ public:
 
     ~DatabasesCloner();
 
-    Status startup();
+    Status startup() noexcept;
     bool isActive();
     void join();
     void shutdown();
+    DatabasesCloner::Stats getStats() const;
 
     /**
      * Returns the status after completion. If multiple error occur, only one is recorded/returned.
@@ -95,17 +105,28 @@ public:
     void setScheduleDbWorkFn_forTest(const CollectionCloner::ScheduleDbWorkFn& scheduleDbWorkFn);
 
 private:
+    bool _isActive_inlock() const;
+
+    /**
+     * Returns a copy of the database cloners.
+     */
+    std::vector<std::shared_ptr<DatabaseCloner>> _getDatabaseCloners() const;
+
+    /**
+     * Returns scheduler for listDatabases (null if not created).
+     */
+    RemoteCommandRetryScheduler* _getListDatabasesScheduler() const;
+
     /**
      *  Setting the status to not-OK will stop the process
      */
     void _setStatus_inlock(Status s);
 
-    /**
-     * Will fail the cloner, unlock and call the completion function.
-     */
-    void _failed_inlock(UniqueLock& lk);
+    /** Will fail the cloner, call the completion function, and become inactive. */
+    void _fail_inlock(UniqueLock* lk, Status s);
 
-    void _cancelCloners_inlock(UniqueLock& lk);
+    /** Will call the completion function, and become inactive. */
+    void _succeed_inlock(UniqueLock* lk);
 
     /** Called each time a database clone is finished */
     void _onEachDBCloneFinish(const Status& status, const std::string& name);
@@ -126,16 +147,24 @@ private:
     Status _status{ErrorCodes::NotYetInitialized, ""};  // (M) If it is not OK, we stop everything.
     executor::TaskExecutor* _exec;                      // (R) executor to schedule things with
     OldThreadPool* _dbWorkThreadPool;  // (R) db worker thread pool for collection cloning.
-    HostAndPort _source;               // (R) The source to use, until we get an error
-    bool _active = false;              // (M) false until we start
-    std::vector<std::shared_ptr<DatabaseCloner>> _databaseCloners;  // (M) database cloners by name
-    std::size_t _currentClonerIndex = 0U;  // (M) Index of currently active database cloner.
-    std::unique_ptr<RemoteCommandRetryScheduler> _listDBsScheduler;  // (M) scheduler for listDBs.
-    CollectionCloner::ScheduleDbWorkFn _scheduleDbWorkFn;            // (M)
+    const HostAndPort _source;         // (R) The source to use.
+    CollectionCloner::ScheduleDbWorkFn _scheduleDbWorkFn;  // (M)
 
     const IncludeDbFilterFn _includeDbFn;  // (R) function which decides which dbs are cloned.
-    const OnFinishFn _finishFn;            // (R) function called when finished.
+    OnFinishFn _finishFn;                  // (M) function called when finished.
     StorageInterface* _storage;            // (R)
+
+    std::unique_ptr<RemoteCommandRetryScheduler> _listDBsScheduler;  // (M) scheduler for listDBs.
+    std::vector<std::shared_ptr<DatabaseCloner>> _databaseCloners;   // (M) database cloners by name
+    Stats _stats;                                                    // (M)
+
+    // State transitions:
+    // PreStart --> Running --> ShuttingDown --> Complete
+    // It is possible to skip intermediate states. For example,
+    // Calling shutdown() when the cloner has not started will transition from PreStart directly
+    // to Complete.
+    enum class State { kPreStart, kRunning, kShuttingDown, kComplete };
+    State _state = State::kPreStart;
 };
 
 

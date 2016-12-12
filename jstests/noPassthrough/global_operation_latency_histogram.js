@@ -11,7 +11,7 @@
     testColl.drop();
 
     function getHistogramStats() {
-        return testDB.serverStatus().metrics.latency;
+        return testDB.serverStatus({opLatencies: {histograms: 1}}).opLatencies;
     }
 
     var lastHistogram = getHistogramStats();

@@ -532,7 +532,7 @@ TEST(BSONTemplateEvaluatorTest, CONCAT) {
     ASSERT_EQUALS(obj2.nFields(), 1);
     BSONObj expectedObj = BSON("concatField"
                                << "hello world");
-    ASSERT_EQUALS(obj2.equal(expectedObj), true);
+    ASSERT_BSONOBJ_EQ(obj2, expectedObj);
 
     // Test success when some arguments to #CONCAT are integers
     BSONObjBuilder builder3;
@@ -543,7 +543,7 @@ TEST(BSONTemplateEvaluatorTest, CONCAT) {
     ASSERT_EQUALS(obj3.nFields(), 1);
     expectedObj = BSON("concatField"
                        << "F1racing");
-    ASSERT_EQUALS(obj3.equal(expectedObj), true);
+    ASSERT_BSONOBJ_EQ(obj3, expectedObj);
 
     // Test success with #CONCAT as first element and last element
     BSONObjBuilder builder4;
@@ -562,7 +562,7 @@ TEST(BSONTemplateEvaluatorTest, CONCAT) {
                        << 1
                        << "concatField2"
                        << "hello world");
-    ASSERT_EQUALS(obj4.equal(expectedObj), true);
+    ASSERT_BSONOBJ_EQ(obj4, expectedObj);
 
     // Test success when one of the arguments to #CONCAT is an array
     BSONObjBuilder builder5;
@@ -573,7 +573,7 @@ TEST(BSONTemplateEvaluatorTest, CONCAT) {
     ASSERT_EQUALS(obj5.nFields(), 1);
     expectedObj = BSON("concatField"
                        << "hello[ 1, 10 ]world");
-    ASSERT_EQUALS(obj5.equal(expectedObj), true);
+    ASSERT_BSONOBJ_EQ(obj5, expectedObj);
 }
 
 TEST(BSONTemplateEvaluatorTest, OID) {

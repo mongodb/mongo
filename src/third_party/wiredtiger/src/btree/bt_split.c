@@ -513,7 +513,7 @@ __split_ref_step2(
 		    __split_verify_intl_key_order(session, child));
 #endif
 
-		WT_ERR(__wt_hazard_clear(session, child));
+		WT_ERR(__wt_hazard_clear(session, ref));
 	}
 
 	return (0);
@@ -542,10 +542,10 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	uint32_t slots;
 	void *p;
 
-	WT_STAT_FAST_CONN_INCR(session, cache_eviction_deepen);
-	WT_STAT_FAST_DATA_INCR(session, cache_eviction_deepen);
-	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split_internal);
-	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split_internal);
+	WT_STAT_CONN_INCR(session, cache_eviction_deepen);
+	WT_STAT_DATA_INCR(session, cache_eviction_deepen);
+	WT_STAT_CONN_INCR(session, cache_eviction_split_internal);
+	WT_STAT_DATA_INCR(session, cache_eviction_split_internal);
 
 	btree = S2BT(session);
 	alloc_index = NULL;
@@ -577,10 +577,10 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	chunk = pindex->entries / children;
 	remain = pindex->entries - chunk * (children - 1);
 
-	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
+	__wt_verbose(session, WT_VERB_SPLIT,
 	    "%p: %" PRIu32 " root page elements, splitting into %" PRIu32
 	    " children",
-	    root, pindex->entries, children));
+	    (void *)root, pindex->entries, children);
 
 	/*
 	 * Allocate a new WT_PAGE_INDEX and set of WT_REF objects to be inserted
@@ -795,7 +795,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	if (result_entries == 0) {
 		empty_parent = true;
 		if (!__wt_ref_is_root(parent->pg_intl_parent_ref))
-			ret = __wt_page_evict_soon(
+			__wt_page_evict_soon(
 			    session, parent->pg_intl_parent_ref);
 		goto err;
 	}
@@ -888,17 +888,19 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 */
 
 	if (ref->page == NULL)
-		WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
+		__wt_verbose(session, WT_VERB_SPLIT,
 		    "%p: reverse split into parent %p, %" PRIu32 " -> %" PRIu32
 		    " (-%" PRIu32 ")",
-		    ref->page, parent, parent_entries, result_entries,
-		    parent_entries - result_entries));
+		    (void *)ref->page, (void *)parent,
+		    parent_entries, result_entries,
+		    parent_entries - result_entries);
 	else
-		WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
+		__wt_verbose(session, WT_VERB_SPLIT,
 		    "%p: split into parent %p, %" PRIu32 " -> %" PRIu32
 		    " (+%" PRIu32 ")",
-		    ref->page, parent, parent_entries, result_entries,
-		    result_entries - parent_entries));
+		    (void *)ref->page, (void *)parent,
+		    parent_entries, result_entries,
+		    result_entries - parent_entries);
 
 	/*
 	 * The new page index is in place, free the WT_REF we were splitting and
@@ -1026,8 +1028,8 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	uint32_t slots;
 	void *p;
 
-	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split_internal);
-	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split_internal);
+	WT_STAT_CONN_INCR(session, cache_eviction_split_internal);
+	WT_STAT_DATA_INCR(session, cache_eviction_split_internal);
 
 	/* The page will be marked dirty, make sure that will succeed. */
 	WT_RET(__wt_page_modify_init(session, page));
@@ -1060,10 +1062,10 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	chunk = pindex->entries / children;
 	remain = pindex->entries - chunk * (children - 1);
 
-	WT_ERR(__wt_verbose(session, WT_VERB_SPLIT,
+	__wt_verbose(session, WT_VERB_SPLIT,
 	    "%p: %" PRIu32 " internal page elements, splitting %" PRIu32
 	    " children into parent %p",
-	    page, pindex->entries, children, parent));
+	    (void *)page, pindex->entries, children, (void *)parent);
 
 	/*
 	 * Ideally, we'd discard the original page, but that's hard since other
@@ -1287,12 +1289,12 @@ __split_internal_lock(WT_SESSION_IMPL *session, WT_REF *ref, bool trylock,
 			return (EBUSY);
 
 		if (trylock)
-			WT_RET(__wt_fair_trylock(session, &parent->page_lock));
+			WT_RET(__wt_try_writelock(session, &parent->page_lock));
 		else
-			WT_RET(__wt_fair_lock(session, &parent->page_lock));
+			__wt_writelock(session, &parent->page_lock);
 		if (parent == ref->home)
 			break;
-		WT_RET(__wt_fair_unlock(session, &parent->page_lock));
+		__wt_writeunlock(session, &parent->page_lock);
 	}
 
 	/*
@@ -1315,7 +1317,7 @@ __split_internal_lock(WT_SESSION_IMPL *session, WT_REF *ref, bool trylock,
 	*parentp = parent;
 	return (0);
 
-err:	WT_TRET(__wt_fair_unlock(session, &parent->page_lock));
+err:	__wt_writeunlock(session, &parent->page_lock);
 	return (ret);
 }
 
@@ -1329,9 +1331,9 @@ __split_internal_unlock(WT_SESSION_IMPL *session, WT_PAGE *parent, bool hazard)
 	WT_DECL_RET;
 
 	if (hazard)
-		ret = __wt_hazard_clear(session, parent);
+		ret = __wt_hazard_clear(session, parent->pg_intl_parent_ref);
 
-	WT_TRET(__wt_fair_unlock(session, &parent->page_lock));
+	__wt_writeunlock(session, &parent->page_lock);
 	return (ret);
 }
 
@@ -1580,6 +1582,13 @@ __split_multi_inmem(
 	 */
 	page->modify->first_dirty_txn = WT_TXN_FIRST;
 
+	/*
+	 * If the new page is modified, save the oldest ID from reconciliation
+	 * to avoid repeatedly attempting eviction on the same page.
+	 */
+	page->modify->last_eviction_id = orig->modify->last_eviction_id;
+	page->modify->update_restored = 1;
+
 err:	/* Free any resources that may have been cached in the cursor. */
 	WT_TRET(__wt_btcur_close(&cbt, true));
 
@@ -1740,8 +1749,8 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	uint8_t type;
 	int i;
 
-	WT_STAT_FAST_CONN_INCR(session, cache_inmem_split);
-	WT_STAT_FAST_DATA_INCR(session, cache_inmem_split);
+	WT_STAT_CONN_INCR(session, cache_inmem_split);
+	WT_STAT_DATA_INCR(session, cache_inmem_split);
 
 	page = ref->page;
 	right = NULL;
@@ -2077,8 +2086,8 @@ __wt_split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_PAGE *parent;
 	bool hazard;
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_SPLIT, "%p: split-insert", ref->page));
+	__wt_verbose(
+	    session, WT_VERB_SPLIT, "%p: split-insert", (void *)ref->page);
 
 	WT_RET(__split_internal_lock(session, ref, true, &parent, &hazard));
 	if ((ret = __split_insert(session, ref)) != 0) {
@@ -2108,8 +2117,8 @@ __split_multi(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	size_t parent_incr;
 	uint32_t i, new_entries;
 
-	WT_STAT_FAST_CONN_INCR(session, cache_eviction_split_leaf);
-	WT_STAT_FAST_DATA_INCR(session, cache_eviction_split_leaf);
+	WT_STAT_CONN_INCR(session, cache_eviction_split_leaf);
+	WT_STAT_DATA_INCR(session, cache_eviction_split_leaf);
 
 	page = ref->page;
 	mod = page->modify;
@@ -2169,8 +2178,8 @@ __wt_split_multi(WT_SESSION_IMPL *session, WT_REF *ref, int closing)
 	WT_PAGE *parent;
 	bool hazard;
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_SPLIT, "%p: split-multi", ref->page));
+	__wt_verbose(
+	    session, WT_VERB_SPLIT, "%p: split-multi", (void *)ref->page);
 
 	WT_RET(__split_internal_lock(session, ref, false, &parent, &hazard));
 	if ((ret = __split_multi(session, ref, closing)) != 0 || closing) {
@@ -2198,8 +2207,8 @@ __wt_split_reverse(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_PAGE *parent;
 	bool hazard;
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_SPLIT, "%p: reverse-split", ref->page));
+	__wt_verbose(
+	    session, WT_VERB_SPLIT, "%p: reverse-split", (void *)ref->page);
 
 	WT_RET(__split_internal_lock(session, ref, false, &parent, &hazard));
 	ret = __split_parent(session, ref, NULL, 0, 0, false, true);
@@ -2220,8 +2229,8 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi)
 
 	page = ref->page;
 
-	WT_RET(__wt_verbose(
-	    session, WT_VERB_SPLIT, "%p: split-rewrite", ref->page));
+	__wt_verbose(
+	    session, WT_VERB_SPLIT, "%p: split-rewrite", (void *)ref->page);
 
 	/*
 	 * This isn't a split: a reconciliation failed because we couldn't write

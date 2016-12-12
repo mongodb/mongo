@@ -100,17 +100,17 @@ TEST(RollBackLocalOperationsTest, RollbackMultipleLocalOperations) {
     OplogInterfaceMock localOplog(localOperations);
     auto i = localOperations.cbegin();
     auto rollbackOperation = [&](const BSONObj& operation) {
-        ASSERT_EQUALS(i->first, operation);
+        ASSERT_BSONOBJ_EQ(i->first, operation);
         i++;
         return Status::OK();
     };
     RollBackLocalOperations finder(localOplog, rollbackOperation);
     auto result = finder.onRemoteOperation(commonOperation.first);
     ASSERT_OK(result.getStatus());
-    ASSERT_EQUALS(commonOperation.first["ts"].timestamp(), result.getValue().first);
+    ASSERT_EQUALS(OpTime::parseFromOplogEntry(commonOperation.first), result.getValue().first);
     ASSERT_EQUALS(commonOperation.second, result.getValue().second);
     ASSERT_FALSE(i == localOperations.cend());
-    ASSERT_EQUALS(commonOperation.first, i->first);
+    ASSERT_BSONOBJ_EQ(commonOperation.first, i->first);
     i++;
     ASSERT_TRUE(i == localOperations.cend());
 }
@@ -148,7 +148,7 @@ TEST(RollBackLocalOperationsTest, SkipRemoteOperations) {
     OplogInterfaceMock localOplog(localOperations);
     auto i = localOperations.cbegin();
     auto rollbackOperation = [&](const BSONObj& operation) {
-        ASSERT_EQUALS(i->first, operation);
+        ASSERT_BSONOBJ_EQ(i->first, operation);
         i++;
         return Status::OK();
     };
@@ -165,10 +165,10 @@ TEST(RollBackLocalOperationsTest, SkipRemoteOperations) {
     }
     auto result = finder.onRemoteOperation(commonOperation.first);
     ASSERT_OK(result.getStatus());
-    ASSERT_EQUALS(commonOperation.first["ts"].timestamp(), result.getValue().first);
+    ASSERT_EQUALS(OpTime::parseFromOplogEntry(commonOperation.first), result.getValue().first);
     ASSERT_EQUALS(commonOperation.second, result.getValue().second);
     ASSERT_FALSE(i == localOperations.cend());
-    ASSERT_EQUALS(commonOperation.first, i->first);
+    ASSERT_BSONOBJ_EQ(commonOperation.first, i->first);
     i++;
     ASSERT_TRUE(i == localOperations.cend());
 }
@@ -181,7 +181,7 @@ TEST(RollBackLocalOperationsTest, SameTimestampDifferentHashess) {
     OplogInterfaceMock localOplog(localOperations);
     auto i = localOperations.cbegin();
     auto rollbackOperation = [&](const BSONObj& operation) {
-        ASSERT_EQUALS(i->first, operation);
+        ASSERT_BSONOBJ_EQ(i->first, operation);
         i++;
         return Status::OK();
     };
@@ -198,10 +198,10 @@ TEST(RollBackLocalOperationsTest, SameTimestampDifferentHashess) {
     }
     auto result = finder.onRemoteOperation(commonOperation.first);
     ASSERT_OK(result.getStatus());
-    ASSERT_EQUALS(commonOperation.first["ts"].timestamp(), result.getValue().first);
+    ASSERT_EQUALS(OpTime::parseFromOplogEntry(commonOperation.first), result.getValue().first);
     ASSERT_EQUALS(commonOperation.second, result.getValue().second);
     ASSERT_FALSE(i == localOperations.cend());
-    ASSERT_EQUALS(commonOperation.first, i->first);
+    ASSERT_BSONOBJ_EQ(commonOperation.first, i->first);
     i++;
     ASSERT_TRUE(i == localOperations.cend());
 }
@@ -266,15 +266,15 @@ TEST(SyncRollBackLocalOperationsTest, RollbackTwoOperations) {
     auto result = syncRollBackLocalOperations(OplogInterfaceMock(localOperations),
                                               OplogInterfaceMock({commonOperation}),
                                               [&](const BSONObj& operation) {
-                                                  ASSERT_EQUALS(i->first, operation);
+                                                  ASSERT_BSONOBJ_EQ(i->first, operation);
                                                   i++;
                                                   return Status::OK();
                                               });
     ASSERT_OK(result.getStatus());
-    ASSERT_EQUALS(commonOperation.first["ts"].timestamp(), result.getValue().first);
+    ASSERT_EQUALS(OpTime::parseFromOplogEntry(commonOperation.first), result.getValue().first);
     ASSERT_EQUALS(commonOperation.second, result.getValue().second);
     ASSERT_FALSE(i == localOperations.cend());
-    ASSERT_EQUALS(commonOperation.first, i->first);
+    ASSERT_BSONOBJ_EQ(commonOperation.first, i->first);
     i++;
     ASSERT_TRUE(i == localOperations.cend());
 }
@@ -290,7 +290,7 @@ TEST(SyncRollBackLocalOperationsTest, SkipOneRemoteOperation) {
                                         return Status::OK();
                                     });
     ASSERT_OK(result.getStatus());
-    ASSERT_EQUALS(commonOperation.first["ts"].timestamp(), result.getValue().first);
+    ASSERT_EQUALS(OpTime::parseFromOplogEntry(commonOperation.first), result.getValue().first);
     ASSERT_EQUALS(commonOperation.second, result.getValue().second);
 }
 
@@ -303,12 +303,12 @@ TEST(SyncRollBackLocalOperationsTest, SameTimestampDifferentHashes) {
         syncRollBackLocalOperations(OplogInterfaceMock({localOperation, commonOperation}),
                                     OplogInterfaceMock({remoteOperation, commonOperation}),
                                     [&](const BSONObj& operation) {
-                                        ASSERT_EQUALS(localOperation.first, operation);
+                                        ASSERT_BSONOBJ_EQ(localOperation.first, operation);
                                         called = true;
                                         return Status::OK();
                                     });
     ASSERT_OK(result.getStatus());
-    ASSERT_EQUALS(commonOperation.first["ts"].timestamp(), result.getValue().first);
+    ASSERT_EQUALS(OpTime::parseFromOplogEntry(commonOperation.first), result.getValue().first);
     ASSERT_EQUALS(commonOperation.second, result.getValue().second);
     ASSERT_TRUE(called);
 }
@@ -322,7 +322,7 @@ TEST(SyncRollBackLocalOperationsTest, SameTimestampEndOfLocalOplog) {
         syncRollBackLocalOperations(OplogInterfaceMock({localOperation}),
                                     OplogInterfaceMock({remoteOperation, commonOperation}),
                                     [&](const BSONObj& operation) {
-                                        ASSERT_EQUALS(localOperation.first, operation);
+                                        ASSERT_BSONOBJ_EQ(localOperation.first, operation);
                                         called = true;
                                         return Status::OK();
                                     });
@@ -348,13 +348,14 @@ TEST(SyncRollBackLocalOperationsTest, SameTimestampEndOfRemoteOplog) {
     auto localOperation = makeOpAndRecordId(1, 2);
     auto remoteOperation = makeOpAndRecordId(1, 3);
     bool called = false;
-    auto result = syncRollBackLocalOperations(OplogInterfaceMock({localOperation, commonOperation}),
-                                              OplogInterfaceMock({remoteOperation}),
-                                              [&](const BSONObj& operation) {
-                                                  ASSERT_EQUALS(localOperation.first, operation);
-                                                  called = true;
-                                                  return Status::OK();
-                                              });
+    auto result =
+        syncRollBackLocalOperations(OplogInterfaceMock({localOperation, commonOperation}),
+                                    OplogInterfaceMock({remoteOperation}),
+                                    [&](const BSONObj& operation) {
+                                        ASSERT_BSONOBJ_EQ(localOperation.first, operation);
+                                        called = true;
+                                        return Status::OK();
+                                    });
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument, result.getStatus().code());
     ASSERT_STRING_CONTAINS(result.getStatus().reason(), "RS100 reached beginning of remote oplog");
     ASSERT_TRUE(called);
@@ -369,7 +370,7 @@ TEST(SyncRollBackLocalOperationsTest, DifferentTimestampEndOfLocalOplog) {
         syncRollBackLocalOperations(OplogInterfaceMock({localOperation}),
                                     OplogInterfaceMock({remoteOperation, commonOperation}),
                                     [&](const BSONObj& operation) {
-                                        ASSERT_EQUALS(localOperation.first, operation);
+                                        ASSERT_BSONOBJ_EQ(localOperation.first, operation);
                                         called = true;
                                         return Status::OK();
                                     });

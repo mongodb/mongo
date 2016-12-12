@@ -2,6 +2,7 @@ selector:
   js_test:
     roots:
       - jstests/readonly/*.js
+    exclude_files:
 
 executor:
   js_test:

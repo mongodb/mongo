@@ -60,7 +60,7 @@ DistinctScan::DistinctScan(OperationContext* txn,
         _specificStats.collation = collationElement.Obj().getOwned();
     }
     _specificStats.indexName = _params.descriptor->indexName();
-    _specificStats.indexVersion = _params.descriptor->version();
+    _specificStats.indexVersion = static_cast<int>(_params.descriptor->version());
     _specificStats.isMultiKey = _params.descriptor->isMultikey(getOpCtx());
     _specificStats.multiKeyPaths = _params.descriptor->getMultikeyPaths(getOpCtx());
     _specificStats.isUnique = _params.descriptor->unique();

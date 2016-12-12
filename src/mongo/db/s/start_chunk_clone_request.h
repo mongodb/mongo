@@ -34,13 +34,14 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
 
 class BSONObjBuilder;
 template <typename T>
 class StatusWith;
-class ShardId;
+
 /**
  * Parses the arguments for a start chunk clone operation.
  */
@@ -62,6 +63,7 @@ public:
                                 const MigrationSessionId& sessionId,
                                 const ConnectionString& configServerConnectionString,
                                 const ConnectionString& fromShardConnectionString,
+                                const ShardId& fromShardId,
                                 const ShardId& toShardId,
                                 const BSONObj& chunkMinKey,
                                 const BSONObj& chunkMaxKey,
@@ -84,7 +86,11 @@ public:
         return _fromShardCS;
     }
 
-    const std::string& getToShardId() const {
+    const ShardId& getFromShardId() const {
+        return _fromShardId;
+    }
+
+    const ShardId& getToShardId() const {
         return _toShardId;
     }
 
@@ -123,8 +129,9 @@ private:
     // The source host and port
     ConnectionString _fromShardCS;
 
-    // The recipient shard id
-    std::string _toShardId;
+    // The recipient and destination shard IDs.
+    ShardId _fromShardId;
+    ShardId _toShardId;
 
     // Exact min and max key of the chunk being moved
     BSONObj _minKey;

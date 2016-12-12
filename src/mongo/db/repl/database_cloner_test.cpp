@@ -98,7 +98,7 @@ void DatabaseClonerTest::setUp() {
                const std::vector<BSONObj>& secondaryIndexSpecs) {
             const auto collInfo = &_collections[nss];
             (collInfo->loader = new CollectionBulkLoaderMock(&collInfo->stats))
-                ->init(nullptr, nullptr, secondaryIndexSpecs);
+                ->init(nullptr, secondaryIndexSpecs);
 
             return StatusWith<std::unique_ptr<CollectionBulkLoader>>(
                 std::unique_ptr<CollectionBulkLoader>(collInfo->loader));
@@ -201,7 +201,7 @@ TEST_F(DatabaseClonerTest, FirstRemoteCommandWithoutFilter) {
     ASSERT_TRUE(noiRequest.cmdObj.hasField("filter"));
     BSONElement filterElement = noiRequest.cmdObj.getField("filter");
     ASSERT_TRUE(filterElement.isABSONObj());
-    ASSERT_EQUALS(ListCollectionsFilter::makeTypeCollectionFilter(), filterElement.Obj());
+    ASSERT_BSONOBJ_EQ(ListCollectionsFilter::makeTypeCollectionFilter(), filterElement.Obj());
     ASSERT_FALSE(net->hasReadyRequests());
     ASSERT_TRUE(_databaseCloner->isActive());
 }
@@ -234,8 +234,8 @@ TEST_F(DatabaseClonerTest, FirstRemoteCommandWithFilter) {
     ASSERT_EQUALS(1, noiRequest.cmdObj.firstElement().numberInt());
     BSONElement filterElement = noiRequest.cmdObj.getField("filter");
     ASSERT_TRUE(filterElement.isABSONObj());
-    ASSERT_EQUALS(ListCollectionsFilter::addTypeCollectionFilter(listCollectionsFilter),
-                  filterElement.Obj());
+    ASSERT_BSONOBJ_EQ(ListCollectionsFilter::addTypeCollectionFilter(listCollectionsFilter),
+                      filterElement.Obj());
     ASSERT_FALSE(net->hasReadyRequests());
     ASSERT_TRUE(_databaseCloner->isActive());
 }
@@ -320,8 +320,8 @@ TEST_F(DatabaseClonerTest, ListCollectionsPredicate) {
 
     const std::vector<BSONObj>& collectionInfos = _databaseCloner->getCollectionInfos_forTest();
     ASSERT_EQUALS(2U, collectionInfos.size());
-    ASSERT_EQUALS(sourceInfos[0], collectionInfos[0]);
-    ASSERT_EQUALS(sourceInfos[2], collectionInfos[1]);
+    ASSERT_BSONOBJ_EQ(sourceInfos[0], collectionInfos[0]);
+    ASSERT_BSONOBJ_EQ(sourceInfos[2], collectionInfos[1]);
 }
 
 TEST_F(DatabaseClonerTest, ListCollectionsMultipleBatches) {
@@ -346,7 +346,7 @@ TEST_F(DatabaseClonerTest, ListCollectionsMultipleBatches) {
     {
         const std::vector<BSONObj>& collectionInfos = _databaseCloner->getCollectionInfos_forTest();
         ASSERT_EQUALS(1U, collectionInfos.size());
-        ASSERT_EQUALS(sourceInfos[0], collectionInfos[0]);
+        ASSERT_BSONOBJ_EQ(sourceInfos[0], collectionInfos[0]);
     }
 
     {
@@ -361,8 +361,8 @@ TEST_F(DatabaseClonerTest, ListCollectionsMultipleBatches) {
     {
         const std::vector<BSONObj>& collectionInfos = _databaseCloner->getCollectionInfos_forTest();
         ASSERT_EQUALS(2U, collectionInfos.size());
-        ASSERT_EQUALS(sourceInfos[0], collectionInfos[0]);
-        ASSERT_EQUALS(sourceInfos[1], collectionInfos[1]);
+        ASSERT_BSONOBJ_EQ(sourceInfos[0], collectionInfos[0]);
+        ASSERT_BSONOBJ_EQ(sourceInfos[1], collectionInfos[1]);
     }
 }
 
@@ -540,6 +540,7 @@ TEST_F(DatabaseClonerTest, StartSecondCollectionClonerFailed) {
                                                                                 << "options"
                                                                                 << BSONObj()))));
 
+        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
         processNetworkResponse(createCursorResponse(0, BSONArray()));
     }
@@ -571,11 +572,13 @@ TEST_F(DatabaseClonerTest, FirstCollectionListIndexesFailed) {
     // This affects the order of the network responses.
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(BSON("ok" << 0 << "errmsg"
                                          << "fake message"
                                          << "code"
                                          << ErrorCodes::CursorNotFound));
 
+        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
         processNetworkResponse(createCursorResponse(0, BSONArray()));
     }
@@ -621,6 +624,7 @@ TEST_F(DatabaseClonerTest, CreateCollections) {
     // This affects the order of the network responses.
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
     ASSERT_TRUE(_databaseCloner->isActive());
@@ -632,6 +636,7 @@ TEST_F(DatabaseClonerTest, CreateCollections) {
 
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        processNetworkResponse(createCountResponse(0));
         processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
     }
     ASSERT_TRUE(_databaseCloner->isActive());

@@ -5,7 +5,6 @@
     'use strict';
 
     var st = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1}});
-    st.disableAutoSplit();
 
     var mongos = st.s0;
     var admin = mongos.getDB("admin");

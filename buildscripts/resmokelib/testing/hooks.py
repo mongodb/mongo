@@ -10,6 +10,7 @@ import sys
 
 import bson
 import pymongo
+import random
 
 from . import fixtures
 from . import testcases
@@ -122,23 +123,21 @@ class CleanEveryN(CustomBehavior):
                              self.tests_run)
             self.tests_run = 0
 
-            teardown_success = self.fixture.teardown()
+            if not self.fixture.teardown():
+                raise errors.ServerFailure("%s did not exit cleanly" % (self.fixture))
+
             self.logger.info("Starting the fixture back up again...")
             self.fixture.setup()
             self.fixture.await_ready()
-
-            # Raise this after calling setup in case --continueOnFailure was specified.
-            if not teardown_success:
-                raise errors.TestFailure("%s did not exit cleanly" % (self.fixture))
 
 
 class JsCustomBehavior(CustomBehavior):
     def __init__(self, logger, fixture, js_filename, description, shell_options=None):
         CustomBehavior.__init__(self, logger, fixture, description)
         self.hook_test_case = testcases.JSTestCase(logger,
-                                              js_filename,
-                                              shell_options=shell_options,
-                                              test_kind="Hook")
+                                                   js_filename,
+                                                   shell_options=shell_options,
+                                                   test_kind="Hook")
         self.test_case_is_configured = False
 
     def before_suite(self, test_report):
@@ -163,65 +162,206 @@ class JsCustomBehavior(CustomBehavior):
         finally:
             test_report.stopTest(self.hook_test_case)
 
+class BackgroundInitialSync(JsCustomBehavior):
+    """
+    After every test, this hook checks if a background node has finished initial sync and if so,
+    validates it, tears it down, and restarts it.
+
+    This test accepts a parameter 'n' that specifies a number of tests after which it will wait for
+    replication to finish before validating and restarting the initial sync node. It also accepts
+    a parameter 'use_resync' for whether to restart the initial sync node with resync or by
+    shutting it down and restarting it.
+
+    This requires the ReplicaSetFixture to be started with 'start_initial_sync_node=True'. If used
+    at the same time as CleanEveryN, the 'n' value passed to this hook should be equal to the 'n'
+    value for CleanEveryN.
+    """
+
+    DEFAULT_N = CleanEveryN.DEFAULT_N
+
+    def __init__(self, logger, fixture, use_resync=False, n=DEFAULT_N, shell_options=None):
+        description = "Background Initial Sync"
+        js_filename = os.path.join("jstests", "hooks", "run_initial_sync_node_validation.js")
+        JsCustomBehavior.__init__(self, logger, fixture, js_filename, description, shell_options)
+
+        self.use_resync = use_resync
+        self.n = n
+        self.tests_run = 0
+        self.random_restarts = 0
+
+
+    def after_test(self, test, test_report):
+        self.tests_run += 1
+        sync_node = self.fixture.get_initial_sync_node();
+        sync_node_conn = utils.new_mongo_client(port=sync_node.port)
+        description = "{0} after running '{1}'".format(self.description, test.short_name())
+
+        # Restarts initial sync by shutting down the node, clearing its data, and restarting it,
+        # or by calling resync if use_resync is specified.
+        def restart_init_sync():
+            if self.use_resync:
+                self.fixture.logger.info("Calling resync on initial sync node...")
+                cmd = bson.SON([("resync", 1), ("wait", 0)])
+                try:
+                    sync_node_conn.admin.command(cmd)
+                except pymongo.errors.OperationFailure as err:
+                    self.fixture.logger.exception("{0} failed".format(description))
+                    test_report.addFailure(self.hook_test_case, sys.exc_info())
+                    raise errors.TestFailure(err.args[0])
+            else:
+                # Tear down and restart the initial sync node to start initial sync again.
+                if not sync_node.teardown():
+                    raise errors.ServerFailure("%s did not exit cleanly" % (sync_node))
+
+                self.fixture.logger.info("Starting the initial sync node back up again...")
+                sync_node.setup()
+                sync_node.await_ready()
+
+        # If it's been 'n' tests so far, wait for the initial sync node to finish syncing.
+        if self.tests_run >= self.n:
+            self.tests_run = 0
+            self.fixture.logger.info(
+                "%d tests have been run against the fixture, waiting for initial sync"
+                " node to go into SECONDARY state",
+                self.tests_run)
+            cmd = bson.SON([("replSetTest", 1),
+                            ("waitForMemberState", 2),
+                            ("timeoutMillis", 20 * 60 * 1000)])
+            try:
+                sync_node_conn.admin.command(cmd)
+            except pymongo.errors.OperationFailure as err:
+                self.fixture.logger.exception("{0} failed".format(description))
+                test_report.addFailure(self.hook_test_case, sys.exc_info())
+                raise errors.TestFailure(err.args[0])
+
+        # Check if the initial sync node is in SECONDARY state. If it's been 'n' tests, then it
+        # should have waited to be in SECONDARY state and the test should be marked as a failure.
+        # Otherwise, we just skip the hook and will check again after the next test.
+        try:
+            state = sync_node_conn.admin.command("replSetGetStatus").get("myState")
+            if state != 2:
+                if self.tests_run == 0:
+                    msg = "Initial sync node did not catch up after waiting 20 minutes"
+                    self.fixture.logger.exception("{0} failed: {1}".format(description, msg))
+                    test_report.addFailure(self.hook_test_case, sys.exc_info())
+                    raise errors.TestFailure(msg)
+
+                self.fixture.logger.info(
+                    "Initial sync node is in state %d, not state SECONDARY (2)."
+                    " Skipping BackgroundInitialSync hook for %s",
+                    state,
+                    test.short_name())
+
+                # If we have not restarted initial sync since the last time we ran the data
+                # validation, and if we're using resync for restarts, restart initial sync with a
+                # 20% probability.
+                if self.random_restarts < 1 and self.use_resync and random.random() < 0.2:
+                    self.fixture.logger.info(
+                        "Calling resync randomly in the middle of initial sync")
+                    restart_init_sync()
+                    self.random_restarts += 1
+                return
+        except pymongo.errors.OperationFailure:
+            # replSetGetStatus can fail if the node is in STARTUP state. The node will soon go into
+            # STARTUP2 state and replSetGetStatus will succeed after the next test.
+            self.fixture.logger.info(
+                "replSetGetStatus call failed in BackgroundInitialSync hook, skipping hook for %s",
+                test.short_name())
+            return
+
+        self.random_restarts = 0
+
+        # We're in SECONDARY state so validate the data. If there's a failure restart the fixture
+        # so we don't get multiple occurrences of the same failure, and then rethrow the failure.
+        try:
+            JsCustomBehavior.after_test(self, test, test_report)
+        except errors.TestFailure as err:
+            self.fixture.logger.exception("{0} failed with {1}".format(description, err.args[0]))
+            restart_init_sync()
+            raise errors.TestFailure(err.args[0])
+
+        restart_init_sync()
+
 
 class IntermediateInitialSync(JsCustomBehavior):
     """
     This hook accepts a parameter 'n' that specifies a number of tests after which it will start up
-    a node to initial sync, wait for replication to finish, and then validate the data.
+    a node to initial sync, wait for replication to finish, and then validate the data. It also
+    accepts a parameter 'use_resync' for whether to restart the initial sync node with resync or by
+    shutting it down and restarting it.
 
     This requires the ReplicaSetFixture to be started with 'start_initial_sync_node=True'.
     """
 
     DEFAULT_N = CleanEveryN.DEFAULT_N
 
-    def __init__(self, logger, fixture, n=DEFAULT_N):
+    def __init__(self, logger, fixture, use_resync=False, n=DEFAULT_N):
         description = "Intermediate Initial Sync"
         js_filename = os.path.join("jstests", "hooks", "run_initial_sync_node_validation.js")
         JsCustomBehavior.__init__(self, logger, fixture, js_filename, description)
 
+        self.use_resync = use_resync
         self.n = n
         self.tests_run = 0
 
     def after_test(self, test, test_report):
         self.tests_run += 1
+        # If we have not run 'n' tests yet, skip this hook.
+        if self.tests_run < self.n:
+            return
+        self.tests_run = 0
+
         sync_node = self.fixture.get_initial_sync_node();
         sync_node_conn = utils.new_mongo_client(port=sync_node.port)
+        description = "{0} after running '{1}'".format(self.description, test.short_name())
 
-        if self.tests_run >= self.n:
-            self.tests_run = 0
-            teardown_success = sync_node.teardown()
+        if self.use_resync:
+            self.fixture.logger.info("Calling resync on initial sync node...")
+            cmd = bson.SON([("resync", 1)])
+            try:
+                sync_node_conn.admin.command(cmd)
+            except pymongo.errors.OperationFailure as err:
+                self.fixture.logger.exception("{0} failed".format(description))
+                test_report.addFailure(self.hook_test_case, sys.exc_info())
+                raise errors.TestFailure(err.args[0])
+        else:
+            if not sync_node.teardown():
+                raise errors.ServerFailure("%s did not exit cleanly" % (sync_node))
 
-            self.logger.info("Starting the initial sync node back up again...")
+            self.fixture.logger.info("Starting the initial sync node back up again...")
             sync_node.setup()
             sync_node.await_ready()
 
-            # Do initial sync round.
-            self.logger.info("Waiting for initial sync node to go into SECONDARY state")
-            cmd = bson.SON([("replSetTest", 1),
-                            ("waitForMemberState", 2),
-                            ("timeoutMillis", 20 * 60 * 1000)])
-            try:
-                sync_node_conn.admin.command(cmd)
-            except self.hook_test_case.failureException as err:
-                self.logger.exception("{0} failed".format(description))
-                test_report.addFailure(self.hook_test_case, sys.exc_info())
-                raise errors.TestFailure(err.args[0])
+        # Do initial sync round.
+        self.fixture.logger.info("Waiting for initial sync node to go into SECONDARY state")
+        cmd = bson.SON([("replSetTest", 1),
+                        ("waitForMemberState", 2),
+                        ("timeoutMillis", 20 * 60 * 1000)])
+        try:
+            sync_node_conn.admin.command(cmd)
+        except pymongo.errors.OperationFailure as err:
+            self.fixture.logger.exception("{0} failed".format(description))
+            test_report.addFailure(self.hook_test_case, sys.exc_info())
+            raise errors.TestFailure(err.args[0])
 
-            # Run data validation and dbhash checking.
-            JsCustomBehavior.after_test(self, test, test_report)
+        # Run data validation and dbhash checking.
+        JsCustomBehavior.after_test(self, test, test_report)
 
-            if not teardown_success:
-                raise errors.TestFailure("%s did not exit cleanly" % (sync_node))
 
 class ValidateCollections(JsCustomBehavior):
     """
     Runs full validation on all collections in all databases on every stand-alone
     node, primary replica-set node, or primary shard node.
     """
-    def __init__(self, logger, fixture):
+    def __init__(self, logger, fixture, shell_options=None):
         description = "Full collection validation"
         js_filename = os.path.join("jstests", "hooks", "run_validate_collections.js")
-        JsCustomBehavior.__init__(self, logger, fixture, js_filename, description)
+        JsCustomBehavior.__init__(self,
+                                  logger,
+                                  fixture,
+                                  js_filename,
+                                  description,
+                                  shell_options=shell_options)
 
 
 class CheckReplDBHash(JsCustomBehavior):
@@ -229,43 +369,37 @@ class CheckReplDBHash(JsCustomBehavior):
     Checks that the dbhashes of all non-local databases and non-replicated system collections
     match on the primary and secondaries.
     """
-    def __init__(self, logger, fixture):
+    def __init__(self, logger, fixture, shell_options=None):
         description = "Check dbhashes of all replica set or master/slave members"
         js_filename = os.path.join("jstests", "hooks", "run_check_repl_dbhash.js")
-        JsCustomBehavior.__init__(self, logger, fixture, js_filename, description)
+        JsCustomBehavior.__init__(self,
+                                  logger,
+                                  fixture,
+                                  js_filename,
+                                  description,
+                                  shell_options=shell_options)
 
 
-class TypeSensitiveSON(bson.SON):
+class CheckReplOplogs(JsCustomBehavior):
     """
-    Extends bson.SON to perform additional type-checking of document values
-    to differentiate BSON types.
+    Checks that local.oplog.rs matches on the primary and secondaries.
     """
-
-    def items_with_types(self):
-        """
-        Returns a list of triples. Each triple consists of a field name, a
-        field value, and a field type for each field in the document.
-        """
-
-        return [(key, self[key], type(self[key])) for key in self]
-
-    def __eq__(self, other):
-        """
-        Comparison to another TypeSensitiveSON is order-sensitive and
-        type-sensitive while comparison to a regular dictionary ignores order
-        and type mismatches.
-        """
-
-        if isinstance(other, TypeSensitiveSON):
-            return (len(self) == len(other) and
-                    self.items_with_types() == other.items_with_types())
-
-        raise TypeError("TypeSensitiveSON objects cannot be compared to other types")
+    def __init__(self, logger, fixture, shell_options=None):
+        description = "Check oplogs of all replica set members"
+        js_filename = os.path.join("jstests", "hooks", "run_check_repl_oplogs.js")
+        JsCustomBehavior.__init__(self,
+                                  logger,
+                                  fixture,
+                                  js_filename,
+                                  description,
+                                  shell_options=shell_options)
 
 
 _CUSTOM_BEHAVIORS = {
     "CleanEveryN": CleanEveryN,
     "CheckReplDBHash": CheckReplDBHash,
+    "CheckReplOplogs": CheckReplOplogs,
     "ValidateCollections": ValidateCollections,
     "IntermediateInitialSync": IntermediateInitialSync,
+    "BackgroundInitialSync": BackgroundInitialSync,
 }

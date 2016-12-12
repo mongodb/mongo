@@ -1,8 +1,8 @@
 // Provides convenience methods for confirming system.profile content.
 
 // Retrieve latest system.profile entry.
-function getLatestProfilerEntry(inputDb) {
-    var cursor = inputDb.system.profile.find();
+function getLatestProfilerEntry(inputDb, filter) {
+    var cursor = inputDb.system.profile.find(filter === null ? {} : filter);
     return cursor.sort({$natural: -1}).next();
 }
 

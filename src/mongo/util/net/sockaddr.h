@@ -78,6 +78,10 @@ struct SockAddr {
         return *(const T*)(&sa);
     }
 
+    std::string hostOrIp() const {
+        return _hostOrIp;
+    }
+
     std::string toString(bool includePort = true) const;
 
     bool isValid() const {
@@ -111,6 +115,7 @@ struct SockAddr {
     socklen_t addressSize;
 
 private:
+    std::string _hostOrIp;
     struct sockaddr_storage sa;
     bool _isValid;
 };

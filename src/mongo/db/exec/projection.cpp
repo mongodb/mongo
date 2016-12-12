@@ -203,7 +203,7 @@ PlanStage::StageState ProjectionStage::doWork(WorkingSetID* out) {
         // Punt to our specific projection impl.
         Status projStatus = transform(member);
         if (!projStatus.isOK()) {
-            warning() << "Couldn't execute projection, status = " << projStatus.toString() << endl;
+            warning() << "Couldn't execute projection, status = " << redact(projStatus);
             *out = WorkingSetCommon::allocateStatusMember(_ws, projStatus);
             return PlanStage::FAILURE;
         }

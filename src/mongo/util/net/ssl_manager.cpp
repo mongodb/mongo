@@ -249,7 +249,6 @@ private:
                                      mongodbRolesOID.longDescription.c_str());
     UniqueSSLContext _serverContext;  // SSL context for incoming connections
     UniqueSSLContext _clientContext;  // SSL context for outgoing connections
-    std::string _password;
     bool _weakValidation;
     bool _allowInvalidCertificates;
     bool _allowInvalidHostnames;
@@ -292,11 +291,12 @@ private:
      * @return bool showing if the function was successful.
      */
     bool _parseAndValidateCertificate(const std::string& keyFile,
+                                      const std::string& keyPassword,
                                       std::string* subjectName,
                                       Date_t* serverNotAfter);
 
 
-    StatusWith<std::unordered_set<RoleName>> _parsePeerRoles(X509* peerCert) const;
+    StatusWith<stdx::unordered_set<RoleName>> _parsePeerRoles(X509* peerCert) const;
 
     /** @return true if was successful, otherwise false */
     bool _setupPEM(SSL_CTX* context, const std::string& keyFile, const std::string& password);
@@ -385,7 +385,7 @@ MONGO_INITIALIZER(SetupOpenSSL)(InitializerContext*) {
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL"))(InitializerContext*) {
     stdx::lock_guard<SimpleMutex> lck(sslManagerMtx);
-    if (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled) {
+    if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         theSSLManager = new SSLManager(sslGlobalParams, isSSLServer);
     }
     return Status::OK();
@@ -512,18 +512,21 @@ SSLManager::SSLManager(const SSLParams& params, bool isServer)
     }
 
     // pick the certificate for use in outgoing connections,
-    std::string clientPEM;
+    std::string clientPEM, clientPassword;
     if (!isServer || params.sslClusterFile.empty()) {
         // We are either a client, or a server without a cluster key,
         // so use the PEM key file, if specified
         clientPEM = params.sslPEMKeyFile;
+        clientPassword = params.sslPEMKeyPassword;
     } else {
         // We are a server with a cluster key, so use the cluster key file
         clientPEM = params.sslClusterFile;
+        clientPassword = params.sslClusterPassword;
     }
 
     if (!clientPEM.empty()) {
-        if (!_parseAndValidateCertificate(clientPEM, &_sslConfiguration.clientSubjectName, NULL)) {
+        if (!_parseAndValidateCertificate(
+                clientPEM, clientPassword, &_sslConfiguration.clientSubjectName, NULL)) {
             uasserted(16941, "ssl initialization problem");
         }
     }
@@ -534,6 +537,7 @@ SSLManager::SSLManager(const SSLParams& params, bool isServer)
         }
 
         if (!_parseAndValidateCertificate(params.sslPEMKeyFile,
+                                          params.sslPEMKeyPassword,
                                           &_sslConfiguration.serverSubjectName,
                                           &_sslConfiguration.serverCertificateExpirationDate)) {
             uasserted(16942, "ssl initialization problem");
@@ -547,8 +551,10 @@ SSLManager::SSLManager(const SSLParams& params, bool isServer)
 int SSLManager::password_cb(char* buf, int num, int rwflag, void* userdata) {
     // Unless OpenSSL misbehaves, num should always be positive
     fassert(17314, num > 0);
-    SSLManager* sm = static_cast<SSLManager*>(userdata);
-    const size_t copied = sm->_password.copy(buf, num - 1);
+    invariant(userdata);
+    auto pw = static_cast<const std::string*>(userdata);
+
+    const size_t copied = pw->copy(buf, num - 1);
     buf[copied] = '\0';
     return copied;
 }
@@ -732,6 +738,7 @@ unsigned long long SSLManager::_convertASN1ToMillis(ASN1_TIME* asn1time) {
 }
 
 bool SSLManager::_parseAndValidateCertificate(const std::string& keyFile,
+                                              const std::string& keyPassword,
                                               std::string* subjectName,
                                               Date_t* serverCertificateExpirationDate) {
     BIO* inBIO = BIO_new(BIO_s_file_internal());
@@ -747,7 +754,11 @@ bool SSLManager::_parseAndValidateCertificate(const std::string& keyFile,
         return false;
     }
 
-    X509* x509 = PEM_read_bio_X509(inBIO, NULL, &SSLManager::password_cb, this);
+    // Callback will not manipulate the password, so const_cast is safe.
+    X509* x509 = PEM_read_bio_X509(inBIO,
+                                   NULL,
+                                   &SSLManager::password_cb,
+                                   const_cast<void*>(static_cast<const void*>(&keyPassword)));
     if (x509 == NULL) {
         error() << "cannot retrieve certificate from keyfile: " << keyFile << ' '
                 << getSSLErrorMessage(ERR_get_error());
@@ -783,23 +794,44 @@ bool SSLManager::_parseAndValidateCertificate(const std::string& keyFile,
 bool SSLManager::_setupPEM(SSL_CTX* context,
                            const std::string& keyFile,
                            const std::string& password) {
-    _password = password;
-
     if (SSL_CTX_use_certificate_chain_file(context, keyFile.c_str()) != 1) {
         error() << "cannot read certificate file: " << keyFile << ' '
                 << getSSLErrorMessage(ERR_get_error());
         return false;
     }
 
-    // If password is empty, use default OpenSSL callback, which uses the terminal
-    // to securely request the password interactively from the user.
-    if (!password.empty()) {
-        SSL_CTX_set_default_passwd_cb_userdata(context, this);
-        SSL_CTX_set_default_passwd_cb(context, &SSLManager::password_cb);
+    BIO* inBio = BIO_new(BIO_s_file_internal());
+    if (!inBio) {
+        error() << "failed to allocate BIO object: " << getSSLErrorMessage(ERR_get_error());
+        return false;
+    }
+    const auto bioGuard = MakeGuard([&inBio]() { BIO_free(inBio); });
+
+    if (BIO_read_filename(inBio, keyFile.c_str()) <= 0) {
+        error() << "cannot read PEM key file: " << keyFile << ' '
+                << getSSLErrorMessage(ERR_get_error());
+        return false;
     }
 
-    if (SSL_CTX_use_PrivateKey_file(context, keyFile.c_str(), SSL_FILETYPE_PEM) != 1) {
+    // If password is empty, use default OpenSSL callback, which uses the terminal
+    // to securely request the password interactively from the user.
+    decltype(&SSLManager::password_cb) password_cb = nullptr;
+    void* userdata = nullptr;
+    if (!password.empty()) {
+        password_cb = &SSLManager::password_cb;
+        // SSLManager::password_cb will not manipulate the password, so const_cast is safe.
+        userdata = const_cast<void*>(static_cast<const void*>(&password));
+    }
+    EVP_PKEY* privateKey = PEM_read_bio_PrivateKey(inBio, nullptr, password_cb, userdata);
+    if (!privateKey) {
         error() << "cannot read PEM key file: " << keyFile << ' '
+                << getSSLErrorMessage(ERR_get_error());
+        return false;
+    }
+    const auto privateKeyGuard = MakeGuard([&privateKey]() { EVP_PKEY_free(privateKey); });
+
+    if (SSL_CTX_use_PrivateKey(context, privateKey) != 1) {
+        error() << "cannot use PEM key file: " << keyFile << ' '
                 << getSSLErrorMessage(ERR_get_error());
         return false;
     }
@@ -1077,7 +1109,10 @@ SSLConnection* SSLManager::connect(Socket* socket) {
     std::unique_ptr<SSLConnection> sslConn =
         stdx::make_unique<SSLConnection>(_clientContext.get(), socket, (const char*)NULL, 0);
 
-    int ret;
+    int ret = ::SSL_set_tlsext_host_name(sslConn->ssl, socket->remoteAddr().hostOrIp().c_str());
+    if (ret != 1)
+        _handleSSLError(SSL_get_error(sslConn.get(), ret), ret);
+
     do {
         ret = ::SSL_connect(sslConn->ssl);
     } while (!_doneWithSSLOp(sslConn.get(), ret));
@@ -1157,7 +1192,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertifi
     std::string peerSubjectName = getCertificateSubjectName(peerCert);
     LOG(2) << "Accepted TLS connection from peer: " << peerSubjectName;
 
-    StatusWith<std::unordered_set<RoleName>> swPeerCertificateRoles = _parsePeerRoles(peerCert);
+    StatusWith<stdx::unordered_set<RoleName>> swPeerCertificateRoles = _parsePeerRoles(peerCert);
     if (!swPeerCertificateRoles.isOK()) {
         return swPeerCertificateRoles.getStatus();
     }
@@ -1224,7 +1259,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertifi
         }
     }
 
-    return boost::make_optional(SSLPeerInfo(peerSubjectName, std::unordered_set<RoleName>()));
+    return boost::make_optional(SSLPeerInfo(peerSubjectName, stdx::unordered_set<RoleName>()));
 }
 
 
@@ -1239,7 +1274,7 @@ SSLPeerInfo SSLManager::parseAndValidatePeerCertificateDeprecated(const SSLConne
     return swPeerSubjectName.getValue().get_value_or(SSLPeerInfo());
 }
 
-StatusWith<std::unordered_set<RoleName>> SSLManager::_parsePeerRoles(X509* peerCert) const {
+StatusWith<stdx::unordered_set<RoleName>> SSLManager::_parsePeerRoles(X509* peerCert) const {
     // exts is owned by the peerCert
     STACK_OF(X509_EXTENSION)* exts = peerCert->cert_info->extensions;
 
@@ -1251,7 +1286,7 @@ StatusWith<std::unordered_set<RoleName>> SSLManager::_parsePeerRoles(X509* peerC
     ASN1_OBJECT* rolesObj = OBJ_nid2obj(_rolesNid);
 
     // Search all certificate extensions for our own
-    std::unordered_set<RoleName> roles;
+    stdx::unordered_set<RoleName> roles;
     for (int i = 0; i < extCount; i++) {
         X509_EXTENSION* ex = sk_X509_EXTENSION_value(exts, i);
         ASN1_OBJECT* obj = X509_EXTENSION_get_object(ex);
@@ -1345,17 +1380,17 @@ StatusWith<std::unordered_set<RoleName>> SSLManager::_parsePeerRoles(X509* peerC
                                   "Unrecognized entity in MongoDBAuthorizationGrant");
                 }
             }
+            LOG(1) << "MONGODB-X509 authorization parsed the following roles from peer "
+                      "certificate: "
+                   << [&roles]() {
+                          StringBuilder sb;
+                          std::for_each(roles.begin(), roles.end(), [&sb](const RoleName& role) {
+                              sb << role.toString();
+                          });
+                          return sb.str();
+                      }();
         }
     }
-
-    LOG(1) << "MONGODB-X509 authorization parsed the following roles from peer certificate: "
-           << [&roles]() {
-                  StringBuilder sb;
-                  std::for_each(roles.begin(), roles.end(), [&sb](const RoleName& role) {
-                      sb << role.toString();
-                  });
-                  return sb.str();
-              }();
 
     return roles;
 }

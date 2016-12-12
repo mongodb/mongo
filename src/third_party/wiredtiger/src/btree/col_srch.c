@@ -210,7 +210,7 @@ leaf_only:
 	page = current->page;
 	cbt->ref = current;
 
-	/* 
+	/*
 	 * Don't bother searching if the caller is appending a new record where
 	 * we'll allocate the record number; we're not going to find a match by
 	 * definition, and we figure out the record number and position when we

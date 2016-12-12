@@ -32,7 +32,7 @@
 
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/operation_context_noop.h"
-#include "mongo/s/catalog/replset/sharding_catalog_test_fixture.h"
+#include "mongo/s/catalog/sharding_catalog_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -82,7 +82,7 @@ protected:
     static const int numSplitPoints = 100;
 
     void genUniqueRandomSplitKeys(const string& keyName, vector<BSONObj>* splitKeys) {
-        std::unordered_set<int> uniquePoints;
+        stdx::unordered_set<int> uniquePoints;
         while (static_cast<int>(uniquePoints.size()) < numSplitPoints) {
             uniquePoints.insert(rand(numSplitPoints * 10));
         }

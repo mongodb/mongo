@@ -35,84 +35,36 @@
 
 namespace mongo {
 
-using std::ostream;
 using std::string;
-using std::stringstream;
 using std::vector;
 
-using namespace mongoutils;
-
-const char FieldPath::prefix[] = "$";
-
-std::string FieldPath::getFullyQualifiedPath(StringData prefix, StringData suffix) {
+string FieldPath::getFullyQualifiedPath(StringData prefix, StringData suffix) {
     if (prefix.empty()) {
         return suffix.toString();
     }
+
     return str::stream() << prefix << "." << suffix;
 }
 
-FieldPath::FieldPath(const vector<string>& fieldNames) {
-    massert(16409, "FieldPath cannot be constructed from an empty vector.", !fieldNames.empty());
-    _fieldNames.reserve(fieldNames.size());
-    for (auto fieldName : fieldNames) {
-        pushFieldName(fieldName);
+FieldPath::FieldPath(std::string inputPath)
+    : _fieldPath(std::move(inputPath)), _fieldPathDotPosition{string::npos} {
+    uassert(40352, "FieldPath cannot be constructed with empty string", !_fieldPath.empty());
+    uassert(40353, "FieldPath must not end with a '.'.", _fieldPath[_fieldPath.size() - 1] != '.');
+
+    // Store index delimiter position for use in field lookup.
+    size_t dotPos;
+    size_t startPos = 0;
+    while (string::npos != (dotPos = _fieldPath.find('.', startPos))) {
+        _fieldPathDotPosition.push_back(dotPos);
+        startPos = dotPos + 1;
     }
-}
 
-FieldPath::FieldPath(const string& fieldPath) {
-    // Split 'fieldPath' at the dots.
-    size_t startpos = 0;
-    while (true) {
-        // Find the next dot.
-        const size_t dotpos = fieldPath.find('.', startpos);
+    _fieldPathDotPosition.push_back(_fieldPath.size());
 
-        // If there are no more dots, use the remainder of the string.
-        if (dotpos == fieldPath.npos) {
-            string lastFieldName = fieldPath.substr(startpos, dotpos);
-            pushFieldName(lastFieldName);
-            break;
-        }
-
-        // Use the string up to the dot.
-        const size_t length = dotpos - startpos;
-        string nextFieldName = fieldPath.substr(startpos, length);
-        pushFieldName(nextFieldName);
-
-        // Start the next search after the dot.
-        startpos = dotpos + 1;
+    // Validate fields.
+    for (size_t i = 0; i < getPathLength(); ++i) {
+        uassertValidFieldName(getFieldName(i));
     }
-    verify(getPathLength() > 0);
-}
-
-string FieldPath::fullPath() const {
-    stringstream ss;
-    const bool includePrefix = false;
-    writePath(ss, includePrefix);
-    return ss.str();
-}
-
-string FieldPath::fullPathWithPrefix() const {
-    stringstream ss;
-    const bool includePrefix = true;
-    writePath(ss, includePrefix);
-    return ss.str();
-}
-
-void FieldPath::writePath(ostream& outStream, bool includePrefix) const {
-    if (includePrefix)
-        outStream << prefix;
-
-    const size_t n = _fieldNames.size();
-
-    verify(n > 0);
-    outStream << _fieldNames[0];
-    for (size_t i = 1; i < n; ++i)
-        outStream << '.' << _fieldNames[i];
-}
-
-FieldPath FieldPath::tail() const {
-    vector<string> allButFirst(_fieldNames.begin() + 1, _fieldNames.end());
-    return FieldPath(allButFirst);
 }
 
 void FieldPath::uassertValidFieldName(StringData fieldName) {
@@ -122,10 +74,5 @@ void FieldPath::uassertValidFieldName(StringData fieldName) {
         16411, "FieldPath field names may not contain '\0'.", fieldName.find('\0') == string::npos);
     uassert(
         16412, "FieldPath field names may not contain '.'.", fieldName.find('.') == string::npos);
-}
-
-void FieldPath::pushFieldName(const string& fieldName) {
-    uassertValidFieldName(fieldName);
-    _fieldNames.push_back(fieldName);
 }
 }

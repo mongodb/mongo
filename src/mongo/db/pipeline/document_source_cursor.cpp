@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_cursor.h"
 
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/db_raii.h"
@@ -59,19 +59,19 @@ const char* DocumentSourceCursor::getSourceName() const {
     return "$cursor";
 }
 
-boost::optional<Document> DocumentSourceCursor::getNext() {
+DocumentSource::GetNextResult DocumentSourceCursor::getNext() {
     pExpCtx->checkForInterrupt();
 
     if (_currentBatch.empty()) {
         loadBatch();
 
-        if (_currentBatch.empty())  // exhausted the cursor
-            return boost::none;
+        if (_currentBatch.empty())
+            return GetNextResult::makeEOF();
     }
 
-    Document out = _currentBatch.front();
+    Document out = std::move(_currentBatch.front());
     _currentBatch.pop_front();
-    return out;
+    return std::move(out);
 }
 
 void DocumentSourceCursor::dispose() {
@@ -87,8 +87,7 @@ void DocumentSourceCursor::loadBatch() {
 
     // We have already validated the sharding version when we constructed the PlanExecutor
     // so we shouldn't check it again.
-    const NamespaceString nss(_ns);
-    AutoGetCollectionForRead autoColl(pExpCtx->opCtx, nss);
+    AutoGetCollectionForRead autoColl(pExpCtx->opCtx, _nss);
 
     _exec->restoreState();
 
@@ -147,7 +146,7 @@ long long DocumentSourceCursor::getLimit() const {
     return _limit ? _limit->getLimit() : -1;
 }
 
-Pipeline::SourceContainer::iterator DocumentSourceCursor::optimizeAt(
+Pipeline::SourceContainer::iterator DocumentSourceCursor::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
@@ -192,8 +191,7 @@ Value DocumentSourceCursor::serialize(bool explain) const {
     // Get planner-level explain info from the underlying PlanExecutor.
     BSONObjBuilder explainBuilder;
     {
-        const NamespaceString nss(_ns);
-        AutoGetCollectionForRead autoColl(pExpCtx->opCtx, nss);
+        AutoGetCollectionForRead autoColl(pExpCtx->opCtx, _nss);
 
         massert(17392, "No _exec. Were we disposed before explained?", _exec);
 
@@ -247,7 +245,7 @@ DocumentSourceCursor::DocumentSourceCursor(const string& ns,
                                            const intrusive_ptr<ExpressionContext>& pCtx)
     : DocumentSource(pCtx),
       _docsAddedToBatches(0),
-      _ns(ns),
+      _nss(ns),
       _exec(std::move(exec)),
       _outputSorts(_exec->getOutputSorts()) {
     recordPlanSummaryStr();

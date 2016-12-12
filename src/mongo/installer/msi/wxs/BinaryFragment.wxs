@@ -65,7 +65,11 @@
       <?if $(var.Edition) = Enterprise ?>
         <Component Id="c_mongodecrypt" Guid="B81B0CED-8CAD-4A92-BABC-7C473BBFF44E">
           <File Id="f_mongodecrypt" Name="mongodecrypt.exe" Source="$(var.EnterpriseToolBinarySource)\mongodecrypt.exe"
-                DiskId ="1" KeyPath="yes"/>
+                DiskId="1" KeyPath="yes"/>
+        </Component>
+        <Component Id="c_mongoldap" Guid="553E4E3D-ED32-4ABA-8F27-3A7525C3145C">
+          <File Id="f_mongoldap" Name="mongoldap.exe" Source="$(var.EnterpriseToolBinarySource)\mongoldap.exe"
+                DiskId="1" KeyPath="yes"/>
         </Component>
         <Component Id="c_sasl" Guid="6632B1B8-9F0C-452C-9101-BE6044471CAC">
           <File Id="f_sasl" Name="libsasl.dll" Source="$(var.SaslSource)\libsasl.dll"

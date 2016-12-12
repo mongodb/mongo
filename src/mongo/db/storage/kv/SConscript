@@ -90,11 +90,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'kv_engine_core',
         ],
-    LIBDEPS_TAGS=[
-        # Depends on KVHarnessHelper::create which does not have a unique definition
-        'incomplete',
-    ],
-
     )
 
 env.CppUnitTest(

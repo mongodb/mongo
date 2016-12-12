@@ -61,11 +61,10 @@ void OplogBufferBlockingQueue::push(OperationContext*, const Value& value) {
     _queue.push(value);
 }
 
-bool OplogBufferBlockingQueue::pushAllNonBlocking(OperationContext*,
+void OplogBufferBlockingQueue::pushAllNonBlocking(OperationContext*,
                                                   Batch::const_iterator begin,
                                                   Batch::const_iterator end) {
     _queue.pushAllNonBlocking(begin, end);
-    return true;
 }
 
 void OplogBufferBlockingQueue::waitForSpace(OperationContext*, std::size_t size) {
@@ -96,12 +95,9 @@ bool OplogBufferBlockingQueue::tryPop(OperationContext*, Value* value) {
     return _queue.tryPop(*value);
 }
 
-OplogBuffer::Value OplogBufferBlockingQueue::blockingPop(OperationContext*) {
-    return _queue.blockingPop();
-}
-
-bool OplogBufferBlockingQueue::blockingPeek(OperationContext*, Value* value, Seconds waitDuration) {
-    return _queue.blockingPeek(*value, static_cast<int>(durationCount<Seconds>(waitDuration)));
+bool OplogBufferBlockingQueue::waitForData(Seconds waitDuration) {
+    Value ignored;
+    return _queue.blockingPeek(ignored, static_cast<int>(durationCount<Seconds>(waitDuration)));
 }
 
 bool OplogBufferBlockingQueue::peek(OperationContext*, Value* value) {

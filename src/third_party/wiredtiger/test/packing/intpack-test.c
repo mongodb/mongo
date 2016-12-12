@@ -28,8 +28,6 @@
 
 #include "test_util.h"
 
-void (*custom_die)(void) = NULL;
-
 int
 main(void)
 {

@@ -87,17 +87,18 @@ public:
         grid.shardRegistry()->getAllShardIds(&shardIds);
 
         for (const ShardId& shardId : shardIds) {
-            const auto s = grid.shardRegistry()->getShard(txn, shardId);
-            if (!s) {
+            auto shardStatus = grid.shardRegistry()->getShard(txn, shardId);
+            if (!shardStatus.isOK()) {
                 continue;
             }
+            const auto s = shardStatus.getValue();
 
-            auto response =
-                uassertStatusOK(s->runCommand(txn,
-                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                              "admin",
-                                              BSON("fsync" << 1),
-                                              Shard::RetryPolicy::kIdempotent));
+            auto response = uassertStatusOK(s->runCommandWithFixedRetryAttempts(
+                txn,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                "admin",
+                BSON("fsync" << 1),
+                Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(response.commandStatus);
             BSONObj x = std::move(response.response);
 

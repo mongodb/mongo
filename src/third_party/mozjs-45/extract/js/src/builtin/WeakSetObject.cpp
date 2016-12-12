@@ -138,7 +138,7 @@ WeakSetObject::construct(JSContext* cx, unsigned argc, Value* vp)
                 if (!SetWeakMapEntry(cx, map, keyObject, placeholder))
                     return false;
             } else {
-                if (!args2.init(1))
+                if (!args2.init(cx, 1))
                     return false;
 
                 args2.setCallee(adderVal);

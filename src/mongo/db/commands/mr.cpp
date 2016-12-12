@@ -68,6 +68,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk.h"
@@ -92,6 +93,8 @@ using std::string;
 using std::stringstream;
 using std::unique_ptr;
 using std::vector;
+
+using IndexVersion = IndexDescriptor::IndexVersion;
 
 namespace dps = ::mongo::dotted_path_support;
 
@@ -276,7 +279,14 @@ void JSReducer::_reduce(const BSONList& tuples, BSONObj& key, int& endSizeEstima
 
 Config::Config(const string& _dbname, const BSONObj& cmdObj) {
     dbname = _dbname;
-    ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
+    uassert(ErrorCodes::TypeMismatch,
+            str::stream() << "'mapReduce' must be of type String",
+            cmdObj.firstElement().type() == BSONType::String);
+    const NamespaceString nss(dbname, cmdObj.firstElement().valueStringData());
+    uassert(ErrorCodes::InvalidNamespace,
+            str::stream() << "Invalid namespace: " << nss.ns(),
+            nss.isValid());
+    ns = nss.ns();
 
     verbose = cmdObj["verbose"].trueValue();
     jsMode = cmdObj["jsMode"].trueValue();
@@ -303,9 +313,12 @@ Config::Config(const string& _dbname, const BSONObj& cmdObj) {
     }
 
     if (outputOptions.outType != INMEMORY) {  // setup temp collection name
-        tempNamespace = str::stream()
-            << (outputOptions.outDB.empty() ? dbname : outputOptions.outDB) << ".tmp.mr."
-            << cmdObj.firstElement().String() << "_" << JOB_NUMBER.fetchAndAdd(1);
+        tempNamespace =
+            NamespaceString(outputOptions.outDB.empty() ? dbname : outputOptions.outDB,
+                            str::stream() << "tmp.mr." << cmdObj.firstElement().valueStringData()
+                                          << "_"
+                                          << JOB_NUMBER.fetchAndAdd(1))
+                .ns();
         incLong = tempNamespace + "_inc";
     }
 
@@ -361,7 +374,20 @@ Config::Config(const string& _dbname, const BSONObj& cmdObj) {
  * Clean up the temporary and incremental collections
  */
 void State::dropTempCollections() {
-    _db.dropCollection(_config.tempNamespace);
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+        ScopedTransaction scopedXact(_txn, MODE_IX);
+        AutoGetDb autoDb(_txn, nsToDatabaseSubstring(_config.tempNamespace), MODE_X);
+        if (auto db = autoDb.getDb()) {
+            WriteUnitOfWork wunit(_txn);
+            NamespaceString tempNss(_config.tempNamespace);
+            uassert(ErrorCodes::PrimarySteppedDown,
+                    "no longer primary",
+                    repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(tempNss));
+            db->dropCollection(_txn, _config.tempNamespace);
+            wunit.commit();
+        }
+    }
+    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_txn, "M/R dropTempCollections", _config.tempNamespace)
     // Always forget about temporary namespaces, so we don't cache lots of them
     ShardConnection::forgetNS(_config.tempNamespace);
     if (_useIncremental) {
@@ -413,10 +439,17 @@ void State::prepTempCollection() {
             incColl = incCtx.db()->createCollection(_txn, _config.incLong, options);
             invariant(incColl);
 
+            // We explicitly create a v=2 index on the "0" field so that it is always possible for a
+            // user to emit() decimal keys. Since the incremental collection is not replicated to
+            // any secondaries, there is no risk of inadvertently crashing an older version of
+            // MongoDB when the featureCompatibilityVersion of this server is 3.2.
             BSONObj indexSpec = BSON("key" << BSON("0" << 1) << "ns" << _config.incLong << "name"
-                                           << "_temp_0");
-            Status status =
-                incColl->getIndexCatalog()->createIndexOnEmptyCollection(_txn, indexSpec);
+                                           << "_temp_0"
+                                           << "v"
+                                           << static_cast<int>(IndexVersion::kV2));
+            Status status = incColl->getIndexCatalog()
+                                ->createIndexOnEmptyCollection(_txn, indexSpec)
+                                .getStatus();
             if (!status.isOK()) {
                 uasserted(17305,
                           str::stream() << "createIndex failed for mr incLong ns: "
@@ -465,8 +498,8 @@ void State::prepTempCollection() {
         OldClientWriteContext tempCtx(_txn, _config.tempNamespace);
         WriteUnitOfWork wuow(_txn);
         NamespaceString tempNss(_config.tempNamespace);
-        uassert(ErrorCodes::NotMaster,
-                "no longer master",
+        uassert(ErrorCodes::PrimarySteppedDown,
+                "no longer primary",
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(tempNss));
         Collection* tempColl = tempCtx.getCollection();
         invariant(!tempColl);
@@ -477,7 +510,8 @@ void State::prepTempCollection() {
 
         for (vector<BSONObj>::iterator it = indexesToInsert.begin(); it != indexesToInsert.end();
              ++it) {
-            Status status = tempColl->getIndexCatalog()->createIndexOnEmptyCollection(_txn, *it);
+            Status status =
+                tempColl->getIndexCatalog()->createIndexOnEmptyCollection(_txn, *it).getStatus();
             if (!status.isOK()) {
                 if (status.code() == ErrorCodes::IndexAlreadyExists) {
                     continue;
@@ -486,7 +520,7 @@ void State::prepTempCollection() {
             }
             // Log the createIndex operation.
             string logNs = nsToDatabase(_config.tempNamespace) + ".system.indexes";
-            getGlobalServiceContext()->getOpObserver()->onCreateIndex(_txn, logNs, *it);
+            getGlobalServiceContext()->getOpObserver()->onCreateIndex(_txn, logNs, *it, false);
         }
         wuow.commit();
     }
@@ -577,52 +611,58 @@ long long State::postProcessCollection(OperationContext* txn,
     if (_onDisk == false || _config.outputOptions.outType == Config::INMEMORY)
         return numInMemKeys();
 
+    bool holdingGlobalLock = false;
     if (_config.outputOptions.outNonAtomic)
-        return postProcessCollectionNonAtomic(txn, curOp, pm);
+        return postProcessCollectionNonAtomic(txn, curOp, pm, holdingGlobalLock);
 
     invariant(!txn->lockState()->isLocked());
 
     ScopedTransaction transaction(txn, MODE_X);
-    Lock::GlobalWrite lock(
-        txn->lockState());  // TODO(erh): this is how it was, but seems it doesn't need to be global
-    return postProcessCollectionNonAtomic(txn, curOp, pm);
+    // This must be global because we may write across different databases.
+    Lock::GlobalWrite lock(txn->lockState());
+    holdingGlobalLock = true;
+    return postProcessCollectionNonAtomic(txn, curOp, pm, holdingGlobalLock);
 }
 
-//
-// For SERVER-6116 - can't handle version errors in count currently
-//
+namespace {
 
-/**
- * Runs count and disables version errors.
- *
- * TODO: make count work with versioning
- */
-unsigned long long _safeCount(OperationContext* txn,
-                              // Can't be const b/c count isn't
-                              /* const */ DBDirectClient& db,
-                              const string& ns,
-                              const BSONObj& query = BSONObj(),
-                              int options = 0,
-                              int limit = 0,
-                              int skip = 0) {
-    OperationShardingState::IgnoreVersioningBlock ignoreVersion(txn, NamespaceString(ns));
-    return db.count(ns, query, options, limit, skip);
+// Runs a count against the namespace specified by 'ns'. If the caller holds the global write lock,
+// then this function does not acquire any additional locks.
+unsigned long long _collectionCount(OperationContext* txn,
+                                    const string& ns,
+                                    bool callerHoldsGlobalLock) {
+    Collection* coll = nullptr;
+    boost::optional<AutoGetCollectionForRead> ctx;
+
+    // If the global write lock is held, we must avoid using AutoGetCollectionForRead as it may lead
+    // to deadlock when waiting for a majority snapshot to be committed. See SERVER-24596.
+    if (callerHoldsGlobalLock) {
+        Database* db = dbHolder().get(txn, ns);
+        if (db) {
+            coll = db->getCollection(ns);
+        }
+    } else {
+        ctx.emplace(txn, NamespaceString(ns));
+        coll = ctx->getCollection();
+    }
+
+    return coll ? coll->numRecords(txn) : 0;
 }
 
-//
-// End SERVER-6116
-//
+}  // namespace
 
 long long State::postProcessCollectionNonAtomic(OperationContext* txn,
                                                 CurOp* curOp,
-                                                ProgressMeterHolder& pm) {
+                                                ProgressMeterHolder& pm,
+                                                bool callerHoldsGlobalLock) {
     if (_config.outputOptions.finalNamespace == _config.tempNamespace)
-        return _safeCount(txn, _db, _config.outputOptions.finalNamespace);
+        return _collectionCount(txn, _config.outputOptions.finalNamespace, callerHoldsGlobalLock);
 
     if (_config.outputOptions.outType == Config::REPLACE ||
-        _safeCount(txn, _db, _config.outputOptions.finalNamespace) == 0) {
+        _collectionCount(txn, _config.outputOptions.finalNamespace, callerHoldsGlobalLock) == 0) {
         ScopedTransaction transaction(txn, MODE_X);
-        Lock::GlobalWrite lock(txn->lockState());  // TODO(erh): why global???
+        // This must be global because we may write across different databases.
+        Lock::GlobalWrite lock(txn->lockState());
         // replace: just rename from temp to final collection name, dropping previous collection
         _db.dropCollection(_config.outputOptions.finalNamespace);
         BSONObj info;
@@ -640,19 +680,19 @@ long long State::postProcessCollectionNonAtomic(OperationContext* txn,
     } else if (_config.outputOptions.outType == Config::MERGE) {
         // merge: upsert new docs into old collection
         {
-            const auto count = _safeCount(txn, _db, _config.tempNamespace, BSONObj());
+            const auto count = _collectionCount(txn, _config.tempNamespace, callerHoldsGlobalLock);
             stdx::lock_guard<Client> lk(*txn->getClient());
             curOp->setMessage_inlock(
                 "m/r: merge post processing", "M/R Merge Post Processing Progress", count);
         }
         unique_ptr<DBClientCursor> cursor = _db.query(_config.tempNamespace, BSONObj());
         while (cursor->more()) {
-            ScopedTransaction scopedXact(_txn, MODE_IX);
-            Lock::DBLock lock(_txn->lockState(),
+            ScopedTransaction scopedXact(txn, MODE_X);
+            Lock::DBLock lock(txn->lockState(),
                               nsToDatabaseSubstring(_config.outputOptions.finalNamespace),
                               MODE_X);
             BSONObj o = cursor->nextSafe();
-            Helpers::upsert(_txn, _config.outputOptions.finalNamespace, o);
+            Helpers::upsert(txn, _config.outputOptions.finalNamespace, o);
             pm.hit();
         }
         _db.dropCollection(_config.tempNamespace);
@@ -662,7 +702,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* txn,
         BSONList values;
 
         {
-            const auto count = _safeCount(txn, _db, _config.tempNamespace, BSONObj());
+            const auto count = _collectionCount(txn, _config.tempNamespace, callerHoldsGlobalLock);
             stdx::lock_guard<Client> lk(*txn->getClient());
             curOp->setMessage_inlock(
                 "m/r: reduce post processing", "M/R Reduce Post Processing Progress", count);
@@ -670,7 +710,8 @@ long long State::postProcessCollectionNonAtomic(OperationContext* txn,
         unique_ptr<DBClientCursor> cursor = _db.query(_config.tempNamespace, BSONObj());
         while (cursor->more()) {
             ScopedTransaction transaction(txn, MODE_X);
-            Lock::GlobalWrite lock(txn->lockState());  // TODO(erh) why global?
+            // This must be global because we may write across different databases.
+            Lock::GlobalWrite lock(txn->lockState());
             BSONObj temp = cursor->nextSafe();
             BSONObj old;
 
@@ -679,7 +720,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* txn,
                 const std::string& finalNamespace = _config.outputOptions.finalNamespace;
                 OldClientContext tx(txn, finalNamespace);
                 Collection* coll = getCollectionOrUassert(tx.db(), finalNamespace);
-                found = Helpers::findOne(_txn, coll, temp["_id"].wrap(), old, true);
+                found = Helpers::findOne(txn, coll, temp["_id"].wrap(), old, true);
             }
 
             if (found) {
@@ -687,18 +728,18 @@ long long State::postProcessCollectionNonAtomic(OperationContext* txn,
                 values.clear();
                 values.push_back(temp);
                 values.push_back(old);
-                Helpers::upsert(_txn,
+                Helpers::upsert(txn,
                                 _config.outputOptions.finalNamespace,
                                 _config.reducer->finalReduce(values, _config.finalizer.get()));
             } else {
-                Helpers::upsert(_txn, _config.outputOptions.finalNamespace, temp);
+                Helpers::upsert(txn, _config.outputOptions.finalNamespace, temp);
             }
             pm.hit();
         }
         pm.finished();
     }
 
-    return _safeCount(txn, _db, _config.outputOptions.finalNamespace);
+    return _collectionCount(txn, _config.outputOptions.finalNamespace, callerHoldsGlobalLock);
 }
 
 /**
@@ -711,8 +752,8 @@ void State::insert(const string& ns, const BSONObj& o) {
         OldClientWriteContext ctx(_txn, ns);
         WriteUnitOfWork wuow(_txn);
         NamespaceString nss(ns);
-        uassert(ErrorCodes::NotMaster,
-                "no longer master",
+        uassert(ErrorCodes::PrimarySteppedDown,
+                "no longer primary",
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss));
         Collection* coll = getCollectionOrUassert(ctx.db(), ns);
 
@@ -782,17 +823,12 @@ bool State::sourceExists() {
     return _db.exists(_config.ns);
 }
 
-long long State::incomingDocuments() {
-    return _safeCount(
-        _txn, _db, _config.ns, _config.filter, QueryOption_SlaveOk, (unsigned)_config.limit);
-}
-
 State::~State() {
     if (_onDisk) {
         try {
             dropTempCollections();
         } catch (std::exception& e) {
-            error() << "couldn't cleanup after map reduce: " << e.what() << endl;
+            error() << "couldn't cleanup after map reduce: " << e.what();
         }
     }
     if (_scope && !_scope->isKillPending() && _scope->getError().empty()) {
@@ -803,7 +839,7 @@ State::~State() {
             _scope->invoke(cleanup, 0, 0, 0, true);
         } catch (const DBException&) {
             // not important because properties will be reset if scope is reused
-            LOG(1) << "MapReduce terminated during state destruction" << endl;
+            LOG(1) << "MapReduce terminated during state destruction";
         }
     }
 }
@@ -815,7 +851,7 @@ void State::init() {
     // setup js
     const string userToken =
         AuthorizationSession::get(Client::getCurrent())->getAuthenticatedUserNamesToken();
-    _scope.reset(globalScriptEngine->newScopeForCurrentThread());
+    _scope.reset(getGlobalScriptEngine()->newScopeForCurrentThread());
     _scope->registerOperation(_txn);
     _scope->setLocalDB(_config.dbname);
     _scope->loadStored(_txn, true);
@@ -946,7 +982,7 @@ void State::switchMode(bool jsMode) {
 }
 
 void State::bailFromJS() {
-    LOG(1) << "M/R: Switching from JS mode to mixed mode" << endl;
+    LOG(1) << "M/R: Switching from JS mode to mixed mode";
 
     // reduce and reemit into c++
     switchMode(false);
@@ -1232,7 +1268,7 @@ void State::reduceAndSpillInMemoryStateIfNeeded() {
             _scope->invoke(_reduceAll, 0, 0, 0, true);
             LOG(3) << "  MR - did reduceAll: keys=" << keyCt << " dups=" << dupCt
                    << " newKeys=" << _scope->getNumberInt("_keyCt") << " time=" << t.millis()
-                   << "ms" << endl;
+                   << "ms";
             return;
         }
     }
@@ -1246,12 +1282,12 @@ void State::reduceAndSpillInMemoryStateIfNeeded() {
         Timer t;
         reduceInMemory();
         LOG(3) << "  MR - did reduceInMemory: size=" << oldSize << " dups=" << _dupCount
-               << " newSize=" << _size << " time=" << t.millis() << "ms" << endl;
+               << " newSize=" << _size << " time=" << t.millis() << "ms";
 
         // if size is still high, or values are not reducing well, dump
         if (_onDisk && (_size > _config.maxInMemSize || _size > oldSize / 2)) {
             dumpToInc();
-            LOG(3) << "  MR - dumping to db" << endl;
+            LOG(3) << "  MR - dumping to db";
         }
     }
 }
@@ -1354,9 +1390,19 @@ public:
 
         Config config(dbname, cmd);
 
-        LOG(1) << "mr ns: " << config.ns << endl;
+        if (!config.collation.isEmpty() &&
+            serverGlobalParams.featureCompatibility.version.load() ==
+                ServerGlobalParams::FeatureCompatibility::Version::k32) {
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::InvalidOptions,
+                       "The featureCompatibilityVersion must be 3.4 to use collation. See "
+                       "http://dochub.mongodb.org/core/3.4-feature-compatibility."));
+        }
 
-        uassert(16149, "cannot run map reduce without the js engine", globalScriptEngine);
+        LOG(1) << "mr ns: " << config.ns;
+
+        uassert(16149, "cannot run map reduce without the js engine", getGlobalScriptEngine());
 
         // Prevent sharding state from changing during the MR.
         unique_ptr<RangePreserver> rangePreserver;
@@ -1413,7 +1459,10 @@ public:
             int progressTotal = 0;
             bool showTotal = true;
             if (state.config().filter.isEmpty()) {
-                progressTotal = state.incomingDocuments();
+                const bool holdingGlobalLock = false;
+                const auto count = _collectionCount(txn, config.ns, holdingGlobalLock);
+                progressTotal =
+                    (config.limit && (unsigned)config.limit < count) ? config.limit : count;
             } else {
                 showTotal = false;
                 // Set an arbitrary total > 0 so the meter will be activated.
@@ -1563,7 +1612,7 @@ public:
                 invariant(coll);  // 'exec' hasn't been killed, so collection must be alive.
                 coll->infoCache()->notifyOfQuery(txn, stats.indexesUsed);
 
-                if (curOp->shouldDBProfile(curOp->elapsedMillis())) {
+                if (curOp->shouldDBProfile()) {
                     BSONObjBuilder execStatsBob;
                     Explain::getWinningPlanStats(exec.get(), &execStatsBob);
                     curOp->debug().execStats = execStatsBob.obj();
@@ -1616,19 +1665,19 @@ public:
                 return false;
             }
         } catch (SendStaleConfigException& e) {
-            log() << "mr detected stale config, should retry" << causedBy(e) << endl;
+            log() << "mr detected stale config, should retry" << redact(e);
             throw e;
         }
         // TODO:  The error handling code for queries is v. fragile,
         // *requires* rethrow AssertionExceptions - should probably fix.
         catch (AssertionException& e) {
-            log() << "mr failed, removing collection" << causedBy(e) << endl;
+            log() << "mr failed, removing collection" << redact(e);
             throw e;
         } catch (std::exception& e) {
-            log() << "mr failed, removing collection" << causedBy(e) << endl;
+            log() << "mr failed, removing collection" << causedBy(e);
             throw e;
         } catch (...) {
-            log() << "mr failed for unknown reason, removing collection" << endl;
+            log() << "mr failed for unknown reason, removing collection";
             throw;
         }
 
@@ -1684,13 +1733,19 @@ public:
         ShardedConnectionInfo::addHook();
 
         // legacy name
-        string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
+        const auto shardedOutputCollectionElt = cmdObj["shardedOutputCollection"];
+        uassert(ErrorCodes::InvalidNamespace,
+                "'shardedOutputCollection' must be of type String",
+                shardedOutputCollectionElt.type() == BSONType::String);
+        const std::string shardedOutputCollection = shardedOutputCollectionElt.str();
         verify(shardedOutputCollection.size() > 0);
-        string inputNS;
+
+        std::string inputNS;
         if (cmdObj["inputDB"].type() == String) {
-            inputNS = cmdObj["inputDB"].String() + "." + shardedOutputCollection;
+            inputNS =
+                NamespaceString(cmdObj["inputDB"].valueStringData(), shardedOutputCollection).ns();
         } else {
-            inputNS = dbname + "." + shardedOutputCollection;
+            inputNS = NamespaceString(dbname, shardedOutputCollection).ns();
         }
 
         CurOp* curOp = CurOp::get(txn);
@@ -1720,11 +1775,9 @@ public:
                 std::string server = e.fieldName();
                 servers.insert(server);
 
-                if (!grid.shardRegistry()->getShard(txn, server)) {
-                    return appendCommandStatus(
-                        result,
-                        Status(ErrorCodes::ShardNotFound,
-                               str::stream() << "Shard not found for server: " << server));
+                auto shardStatus = grid.shardRegistry()->getShard(txn, server);
+                if (!shardStatus.isOK()) {
+                    return appendCommandStatus(result, shardStatus.getStatus());
                 }
             }
         }

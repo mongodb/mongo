@@ -51,11 +51,10 @@ void logCommonStartupWarnings(const ServerGlobalParams& serverParams) {
 
     bool warned = false;
     {
-        const char* foo = strchr(versionString, '.') + 1;
-        int bar = atoi(foo);
-        if ((2 * (bar / 2)) != bar) {
+        auto&& vii = VersionInfoInterface::instance();
+        if ((vii.minorVersion() % 2) != 0) {
             log() << startupWarningsLog;
-            log() << "** NOTE: This is a development version (" << versionString << ") of MongoDB."
+            log() << "** NOTE: This is a development version (" << vii.version() << ") of MongoDB."
                   << startupWarningsLog;
             log() << "**       Not recommended for production." << startupWarningsLog;
             warned = true;

@@ -38,6 +38,7 @@
 #include <utility>
 #include <vector>
 
+#include "mongo/base/static_assert.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
@@ -64,13 +65,10 @@ void data_file_check(void* _mb) {
 }  // namespace
 
 
-static_assert(DataFileHeader::HeaderSize == 8192, "DataFileHeader::HeaderSize == 8192");
-static_assert(sizeof(static_cast<DataFileHeader*>(NULL)->data) == 4,
-              "sizeof(static_cast<DataFileHeader*>(NULL)->data) == 4");
-static_assert(sizeof(DataFileHeader) - sizeof(static_cast<DataFileHeader*>(NULL)->data) ==
-                  DataFileHeader::HeaderSize,
-              "sizeof(DataFileHeader) - sizeof(static_cast<DataFileHeader*>(NULL)->data) == "
-              "DataFileHeader::HeaderSize");
+MONGO_STATIC_ASSERT(DataFileHeader::HeaderSize == 8192);
+MONGO_STATIC_ASSERT(sizeof(static_cast<DataFileHeader*>(NULL)->data) == 4);
+MONGO_STATIC_ASSERT(sizeof(DataFileHeader) - sizeof(static_cast<DataFileHeader*>(NULL)->data) ==
+                    DataFileHeader::HeaderSize);
 
 
 int DataFile::maxSize() {

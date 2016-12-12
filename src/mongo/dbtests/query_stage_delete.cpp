@@ -247,7 +247,7 @@ public:
         ASSERT_TRUE(resultMember->obj.value().isOwned());
 
         // Should be the old value.
-        ASSERT_EQUALS(resultMember->obj.value(), oldDoc);
+        ASSERT_BSONOBJ_EQ(resultMember->obj.value(), oldDoc);
 
         // Should have done the delete.
         ASSERT_EQUALS(stats->docsDeleted, 1U);

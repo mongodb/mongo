@@ -99,7 +99,8 @@ public:
                                            StringData who,
                                            StringData processId,
                                            Date_t time,
-                                           StringData why) override;
+                                           StringData why,
+                                           const WriteConcernOptions& writeConcern) override;
 
     virtual StatusWith<LocksType> overtakeLock(OperationContext* txn,
                                                StringData lockID,
@@ -111,6 +112,10 @@ public:
                                                StringData why) override;
 
     virtual Status unlock(OperationContext* txn, const OID& lockSessionID) override;
+
+    virtual Status unlock(OperationContext* txn,
+                          const OID& lockSessionID,
+                          StringData name) override;
 
     virtual Status unlockAll(OperationContext* txn, const std::string& processID) override;
 

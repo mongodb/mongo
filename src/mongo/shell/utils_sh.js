@@ -69,7 +69,7 @@ sh.help = function() {
     print("\tsh.removeShardFromZone(shard,zone)      removes the shard from zone");
     print(
         "\tsh.removeRangeFromZone(fullName,min,max)   removes the range of the given collection from any zone");
-    print("\tsh.shardCollection(fullName,key,unique)   shards the collection");
+    print("\tsh.shardCollection(fullName,key,unique,options)   shards the collection");
     print(
         "\tsh.splitAt(fullName,middle)               splits the chunk that middle is in at middle");
     print(
@@ -98,7 +98,7 @@ sh.enableSharding = function(dbname) {
     return sh._adminCommand({enableSharding: dbname});
 };
 
-sh.shardCollection = function(fullName, key, unique) {
+sh.shardCollection = function(fullName, key, unique, options) {
     sh._checkFullName(fullName);
     assert(key, "need a key");
     assert(typeof(key) == "object", "key needs to be an object");
@@ -106,6 +106,12 @@ sh.shardCollection = function(fullName, key, unique) {
     var cmd = {shardCollection: fullName, key: key};
     if (unique)
         cmd.unique = true;
+    if (options) {
+        if (typeof(options) !== "object") {
+            throw new Error("options must be an object");
+        }
+        Object.extend(cmd, options);
+    }
 
     return sh._adminCommand(cmd);
 };
@@ -145,6 +151,12 @@ sh.getBalancerState = function(configDB) {
 sh.isBalancerRunning = function(configDB) {
     if (configDB === undefined)
         configDB = sh._getConfigDB();
+
+    var result = configDB.adminCommand({balancerStatus: 1});
+    if (result.code != ErrorCodes.CommandNotFound) {
+        return assert.commandWorked(result).inBalancerRound;
+    }
+
     var x = configDB.locks.findOne({_id: "balancer"});
     if (x == null) {
         print("config.locks collection empty or missing. be sure you are connected to a mongos");
@@ -161,8 +173,13 @@ sh.getBalancerHost = function(configDB) {
         print(
             "config.locks collection does not contain balancer lock. be sure you are connected to a mongos");
         return "";
+    } else if (x.process.match(/ConfigServer/)) {
+        print("getBalancerHost is deprecated starting version 3.4. The balancer is running on " +
+              "the config server primary host.");
+        return "";
+    } else {
+        return x.process.match(/[^:]+:[^:]+/)[0];
     }
-    return x.process.match(/[^:]+:[^:]+/)[0];
 };
 
 sh.stopBalancer = function(timeoutMs, interval) {
@@ -216,8 +233,6 @@ sh.getShouldAutoSplit = function(configDB) {
         configDB = sh._getConfigDB();
     var autosplit = configDB.settings.findOne({_id: 'autosplit'});
     if (autosplit == null) {
-        print(
-            "No autosplit document found in config.settings collection. Be sure you are connected to a mongos");
         return true;
     }
     return autosplit.enabled;

@@ -15,6 +15,7 @@ Coverity
 Coverity's
 DB's
 DBTs
+DONTNEED
 Datastore
 DbCursor
 DbEnv
@@ -94,6 +95,7 @@ WiredTigerStat
 WiredTigerTestCase
 Yann
 Za
+Zstd
 aR
 abstime
 ack'ed
@@ -216,6 +218,8 @@ failchk
 fallocate
 fd's
 fdatasync
+fextend
+fh
 fieldname
 fileID
 fileformats
@@ -230,6 +234,7 @@ forw
 fput
 freelist
 fsync
+ftruncate
 gcc
 gdbm
 ge
@@ -341,6 +346,7 @@ nolock
 nolocking
 nommap
 nop
+noraw
 nosql
 nosync
 notgranted
@@ -502,3 +508,5 @@ wtstats
 xa
 yieldcpu
 zlib
+zseries
+zstd

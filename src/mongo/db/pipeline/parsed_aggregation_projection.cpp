@@ -32,7 +32,6 @@
 
 #include <boost/optional.hpp>
 #include <string>
-#include <unordered_set>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
@@ -40,6 +39,7 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/parsed_exclusion_projection.h"
 #include "mongo/db/pipeline/parsed_inclusion_projection.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 

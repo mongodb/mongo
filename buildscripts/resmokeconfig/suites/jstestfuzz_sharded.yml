@@ -10,6 +10,11 @@ executor:
         readMode: commands
     hooks:
     - class: ValidateCollections
+      shell_options:
+        global_vars:
+          TestData:
+            skipValidationOnInvalidViewDefinitions: true
+            forceValidationWithFeatureCompatibilityVersion: "3.4"
     fixture:
       class: ShardedClusterFixture
       mongos_options:
@@ -19,5 +24,6 @@ executor:
       mongod_options:
         set_parameters:
           enableTestCommands: 1
+          numInitialSyncAttempts: 1
         verbose: ''
       num_shards: 2

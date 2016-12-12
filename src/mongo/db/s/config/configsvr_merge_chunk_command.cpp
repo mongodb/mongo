@@ -36,6 +36,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/request_types/merge_chunk_request_type.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -50,7 +52,7 @@ using std::string;
  *
  * Format:
  * {
- *   _configsvrMergeChunk: <string namespace>,
+ *   _configsvrCommitChunkMerge: <string namespace>,
  *   collEpoch: <OID epoch>,
  *   chunkBoundaries: [
  *      <BSONObj key1>,
@@ -63,11 +65,11 @@ using std::string;
  */
 class ConfigSvrMergeChunkCommand : public Command {
 public:
-    ConfigSvrMergeChunkCommand() : Command("_configsvrMergeChunk") {}
+    ConfigSvrMergeChunkCommand() : Command("_configsvrCommitChunkMerge") {}
 
     void help(std::stringstream& help) const override {
         help << "Internal command, which is sent by a shard to the sharding config server. Do "
-                "not call directly. Receives, validates, and processes a MergeChunkRequest"
+                "not call directly. Receives, validates, and processes a MergeChunkRequest";
     }
 
     bool slaveOk() const override {
@@ -82,7 +84,7 @@ public:
         return true;
     }
 
-    Status checkAuthForCommand(ClientBasic* client,
+    Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) override {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
@@ -92,7 +94,7 @@ public:
         return Status::OK();
     }
 
-    std::string parseNs(const std::string& dbname, const BVSONObj& cmdObj) const override {
+    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
@@ -104,7 +106,7 @@ public:
              BSONObjBuilder& result) override {
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
             uasserted(ErrorCodes::IllegalOperation,
-                      "_configsvrMergeChunk can only be run on config servers");
+                      "_configsvrCommitChunkMerge can only be run on config servers");
         }
 
         auto parsedRequest = uassertStatusOK(MergeChunkRequest::parseFromConfigCommand(cmdObj));
@@ -116,7 +118,9 @@ public:
                                                                parsedRequest.getChunkBoundaries(),
                                                                parsedRequest.getShardName());
 
-        uassertStatusOK(mergeChunkResult);
+        if (!mergeChunkResult.isOK()) {
+            return appendCommandStatus(result, mergeChunkResult);
+        }
 
         return true;
     }
