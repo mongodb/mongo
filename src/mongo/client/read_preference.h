@@ -122,14 +122,14 @@ struct ReadPreferenceSetting {
      *     object's copy of tag will have the iterator in the initial
      *     position).
      */
-    ReadPreferenceSetting(ReadPreference pref, TagSet tags, Milliseconds maxStalenessMS);
-    ReadPreferenceSetting(ReadPreference pref, Milliseconds maxStalenessMS);
+    ReadPreferenceSetting(ReadPreference pref, TagSet tags, Seconds maxStalenessSeconds);
+    ReadPreferenceSetting(ReadPreference pref, Seconds maxStalenessSeconds);
     ReadPreferenceSetting(ReadPreference pref, TagSet tags);
     explicit ReadPreferenceSetting(ReadPreference pref);
 
     inline bool equals(const ReadPreferenceSetting& other) const {
         return (pref == other.pref) && (tags == other.tags) &&
-            (maxStalenessMS == other.maxStalenessMS) && (minOpTime == other.minOpTime);
+            (maxStalenessSeconds == other.maxStalenessSeconds) && (minOpTime == other.minOpTime);
     }
 
     /**
@@ -144,24 +144,23 @@ struct ReadPreferenceSetting {
 
     /**
      * Parses a ReadPreferenceSetting from a BSON document of the form:
-     * { mode: <mode>, tags: <array of tags>, maxStalenessMS: Number }. The 'mode' element must a
-     * string equal to either
-     * "primary", "primaryPreferred", "secondary", "secondaryPreferred", or "nearest". Although
-     * the tags array is intended to be an array of unique BSON documents, no further validation
-     * is performed on it other than checking that it is an array, and that it is empty if
-     * 'mode' is 'primary'.
+     * { mode: <mode>, tags: <array of tags>, maxStalenessSeconds: Number }. The 'mode' element must
+     * be a string equal to either "primary", "primaryPreferred", "secondary", "secondaryPreferred",
+     * or "nearest". Although the tags array is intended to be an array of unique BSON documents, no
+     * further validation is performed on it other than checking that it is an array, and that it is
+     * empty if 'mode' is 'primary'.
      */
     static StatusWith<ReadPreferenceSetting> fromBSON(const BSONObj& readPrefSettingObj);
 
     ReadPreference pref;
     TagSet tags;
-    Milliseconds maxStalenessMS{};
+    Seconds maxStalenessSeconds{};
     repl::OpTime minOpTime{};
 
     /**
-     * The minimal value maxStalenessMS can have. It MUST be ReplicaSetMonitor::kRefreshPeriod * 2
+     * The minimal value maxStalenessSeconds can have.
      */
-    static const Milliseconds kMinimalMaxStalenessValue;
+    static const Seconds kMinimalMaxStalenessValue;
 };
 
 }  // namespace mongo
