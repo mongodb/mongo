@@ -38,6 +38,11 @@ function wait(f) {
 }
 
 doTest = function(signal) {
+    if (!(typeof TestData.setParameters === 'string') ||
+        !TestData.setParameters.includes("use3dot2InitialSync=true")) {
+        print("Test should only run with 3.2 style initial sync.");
+        return;
+    }
     var replTest = new ReplSetTest({name: 'testSet', nodes: 0});
 
     var first = replTest.add();
@@ -56,8 +61,11 @@ doTest = function(signal) {
 
     var a = replTest.getPrimary().getDB("two");
     for (var i = 0; i < 20000; i++)
-        a.coll.insert(
-            {i: i, s: "a                                                                       b"});
+        assert.writeOK(a.coll.insert({
+            i: i,
+            s: "a                                                                       b"
+        }));
+    assert.eq(20000, a.coll.find().itcount());
 
     // Start a second node
     var second = replTest.add();
