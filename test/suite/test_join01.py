@@ -110,8 +110,9 @@ class test_join01(wttest.WiredTigerTestCase):
         while jc.next() == 0:
             [k] = jc.get_keys()
             i = k - 1
-            if do_proj:  # our projection test simply reverses the values
-                [v2,v1,v0] = jc.get_values()
+            if do_proj:  # our projection reverses the values and adds the key
+                [v2,v1,v0,kproj] = jc.get_values()
+                self.assertEquals(k, kproj)
             else:
                 [v0,v1,v2] = jc.get_values()
             self.assertEquals(self.gen_values(i), [v0,v1,v2])
@@ -136,7 +137,7 @@ class test_join01(wttest.WiredTigerTestCase):
         if self.ref == 'index':
             expectstats.append('join: index:join01:index0: ' + statdesc)
         elif self.do_proj:
-            expectstats.append('join: table:join01(v2,v1,v0): ' + statdesc)
+            expectstats.append('join: table:join01(v2,v1,v0,k): ' + statdesc)
         else:
             expectstats.append('join: table:join01: ' + statdesc)
         self.check_stats(statcur, expectstats)
@@ -228,7 +229,7 @@ class test_join01(wttest.WiredTigerTestCase):
         c.close()
 
         if do_proj:
-            proj_suffix = '(v2,v1,v0)'  # Reversed values
+            proj_suffix = '(v2,v1,v0,k)'  # Reversed values plus key
         else:
             proj_suffix = ''            # Default projection (v0,v1,v2)
 
