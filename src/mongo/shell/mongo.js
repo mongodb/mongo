@@ -221,12 +221,13 @@ connect = function(url, user, pass) {
     }
 
     if (!url.startsWith("mongodb://")) {
-        var colon = url.lastIndexOf(":");
-        var slash = url.lastIndexOf("/");
+        const colon = url.lastIndexOf(":");
+        const slash = url.lastIndexOf("/");
+        if (slash == 0) {
+            throw Error("Failed to parse mongodb:// URL: " + url);
+        }
         if (slash == -1 && colon == -1) {
             url = "mongodb://127.0.0.1:27017/" + url;
-        } else {
-            url = "mongodb://" + url;
         }
     }
 
