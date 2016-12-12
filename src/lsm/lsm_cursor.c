@@ -267,7 +267,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, bool reset, bool update)
 		    (!update && F_ISSET(clsm, WT_CLSM_OPEN_READ))))
 			break;
 
-open:		WT_WITH_SCHEMA_LOCK(session, ret,
+open:		WT_WITH_SCHEMA_LOCK(session,
 		    ret = __clsm_open_cursors(clsm, update, 0, 0));
 		WT_RET(ret);
 	}
@@ -763,7 +763,7 @@ __wt_clsm_init_merge(
 		F_SET(clsm, WT_CLSM_MINOR_MERGE);
 	clsm->nchunks = nchunks;
 
-	WT_WITH_SCHEMA_LOCK(session, ret,
+	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __clsm_open_cursors(clsm, false, start_chunk, start_id));
 	return (ret);
 }

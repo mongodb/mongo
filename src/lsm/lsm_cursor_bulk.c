@@ -113,7 +113,7 @@ __wt_clsm_open_bulk(WT_CURSOR_LSM *clsm, const char *cfg[])
 	 * switch inline, since switch needs a schema lock and online index
 	 * creation opens a bulk cursor while holding the schema lock.
 	 */
-	WT_WITH_SCHEMA_LOCK(session, ret,
+	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_lsm_tree_switch(session, lsm_tree));
 	WT_RET(ret);
 

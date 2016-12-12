@@ -597,6 +597,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 %typemap(javabody) struct __wt_async_op %{
  private long swigCPtr;
  protected boolean swigCMemOwn;
+ protected boolean javaRaw;
  protected String keyFormat;
  protected String valueFormat;
  protected PackOutputStream keyPacker;
@@ -609,8 +610,9 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
    swigCPtr = cPtr;
    keyFormat = getKey_format();
    valueFormat = getValue_format();
-   keyPacker = new PackOutputStream(keyFormat);
-   valuePacker = new PackOutputStream(valueFormat);
+   javaRaw = _java_raw();
+   keyPacker = new PackOutputStream(keyFormat, javaRaw);
+   valuePacker = new PackOutputStream(valueFormat, javaRaw);
    wiredtigerJNI.AsyncOp__java_init(swigCPtr, this, this);
  }
 
@@ -1098,7 +1100,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		if (keyUnpacker == null)
 			keyUnpacker =
 			    new PackInputStream(keyFormat, get_key_wrap(),
-			    _java_raw());
+			    javaRaw);
 		return keyUnpacker;
 	}
 
@@ -1112,7 +1114,7 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 		if (valueUnpacker == null)
 			valueUnpacker =
 			    new PackInputStream(valueFormat, get_value_wrap(),
-			    _java_raw());
+			    javaRaw);
 		return valueUnpacker;
 	}
 
@@ -1232,8 +1234,8 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
    swigCPtr = cPtr;
    keyFormat = getKey_format();
    valueFormat = getValue_format();
-   keyPacker = new PackOutputStream(keyFormat);
-   valuePacker = new PackOutputStream(valueFormat);
+   keyPacker = new PackOutputStream(keyFormat, _java_raw());
+   valuePacker = new PackOutputStream(valueFormat, _java_raw());
    wiredtigerJNI.Cursor__java_init(swigCPtr, this, this);
  }
 

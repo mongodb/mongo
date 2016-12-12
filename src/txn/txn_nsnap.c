@@ -152,26 +152,45 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	const char *txn_cfg[] =
 	    { WT_CONFIG_BASE(session, WT_SESSION_begin_transaction),
 	      "isolation=snapshot", NULL };
-	bool started_txn;
+	bool include_updates, started_txn;
 
 	started_txn = false;
 	nsnap_new = NULL;
 	txn_global = &S2C(session)->txn_global;
 	txn = &session->txn;
 
+	WT_RET(__wt_config_gets_def(session, cfg, "include_updates", 0, &cval));
+	include_updates = cval.val != 0;
+
 	WT_RET(__wt_config_gets_def(session, cfg, "name", 0, &cval));
 	WT_ASSERT(session, cval.len != 0);
 
 	if (!F_ISSET(txn, WT_TXN_RUNNING)) {
+		if (include_updates)
+			WT_RET_MSG(session, EINVAL, "A transaction must be "
+			    "running to include updates in a named snapshot");
+
 		WT_RET(__wt_txn_begin(session, txn_cfg));
 		started_txn = true;
 	}
-	F_SET(txn, WT_TXN_READONLY);
+	if (!include_updates)
+		F_SET(txn, WT_TXN_READONLY);
 
 	/* Save a copy of the transaction's snapshot. */
 	WT_ERR(__wt_calloc_one(session, &nsnap_new));
 	nsnap = nsnap_new;
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &nsnap->name));
+
+	/*
+	 * To include updates from a writing transaction, make sure a
+	 * transaction ID has been allocated.
+	 */
+	if (include_updates) {
+		WT_ERR(__wt_txn_id_check(session));
+		WT_ASSERT(session, txn->id != WT_TXN_NONE);
+		nsnap->id = txn->id;
+	} else
+		nsnap->id = WT_TXN_NONE;
 	nsnap->pinned_id = WT_SESSION_TXN_STATE(session)->pinned_id;
 	nsnap->snap_min = txn->snap_min;
 	nsnap->snap_max = txn->snap_max;
@@ -209,8 +228,7 @@ err:	if (started_txn) {
 		WT_TRET(__wt_txn_rollback(session, NULL));
 		WT_DIAGNOSTIC_YIELD;
 		WT_ASSERT(session, !__wt_txn_visible_all(session, pinned_id));
-	} else if (ret == 0)
-		F_SET(txn, WT_TXN_NAMED_SNAPSHOT);
+	}
 
 	if (nsnap_new != NULL)
 		__nsnap_destroy(session, nsnap_new);
@@ -303,6 +321,11 @@ __wt_txn_named_snapshot_get(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *nameval)
 				memcpy(txn->snapshot, nsnap->snapshot,
 				    nsnap->snapshot_count *
 				    sizeof(*nsnap->snapshot));
+			if (nsnap->id != WT_TXN_NONE) {
+				WT_ASSERT(session, txn->id == WT_TXN_NONE);
+				txn->id = nsnap->id;
+				F_SET(txn, WT_TXN_READONLY);
+			}
 			F_SET(txn, WT_TXN_HAS_SNAPSHOT);
 			break;
 		}

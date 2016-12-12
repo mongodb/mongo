@@ -1,7 +1,16 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
-@section version_281 Upgrading to Version 2.8.1
+@section version_290 Upgrading to Version 2.9.0
 <dl>
+<dt>Changes to cursor behavior after WT_CURSOR::insert</dt>
+<dd>
+After a successful call to WT_CURSOR::insert, unless a cursor has record
+number keys and was configured with "append=true", the cursor's key is
+cleared and a subsequent call to the WT_CURSOR::get_key method will fail.
+In all cursors, the value is cleared and a subsequent call to
+WT_CURSOR::get_value will fail.
+</dd>
+
 <dt>Cache management defaults</dt>
 <dd>
 The default values for the \c eviction_dirty_target and \c
@@ -15,6 +24,15 @@ files concurrently.
 There is also a new \c eviction_checkpoint_target setting that determines
 how much work is done at the beginning of a checkpoint to make the critical
 section of checkpoints complete more quickly.
+</dd>
+
+<dt>Change to default fadvise setting for data files</dt>
+<dd>
+The default behavior for data files was to advise the file system to optimize
+for random access on POSIX and Windows platforms. The default is now to not
+advise about access patterns. There is a new \c access_pattern_hint
+configuration string available to WT_SESSION::create that can be used
+to configure the old default behavior.
 </dd>
 
 <dt>Checkpoint server created checkpoint names</dt>
@@ -34,13 +52,13 @@ of the path may no longer be specified. Applications depending on the
 ability to set statistics log file names will require modification.
 </dd>
 
-<dt>Deprecated statistics field</dt>
+<dt>Removed and renamed statistics fields</dt>
 <dd>
-The connection statistic \c WT_STAT_CONN_CACHE_BYTES_OVERFLOW has been
-removed.  Overflow information is now available in the
-\c WT_STAT_CONN_CACHE_BYTES_OVERFLOW and \c WT_STAT_CONN_CACHE_OVERFLOW_VALUE.
-Applications specifically looking for that statistic will require
-modification.
+WT_STAT_JOIN_ACTUAL_COUNT is renamed to WT_STAT_JOIN_ITERATED
+
+WT_STAT_CONN_CACHE_BYTES_OVERFLOW removed since overflow pages are not cached
+
+WT_STAT_CONN_CACHE_EVICTION_SERVER_NOT_EVICTING removed since all eviction threads can now be the server
 </dd>
 
 </dl><hr>

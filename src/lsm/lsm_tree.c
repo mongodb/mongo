@@ -251,7 +251,7 @@ __lsm_tree_cleanup_old(WT_SESSION_IMPL *session, const char *uri)
 
 	WT_RET(__wt_fs_exist(session, uri + strlen("file:"), &exists));
 	if (exists)
-		WT_WITH_SCHEMA_LOCK(session, ret,
+		WT_WITH_SCHEMA_LOCK(session,
 		    ret = __wt_schema_drop(session, uri, cfg));
 	return (ret);
 }
@@ -1102,7 +1102,6 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, bool *skipp)
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
-	time_t begin, end;
 	uint64_t progress;
 	uint32_t i;
 	bool compacting, flushing, locked, ref;
@@ -1138,8 +1137,6 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, bool *skipp)
 		__wt_lsm_tree_release(session, lsm_tree);
 		return (0);
 	}
-
-	__wt_seconds(session, &begin);
 
 	/*
 	 * Compacting has two distinct phases.
@@ -1266,12 +1263,9 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, bool *skipp)
 			} else
 				break;
 		}
+		WT_ERR(__wt_session_compact_check_timeout(session));
 		__wt_sleep(1, 0);
-		__wt_seconds(session, &end);
-		if (session->compact->max_time > 0 &&
-		    session->compact->max_time < (uint64_t)(end - begin)) {
-			WT_ERR(ETIMEDOUT);
-		}
+
 		/*
 		 * Push merge operations while they are still getting work
 		 * done. If we are pushing merges, make sure they are
