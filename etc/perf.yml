@@ -14,6 +14,16 @@ post:
     - command: attach.results
       params:
         file_location: src/report.json
+    - command: s3.put
+      params:
+            aws_key: ${aws_key}
+            aws_secret: ${aws_secret}
+            local_file: src/mongod.log
+            remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/mongod-${build_id}.log
+            bucket: mciuploads
+            permissions: public-read
+            content_type: ${content_type|text/plain}
+            display_name: mongod.log
     - command: shell.exec
       params:
         silent: true
@@ -21,6 +31,13 @@ post:
           ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongooplog-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongooplog-2.4; pkill -9 mongotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 lldb; pkill -9 _test} >/dev/null 2>&1
           exit 0
     - command: shell.cleanup
+
+modules:
+- name: enterprise
+  repo: git@github.com:10gen/mongo-enterprise-modules.git
+  prefix: src/mongo/db/modules
+  branch: v3.0
+
 
 functions:
   "start server":
@@ -72,7 +89,15 @@ functions:
           sleep 5
           # if we started a replset, initiate it and wait for it to become primary
           ./mongo --eval "if(db.isMaster().isreplicaset){rs.initiate(); assert.soon(function(){return db.isMaster().ismaster}, 'no primary')}"
-          echo "MONGOD STARTED."
+
+          # benchRun() authenticates against the admin db, with a user that must has admin access.
+          # Note: This is possibly a legacy requirement from times when it would call serverStatus.
+          # Btw, when mongod is started without --auth, these should be harmless no-ops
+          ./mongo --eval "db.createUser({user: 'admin', pwd: 'password', roles:\
+                         [ { role: 'userAdminAnyDatabase', db: 'admin' },\
+                           {role: 'readWriteAnyDatabase', db: 'admin' } ] })"\
+                           admin
+            echo "MONGOD STARTED."
   "analyze":
     - command: s3.get
       params:
@@ -130,7 +155,7 @@ functions:
           cd perf-3.0
           #  give mongod a few seconds to start up so that we can connect.
           sleep 5
-          ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t ${threads} --trialCount 5 -f testcases/*.js --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed
+          ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t ${threads} --trialCount 5 -f testcases/*.js --readCmd ${readCmd} --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed --username admin --password password
     - command: "json.send"
       params:
         name: "perf"
@@ -168,7 +193,7 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/mongo
+        local_file: src/build/linux2/release/mongo/mongo
         remote_file: perf-3.0/${version_id}/${revision}/mongo-${version_id}
         bucket: mciuploads
         permissions: public-read
@@ -189,7 +214,7 @@ tasks:
   depends_on:
   - variant: linux-wt-standalone
     name: compile
-  commands:
+    commands:
     - func: "start server"
     - func: "run perf tests"
       vars:
@@ -281,11 +306,13 @@ buildvariants:
 - name: linux-wt-standalone
   display_name: Standalone Linux WT
   batchtime: 90 # 1.5 hours
+  modules:
+    - enterprise
   expansions:
-    compile_flags: &compile_flags -j$(grep -c ^processor /proc/cpuinfo) --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --release --variant-dir="linux2/release"
+    compile_flags: &compile_flags -j$(grep -c ^processor /proc/cpuinfo) --cc=/opt/mongodbtoolchain/bin/gcc --cxx=/opt/mongodbtoolchain/bin/g++ --release --variant-dir="linux2/release" --ssl
     mongod_exec_wrapper: &exec_wrapper "numactl --physcpubind=4,5,6,7 -i 1"
     perf_exec_wrapper: &perf_wrapper "numactl --physcpubind=1,2,3 -i 0"
-    mongod_flags: "--storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --wiredTigerCacheSizeGB 16"
+    mongod_flags: "--storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --wiredTigerCacheSizeGB 16 --auth"
 
   run_on:
   - "centos6-perf"
@@ -308,7 +335,7 @@ buildvariants:
     compile_flags: *compile_flags
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false"
+    mongod_flags: "--storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --auth"
 
   run_on:
   - "centos6-perf"
@@ -328,7 +355,7 @@ buildvariants:
     compile_flags: *compile_flags 
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--replSet=test --storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --wiredTigerCacheSizeGB 16 --oplogSize 100000"
+    mongod_flags: "--replSet=test --storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --wiredTigerCacheSizeGB 16 --oplogSize 100000 --auth"
 
   run_on:
   - "centos6-perf"
@@ -345,7 +372,7 @@ buildvariants:
     compile_flags: *compile_flags 
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --oplogSize 100000"
+    mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --oplogSize 100000 --auth"
 
   run_on:
   - "centos6-perf"
