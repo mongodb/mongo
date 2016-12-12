@@ -325,7 +325,11 @@ namespace mongo {
           @returns addition expression
          */
         static intrusive_ptr<ExpressionNary> create();
-    };
+
+    private:
+        boost::optional<Value> addToRunningTotal(const Value& val, BSONType& totalType,
+                double& doubleTotal, long long & longTotal, bool& haveDate) const;
+};
 
 
     class ExpressionAnd :

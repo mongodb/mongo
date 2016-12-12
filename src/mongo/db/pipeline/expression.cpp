@@ -345,28 +345,10 @@ namespace mongo {
         for (size_t i = 0; i < n; ++i) {
             Value val = vpOperand[i]->evaluate(pDocument);
 
-            if (val.numeric()) {
-                totalType = Value::getWidestNumeric(totalType, val.getType());
-
-                doubleTotal += val.coerceToDouble();
-                longTotal += val.coerceToLong();
-            }
-            else if (val.getType() == Date) {
-                uassert(16612, "only one Date allowed in an $add expression",
-                        !haveDate);
-                haveDate = true;
-
-                // We don't manipulate totalType here.
-
-                longTotal += val.getDate();
-                doubleTotal += val.getDate();
-            }
-            else if (val.nullish()) {
-                return Value(BSONNULL);
-            }
-            else {
-                uasserted(16554, str::stream() << "$add only supports numeric or date types, not "
-                                               << typeName(val.getType()));
+            boost::optional<Value> earlyReturnValue = addToRunningTotal(
+                    val, totalType, doubleTotal, longTotal, haveDate);
+            if (earlyReturnValue) {
+                return *earlyReturnValue;
             }
         }
 
@@ -387,6 +369,45 @@ namespace mongo {
         else {
             massert(16417, "$add resulted in a non-numeric type", false);
         }
+    }
+
+    boost::optional<Value> ExpressionAdd::addToRunningTotal(const Value& val, BSONType& totalType,
+            double& doubleTotal, long long & longTotal, bool& haveDate) const {
+        if (val.numeric()) {
+            totalType = Value::getWidestNumeric(totalType, val.getType());
+
+            doubleTotal += val.coerceToDouble();
+            longTotal += val.coerceToLong();
+        }
+        else if (val.getType() == Date) {
+            uassert(16612, "only one Date allowed in an $add expression",
+                    !haveDate);
+            haveDate = true;
+
+            // We don't manipulate totalType here.
+
+            longTotal += val.getDate();
+            doubleTotal += val.getDate();
+        }
+        else if (val.getType() == Array) {
+            // Sum numeric array values if supplied
+            for (size_t i = 0; i < val.getArrayLength(); i++) {
+                boost::optional<Value> earlyReturnValue = addToRunningTotal(val.getArray()[i],
+                        totalType, doubleTotal, longTotal, haveDate);
+                if (earlyReturnValue) {
+                    return earlyReturnValue;
+                }
+            }
+        }
+        else if (val.nullish()) {
+            return boost::optional<Value>(Value(BSONNULL));
+        }
+        else {
+            uasserted(16554, str::stream() << "$add only supports numeric or date types, not "
+                                           << typeName(val.getType()));
+        }
+
+        return boost::optional<Value>();
     }
 
     const char *ExpressionAdd::getOpName() const {
