@@ -5519,7 +5519,6 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 static int
 __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
 	WT_MULTI *multi;
 	uint32_t i;
@@ -5579,7 +5578,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 		break;
 	}
 
-	return (ret);
+	return (0);
 }
 
 /*

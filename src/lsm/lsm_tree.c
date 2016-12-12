@@ -293,8 +293,6 @@ int
 __wt_lsm_tree_setup_bloom(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
 {
-	WT_DECL_RET;
-
 	/*
 	 * The Bloom URI can be populated when the chunk is created, but
 	 * it isn't set yet on open or merge.
@@ -302,8 +300,8 @@ __wt_lsm_tree_setup_bloom(
 	if (chunk->bloom_uri == NULL)
 		WT_RET(__wt_lsm_tree_bloom_name(
 		    session, lsm_tree, chunk->id, &chunk->bloom_uri));
-	WT_RET(__lsm_tree_cleanup_old(session, chunk->bloom_uri));
-	return (ret);
+
+	return (__lsm_tree_cleanup_old(session, chunk->bloom_uri));
 }
 
 /*

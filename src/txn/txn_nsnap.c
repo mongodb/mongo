@@ -28,7 +28,6 @@ __nsnap_destroy(WT_SESSION_IMPL *session, WT_NAMED_SNAPSHOT *nsnap)
 static int
 __nsnap_drop_one(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name)
 {
-	WT_DECL_RET;
 	WT_NAMED_SNAPSHOT *found;
 	WT_TXN_GLOBAL *txn_global;
 
@@ -56,7 +55,7 @@ __nsnap_drop_one(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name)
 	__nsnap_destroy(session, found);
 	WT_STAT_CONN_INCR(session, txn_snapshots_dropped);
 
-	return (ret);
+	return (0);
 }
 
 /*
@@ -67,7 +66,6 @@ __nsnap_drop_one(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name)
 static int
 __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, bool inclusive)
 {
-	WT_DECL_RET;
 	WT_NAMED_SNAPSHOT *last, *nsnap, *prev;
 	WT_TXN_GLOBAL *txn_global;
 	uint64_t new_nsnap_oldest;
@@ -134,7 +132,7 @@ __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, bool inclusive)
 	    new_nsnap_oldest == WT_TXN_NONE ||
 	    !__wt_txn_visible_all(session, new_nsnap_oldest));
 
-	return (ret);
+	return (0);
 }
 
 /*

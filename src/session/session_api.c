@@ -58,7 +58,6 @@ int
 __wt_session_copy_values(WT_SESSION_IMPL *session)
 {
 	WT_CURSOR *cursor;
-	WT_DECL_RET;
 
 	TAILQ_FOREACH(cursor, &session->cursors, q)
 		if (F_ISSET(cursor, WT_CURSTD_VALUE_INT)) {
@@ -80,7 +79,7 @@ __wt_session_copy_values(WT_SESSION_IMPL *session)
 			F_SET(cursor, WT_CURSTD_VALUE_EXT);
 		}
 
-	return (ret);
+	return (0);
 }
 
 /*
