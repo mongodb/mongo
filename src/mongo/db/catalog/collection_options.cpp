@@ -132,25 +132,20 @@ Status CollectionOptions::validate() const {
 Status CollectionOptions::parse(const BSONObj& options) {
     reset();
 
-    // Versions 2.4 and earlier of the server store "create" as the first field inside the
-    // collection metadata when the user issues an explicit collection creation command. These
-    // versions also wrote any unrecognized fields into the catalog metadata. Therefore, if the
-    // "create" field is present and first, we must ignore any unknown fields during parsing.
-    // Otherwise, we disallow unknown collection options.
+    // Versions 2.4 and earlier of the server store "create" inside the collection metadata when the
+    // user issues an explicit collection creation command. These versions also wrote any
+    // unrecognized fields into the catalog metadata and allowed the order of these fields to be
+    // changed. Therefore, if the "create" field is present, we must ignore any
+    // unknown fields during parsing. Otherwise, we disallow unknown collection options.
     //
     // Versions 2.6 through 3.2 ignored unknown collection options rather than failing but did not
     // store the "create" field. These versions also refrained from materializing the unknown
     // options in the catalog, so we are free to fail on unknown options in this case.
-    const bool createdOn24OrEarlier = (options.firstElement().fieldNameStringData() == "create"_sd);
+    const bool createdOn24OrEarlier = static_cast<bool>(options["create"]);
 
     // During parsing, ignore some validation errors in order to accept options objects that
     // were valid in previous versions of the server.  SERVER-13737.
     BSONObjIterator i(options);
-
-    // Skip the initial "create" field, if present.
-    if (createdOn24OrEarlier) {
-        i.next();
-    }
 
     while (i.more()) {
         BSONElement e = i.next();
