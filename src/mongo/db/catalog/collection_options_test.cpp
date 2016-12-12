@@ -276,9 +276,29 @@ TEST(CollectionOptions, CreateOptionIgnoredIfFirst) {
     ASSERT_OK(status);
 }
 
+TEST(CollectionOptions, CreateOptionIgnoredIfNotFirst) {
+    CollectionOptions options;
+    auto status = options.parse(fromjson("{capped: true, create: 1, size: 1024}"));
+    ASSERT_OK(status);
+    ASSERT_EQ(options.capped, true);
+    ASSERT_EQ(options.cappedSize, 1024L);
+}
+
 TEST(CollectionOptions, UnknownOptionIgnoredIfCreateOptionFirst) {
     CollectionOptions options;
     ASSERT_OK(options.parse(fromjson("{create: 1, invalidOption: 1}")));
+}
+
+TEST(CollectionOptions, UnknownOptionIgnoredIfCreateOptionPresent) {
+    CollectionOptions options;
+    ASSERT_OK(options.parse(fromjson("{invalidOption: 1, create: 1}")));
+}
+
+TEST(CollectionOptions, UnknownOptionRejectedIfCreateOptionNotPresent) {
+    CollectionOptions options;
+    auto status = options.parse(fromjson("{invalidOption: 1}"));
+    ASSERT_NOT_OK(status);
+    ASSERT_EQ(status.code(), ErrorCodes::InvalidOptions);
 }
 
 TEST(CollectionOptions, DuplicateCreateOptionIgnoredIfCreateOptionFirst) {
@@ -287,11 +307,11 @@ TEST(CollectionOptions, DuplicateCreateOptionIgnoredIfCreateOptionFirst) {
     ASSERT_OK(status);
 }
 
-TEST(CollectionOptions, CreateOptionRejectedIfNotFirst) {
+TEST(CollectionOptions, DuplicateCreateOptionIgnoredIfCreateOptionNotFirst) {
     CollectionOptions options;
-    auto status = options.parse(fromjson("{validator: {a: 1}, create: 1}"));
-    ASSERT_NOT_OK(status);
-    ASSERT_EQ(status.code(), ErrorCodes::InvalidOptions);
+    auto status =
+        options.parse(BSON("capped" << true << "create" << 1 << "create" << 1 << "size" << 1024));
+    ASSERT_OK(status);
 }
 
 TEST(CollectionOptions, MaxTimeMSWhitelistedOptionIgnored) {
