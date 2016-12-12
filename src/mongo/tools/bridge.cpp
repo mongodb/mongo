@@ -293,12 +293,12 @@ public:
 
 private:
     Status runBridgeCommand(StringData cmdName, BSONObj cmdObj) {
-        auto status = Command::findCommand(cmdName);
+        auto status = BridgeCommand::findCommand(cmdName);
         if (!status.isOK()) {
             return status.getStatus();
         }
 
-        Command* command = status.getValue();
+        BridgeCommand* command = status.getValue();
         return command->run(cmdObj, _settingsMutex, _settings);
     }
 

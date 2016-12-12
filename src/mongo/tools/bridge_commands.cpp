@@ -45,7 +45,7 @@ namespace {
 
 const char kHostFieldName[] = "host";
 
-class CmdDelayMessagesFrom final : public Command {
+class CmdDelayMessagesFrom final : public BridgeCommand {
 public:
     Status run(const BSONObj& cmdObj, stdx::mutex* settingsMutex, HostSettingsMap* settings) final {
         invariant(settingsMutex);
@@ -77,7 +77,7 @@ public:
     }
 };
 
-class CmdAcceptConnectionsFrom final : public Command {
+class CmdAcceptConnectionsFrom final : public BridgeCommand {
 public:
     Status run(const BSONObj& cmdObj, stdx::mutex* settingsMutex, HostSettingsMap* settings) final {
         invariant(settingsMutex);
@@ -99,7 +99,7 @@ public:
     }
 };
 
-class CmdRejectConnectionsFrom final : public Command {
+class CmdRejectConnectionsFrom final : public BridgeCommand {
 public:
     Status run(const BSONObj& cmdObj, stdx::mutex* settingsMutex, HostSettingsMap* settings) final {
         invariant(settingsMutex);
@@ -121,7 +121,7 @@ public:
     }
 };
 
-class CmdDiscardMessagesFrom final : public Command {
+class CmdDiscardMessagesFrom final : public BridgeCommand {
 public:
     Status run(const BSONObj& cmdObj, stdx::mutex* settingsMutex, HostSettingsMap* settings) final {
         invariant(settingsMutex);
@@ -159,25 +159,27 @@ public:
     }
 };
 
-StringMap<Command*> commandMap;
+StringMap<BridgeCommand*> bridgeCommandMap;
 
 MONGO_INITIALIZER(RegisterBridgeCommands)(InitializerContext* context) {
-    commandMap["delayMessagesFrom"] = new CmdDelayMessagesFrom();
-    commandMap["acceptConnectionsFrom"] = new CmdAcceptConnectionsFrom();
-    commandMap["rejectConnectionsFrom"] = new CmdRejectConnectionsFrom();
-    commandMap["discardMessagesFrom"] = new CmdDiscardMessagesFrom();
+    bridgeCommandMap["delayMessagesFrom"] = new CmdDelayMessagesFrom();
+    bridgeCommandMap["acceptConnectionsFrom"] = new CmdAcceptConnectionsFrom();
+    bridgeCommandMap["rejectConnectionsFrom"] = new CmdRejectConnectionsFrom();
+    bridgeCommandMap["discardMessagesFrom"] = new CmdDiscardMessagesFrom();
     return Status::OK();
 }
 
 }  // namespace
 
-StatusWith<Command*> Command::findCommand(StringData cmdName) {
-    auto it = commandMap.find(cmdName);
-    if (it != commandMap.end()) {
+StatusWith<BridgeCommand*> BridgeCommand::findCommand(StringData cmdName) {
+    auto it = bridgeCommandMap.find(cmdName);
+    if (it != bridgeCommandMap.end()) {
         invariant(it->second);
         return it->second;
     }
     return {ErrorCodes::CommandNotFound, str::stream() << "Unknown command: " << cmdName};
 }
+
+BridgeCommand::~BridgeCommand() = default;
 
 }  // namespace mongo

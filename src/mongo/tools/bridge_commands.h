@@ -51,11 +51,11 @@ struct HostSettings {
 
 using HostSettingsMap = stdx::unordered_map<HostAndPort, HostSettings>;
 
-class Command {
+class BridgeCommand {
 public:
-    static StatusWith<Command*> findCommand(StringData cmdName);
+    static StatusWith<BridgeCommand*> findCommand(StringData cmdName);
 
-    virtual ~Command() = default;
+    virtual ~BridgeCommand() = 0;
 
     virtual Status run(const BSONObj& cmdObj,
                        stdx::mutex* settingsMutex,
