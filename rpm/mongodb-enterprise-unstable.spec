@@ -165,7 +165,7 @@ rm -v $RPM_BUILD_ROOT/usr/share/man/man1/mongosniff.1*
 mkdir -p $RPM_BUILD_ROOT/etc
 cp -v rpm/mongod.conf $RPM_BUILD_ROOT/etc/mongod.conf
 mkdir -p $RPM_BUILD_ROOT/lib/systemd/system
-adcp -v rpm/mongod.service $RPM_BUILD_ROOT/lib/systemd/system
+cp -v rpm/mongod.service $RPM_BUILD_ROOT/lib/systemd/system
 mkdir -p $RPM_BUILD_ROOT/var/lib/mongo
 mkdir -p $RPM_BUILD_ROOT/var/log/mongodb
 mkdir -p $RPM_BUILD_ROOT/var/run/mongodb
