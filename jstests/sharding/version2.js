@@ -34,7 +34,7 @@
               1);
 
     // From a different client
-    var a2 = connect(s._connections[0].name + "/admin");
+    var a2 = connect(`mongodb://${s._connections[0].name}/admin`);
 
     assert.eq(
         a2.runCommand({"getShardVersion": "alleyinsider.foo", configdb: s._configDB}).global.t,

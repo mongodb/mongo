@@ -23,6 +23,7 @@ var noPort = /^No digits/;
 var badPort = /^Bad digit/;
 var invalidPort = /^Port number \d+ out of range/;
 var multipleColon = /^More than one ':' detected./;
+var noReplSet = /^connect failed to replica set/;
 var badStrings = [
     {s: undefined, r: missingConnString},
     {s: 7, r: incorrectType},
@@ -33,39 +34,18 @@ var badStrings = [
     {s: "/", r: badHost},
     {s: "/test", r: badHost},
     {s: ":/", r: emptyHost},
-    {s: ":/test", r: emptyHost},
-    {s: ":" + port + "/", r: emptyHost},
-    {s: ":" + port + "/test", r: emptyHost},
-    {s: "localhost:/test", r: noPort},
-    {s: "127.0.0.1:/test", r: noPort},
-    {s: "127.0.0.1:cat/test", r: badPort},
-    {s: "127.0.0.1:1cat/test", r: badPort},
-    {s: "127.0.0.1:123456/test", r: invalidPort},
-    {s: "127.0.0.1:65536/test", r: invalidPort},
-    {s: "::1:65536/test", r: multipleColon},
-    {s: "::1:" + port + "/", r: multipleColon}
+    {s: ":/test", r: noReplSet},
+    {s: "mongodb://:" + port + "/", r: emptyHost},
+    {s: "mongodb://:" + port + "/test", r: emptyHost},
+    {s: "mongodb://localhost:/test", r: noPort},
+    {s: "mongodb://127.0.0.1:/test", r: noPort},
+    {s: "mongodb://127.0.0.1:cat/test", r: badPort},
+    {s: "mongodb://127.0.0.1:1cat/test", r: badPort},
+    {s: "mongodb://127.0.0.1:123456/test", r: invalidPort},
+    {s: "mongodb://127.0.0.1:65536/test", r: invalidPort},
+    {s: "mongodb://::1:65536/test", r: multipleColon},
+    {s: "mongodb://::1:" + port + "/", r: multipleColon}
 ];
-
-function testGood(i, connectionString) {
-    print("\nTesting good connection string " + i + " (\"" + connectionString + "\") ...");
-    var gotException = false;
-    var exception;
-    try {
-        var connectDB = connect(connectionString);
-        connectDB = null;
-    } catch (e) {
-        gotException = true;
-        exception = e;
-    }
-    if (!gotException) {
-        print("Good connection string " + i + " (\"" + connectionString +
-              "\") correctly validated");
-        return;
-    }
-    var message = "FAILED to correctly validate goodString " + i + " (\"" + connectionString +
-        "\"):  exception was \"" + tojson(exception) + "\"";
-    doassert(message);
-}
 
 function testGoodAsURI(i, uri) {
     uri = "mongodb://" + uri;
@@ -123,7 +103,6 @@ function testBad(i, connectionString, errorRegex) {
 var i;
 jsTest.log("TESTING " + goodStrings.length + " good connection strings");
 for (i = 0; i < goodStrings.length; ++i) {
-    testGood(i, goodStrings[i]);
     testGoodAsURI(i, goodStrings[i]);
 }
 
