@@ -374,23 +374,25 @@ Config::Config(const string& _dbname, const BSONObj& cmdObj) {
  * Clean up the temporary and incremental collections
  */
 void State::dropTempCollections() {
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction scopedXact(_txn, MODE_IX);
-        AutoGetDb autoDb(_txn, nsToDatabaseSubstring(_config.tempNamespace), MODE_X);
-        if (auto db = autoDb.getDb()) {
-            WriteUnitOfWork wunit(_txn);
-            NamespaceString tempNss(_config.tempNamespace);
-            uassert(ErrorCodes::PrimarySteppedDown,
-                    "no longer primary",
-                    repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(tempNss));
-            db->dropCollection(_txn, _config.tempNamespace);
-            wunit.commit();
+    if (!_config.tempNamespace.empty()) {
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+            ScopedTransaction scopedXact(_txn, MODE_IX);
+            AutoGetDb autoDb(_txn, nsToDatabaseSubstring(_config.tempNamespace), MODE_X);
+            if (auto db = autoDb.getDb()) {
+                WriteUnitOfWork wunit(_txn);
+                NamespaceString tempNss(_config.tempNamespace);
+                uassert(ErrorCodes::PrimarySteppedDown,
+                        "no longer primary",
+                        repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(tempNss));
+                db->dropCollection(_txn, _config.tempNamespace);
+                wunit.commit();
+            }
         }
+        MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_txn, "M/R dropTempCollections", _config.tempNamespace)
+        // Always forget about temporary namespaces, so we don't cache lots of them
+        ShardConnection::forgetNS(_config.tempNamespace);
     }
-    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_txn, "M/R dropTempCollections", _config.tempNamespace)
-    // Always forget about temporary namespaces, so we don't cache lots of them
-    ShardConnection::forgetNS(_config.tempNamespace);
-    if (_useIncremental) {
+    if (_useIncremental && !_config.incLong.empty()) {
         // We don't want to log the deletion of incLong as it isn't replicated. While
         // harmless, this would lead to a scary looking warning on the secondaries.
         bool shouldReplicateWrites = _txn->writesAreReplicated();
