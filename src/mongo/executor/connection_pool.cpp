@@ -360,7 +360,7 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
                              // If we've exceeded the time limit, start a new connect, rather than
                              // failing all operations.  We do this because the various callers have
                              // their own time limit which is unrelated to our internal one.
-                             if (status.code() == ErrorCodes::ExceededTimeLimit) {
+                             if (status.code() == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
                                  spawnConnections(lk);
                                  return;
                              }
@@ -542,29 +542,29 @@ void ConnectionPool::SpecificPool::spawnConnections(stdx::unique_lock<stdx::mute
 
         // Run the setup callback
         lk.unlock();
-        connPtr->setup(_parent->_options.refreshTimeout,
-                       [this](ConnectionInterface* connPtr, Status status) {
-                           connPtr->indicateUsed();
+        connPtr->setup(
+            _parent->_options.refreshTimeout, [this](ConnectionInterface* connPtr, Status status) {
+                connPtr->indicateUsed();
 
-                           stdx::unique_lock<stdx::mutex> lk(_parent->_mutex);
+                stdx::unique_lock<stdx::mutex> lk(_parent->_mutex);
 
-                           auto conn = takeFromProcessingPool(connPtr);
+                auto conn = takeFromProcessingPool(connPtr);
 
-                           if (conn->getGeneration() != _generation) {
-                               // If the host and port was dropped, let the
-                               // connection lapse
-                           } else if (status.isOK()) {
-                               addToReady(lk, std::move(conn));
-                           } else if (status.code() == ErrorCodes::ExceededTimeLimit) {
-                               // If we've exceeded the time limit, restart the connect, rather than
-                               // failing all operations.  We do this because the various callers
-                               // have their own time limit which is unrelated to our internal one.
-                               spawnConnections(lk);
-                           } else {
-                               // If the setup failed, cascade the failure edge
-                               processFailure(status, std::move(lk));
-                           }
-                       });
+                if (conn->getGeneration() != _generation) {
+                    // If the host and port was dropped, let the
+                    // connection lapse
+                } else if (status.isOK()) {
+                    addToReady(lk, std::move(conn));
+                } else if (status.code() == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
+                    // If we've exceeded the time limit, restart the connect, rather than
+                    // failing all operations.  We do this because the various callers
+                    // have their own time limit which is unrelated to our internal one.
+                    spawnConnections(lk);
+                } else {
+                    // If the setup failed, cascade the failure edge
+                    processFailure(status, std::move(lk));
+                }
+            });
         // Note that this assumes that the refreshTimeout is sound for the
         // setupTimeout
 
@@ -663,7 +663,7 @@ void ConnectionPool::SpecificPool::updateStateInLock() {
                     _requests.pop();
 
                     lk.unlock();
-                    cb(Status(ErrorCodes::ExceededTimeLimit,
+                    cb(Status(ErrorCodes::NetworkInterfaceExceededTimeLimit,
                               "Couldn't get a connection within the time limit"));
                     lk.lock();
                 } else {

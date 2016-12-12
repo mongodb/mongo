@@ -283,7 +283,8 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, ResponseStatus resp) 
         op->_timeoutAlarm->cancel();
     }
 
-    if (resp.status.code() == ErrorCodes::ExceededTimeLimit) {
+    if (resp.status.code() == ErrorCodes::ExceededTimeLimit ||
+        resp.status.code() == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
         _numTimedOutOps.fetchAndAdd(1);
     }
 
@@ -293,7 +294,7 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, ResponseStatus resp) 
         // If we fail during connection, we won't be able to access any of op's members after
         // calling finish(), so we return here.
         log() << "Failed to connect to " << op->request().target << " - " << resp.status;
-        op->finish(resp);
+        op->finish(std::move(resp));
         return;
     }
 
@@ -305,7 +306,7 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, ResponseStatus resp) 
         log() << "Failed asio heartbeat to " << op->request().target << " - "
               << redact(resp.status);
         _numFailedOps.fetchAndAdd(1);
-        op->finish(resp);
+        op->finish(std::move(resp));
         return;
     }
 
@@ -337,7 +338,7 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, ResponseStatus resp) 
         _inProgress.erase(iter);
     }
 
-    op->finish(resp);
+    op->finish(std::move(resp));
 
     MONGO_ASIO_INVARIANT(static_cast<bool>(ownedOp), "Invalid AsyncOp", op);
 

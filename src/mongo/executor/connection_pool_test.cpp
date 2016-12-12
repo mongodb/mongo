@@ -867,7 +867,7 @@ TEST_F(ConnectionPoolTest, SetupTimeoutsDontTimeoutUnrelatedRequests) {
 
     ASSERT(conn1);
     ASSERT(!conn1->isOK());
-    ASSERT(conn1->getStatus().code() == ErrorCodes::ExceededTimeLimit);
+    ASSERT(conn1->getStatus().code() == ErrorCodes::NetworkInterfaceExceededTimeLimit);
 
     ASSERT(!conn2);
 }
@@ -920,7 +920,7 @@ TEST_F(ConnectionPoolTest, RefreshTimeoutsDontTimeoutRequests) {
 
     ASSERT(conn1);
     ASSERT(!conn1->isOK());
-    ASSERT(conn1->getStatus().code() == ErrorCodes::ExceededTimeLimit);
+    ASSERT(conn1->getStatus().code() == ErrorCodes::NetworkInterfaceExceededTimeLimit);
 
     ASSERT(!conn2);
 }

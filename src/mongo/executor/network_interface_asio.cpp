@@ -287,6 +287,9 @@ Status NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cb
             Status status = wasPreviouslyCanceled
                 ? Status(ErrorCodes::CallbackCanceled, "Callback canceled")
                 : swConn.getStatus();
+            if (status.code() == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
+                status = Status(ErrorCodes::ExceededTimeLimit, status.reason());
+            }
             if (status.code() == ErrorCodes::ExceededTimeLimit) {
                 _numTimedOutOps.fetchAndAdd(1);
             }
@@ -363,8 +366,9 @@ Status NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cb
                     msg << "Remote command timed out while waiting to get a connection from the "
                         << "pool, took " << getConnectionDuration << ", timeout was set to "
                         << timeout;
-                    auto rs = ResponseStatus(
-                        ErrorCodes::ExceededTimeLimit, msg.str(), getConnectionDuration);
+                    auto rs = ResponseStatus(ErrorCodes::NetworkInterfaceExceededTimeLimit,
+                                             msg.str(),
+                                             getConnectionDuration);
                     return _completeOperation(op, rs);
                 }
 
