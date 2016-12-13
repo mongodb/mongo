@@ -14,7 +14,10 @@
         assert.commandWorked(res, "Failed to run the top command");
 
         let entriesInTop = Object.keys(res.totals).filter(function(ns) {
-            return ns.startsWith(topDB.getName() + ".");
+            // This filter only includes non-system collections in our test database.
+            const dbPrefix = topDB.getName() + ".";
+            const systemCollectionPrefix = "system.";
+            return ns.startsWith(dbPrefix) && !ns.startsWith(dbPrefix + systemCollectionPrefix);
         });
         let expectedEntryNames = expectedEntries.map(function(coll) {
             return coll.getFullName();
