@@ -20,7 +20,8 @@ load('jstests/replsets/rslib.js');
     rst.awaitReplication();
 
     let id = rst.getNodeId(rst.getSecondary());
-    let program = rst.restart(
+    rst.stop(id);
+    let program = rst.start(
         id, {waitForConnect: false, setParameter: "failpoint.shutdownAtStartup={mode:'alwaysOn'}"});
     // mongod should exit automatically, since failpoint was set.
     let exitCode = waitProgram(program.pid);
