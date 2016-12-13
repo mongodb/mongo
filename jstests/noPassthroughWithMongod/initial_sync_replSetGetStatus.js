@@ -5,6 +5,8 @@
 
 (function() {
     "use strict";
+    load("jstests/libs/check_log.js");
+
     // If the parameter is already set, don't run this test.
     var parameters = db.adminCommand({getCmdLineOpts: 1}).parsed.setParameter;
     if (parameters.use3dot2InitialSync || parameters.initialSyncOplogBuffer) {
@@ -38,21 +40,9 @@
         {configureFailPoint: 'initialSyncHangBeforeFinish', mode: 'alwaysOn'}));
     replSet.reInitiate();
 
-    // Wait for fail point message to be logged.
-    var checkLog = function(node, msg) {
-        assert.soon(function() {
-            var logMessages = assert.commandWorked(node.adminCommand({getLog: 'global'})).log;
-            for (var i = 0; i < logMessages.length; i++) {
-                if (logMessages[i].indexOf(msg) != -1) {
-                    return true;
-                }
-            }
-            return false;
-        }, 'Did not see a log entry containing the following message: ' + msg, 10000, 1000);
-    };
-
     // Wait for initial sync to pause before it copies the databases.
-    checkLog(secondary, 'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');
+    checkLog.contains(secondary,
+                      'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');
 
     // Test that replSetGetStatus returns the correct results while initial sync is in progress.
     var res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
@@ -74,7 +64,7 @@
         {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
 
     // Wait for initial sync to pause right before it finishes.
-    checkLog(secondary, 'initial sync - initialSyncHangBeforeFinish fail point enabled');
+    checkLog.contains(secondary, 'initial sync - initialSyncHangBeforeFinish fail point enabled');
 
     // Test that replSetGetStatus returns the correct results when initial sync is at the very end.
     res = assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1, initialSync: 1}));

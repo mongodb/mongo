@@ -11,6 +11,8 @@
  */
 
 (function() {
+    load("jstests/libs/check_log.js");
+
     var parameters = TestData.setParameters;
     if (parameters && parameters.indexOf("use3dot2InitialSync=true") != -1) {
         jsTest.log("Skipping this test because use3dot2InitialSync was provided.");
@@ -42,18 +44,8 @@
     replSet.reInitiate();
 
     // Wait for fail point message to be logged.
-    var checkLog = function(node, msg) {
-        assert.soon(function() {
-            var logMessages = assert.commandWorked(node.adminCommand({getLog: 'global'})).log;
-            for (var i = 0; i < logMessages.length; i++) {
-                if (logMessages[i].indexOf(msg) != -1) {
-                    return true;
-                }
-            }
-            return false;
-        }, 'Did not see a log entry containing the following message: ' + msg, 60000, 1000);
-    };
-    checkLog(secondary, 'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');
+    checkLog.contains(secondary,
+                      'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');
 
     assert.writeOK(coll.update({_id: 0}, {x: 2}, {upsert: false, writeConcern: {w: 1}}));
     assert.writeOK(coll.remove({_id: 0}, {justOne: true, writeConcern: {w: 1}}));
@@ -61,11 +53,11 @@
     assert.commandWorked(secondary.getDB('admin').runCommand(
         {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'off'}));
 
-    checkLog(secondary, 'update of non-mod failed');
-    checkLog(secondary, 'adding missing object');
+    checkLog.contains(secondary, 'update of non-mod failed');
+    checkLog.contains(secondary, 'adding missing object');
 
-    checkLog(secondary,
-             'initial sync - initialSyncHangBeforeGettingMissingDocument fail point enabled');
+    checkLog.contains(
+        secondary, 'initial sync - initialSyncHangBeforeGettingMissingDocument fail point enabled');
     var doc = {_id: 0, x: 3};
     // Re-insert deleted document.
     assert.writeOK(coll.insert(doc, {writeConcern: {w: 1}}));
@@ -78,10 +70,10 @@
     assert.commandWorked(secondary.getDB('admin').runCommand(
         {configureFailPoint: 'initialSyncHangBeforeGettingMissingDocument', mode: 'off'}));
 
-    checkLog(secondary, 'inserted missing doc:');
+    checkLog.contains(secondary, 'inserted missing doc:');
     secondary.getDB('test').setLogLevel(0, 'replication');
 
-    checkLog(secondary, 'initial sync done');
+    checkLog.contains(secondary, 'initial sync done');
 
     replSet.awaitReplication();
     replSet.awaitSecondaryNodes();

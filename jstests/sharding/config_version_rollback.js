@@ -7,23 +7,6 @@
 (function() {
     "use strict";
 
-    // Wait for fail point message to be logged.
-    var checkLog = function(node, msg) {
-        assert.soon(
-            function() {
-                var logMessages = assert.commandWorked(node.adminCommand({getLog: 'global'})).log;
-                for (var i = 0; i < logMessages.length; i++) {
-                    if (logMessages[i].indexOf(msg) != -1) {
-                        return true;
-                    }
-                }
-                return false;
-            },
-            'Did not see a log entry for ' + node + ' containing the following message: ' + msg,
-            60000,
-            1000);
-    };
-
     // The config.version document is written on transition to primary. We need to ensure this
     // config.version document is rolled back for this test.
     //
