@@ -406,7 +406,7 @@ functions:
           # Set the shell process (and its children processes) to dump ELF headers (bit 4),
           # anonymous shared mappings (bit 1), and anonymous private mappings (bit 0).
           echo 0x13 > /proc/self/coredump_filter
-        
+
           if [ -f /sbin/sysctl ]; then
             # Check that the core pattern is set explicitly on our distro image instead
             # of being the OS's default value. This ensures that coredump names are consistent
@@ -6594,22 +6594,23 @@ buildvariants:
   - name: push
 
 
-- name: enterprise-ubuntu1404-clang-3.4-libc
-  display_name: "! Enterprise Ubuntu 14.04 (Clang 3.4/libc++)"
-  modules:
-  - enterprise
-  run_on:
-  - ubuntu1404-test
-  expansions:
-    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
-    tooltags: "-tags 'ssl sasl'"
-    compile_flags: --ssl CC=/usr/bin/clang CXX=/usr/bin/clang++ --libc++ -j$(grep -c ^processor /proc/cpuinfo)
-    use_scons_cache: true
-    build_mongoreplay: true
-  tasks:
-  - name: compile
-    distros:
-    - ubuntu1404-build
+# TODO (SERVER-27434) re-enable this after Ubuntu 16.04 images come with clang 3.7
+# - name: enterprise-ubuntu1604-clang-3.7-libcpp
+#   display_name: "! Enterprise Ubuntu 16.04 (Clang 3.7/libc++)"
+#   modules:
+#   - enterprise
+#   run_on:
+#   - ubuntu1604-test
+#   expansions:
+#     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+#     tooltags: "-tags 'ssl sasl'"
+#     compile_flags: --ssl CC=/usr/bin/clang-3.7 CXX=/usr/bin/clang++-3.7 --libc++ -j$(grep -c ^processor /proc/cpuinfo)
+#     use_scons_cache: true
+#     build_mongoreplay: true
+#   tasks:
+#   - name: compile
+#     distros:
+#     - ubuntu1404-build
 
 ###########################################
 #          SUSE buildvariants             #
@@ -8334,137 +8335,6 @@ buildvariants:
     distros:
     - ubuntu1604-build
 
-- name: enterprise-debug-rhel-62-cxx14
-  display_name: ~ Enterprise RHEL 6.2 C++14 DEBUG
-  modules:
-  - enterprise
-  run_on:
-  - rhel62-small
-  batchtime: 1440 # 1 day
-  expansions:
-    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
-    tooltags: "-tags 'ssl sasl'"
-    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
-    compile_flags: --allocator=system --dbg=on --opt=on --ssl -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on --cxx-std=14
-    multiversion_platform_arch: "rhel62"
-    multiversion_edition: "targeted"
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    use_scons_cache: true
-    build_mongoreplay: true
-  tasks:
-  - name: compile
-    distros:
-    - rhel62-large
-  - name: aggregation
-  - name: aggregation_WT
-  - name: aggregation_WT_ese
-  - name: aggregation_auth
-  - name: aggregation_read_concern_majority_passthrough_WT
-  - name: aggregation_sharded_collections_passthrough_WT
-  - name: audit
-  - name: audit_WT
-  - name: auth
-  - name: auth_WT
-  - name: auth_audit
-  - name: auth_audit_WT
-  - name: bulk_gle_passthrough
-  - name: bulk_gle_passthrough_WT
-  - name: concurrency
-  - name: concurrency_WT
-  - name: concurrency_replication
-  - name: concurrency_replication_WT
-  - name: concurrency_sharded
-  - name: concurrency_sharded_WT
-  - name: concurrency_simultaneous
-  - name: concurrency_simultaneous_WT
-  - name: dbtest
-  - name: dbtest_WT
-  - name: disk
-  - name: dur_jscore_passthrough
-  - name: durability
-  - name: ese_WT
-  - name: failpoints
-  - name: failpoints_auth
-  - name: gle_auth
-  - name: gle_auth_WT
-  - name: gle_auth_basics_passthrough
-  - name: gle_auth_basics_passthrough_WT
-  - name: gle_auth_basics_passthrough_write_cmd
-  - name: gle_auth_basics_passthrough_write_cmd_WT
-  - name: gle_auth_write_cmd
-  - name: gle_auth_write_cmd_WT
-  - name: httpinterface
-  - name: integration_tests_replset
-  - name: integration_tests_standalone
-  - name: jsCore
-  - name: jsCore_WT
-  - name: jsCore_WT_ese
-  - name: jsCore_auth
-  - name: jsCore_compatibility
-  - name: jsCore_compatibility_WT
-  - name: jsCore_minimum_batch_size_WT
-  - name: jsCore_op_query
-  - name: jsCore_op_query_WT
-  - name: jsCore_small_oplog
-  - name: jsCore_small_oplog_WT
-  - name: jsCore_small_oplog_rs
-  - name: jsCore_small_oplog_rs_WT
-  - name: mmap
-  - name: mongosTest
-  - name: multiversion
-  - name: multiversion_WT
-  - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
-  - name: noPassthrough_WT
-  - name: parallel
-  - name: parallel_WT
-  - name: parallel_compatibility
-  - name: parallel_compatibility_WT
-  - name: read_concern_majority_passthrough_WT
-  - name: read_only
-  - name: read_only_WT
-  - name: read_only_sharded
-  - name: read_only_sharded_WT
-  - name: replicasets
-  - name: replicasets_WT
-  - name: replicasets_WT_ese
-  - name: replicasets_auth
-  - name: replicasets_legacy
-  - name: replication
-  - name: replication_WT
-  - name: replication_auth
-  - name: rlp
-  - name: rlp_WT
-  - name: sasl
-  - name: sharded_collections_jscore_passthrough
-  - name: sharded_collections_jscore_passthrough_WT
-  - name: sharding
-  - name: sharding_WT
-  - name: sharding_WT_ese
-  - name: sharding_auth
-  - name: sharding_auth_audit_WT
-  - name: sharding_gle_auth_basics_passthrough
-  - name: sharding_gle_auth_basics_passthrough_WT
-  - name: sharding_gle_auth_basics_passthrough_write_cmd
-  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: sharding_jscore_passthrough
-  - name: sharding_jscore_passthrough_WT
-  - name: sharding_jscore_passthrough_wire_ops_WT
-  - name: sharding_last_stable_mongos_and_mixed_shards
-  - name: sharding_op_query_WT
-  - name: sharding_csrs_continuous_config_stepdown_WT
-  - name: slow1
-  - name: slow1_WT
-  - name: serial_run
-  - name: serial_run_WT
-  - name: snmp
-  - name: snmp_WT
-  - name: ssl
-  - name: sslSpecial
-  - name: tool
-  - name: tool_WT
-  - name: unittests
 
 - name: ubuntu1404-jepsen
   display_name: ~ Jepsen Ubuntu 14.04

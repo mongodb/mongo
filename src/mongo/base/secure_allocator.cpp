@@ -302,7 +302,7 @@ public:
      * Returns null if the request can't be satisifed.
      */
     void* allocate(std::size_t size, std::size_t alignOf) {
-        if (stdx::align(alignOf, size, _ptr, _remaining)) {
+        if (std::align(alignOf, size, _ptr, _remaining)) {
             auto result = _ptr;
             _ptr = static_cast<char*>(_ptr) + size;
             _remaining -= size;

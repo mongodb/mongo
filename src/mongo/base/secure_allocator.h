@@ -72,21 +72,19 @@ void deallocate(void* ptr, std::size_t bytes);
  */
 template <typename T>
 struct SecureAllocator {
-/**
- * We only support trivially copyable types to avoid situations where the
- * SecureAllocator is used in containers with complex types that do their
- * own allocation. I.e. one could otherwise have a:
- *
- * std::vector<std::string, SecureAllocator<std::string>>
- *
- * where the vectors were stored securely, but the strings spilled to the
- * heap
- *
- */
-#ifdef MONGO_CONFIG_HAVE_STD_IS_TRIVIALLY_COPYABLE
+    /**
+     * We only support trivially copyable types to avoid situations where the
+     * SecureAllocator is used in containers with complex types that do their
+     * own allocation. I.e. one could otherwise have a:
+     *
+     * std::vector<std::string, SecureAllocator<std::string>>
+     *
+     * where the vectors were stored securely, but the strings spilled to the
+     * heap
+     *
+     */
     MONGO_STATIC_ASSERT_MSG(std::is_trivially_copyable<T>::value,
                             "SecureAllocator can only be used with trivially copyable types");
-#endif
 
     // NOTE: The standard doesn't seem to require these, but libstdc++
     // definitly wants them.

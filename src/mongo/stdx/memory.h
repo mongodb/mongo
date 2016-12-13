@@ -55,29 +55,3 @@ using boost::make_unique;  // NOLINT
 }  // namespace mongo
 
 #endif
-
-#if defined(MONGO_CONFIG_HAVE_STD_ALIGN)
-
-#include <memory>
-
-namespace mongo {
-namespace stdx {
-
-using ::std::align;  // NOLINT
-
-}  // namespace stdx
-}  // namespace mongo
-
-#else
-
-#include <boost/align/align.hpp>
-
-namespace mongo {
-namespace stdx {
-
-using boost::alignment::align;  // NOLINT
-
-}  // namespace stdx
-}  // namespace mongo
-
-#endif
