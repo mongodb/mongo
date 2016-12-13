@@ -397,6 +397,11 @@ OperationContext::RecoveryUnitState OperationContext::setRecoveryUnit(RecoveryUn
     return oldState;
 }
 
+std::unique_ptr<Locker> OperationContext::releaseLockState() {
+    dassert(_locker);
+    return std::move(_locker);
+}
+
 void OperationContext::setLockState(std::unique_ptr<Locker> locker) {
     dassert(!_locker);
     dassert(locker);

@@ -191,6 +191,17 @@ bool LockerImpl<IsForMMAPV1>::isReadLocked() const {
 }
 
 template <bool IsForMMAPV1>
+void LockerImpl<IsForMMAPV1>::assertEmptyAndReset() {
+    invariant(!inAWriteUnitOfWork());
+    invariant(_resourcesToUnlockAtEndOfUnitOfWork.empty());
+    invariant(_requests.empty());
+    invariant(_modeForTicket == MODE_NONE);
+
+    // Reset the locking statistics so the object can be reused
+    _stats.reset();
+}
+
+template <bool IsForMMAPV1>
 void LockerImpl<IsForMMAPV1>::dump() const {
     StringBuilder ss;
     ss << "Locker id " << _id << " status: ";
@@ -272,13 +283,7 @@ LockerImpl<IsForMMAPV1>::~LockerImpl() {
     // Cannot delete the Locker while there are still outstanding requests, because the
     // LockManager may attempt to access deleted memory. Besides it is probably incorrect
     // to delete with unaccounted locks anyways.
-    invariant(!inAWriteUnitOfWork());
-    invariant(_resourcesToUnlockAtEndOfUnitOfWork.empty());
-    invariant(_requests.empty());
-    invariant(_modeForTicket == MODE_NONE);
-
-    // Reset the locking statistics so the object can be reused
-    _stats.reset();
+    assertEmptyAndReset();
 }
 
 template <bool IsForMMAPV1>
