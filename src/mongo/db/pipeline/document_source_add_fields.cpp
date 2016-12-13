@@ -49,8 +49,7 @@ intrusive_ptr<DocumentSource> DocumentSourceAddFields::create(
     BSONObj addFieldsSpec, const intrusive_ptr<ExpressionContext>& expCtx) {
     intrusive_ptr<DocumentSourceSingleDocumentTransformation> addFields(
         new DocumentSourceSingleDocumentTransformation(
-            expCtx, ParsedAddFields::create(addFieldsSpec), "$addFields"));
-    addFields->injectExpressionContext(expCtx);
+            expCtx, ParsedAddFields::create(expCtx, addFieldsSpec), "$addFields"));
     return addFields;
 }
 

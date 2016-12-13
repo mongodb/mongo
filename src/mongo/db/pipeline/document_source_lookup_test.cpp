@@ -54,15 +54,20 @@ using std::vector;
 using DocumentSourceLookUpTest = AggregationContextFixture;
 
 TEST_F(DocumentSourceLookUpTest, ShouldTruncateOutputSortOnAsField) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "a");
+    expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+
     intrusive_ptr<DocumentSourceMock> source = DocumentSourceMock::create();
     source->sorts = {BSON("a" << 1 << "d.e" << 1 << "c" << 1)};
-    auto lookup = DocumentSourceLookUp::createFromBson(
-        Document{
-            {"$lookup",
-             Document{{"from", "a"}, {"localField", "b"}, {"foreignField", "c"}, {"as", "d.e"}}}}
-            .toBson()
-            .firstElement(),
-        getExpCtx());
+    auto lookup = DocumentSourceLookUp::createFromBson(Document{{"$lookup",
+                                                                 Document{{"from", "a"_sd},
+                                                                          {"localField", "b"_sd},
+                                                                          {"foreignField", "c"_sd},
+                                                                          {"as", "d.e"_sd}}}}
+                                                           .toBson()
+                                                           .firstElement(),
+                                                       expCtx);
     lookup->setSource(source.get());
 
     BSONObjSet outputSort = lookup->getOutputSorts();
@@ -72,14 +77,20 @@ TEST_F(DocumentSourceLookUpTest, ShouldTruncateOutputSortOnAsField) {
 }
 
 TEST_F(DocumentSourceLookUpTest, ShouldTruncateOutputSortOnSuffixOfAsField) {
+    auto expCtx = getExpCtx();
+    NamespaceString fromNs("test", "a");
+    expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+
     intrusive_ptr<DocumentSourceMock> source = DocumentSourceMock::create();
     source->sorts = {BSON("a" << 1 << "d.e" << 1 << "c" << 1)};
-    auto lookup = DocumentSourceLookUp::createFromBson(
-        Document{{"$lookup",
-                  Document{{"from", "a"}, {"localField", "b"}, {"foreignField", "c"}, {"as", "d"}}}}
-            .toBson()
-            .firstElement(),
-        getExpCtx());
+    auto lookup = DocumentSourceLookUp::createFromBson(Document{{"$lookup",
+                                                                 Document{{"from", "a"_sd},
+                                                                          {"localField", "b"_sd},
+                                                                          {"foreignField", "c"_sd},
+                                                                          {"as", "d"_sd}}}}
+                                                           .toBson()
+                                                           .firstElement(),
+                                                       expCtx);
     lookup->setSource(source.get());
 
     BSONObjSet outputSort = lookup->getOutputSorts();
@@ -155,7 +166,6 @@ public:
         }
 
         pipeline.getValue()->addInitialSource(DocumentSourceMock::create(_mockResults));
-        pipeline.getValue()->injectExpressionContext(expCtx);
         pipeline.getValue()->optimizePipeline();
 
         return pipeline;
@@ -168,7 +178,7 @@ private:
 TEST_F(DocumentSourceLookUpTest, ShouldPropagatePauses) {
     auto expCtx = getExpCtx();
     NamespaceString fromNs("test", "foreign");
-    expCtx->resolvedNamespaces[fromNs.coll()] = {fromNs, std::vector<BSONObj>{}};
+    expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
 
     // Set up the $lookup stage.
     auto lookupSpec = Document{{"$lookup",
@@ -188,7 +198,6 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePauses) {
                                     DocumentSource::GetNextResult::makePauseExecution()});
 
     lookup->setSource(mockLocalSource.get());
-    lookup->injectExpressionContext(expCtx);
 
     // Mock out the foreign collection.
     deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}},
@@ -219,7 +228,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePauses) {
 TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
     auto expCtx = getExpCtx();
     NamespaceString fromNs("test", "foreign");
-    expCtx->resolvedNamespaces[fromNs.coll()] = {fromNs, std::vector<BSONObj>{}};
+    expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
 
     // Set up the $lookup stage.
     auto lookupSpec = Document{{"$lookup",
@@ -243,8 +252,6 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
                                     Document{{"foreignId", 1}},
                                     DocumentSource::GetNextResult::makePauseExecution()});
     lookup->setSource(mockLocalSource.get());
-
-    lookup->injectExpressionContext(expCtx);
 
     // Mock out the foreign collection.
     deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}},
@@ -273,7 +280,7 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
 TEST_F(DocumentSourceLookUpTest, LookupReportsAsFieldIsModified) {
     auto expCtx = getExpCtx();
     NamespaceString fromNs("test", "foreign");
-    expCtx->resolvedNamespaces[fromNs.coll()] = {fromNs, std::vector<BSONObj>{}};
+    expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
 
     // Set up the $lookup stage.
     auto lookupSpec = Document{{"$lookup",
@@ -294,7 +301,7 @@ TEST_F(DocumentSourceLookUpTest, LookupReportsAsFieldIsModified) {
 TEST_F(DocumentSourceLookUpTest, LookupReportsFieldsModifiedByAbsorbedUnwind) {
     auto expCtx = getExpCtx();
     NamespaceString fromNs("test", "foreign");
-    expCtx->resolvedNamespaces[fromNs.coll()] = {fromNs, std::vector<BSONObj>{}};
+    expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
 
     // Set up the $lookup stage.
     auto lookupSpec = Document{{"$lookup",

@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/unittest/unittest.h"
 
@@ -47,69 +48,78 @@ namespace {
 using std::vector;
 
 // These ParsedAddFields spec tests are a subset of the ParsedAggregationProjection creation tests.
-// ParsedAddField should behave the same way, but does not use the same creation, so we include
+// ParsedAddFields should behave the same way, but does not use the same creation, so we include
 // an abbreviation of the same tests here.
 
 // Verify that ParsedAddFields rejects specifications with conflicting field paths.
 TEST(ParsedAddFieldsSpec, ThrowsOnCreationWithConflictingFieldPaths) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     // These specs contain the same exact path.
-    ASSERT_THROWS(ParsedAddFields::create(BSON("a" << 1 << "a" << 2)), UserException);
-    ASSERT_THROWS(ParsedAddFields::create(BSON("a" << BSON("b" << 1 << "b" << 2))), UserException);
-    ASSERT_THROWS(ParsedAddFields::create(BSON("_id" << 3 << "_id" << true)), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a" << 1 << "a" << 2)), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a" << BSON("b" << 1 << "b" << 2))),
+                  UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("_id" << 3 << "_id" << true)),
+                  UserException);
 
     // These specs contain overlapping paths.
-    ASSERT_THROWS(ParsedAddFields::create(BSON("a" << 1 << "a.b" << 2)), UserException);
-    ASSERT_THROWS(ParsedAddFields::create(BSON("a.b.c" << 1 << "a" << 2)), UserException);
-    ASSERT_THROWS(ParsedAddFields::create(BSON("_id" << true << "_id.x" << true)), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a" << 1 << "a.b" << 2)), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a.b.c" << 1 << "a" << 2)), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("_id" << true << "_id.x" << true)),
+                  UserException);
 }
 
 // Verify that ParsedAddFields rejects specifications that contain invalid field paths.
 TEST(ParsedAddFieldsSpec, ThrowsOnCreationWithInvalidFieldPath) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     // Dotted subfields are not allowed.
-    ASSERT_THROWS(ParsedAddFields::create(BSON("a" << BSON("b.c" << true))), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a" << BSON("b.c" << true))), UserException);
 
     // The user cannot start a field with $.
-    ASSERT_THROWS(ParsedAddFields::create(BSON("$dollar" << 0)), UserException);
-    ASSERT_THROWS(ParsedAddFields::create(BSON("c.$d" << true)), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("$dollar" << 0)), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("c.$d" << true)), UserException);
 
     // Empty field names should throw an error.
-    ASSERT_THROWS(ParsedAddFields::create(BSON("" << 2)), UserException);
-    ASSERT_THROWS(ParsedAddFields::create(BSON("a" << BSON("" << true))), UserException);
-    ASSERT_THROWS(ParsedAddFields::create(BSON("" << BSON("a" << true))), UserException);
-    ASSERT_THROWS(ParsedAddFields::create(BSON("a." << true)), UserException);
-    ASSERT_THROWS(ParsedAddFields::create(BSON(".a" << true)), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("" << 2)), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a" << BSON("" << true))), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("" << BSON("a" << true))), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a." << true)), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON(".a" << true)), UserException);
 }
 
 // Verify that ParsedAddFields rejects specifications that contain empty objects or invalid
 // expressions.
 TEST(ParsedAddFieldsSpec, ThrowsOnCreationWithInvalidObjectsOrExpressions) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     // Invalid expressions should be rejected.
-    ASSERT_THROWS(
-        ParsedAddFields::create(BSON("a" << BSON("$add" << BSON_ARRAY(4 << 2) << "b" << 1))),
-        UserException);
-    ASSERT_THROWS(ParsedAddFields::create(BSON("a" << BSON("$gt" << BSON("bad"
+    ASSERT_THROWS(ParsedAddFields::create(
+                      expCtx, BSON("a" << BSON("$add" << BSON_ARRAY(4 << 2) << "b" << 1))),
+                  UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx,
+                                          BSON("a" << BSON("$gt" << BSON("bad"
                                                                          << "arguments")))),
                   UserException);
     ASSERT_THROWS(ParsedAddFields::create(
-                      BSON("a" << false << "b" << BSON("$unknown" << BSON_ARRAY(4 << 2)))),
+                      expCtx, BSON("a" << false << "b" << BSON("$unknown" << BSON_ARRAY(4 << 2)))),
                   UserException);
 
     // Empty specifications are not allowed.
-    ASSERT_THROWS(ParsedAddFields::create(BSONObj()), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSONObj()), UserException);
 
     // Empty nested objects are not allowed.
-    ASSERT_THROWS(ParsedAddFields::create(BSON("a" << BSONObj())), UserException);
+    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a" << BSONObj())), UserException);
 }
 
 TEST(ParsedAddFields, DoesNotErrorOnTwoNestedFields) {
-    ParsedAddFields::create(BSON("a.b" << true << "a.c" << true));
-    ParsedAddFields::create(BSON("a.b" << true << "a" << BSON("c" << true)));
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedAddFields::create(expCtx, BSON("a.b" << true << "a.c" << true));
+    ParsedAddFields::create(expCtx, BSON("a.b" << true << "a" << BSON("c" << true)));
 }
 
 // Verify that replaced fields are not included as dependencies.
 TEST(ParsedAddFieldsDeps, RemovesReplaceFieldsFromDependencies) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("a" << true));
+    addition.parse(expCtx, BSON("a" << true));
 
     DepsTracker deps;
     addition.addDependencies(&deps);
@@ -121,8 +131,9 @@ TEST(ParsedAddFieldsDeps, RemovesReplaceFieldsFromDependencies) {
 
 // Verify that adding nested fields keeps the top-level field as a dependency.
 TEST(ParsedAddFieldsDeps, IncludesTopLevelFieldInDependenciesWhenAddingNestedFields) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("x.y" << true));
+    addition.parse(expCtx, BSON("x.y" << true));
 
     DepsTracker deps;
     addition.addDependencies(&deps);
@@ -135,8 +146,10 @@ TEST(ParsedAddFieldsDeps, IncludesTopLevelFieldInDependenciesWhenAddingNestedFie
 
 // Verify that fields that an expression depends on are added to the dependencies.
 TEST(ParsedAddFieldsDeps, AddsDependenciesForComputedFields) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("x.y"
+    addition.parse(expCtx,
+                   BSON("x.y"
                         << "$z"
                         << "a"
                         << "$b"));
@@ -155,8 +168,9 @@ TEST(ParsedAddFieldsDeps, AddsDependenciesForComputedFields) {
 // Verify that the serialization produces the correct output: converting numbers and literals to
 // their corresponding $const form.
 TEST(ParsedAddFieldsSerialize, SerializesToCorrectForm) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(fromjson("{a: {$add: ['$a', 2]}, b: {d: 3}, 'x.y': {$literal: 4}}"));
+    addition.parse(expCtx, fromjson("{a: {$add: ['$a', 2]}, b: {d: 3}, 'x.y': {$literal: 4}}"));
 
     auto expectedSerialization = Document(
         fromjson("{a: {$add: [\"$a\", {$const: 2}]}, b: {d: {$const: 3}}, x: {y: {$const: 4}}}"));
@@ -168,8 +182,9 @@ TEST(ParsedAddFieldsSerialize, SerializesToCorrectForm) {
 
 // Verify that serialize treats the _id field as any other field: including when explicity included.
 TEST(ParsedAddFieldsSerialize, AddsIdToSerializeWhenExplicitlyIncluded) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("_id" << false));
+    addition.parse(expCtx, BSON("_id" << false));
 
     // Adds explicit "_id" setting field, serializes expressions.
     auto expectedSerialization = Document(fromjson("{_id: {$const: false}}"));
@@ -184,8 +199,9 @@ TEST(ParsedAddFieldsSerialize, AddsIdToSerializeWhenExplicitlyIncluded) {
 // yet they derive from the same parent class. If the parent class were to change, this test would
 // fail.
 TEST(ParsedAddFieldsSerialize, OmitsIdFromSerializeWhenNotIncluded) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("a" << true));
+    addition.parse(expCtx, BSON("a" << true));
 
     // Does not implicitly include "_id" field.
     auto expectedSerialization = Document(fromjson("{a: {$const: true}}"));
@@ -197,8 +213,9 @@ TEST(ParsedAddFieldsSerialize, OmitsIdFromSerializeWhenNotIncluded) {
 
 // Verify that the $addFields stage optimizes expressions into simpler forms when possible.
 TEST(ParsedAddFieldsOptimize, OptimizesTopLevelExpressions) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("a" << BSON("$add" << BSON_ARRAY(1 << 2))));
+    addition.parse(expCtx, BSON("a" << BSON("$add" << BSON_ARRAY(1 << 2))));
     addition.optimize();
     auto expectedSerialization = Document{{"a", Document{{"$const", 3}}}};
 
@@ -209,8 +226,9 @@ TEST(ParsedAddFieldsOptimize, OptimizesTopLevelExpressions) {
 
 // Verify that the $addFields stage optimizes expressions even when they are nested.
 TEST(ParsedAddFieldsOptimize, ShouldOptimizeNestedExpressions) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("a.b" << BSON("$add" << BSON_ARRAY(1 << 2))));
+    addition.parse(expCtx, BSON("a.b" << BSON("$add" << BSON_ARRAY(1 << 2))));
     addition.optimize();
     auto expectedSerialization = Document{{"a", Document{{"b", Document{{"$const", 3}}}}}};
 
@@ -225,8 +243,9 @@ TEST(ParsedAddFieldsOptimize, ShouldOptimizeNestedExpressions) {
 
 // Verify that a new field is added to the end of the document.
 TEST(ParsedAddFieldsExecutionTest, AddsNewFieldToEndOfDocument) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("c" << 3));
+    addition.parse(expCtx, BSON("c" << 3));
 
     // There are no fields in the document.
     auto result = addition.applyProjection(Document{});
@@ -241,8 +260,9 @@ TEST(ParsedAddFieldsExecutionTest, AddsNewFieldToEndOfDocument) {
 
 // Verify that an existing field is replaced and stays in the same order in the document.
 TEST(ParsedAddFieldsExecutionTest, ReplacesFieldThatAlreadyExistsInDocument) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("c" << 3));
+    addition.parse(expCtx, BSON("c" << 3));
 
     // Specified field is the only field in the document, and is replaced.
     auto result = addition.applyProjection(Document{{"c", 1}});
@@ -257,8 +277,10 @@ TEST(ParsedAddFieldsExecutionTest, ReplacesFieldThatAlreadyExistsInDocument) {
 
 // Verify that replacing multiple fields preserves the original field order in the document.
 TEST(ParsedAddFieldsExecutionTest, ReplacesMultipleFieldsWhilePreservingInputFieldOrder) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("second"
+    addition.parse(expCtx,
+                   BSON("second"
                         << "SECOND"
                         << "first"
                         << "FIRST"));
@@ -269,8 +291,10 @@ TEST(ParsedAddFieldsExecutionTest, ReplacesMultipleFieldsWhilePreservingInputFie
 
 // Verify that adding multiple fields adds the fields in the order specified.
 TEST(ParsedAddFieldsExecutionTest, AddsNewFieldsAfterExistingFieldsInOrderSpecified) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("firstComputed"
+    addition.parse(expCtx,
+                   BSON("firstComputed"
                         << "FIRST"
                         << "secondComputed"
                         << "SECOND"));
@@ -286,8 +310,10 @@ TEST(ParsedAddFieldsExecutionTest, AddsNewFieldsAfterExistingFieldsInOrderSpecif
 // Verify that both adding and replacing fields at the same time follows the same rules as doing
 // each independently.
 TEST(ParsedAddFieldsExecutionTest, ReplacesAndAddsNewFieldsWithSameOrderingRulesAsSeparately) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("firstComputed"
+    addition.parse(expCtx,
+                   BSON("firstComputed"
                         << "FIRST"
                         << "second"
                         << "SECOND"));
@@ -300,8 +326,10 @@ TEST(ParsedAddFieldsExecutionTest, ReplacesAndAddsNewFieldsWithSameOrderingRules
 // Verify that _id is included just like a regular field, in whatever order it appears in the
 // input document, when adding new fields.
 TEST(ParsedAddFieldsExecutionTest, IdFieldIsKeptInOrderItAppearsInInputDocument) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("newField"
+    addition.parse(expCtx,
+                   BSON("newField"
                         << "computedVal"));
     auto result = addition.applyProjection(Document{{"_id", "ID"}, {"a", 1}});
     auto expectedResult = Document{{"_id", "ID"}, {"a", 1}, {"newField", "computedVal"}};
@@ -314,8 +342,10 @@ TEST(ParsedAddFieldsExecutionTest, IdFieldIsKeptInOrderItAppearsInInputDocument)
 
 // Verify that replacing or adding _id works just like any other field.
 TEST(ParsedAddFieldsExecutionTest, ShouldReplaceIdWithComputedId) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("_id"
+    addition.parse(expCtx,
+                   BSON("_id"
                         << "newId"));
     auto result = addition.applyProjection(Document{{"_id", "ID"}, {"a", 1}});
     auto expectedResult = Document{{"_id", "newId"}, {"a", 1}};
@@ -336,8 +366,9 @@ TEST(ParsedAddFieldsExecutionTest, ShouldReplaceIdWithComputedId) {
 
 // Verify that adding a dotted field keeps the other fields in the subdocument.
 TEST(ParsedAddFieldsExecutionTest, KeepsExistingSubFieldsWhenAddingSimpleDottedFieldToSubDoc) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("a.b" << true));
+    addition.parse(expCtx, BSON("a.b" << true));
 
     // More than one field in sub document.
     auto result = addition.applyProjection(Document{{"a", Document{{"b", 1}, {"c", 2}}}});
@@ -362,8 +393,9 @@ TEST(ParsedAddFieldsExecutionTest, KeepsExistingSubFieldsWhenAddingSimpleDottedF
 
 // Verify that creating a dotted field creates the subdocument structure necessary.
 TEST(ParsedAddFieldsExecutionTest, CreatesSubDocIfDottedAddedFieldDoesNotExist) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("sub.target" << true));
+    addition.parse(expCtx, BSON("sub.target" << true));
 
     // Should add the path if it doesn't exist.
     auto result = addition.applyProjection(Document{});
@@ -379,8 +411,9 @@ TEST(ParsedAddFieldsExecutionTest, CreatesSubDocIfDottedAddedFieldDoesNotExist) 
 // Verify that adding a dotted value to an array field sets the field in every element of the array.
 // SERVER-25200: make this agree with $set.
 TEST(ParsedAddFieldsExecutionTest, AppliesDottedAdditionToEachElementInArray) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("a.b" << true));
+    addition.parse(expCtx, BSON("a.b" << true));
 
     vector<Value> nestedValues = {Value(1),
                                   Value(Document{}),
@@ -404,8 +437,10 @@ TEST(ParsedAddFieldsExecutionTest, AppliesDottedAdditionToEachElementInArray) {
 
 // Verify that creation of the subdocument structure works for many layers of nesting.
 TEST(ParsedAddFieldsExecutionTest, CreatesNestedSubDocumentsAllTheWayToAddedField) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("a.b.c.d"
+    addition.parse(expCtx,
+                   BSON("a.b.c.d"
                         << "computedVal"));
 
     // Should add the path if it doesn't exist.
@@ -421,8 +456,10 @@ TEST(ParsedAddFieldsExecutionTest, CreatesNestedSubDocumentsAllTheWayToAddedFiel
 
 // Verify that _id is not special: we can add subfields to it as well.
 TEST(ParsedAddFieldsExecutionTest, AddsSubFieldsOfId) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("_id.X" << true << "_id.Z"
+    addition.parse(expCtx,
+                   BSON("_id.X" << true << "_id.Z"
                                 << "NEW"));
     auto result = addition.applyProjection(Document{{"_id", Document{{"X", 1}, {"Y", 2}}}});
     auto expectedResult = Document{{"_id", Document{{"X", true}, {"Y", 2}, {"Z", "NEW"}}}};
@@ -432,10 +469,12 @@ TEST(ParsedAddFieldsExecutionTest, AddsSubFieldsOfId) {
 // Verify that both ways of specifying nested fields -- both dotted notation and nesting --
 // can be used together in the same specification.
 TEST(ParsedAddFieldsExecutionTest, ShouldAllowMixedNestedAndDottedFields) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
     // Include all of "a.b", "a.c", "a.d", and "a.e".
     // Add new computed fields "a.W", "a.X", "a.Y", and "a.Z".
-    addition.parse(BSON("a.b" << true << "a.c" << true << "a.W"
+    addition.parse(expCtx,
+                   BSON("a.b" << true << "a.c" << true << "a.W"
                               << "W"
                               << "a.X"
                               << "X"
@@ -461,8 +500,10 @@ TEST(ParsedAddFieldsExecutionTest, ShouldAllowMixedNestedAndDottedFields) {
 
 // Verify that adding nested fields preserves the addition order in the spec.
 TEST(ParsedAddFieldsExecutionTest, AddsNestedAddedFieldsInOrderSpecified) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("b.d"
+    addition.parse(expCtx,
+                   BSON("b.d"
                         << "FIRST"
                         << "b.c"
                         << "SECOND"));
@@ -477,8 +518,9 @@ TEST(ParsedAddFieldsExecutionTest, AddsNestedAddedFieldsInOrderSpecified) {
 
 // Verify that the metadata is kept from the original input document.
 TEST(ParsedAddFieldsExecutionTest, AlwaysKeepsMetadataFromOriginalDoc) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ParsedAddFields addition;
-    addition.parse(BSON("a" << true));
+    addition.parse(expCtx, BSON("a" << true));
 
     MutableDocument inputDocBuilder(Document{{"a", 1}});
     inputDocBuilder.setRandMetaField(1.0);

@@ -38,7 +38,7 @@ namespace mongo {
 class Collection;
 class DocumentSourceCursor;
 class DocumentSourceSort;
-struct ExpressionContext;
+class ExpressionContext;
 class OperationContext;
 class Pipeline;
 class PlanExecutor;

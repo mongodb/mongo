@@ -50,11 +50,11 @@ void GranularityRounder::registerGranularityRounder(StringData name, Rounder rou
 }
 
 boost::intrusive_ptr<GranularityRounder> GranularityRounder::getGranularityRounder(
-    StringData granularity) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, StringData granularity) {
     auto it = rounderMap.find(granularity);
     uassert(40257,
             str::stream() << "Unknown rounding granularity '" << granularity << "'",
             it != rounderMap.end());
-    return it->second();
+    return it->second(expCtx);
 }
 }  // namespace mongo

@@ -54,7 +54,16 @@ DocumentSourceLookUp::DocumentSourceLookUp(NamespaceString fromNs,
       _as(std::move(as)),
       _localField(std::move(localField)),
       _foreignField(foreignField),
-      _foreignFieldFieldName(std::move(foreignField)) {}
+      _foreignFieldFieldName(std::move(foreignField)) {
+    const auto& resolvedNamespace = pExpCtx->getResolvedNamespace(_fromNs);
+    _fromExpCtx = pExpCtx->copyWith(resolvedNamespace.ns);
+    _fromPipeline = resolvedNamespace.pipeline;
+
+    // We append an additional BSONObj to '_fromPipeline' as a placeholder for the $match stage
+    // we'll eventually construct from the input document.
+    _fromPipeline.reserve(_fromPipeline.size() + 1);
+    _fromPipeline.push_back(BSONObj());
+}
 
 std::unique_ptr<LiteParsedDocumentSourceOneForeignCollection> DocumentSourceLookUp::liteParse(
     const AggregationRequest& request, const BSONElement& spec) {
@@ -452,19 +461,6 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array, bool expl
 DocumentSource::GetDepsReturn DocumentSourceLookUp::getDependencies(DepsTracker* deps) const {
     deps->fields.insert(_localField.fullPath());
     return SEE_NEXT;
-}
-
-void DocumentSourceLookUp::doInjectExpressionContext() {
-    auto it = pExpCtx->resolvedNamespaces.find(_fromNs.coll());
-    invariant(it != pExpCtx->resolvedNamespaces.end());
-    const auto& resolvedNamespace = it->second;
-    _fromExpCtx = pExpCtx->copyWith(resolvedNamespace.ns);
-    _fromPipeline = resolvedNamespace.pipeline;
-
-    // We append an additional BSONObj to '_fromPipeline' as a placeholder for the $match stage
-    // we'll eventually construct from the input document.
-    _fromPipeline.reserve(_fromPipeline.size() + 1);
-    _fromPipeline.push_back(BSONObj());
 }
 
 void DocumentSourceLookUp::doDetachFromOperationContext() {

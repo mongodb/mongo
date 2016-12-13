@@ -156,9 +156,6 @@ class InvalidBucketSpec : public AggregationContextFixture {
 public:
     vector<intrusive_ptr<DocumentSource>> createBucket(BSONObj bucketSpec) {
         auto sources = DocumentSourceBucket::createFromBson(bucketSpec.firstElement(), getExpCtx());
-        for (auto&& source : sources) {
-            source->injectExpressionContext(getExpCtx());
-        }
         return sources;
     }
 };

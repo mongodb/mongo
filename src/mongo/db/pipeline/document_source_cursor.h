@@ -132,9 +132,6 @@ public:
 
     const PlanSummaryStats& getPlanSummaryStats() const;
 
-protected:
-    void doInjectExpressionContext() final;
-
 private:
     DocumentSourceCursor(const std::string& ns,
                          std::unique_ptr<PlanExecutor> exec,

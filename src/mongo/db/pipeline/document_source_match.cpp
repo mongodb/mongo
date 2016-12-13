@@ -401,7 +401,7 @@ DocumentSourceMatch::splitSourceBy(const std::set<std::string>& fields) {
 boost::intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::descendMatchOnPath(
     MatchExpression* matchExpr,
     const std::string& descendOn,
-    intrusive_ptr<ExpressionContext> expCtx) {
+    const intrusive_ptr<ExpressionContext>& expCtx) {
     expression::mapOver(matchExpr, [&descendOn](MatchExpression* node, std::string path) -> void {
         // Cannot call this method on a $match including a $elemMatch.
         invariant(node->matchType() != MatchExpression::ELEM_MATCH_OBJECT &&
@@ -453,7 +453,6 @@ intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::create(
     BSONObj filter, const intrusive_ptr<ExpressionContext>& expCtx) {
     uassertNoDisallowedClauses(filter);
     intrusive_ptr<DocumentSourceMatch> match(new DocumentSourceMatch(filter, expCtx));
-    match->injectExpressionContext(expCtx);
     return match;
 }
 
@@ -488,10 +487,6 @@ void DocumentSourceMatch::addDependencies(DepsTracker* deps) const {
             deps->fields.insert(path);
         }
     });
-}
-
-void DocumentSourceMatch::doInjectExpressionContext() {
-    _expression->setCollator(pExpCtx->getCollator());
 }
 
 DocumentSourceMatch::DocumentSourceMatch(const BSONObj& query,

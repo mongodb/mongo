@@ -32,7 +32,7 @@
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -56,8 +56,7 @@ static void assertExpectedResults(
         try {
             // Asserts that result equals expected result when not sharded.
             {
-                boost::intrusive_ptr<Accumulator> accum = factory();
-                accum->injectExpressionContext(expCtx);
+                boost::intrusive_ptr<Accumulator> accum(factory(expCtx));
                 for (auto&& val : op.first) {
                     accum->process(val, false);
                 }
@@ -68,10 +67,8 @@ static void assertExpectedResults(
 
             // Asserts that result equals expected result when all input is on one shard.
             {
-                boost::intrusive_ptr<Accumulator> accum = factory();
-                accum->injectExpressionContext(expCtx);
-                boost::intrusive_ptr<Accumulator> shard = factory();
-                shard->injectExpressionContext(expCtx);
+                boost::intrusive_ptr<Accumulator> accum(factory(expCtx));
+                boost::intrusive_ptr<Accumulator> shard(factory(expCtx));
                 for (auto&& val : op.first) {
                     shard->process(val, false);
                 }
@@ -83,11 +80,9 @@ static void assertExpectedResults(
 
             // Asserts that result equals expected result when each input is on a separate shard.
             {
-                boost::intrusive_ptr<Accumulator> accum = factory();
-                accum->injectExpressionContext(expCtx);
+                boost::intrusive_ptr<Accumulator> accum(factory(expCtx));
                 for (auto&& val : op.first) {
-                    boost::intrusive_ptr<Accumulator> shard = factory();
-                    shard->injectExpressionContext(expCtx);
+                    boost::intrusive_ptr<Accumulator> shard(factory(expCtx));
                     shard->process(val, false);
                     accum->process(shard->getValue(true), true);
                 }
@@ -103,7 +98,7 @@ static void assertExpectedResults(
 }
 
 TEST(Accumulators, Avg) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
     assertExpectedResults(
         "$avg",
         expCtx,
@@ -159,7 +154,7 @@ TEST(Accumulators, Avg) {
 }
 
 TEST(Accumulators, First) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
     assertExpectedResults(
         "$first",
         expCtx,
@@ -178,7 +173,7 @@ TEST(Accumulators, First) {
 }
 
 TEST(Accumulators, Last) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
     assertExpectedResults(
         "$last",
         expCtx,
@@ -197,7 +192,7 @@ TEST(Accumulators, Last) {
 }
 
 TEST(Accumulators, Min) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
     assertExpectedResults(
         "$min",
         expCtx,
@@ -216,14 +211,14 @@ TEST(Accumulators, Min) {
 }
 
 TEST(Accumulators, MinRespectsCollation) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     expCtx->setCollator(
         stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
     assertExpectedResults("$min", expCtx, {{{Value("abc"), Value("cba")}, Value("cba")}});
 }
 
 TEST(Accumulators, Max) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
     assertExpectedResults(
         "$max",
         expCtx,
@@ -242,14 +237,14 @@ TEST(Accumulators, Max) {
 }
 
 TEST(Accumulators, MaxRespectsCollation) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     expCtx->setCollator(
         stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
     assertExpectedResults("$max", expCtx, {{{Value("abc"), Value("cba")}, Value("abc")}});
 }
 
 TEST(Accumulators, Sum) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
+    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContextForTest());
     assertExpectedResults(
         "$sum",
         expCtx,
@@ -339,7 +334,7 @@ TEST(Accumulators, Sum) {
 }
 
 TEST(Accumulators, AddToSetRespectsCollation) {
-    intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     expCtx->setCollator(
         stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual));
     assertExpectedResults(

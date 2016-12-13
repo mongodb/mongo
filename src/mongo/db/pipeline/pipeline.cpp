@@ -165,13 +165,6 @@ void Pipeline::reattachToOperationContext(OperationContext* opCtx) {
     }
 }
 
-void Pipeline::injectExpressionContext(const intrusive_ptr<ExpressionContext>& expCtx) {
-    pCtx = expCtx;
-    for (auto&& stage : _sources) {
-        stage->injectExpressionContext(pCtx);
-    }
-}
-
 intrusive_ptr<Pipeline> Pipeline::splitForSharded() {
     // Create and initialize the shard spec we'll return. We start with an empty pipeline on the
     // shards and all work being done in the merger. Optimizations can move operations between

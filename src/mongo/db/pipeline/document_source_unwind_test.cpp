@@ -42,7 +42,7 @@
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/service_context.h"
@@ -70,7 +70,8 @@ public:
     CheckResultsBase()
         : _queryServiceContext(stdx::make_unique<QueryTestServiceContext>()),
           _opCtx(_queryServiceContext->makeOperationContext()),
-          _ctx(new ExpressionContext(_opCtx.get(), AggregationRequest(NamespaceString(ns), {}))) {}
+          _ctx(new ExpressionContextForTest(_opCtx.get(),
+                                            AggregationRequest(NamespaceString(ns), {}))) {}
 
     virtual ~CheckResultsBase() {}
 
@@ -141,7 +142,7 @@ protected:
         return expectedIndexedResultSetString();
     }
 
-    intrusive_ptr<ExpressionContext> ctx() const {
+    intrusive_ptr<ExpressionContextForTest> ctx() const {
         return _ctx;
     }
 
@@ -248,7 +249,7 @@ private:
 
     unique_ptr<QueryTestServiceContext> _queryServiceContext;
     ServiceContext::UniqueOperationContext _opCtx;
-    intrusive_ptr<ExpressionContext> _ctx;
+    intrusive_ptr<ExpressionContextForTest> _ctx;
     intrusive_ptr<DocumentSourceUnwind> _unwind;
 };
 

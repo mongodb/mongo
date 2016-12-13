@@ -72,8 +72,10 @@ public:
      *
      * Throws a UserException if parsing fails.
      */
-    static AccumulationStatement parseAccumulationStatement(const BSONElement& elem,
-                                                            const VariablesParseState& vps);
+    static AccumulationStatement parseAccumulationStatement(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const BSONElement& elem,
+        const VariablesParseState& vps);
 
     /**
      * Registers an Accumulator with a parsing function, so that when an accumulator with the given

@@ -53,6 +53,8 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
+    // It is illegal to construct a DocumentSourceProject directly, use create() or createFromBson()
+    // instead.
     DocumentSourceProject() = default;
 };
 

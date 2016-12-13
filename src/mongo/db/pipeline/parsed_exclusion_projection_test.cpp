@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -57,28 +58,32 @@ DEATH_TEST(ExclusionProjection,
            ShouldRejectComputedField,
            "Invariant failure fieldName[0] != '$'") {
     ParsedExclusionProjection exclusion;
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     // Top-level expression.
-    exclusion.parse(BSON("a" << false << "b" << BSON("$literal" << 1)));
+    exclusion.parse(expCtx, BSON("a" << false << "b" << BSON("$literal" << 1)));
 }
 
 DEATH_TEST(ExclusionProjection,
            ShouldFailWhenGivenIncludedField,
            "Invariant failure !elem.trueValue()") {
     ParsedExclusionProjection exclusion;
-    exclusion.parse(BSON("a" << true));
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    exclusion.parse(expCtx, BSON("a" << true));
 }
 
 DEATH_TEST(ExclusionProjection,
            ShouldFailWhenGivenIncludedId,
            "Invariant failure !elem.trueValue()") {
     ParsedExclusionProjection exclusion;
-    exclusion.parse(BSON("_id" << true << "a" << false));
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    exclusion.parse(expCtx, BSON("_id" << true << "a" << false));
 }
 
 TEST(ExclusionProjection, ShouldSerializeToEquivalentProjection) {
     ParsedExclusionProjection exclusion;
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     exclusion.parse(
-        fromjson("{a: 0, b: {c: NumberLong(0), d: 0.0}, 'x.y': false, _id: NumberInt(0)}"));
+        expCtx, fromjson("{a: 0, b: {c: NumberLong(0), d: 0.0}, 'x.y': false, _id: NumberInt(0)}"));
 
     // Converts numbers to bools, converts dotted paths to nested documents. Note order of excluded
     // fields is subject to change.
@@ -107,7 +112,9 @@ TEST(ExclusionProjection, ShouldNotAddAnyDependencies) {
     // later. If there are no later stages, then we will finish the dependency computation
     // cycle without full knowledge of which fields are needed, and thus include all the fields.
     ParsedExclusionProjection exclusion;
-    exclusion.parse(BSON("_id" << false << "a" << false << "b.c" << false << "x.y.z" << false));
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    exclusion.parse(expCtx,
+                    BSON("_id" << false << "a" << false << "b.c" << false << "x.y.z" << false));
 
     DepsTracker deps;
     exclusion.addDependencies(&deps);
@@ -119,7 +126,8 @@ TEST(ExclusionProjection, ShouldNotAddAnyDependencies) {
 
 TEST(ExclusionProjection, ShouldReportExcludedFieldsAsModified) {
     ParsedExclusionProjection exclusion;
-    exclusion.parse(BSON("_id" << false << "a" << false << "b.c" << false));
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    exclusion.parse(expCtx, BSON("_id" << false << "a" << false << "b.c" << false));
 
     auto modifiedPaths = exclusion.getModifiedPaths();
     ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet);
@@ -131,7 +139,8 @@ TEST(ExclusionProjection, ShouldReportExcludedFieldsAsModified) {
 
 TEST(ExclusionProjection, ShouldReportExcludedFieldsAsModifiedWhenSpecifiedAsNestedObj) {
     ParsedExclusionProjection exclusion;
-    exclusion.parse(BSON("a" << BSON("b" << false << "c" << BSON("d" << false))));
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    exclusion.parse(expCtx, BSON("a" << BSON("b" << false << "c" << BSON("d" << false))));
 
     auto modifiedPaths = exclusion.getModifiedPaths();
     ASSERT(modifiedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet);
@@ -146,7 +155,8 @@ TEST(ExclusionProjection, ShouldReportExcludedFieldsAsModifiedWhenSpecifiedAsNes
 
 TEST(ExclusionProjectionExecutionTest, ShouldExcludeTopLevelField) {
     ParsedExclusionProjection exclusion;
-    exclusion.parse(BSON("a" << false));
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    exclusion.parse(expCtx, BSON("a" << false));
 
     // More than one field in document.
     auto result = exclusion.applyProjection(Document{{"a", 1}, {"b", 2}});
@@ -171,7 +181,9 @@ TEST(ExclusionProjectionExecutionTest, ShouldExcludeTopLevelField) {
 
 TEST(ExclusionProjectionExecutionTest, ShouldCoerceNumericsToBools) {
     ParsedExclusionProjection exclusion;
-    exclusion.parse(BSON("a" << Value(0) << "b" << Value(0LL) << "c" << Value(0.0) << "d"
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    exclusion.parse(expCtx,
+                    BSON("a" << Value(0) << "b" << Value(0LL) << "c" << Value(0.0) << "d"
                              << Value(Decimal128(0))));
 
     auto result = exclusion.applyProjection(Document{{"_id", "ID"}, {"a", 1}, {"b", 2}, {"c", 3}});
@@ -181,7 +193,8 @@ TEST(ExclusionProjectionExecutionTest, ShouldCoerceNumericsToBools) {
 
 TEST(ExclusionProjectionExecutionTest, ShouldPreserveOrderOfExistingFields) {
     ParsedExclusionProjection exclusion;
-    exclusion.parse(BSON("second" << false));
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    exclusion.parse(expCtx, BSON("second" << false));
     auto result = exclusion.applyProjection(Document{{"first", 0}, {"second", 1}, {"third", 2}});
     auto expectedResult = Document{{"first", 0}, {"third", 2}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
@@ -189,24 +202,27 @@ TEST(ExclusionProjectionExecutionTest, ShouldPreserveOrderOfExistingFields) {
 
 TEST(ExclusionProjectionExecutionTest, ShouldImplicitlyIncludeId) {
     ParsedExclusionProjection exclusion;
-    exclusion.parse(BSON("a" << false));
-    auto result = exclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"}});
-    auto expectedResult = Document{{"b", 2}, {"_id", "ID"}};
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    exclusion.parse(expCtx, BSON("a" << false));
+    auto result = exclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}});
+    auto expectedResult = Document{{"b", 2}, {"_id", "ID"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldExcludeIdIfExplicitlyExcluded) {
     ParsedExclusionProjection exclusion;
-    exclusion.parse(BSON("a" << false << "_id" << false));
-    auto result = exclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"}});
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    exclusion.parse(expCtx, BSON("a" << false << "_id" << false));
+    auto result = exclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}});
     auto expectedResult = Document{{"b", 2}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldExcludeIdAndKeepAllOtherFields) {
     ParsedExclusionProjection exclusion;
-    exclusion.parse(BSON("_id" << false));
-    auto result = exclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"}});
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    exclusion.parse(expCtx, BSON("_id" << false));
+    auto result = exclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}});
     auto expectedResult = Document{{"a", 1}, {"b", 2}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -217,7 +233,8 @@ TEST(ExclusionProjectionExecutionTest, ShouldExcludeIdAndKeepAllOtherFields) {
 
 TEST(ExclusionProjectionExecutionTest, ShouldExcludeSubFieldsOfId) {
     ParsedExclusionProjection exclusion;
-    exclusion.parse(BSON("_id.x" << false << "_id" << BSON("y" << false)));
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    exclusion.parse(expCtx, BSON("_id.x" << false << "_id" << BSON("y" << false)));
     auto result = exclusion.applyProjection(
         Document{{"_id", Document{{"x", 1}, {"y", 2}, {"z", 3}}}, {"a", 1}});
     auto expectedResult = Document{{"_id", Document{{"z", 3}}}, {"a", 1}};
@@ -226,7 +243,8 @@ TEST(ExclusionProjectionExecutionTest, ShouldExcludeSubFieldsOfId) {
 
 TEST(ExclusionProjectionExecutionTest, ShouldExcludeSimpleDottedFieldFromSubDoc) {
     ParsedExclusionProjection exclusion;
-    exclusion.parse(BSON("a.b" << false));
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    exclusion.parse(expCtx, BSON("a.b" << false));
 
     // More than one field in sub document.
     auto result = exclusion.applyProjection(Document{{"a", Document{{"b", 1}, {"c", 2}}}});
@@ -251,7 +269,8 @@ TEST(ExclusionProjectionExecutionTest, ShouldExcludeSimpleDottedFieldFromSubDoc)
 
 TEST(ExclusionProjectionExecutionTest, ShouldNotCreateSubDocIfDottedExcludedFieldDoesNotExist) {
     ParsedExclusionProjection exclusion;
-    exclusion.parse(BSON("sub.target" << false));
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    exclusion.parse(expCtx, BSON("sub.target" << false));
 
     // Should not add the path if it doesn't exist.
     auto result = exclusion.applyProjection(Document{});
@@ -266,7 +285,8 @@ TEST(ExclusionProjectionExecutionTest, ShouldNotCreateSubDocIfDottedExcludedFiel
 
 TEST(ExclusionProjectionExecutionTest, ShouldApplyDottedExclusionToEachElementInArray) {
     ParsedExclusionProjection exclusion;
-    exclusion.parse(BSON("a.b" << false));
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    exclusion.parse(expCtx, BSON("a.b" << false));
 
     std::vector<Value> nestedValues = {
         Value(1),
@@ -289,8 +309,10 @@ TEST(ExclusionProjectionExecutionTest, ShouldApplyDottedExclusionToEachElementIn
 
 TEST(ExclusionProjectionExecutionTest, ShouldAllowMixedNestedAndDottedFields) {
     ParsedExclusionProjection exclusion;
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     // Exclude all of "a.b", "a.c", "a.d", and "a.e".
     exclusion.parse(
+        expCtx,
         BSON("a.b" << false << "a.c" << false << "a" << BSON("d" << false << "e" << false)));
     auto result = exclusion.applyProjection(
         Document{{"a", Document{{"b", 1}, {"c", 2}, {"d", 3}, {"e", 4}, {"f", 5}}}});
@@ -300,7 +322,8 @@ TEST(ExclusionProjectionExecutionTest, ShouldAllowMixedNestedAndDottedFields) {
 
 TEST(ExclusionProjectionExecutionTest, ShouldAlwaysKeepMetadataFromOriginalDoc) {
     ParsedExclusionProjection exclusion;
-    exclusion.parse(BSON("a" << false));
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    exclusion.parse(expCtx, BSON("a" << false));
 
     MutableDocument inputDocBuilder(Document{{"_id", "ID"}, {"a", 1}});
     inputDocBuilder.setRandMetaField(1.0);

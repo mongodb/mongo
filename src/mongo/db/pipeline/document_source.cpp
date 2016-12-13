@@ -61,7 +61,7 @@ void DocumentSource::registerParser(string name, Parser parser) {
 }
 
 vector<intrusive_ptr<DocumentSource>> DocumentSource::parse(
-    const intrusive_ptr<ExpressionContext> expCtx, BSONObj stageObj) {
+    const intrusive_ptr<ExpressionContext>& expCtx, BSONObj stageObj) {
     uassert(16435,
             "A pipeline stage specification object must contain exactly one field.",
             stageObj.nFields() == 1);

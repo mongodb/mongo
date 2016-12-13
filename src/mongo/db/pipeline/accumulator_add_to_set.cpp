@@ -48,7 +48,7 @@ const char* AccumulatorAddToSet::getOpName() const {
 void AccumulatorAddToSet::processInternal(const Value& input, bool merging) {
     if (!merging) {
         if (!input.missing()) {
-            bool inserted = _set->insert(input).second;
+            bool inserted = _set.insert(input).second;
             if (inserted) {
                 _memUsageBytes += input.getApproximateSize();
             }
@@ -62,7 +62,7 @@ void AccumulatorAddToSet::processInternal(const Value& input, bool merging) {
 
         const vector<Value>& array = input.getArray();
         for (size_t i = 0; i < array.size(); i++) {
-            bool inserted = _set->insert(array[i]).second;
+            bool inserted = _set.insert(array[i]).second;
             if (inserted) {
                 _memUsageBytes += array[i].getApproximateSize();
             }
@@ -71,10 +71,11 @@ void AccumulatorAddToSet::processInternal(const Value& input, bool merging) {
 }
 
 Value AccumulatorAddToSet::getValue(bool toBeMerged) const {
-    return Value(vector<Value>(_set->begin(), _set->end()));
+    return Value(vector<Value>(_set.begin(), _set.end()));
 }
 
-AccumulatorAddToSet::AccumulatorAddToSet() {
+AccumulatorAddToSet::AccumulatorAddToSet(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    : Accumulator(expCtx), _set(expCtx->getValueComparator().makeUnorderedValueSet()) {
     _memUsageBytes = sizeof(*this);
 }
 
@@ -83,12 +84,9 @@ void AccumulatorAddToSet::reset() {
     _memUsageBytes = sizeof(*this);
 }
 
-intrusive_ptr<Accumulator> AccumulatorAddToSet::create() {
-    return new AccumulatorAddToSet();
-}
-
-void AccumulatorAddToSet::doInjectExpressionContext() {
-    _set = getExpressionContext()->getValueComparator().makeUnorderedValueSet();
+intrusive_ptr<Accumulator> AccumulatorAddToSet::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return new AccumulatorAddToSet(expCtx);
 }
 
 }  // namespace mongo

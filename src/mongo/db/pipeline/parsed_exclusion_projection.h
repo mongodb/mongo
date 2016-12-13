@@ -108,8 +108,8 @@ public:
     /**
      * Parses the projection specification given by 'spec', populating internal data structures.
      */
-    void parse(const BSONObj& spec) final {
-        parse(spec, _root.get(), 0);
+    void parse(const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& spec) final {
+        parse(expCtx, spec, _root.get(), 0);
     }
 
     /**
@@ -134,7 +134,10 @@ private:
      * Traverses 'spec' and parses each field. Adds any excluded fields at this level to 'node',
      * and recurses on any sub-objects.
      */
-    void parse(const BSONObj& spec, ExclusionNode* node, size_t depth);
+    void parse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+               const BSONObj& spec,
+               ExclusionNode* node,
+               size_t depth);
 
 
     // The ExclusionNode tree does most of the execution work once constructed.

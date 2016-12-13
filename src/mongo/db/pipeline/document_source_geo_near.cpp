@@ -178,7 +178,6 @@ void DocumentSourceGeoNear::runCommand() {
 intrusive_ptr<DocumentSourceGeoNear> DocumentSourceGeoNear::create(
     const intrusive_ptr<ExpressionContext>& pCtx) {
     intrusive_ptr<DocumentSourceGeoNear> source(new DocumentSourceGeoNear(pCtx));
-    source->injectExpressionContext(pCtx);
     return source;
 }
 

@@ -44,6 +44,8 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
+    // It is illegal to construct a DocumentSourceSortByCount directly, use createFromBson()
+    // instead.
     DocumentSourceSortByCount() = default;
 };
 

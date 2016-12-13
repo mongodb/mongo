@@ -259,7 +259,7 @@ private:
 }  // namespace
 
 std::unique_ptr<ParsedAggregationProjection> ParsedAggregationProjection::create(
-    const BSONObj& spec) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& spec) {
     // Check that the specification was valid. Status returned is unspecific because validate()
     // is used by the $addFields stage as well as $project.
     // If there was an error, uassert with a $project-specific message.
@@ -282,7 +282,7 @@ std::unique_ptr<ParsedAggregationProjection> ParsedAggregationProjection::create
             : static_cast<ParsedAggregationProjection*>(new ParsedExclusionProjection()));
 
     // Actually parse the specification.
-    parsedProject->parse(spec);
+    parsedProject->parse(expCtx, spec);
     return parsedProject;
 }
 

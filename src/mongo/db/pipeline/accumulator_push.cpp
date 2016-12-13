@@ -71,7 +71,8 @@ Value AccumulatorPush::getValue(bool toBeMerged) const {
     return Value(vpValue);
 }
 
-AccumulatorPush::AccumulatorPush() {
+AccumulatorPush::AccumulatorPush(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    : Accumulator(expCtx) {
     _memUsageBytes = sizeof(*this);
 }
 
@@ -80,7 +81,8 @@ void AccumulatorPush::reset() {
     _memUsageBytes = sizeof(*this);
 }
 
-intrusive_ptr<Accumulator> AccumulatorPush::create() {
-    return new AccumulatorPush();
+intrusive_ptr<Accumulator> AccumulatorPush::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return new AccumulatorPush(expCtx);
 }
 }

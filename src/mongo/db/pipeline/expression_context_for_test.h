@@ -28,38 +28,37 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo {
 
-class DocumentSourceSample final : public DocumentSource, public SplittableDocumentSource {
+/**
+ * An ExpressionContext that can have state like the collation and resolved namespace map
+ * manipulated after construction. In contrast, a regular ExpressionContext requires the collation
+ * and resolved namespaces to be provided on construction and does not allow them to be subsequently
+ * mutated.
+ */
+class ExpressionContextForTest : public ExpressionContext {
 public:
-    GetNextResult getNext() final;
-    const char* getSourceName() const final;
-    Value serialize(bool explain = false) const final;
+    ExpressionContextForTest() = default;
 
-    GetDepsReturn getDependencies(DepsTracker* deps) const final {
-        return SEE_NEXT;
+    ExpressionContextForTest(OperationContext* txn, const AggregationRequest& request)
+        : ExpressionContext(txn, request, nullptr, {}) {}
+
+    /**
+     * Changes the collation used by this ExpressionContext. Must not be changed after parsing a
+     * Pipeline with this ExpressionContext.
+     */
+    void setCollator(std::unique_ptr<CollatorInterface> collator) {
+        ExpressionContext::setCollator(std::move(collator));
     }
 
-    boost::intrusive_ptr<DocumentSource> getShardSource() final;
-    boost::intrusive_ptr<DocumentSource> getMergeSource() final;
-
-    long long getSampleSize() const {
-        return _size;
+    /**
+     * Sets the resolved definition for an involved namespace.
+     */
+    void setResolvedNamespace(const NamespaceString& nss, ResolvedNamespace resolvedNamespace) {
+        _resolvedNamespaces[nss.coll()] = std::move(resolvedNamespace);
     }
-
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
-private:
-    explicit DocumentSourceSample(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-    long long _size;
-
-    // Uses a $sort stage to randomly sort the documents.
-    boost::intrusive_ptr<DocumentSourceSort> _sortStage;
 };
 
 }  // namespace mongo

@@ -45,7 +45,7 @@
 
 namespace mongo {
 
-struct ExpressionContext : public IntrusiveCounterUnsigned {
+class ExpressionContext : public RefCountable {
 public:
     struct ResolvedNamespace {
         ResolvedNamespace() = default;
@@ -55,17 +55,20 @@ public:
         std::vector<BSONObj> pipeline;
     };
 
-    ExpressionContext() = default;
-
-    ExpressionContext(OperationContext* opCtx, const AggregationRequest& request);
+    /**
+     * Constructs an ExpressionContext to be used for Pipeline parsing and evaluation.
+     * 'resolvedNamespaces' maps collection names (not full namespaces) to ResolvedNamespaces.
+     */
+    ExpressionContext(OperationContext* opCtx,
+                      const AggregationRequest& request,
+                      std::unique_ptr<CollatorInterface> collator,
+                      StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces);
 
     /**
      * Used by a pipeline to check for interrupts so that killOp() works. Throws a UserAssertion if
      * this aggregation pipeline has been interrupted.
      */
     void checkForInterrupt();
-
-    void setCollator(std::unique_ptr<CollatorInterface> coll);
 
     const CollatorInterface* getCollator() const {
         return _collator.get();
@@ -85,6 +88,16 @@ public:
      */
     boost::intrusive_ptr<ExpressionContext> copyWith(NamespaceString ns) const;
 
+    /**
+     * Returns the ResolvedNamespace corresponding to 'nss'. It is an error to call this method on a
+     * namespace not involved in the pipeline.
+     */
+    const ResolvedNamespace& getResolvedNamespace(const NamespaceString& nss) const {
+        auto it = _resolvedNamespaces.find(nss.coll());
+        invariant(it != _resolvedNamespaces.end());
+        return it->second;
+    };
+
     bool isExplain = false;
     bool inShard = false;
     bool inRouter = false;
@@ -100,19 +113,34 @@ public:
     // collation.
     BSONObj collation;
 
-    StringMap<ResolvedNamespace> resolvedNamespaces;
-
+protected:
     static const int kInterruptCheckPeriod = 128;
-    int interruptCounter = kInterruptCheckPeriod;  // when 0, check interruptStatus
 
-private:
-    // Collator used to compare elements. 'collator' is initialized from 'collation', except in the
-    // case where 'collation' is empty and there is a collection default collation.
+    /**
+     * Should only be used by 'ExpressionContextForTest'.
+     */
+    ExpressionContext() = default;
+
+    /**
+     * Sets '_collator' and resets '_documentComparator' and '_valueComparator'.
+     *
+     * Use with caution - it is illegal to change the collation once a Pipeline has been parsed with
+     * this ExpressionContext.
+     */
+    void setCollator(std::unique_ptr<CollatorInterface> collator);
+
+    // Collator used for comparisons.
     std::unique_ptr<CollatorInterface> _collator;
 
     // Used for all comparisons of Document/Value during execution of the aggregation operation.
+    // Must not be changed after parsing a Pipeline with this ExpressionContext.
     DocumentComparator _documentComparator;
     ValueComparator _valueComparator;
+
+    // A map from namespace to the resolved namespace, in case any views are involved.
+    StringMap<ResolvedNamespace> _resolvedNamespaces;
+
+    int _interruptCounter = kInterruptCheckPeriod;
 };
 
 }  // namespace mongo

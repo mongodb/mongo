@@ -188,7 +188,6 @@ public:
             return pipeline.getStatus();
         }
 
-        pipeline.getValue()->injectExpressionContext(expCtx);
         pipeline.getValue()->optimizePipeline();
 
         AutoGetCollectionForRead autoColl(expCtx->opCtx, expCtx->ns);
@@ -294,7 +293,8 @@ StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
     // that the user omitted.
     //
     // If pipeline has a null collator (representing the "simple" collation), we simply set the
-    // collation option to the original user BSON.
+    // collation option to the original user BSON, which is either the empty object (unspecified),
+    // or the specification for the "simple" collation.
     qr->setCollation(pExpCtx->getCollator() ? pExpCtx->getCollator()->getSpec().toBSON()
                                             : pExpCtx->collation);
 

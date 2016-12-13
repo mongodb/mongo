@@ -95,56 +95,57 @@ const vector<double> e192Series{
 }  //  namespace
 
 // Register the GranularityRounders for the Renard number series.
-REGISTER_GRANULARITY_ROUNDER(R5, []() {
-    return GranularityRounderPreferredNumbers::create(r5Series, "R5");
+REGISTER_GRANULARITY_ROUNDER(R5, [](const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return GranularityRounderPreferredNumbers::create(expCtx, r5Series, "R5");
 });
-REGISTER_GRANULARITY_ROUNDER(R10, []() {
-    return GranularityRounderPreferredNumbers::create(r10Series, "R10");
+REGISTER_GRANULARITY_ROUNDER(R10, [](const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return GranularityRounderPreferredNumbers::create(expCtx, r10Series, "R10");
 });
-REGISTER_GRANULARITY_ROUNDER(R20, []() {
-    return GranularityRounderPreferredNumbers::create(r20Series, "R20");
+REGISTER_GRANULARITY_ROUNDER(R20, [](const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return GranularityRounderPreferredNumbers::create(expCtx, r20Series, "R20");
 });
-REGISTER_GRANULARITY_ROUNDER(R40, []() {
-    return GranularityRounderPreferredNumbers::create(r40Series, "R40");
+REGISTER_GRANULARITY_ROUNDER(R40, [](const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return GranularityRounderPreferredNumbers::create(expCtx, r40Series, "R40");
 });
-REGISTER_GRANULARITY_ROUNDER(R80, []() {
-    return GranularityRounderPreferredNumbers::create(r80Series, "R80");
+REGISTER_GRANULARITY_ROUNDER(R80, [](const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return GranularityRounderPreferredNumbers::create(expCtx, r80Series, "R80");
 });
 
-REGISTER_GRANULARITY_ROUNDER_GENERAL("1-2-5", 1_2_5, []() {
-    return GranularityRounderPreferredNumbers::create(series125, "1-2-5");
-});
+REGISTER_GRANULARITY_ROUNDER_GENERAL(
+    "1-2-5", 1_2_5, [](const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+        return GranularityRounderPreferredNumbers::create(expCtx, series125, "1-2-5");
+    });
 
 // Register the GranularityRounders for the E series.
-REGISTER_GRANULARITY_ROUNDER(E6, []() {
-    return GranularityRounderPreferredNumbers::create(e6Series, "E6");
+REGISTER_GRANULARITY_ROUNDER(E6, [](const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return GranularityRounderPreferredNumbers::create(expCtx, e6Series, "E6");
 });
-REGISTER_GRANULARITY_ROUNDER(E12, []() {
-    return GranularityRounderPreferredNumbers::create(e12Series, "E12");
+REGISTER_GRANULARITY_ROUNDER(E12, [](const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return GranularityRounderPreferredNumbers::create(expCtx, e12Series, "E12");
 });
-REGISTER_GRANULARITY_ROUNDER(E24, []() {
-    return GranularityRounderPreferredNumbers::create(e24Series, "E24");
+REGISTER_GRANULARITY_ROUNDER(E24, [](const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return GranularityRounderPreferredNumbers::create(expCtx, e24Series, "E24");
 });
-REGISTER_GRANULARITY_ROUNDER(E48, []() {
-    return GranularityRounderPreferredNumbers::create(e48Series, "E48");
+REGISTER_GRANULARITY_ROUNDER(E48, [](const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return GranularityRounderPreferredNumbers::create(expCtx, e48Series, "E48");
 });
-REGISTER_GRANULARITY_ROUNDER(E96, []() {
-    return GranularityRounderPreferredNumbers::create(e96Series, "E96");
+REGISTER_GRANULARITY_ROUNDER(E96, [](const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return GranularityRounderPreferredNumbers::create(expCtx, e96Series, "E96");
 });
-REGISTER_GRANULARITY_ROUNDER(E192, []() {
-    return GranularityRounderPreferredNumbers::create(e192Series, "E192");
+REGISTER_GRANULARITY_ROUNDER(E192, [](const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return GranularityRounderPreferredNumbers::create(expCtx, e192Series, "E192");
 });
 
-GranularityRounderPreferredNumbers::GranularityRounderPreferredNumbers(vector<double> baseSeries,
-                                                                       string name)
-    : _baseSeries(baseSeries), _name(name) {
+GranularityRounderPreferredNumbers::GranularityRounderPreferredNumbers(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, vector<double> baseSeries, string name)
+    : GranularityRounder(expCtx), _baseSeries(baseSeries), _name(name) {
     invariant(_baseSeries.size() > 1);
     invariant(std::is_sorted(_baseSeries.begin(), _baseSeries.end()));
 }
 
 intrusive_ptr<GranularityRounder> GranularityRounderPreferredNumbers::create(
-    vector<double> baseSeries, string name) {
-    return new GranularityRounderPreferredNumbers(baseSeries, name);
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, vector<double> baseSeries, string name) {
+    return new GranularityRounderPreferredNumbers(expCtx, baseSeries, name);
 }
 
 namespace {

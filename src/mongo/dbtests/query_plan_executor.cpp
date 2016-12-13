@@ -45,7 +45,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
-#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_solution.h"
@@ -283,8 +283,8 @@ public:
 
         // Create the aggregation pipeline.
         std::vector<BSONObj> rawPipeline = {fromjson("{$match: {a: {$gte: 7, $lte: 10}}}")};
-        boost::intrusive_ptr<ExpressionContext> expCtx =
-            new ExpressionContext(&_txn, AggregationRequest(nss, rawPipeline));
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx =
+            new ExpressionContextForTest(&_txn, AggregationRequest(nss, rawPipeline));
 
         // Create an "inner" plan executor and register it with the cursor manager so that it can
         // get notified when the collection is dropped.

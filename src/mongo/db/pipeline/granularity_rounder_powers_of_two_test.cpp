@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/granularity_rounder.h"
 
 #include "mongo/db/pipeline/document_value_test_util.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -50,7 +51,8 @@ void testEquals(Value actual, Value expected, double delta = DELTA) {
 }
 
 TEST(GranularityRounderPowersOfTwoTest, ShouldRoundUpPowersOfTwoToNextPowerOfTwo) {
-    auto rounder = GranularityRounder::getGranularityRounder("POWERSOF2");
+    auto rounder =
+        GranularityRounder::getGranularityRounder(new ExpressionContextForTest(), "POWERSOF2");
 
     testEquals(rounder->roundUp(Value(0.5)), Value(1));
     testEquals(rounder->roundUp(Value(1)), Value(2));
@@ -64,7 +66,8 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldRoundUpPowersOfTwoToNextPowerOfTwo
 }
 
 TEST(GranularityRounderPowersOfTwoTest, ShouldReturnDoubleIfExceedsNumberLong) {
-    auto rounder = GranularityRounder::getGranularityRounder("POWERSOF2");
+    auto rounder =
+        GranularityRounder::getGranularityRounder(new ExpressionContextForTest(), "POWERSOF2");
 
     long long input = 4611686018427387905;  // 2^62 + 1
     double output = 9223372036854775808.0;  // 2^63
@@ -78,7 +81,8 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldReturnDoubleIfExceedsNumberLong) {
 }
 
 TEST(GranularityRounderPowersOfTwoTest, ShouldReturnNumberLongIfExceedsNumberInt) {
-    auto rounder = GranularityRounder::getGranularityRounder("POWERSOF2");
+    auto rounder =
+        GranularityRounder::getGranularityRounder(new ExpressionContextForTest(), "POWERSOF2");
 
     int input = 1073741824;         // 2^30
     long long output = 2147483648;  // 2^31
@@ -92,7 +96,8 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldReturnNumberLongIfExceedsNumberInt
 }
 
 TEST(GranularityRounderPowersOfTwoTest, ShouldReturnNumberLongIfRoundedDownDoubleIsSmallEnough) {
-    auto rounder = GranularityRounder::getGranularityRounder("POWERSOF2");
+    auto rounder =
+        GranularityRounder::getGranularityRounder(new ExpressionContextForTest(), "POWERSOF2");
 
     double input = 9223372036854775808.0;    // 2^63
     long long output = 4611686018427387904;  // 2^62
@@ -106,7 +111,8 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldReturnNumberLongIfRoundedDownDoubl
 }
 
 TEST(GranularityRounderPowersOfTwoTest, ShouldReturnNumberIntIfRoundedDownNumberLongIsSmallEnough) {
-    auto rounder = GranularityRounder::getGranularityRounder("POWERSOF2");
+    auto rounder =
+        GranularityRounder::getGranularityRounder(new ExpressionContextForTest(), "POWERSOF2");
 
     long long input = 2147483648;  // 2^31
     int output = 1073741824;       // 2^30
@@ -120,7 +126,8 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldReturnNumberIntIfRoundedDownNumber
 }
 
 TEST(GranularityRounderPowersOfTwoTest, ShouldReturnNumberDecimalWhenRoundingUpNumberDecimal) {
-    auto rounder = GranularityRounder::getGranularityRounder("POWERSOF2");
+    auto rounder =
+        GranularityRounder::getGranularityRounder(new ExpressionContextForTest(), "POWERSOF2");
 
     Decimal128 input = Decimal128(0.12);
     Decimal128 output = Decimal128(0.125);
@@ -134,7 +141,8 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldReturnNumberDecimalWhenRoundingUpN
 }
 
 TEST(GranularityRounderPowersOfTwoTest, ShouldReturnNumberDecimalWhenRoundingDownNumberDecimal) {
-    auto rounder = GranularityRounder::getGranularityRounder("POWERSOF2");
+    auto rounder =
+        GranularityRounder::getGranularityRounder(new ExpressionContextForTest(), "POWERSOF2");
 
     Decimal128 input = Decimal128(0.13);
     Decimal128 output = Decimal128(0.125);
@@ -148,7 +156,8 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldReturnNumberDecimalWhenRoundingDow
 }
 
 TEST(GranularityRounderPowersOfTwoTest, ShouldRoundUpNonPowersOfTwoToNextPowerOfTwo) {
-    auto rounder = GranularityRounder::getGranularityRounder("POWERSOF2");
+    auto rounder =
+        GranularityRounder::getGranularityRounder(new ExpressionContextForTest(), "POWERSOF2");
 
     testEquals(rounder->roundUp(Value(3)), Value(4));
     testEquals(rounder->roundUp(Value(5)), Value(8));
@@ -168,7 +177,8 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldRoundUpNonPowersOfTwoToNextPowerOf
 }
 
 TEST(GranularityRounderPowersOfTwoTest, ShouldRoundDownPowersOfTwoToNextPowerOfTwo) {
-    auto rounder = GranularityRounder::getGranularityRounder("POWERSOF2");
+    auto rounder =
+        GranularityRounder::getGranularityRounder(new ExpressionContextForTest(), "POWERSOF2");
 
     testEquals(rounder->roundDown(Value(16)), Value(8));
     testEquals(rounder->roundDown(Value(8)), Value(4));
@@ -183,7 +193,8 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldRoundDownPowersOfTwoToNextPowerOfT
 }
 
 TEST(GranularityRounderPowersOfTwoTest, ShouldRoundDownNonPowersOfTwoToNextPowerOfTwo) {
-    auto rounder = GranularityRounder::getGranularityRounder("POWERSOF2");
+    auto rounder =
+        GranularityRounder::getGranularityRounder(new ExpressionContextForTest(), "POWERSOF2");
 
     testEquals(rounder->roundDown(Value(10)), Value(8));
     testEquals(rounder->roundDown(Value(9)), Value(8));
@@ -201,14 +212,16 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldRoundDownNonPowersOfTwoToNextPower
 }
 
 TEST(GranularityRounderPowersOfTwoTest, ShouldRoundZeroToZero) {
-    auto rounder = GranularityRounder::getGranularityRounder("POWERSOF2");
+    auto rounder =
+        GranularityRounder::getGranularityRounder(new ExpressionContextForTest(), "POWERSOF2");
 
     testEquals(rounder->roundUp(Value(0)), Value(0));
     testEquals(rounder->roundDown(Value(0)), Value(0));
 }
 
 TEST(GranularityRounderPowersOfTwoTest, ShouldFailOnRoundingNonNumericValues) {
-    auto rounder = GranularityRounder::getGranularityRounder("POWERSOF2");
+    auto rounder =
+        GranularityRounder::getGranularityRounder(new ExpressionContextForTest(), "POWERSOF2");
 
     // Make sure that each GranularityRounder fails when rounding a non-numeric value.
     Value stringValue = Value("test");
@@ -217,7 +230,8 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldFailOnRoundingNonNumericValues) {
 }
 
 TEST(GranularityRounderPowersOfTwoTest, ShouldFailOnRoundingNaN) {
-    auto rounder = GranularityRounder::getGranularityRounder("POWERSOF2");
+    auto rounder =
+        GranularityRounder::getGranularityRounder(new ExpressionContextForTest(), "POWERSOF2");
 
     Value nan = Value(std::nan("NaN"));
     ASSERT_THROWS_CODE(rounder->roundUp(nan), UserException, 40266);
@@ -232,7 +246,8 @@ TEST(GranularityRounderPowersOfTwoTest, ShouldFailOnRoundingNaN) {
 }
 
 TEST(GranularityRounderPowersOfTwoTest, ShouldFailOnRoundingNegativeNumber) {
-    auto rounder = GranularityRounder::getGranularityRounder("POWERSOF2");
+    auto rounder =
+        GranularityRounder::getGranularityRounder(new ExpressionContextForTest(), "POWERSOF2");
 
     Value negativeNumber = Value(-1);
     ASSERT_THROWS_CODE(rounder->roundUp(negativeNumber), UserException, 40267);

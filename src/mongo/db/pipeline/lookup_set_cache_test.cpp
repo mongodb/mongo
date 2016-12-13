@@ -52,9 +52,10 @@ BSONObj intToObj(int value) {
     return BSON("n" << value);
 }
 
+const ValueComparator defaultComparator{nullptr};
+
 TEST(LookupSetCacheTest, InsertAndRetrieveWorksCorrectly) {
-    const StringData::ComparatorInterface* stringComparator = nullptr;
-    LookupSetCache cache(stringComparator);
+    LookupSetCache cache(defaultComparator);
     cache.insert(Value(0), intToObj(1));
     cache.insert(Value(0), intToObj(2));
     cache.insert(Value(0), intToObj(3));
@@ -70,8 +71,7 @@ TEST(LookupSetCacheTest, InsertAndRetrieveWorksCorrectly) {
 }
 
 TEST(LookupSetCacheTest, CacheDoesEvictInExpectedOrder) {
-    const StringData::ComparatorInterface* stringComparator = nullptr;
-    LookupSetCache cache(stringComparator);
+    LookupSetCache cache(defaultComparator);
 
     cache.insert(Value(0), intToObj(0));
     cache.insert(Value(1), intToObj(0));
@@ -90,8 +90,7 @@ TEST(LookupSetCacheTest, CacheDoesEvictInExpectedOrder) {
 }
 
 TEST(LookupSetCacheTest, ReadDoesMoveKeyToFrontOfCache) {
-    const StringData::ComparatorInterface* stringComparator = nullptr;
-    LookupSetCache cache(stringComparator);
+    LookupSetCache cache(defaultComparator);
 
     cache.insert(Value(0), intToObj(0));
     cache.insert(Value(1), intToObj(0));
@@ -106,8 +105,7 @@ TEST(LookupSetCacheTest, ReadDoesMoveKeyToFrontOfCache) {
 }
 
 TEST(LookupSetCacheTest, InsertDoesPutKeyInMiddle) {
-    const StringData::ComparatorInterface* stringComparator = nullptr;
-    LookupSetCache cache(stringComparator);
+    LookupSetCache cache(defaultComparator);
 
     cache.insert(Value(0), intToObj(0));
     cache.insert(Value(1), intToObj(0));
@@ -120,8 +118,7 @@ TEST(LookupSetCacheTest, InsertDoesPutKeyInMiddle) {
 }
 
 TEST(LookupSetCacheTest, EvictDoesRespectMemoryUsage) {
-    const StringData::ComparatorInterface* stringComparator = nullptr;
-    LookupSetCache cache(stringComparator);
+    LookupSetCache cache(defaultComparator);
 
     cache.insert(Value(0), intToObj(0));
     cache.insert(Value(1), intToObj(0));
@@ -134,8 +131,7 @@ TEST(LookupSetCacheTest, EvictDoesRespectMemoryUsage) {
 }
 
 TEST(LookupSetCacheTest, ComplexAccessPatternDoesBehaveCorrectly) {
-    const StringData::ComparatorInterface* stringComparator = nullptr;
-    LookupSetCache cache(stringComparator);
+    LookupSetCache cache(defaultComparator);
 
     for (int i = 0; i < 5; i++) {
         for (int j = 0; j < 5; j++) {
@@ -173,7 +169,8 @@ TEST(LookupSetCacheTest, ComplexAccessPatternDoesBehaveCorrectly) {
 
 TEST(LookupSetCacheTest, CacheKeysRespectCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
-    LookupSetCache cache(&collator);
+    ValueComparator comparator{&collator};
+    LookupSetCache cache(comparator);
 
     cache.insert(Value("foo"), intToObj(1));
     cache.insert(Value("FOO"), intToObj(2));
@@ -196,7 +193,8 @@ TEST(LookupSetCacheTest, CacheKeysRespectCollation) {
 // foreign collection.
 TEST(LookupSetCacheTest, CachedValuesDontRespectCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
-    LookupSetCache cache(&collator);
+    ValueComparator comparator{&collator};
+    LookupSetCache cache(comparator);
 
     cache.insert(Value("foo"),
                  BSON("foo"

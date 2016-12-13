@@ -269,22 +269,10 @@ public:
     virtual void reattachToOperationContext(OperationContext* opCtx) {}
 
     /**
-     * Injects a new ExpressionContext into this DocumentSource and propagates the ExpressionContext
-     * to all child expressions, accumulators, etc.
-     *
-     * Stages which require work to propagate the ExpressionContext to their private execution
-     * machinery should override doInjectExpressionContext().
-     */
-    void injectExpressionContext(const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        pExpCtx = expCtx;
-        doInjectExpressionContext();
-    }
-
-    /**
      * Create a DocumentSource pipeline stage from 'stageObj'.
      */
     static std::vector<boost::intrusive_ptr<DocumentSource>> parse(
-        const boost::intrusive_ptr<ExpressionContext> expCtx, BSONObj stageObj);
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, BSONObj stageObj);
 
     /**
      * Registers a DocumentSource with a parsing function, so that when a stage with the given name
@@ -442,15 +430,6 @@ protected:
        Base constructor.
      */
     explicit DocumentSource(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-    /**
-     * DocumentSources which need to update their internal state when attaching to a new
-     * ExpressionContext should override this method.
-     *
-     * Any stage subclassing from DocumentSource should override this method if it contains
-     * expressions or accumulators which need to attach to the newly injected ExpressionContext.
-     */
-    virtual void doInjectExpressionContext() {}
 
     /**
      * Attempt to perform an optimization with the following source in the pipeline. 'container'

@@ -259,7 +259,6 @@ boost::intrusive_ptr<Pipeline> reparsePipeline(
         fassertFailedWithStatusNoTrace(40175, reparsedPipeline.getStatus());
     }
 
-    reparsedPipeline.getValue()->injectExpressionContext(expCtx);
     reparsedPipeline.getValue()->optimizePipeline();
     return reparsedPipeline.getValue();
 }
@@ -351,18 +350,15 @@ public:
         // For operations on views, this will be the underlying namespace.
         const NamespaceString& nss = request.getNamespaceString();
 
-        // Set up the ExpressionContext.
-        intrusive_ptr<ExpressionContext> expCtx = new ExpressionContext(txn, request);
-        expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
-
-        auto resolvedNamespaces = resolveInvolvedNamespaces(txn, request);
-        if (!resolvedNamespaces.isOK()) {
-            return appendCommandStatus(result, resolvedNamespaces.getStatus());
-        }
-        expCtx->resolvedNamespaces = std::move(resolvedNamespaces.getValue());
+        // Parse the user-specified collation, if any.
+        std::unique_ptr<CollatorInterface> userSpecifiedCollator = request.getCollation().isEmpty()
+            ? nullptr
+            : uassertStatusOK(CollatorFactoryInterface::get(txn->getServiceContext())
+                                  ->makeFromBSON(request.getCollation()));
 
         unique_ptr<ClientCursorPin> pin;  // either this OR the exec will be non-null
         unique_ptr<PlanExecutor> exec;
+        boost::intrusive_ptr<ExpressionContext> expCtx;
         boost::intrusive_ptr<Pipeline> pipeline;
         auto curOp = CurOp::get(txn);
         {
@@ -388,7 +384,7 @@ public:
                 // means that no collation was specified.
                 if (!request.getCollation().isEmpty()) {
                     if (!CollatorInterface::collatorsMatch(ctx.getView()->defaultCollator(),
-                                                           expCtx->getCollator())) {
+                                                           userSpecifiedCollator.get())) {
                         return appendCommandStatus(result,
                                                    {ErrorCodes::OptionNotSupportedOnView,
                                                     "Cannot override a view's default collation"});
@@ -441,13 +437,25 @@ public:
                 return status;
             }
 
+            // Determine the appropriate collation to make the ExpressionContext.
+
             // If the pipeline does not have a user-specified collation, set it from the collection
-            // default.
+            // default. Be careful to consult the original request BSON to check if a collation was
+            // specified, since a specification of {locale: "simple"} will result in a null
+            // collator.
+            auto collatorToUse = std::move(userSpecifiedCollator);
             if (request.getCollation().isEmpty() && collection &&
                 collection->getDefaultCollator()) {
-                invariant(!expCtx->getCollator());
-                expCtx->setCollator(collection->getDefaultCollator()->clone());
+                invariant(!collatorToUse);
+                collatorToUse = collection->getDefaultCollator()->clone();
             }
+
+            expCtx.reset(
+                new ExpressionContext(txn,
+                                      request,
+                                      std::move(collatorToUse),
+                                      uassertStatusOK(resolveInvolvedNamespaces(txn, request))));
+            expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
 
             // Parse the pipeline.
             auto statusWithPipeline = Pipeline::parse(request.getPipeline(), expCtx);
@@ -464,14 +472,6 @@ public:
                 return appendCommandStatus(result, pipelineCollationStatus);
             }
 
-            // Propagate the ExpressionContext throughout all of the pipeline's stages and
-            // expressions.
-            pipeline->injectExpressionContext(expCtx);
-
-            // The pipeline must be optimized after the correct collator has been set on it (by
-            // injecting the ExpressionContext containing the collator). This is necessary because
-            // optimization may make string comparisons, e.g. optimizing {$eq: [<str1>, <str2>]} to
-            // a constant.
             pipeline->optimizePipeline();
 
             if (kDebugBuild && !expCtx->isExplain && !expCtx->inShard) {

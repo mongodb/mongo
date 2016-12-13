@@ -57,7 +57,6 @@ intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::create(
     const intrusive_ptr<ExpressionContext>& pExpCtx) {
     intrusive_ptr<DocumentSourceMergeCursors> source(
         new DocumentSourceMergeCursors(std::move(cursorDescriptors), pExpCtx));
-    source->injectExpressionContext(pExpCtx);
     return source;
 }
 

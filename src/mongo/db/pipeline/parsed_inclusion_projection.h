@@ -119,8 +119,6 @@ public:
         return _pathToNode;
     }
 
-    void injectExpressionContext(const boost::intrusive_ptr<ExpressionContext>& expCtx);
-
     /**
      * Recursively add all paths that are preserved by this inclusion projection.
      */
@@ -184,10 +182,10 @@ public:
     /**
      * Parses the projection specification given by 'spec', populating internal data structures.
      */
-    void parse(const BSONObj& spec) final {
+    void parse(const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& spec) final {
         VariablesIdGenerator idGenerator;
         VariablesParseState variablesParseState(&idGenerator);
-        parse(spec, variablesParseState);
+        parse(expCtx, spec, variablesParseState);
         _variables = stdx::make_unique<Variables>(idGenerator.getIdCount());
     }
 
@@ -208,10 +206,6 @@ public:
      */
     void optimize() final {
         _root->optimize();
-    }
-
-    void injectExpressionContext(const boost::intrusive_ptr<ExpressionContext>& expCtx) final {
-        _root->injectExpressionContext(expCtx);
     }
 
     DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const final {
@@ -246,7 +240,9 @@ private:
      * Parses 'spec' to determine which fields to include, which are computed, and whether to
      * include '_id' or not.
      */
-    void parse(const BSONObj& spec, const VariablesParseState& variablesParseState);
+    void parse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+               const BSONObj& spec,
+               const VariablesParseState& variablesParseState);
 
     /**
      * Attempts to parse 'objSpec' as an expression like {$add: [...]}. Adds a computed field to
@@ -256,7 +252,8 @@ private:
      * Throws an error if it was determined to be an expression specification, but failed to parse
      * as a valid expression.
      */
-    bool parseObjectAsExpression(StringData pathToObject,
+    bool parseObjectAsExpression(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                 StringData pathToObject,
                                  const BSONObj& objSpec,
                                  const VariablesParseState& variablesParseState);
 
@@ -264,7 +261,8 @@ private:
      * Traverses 'subObj' and parses each field. Adds any included or computed fields at this level
      * to 'node'.
      */
-    void parseSubObject(const BSONObj& subObj,
+    void parseSubObject(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                        const BSONObj& subObj,
                         const VariablesParseState& variablesParseState,
                         InclusionNode* node);
 

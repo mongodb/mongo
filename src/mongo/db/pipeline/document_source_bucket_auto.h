@@ -93,7 +93,10 @@ private:
 
     // struct for holding information about a bucket.
     struct Bucket {
-        Bucket(Value min, Value max, std::vector<Accumulator::Factory> accumulatorFactories);
+        Bucket(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+               Value min,
+               Value max,
+               std::vector<Accumulator::Factory> accumulatorFactories);
         Value _min;
         Value _max;
         std::vector<boost::intrusive_ptr<Accumulator>> _accums;
