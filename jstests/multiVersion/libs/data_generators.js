@@ -170,12 +170,6 @@ function DataGenerator() {
     function GenTimestamp(seed) {
         var seed = seed || 0;
 
-        // Make sure our timestamp is not zero, because that doesn't round trip from 2.4 to latest.
-        // See SERVER-12302.
-        if (seed == 0) {
-            seed = 1;
-        }
-
         return Timestamp(seed, (seed * 100000) / 99999);
     }
     // BSON Type: 18
@@ -528,21 +522,11 @@ function IndexDataGenerator(options) {
     }
 
     function GenTextIndexOptions(seed) {
-        var attributes = GenIndexOptions(seed);
-        // When using a text index, the following additional index properties are required when
-        // downgrading from 2.6:
-        // { "textIndexVersion" : 1 }
-        attributes["textIndexVersion"] = 1;
-        return attributes;
+        return GenIndexOptions(seed);
     }
 
     function Gen2dSphereIndexOptions(seed) {
-        var attributes = GenIndexOptions(seed);
-        // When using a 2dsphere index, the following additional index properties are required when
-        // downgrading from 2.6:
-        // { "2dsphereIndexVersion" : 1 }
-        attributes["2dsphereIndexVersion"] = 1;
-        return attributes;
+        return GenIndexOptions(seed);
     }
 
     testIndexes = [
@@ -641,15 +625,11 @@ function CollectionMetadataGenerator(options) {
         "capped": true,
         "size": 100000,
         "max": 2000,
-        "usePowerOf2Sizes": true,
-        //"autoIndexId" : false // XXX: this doesn't exist in 2.4
     };
-    // We need to explicitly enable usePowerOf2Sizes, since it's the default in 2.6 but not in 2.4
-    var normalCollectionMetadata = {"usePowerOf2Sizes": true};
 
     return {
         "get": function() {
-            return capped ? cappedCollectionMetadata : normalCollectionMetadata;
+            return capped ? cappedCollectionMetadata : {};
         }
     };
 }

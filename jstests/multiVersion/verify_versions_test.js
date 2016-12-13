@@ -35,6 +35,9 @@
     assertBinVersionsNotEqual("3.2", "3.0");
     assertBinVersionsNotEqual("3.0.9", "3.2.9");
 
+    assertBinVersionsEqual("3.4", "3.4.0-abcd");
+    assertBinVersionsNotEqual("3.4.0", "3.4.0-abcd");
+
     // Prohibit versions that don't have at least two components (3 is no good, 3.2 is).
     assert.throws(MongoRunner.areBinVersionsTheSame, ["3", "3.2"]);
     assert.throws(MongoRunner.areBinVersionsTheSame, ["3.2", "3"]);

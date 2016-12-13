@@ -37,7 +37,7 @@
     };
 
     // Create the cluster to test adding shards to.
-    var st = new ShardingTest({shards: 1, mongos: {s0: {binVersion: '3.2'}}});
+    var st = new ShardingTest({shards: 1, mongos: {s0: {binVersion: 'last-stable'}}});
     var clusterId = st.s.getDB('config').getCollection('version').findOne().clusterId;
 
     // Add a shard that is a standalone mongod.

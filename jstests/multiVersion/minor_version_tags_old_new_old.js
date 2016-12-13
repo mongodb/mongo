@@ -2,8 +2,7 @@
 (function() {
     'use strict';
 
-    // 3.2.1 is the final version to use the old style replSetUpdatePosition command.
-    var oldVersion = "3.2.1";
+    var oldVersion = "last-stable";
     var newVersion = "latest";
     var nodes = {
         n1: {binVersion: oldVersion},

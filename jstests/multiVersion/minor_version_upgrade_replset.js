@@ -5,8 +5,7 @@
 load('./jstests/multiVersion/libs/multi_rs.js');
 load('./jstests/libs/test_background_ops.js');
 
-// 3.2.1 is the final version to use the old style replSetUpdatePosition command.
-var oldVersion = "3.2.1";
+var oldVersion = "last-stable";
 
 var nodes = {
     n1: {binVersion: oldVersion},
