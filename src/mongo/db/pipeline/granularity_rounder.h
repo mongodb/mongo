@@ -32,6 +32,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/intrusive_counter.h"
@@ -73,7 +74,8 @@ namespace mongo {
  */
 class GranularityRounder : public RefCountable {
 public:
-    using Rounder = stdx::function<boost::intrusive_ptr<GranularityRounder>()>;
+    using Rounder = stdx::function<boost::intrusive_ptr<GranularityRounder>(
+        const boost::intrusive_ptr<ExpressionContext>&)>;
 
     /**
      * Registers a GranularityRounder with a parsing function so that when a granularity
@@ -89,7 +91,8 @@ public:
      * Retrieves the GranularityRounder for the granularity given by 'granularity', and raises an
      * error if there is no such granularity registered.
      */
-    static boost::intrusive_ptr<GranularityRounder> getGranularityRounder(StringData granularity);
+    static boost::intrusive_ptr<GranularityRounder> getGranularityRounder(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, StringData granularity);
 
     /**
      * Rounds up 'value' to the first value greater than 'value' in the granularity series. If
@@ -109,6 +112,16 @@ public:
      * Returns the name of the granularity series that the GranularityRounder is using for rounding.
      */
     virtual std::string getName() = 0;
+
+protected:
+    GranularityRounder(const boost::intrusive_ptr<ExpressionContext>& expCtx) : _expCtx(expCtx) {}
+
+    ExpressionContext* getExpCtx() {
+        return _expCtx.get();
+    }
+
+private:
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
 };
 
 /**
@@ -124,8 +137,10 @@ public:
      * 'baseSeries'. This method requires that baseSeries has at least 2 numbers and is in sorted
      * order.
      */
-    static boost::intrusive_ptr<GranularityRounder> create(const std::vector<double> baseSeries,
-                                                           std::string name);
+    static boost::intrusive_ptr<GranularityRounder> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const std::vector<double> baseSeries,
+        std::string name);
     Value roundUp(Value value);
     Value roundDown(Value value);
 
@@ -138,7 +153,9 @@ public:
     const std::vector<double> getSeries() const;
 
 private:
-    GranularityRounderPreferredNumbers(std::vector<double> baseSeries, std::string name);
+    GranularityRounderPreferredNumbers(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                       std::vector<double> baseSeries,
+                                       std::string name);
 
     // '_baseSeries' is the preferred number series that is used for rounding. A preferred numbers
     // series is infinite, but we represent it with a finite vector of numbers. When rounding, we
@@ -153,13 +170,16 @@ private:
  */
 class GranularityRounderPowersOfTwo final : public GranularityRounder {
 public:
-    static boost::intrusive_ptr<GranularityRounder> create();
+    static boost::intrusive_ptr<GranularityRounder> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
     Value roundUp(Value value);
     Value roundDown(Value value);
     std::string getName();
 
 private:
-    GranularityRounderPowersOfTwo() = default;
+    GranularityRounderPowersOfTwo(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : GranularityRounder(expCtx) {}
+
     std::string _name = "POWERSOF2";
 };
 }  //  namespace mongo

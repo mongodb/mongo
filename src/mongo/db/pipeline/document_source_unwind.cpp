@@ -183,7 +183,6 @@ intrusive_ptr<DocumentSourceUnwind> DocumentSourceUnwind::create(
                                  FieldPath(unwindPath),
                                  preserveNullAndEmptyArrays,
                                  indexPath ? FieldPath(*indexPath) : boost::optional<FieldPath>()));
-    source->injectExpressionContext(expCtx);
     return source;
 }
 

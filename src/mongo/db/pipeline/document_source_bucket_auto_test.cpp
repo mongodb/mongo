@@ -355,7 +355,7 @@ TEST_F(BucketAutoTests, ShouldBeAbleToCorrectlySpillToDisk) {
 
     VariablesIdGenerator idGen;
     VariablesParseState vps(&idGen);
-    auto groupByExpression = ExpressionFieldPath::parse("$a", vps);
+    auto groupByExpression = ExpressionFieldPath::parse(expCtx, "$a", vps);
 
     const int numBuckets = 2;
     auto bucketAutoStage = DocumentSourceBucketAuto::create(expCtx,
@@ -397,7 +397,7 @@ TEST_F(BucketAutoTests, ShouldBeAbleToPauseLoadingWhileSpilled) {
 
     VariablesIdGenerator idGen;
     VariablesParseState vps(&idGen);
-    auto groupByExpression = ExpressionFieldPath::parse("$a", vps);
+    auto groupByExpression = ExpressionFieldPath::parse(expCtx, "$a", vps);
 
     const int numBuckets = 2;
     auto bucketAutoStage = DocumentSourceBucketAuto::create(expCtx,
@@ -643,7 +643,7 @@ void assertCannotSpillToDisk(const boost::intrusive_ptr<ExpressionContext>& expC
 
     VariablesIdGenerator idGen;
     VariablesParseState vps(&idGen);
-    auto groupByExpression = ExpressionFieldPath::parse("$a", vps);
+    auto groupByExpression = ExpressionFieldPath::parse(expCtx, "$a", vps);
 
     const int numBuckets = 2;
     auto bucketAutoStage = DocumentSourceBucketAuto::create(expCtx,
@@ -685,7 +685,7 @@ TEST_F(BucketAutoTests, ShouldCorrectlyTrackMemoryUsageBetweenPauses) {
 
     VariablesIdGenerator idGen;
     VariablesParseState vps(&idGen);
-    auto groupByExpression = ExpressionFieldPath::parse("$a", vps);
+    auto groupByExpression = ExpressionFieldPath::parse(expCtx, "$a", vps);
 
     const int numBuckets = 2;
     auto bucketAutoStage = DocumentSourceBucketAuto::create(expCtx,

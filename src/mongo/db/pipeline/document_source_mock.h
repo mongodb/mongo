@@ -79,10 +79,6 @@ public:
         return this;
     }
 
-    void doInjectExpressionContext() override {
-        isExpCtxInjected = true;
-    }
-
     // Return documents from front of queue.
     std::deque<GetNextResult> queue;
 

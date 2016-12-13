@@ -198,23 +198,6 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::optimize() {
     return this;
 }
 
-void DocumentSourceGroup::doInjectExpressionContext() {
-    // Groups map must respect new comparator.
-    _groups = pExpCtx->getValueComparator().makeUnorderedValueMap<Accumulators>();
-
-    for (auto&& idExpr : _idExpressions) {
-        idExpr->injectExpressionContext(pExpCtx);
-    }
-
-    for (auto&& expr : vpExpression) {
-        expr->injectExpressionContext(pExpCtx);
-    }
-
-    for (auto&& accum : _currentAccumulators) {
-        accum->injectExpressionContext(pExpCtx);
-    }
-}
-
 Value DocumentSourceGroup::serialize(bool explain) const {
     MutableDocument insides;
 
@@ -235,7 +218,7 @@ Value DocumentSourceGroup::serialize(bool explain) const {
     // Add the remaining fields.
     const size_t n = vFieldName.size();
     for (size_t i = 0; i < n; ++i) {
-        intrusive_ptr<Accumulator> accum = vpAccumulatorFactory[i]();
+        intrusive_ptr<Accumulator> accum = vpAccumulatorFactory[i](pExpCtx);
         insides[vFieldName[i]] =
             Value(DOC(accum->getOpName() << vpExpression[i]->serialize(explain)));
     }
@@ -280,7 +263,6 @@ intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
         groupStage->addAccumulator(statement);
     }
     groupStage->_variables = stdx::make_unique<Variables>(numVariables);
-    groupStage->injectExpressionContext(pExpCtx);
     return groupStage;
 }
 
@@ -292,6 +274,7 @@ DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>&
       _inputSort(BSONObj()),
       _streaming(false),
       _initialized(false),
+      _groups(pExpCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()),
       _spilled(false),
       _extSortAllowed(pExpCtx->extSortAllowed && !pExpCtx->inRouter) {}
 
@@ -303,7 +286,7 @@ void DocumentSourceGroup::addAccumulator(AccumulationStatement accumulationState
 
 namespace {
 
-intrusive_ptr<Expression> parseIdExpression(const intrusive_ptr<ExpressionContext> expCtx,
+intrusive_ptr<Expression> parseIdExpression(const intrusive_ptr<ExpressionContext>& expCtx,
                                             BSONElement groupField,
                                             const VariablesParseState& vps) {
     if (groupField.type() == Object && !groupField.Obj().isEmpty()) {
@@ -312,18 +295,18 @@ intrusive_ptr<Expression> parseIdExpression(const intrusive_ptr<ExpressionContex
         const BSONObj idKeyObj = groupField.Obj();
         if (idKeyObj.firstElementFieldName()[0] == '$') {
             // grouping on a $op expression
-            return Expression::parseObject(idKeyObj, vps);
+            return Expression::parseObject(expCtx, idKeyObj, vps);
         } else {
             for (auto&& field : idKeyObj) {
                 uassert(17390,
                         "$group does not support inclusion-style expressions",
                         !field.isNumber() && field.type() != Bool);
             }
-            return ExpressionObject::parse(idKeyObj, vps);
+            return ExpressionObject::parse(expCtx, idKeyObj, vps);
         }
     } else if (groupField.type() == String && groupField.valuestr()[0] == '$') {
         // grouping on a field path.
-        return ExpressionFieldPath::parse(groupField.str(), vps);
+        return ExpressionFieldPath::parse(expCtx, groupField.str(), vps);
     } else {
         // constant id - single group
         return ExpressionConstant::create(expCtx, Value(groupField));
@@ -377,7 +360,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
         } else {
             // Any other field will be treated as an accumulator specification.
             pGroup->addAccumulator(
-                AccumulationStatement::parseAccumulationStatement(groupField, vps));
+                AccumulationStatement::parseAccumulationStatement(pExpCtx, groupField, vps));
         }
     }
 
@@ -493,8 +476,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         // Set up accumulators.
         _currentAccumulators.reserve(numAccumulators);
         for (size_t i = 0; i < numAccumulators; i++) {
-            _currentAccumulators.push_back(vpAccumulatorFactory[i]());
-            _currentAccumulators.back()->injectExpressionContext(pExpCtx);
+            _currentAccumulators.push_back(vpAccumulatorFactory[i](pExpCtx));
         }
 
         // We only need to load the first document.
@@ -543,8 +525,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
             // Add the accumulators
             group.reserve(numAccumulators);
             for (size_t i = 0; i < numAccumulators; i++) {
-                group.push_back(vpAccumulatorFactory[i]());
-                group.back()->injectExpressionContext(pExpCtx);
+                group.push_back(vpAccumulatorFactory[i](pExpCtx));
             }
         } else {
             for (size_t i = 0; i < numAccumulators; i++) {
@@ -599,8 +580,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
                 // prepare current to accumulate data
                 _currentAccumulators.reserve(numAccumulators);
                 for (size_t i = 0; i < numAccumulators; i++) {
-                    _currentAccumulators.push_back(vpAccumulatorFactory[i]());
-                    _currentAccumulators.back()->injectExpressionContext(pExpCtx);
+                    _currentAccumulators.push_back(vpAccumulatorFactory[i](pExpCtx));
                 }
 
                 verify(_sorterIterator->more());  // we put data in, we should get something out.
@@ -876,7 +856,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::getMergeSource() {
     VariablesIdGenerator idGenerator;
     VariablesParseState vps(&idGenerator);
     /* the merger will use the same grouping key */
-    pMerger->setIdExpression(ExpressionFieldPath::parse("$$ROOT._id", vps));
+    pMerger->setIdExpression(ExpressionFieldPath::parse(pExpCtx, "$$ROOT._id", vps));
 
     const size_t n = vFieldName.size();
     for (size_t i = 0; i < n; ++i) {
@@ -888,13 +868,13 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::getMergeSource() {
           expression or constant.  Here, we accumulate the output of the
           same name from the prior group.
         */
-        pMerger->addAccumulator({vFieldName[i],
-                                 vpAccumulatorFactory[i],
-                                 ExpressionFieldPath::parse("$$ROOT." + vFieldName[i], vps)});
+        pMerger->addAccumulator(
+            {vFieldName[i],
+             vpAccumulatorFactory[i],
+             ExpressionFieldPath::parse(pExpCtx, "$$ROOT." + vFieldName[i], vps)});
     }
 
     pMerger->_variables.reset(new Variables(idGenerator.getIdCount()));
-    pMerger->injectExpressionContext(pExpCtx);
 
     return pMerger;
 }

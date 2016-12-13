@@ -57,8 +57,6 @@ public:
         virtual void optimize() = 0;
         virtual Document serialize(bool explain) const = 0;
         virtual DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const = 0;
-        virtual void injectExpressionContext(
-            const boost::intrusive_ptr<ExpressionContext>& pExpCtx) = 0;
         virtual GetModPathsReturn getModifiedPaths() const = 0;
     };
 
@@ -75,7 +73,6 @@ public:
     Value serialize(bool explain) const final;
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
-    void doInjectExpressionContext() final;
     DocumentSource::GetDepsReturn getDependencies(DepsTracker* deps) const final;
     GetModPathsReturn getModifiedPaths() const final;
 

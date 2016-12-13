@@ -43,7 +43,7 @@ namespace mongo {
 class BSONElement;
 class TeeBuffer;
 class DocumentSourceTeeConsumer;
-struct ExpressionContext;
+class ExpressionContext;
 class NamespaceString;
 
 /**
@@ -96,11 +96,6 @@ public:
      * Optimizes inner pipelines.
      */
     boost::intrusive_ptr<DocumentSource> optimize() final;
-
-    /**
-     * Injects the expression context into inner pipelines.
-     */
-    void doInjectExpressionContext() final;
 
     /**
      * Takes a union of all sub-pipelines, and adds them to 'deps'.

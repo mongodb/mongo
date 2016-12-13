@@ -221,12 +221,6 @@ Value DocumentSourceCursor::serialize(bool explain) const {
     return Value(DOC(getSourceName() << out.freezeToValue()));
 }
 
-void DocumentSourceCursor::doInjectExpressionContext() {
-    if (_limit) {
-        _limit->injectExpressionContext(pExpCtx);
-    }
-}
-
 void DocumentSourceCursor::detachFromOperationContext() {
     if (_exec) {
         _exec->detachFromOperationContext();
@@ -259,7 +253,6 @@ intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
     const intrusive_ptr<ExpressionContext>& pExpCtx) {
     intrusive_ptr<DocumentSourceCursor> source(
         new DocumentSourceCursor(ns, std::move(exec), pExpCtx));
-    source->injectExpressionContext(pExpCtx);
     return source;
 }
 

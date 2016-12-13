@@ -38,7 +38,8 @@ namespace mongo {
 
 namespace parsed_aggregation_projection {
 
-std::unique_ptr<ParsedAddFields> ParsedAddFields::create(const BSONObj& spec) {
+std::unique_ptr<ParsedAddFields> ParsedAddFields::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& spec) {
     // Verify that we don't have conflicting field paths, etc.
     Status status = ProjectionSpecValidator::validate(spec);
     if (!status.isOK()) {
@@ -48,17 +49,19 @@ std::unique_ptr<ParsedAddFields> ParsedAddFields::create(const BSONObj& spec) {
     std::unique_ptr<ParsedAddFields> parsedAddFields = stdx::make_unique<ParsedAddFields>();
 
     // Actually parse the specification.
-    parsedAddFields->parse(spec);
+    parsedAddFields->parse(expCtx, spec);
     return parsedAddFields;
 }
 
-void ParsedAddFields::parse(const BSONObj& spec, const VariablesParseState& variablesParseState) {
+void ParsedAddFields::parse(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            const BSONObj& spec,
+                            const VariablesParseState& variablesParseState) {
     for (auto elem : spec) {
         auto fieldName = elem.fieldNameStringData();
 
         if (elem.type() == BSONType::Object) {
             // This is either an expression, or a nested specification.
-            if (parseObjectAsExpression(fieldName, elem.Obj(), variablesParseState)) {
+            if (parseObjectAsExpression(expCtx, fieldName, elem.Obj(), variablesParseState)) {
                 // It was an expression.
             } else {
                 // The field name might be a dotted path. If so, we need to keep adding children
@@ -72,12 +75,12 @@ void ParsedAddFields::parse(const BSONObj& spec, const VariablesParseState& vari
                 // It is illegal to construct an empty FieldPath, so the above loop ends one
                 // iteration too soon. Add the last path here.
                 child = child->addOrGetChild(remainingPath.fullPath());
-                parseSubObject(elem.Obj(), variablesParseState, child);
+                parseSubObject(expCtx, elem.Obj(), variablesParseState, child);
             }
         } else {
             // This is a literal or regular value.
             _root->addComputedField(FieldPath(elem.fieldName()),
-                                    Expression::parseOperand(elem, variablesParseState));
+                                    Expression::parseOperand(expCtx, elem, variablesParseState));
         }
     }
 }
@@ -96,7 +99,8 @@ Document ParsedAddFields::applyProjection(Document inputDoc, Variables* vars) co
     return output.freeze();
 }
 
-bool ParsedAddFields::parseObjectAsExpression(StringData pathToObject,
+bool ParsedAddFields::parseObjectAsExpression(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                              StringData pathToObject,
                                               const BSONObj& objSpec,
                                               const VariablesParseState& variablesParseState) {
     if (objSpec.firstElementFieldName()[0] == '$') {
@@ -104,13 +108,14 @@ bool ParsedAddFields::parseObjectAsExpression(StringData pathToObject,
         // field.
         invariant(objSpec.nFields() == 1);
         _root->addComputedField(pathToObject,
-                                Expression::parseExpression(objSpec, variablesParseState));
+                                Expression::parseExpression(expCtx, objSpec, variablesParseState));
         return true;
     }
     return false;
 }
 
-void ParsedAddFields::parseSubObject(const BSONObj& subObj,
+void ParsedAddFields::parseSubObject(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                     const BSONObj& subObj,
                                      const VariablesParseState& variablesParseState,
                                      InclusionNode* node) {
     for (auto&& elem : subObj) {
@@ -123,17 +128,18 @@ void ParsedAddFields::parseSubObject(const BSONObj& subObj,
             // This is either an expression, or a nested specification.
             auto fieldName = elem.fieldNameStringData().toString();
             if (!parseObjectAsExpression(
+                    expCtx,
                     FieldPath::getFullyQualifiedPath(node->getPath(), fieldName),
                     elem.Obj(),
                     variablesParseState)) {
                 // It was a nested subobject
                 auto child = node->addOrGetChild(fieldName);
-                parseSubObject(elem.Obj(), variablesParseState, child);
+                parseSubObject(expCtx, elem.Obj(), variablesParseState, child);
             }
         } else {
             // This is a literal or regular value.
             node->addComputedField(FieldPath(elem.fieldName()),
-                                   Expression::parseOperand(elem, variablesParseState));
+                                   Expression::parseOperand(expCtx, elem, variablesParseState));
         }
     }
 }

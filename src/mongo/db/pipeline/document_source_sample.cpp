@@ -87,10 +87,6 @@ Value DocumentSourceSample::serialize(bool explain) const {
     return Value(DOC(getSourceName() << DOC("size" << _size)));
 }
 
-void DocumentSourceSample::doInjectExpressionContext() {
-    _sortStage->injectExpressionContext(pExpCtx);
-}
-
 namespace {
 const BSONObj randSortSpec = BSON("$rand" << BSON("$meta"
                                                   << "randVal"));

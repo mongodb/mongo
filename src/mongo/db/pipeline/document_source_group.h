@@ -96,9 +96,6 @@ public:
     boost::intrusive_ptr<DocumentSource> getShardSource() final;
     boost::intrusive_ptr<DocumentSource> getMergeSource() final;
 
-protected:
-    void doInjectExpressionContext() final;
-
 private:
     explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
                                  size_t maxMemoryUsageBytes = kDefaultMaxMemoryUsageBytes);

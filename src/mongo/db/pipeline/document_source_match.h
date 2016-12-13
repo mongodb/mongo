@@ -140,9 +140,7 @@ public:
     static boost::intrusive_ptr<DocumentSourceMatch> descendMatchOnPath(
         MatchExpression* matchExpr,
         const std::string& path,
-        boost::intrusive_ptr<ExpressionContext> expCtx);
-
-    void doInjectExpressionContext();
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 private:
     DocumentSourceMatch(const BSONObj& query,

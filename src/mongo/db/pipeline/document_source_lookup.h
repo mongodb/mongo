@@ -113,9 +113,6 @@ public:
         _handlingUnwind = true;
     }
 
-protected:
-    void doInjectExpressionContext() final;
-
 private:
     DocumentSourceLookUp(NamespaceString fromNs,
                          std::string as,

@@ -84,33 +84,38 @@ Status ClusterAggregate::runAggregate(OperationContext* txn,
         return request.getStatus();
     }
 
-    boost::intrusive_ptr<ExpressionContext> mergeCtx =
-        new ExpressionContext(txn, request.getValue());
-    mergeCtx->inRouter = true;
-    // explicitly *not* setting mergeCtx->tempDir
+    // Determine the appropriate collation and 'resolve' involved namespaces to make the
+    // ExpressionContext.
 
+    // We won't try to execute anything on a mongos, but we still have to populate this map so that
+    // any $lookups, etc. will be able to have a resolved view definition. It's okay that this is
+    // incorrect, we will repopulate the real resolved namespace map on the mongod. Note that we
+    // need to check if any involved collections are sharded before forwarding an aggregation
+    // command on an unsharded collection.
+    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     LiteParsedPipeline liteParsedPipeline(request.getValue());
-
     for (auto&& ns : liteParsedPipeline.getInvolvedNamespaces()) {
         uassert(28769, str::stream() << ns.ns() << " cannot be sharded", !conf->isSharded(ns.ns()));
-        // We won't try to execute anything on a mongos, but we still have to populate this map
-        // so that any $lookups etc will be able to have a resolved view definition. It's okay
-        // that this is incorrect, we will repopulate the real resolved namespace map on the
-        // mongod.
-        mergeCtx->resolvedNamespaces[ns.coll()] = {ns, std::vector<BSONObj>{}};
+        resolvedNamespaces[ns.coll()] = {ns, std::vector<BSONObj>{}};
     }
 
     if (!conf->isSharded(namespaces.executionNss.ns())) {
         return aggPassthrough(txn, namespaces, conf, cmdObj, result, options);
     }
-
     auto chunkMgr = conf->getChunkManager(txn, namespaces.executionNss.ns());
 
-    // If there was no collation specified, but there is a default collation for the collation,
-    // use that.
-    if (request.getValue().getCollation().isEmpty() && chunkMgr->getDefaultCollator()) {
-        mergeCtx->setCollator(chunkMgr->getDefaultCollator()->clone());
+    std::unique_ptr<CollatorInterface> collation;
+    if (!request.getValue().getCollation().isEmpty()) {
+        collation = uassertStatusOK(CollatorFactoryInterface::get(txn->getServiceContext())
+                                        ->makeFromBSON(request.getValue().getCollation()));
+    } else if (chunkMgr->getDefaultCollator()) {
+        collation = chunkMgr->getDefaultCollator()->clone();
     }
+
+    boost::intrusive_ptr<ExpressionContext> mergeCtx = new ExpressionContext(
+        txn, request.getValue(), std::move(collation), std::move(resolvedNamespaces));
+    mergeCtx->inRouter = true;
+    // explicitly *not* setting mergeCtx->tempDir
 
     // Parse and optimize the pipeline specification.
     auto pipeline = Pipeline::parse(request.getValue().getPipeline(), mergeCtx);
@@ -118,7 +123,6 @@ Status ClusterAggregate::runAggregate(OperationContext* txn,
         return pipeline.getStatus();
     }
 
-    pipeline.getValue()->injectExpressionContext(mergeCtx);
     pipeline.getValue()->optimizePipeline();
 
     // If the first $match stage is an exact match on the shard key (with a simple collation or

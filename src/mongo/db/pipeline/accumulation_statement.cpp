@@ -64,7 +64,9 @@ Accumulator::Factory AccumulationStatement::getFactory(StringData name) {
 }
 
 AccumulationStatement AccumulationStatement::parseAccumulationStatement(
-    const BSONElement& elem, const VariablesParseState& vps) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const BSONElement& elem,
+    const VariablesParseState& vps) {
     auto fieldName = elem.fieldNameStringData();
     uassert(40234,
             str::stream() << "The field '" << fieldName << "' must be an accumulator object",
@@ -91,7 +93,7 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
 
     return {fieldName.toString(),
             AccumulationStatement::getFactory(accName),
-            Expression::parseOperand(specElem, vps)};
+            Expression::parseOperand(expCtx, specElem, vps)};
 }
 
 }  // namespace mongo

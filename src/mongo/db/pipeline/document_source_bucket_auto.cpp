@@ -196,7 +196,8 @@ void DocumentSourceBucketAuto::populateBuckets() {
         }
 
         // Initialize the current bucket.
-        Bucket currentBucket(currentValue.first, currentValue.first, _accumulatorFactories);
+        Bucket currentBucket(
+            pExpCtx, currentValue.first, currentValue.first, _accumulatorFactories);
 
         // Add the first value into the current bucket.
         addDocumentToBucket(currentValue, currentBucket);
@@ -267,13 +268,14 @@ void DocumentSourceBucketAuto::populateBuckets() {
     }
 }
 
-DocumentSourceBucketAuto::Bucket::Bucket(Value min,
+DocumentSourceBucketAuto::Bucket::Bucket(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                         Value min,
                                          Value max,
                                          vector<Accumulator::Factory> accumulatorFactories)
     : _min(min), _max(max) {
     _accums.reserve(accumulatorFactories.size());
     for (auto&& factory : accumulatorFactories) {
-        _accums.push_back(factory());
+        _accums.push_back(factory(expCtx));
     }
 }
 
@@ -344,7 +346,7 @@ Value DocumentSourceBucketAuto::serialize(bool explain) const {
     const size_t nOutputFields = _fieldNames.size();
     MutableDocument outputSpec(nOutputFields);
     for (size_t i = 0; i < nOutputFields; i++) {
-        intrusive_ptr<Accumulator> accum = _accumulatorFactories[i]();
+        intrusive_ptr<Accumulator> accum = _accumulatorFactories[i](pExpCtx);
         outputSpec[_fieldNames[i]] =
             Value{Document{{accum->getOpName(), _expressions[i]->serialize(explain)}}};
     }
@@ -405,14 +407,16 @@ DocumentSourceBucketAuto::DocumentSourceBucketAuto(
 
 namespace {
 
-boost::intrusive_ptr<Expression> parseGroupByExpression(const BSONElement& groupByField,
-                                                        const VariablesParseState& vps) {
+boost::intrusive_ptr<Expression> parseGroupByExpression(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const BSONElement& groupByField,
+    const VariablesParseState& vps) {
     if (groupByField.type() == BSONType::Object &&
         groupByField.embeddedObject().firstElementFieldName()[0] == '$') {
-        return Expression::parseObject(groupByField.embeddedObject(), vps);
+        return Expression::parseObject(expCtx, groupByField.embeddedObject(), vps);
     } else if (groupByField.type() == BSONType::String &&
                groupByField.valueStringData()[0] == '$') {
-        return ExpressionFieldPath::parse(groupByField.str(), vps);
+        return ExpressionFieldPath::parse(expCtx, groupByField.str(), vps);
     } else {
         uasserted(
             40239,
@@ -440,7 +444,7 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
     for (auto&& argument : elem.Obj()) {
         const auto argName = argument.fieldNameStringData();
         if ("groupBy" == argName) {
-            groupByExpression = parseGroupByExpression(argument, vps);
+            groupByExpression = parseGroupByExpression(pExpCtx, argument, vps);
         } else if ("buckets" == argName) {
             Value bucketsValue = Value(argument);
 
@@ -467,7 +471,7 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
 
             for (auto&& outputField : argument.embeddedObject()) {
                 accumulationStatements.push_back(
-                    AccumulationStatement::parseAccumulationStatement(outputField, vps));
+                    AccumulationStatement::parseAccumulationStatement(pExpCtx, outputField, vps));
             }
         } else if ("granularity" == argName) {
             uassert(40261,
@@ -475,7 +479,7 @@ intrusive_ptr<DocumentSource> DocumentSourceBucketAuto::createFromBson(
                         << "The $bucketAuto 'granularity' field must be a string, but found type: "
                         << typeName(argument.type()),
                     argument.type() == BSONType::String);
-            granularityRounder = GranularityRounder::getGranularityRounder(argument.str());
+            granularityRounder = GranularityRounder::getGranularityRounder(pExpCtx, argument.str());
         } else {
             uasserted(40245, str::stream() << "Unrecognized option to $bucketAuto: " << argName);
         }

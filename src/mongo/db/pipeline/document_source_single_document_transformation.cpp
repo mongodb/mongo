@@ -98,10 +98,6 @@ DocumentSource::GetDepsReturn DocumentSourceSingleDocumentTransformation::getDep
     return _parsedTransform->addDependencies(deps);
 }
 
-void DocumentSourceSingleDocumentTransformation::doInjectExpressionContext() {
-    _parsedTransform->injectExpressionContext(pExpCtx);
-}
-
 DocumentSource::GetModPathsReturn DocumentSourceSingleDocumentTransformation::getModifiedPaths()
     const {
     return _parsedTransform->getModifiedPaths();

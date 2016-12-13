@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/server_options.h"
@@ -156,10 +157,24 @@ Status ViewCatalog::_upsertIntoGraph(OperationContext* txn, const ViewDefinition
 
     // Performs the insert into the graph.
     auto doInsert = [this, &txn](const ViewDefinition& viewDef, bool needsValidation) -> Status {
-        // Parse the pipeline for this view to get the namespaces it references.
+        // Make a LiteParsedPipeline to determine the namespaces referenced by this pipeline.
         AggregationRequest request(viewDef.viewOn(), viewDef.pipeline());
-        boost::intrusive_ptr<ExpressionContext> expCtx = new ExpressionContext(txn, request);
-        expCtx->setCollator(CollatorInterface::cloneCollator(viewDef.defaultCollator()));
+        const LiteParsedPipeline liteParsedPipeline(request);
+        const auto involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
+
+        // Verify that this is a legitimate pipeline specification by making sure it parses
+        // correctly. In order to parse a pipeline we need to resolve any namespaces involved to a
+        // collection and a pipeline, but in this case we don't need this map to be accurate since
+        // we will not be evaluating the pipeline.
+        StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+        for (auto&& nss : liteParsedPipeline.getInvolvedNamespaces()) {
+            resolvedNamespaces[nss.coll()] = {nss, {}};
+        }
+        boost::intrusive_ptr<ExpressionContext> expCtx =
+            new ExpressionContext(txn,
+                                  request,
+                                  CollatorInterface::cloneCollator(viewDef.defaultCollator()),
+                                  std::move(resolvedNamespaces));
         auto pipelineStatus = Pipeline::parse(viewDef.pipeline(), expCtx);
         if (!pipelineStatus.isOK()) {
             uassert(40255,
@@ -169,7 +184,7 @@ Status ViewCatalog::_upsertIntoGraph(OperationContext* txn, const ViewDefinition
             return pipelineStatus.getStatus();
         }
 
-        std::vector<NamespaceString> refs = pipelineStatus.getValue()->getInvolvedCollections();
+        std::vector<NamespaceString> refs(involvedNamespaces.begin(), involvedNamespaces.end());
         refs.push_back(viewDef.viewOn());
 
         int pipelineSize = 0;

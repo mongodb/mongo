@@ -94,9 +94,6 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-protected:
-    void doInjectExpressionContext() final;
-
 private:
     DocumentSourceGraphLookUp(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -188,9 +185,7 @@ private:
     size_t _frontierUsageBytes = 0;
 
     // Only used during the breadth-first search, tracks the set of values on the current frontier.
-    // We use boost::optional to defer initialization until the ExpressionContext containing the
-    // correct comparator is injected.
-    boost::optional<ValueUnorderedSet> _frontier;
+    ValueUnorderedSet _frontier;
 
     // Tracks nodes that have been discovered for a given input. Keys are the '_id' value of the
     // document from the foreign collection, value is the document itself.  The keys are compared

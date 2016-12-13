@@ -81,9 +81,12 @@ public:
      * ValueComparator. This requires instantiating the multi_index_container with comparison and
      * hasher functions obtained from the comparator.
      */
-    LookupSetCache(ValueComparator valueComparator)
-        : _valueComparator(std::move(valueComparator)),
-          _container(makeIndexedContainer(_valueComparator)) {}
+    explicit LookupSetCache(const ValueComparator& comparator)
+        : _container(boost::make_tuple(IndexedContainer::nth_index<0>::type::ctor_args(),
+                                       boost::make_tuple(0,
+                                                         member<Cached, Value, &Cached::first>(),
+                                                         comparator.getHasher(),
+                                                         comparator.getEqualTo()))) {}
 
     /**
      * Insert "value" into the set with key "key". If "key" is already present in the cache, move it
@@ -186,29 +189,7 @@ public:
         return boost::none;
     }
 
-    /**
-     * Binds the cache to a new comparator that should be used to make all subsequent Value
-     * comparisons.
-     *
-     * TODO SERVER-25535: Remove this method.
-     */
-    void setValueComparator(ValueComparator valueComparator) {
-        _valueComparator = std::move(valueComparator);
-        _container = makeIndexedContainer(_valueComparator);
-    }
-
 private:
-    IndexedContainer makeIndexedContainer(const ValueComparator& valueComparator) const {
-        return IndexedContainer(
-            boost::make_tuple(IndexedContainer::nth_index<0>::type::ctor_args(),
-                              boost::make_tuple(0,
-                                                member<Cached, Value, &Cached::first>(),
-                                                valueComparator.getHasher(),
-                                                valueComparator.getEqualTo())));
-    }
-
-    ValueComparator _valueComparator;
-
     IndexedContainer _container;
 
     size_t _memoryUsage = 0;

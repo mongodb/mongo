@@ -113,7 +113,7 @@ long long DocumentSourceSort::getLimit() const {
 void DocumentSourceSort::addKey(StringData fieldPath, bool ascending) {
     VariablesIdGenerator idGenerator;
     VariablesParseState vps(&idGenerator);
-    vSortKey.push_back(ExpressionFieldPath::parse("$$ROOT." + fieldPath.toString(), vps));
+    vSortKey.push_back(ExpressionFieldPath::parse(pExpCtx, "$$ROOT." + fieldPath.toString(), vps));
     vAscending.push_back(ascending);
 }
 
@@ -176,7 +176,6 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
     uint64_t maxMemoryUsageBytes) {
     intrusive_ptr<DocumentSourceSort> pSort(new DocumentSourceSort(pExpCtx));
     pSort->_maxMemoryUsageBytes = maxMemoryUsageBytes;
-    pSort->injectExpressionContext(pExpCtx);
     pSort->_sort = sortOrder.getOwned();
 
     for (auto&& keyField : sortOrder) {
@@ -197,7 +196,7 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
 
             VariablesIdGenerator idGen;
             VariablesParseState vps(&idGen);
-            pSort->vSortKey.push_back(ExpressionMeta::parse(metaDoc.firstElement(), vps));
+            pSort->vSortKey.push_back(ExpressionMeta::parse(pExpCtx, metaDoc.firstElement(), vps));
 
             // If sorting by textScore, sort highest scores first. If sorting by randVal, order
             // doesn't matter, so just always use descending.

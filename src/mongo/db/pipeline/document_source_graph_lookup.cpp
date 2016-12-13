@@ -164,7 +164,7 @@ DocumentSource::GetNextResult DocumentSourceGraphLookUp::getNextUnwound() {
 
 void DocumentSourceGraphLookUp::dispose() {
     _cache.clear();
-    _frontier->clear();
+    _frontier.clear();
     _visited.clear();
     pSource->dispose();
 }
@@ -180,7 +180,7 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
         auto matchStage = makeMatchStageFromFrontier(&cached);
 
         ValueUnorderedSet queried = pExpCtx->getValueComparator().makeUnorderedValueSet();
-        _frontier->swap(queried);
+        _frontier.swap(queried);
         _frontierUsageBytes = 0;
 
         // Process cached values, populating '_frontier' for the next iteration of search.
@@ -219,7 +219,7 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
     } while (shouldPerformAnotherQuery && depth < std::numeric_limits<long long>::max() &&
              (!_maxDepth || depth <= *_maxDepth));
 
-    _frontier->clear();
+    _frontier.clear();
     _frontierUsageBytes = 0;
 }
 
@@ -264,12 +264,12 @@ bool DocumentSourceGraphLookUp::addToVisitedAndFrontier(BSONObj result, long lon
         Value recurseOn = Value(elem);
         if (recurseOn.isArray()) {
             for (auto&& subElem : recurseOn.getArray()) {
-                _frontier->insert(subElem);
+                _frontier.insert(subElem);
                 _frontierUsageBytes += subElem.getApproximateSize();
             }
         } else if (!recurseOn.missing()) {
             // Don't recurse on a missing value.
-            _frontier->insert(recurseOn);
+            _frontier.insert(recurseOn);
             _frontierUsageBytes += recurseOn.getApproximateSize();
         }
     }
@@ -304,13 +304,13 @@ void DocumentSourceGraphLookUp::addToCache(const BSONObj& result,
 
 boost::optional<BSONObj> DocumentSourceGraphLookUp::makeMatchStageFromFrontier(BSONObjSet* cached) {
     // Add any cached values to 'cached' and remove them from '_frontier'.
-    for (auto it = _frontier->begin(); it != _frontier->end();) {
+    for (auto it = _frontier.begin(); it != _frontier.end();) {
         if (auto entry = _cache[*it]) {
             for (auto&& obj : *entry) {
                 cached->insert(obj);
             }
             size_t valueSize = it->getApproximateSize();
-            it = _frontier->erase(it);
+            it = _frontier.erase(it);
 
             // If the cached value increased in size while in the cache, we don't want to underflow
             // '_frontierUsageBytes'.
@@ -340,7 +340,7 @@ boost::optional<BSONObj> DocumentSourceGraphLookUp::makeMatchStageFromFrontier(B
                     BSONObjBuilder subObj(connectToObj.subobjStart(_connectToField.fullPath()));
                     {
                         BSONArrayBuilder in(subObj.subarrayStart("$in"));
-                        for (auto&& value : *_frontier) {
+                        for (auto&& value : _frontier) {
                             in << value;
                         }
                     }
@@ -349,7 +349,7 @@ boost::optional<BSONObj> DocumentSourceGraphLookUp::makeMatchStageFromFrontier(B
         }
     }
 
-    return _frontier->empty() ? boost::none : boost::optional<BSONObj>(match.obj());
+    return _frontier.empty() ? boost::none : boost::optional<BSONObj>(match.obj());
 }
 
 void DocumentSourceGraphLookUp::performSearch() {
@@ -363,11 +363,11 @@ void DocumentSourceGraphLookUp::performSearch() {
     // If _startWith evaluates to an array, treat each value as a separate starting point.
     if (startingValue.isArray()) {
         for (auto value : startingValue.getArray()) {
-            _frontier->insert(value);
+            _frontier.insert(value);
             _frontierUsageBytes += value.getApproximateSize();
         }
     } else {
-        _frontier->insert(startingValue);
+        _frontier.insert(startingValue);
         _frontierUsageBytes += startingValue.getApproximateSize();
     }
 
@@ -460,24 +460,6 @@ void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array, bool
     }
 }
 
-void DocumentSourceGraphLookUp::doInjectExpressionContext() {
-    _startWith->injectExpressionContext(pExpCtx);
-
-    auto it = pExpCtx->resolvedNamespaces.find(_from.coll());
-    invariant(it != pExpCtx->resolvedNamespaces.end());
-    const auto& resolvedNamespace = it->second;
-    _fromExpCtx = pExpCtx->copyWith(resolvedNamespace.ns);
-    _fromPipeline = resolvedNamespace.pipeline;
-
-    // We append an additional BSONObj to '_fromPipeline' as a placeholder for the $match stage
-    // we'll eventually construct from the input document.
-    _fromPipeline.reserve(_fromPipeline.size() + 1);
-    _fromPipeline.push_back(BSONObj());
-
-    _frontier = pExpCtx->getValueComparator().makeUnorderedValueSet();
-    _cache.setValueComparator(pExpCtx->getValueComparator());
-}
-
 void DocumentSourceGraphLookUp::doDetachFromOperationContext() {
     _fromExpCtx->opCtx = nullptr;
 }
@@ -506,9 +488,19 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _additionalFilter(additionalFilter),
       _depthField(depthField),
       _maxDepth(maxDepth),
+      _frontier(pExpCtx->getValueComparator().makeUnorderedValueSet()),
       _visited(ValueComparator::kInstance.makeUnorderedValueMap<BSONObj>()),
-      _cache(expCtx->getValueComparator()),
-      _unwind(unwindSrc) {}
+      _cache(pExpCtx->getValueComparator()),
+      _unwind(unwindSrc) {
+    const auto& resolvedNamespace = pExpCtx->getResolvedNamespace(_from);
+    _fromExpCtx = pExpCtx->copyWith(resolvedNamespace.ns);
+    _fromPipeline = resolvedNamespace.pipeline;
+
+    // We append an additional BSONObj to '_fromPipeline' as a placeholder for the $match stage
+    // we'll eventually construct from the input document.
+    _fromPipeline.reserve(_fromPipeline.size() + 1);
+    _fromPipeline.push_back(BSONObj());
+}
 
 intrusive_ptr<DocumentSourceGraphLookUp> DocumentSourceGraphLookUp::create(
     const intrusive_ptr<ExpressionContext>& expCtx,
@@ -533,8 +525,6 @@ intrusive_ptr<DocumentSourceGraphLookUp> DocumentSourceGraphLookUp::create(
                                       maxDepth,
                                       unwindSrc));
     source->_variables.reset(new Variables());
-
-    source->injectExpressionContext(expCtx);
     return source;
 }
 
@@ -556,7 +546,7 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
         const auto argName = argument.fieldNameStringData();
 
         if (argName == "startWith") {
-            startWith = Expression::parseOperand(argument, vps);
+            startWith = Expression::parseOperand(expCtx, argument, vps);
             continue;
         } else if (argName == "maxDepth") {
             uassert(40100,

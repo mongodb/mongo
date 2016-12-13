@@ -44,6 +44,7 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
+    // It is illegal to construct a DocumentSourceBucket directly, use createFromBson() instead.
     DocumentSourceBucket() = default;
 };
 
