@@ -1,10 +1,11 @@
 // Test the catch-up behavior of new primaries.
 
-load("jstests/replsets/rslib.js");
-
 (function() {
-
     "use strict";
+
+    load("jstests/libs/check_log.js");
+    load("jstests/replsets/rslib.js");
+
     var name = "catch_up";
     var rst = new ReplSetTest({name: name, nodes: 3, useBridge: true});
 
@@ -13,7 +14,7 @@ load("jstests/replsets/rslib.js");
     conf.settings = {
         heartbeatIntervalMillis: 500,
         electionTimeoutMillis: 10000,
-        catchUpTimeoutMillis: 10000
+        catchUpTimeoutMillis: 4 * 60 * 1000
     };
     rst.initiate(conf);
     rst.awaitSecondaryNodes();
@@ -82,28 +83,17 @@ load("jstests/replsets/rslib.js");
         return ts1.getTime() < ts2.getTime();
     }
 
-    function countMatchedLog(node, regex) {
-        var res = node.adminCommand({getLog: 'global'});
-        assert.commandWorked(res);
-        var count = 0;
-        res.log.forEach(function(line) {
-            if (regex.exec(line)) {
-                count += 1;
-            }
-        });
-        return count;
-    }
+    rst.awaitReplication(ReplSetTest.kDefaultTimeoutMS, ReplSetTest.OpTimeType.LAST_DURABLE);
 
     jsTest.log("Case 1: The primary is up-to-date after freshness scan.");
     // Should complete transition to primary immediately.
-    rst.awaitReplication(ReplSetTest.kDefaultTimeoutMS, ReplSetTest.OpTimeType.LAST_DURABLE);
     var newPrimary = stepUp(rst.getSecondary());
     rst.awaitNodesAgreeOnPrimary();
     // Should win an election and finish the transition very quickly.
     assert.eq(newPrimary, rst.getPrimary());
+    rst.awaitReplication(ReplSetTest.kDefaultTimeoutMS, ReplSetTest.OpTimeType.LAST_DURABLE);
 
     jsTest.log("Case 2: The primary needs to catch up, succeeds in time.");
-    rst.awaitReplication(ReplSetTest.kDefaultTimeoutMS, ReplSetTest.OpTimeType.LAST_DURABLE);
     // Write documents that cannot be replicated to secondaries in time.
     var originalSecondaries = rst.getSecondaries();
     originalSecondaries.forEach(enableFailPoint);
@@ -122,37 +112,9 @@ load("jstests/replsets/rslib.js");
     rst.awaitReplication();
     // Check the latest op on old primary is preserved on the new one.
     checkOpInOplog(newPrimary, latestOp, 1);
-
-    jsTest.log("Case 3: The primary needs to catch up, fails due to timeout.");
     rst.awaitReplication(ReplSetTest.kDefaultTimeoutMS, ReplSetTest.OpTimeType.LAST_DURABLE);
-    // Write documents that cannot be replicated to secondaries in time.
-    originalSecondaries = rst.getSecondaries();
-    originalSecondaries.forEach(enableFailPoint);
-    doWrites(rst.getPrimary());
-    latestOp = getLatestOp(rst.getPrimary());
 
-    // New primary wins immediately, but needs to catch up.
-    newPrimary = stepUp(originalSecondaries[0]);
-    rst.awaitNodesAgreeOnPrimary();
-    var latestOpOnNewPrimary = getLatestOp(newPrimary);
-    // Wait until the new primary completes the transition to primary and writes a no-op.
-    assert.soon(function() {
-        return countMatchedLog(newPrimary, /Cannot catch up oplog after becoming primary/) > 0;
-    });
-    disableFailPoint(newPrimary);
-    assert.eq(newPrimary, rst.getPrimary());
-
-    // Wait for the no-op "new primary" after winning an election, so that we know it has
-    // finished transition to primary.
-    assert.soon(function() {
-        return isEarlierTimestamp(latestOpOnNewPrimary.ts, getLatestOp(newPrimary).ts);
-    });
-    // The extra oplog entries on the old primary are not replicated to the new one.
-    checkOpInOplog(newPrimary, latestOp, 0);
-    disableFailPoint(originalSecondaries[1]);
-
-    jsTest.log("Case 4: The primary needs to catch up, but has to change sync source to catch up.");
-    rst.awaitReplication(ReplSetTest.kDefaultTimeoutMS, ReplSetTest.OpTimeType.LAST_DURABLE);
+    jsTest.log("Case 3: The primary needs to catch up, but has to change sync source to catch up.");
     // Write documents that cannot be replicated to secondaries in time.
     rst.getSecondaries().forEach(enableFailPoint);
     doWrites(rst.getPrimary());
@@ -172,5 +134,39 @@ load("jstests/replsets/rslib.js");
     disableFailPoint(newPrimary);
     assert.eq(newPrimary, rst.getPrimary());
     checkOpInOplog(newPrimary, latestOp, 1);
+    // Restore the broken connection
+    oldPrimary.reconnect(newPrimary);
+    rst.awaitReplication(ReplSetTest.kDefaultTimeoutMS, ReplSetTest.OpTimeType.LAST_DURABLE);
 
+    jsTest.log("Case 4: The primary needs to catch up, fails due to timeout.");
+    // Reconfigure replicaset to decrease catchup timeout
+    conf = rst.getReplSetConfigFromNode();
+    conf.version++;
+    conf.settings.catchUpTimeoutMillis = 10 * 1000;
+    reconfig(rst, conf);
+    rst.awaitReplication(ReplSetTest.kDefaultTimeoutMS, ReplSetTest.OpTimeType.LAST_DURABLE);
+
+    // Write documents that cannot be replicated to secondaries in time.
+    originalSecondaries = rst.getSecondaries();
+    originalSecondaries.forEach(enableFailPoint);
+    doWrites(rst.getPrimary());
+    latestOp = getLatestOp(rst.getPrimary());
+
+    // New primary wins immediately, but needs to catch up.
+    newPrimary = stepUp(originalSecondaries[0]);
+    rst.awaitNodesAgreeOnPrimary();
+    var latestOpOnNewPrimary = getLatestOp(newPrimary);
+    // Wait until the new primary completes the transition to primary and writes a no-op.
+    checkLog.contains(newPrimary, "Cannot catch up oplog after becoming primary");
+    disableFailPoint(newPrimary);
+    assert.eq(newPrimary, rst.getPrimary());
+
+    // Wait for the no-op "new primary" after winning an election, so that we know it has
+    // finished transition to primary.
+    assert.soon(function() {
+        return isEarlierTimestamp(latestOpOnNewPrimary.ts, getLatestOp(newPrimary).ts);
+    });
+    // The extra oplog entries on the old primary are not replicated to the new one.
+    checkOpInOplog(newPrimary, latestOp, 0);
+    disableFailPoint(originalSecondaries[1]);
 })();
