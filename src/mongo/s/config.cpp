@@ -152,7 +152,7 @@ bool DBConfig::isSharded(const string& ns) {
     return i->second.isSharded();
 }
 
-void DBConfig::invalidateNs(const std::string& ns) {
+void DBConfig::markNSNotSharded(const std::string& ns) {
     stdx::lock_guard<stdx::mutex> lk(_lock);
 
     CollectionInfoMap::iterator it = _collections.find(ns);
