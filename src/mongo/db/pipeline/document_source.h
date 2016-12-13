@@ -30,12 +30,12 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/optional.hpp>
 #include <boost/intrusive_ptr.hpp>
+#include <boost/optional.hpp>
+#include <boost/unordered_map.hpp>
 #include <deque>
 #include <list>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -502,7 +502,7 @@ private:
 
 
     typedef std::vector<boost::intrusive_ptr<Accumulator>> Accumulators;
-    typedef std::unordered_map<Value, Accumulators, Value::Hash> GroupsMap;
+    typedef boost::unordered_map<Value, Accumulators, Value::Hash> GroupsMap;
     GroupsMap groups;
 
     /*
