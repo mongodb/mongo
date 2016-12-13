@@ -78,34 +78,31 @@
 
         // Test read on future afterOpTime that will eventually occur.
         primaryConn.getDB(dbName).parallelShellStarted.drop();
-        var insertFunc =
-            startParallelShell('let testDB = db.getSiblingDB("' + dbName + '"); ' +
-                                   'testDB.parallelShellStarted.insert({}); ' +
-                                   'sleep(2100); ' +
-                                   'testDB.user.insert({y: 1}, { writeConcern: { w: 2 }});',
-                               primaryConn.port);
-        assert.soon(function() {
-            return primaryConn.getDB(dbName).parallelShellStarted.count();
-        });
-
         oplogTS = localDB.oplog.rs.find().sort({$natural: -1}).limit(1).next();
+        var insertFunc = startParallelShell('let testDB = db.getSiblingDB("' + dbName + '"); ' +
+                                                'sleep(3000); ' +
+                                                'testDB.user.insert({y: 1});',
+                                            primaryConn.port);
+
         var twoSecTS = new Timestamp(oplogTS.ts.getTime() + 2, 0);
         var res = assert.commandWorked(testDB.runCommand({
             find: 'user',
-            filter: {x: 1},
+            filter: {y: 1},
             readConcern: {
                 afterOpTime: {ts: twoSecTS, t: term},
             },
-            maxTimeMS: 10 * 1000,
+            maxTimeMS: 90 * 1000,
         }));
 
         assert.eq(null, res.code);
-
+        assert.eq(res.cursor.firstBatch[0].y, 1);
         insertFunc();
     };
 
     var primary = replTest.getPrimary();
+    jsTest.log("test1");
     runTest(primary.getDB('test1'), primary);
+    jsTest.log("test2");
     runTest(replTest.getSecondary().getDB('test2'), primary);
 
     replTest.stopSet();
