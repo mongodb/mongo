@@ -256,11 +256,11 @@ class BackgroundInitialSync(JsCustomBehavior):
                     test.short_name())
 
                 # If we have not restarted initial sync since the last time we ran the data
-                # validation, and if we're using resync for restarts, restart initial sync with a
-                # 20% probability.
-                if self.random_restarts < 1 and self.use_resync and random.random() < 0.2:
-                    self.fixture.logger.info(
-                        "Calling resync randomly in the middle of initial sync")
+                # validation, restart initial sync with a 20% probability.
+                if self.random_restarts < 1 and random.random() < 0.2:
+                    hook_type = "resync" if self.use_resync else "initial sync"
+                    self.fixture.logger.info("randomly restarting " + hook_type +
+                                             " in the middle of " + hook_type)
                     restart_init_sync()
                     self.random_restarts += 1
                 return
