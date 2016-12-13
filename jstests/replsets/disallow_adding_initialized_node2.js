@@ -8,8 +8,10 @@
 
 // This test requires users to persist across a restart.
 // @tags: [requires_persistence]
+
 (function() {
     'use strict';
+    load("jstests/libs/check_log.js");
 
     var name = 'disallow_adding_initialized_node2';
     var replSetA = new ReplSetTest({
@@ -62,23 +64,12 @@
     assert.eq(primaryB, newPrimaryB);
 
     // Mismatch replica set IDs in heartbeat responses should be logged.
-    var checkLog = function(node, msg) {
-        assert.soon(function() {
-            var logMessages = assert.commandWorked(node.adminCommand({getLog: 'global'})).log;
-            for (var i = 0; i < logMessages.length; i++) {
-                if (logMessages[i].indexOf(msg) != -1) {
-                    return true;
-                }
-            }
-            return false;
-        }, 'Did not see a log entry containing the following message: ' + msg, 60000, 1000);
-    };
     var msgA = "replica set IDs do not match, ours: " + configA.settings.replicaSetId +
         "; remote node's: " + configB.settings.replicaSetId;
     var msgB = "replica set IDs do not match, ours: " + configB.settings.replicaSetId +
         "; remote node's: " + configA.settings.replicaSetId;
-    checkLog(primaryA, msgA);
-    checkLog(primaryB, msgB);
+    checkLog.contains(primaryA, msgA);
+    checkLog.contains(primaryB, msgB);
 
     var statusA = assert.commandWorked(primaryA.adminCommand({replSetGetStatus: 1}));
     var statusB = assert.commandWorked(primaryB.adminCommand({replSetGetStatus: 1}));

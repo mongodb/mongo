@@ -9,6 +9,8 @@
 
 (function() {
     "use strict";
+    load("jstests/libs/check_log.js");
+
     // If the parameter is already set, don't run this test.
     var parameters = db.adminCommand({getCmdLineOpts: 1}).parsed.setParameter;
     if (parameters.use3dot2InitialSync || parameters.initialSyncOplogBuffer) {
@@ -46,19 +48,8 @@
         {configureFailPoint: 'initialSyncHangBeforeCopyingDatabases', mode: 'alwaysOn'}));
     replSet.reInitiate();
 
-    // Wait for fail point message to be logged.
-    var checkLog = function(node, msg) {
-        assert.soon(function() {
-            var logMessages = assert.commandWorked(node.adminCommand({getLog: 'global'})).log;
-            for (var i = 0; i < logMessages.length; i++) {
-                if (logMessages[i].indexOf(msg) != -1) {
-                    return true;
-                }
-            }
-            return false;
-        }, 'Did not see a log entry containing the following message: ' + msg);
-    };
-    checkLog(secondary, 'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');
+    checkLog.contains(secondary,
+                      'initial sync - initialSyncHangBeforeCopyingDatabases fail point enabled');
 
     // Keep inserting large documents until they roll over the oplog.
     const largeStr = new Array(4 * 1024 * oplogSizeOnPrimary).join('aaaaaaaa');
