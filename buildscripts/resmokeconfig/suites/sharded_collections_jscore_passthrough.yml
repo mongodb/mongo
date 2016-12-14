@@ -68,6 +68,7 @@ selector:
     - jstests/core/eval0.js
     - jstests/core/eval7.js
     - jstests/core/eval9.js
+    - jstests/core/killop_drop_collection.js # Uses fsyncLock.
 
 executor:
   js_test:
