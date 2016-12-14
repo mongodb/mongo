@@ -27,14 +27,12 @@ assertArgsException(['foo', 1, 1, 1]);
 // Basic offset / length checks.
 assertSubstring('abcd', 'abcd', 0, 4);
 assertSubstring('abcd', 'abcd', 0, 5);
-assertSubstring('', 'abcd', -1 /* unsigned */, 4);
 assertSubstring('a', 'abcd', 0, 1);
 assertSubstring('ab', 'abcd', 0, 2);
 assertSubstring('b', 'abcd', 1, 1);
 assertSubstring('d', 'abcd', 3, 1);
 assertSubstring('', 'abcd', 4, 1);
 assertSubstring('', 'abcd', 3, 0);
-assertSubstring('cd', 'abcd', 2, -1 /* unsigned */);
 
 // See server6186.js for additional offset / length checks.
 
@@ -46,8 +44,14 @@ assertSubstring('bc', 'abcd', NumberLong(1), NumberLong(2));
 assertSubstring('bc', 'abcd', NumberInt(1), NumberLong(2));
 assertSubstring('bc', 'abcd', NumberLong(1), NumberInt(2));
 // Integer component is used.
-assertSubstring('bc', 'abcd', 1.2, 2.2);
-assertSubstring('bc', 'abcd', 1.9, 2.9);
+
+// SERVER-25173 Negative values for length or offset.
+assertException('', 'abcd', -1, 4);
+assertException('cd', 'abcd', 2, -1);
+
+// Non-integral values throw an exception.
+assertException('bc', 'abcd', 1.2, 2.2);
+assertException('bc', 'abcd', 1.9, 2.9);
 
 // Non numeric types for offset / length.
 assertException('abcd', false, 2);
