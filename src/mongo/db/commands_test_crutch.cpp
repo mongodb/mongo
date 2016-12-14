@@ -43,8 +43,4 @@ void Command::execCommand(OperationContext*,
     invariant(false);
 }
 
-void Command::registerError(OperationContext*, const DBException&) {
-    invariant(false);
-}
-
 }  // namespace mongo

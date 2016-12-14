@@ -43,6 +43,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/rpc/request_interface.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -425,6 +426,14 @@ public:
      * does not have CurOp linked in to it.
      */
     static void registerError(OperationContext* txn, const DBException& exception);
+
+    /**
+     * Registers the implementation of the `registerError` function. This hook is needed because
+     * mongos does not have CurOp linked in to it. This must be called from a MONGO_INITIALIZER
+     * context and/or a single-threaded context.
+     */
+    static void registerRegisterError(
+        stdx::function<void(OperationContext*, const DBException&)> registerErrorHandler);
 
     /**
      * This function checks if a command is a user management command by name.

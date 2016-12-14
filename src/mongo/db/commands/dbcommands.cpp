@@ -120,6 +120,18 @@ using std::string;
 using std::stringstream;
 using std::unique_ptr;
 
+namespace {
+void registerErrorImpl(OperationContext* txn, const DBException& exception) {
+    CurOp::get(txn)->debug().exceptionInfo = exception.getInfo();
+}
+
+MONGO_INITIALIZER(InitializeRegisterErrorHandler)(InitializerContext* const) {
+    Command::registerRegisterError(registerErrorImpl);
+    return Status::OK();
+}
+}  // namespace
+
+
 class CmdShutdownMongoD : public CmdShutdown {
 public:
     virtual void help(stringstream& help) const {
@@ -1609,10 +1621,6 @@ bool Command::run(OperationContext* txn,
     replyBuilder->setMetadata(metadataBob.done());
 
     return result;
-}
-
-void Command::registerError(OperationContext* txn, const DBException& exception) {
-    CurOp::get(txn)->debug().exceptionInfo = exception.getInfo();
 }
 
 }  // namespace mongo

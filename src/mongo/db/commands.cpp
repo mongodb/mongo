@@ -372,4 +372,18 @@ bool Command::isUserManagementCommand(const std::string& name) {
     return userManagementCommands.count(name);
 }
 
+namespace {
+stdx::function<void(OperationContext*, const DBException&)> registeredRegisterErrorHandler =
+    [](OperationContext*, const DBException&) { fassertFailed(40357); };
+}  // namespace
+
+void Command::registerRegisterError(
+    stdx::function<void(OperationContext*, const DBException&)> handler) {
+    registeredRegisterErrorHandler = std::move(handler);
+}
+
+void Command::registerError(OperationContext* const txn, const DBException& exception) {
+    registeredRegisterErrorHandler(txn, exception);
+}
+
 }  // namespace mongo

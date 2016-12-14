@@ -32,6 +32,7 @@
 
 #include <tuple>
 
+#include "mongo/base/init.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -160,6 +161,13 @@ void Command::execCommandClient(OperationContext* txn,
     appendCommandStatus(result, ok, errmsg);
 }
 
-void Command::registerError(OperationContext* txn, const DBException& exception) {}
+namespace {
+void registerErrorImpl(OperationContext* txn, const DBException& exception) {}
+
+MONGO_INITIALIZER(InitializeRegisterErrorHandler)(InitializerContext* const) {
+    Command::registerRegisterError(registerErrorImpl);
+    return Status::OK();
+}
+}  // namespace
 
 }  // namespace mongo
