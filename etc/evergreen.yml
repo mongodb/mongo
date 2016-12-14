@@ -740,6 +740,7 @@ functions:
     command: shell.exec
     type: test
     params:
+      shell: bash
       working_dir: src/buildscripts/package_test
       script: |
         set -o errexit
@@ -757,15 +758,32 @@ functions:
           exit 1
         fi
 
-        # run `kitchen destroy` after we run `kitchen verify`, and exit with the `kitchen verify` exit status
-        finish () {
+        kitchen create $kitchen_variant
+
+        # retry converge in case the instance isn't fully ready
+        converged="false"
+        for i in {1..3}
+        do
+          kitchen converge "$kitchen_variant"
+          if [ $? -eq 0 ]; then
+            converged="true"
+            break
+          else
+            sleep 10
+          fi
+        done
+
+        if [ "$converged" = "true" ]; then
+          kitchen verify "$kitchen_variant"
           ret=$?
           kitchen destroy "$kitchen_variant"
           exit $ret
-        }
-        trap finish EXIT
+        else
+          echo "converge failed, running kitchen destroy and then exiting"
+          kitchen destroy "$kitchen_variant"
+          exit 1
+        fi
 
-        kitchen verify "$kitchen_variant"
 
 pre:
   - command: shell.track

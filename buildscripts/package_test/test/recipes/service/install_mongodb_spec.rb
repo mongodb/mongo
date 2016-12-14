@@ -35,9 +35,8 @@ describe service('mongod') do
   it { should be_running }
 end
 
-# wait for a few seconds so that we are sure mongod has
-# written to its log and is ready to accept writes and reads
-describe command("sleep 5") do
+# wait to make sure mongod is ready
+describe command("/inspec_wait.sh") do
   its('exit_status') { should eq 0 }
 end
 

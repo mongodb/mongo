@@ -94,3 +94,24 @@ if platform_family? 'suse'
     cwd homedir
   end
 end
+
+inspec_wait = <<HEREDOC
+#!/bin/bash
+for i in {1..60}
+do
+  mongo --eval "db.smoke.insert({answer: 42})"
+  if [ $? -eq 0 ]
+  then
+    exit 0
+  else
+    echo "sleeping"
+    sleep 1
+  fi
+done
+exit 1
+HEREDOC
+
+file '/inspec_wait.sh' do
+  content inspec_wait
+  mode '0755'
+end
