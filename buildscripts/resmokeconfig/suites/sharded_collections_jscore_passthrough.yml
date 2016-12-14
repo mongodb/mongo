@@ -64,6 +64,7 @@ selector:
     - jstests/core/dbcase2.js
     - jstests/core/no_db_created.js
     - jstests/core/ns_length.js
+    - jstests/core/killop_drop_collection.js # Uses fsyncLock.
 
 executor:
   js_test:
