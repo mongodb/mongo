@@ -303,8 +303,10 @@ public:
         if (parameter)
             parameter->append(txn, result, "automationServiceDescriptor");
 
-        MessageCompressorManager::forSession(txn->getClient()->session())
-            .serverNegotiate(cmdObj, &result);
+        if (txn->getClient()->session()) {
+            MessageCompressorManager::forSession(txn->getClient()->session())
+                .serverNegotiate(cmdObj, &result);
+        }
 
         return true;
     }
