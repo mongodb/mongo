@@ -1,5 +1,3 @@
-// kv_storage_engine.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -50,7 +48,7 @@ const std::string catalogInfo = "_mdb_catalog";
 
 class KVStorageEngine::RemoveDBChange : public RecoveryUnit::Change {
 public:
-    RemoveDBChange(KVStorageEngine* engine, StringData db, KVDatabaseCatalogEntry* entry)
+    RemoveDBChange(KVStorageEngine* engine, StringData db, KVDatabaseCatalogEntryBase* entry)
         : _engine(engine), _db(db.toString()), _entry(entry) {}
 
     virtual void commit() {
@@ -64,11 +62,17 @@ public:
 
     KVStorageEngine* const _engine;
     const std::string _db;
-    KVDatabaseCatalogEntry* const _entry;
+    KVDatabaseCatalogEntryBase* const _entry;
 };
 
-KVStorageEngine::KVStorageEngine(KVEngine* engine, const KVStorageEngineOptions& options)
-    : _options(options), _engine(engine), _supportsDocLocking(_engine->supportsDocLocking()) {
+KVStorageEngine::KVStorageEngine(
+    KVEngine* engine,
+    const KVStorageEngineOptions& options,
+    stdx::function<KVDatabaseCatalogEntryFactory> databaseCatalogEntryFactory)
+    : _databaseCatalogEntryFactory(std::move(databaseCatalogEntryFactory)),
+      _options(options),
+      _engine(engine),
+      _supportsDocLocking(_engine->supportsDocLocking()) {
     uassert(28601,
             "Storage engine does not support --directoryperdb",
             !(options.directoryPerDB && !engine->supportsDirectoryPerDB()));
@@ -114,9 +118,9 @@ KVStorageEngine::KVStorageEngine(KVEngine* engine, const KVStorageEngineOptions&
         string dbName = nss.db().toString();
 
         // No rollback since this is only for committed dbs.
-        KVDatabaseCatalogEntry*& db = _dbs[dbName];
+        KVDatabaseCatalogEntryBase*& db = _dbs[dbName];
         if (!db) {
-            db = new KVDatabaseCatalogEntry(dbName, this);
+            db = _databaseCatalogEntryFactory(dbName, this).release();
         }
 
         db->initCollection(&opCtx, coll, options.forRepair);
@@ -193,13 +197,13 @@ void KVStorageEngine::listDatabases(std::vector<std::string>* out) const {
     }
 }
 
-DatabaseCatalogEntry* KVStorageEngine::getDatabaseCatalogEntry(OperationContext* opCtx,
-                                                               StringData dbName) {
+KVDatabaseCatalogEntryBase* KVStorageEngine::getDatabaseCatalogEntry(OperationContext* opCtx,
+                                                                     StringData dbName) {
     stdx::lock_guard<stdx::mutex> lk(_dbsLock);
-    KVDatabaseCatalogEntry*& db = _dbs[dbName.toString()];
+    KVDatabaseCatalogEntryBase*& db = _dbs[dbName.toString()];
     if (!db) {
         // Not registering change since db creation is implicit and never rolled back.
-        db = new KVDatabaseCatalogEntry(dbName, this);
+        db = _databaseCatalogEntryFactory(dbName, this).release();
     }
     return db;
 }
@@ -210,7 +214,7 @@ Status KVStorageEngine::closeDatabase(OperationContext* txn, StringData db) {
 }
 
 Status KVStorageEngine::dropDatabase(OperationContext* txn, StringData db) {
-    KVDatabaseCatalogEntry* entry;
+    KVDatabaseCatalogEntryBase* entry;
     {
         stdx::lock_guard<stdx::mutex> lk(_dbsLock);
         DBMap::const_iterator it = _dbs.find(db.toString());
@@ -292,4 +296,4 @@ Status KVStorageEngine::repairRecordStore(OperationContext* txn, const std::stri
 void KVStorageEngine::setJournalListener(JournalListener* jl) {
     _engine->setJournalListener(jl);
 }
-}
+}  // namespace mongo

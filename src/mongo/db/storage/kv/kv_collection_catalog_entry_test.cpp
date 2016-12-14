@@ -37,6 +37,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
+#include "mongo/db/storage/kv/kv_database_catalog_entry_mock.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/unittest/death_test.h"
@@ -49,7 +50,9 @@ namespace {
 class KVCollectionCatalogEntryTest : public unittest::Test {
 public:
     KVCollectionCatalogEntryTest()
-        : _nss("unittests.kv_collection_catalog_entry"), _storageEngine(new DevNullKVEngine()) {
+        : _nss("unittests.kv_collection_catalog_entry"),
+          _storageEngine(
+              new DevNullKVEngine(), KVStorageEngineOptions(), kvDatabaseCatalogEntryMockFactory) {
         _storageEngine.finishInit();
     }
 

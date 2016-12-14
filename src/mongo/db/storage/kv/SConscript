@@ -1,5 +1,8 @@
+# -*- mode: python; -*-
+
 Import("env")
 
+# Should not be referenced outside this SConscript file.
 env.Library(
     target='kv_engine_core',
     source=[
@@ -14,25 +17,16 @@ env.Library(
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
         ],
-    LIBDEPS_TAGS=[
-        # Depends on KVDatabaseCatalogEntry::getIndex, which does not have
-        # a unique definition.
-        'incomplete',
-    ],
     )
 
 # Should not be referenced outside this SConscript file.
 env.Library(
     target='kv_database_catalog_entry_core',
-    source=['kv_database_catalog_entry.cpp'],
+    source=['kv_database_catalog_entry_base.cpp'],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
         '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
-    ],
-    LIBDEPS_TAGS=[
-        # Depends on KVDatabaseCatalogEntry::getIndex, which is not uniquely defined
-        'incomplete',
     ],
 )
 
@@ -51,7 +45,7 @@ env.Library(
 env.Library(
     target='kv_engine',
     source=[
-        'kv_database_catalog_entry_get_index.cpp',
+        'kv_database_catalog_entry.cpp',
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/index/index_access_methods',
@@ -66,7 +60,7 @@ env.Library(
 env.Library(
     target='kv_engine_mock',
     source=[
-        'kv_database_catalog_entry_get_index_mock.cpp'
+        'kv_database_catalog_entry_mock.cpp'
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/storage/storage_options',
@@ -88,7 +82,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/unittest/unittest',
         '$BUILD_DIR/mongo/util/clock_source_mock',
-        'kv_engine_core',
+        'kv_engine_mock',
         ],
     )
 

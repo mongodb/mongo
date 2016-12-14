@@ -1,7 +1,5 @@
-// kv_database_catalog_entry_get_index_mock.cpp
-
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,16 +26,22 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/kv/kv_database_catalog_entry.h"
+#include "mongo/platform/basic.h"
 
+#include "mongo/db/storage/kv/kv_database_catalog_entry_mock.h"
+
+#include <memory>
+
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 
-namespace mongo {
+std::unique_ptr<mongo::KVDatabaseCatalogEntryMock> mongo::kvDatabaseCatalogEntryMockFactory(
+    const StringData name, KVStorageEngine* const engine) {
+    return stdx::make_unique<KVDatabaseCatalogEntryMock>(name, engine);
+}
 
 // Used to satisfy link dependencies in unit test - not invoked.
-IndexAccessMethod* KVDatabaseCatalogEntry::getIndex(OperationContext* txn,
-                                                    const CollectionCatalogEntry* collection,
-                                                    IndexCatalogEntry* index) {
+mongo::IndexAccessMethod* mongo::KVDatabaseCatalogEntryMock::getIndex(
+    OperationContext* txn, const CollectionCatalogEntry* collection, IndexCatalogEntry* index) {
     invariant(false);
-}
 }

@@ -1,5 +1,3 @@
-// kv_storage_engine.h
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -33,26 +31,38 @@
 #include <map>
 #include <string>
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
+#include "mongo/db/storage/kv/kv_database_catalog_entry_base.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/stdx/functional.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
 class KVCatalog;
 class KVEngine;
-class KVDatabaseCatalogEntry;
 
 struct KVStorageEngineOptions {
-    KVStorageEngineOptions()
-        : directoryPerDB(false), directoryForIndexes(false), forRepair(false) {}
-
-    bool directoryPerDB;
-    bool directoryForIndexes;
-    bool forRepair;
+    bool directoryPerDB = false;
+    bool directoryForIndexes = false;
+    bool forRepair = false;
 };
+
+/*
+ * The actual definition for this function is in
+ * `src/mongo/db/storage/kv/kv_database_catalog_entry.cpp` This unusual forward declaration is to
+ * facilitate better linker error messages.  Tests need to pass a mock construction factory, whereas
+ * main implementations should pass the `default...` factory which is linked in with the main
+ * `KVDatabaseCatalogEntry` code.
+ */
+std::unique_ptr<KVDatabaseCatalogEntryBase> defaultDatabaseCatalogEntryFactory(
+    const StringData name, KVStorageEngine* const engine);
+
+using KVDatabaseCatalogEntryFactory = decltype(defaultDatabaseCatalogEntryFactory);
 
 class KVStorageEngine final : public StorageEngine {
 public:
@@ -60,7 +70,10 @@ public:
      * @param engine - ownership passes to me
      */
     KVStorageEngine(KVEngine* engine,
-                    const KVStorageEngineOptions& options = KVStorageEngineOptions());
+                    const KVStorageEngineOptions& options = KVStorageEngineOptions(),
+                    stdx::function<KVDatabaseCatalogEntryFactory> databaseCatalogEntryFactory =
+                        defaultDatabaseCatalogEntryFactory);
+
     virtual ~KVStorageEngine();
 
     virtual void finishInit();
@@ -69,7 +82,8 @@ public:
 
     virtual void listDatabases(std::vector<std::string>* out) const;
 
-    virtual DatabaseCatalogEntry* getDatabaseCatalogEntry(OperationContext* opCtx, StringData db);
+    KVDatabaseCatalogEntryBase* getDatabaseCatalogEntry(OperationContext* opCtx,
+                                                        StringData db) override;
 
     virtual bool supportsDocLocking() const {
         return _supportsDocLocking;
@@ -116,6 +130,8 @@ public:
 private:
     class RemoveDBChange;
 
+    stdx::function<KVDatabaseCatalogEntryFactory> _databaseCatalogEntryFactory;
+
     KVStorageEngineOptions _options;
 
     // This must be the first member so it is destroyed last.
@@ -126,11 +142,11 @@ private:
     std::unique_ptr<RecordStore> _catalogRecordStore;
     std::unique_ptr<KVCatalog> _catalog;
 
-    typedef std::map<std::string, KVDatabaseCatalogEntry*> DBMap;
+    typedef std::map<std::string, KVDatabaseCatalogEntryBase*> DBMap;
     DBMap _dbs;
     mutable stdx::mutex _dbsLock;
 
     // Flag variable that states if the storage engine is in backup mode.
     bool _inBackupMode = false;
 };
-}
+}  // namespace mongo
