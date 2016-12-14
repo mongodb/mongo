@@ -203,7 +203,7 @@ functions:
           cd perf
           #  give mongod a few seconds to start up so that we can connect.
           sleep 5
-          ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t ${threads} --trialCount 5 -f testcases/*.js --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed
+          ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t ${threads} --trialCount 5 -f testcases/*.js --readCmd ${readCmd} --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -287,10 +287,45 @@ tasks:
         includeFilter2 : "core regression"
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+        readCmd: false
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
         reports_analysis: true
+- name: views-query
+  depends_on:
+  - variant: linux-wt-standalone
+    name: compile
+  commands:
+    - func: "start server"
+    - func: "run perf tests"
+      vars:
+        includeFilter1: "query_identityview"
+        includeFilter2 : "core regression"
+        excludeFilter : "single_threaded"
+        threads : "1 2 4 8"
+        readCmd: true
+    - func: "download analysis scripts"
+    - func: "analyze"
+      vars:
+        reports_analysis: true
+- name: views-aggregation
+  depends_on:
+  - variant: linux-wt-standalone
+    name: compile
+  commands:
+    - func: "start server"
+    - func: "run perf tests"
+      vars:
+        includeFilter1: "aggregation_identityview"
+        includeFilter2 : "regression"
+        excludeFilter: "none"
+        threads : "1"
+        readCmd: true
+    - func: "download analysis scripts"
+    - func: "analyze"
+      vars:
+        report_analysis: true
 - name: where
   depends_on:
   - variant: linux-wt-standalone
@@ -303,6 +338,7 @@ tasks:
         includeFilter2 : "core regression"
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+        readCmd: false
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
@@ -319,6 +355,7 @@ tasks:
         includeFilter2 : "core regression"
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+        readCmd: false
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
@@ -335,6 +372,7 @@ tasks:
         includeFilter2 : "core regression"
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+        readCmd: false
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
@@ -351,6 +389,7 @@ tasks:
         includeFilter2 : "core regression"
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+        readCmd: false
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
@@ -367,6 +406,7 @@ tasks:
         includeFilter2 : "core regression"
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+        readCmd: false
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
@@ -383,6 +423,7 @@ tasks:
         includeFilter2 : "core regression"
         excludeFilter : "none"
         threads : "1"
+        readCmd: false
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
@@ -543,10 +584,11 @@ tasks:
         includeFilter2: "regression"
         excludeFilter: "none"
         threads : "1"
+        readCmd: false
     - func: "download analysis scripts"
     - func: "analyze"
       vars:
-        log_analysis: true
+        report_analysis: true
 
 buildvariants:
 - name: linux-wt-standalone
@@ -569,6 +611,8 @@ buildvariants:
     - rhel62-large
   - name: aggregation
   - name: query
+  - name: views-aggregation
+  - name: views-query
   - name: where
   - name: update
   - name: insert
@@ -589,6 +633,8 @@ buildvariants:
   tasks:
   - name: aggregation
   - name: query
+  - name: views-aggregation
+  - name: views-query
   - name: where
   - name: update
   - name: insert
