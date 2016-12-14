@@ -200,11 +200,14 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetched) {
         kDonorConnStr,
         kRecipientConnStr.getServers()[0]);
 
-    auto futureStart = launchAsync([&]() {
-        onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
-    });
+    {
+        auto futureStartClone = launchAsync([&]() {
+            onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
+        });
 
-    ASSERT_OK(cloner.startClone(operationContext()));
+        ASSERT_OK(cloner.startClone(operationContext()));
+        futureStartClone.timed_get(kFutureTimeout);
+    }
 
     // Ensure the initial clone documents are available
     {
@@ -290,6 +293,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetched) {
     });
 
     ASSERT_OK(cloner.commitClone(operationContext()));
+    futureCommit.timed_get(kFutureTimeout);
 }
 
 TEST_F(MigrationChunkClonerSourceLegacyTest, CollectionNotFound) {
@@ -330,14 +334,18 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, FailedToEngageRecipientShard) {
         kDonorConnStr,
         kRecipientConnStr.getServers()[0]);
 
-    auto future = launchAsync([&]() {
-        onCommand([&](const RemoteCommandRequest& request) {
-            return Status(ErrorCodes::NetworkTimeout, "Did not receive confirmation from donor");
+    {
+        auto futureStartClone = launchAsync([&]() {
+            onCommand([&](const RemoteCommandRequest& request) {
+                return Status(ErrorCodes::NetworkTimeout,
+                              "Did not receive confirmation from donor");
+            });
         });
-    });
 
-    auto startCloneStatus = cloner.startClone(operationContext());
-    ASSERT_EQ(ErrorCodes::NetworkTimeout, startCloneStatus.code());
+        auto startCloneStatus = cloner.startClone(operationContext());
+        ASSERT_EQ(ErrorCodes::NetworkTimeout, startCloneStatus.code());
+        futureStartClone.timed_get(kFutureTimeout);
+    }
 
     // Ensure that if the recipient tries to fetch some documents, the cloner won't crash
     {
