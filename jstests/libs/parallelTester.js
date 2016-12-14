@@ -164,7 +164,6 @@ if (typeof _threadInject != "undefined") {
             "killop.js",
             "run_program1.js",
             "notablescan.js",
-            "drop2.js",
             "dropdb_race.js",
             "bench_test1.js",
             "padding.js",
@@ -194,6 +193,7 @@ if (typeof _threadInject != "undefined") {
             // These tests use fsyncLock.
             parallelFilesDir + "/fsync.js",
             parallelFilesDir + "/currentop.js",
+            parallelFilesDir + "/killop_drop_collection.js",
 
             // These tests expect the profiler to be on or off at specific points. They should not
             // be run in parallel with tests that perform fsyncLock. User operations skip writing to

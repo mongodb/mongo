@@ -65,6 +65,7 @@ selector:
     - jstests/core/no_db_created.js
     - jstests/core/ns_length.js
     - jstests/core/views/*.js # Views tests aren't expected to work when collections are implicitly sharded.
+    - jstests/core/killop_drop_collection.js # Uses fsyncLock.
 
 executor:
   js_test:

@@ -47,6 +47,7 @@ selector:
     - jstests/core/views/invalid_system_views.js # We expect listCollections to fail when there's an invalid view.
     # TODO: SERVER-27269: mongos can't establish cursor if view has $collStats and views another view.
     - jstests/core/views/views_coll_stats.js
+    - jstests/core/killop_drop_collection.js # Uses fsyncLock.
 
 executor:
   js_test:
