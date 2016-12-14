@@ -30,25 +30,23 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/storage/record_store_test_harness.h"
-
-
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_docwriter.h"
+#include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/unittest/unittest.h"
+
+namespace mongo {
+namespace {
 
 using std::string;
 using std::stringstream;
-
-namespace mongo {
-
 using std::unique_ptr;
 
 // Insert a record and verify the number of entries in the collection is 1.
 TEST(RecordStoreTestHarness, InsertRecord) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -79,7 +77,7 @@ TEST(RecordStoreTestHarness, InsertRecord) {
 // Insert multiple records and verify the number of entries in the collection
 // equals the number that were inserted.
 TEST(RecordStoreTestHarness, InsertMultipleRecords) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -114,7 +112,7 @@ TEST(RecordStoreTestHarness, InsertMultipleRecords) {
 // Insert a record using a DocWriter and verify the number of entries
 // in the collection is 1.
 TEST(RecordStoreTestHarness, InsertRecordUsingDocWriter) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -145,7 +143,7 @@ TEST(RecordStoreTestHarness, InsertRecordUsingDocWriter) {
 // Insert multiple records using a DocWriter and verify the number of entries
 // in the collection equals the number that were inserted.
 TEST(RecordStoreTestHarness, InsertMultipleRecordsUsingDocWriter) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -176,4 +174,5 @@ TEST(RecordStoreTestHarness, InsertMultipleRecordsUsingDocWriter) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

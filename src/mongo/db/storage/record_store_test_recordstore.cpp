@@ -36,14 +36,15 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
+namespace {
+
 using std::unique_ptr;
 using std::string;
 
-namespace mongo {
-
 // Verify that the name of the record store is not NULL and nonempty.
 TEST(RecordStoreTestHarness, RecordStoreName) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -54,7 +55,7 @@ TEST(RecordStoreTestHarness, RecordStoreName) {
 
 // Verify that the namespace of the record store is nonempty.
 TEST(RecordStoreTestHarness, Namespace) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -65,9 +66,10 @@ TEST(RecordStoreTestHarness, Namespace) {
 
 // Call isCapped() on a non-capped collection and verify the result is false.
 TEST(RecordStoreTestHarness, IsNotCapped) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
     ASSERT(!rs->isCapped());
 }
 
+}  // namespace
 }  // namespace mongo

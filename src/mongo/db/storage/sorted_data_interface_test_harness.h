@@ -39,6 +39,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/test_harness_helper.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/unowned_ptr.h"
 
@@ -84,23 +85,9 @@ const RecordId loc8(0, 56);
 
 class RecoveryUnit;
 
-class HarnessHelper {
+class SortedDataInterfaceHarnessHelper : public virtual HarnessHelper {
 public:
-    HarnessHelper() : _serviceContext(), _client(_serviceContext.makeClient("hh")) {}
-    virtual ~HarnessHelper() {}
-
     virtual std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique) = 0;
-    virtual std::unique_ptr<RecoveryUnit> newRecoveryUnit() = 0;
-
-    ServiceContext::UniqueOperationContext newOperationContext(Client* client) {
-        auto opCtx = client->makeOperationContext();
-        opCtx->setRecoveryUnit(newRecoveryUnit().release(), OperationContext::kNotInUnitOfWork);
-        return opCtx;
-    }
-
-    ServiceContext::UniqueOperationContext newOperationContext() {
-        return newOperationContext(_client.get());
-    }
 
     /**
      * Creates a new SDI with some initial data.
@@ -109,18 +96,6 @@ public:
      */
     std::unique_ptr<SortedDataInterface> newSortedDataInterface(
         bool unique, std::initializer_list<IndexKeyEntry> toInsert);
-
-    Client* client() {
-        return _client.get();
-    }
-
-    ServiceContext* serviceContext() {
-        return &_serviceContext;
-    }
-
-private:
-    ServiceContextNoop _serviceContext;
-    ServiceContext::UniqueClient _client;
 };
 
 /**
@@ -158,5 +133,7 @@ inline void removeFromIndex(unowned_ptr<HarnessHelper> harness,
     removeFromIndex(harness->newOperationContext(client.get()), index, toRemove);
 }
 
-std::unique_ptr<HarnessHelper> newHarnessHelper();
+inline std::unique_ptr<SortedDataInterfaceHarnessHelper> newSortedDataInterfaceHarnessHelper() {
+    return dynamic_ptr_cast<SortedDataInterfaceHarnessHelper>(newHarnessHelper());
+}
 }

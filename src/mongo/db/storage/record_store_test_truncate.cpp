@@ -36,15 +36,16 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
+namespace {
+
 using std::unique_ptr;
 using std::string;
 using std::stringstream;
 
-namespace mongo {
-
 // Verify that calling truncate() on an already empty collection returns an OK status.
 TEST(RecordStoreTestHarness, TruncateEmpty) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -70,7 +71,7 @@ TEST(RecordStoreTestHarness, TruncateEmpty) {
 // Insert multiple records, and verify that calling truncate() on a nonempty collection
 // removes all of them and returns an OK status.
 TEST(RecordStoreTestHarness, TruncateNonEmpty) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -114,4 +115,5 @@ TEST(RecordStoreTestHarness, TruncateNonEmpty) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

@@ -1,7 +1,5 @@
-// ephemeral_for_test_btree_impl_test.cpp
-
 /**
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2016 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,44 +26,26 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_btree_impl.h"
+#include "mongo/db/storage/test_harness_helper.h"
 
+#include <exception>
+#include <stdexcept>
 
-#include "mongo/base/init.h"
-#include "mongo/db/storage/ephemeral_for_test/ephemeral_for_test_recovery_unit.h"
-#include "mongo/db/storage/sorted_data_interface_test_harness.h"
-#include "mongo/stdx/memory.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
-
-class EphemeralForBtreeImplTestHarnessHelper final
-    : public virtual SortedDataInterfaceHarnessHelper {
-public:
-    EphemeralForBtreeImplTestHarnessHelper() : _order(Ordering::make(BSONObj())) {}
-
-    std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique) final {
-        return std::unique_ptr<SortedDataInterface>(
-            getEphemeralForTestBtreeImpl(_order, unique, &_data));
-    }
-
-    std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
-        return stdx::make_unique<EphemeralForTestRecoveryUnit>();
-    }
-
-private:
-    std::shared_ptr<void> _data;  // used by EphemeralForTestBtreeImpl
-    Ordering _order;
-};
-
-std::unique_ptr<HarnessHelper> makeHarnessHelper() {
-    return stdx::make_unique<EphemeralForBtreeImplTestHarnessHelper>();
-}
-
-MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
-    mongo::registerHarnessHelperFactory(makeHarnessHelper);
-    return Status::OK();
-}
+stdx::function<std::unique_ptr<HarnessHelper>()> basicHarnessFactory;
 }  // namespace
 }  // namespace mongo
+
+
+mongo::HarnessHelper::~HarnessHelper() = default;
+
+void mongo::registerHarnessHelperFactory(stdx::function<std::unique_ptr<HarnessHelper>()> factory) {
+    basicHarnessFactory = std::move(factory);
+}
+
+auto mongo::newHarnessHelper() -> std::unique_ptr<HarnessHelper> {
+    return basicHarnessFactory();
+}

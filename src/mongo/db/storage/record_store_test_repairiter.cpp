@@ -38,16 +38,17 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
+namespace {
+
 using std::unique_ptr;
 using std::set;
 using std::string;
 using std::stringstream;
 
-namespace mongo {
-
 // Create an iterator for repairing an empty record store.
 TEST(RecordStoreTestHarness, GetIteratorForRepairEmpty) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -69,7 +70,7 @@ TEST(RecordStoreTestHarness, GetIteratorForRepairEmpty) {
 // Insert multiple records and create an iterator for repairing the record store,
 // even though the it has not been corrupted.
 TEST(RecordStoreTestHarness, GetIteratorForRepairNonEmpty) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -122,7 +123,7 @@ TEST(RecordStoreTestHarness, GetIteratorForRepairNonEmpty) {
 // Then invalidate the record and ensure that the repair iterator responds correctly.
 // See SERVER-16300.
 TEST(RecordStoreTestHarness, GetIteratorForRepairInvalidateSingleton) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -167,4 +168,5 @@ TEST(RecordStoreTestHarness, GetIteratorForRepairInvalidateSingleton) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

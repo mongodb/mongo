@@ -40,17 +40,18 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
+namespace {
+
 using std::unique_ptr;
 using std::string;
 using std::stringstream;
-
-namespace mongo {
 
 // Insert multiple records and iterate through them in the forward direction.
 // When curr() or getNext() is called on an iterator positioned at EOF,
 // the iterator returns RecordId() and stays at EOF.
 TEST(RecordStoreTestHarness, IterateOverMultipleRecords) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -101,7 +102,7 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecords) {
 // When curr() or getNext() is called on an iterator positioned at EOF,
 // the iterator returns RecordId() and stays at EOF.
 TEST(RecordStoreTestHarness, IterateOverMultipleRecordsReversed) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -152,7 +153,7 @@ TEST(RecordStoreTestHarness, IterateOverMultipleRecordsReversed) {
 // Insert multiple records and try to create a forward iterator
 // starting at an interior position.
 TEST(RecordStoreTestHarness, IterateStartFromMiddle) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -204,7 +205,7 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddle) {
 // Insert multiple records and try to create a reverse iterator
 // starting at an interior position.
 TEST(RecordStoreTestHarness, IterateStartFromMiddleReversed) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -257,7 +258,7 @@ TEST(RecordStoreTestHarness, IterateStartFromMiddleReversed) {
 // is EOF. Add an additional record, saving and restoring the iterator state, and check
 // that the iterator remains EOF.
 TEST(RecordStoreTestHarness, RecordIteratorEOF) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -328,7 +329,7 @@ TEST(RecordStoreTestHarness, RecordIteratorEOF) {
 
 // Test calling save and restore after each call to next
 TEST(RecordStoreTestHarness, RecordIteratorSaveRestore) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -390,7 +391,7 @@ TEST(RecordStoreTestHarness, RecordIteratorSaveRestore) {
 // Insert two records, and iterate a cursor to EOF. Seek the same cursor to the first and ensure
 // that next() returns the second record.
 TEST(RecordStoreTestHarness, SeekAfterEofAndContinue) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -442,4 +443,5 @@ TEST(RecordStoreTestHarness, SeekAfterEofAndContinue) {
     ASSERT(!cursor->next());
 }
 
+}  // namespace
 }  // namespace mongo

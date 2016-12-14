@@ -36,12 +36,13 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 // Verify that isEmpty() returns true when the index is empty,
 // returns false when a key is inserted, and returns true again
 // when that is unindex.
 TEST(SortedDataInterface, IsEmpty) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
 
     {
@@ -79,4 +80,5 @@ TEST(SortedDataInterface, IsEmpty) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

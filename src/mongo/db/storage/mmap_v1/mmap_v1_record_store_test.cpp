@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/init.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/record.h"
@@ -42,35 +43,38 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
-class MyHarnessHelper : public HarnessHelper {
+class MyHarnessHelper : public RecordStoreHarnessHelper {
 public:
     MyHarnessHelper() {}
 
     virtual std::unique_ptr<RecordStore> newNonCappedRecordStore() {
         OperationContextNoop txn;
-        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(false, 0);
+        auto md = stdx::make_unique<DummyRecordStoreV1MetaData>(false, 0);
         md->setUserFlag(&txn, CollectionOptions::Flag_NoPadding);
-        return stdx::make_unique<SimpleRecordStoreV1>(&txn, "a.b", md, &_em, false);
+        return stdx::make_unique<SimpleRecordStoreV1>(&txn, "a.b", md.release(), &_em, false);
     }
 
     std::unique_ptr<RecordStore> newCappedRecordStore(int64_t cappedMaxSize,
                                                       int64_t cappedMaxDocs) final {
         OperationContextNoop txn;
-        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData(true, 0);
-        auto rs = stdx::make_unique<CappedRecordStoreV1>(&txn, nullptr, "a.b", md, &_em, false);
+        auto md = stdx::make_unique<DummyRecordStoreV1MetaData>(true, 0);
+        auto md_ptr = md.get();
+        std::unique_ptr<RecordStore> rs =
+            stdx::make_unique<CappedRecordStoreV1>(&txn, nullptr, "a.b", md.release(), &_em, false);
 
         LocAndSize records[] = {{}};
         LocAndSize drecs[] = {{DiskLoc(0, 1000), 1000}, {}};
         md->setCapExtent(&txn, DiskLoc(0, 0));
         md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());
-        initializeV1RS(&txn, records, drecs, NULL, &_em, md);
+        initializeV1RS(&txn, records, drecs, NULL, &_em, md_ptr);
 
-        return std::move(rs);
+        return rs;
     }
 
-    virtual RecoveryUnit* newRecoveryUnit() {
-        return new RecoveryUnitNoop();
+    std::unique_ptr<RecoveryUnit> newRecoveryUnit() override {
+        return stdx::make_unique<RecoveryUnitNoop>();
     }
 
     bool supportsDocLocking() final {
@@ -81,7 +85,13 @@ private:
     DummyExtentManager _em;
 };
 
-std::unique_ptr<HarnessHelper> newHarnessHelper() {
+std::unique_ptr<HarnessHelper> makeHarnessHelper() {
     return stdx::make_unique<MyHarnessHelper>();
 }
+
+MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
+    mongo::registerHarnessHelperFactory(makeHarnessHelper);
+    return Status::OK();
 }
+}  // namespace
+}  // namespace mongo

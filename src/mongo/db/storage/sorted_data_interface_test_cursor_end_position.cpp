@@ -34,9 +34,10 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 // Tests setEndPosition with next().
 void testSetEndPosition_Next_Forward(bool unique, bool inclusive) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(
         unique,
@@ -75,7 +76,7 @@ TEST(SortedDataInterface, SetEndPosition_Next_Forward_Standard_Exclusive) {
 }
 
 void testSetEndPosition_Next_Reverse(bool unique, bool inclusive) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(
         unique,
@@ -115,7 +116,7 @@ TEST(SortedDataInterface, SetEndPosition_Next_Reverse_Standard_Exclusive) {
 
 // Tests setEndPosition with seek() and seekExact().
 void testSetEndPosition_Seek_Forward(bool unique, bool inclusive) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         {
@@ -163,7 +164,7 @@ TEST(SortedDataInterface, SetEndPosition_Seek_Forward_Standard_Exclusive) {
 }
 
 void testSetEndPosition_Seek_Reverse(bool unique, bool inclusive) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         {
@@ -212,7 +213,7 @@ TEST(SortedDataInterface, SetEndPosition_Seek_Reverse_Standard_Exclusive) {
 
 // Test that restore never lands on the wrong side of the endPosition.
 void testSetEndPosition_Restore_Forward(bool unique) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(
         unique,
@@ -248,7 +249,7 @@ TEST(SortedDataInterface, SetEndPosition_Restore_Forward_Standard) {
 }
 
 void testSetEndPosition_Restore_Reverse(bool unique) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(
         unique,
@@ -289,7 +290,7 @@ TEST(SortedDataInterface, SetEndPosition_Restore_Reverse_Standard) {
 // (since implementations are free not to use end cursors) but implementations that incorrectly
 // restore end cursors would tend to fail this test.
 void testSetEndPosition_RestoreEndCursor_Forward(bool unique) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         {
@@ -323,7 +324,7 @@ TEST(SortedDataInterface, SetEndPosition_RestoreEndCursor_Forward_Standard) {
 }
 
 void testSetEndPosition_RestoreEndCursor_Reverse(bool unique) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         {
@@ -358,7 +359,7 @@ TEST(SortedDataInterface, SetEndPosition_RestoreEndCursor_Reverse_Unique) {
 // setEndPosition with empty BSONObj is supposed to mean "no end position", regardless of
 // inclusive flag or direction.
 void testSetEndPosition_Empty_Forward(bool unique, bool inclusive) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted =
         harnessHelper->newSortedDataInterface(unique,
@@ -388,7 +389,7 @@ TEST(SortedDataInterface, SetEndPosition_Empty_Forward_Standard_Exclusive) {
 }
 
 void testSetEndPosition_Empty_Reverse(bool unique, bool inclusive) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted =
         harnessHelper->newSortedDataInterface(unique,
@@ -416,4 +417,5 @@ TEST(SortedDataInterface, SetEndPosition_Empty_Reverse_Standard_Inclusive) {
 TEST(SortedDataInterface, SetEndPosition_Empty_Reverse_Standard_Exclusive) {
     testSetEndPosition_Empty_Reverse(false, false);
 }
+}  // namespace
 }  // namespace mongo

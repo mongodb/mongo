@@ -36,10 +36,11 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 // Insert a key and verify that it can be unindexed.
 TEST(SortedDataInterface, Unindex) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -79,7 +80,7 @@ TEST(SortedDataInterface, Unindex) {
 
 // Insert a compound key and verify that it can be unindexed.
 TEST(SortedDataInterface, UnindexCompoundKey) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -119,7 +120,7 @@ TEST(SortedDataInterface, UnindexCompoundKey) {
 
 // Insert multiple, distinct keys and verify that they can be unindexed.
 TEST(SortedDataInterface, UnindexMultipleDistinct) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -191,7 +192,7 @@ TEST(SortedDataInterface, UnindexMultipleDistinct) {
 
 // Insert the same key multiple times and verify that each occurrence can be unindexed.
 TEST(SortedDataInterface, UnindexMultipleSameKey) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -263,7 +264,7 @@ TEST(SortedDataInterface, UnindexMultipleSameKey) {
 
 // Call unindex() on a nonexistent key and verify the result is false.
 TEST(SortedDataInterface, UnindexEmpty) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -282,4 +283,5 @@ TEST(SortedDataInterface, UnindexEmpty) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

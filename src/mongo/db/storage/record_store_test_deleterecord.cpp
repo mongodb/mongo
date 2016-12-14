@@ -38,16 +38,17 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
-using std::string;
-using std::stringstream;
 
 namespace mongo {
+namespace {
 
+using std::string;
+using std::stringstream;
 using std::unique_ptr;
 
 // Insert a record and try to delete it.
 TEST(RecordStoreTestHarness, DeleteRecord) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -91,7 +92,7 @@ TEST(RecordStoreTestHarness, DeleteRecord) {
 
 // Insert multiple records and try to delete them.
 TEST(RecordStoreTestHarness, DeleteMultipleRecords) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -137,4 +138,5 @@ TEST(RecordStoreTestHarness, DeleteMultipleRecords) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

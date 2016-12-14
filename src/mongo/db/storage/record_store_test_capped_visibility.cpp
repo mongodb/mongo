@@ -52,10 +52,8 @@ RecordId doInsert(unowned_ptr<OperationContext> txn, unowned_ptr<RecordStore> rs
         ASSERT_EQ(record->id, id);                    \
     }((EXPR), (ID));
 
-}  // namespace
-
 TEST(RecordStore_CappedVisibility, EmptyInitialState) {
-    auto harness = newHarnessHelper();
+    const auto harness = newRecordStoreHarnessHelper();
     if (!harness->supportsDocLocking())
         return;
 
@@ -117,7 +115,7 @@ TEST(RecordStore_CappedVisibility, EmptyInitialState) {
 }
 
 TEST(RecordStore_CappedVisibility, NonEmptyInitialState) {
-    auto harness = newHarnessHelper();
+    const auto harness = newRecordStoreHarnessHelper();
     if (!harness->supportsDocLocking())
         return;
 
@@ -189,4 +187,5 @@ TEST(RecordStore_CappedVisibility, NonEmptyInitialState) {
     ASSERT_ID_EQ(rs->getCursor(longLivedOp.get())->seekExact(otherId), otherId);
 }
 
+}  // namespace
 }  // namespace mongo

@@ -36,10 +36,11 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 // Verify that calling touch() on an empty index returns an OK status.
 TEST(SortedDataInterface, TouchEmpty) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -51,7 +52,7 @@ TEST(SortedDataInterface, TouchEmpty) {
 
 // Verify that calling touch() on a nonempty index returns an OK status.
 TEST(SortedDataInterface, TouchNonEmpty) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
 
     {
@@ -84,4 +85,5 @@ TEST(SortedDataInterface, TouchNonEmpty) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

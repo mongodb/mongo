@@ -36,12 +36,13 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 // Insert a key and verify that dupKeyCheck() returns a non-OK status for
 // the same key. When dupKeyCheck() is called with the exact (key, RecordId)
 // pair that was inserted, it should still return an OK status.
 TEST(SortedDataInterface, DupKeyCheckAfterInsert) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
 
     {
@@ -77,7 +78,7 @@ TEST(SortedDataInterface, DupKeyCheckAfterInsert) {
 // Verify that dupKeyCheck() returns an OK status for a key that does
 // not exist in the index.
 TEST(SortedDataInterface, DupKeyCheckEmpty) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
 
     {
@@ -98,7 +99,7 @@ TEST(SortedDataInterface, DupKeyCheckEmpty) {
 // Insert a key and verify that dupKeyCheck() acknowledges the duplicate key, even
 // when the insert key is located at a RecordId that comes after the one specified.
 TEST(SortedDataInterface, DupKeyCheckWhenDiskLocBefore) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
 
     {
@@ -133,7 +134,7 @@ TEST(SortedDataInterface, DupKeyCheckWhenDiskLocBefore) {
 // Insert a key and verify that dupKeyCheck() acknowledges the duplicate key, even
 // when the insert key is located at a RecordId that comes before the one specified.
 TEST(SortedDataInterface, DupKeyCheckWhenDiskLocAfter) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
 
     {
@@ -165,4 +166,5 @@ TEST(SortedDataInterface, DupKeyCheckWhenDiskLocAfter) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

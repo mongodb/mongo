@@ -36,11 +36,12 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 // Insert a key and try to locate it using a forward cursor
 // by specifying its exact key and RecordId.
 TEST(SortedDataInterface, Locate) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -70,7 +71,7 @@ TEST(SortedDataInterface, Locate) {
 // Insert a key and try to locate it using a reverse cursor
 // by specifying its exact key and RecordId.
 TEST(SortedDataInterface, LocateReversed) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -102,7 +103,7 @@ TEST(SortedDataInterface, LocateReversed) {
 // Insert a compound key and try to locate it using a forward cursor
 // by specifying its exact key and RecordId.
 TEST(SortedDataInterface, LocateCompoundKey) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -132,7 +133,7 @@ TEST(SortedDataInterface, LocateCompoundKey) {
 // Insert a compound key and try to locate it using a reverse cursor
 // by specifying its exact key and RecordId.
 TEST(SortedDataInterface, LocateCompoundKeyReversed) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -164,7 +165,7 @@ TEST(SortedDataInterface, LocateCompoundKeyReversed) {
 // Insert multiple keys and try to locate them using a forward cursor
 // by specifying their exact key and RecordId.
 TEST(SortedDataInterface, LocateMultiple) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -219,7 +220,7 @@ TEST(SortedDataInterface, LocateMultiple) {
 // Insert multiple keys and try to locate them using a reverse cursor
 // by specifying their exact key and RecordId.
 TEST(SortedDataInterface, LocateMultipleReversed) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -277,7 +278,7 @@ TEST(SortedDataInterface, LocateMultipleReversed) {
 // Insert multiple compound keys and try to locate them using a forward cursor
 // by specifying their exact key and RecordId.
 TEST(SortedDataInterface, LocateMultipleCompoundKeys) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -333,7 +334,7 @@ TEST(SortedDataInterface, LocateMultipleCompoundKeys) {
 // Insert multiple compound keys and try to locate them using a reverse cursor
 // by specifying their exact key and RecordId.
 TEST(SortedDataInterface, LocateMultipleCompoundKeysReversed) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -392,7 +393,7 @@ TEST(SortedDataInterface, LocateMultipleCompoundKeysReversed) {
 // Insert multiple keys and try to locate them using a forward cursor
 // by specifying either a smaller key or RecordId.
 TEST(SortedDataInterface, LocateIndirect) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -442,7 +443,7 @@ TEST(SortedDataInterface, LocateIndirect) {
 // Insert multiple keys and try to locate them using a reverse cursor
 // by specifying either a larger key or RecordId.
 TEST(SortedDataInterface, LocateIndirectReversed) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -495,7 +496,7 @@ TEST(SortedDataInterface, LocateIndirectReversed) {
 // Insert multiple compound keys and try to locate them using a forward cursor
 // by specifying either a smaller key or RecordId.
 TEST(SortedDataInterface, LocateIndirectCompoundKeys) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -547,7 +548,7 @@ TEST(SortedDataInterface, LocateIndirectCompoundKeys) {
 // Insert multiple compound keys and try to locate them using a reverse cursor
 // by specifying either a larger key or RecordId.
 TEST(SortedDataInterface, LocateIndirectCompoundKeysReversed) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -603,7 +604,7 @@ TEST(SortedDataInterface, LocateIndirectCompoundKeysReversed) {
 // Call locate on a forward cursor of an empty index and verify that the cursor
 // is positioned at EOF.
 TEST(SortedDataInterface, LocateEmpty) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -623,7 +624,7 @@ TEST(SortedDataInterface, LocateEmpty) {
 // Call locate on a reverse cursor of an empty index and verify that the cursor
 // is positioned at EOF.
 TEST(SortedDataInterface, LocateEmptyReversed) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -641,4 +642,5 @@ TEST(SortedDataInterface, LocateEmptyReversed) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

@@ -36,10 +36,11 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 // Verify that an empty index takes up no space.
 TEST(SortedDataInterface, GetSpaceUsedBytesEmpty) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -58,7 +59,7 @@ TEST(SortedDataInterface, GetSpaceUsedBytesEmpty) {
 
 // Verify that a nonempty index takes up some space.
 TEST(SortedDataInterface, GetSpaceUsedBytesNonEmpty) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -103,4 +104,5 @@ TEST(SortedDataInterface, GetSpaceUsedBytesNonEmpty) {
     // }
 }
 
+}  // namespace
 }  // namespace mongo

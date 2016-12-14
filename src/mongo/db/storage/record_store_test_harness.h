@@ -34,6 +34,7 @@
 
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context_noop.h"
+#include "mongo/db/storage/test_harness_helper.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -41,26 +42,13 @@ namespace mongo {
 class RecordStore;
 class RecoveryUnit;
 
-class HarnessHelper {
+class RecordStoreHarnessHelper : public HarnessHelper {
 public:
-    HarnessHelper() : _serviceContext(), _client(_serviceContext.makeClient("hh")) {}
-    virtual ~HarnessHelper() {}
-
     virtual std::unique_ptr<RecordStore> newNonCappedRecordStore() = 0;
 
     static const int64_t kDefaultCapedSizeBytes = 16 * 1024 * 1024;
     virtual std::unique_ptr<RecordStore> newCappedRecordStore(
         int64_t cappedSizeBytes = kDefaultCapedSizeBytes, int64_t cappedMaxDocs = -1) = 0;
-
-    virtual ServiceContext::UniqueOperationContext newOperationContext(Client* client) {
-        auto opCtx = client->makeOperationContext();
-        opCtx->setRecoveryUnit(newRecoveryUnit(), OperationContext::kNotInUnitOfWork);
-        return opCtx;
-    }
-
-    ServiceContext::UniqueOperationContext newOperationContext() {
-        return newOperationContext(_client.get());
-    }
 
     /**
      * Currently this requires that it is possible to have two independent open write operations
@@ -68,20 +56,9 @@ public:
      * RecoveryUnits).
      */
     virtual bool supportsDocLocking() = 0;
-
-    Client* client() {
-        return _client.get();
-    }
-    ServiceContext* serviceContext() {
-        return &_serviceContext;
-    }
-
-private:
-    virtual RecoveryUnit* newRecoveryUnit() = 0;
-
-    ServiceContextNoop _serviceContext;
-    ServiceContext::UniqueClient _client;
 };
 
-std::unique_ptr<HarnessHelper> newHarnessHelper();
+inline std::unique_ptr<RecordStoreHarnessHelper> newRecordStoreHarnessHelper() {
+    return dynamic_ptr_cast<RecordStoreHarnessHelper>(newHarnessHelper());
 }
+}  // namespace mongo

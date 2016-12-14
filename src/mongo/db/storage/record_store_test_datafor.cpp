@@ -37,17 +37,18 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
-using std::string;
-using std::stringstream;
 
 namespace mongo {
+namespace {
 
+using std::string;
+using std::stringstream;
 using std::unique_ptr;
 
 // Insert a record and verify its contents by calling dataFor()
 // on the returned RecordId.
 TEST(RecordStoreTestHarness, DataFor) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -87,7 +88,7 @@ TEST(RecordStoreTestHarness, DataFor) {
 // Insert multiple records and verify their contents by calling dataFor()
 // on each of the returned RecordIds.
 TEST(RecordStoreTestHarness, DataForMultiple) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -132,4 +133,5 @@ TEST(RecordStoreTestHarness, DataForMultiple) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

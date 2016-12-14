@@ -45,7 +45,7 @@ namespace {
 
 // Verify that calling validate() on an empty collection returns an OK status.
 TEST(RecordStoreTestHarness, ValidateEmpty) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -68,7 +68,7 @@ TEST(RecordStoreTestHarness, ValidateEmpty) {
 
 // Verify that calling validate() on an empty collection returns an OK status.
 TEST(RecordStoreTestHarness, ValidateEmptyAndScanData) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -91,7 +91,7 @@ TEST(RecordStoreTestHarness, ValidateEmptyAndScanData) {
 
 // Verify that calling validate() on an empty collection returns an OK status.
 TEST(RecordStoreTestHarness, FullValidateEmptyAndScanData) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {

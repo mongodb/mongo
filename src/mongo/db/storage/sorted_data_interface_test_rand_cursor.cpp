@@ -43,10 +43,11 @@ using std::string;
 using std::stringstream;
 
 namespace mongo {
+namespace {
 
 // A random iterator should never return any entries from an empty index.
 TEST(SortedDataInterface, GetRandomIteratorEmpty) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
 
     {
@@ -68,7 +69,7 @@ TEST(SortedDataInterface, GetRandomIteratorEmpty) {
 // General test for 'randomness' of the cursor. With N entries in the index, we should see at least
 // N/4 distinct entries after iterating N - 1 times.
 TEST(SortedDataInterface, GetRandomIteratorNonEmpty) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -125,7 +126,7 @@ TEST(SortedDataInterface, GetRandomIteratorNonEmpty) {
 
 // With only a single entry in the index, we should always receive that entry via a random cursor.
 TEST(SortedDataInterface, GetRandomIteratorSingleton) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
 
     {
@@ -185,7 +186,7 @@ TEST(SortedDataInterface, GetRandomIteratorSingleton) {
 
 // With enough samples, we should eventually have returned every document in the tree at least once.
 TEST(SortedDataInterface, GetRandomIteratorLargeDocs) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
 
     // Seed the random number generator.
@@ -243,4 +244,5 @@ TEST(SortedDataInterface, GetRandomIteratorLargeDocs) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

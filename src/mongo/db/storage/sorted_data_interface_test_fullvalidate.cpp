@@ -36,11 +36,12 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 // Insert multiple keys and verify that fullValidate() either sets
 // the `numKeysOut` as the number of entries in the index, or as -1.
 TEST(SortedDataInterface, FullValidate) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -74,4 +75,5 @@ TEST(SortedDataInterface, FullValidate) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

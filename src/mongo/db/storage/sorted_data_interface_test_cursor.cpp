@@ -36,10 +36,11 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 // Verify that a forward cursor is positioned at EOF when the index is empty.
 TEST(SortedDataInterface, CursorIsEOFWhenEmpty) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -60,7 +61,7 @@ TEST(SortedDataInterface, CursorIsEOFWhenEmpty) {
 
 // Verify that a reverse cursor is positioned at EOF when the index is empty.
 TEST(SortedDataInterface, CursorIsEOFWhenEmptyReversed) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -83,7 +84,7 @@ TEST(SortedDataInterface, CursorIsEOFWhenEmptyReversed) {
 // Call advance() on a forward cursor until it is exhausted.
 // When a cursor positioned at EOF is advanced, it stays at EOF.
 TEST(SortedDataInterface, ExhaustCursor) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -125,7 +126,7 @@ TEST(SortedDataInterface, ExhaustCursor) {
 // Call advance() on a reverse cursor until it is exhausted.
 // When a cursor positioned at EOF is advanced, it stays at EOF.
 TEST(SortedDataInterface, ExhaustCursorReversed) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -165,4 +166,5 @@ TEST(SortedDataInterface, ExhaustCursorReversed) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

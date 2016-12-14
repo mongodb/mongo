@@ -37,7 +37,6 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-namespace {
 
 class ValidateAdaptorSpy : public ValidateAdaptor {
 public:
@@ -66,7 +65,8 @@ private:
 class ValidateTest : public mongo::unittest::Test {
 public:
     ValidateTest()
-        : _harnessHelper(newHarnessHelper()), _rs(_harnessHelper->newNonCappedRecordStore()) {}
+        : _harnessHelper(newRecordStoreHarnessHelper()),
+          _rs(_harnessHelper->newNonCappedRecordStore()) {}
 
     ServiceContext::UniqueOperationContext newOperationContext() {
         return _harnessHelper->newOperationContext();
@@ -110,10 +110,9 @@ public:
     }
 
 private:
-    std::unique_ptr<HarnessHelper> _harnessHelper;
+    std::unique_ptr<RecordStoreHarnessHelper> _harnessHelper;
     std::unique_ptr<RecordStore> _rs;
     std::set<std::string> _remain;
 };
 
-}  // namespace
 }  // namespace mongo

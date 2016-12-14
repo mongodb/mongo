@@ -36,16 +36,17 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
-using std::string;
-using std::stringstream;
 
 namespace mongo {
+namespace {
 
+using std::string;
+using std::stringstream;
 using std::unique_ptr;
 
 // Verify that an empty collection takes up no space.
 TEST(RecordStoreTestHarness, DataSizeEmpty) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -61,7 +62,7 @@ TEST(RecordStoreTestHarness, DataSizeEmpty) {
 
 // Verify that a nonempty collection takes up some space.
 TEST(RecordStoreTestHarness, DataSizeNonEmpty) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -96,4 +97,5 @@ TEST(RecordStoreTestHarness, DataSizeNonEmpty) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

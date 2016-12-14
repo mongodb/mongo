@@ -1,5 +1,3 @@
-// wiredtiger_record_store_test.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -30,10 +28,12 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
 #include <sstream>
 #include <string>
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/base/init.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -46,18 +46,20 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+namespace {
 
 using std::unique_ptr;
 using std::string;
 using std::stringstream;
 
-class WiredTigerHarnessHelper final : public HarnessHelper {
+class WiredTigerHarnessHelper final : public RecordStoreHarnessHelper {
 public:
     static WT_CONNECTION* createConnection(StringData dbpath, StringData extraStrings) {
         WT_CONNECTION* conn = NULL;
@@ -144,8 +146,8 @@ public:
             &txn, ns, uri, kWiredTigerEngineName, true, false, cappedMaxSize, cappedMaxDocs);
     }
 
-    RecoveryUnit* newRecoveryUnit() final {
-        return new WiredTigerRecoveryUnit(_sessionCache);
+    std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
+        return stdx::make_unique<WiredTigerRecoveryUnit>(_sessionCache);
     }
 
     bool supportsDocLocking() final {
@@ -162,8 +164,13 @@ private:
     WiredTigerSessionCache* _sessionCache;
 };
 
-std::unique_ptr<HarnessHelper> newHarnessHelper() {
+std::unique_ptr<HarnessHelper> makeHarnessHelper() {
     return stdx::make_unique<WiredTigerHarnessHelper>();
+}
+
+MONGO_INITIALIZER(RegisterHarnessFactory)(InitializerContext* const) {
+    mongo::registerHarnessHelperFactory(makeHarnessHelper);
+    return Status::OK();
 }
 
 TEST(WiredTigerRecordStoreTest, GenerateCreateStringEmptyDocument) {
@@ -208,7 +215,7 @@ TEST(WiredTigerRecordStoreTest, GenerateCreateStringValidConfigStringOption) {
 }
 
 TEST(WiredTigerRecordStoreTest, Isolation1) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     RecordId id1;
@@ -259,7 +266,7 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
 }
 
 TEST(WiredTigerRecordStoreTest, Isolation2) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     RecordId id1;
@@ -1554,4 +1561,5 @@ TEST(WiredTigerRecordStoreTest, OplogStones_AscendingOrder) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

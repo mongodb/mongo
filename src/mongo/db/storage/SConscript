@@ -85,6 +85,18 @@ env.Library(
 )
 
 env.Library(
+    target='test_harness_helper',
+    source=[
+        'test_harness_helper.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
+
+)
+
+env.Library(
     target='sorted_data_interface_test_harness',
     source=[
         'sorted_data_interface_test_bulkbuilder.cpp',
@@ -110,10 +122,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/unittest/unittest',
         'index_entry_comparison',
-    ],
-    LIBDEPS_TAGS=[
-        # Depends on newHarnessHelper, which does not have a unique definition
-        'incomplete',
+        'test_harness_helper',
     ],
 
 )
@@ -143,11 +152,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/unittest/unittest',
+        'test_harness_helper',
         ],
-    LIBDEPS_TAGS=[
-        # Depends on newHarnessHelper, which does not have a unique definition
-        'incomplete',
-    ],
     )
 
 env.Library(

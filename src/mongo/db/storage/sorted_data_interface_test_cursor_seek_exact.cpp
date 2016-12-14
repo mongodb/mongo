@@ -34,9 +34,10 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 // Tests seekExact when it hits something.
 void testSeekExact_Hit(bool unique, bool forward) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted =
         harnessHelper->newSortedDataInterface(unique,
@@ -68,7 +69,7 @@ TEST(SortedDataInterface, SeekExact_Hit_Standard_Reverse) {
 
 // Tests seekExact when it doesn't hit the query.
 void testSeekExact_Miss(bool unique, bool forward) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         {
@@ -101,7 +102,7 @@ TEST(SortedDataInterface, SeekExact_Miss_Standard_Reverse) {
 // Tests seekExact on forward cursor when it hits something with dup keys. Doesn't make sense
 // for unique indexes.
 TEST(SortedDataInterface, SeekExact_HitWithDups_Forward) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(
         false,
@@ -120,7 +121,7 @@ TEST(SortedDataInterface, SeekExact_HitWithDups_Forward) {
 // Tests seekExact on reverse cursor when it hits something with dup keys. Doesn't make sense
 // for unique indexes.
 TEST(SortedDataInterface, SeekExact_HitWithDups_Reverse) {
-    auto harnessHelper = newHarnessHelper();
+    const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
     auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(
         false,
@@ -135,4 +136,5 @@ TEST(SortedDataInterface, SeekExact_HitWithDups_Reverse) {
     ASSERT_EQ(cursor->next(), IndexKeyEntry(key1, loc1));
     ASSERT_EQ(cursor->next(), boost::none);
 }
+}  // namespace
 }  // namespace mongo

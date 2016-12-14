@@ -39,15 +39,16 @@
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
+namespace {
+
 using std::unique_ptr;
 using std::string;
 using std::stringstream;
 
-namespace mongo {
-
 // Insert a record and try to update it.
 TEST(RecordStoreTestHarness, UpdateRecord) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -108,7 +109,7 @@ TEST(RecordStoreTestHarness, UpdateRecord) {
 
 // Insert multiple records and try to update them.
 TEST(RecordStoreTestHarness, UpdateMultipleRecords) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -180,7 +181,7 @@ TEST(RecordStoreTestHarness, UpdateMultipleRecords) {
 
 // Insert a record, try to update it, and examine how the UpdateNotifier is called.
 TEST(RecordStoreTestHarness, UpdateRecordWithMoveNotifier) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -243,4 +244,5 @@ TEST(RecordStoreTestHarness, UpdateRecordWithMoveNotifier) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

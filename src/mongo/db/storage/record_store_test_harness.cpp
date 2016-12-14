@@ -37,12 +37,13 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 using std::unique_ptr;
 using std::string;
 
 TEST(RecordStoreTestHarness, Simple1) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -102,12 +103,15 @@ namespace {
 class DummyDocWriter final : public DocWriter {
 public:
     virtual ~DummyDocWriter() {}
+
     virtual void writeDocument(char* buf) const {
         memcpy(buf, "eliot", 6);
     }
+
     virtual size_t documentSize() const {
         return 6;
     }
+
     virtual bool addPadding() const {
         return false;
     }
@@ -116,7 +120,7 @@ public:
 
 
 TEST(RecordStoreTestHarness, Simple1InsertDocWroter) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     RecordId loc1;
@@ -138,7 +142,7 @@ TEST(RecordStoreTestHarness, Simple1InsertDocWroter) {
 }
 
 TEST(RecordStoreTestHarness, Delete1) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -183,7 +187,7 @@ TEST(RecordStoreTestHarness, Delete1) {
 }
 
 TEST(RecordStoreTestHarness, Delete2) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -226,7 +230,7 @@ TEST(RecordStoreTestHarness, Delete2) {
 }
 
 TEST(RecordStoreTestHarness, Update1) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -288,7 +292,7 @@ TEST(RecordStoreTestHarness, Update1) {
 }
 
 TEST(RecordStoreTestHarness, UpdateInPlace1) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     if (!rs->updateWithDamagesSupported())
@@ -342,7 +346,7 @@ TEST(RecordStoreTestHarness, UpdateInPlace1) {
 
 
 TEST(RecordStoreTestHarness, Truncate1) {
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -394,7 +398,7 @@ TEST(RecordStoreTestHarness, Truncate1) {
 TEST(RecordStoreTestHarness, Cursor1) {
     const int N = 10;
 
-    unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newRecordStoreHarnessHelper());
     unique_ptr<RecordStore> rs(harnessHelper->newNonCappedRecordStore());
 
     {
@@ -444,4 +448,5 @@ TEST(RecordStoreTestHarness, Cursor1) {
         ASSERT(!cursor->next());
     }
 }
-}
+}  // namespace
+}  // namespace mongo

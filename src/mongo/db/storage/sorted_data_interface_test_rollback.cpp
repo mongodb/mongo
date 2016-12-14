@@ -36,11 +36,12 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 // Insert multiple keys and verify that omitting the commit()
 // on the WriteUnitOfWork causes the changes to not become visible.
 TEST(SortedDataInterface, InsertWithoutCommit) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
 
     {
@@ -82,7 +83,7 @@ TEST(SortedDataInterface, InsertWithoutCommit) {
 // omitting the commit() on the WriteUnitOfWork causes the changes to
 // not become visible.
 TEST(SortedDataInterface, UnindexWithoutCommit) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -152,4 +153,5 @@ TEST(SortedDataInterface, UnindexWithoutCommit) {
     }
 }
 
+}  // namespace
 }  // namespace mongo

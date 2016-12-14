@@ -36,10 +36,11 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 // Add a key using a bulk builder.
 TEST(SortedDataInterface, BuilderAddKey) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -64,7 +65,7 @@ TEST(SortedDataInterface, BuilderAddKey) {
 
 // Add a compound key using a bulk builder.
 TEST(SortedDataInterface, BuilderAddCompoundKey) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -91,7 +92,7 @@ TEST(SortedDataInterface, BuilderAddCompoundKey) {
 // the returned status is ErrorCodes::DuplicateKey when duplicates are
 // not allowed.
 TEST(SortedDataInterface, BuilderAddSameKey) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(true));
 
     {
@@ -118,7 +119,7 @@ TEST(SortedDataInterface, BuilderAddSameKey) {
 // Add the same key multiple times using a bulk builder and verify that
 // the returned status is OK when duplicates are allowed.
 TEST(SortedDataInterface, BuilderAddSameKeyWithDupsAllowed) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -144,7 +145,7 @@ TEST(SortedDataInterface, BuilderAddSameKeyWithDupsAllowed) {
 
 // Add multiple keys using a bulk builder.
 TEST(SortedDataInterface, BuilderAddMultipleKeys) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -171,7 +172,7 @@ TEST(SortedDataInterface, BuilderAddMultipleKeys) {
 
 // Add multiple compound keys using a bulk builder.
 TEST(SortedDataInterface, BuilderAddMultipleCompoundKeys) {
-    const std::unique_ptr<HarnessHelper> harnessHelper(newHarnessHelper());
+    const auto harnessHelper(newSortedDataInterfaceHarnessHelper());
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(false));
 
     {
@@ -198,4 +199,5 @@ TEST(SortedDataInterface, BuilderAddMultipleCompoundKeys) {
     }
 }
 
+}  // namespace
 }  // namespace mongo
