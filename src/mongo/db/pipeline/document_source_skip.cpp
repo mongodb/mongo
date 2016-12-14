@@ -57,11 +57,20 @@ const char* DocumentSourceSkip::getSourceName() const {
 DocumentSource::GetNextResult DocumentSourceSkip::getNext() {
     pExpCtx->checkForInterrupt();
 
-    auto nextInput = pSource->getNext();
-    for (; _nSkippedSoFar < _nToSkip && nextInput.isAdvanced(); nextInput = pSource->getNext()) {
+    while (_nSkippedSoFar < _nToSkip) {
+        // For performance reasons, a streaming stage must not keep references to documents across
+        // calls to getNext(). Such stages must retrieve a result from their child and then release
+        // it (or return it) before asking for another result. Failing to do so can result in extra
+        // work, since the Document/Value library must copy data on write when that data has a
+        // refcount above one.
+        auto nextInput = pSource->getNext();
+        if (!nextInput.isAdvanced()) {
+            return nextInput;
+        }
         ++_nSkippedSoFar;
     }
-    return nextInput;
+
+    return pSource->getNext();
 }
 
 Value DocumentSourceSkip::serialize(bool explain) const {
