@@ -82,6 +82,13 @@ DocumentSource::GetNextResult DocumentSourceMatch::getNext() {
         if (_expression->matchesBSON(toMatch)) {
             return nextInput;
         }
+
+        // For performance reasons, a streaming stage must not keep references to documents across
+        // calls to getNext(). Such stages must retrieve a result from their child and then release
+        // it (or return it) before asking for another result. Failing to do so can result in extra
+        // work, since the Document/Value library must copy data on write when that data has a
+        // refcount above one.
+        nextInput.releaseDocument();
     }
 
     return nextInput;
