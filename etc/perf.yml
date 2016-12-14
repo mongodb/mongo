@@ -225,6 +225,7 @@ tasks:
     - command: git.get_project
       params:
         directory: src
+    - command: manifest.load
     - command: shell.exec
       params:
         working_dir: src
