@@ -303,7 +303,9 @@ public:
         if (parameter)
             parameter->append(txn, result, "automationServiceDescriptor");
 
-        txn->getClient()->session()->getCompressorManager().serverNegotiate(cmdObj, &result);
+        if (txn->getClient()->session()) {
+            txn->getClient()->session()->getCompressorManager().serverNegotiate(cmdObj, &result);
+        }
 
         return true;
     }
