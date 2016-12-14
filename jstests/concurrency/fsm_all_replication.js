@@ -9,9 +9,6 @@ var blacklist = [
     'agg_group_external.js',         // uses >100MB of data, which can overwhelm test hosts
     'agg_sort_external.js',          // uses >100MB of data, which can overwhelm test hosts
     'findAndModify_update_grow.js',  // can cause OOM kills on test hosts
-
-    // This workload assumes it is running against a sharded cluster.
-    'sharded_moveChunk_drop_shard_key_index.js',
 ].map(function(file) {
     return dir + '/' + file;
 });

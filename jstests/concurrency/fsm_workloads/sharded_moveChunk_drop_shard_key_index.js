@@ -69,13 +69,21 @@ var $config = (function() {
         }
     }
 
+    function skip(cluster) {
+        if (!cluster.isSharded() || cluster.isBalancerEnabled()) {
+            return {skip: true, msg: 'only runs in a sharded cluster with the balancer disabled.'};
+        }
+        return {skip: false};
+    }
+
     return {
         threadCount: 10,
         iterations: 100,
         data: data,
         states: states,
         transitions: transitions,
-        setup: setup
+        setup: setup,
+        skip: skip
     };
 
 })();
