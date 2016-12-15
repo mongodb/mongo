@@ -102,7 +102,7 @@ while test "$run" -le "$runmax"; do
 
 	# Copy the artifacts from the run
 	backup_dir=${home}_$(basename $wttest)_${run}_$(date +"%s")
-	rsync -r -m --exclude=*Log* --exclude=*.wt --exclude=WiredTiger --exclude=*Preplog* --exclude=WiredTiger.lock --exclude=WiredTiger.turtle $home/ $backup_dir
+	rsync -r -m --include="*Stat*" --include="CONFIG.wtperf" --include="*monitor" --include="latency*" --include="test.stat" --exclude="*" $home/ $backup_dir
 
 	# Load is always using floating point, so handle separately
 	l=`grep "^Load time:" ./WT_TEST/test.stat`
