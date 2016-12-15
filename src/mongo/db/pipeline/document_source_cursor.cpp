@@ -30,7 +30,7 @@
 
 #include "mongo/db/pipeline/document_source_cursor.h"
 
-#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/pipeline/document.h"
@@ -233,7 +233,8 @@ void DocumentSourceCursor::reattachToOperationContext(OperationContext* opCtx) {
     }
 }
 
-DocumentSourceCursor::DocumentSourceCursor(const string& ns,
+DocumentSourceCursor::DocumentSourceCursor(Collection* collection,
+                                           const string& ns,
                                            std::unique_ptr<PlanExecutor> exec,
                                            const intrusive_ptr<ExpressionContext>& pCtx)
     : DocumentSource(pCtx),
@@ -245,14 +246,18 @@ DocumentSourceCursor::DocumentSourceCursor(const string& ns,
 
     // We record execution metrics here to allow for capture of indexes used prior to execution.
     recordPlanSummaryStats();
+    if (collection) {
+        collection->infoCache()->notifyOfQuery(pCtx->opCtx, _planSummaryStats.indexesUsed);
+    }
 }
 
 intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
+    Collection* collection,
     const string& ns,
     std::unique_ptr<PlanExecutor> exec,
     const intrusive_ptr<ExpressionContext>& pExpCtx) {
     intrusive_ptr<DocumentSourceCursor> source(
-        new DocumentSourceCursor(ns, std::move(exec), pExpCtx));
+        new DocumentSourceCursor(collection, ns, std::move(exec), pExpCtx));
     return source;
 }
 

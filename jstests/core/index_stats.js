@@ -7,8 +7,9 @@
     var col = db[colName];
     col.drop();
 
-    var getUsageCount = function(indexName) {
-        var cursor = col.aggregate([{$indexStats: {}}]);
+    var getUsageCount = function(indexName, collection) {
+        collection = collection || col;
+        var cursor = collection.aggregate([{$indexStats: {}}]);
         while (cursor.hasNext()) {
             var doc = cursor.next();
 
@@ -213,4 +214,64 @@
     assert.throws(function() {
         col.aggregate([{$match: {}}, {$indexStats: {}}]);
     });
+
+    //
+    // Confirm index use is recorded for $lookup.
+    //
+    const foreignCollection = db[colName + "_foreign"];
+    foreignCollection.drop();
+    assert.writeOK(foreignCollection.insert([{_id: 0}, {_id: 1}, {_id: 2}]));
+    col.drop();
+    assert.writeOK(col.insert([{_id: 0, foreignId: 1}, {_id: 1, foreignId: 2}]));
+    assert.eq(0, getUsageCount("_id_"));
+    assert.eq(2,
+              col.aggregate([
+                     {$match: {_id: {$in: [0, 1]}}},
+                     {
+                       $lookup: {
+                           from: foreignCollection.getName(),
+                           localField: 'foreignId',
+                           foreignField: '_id',
+                           as: 'results'
+                       }
+                     }
+                 ])
+                  .itcount());
+    assert.eq(1, getUsageCount("_id_", col), "Expected aggregation to use _id index");
+    assert.eq(2,
+              getUsageCount("_id_", foreignCollection),
+              "Expected each lookup to be tracked as an index use");
+
+    //
+    // Confirm index use is recorded for $graphLookup.
+    //
+    foreignCollection.drop();
+    assert.writeOK(foreignCollection.insert([
+        {_id: 0, connectedTo: 1},
+        {_id: 1, connectedTo: "X"},
+        {_id: 2, connectedTo: 3},
+        {_id: 3, connectedTo: "Y"},  // Be sure to use a different value here to make sure
+                                     // $graphLookup doesn't cache the query.
+    ]));
+    col.drop();
+    assert.writeOK(col.insert([{_id: 0, foreignId: 0}, {_id: 1, foreignId: 2}]));
+    assert.eq(0, getUsageCount("_id_"));
+    assert.eq(2,
+              col.aggregate([
+                     {$match: {_id: {$in: [0, 1]}}},
+                     {
+                       $graphLookup: {
+                           from: foreignCollection.getName(),
+                           startWith: '$foreignId',
+                           connectToField: '_id',
+                           connectFromField: 'connectedTo',
+                           as: 'results'
+                       }
+                     }
+                 ])
+                  .itcount());
+    assert.eq(1, getUsageCount("_id_", col), "Expected aggregation to use _id index");
+    assert.eq(2 * 3,
+              getUsageCount("_id_", foreignCollection),
+              "Expected each of two graph searches to issue 3 queries, each using the _id index");
 })();

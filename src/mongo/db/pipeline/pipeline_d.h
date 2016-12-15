@@ -108,7 +108,8 @@ private:
      * Creates a DocumentSourceCursor from the given PlanExecutor and adds it to the front of the
      * Pipeline.
      */
-    static void addCursorSource(const boost::intrusive_ptr<Pipeline>& pipeline,
+    static void addCursorSource(Collection* collection,
+                                const boost::intrusive_ptr<Pipeline>& pipeline,
                                 const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                 std::unique_ptr<PlanExecutor> exec,
                                 DepsTracker deps,
