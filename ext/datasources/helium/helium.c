@@ -3329,6 +3329,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	 * compile-time should the structure change underneath us.
 	 */
 	static const WT_DATA_SOURCE wtds = {
+		NULL,				/* No session.alter */
 		helium_session_create,		/* session.create */
 		NULL,				/* No session.compaction */
 		helium_session_drop,		/* session.drop */
