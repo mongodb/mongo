@@ -110,7 +110,8 @@ protected:
         exec->saveState();
         exec->registerExec(ctx.getCollection());
 
-        _source = DocumentSourceCursor::create(nss.ns(), std::move(exec), _ctx);
+        _source =
+            DocumentSourceCursor::create(ctx.getCollection(), nss.ns(), std::move(exec), _ctx);
     }
 
     intrusive_ptr<ExpressionContextForTest> ctx() {

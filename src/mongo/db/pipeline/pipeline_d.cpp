@@ -361,6 +361,7 @@ void PipelineD::prepareCursorSource(Collection* collection,
                     expCtx, sampleSize, idString, numRecords));
 
                 addCursorSource(
+                    collection,
                     pipeline,
                     expCtx,
                     std::move(exec),
@@ -421,7 +422,8 @@ void PipelineD::prepareCursorSource(Collection* collection,
                                                 &sortObj,
                                                 &projForQuery));
 
-    addCursorSource(pipeline, expCtx, std::move(exec), deps, queryObj, sortObj, projForQuery);
+    addCursorSource(
+        collection, pipeline, expCtx, std::move(exec), deps, queryObj, sortObj, projForQuery);
 }
 
 StatusWith<std::unique_ptr<PlanExecutor>> PipelineD::prepareExecutor(
@@ -543,7 +545,8 @@ StatusWith<std::unique_ptr<PlanExecutor>> PipelineD::prepareExecutor(
         txn, collection, expCtx, queryObj, *projectionObj, *sortObj, plannerOpts);
 }
 
-void PipelineD::addCursorSource(const intrusive_ptr<Pipeline>& pipeline,
+void PipelineD::addCursorSource(Collection* collection,
+                                const intrusive_ptr<Pipeline>& pipeline,
                                 const intrusive_ptr<ExpressionContext>& expCtx,
                                 unique_ptr<PlanExecutor> exec,
                                 DepsTracker deps,
@@ -558,7 +561,7 @@ void PipelineD::addCursorSource(const intrusive_ptr<Pipeline>& pipeline,
 
     // Put the PlanExecutor into a DocumentSourceCursor and add it to the front of the pipeline.
     intrusive_ptr<DocumentSourceCursor> pSource =
-        DocumentSourceCursor::create(fullName, std::move(exec), expCtx);
+        DocumentSourceCursor::create(collection, fullName, std::move(exec), expCtx);
 
     // Note the query, sort, and projection for explain.
     pSource->setQuery(queryObj);

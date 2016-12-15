@@ -507,12 +507,6 @@ public:
             }
 
             if (collection) {
-                PlanSummaryStats stats;
-                Explain::getSummaryStats(*exec, &stats);
-                collection->infoCache()->notifyOfQuery(txn, stats.indexesUsed);
-            }
-
-            if (collection) {
                 const bool isAggCursor = true;  // enable special locking behavior
                 ClientCursor* cursor =
                     new ClientCursor(collection->getCursorManager(),

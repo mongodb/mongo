@@ -75,6 +75,7 @@ public:
      * in order to fetch data from the database.
      */
     static boost::intrusive_ptr<DocumentSourceCursor> create(
+        Collection* collection,
         const std::string& ns,
         std::unique_ptr<PlanExecutor> exec,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -133,7 +134,8 @@ public:
     const PlanSummaryStats& getPlanSummaryStats() const;
 
 private:
-    DocumentSourceCursor(const std::string& ns,
+    DocumentSourceCursor(Collection* collection,
+                         const std::string& ns,
                          std::unique_ptr<PlanExecutor> exec,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 

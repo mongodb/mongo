@@ -294,7 +294,8 @@ public:
         // Wrap the "inner" plan executor in a DocumentSourceCursor and add it as the first source
         // in the pipeline.
         innerExec->saveState();
-        auto cursorSource = DocumentSourceCursor::create(nss.ns(), std::move(innerExec), expCtx);
+        auto cursorSource =
+            DocumentSourceCursor::create(collection, nss.ns(), std::move(innerExec), expCtx);
         auto pipeline = assertGet(Pipeline::create({cursorSource}, expCtx));
 
         // Create the output PlanExecutor that pulls results from the pipeline.
