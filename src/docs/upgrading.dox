@@ -1,5 +1,15 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_291 Upgrading to Version 2.9.1
+
+<dl>
+<dt>Changes to hazard pointer configuration</dt>
+<dd>
+The \c hazard_max parameter to ::wiredtiger_open is now ignored.  Memory is
+allocated for hazard pointers as required by each session.
+</dd>
+</dl>
+
 @section version_290 Upgrading to Version 2.9.0
 <dl>
 <dt>Changes to cursor behavior after WT_CURSOR::insert</dt>

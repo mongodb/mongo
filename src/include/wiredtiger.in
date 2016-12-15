@@ -2355,8 +2355,6 @@ struct __wt_connection {
  * in seconds at which to check for files that are inactive and close them., an
  * integer between 1 and 100000; default \c 10.}
  * @config{ ),,}
- * @config{hazard_max, maximum number of simultaneous hazard pointers per
- * session handle., an integer greater than or equal to 15; default \c 1000.}
  * @config{in_memory, keep data in-memory only.  See @ref in_memory for more
  * information., a boolean flag; default \c false.}
  * @config{log = (, enable logging.  Enabling logging uses three sessions from

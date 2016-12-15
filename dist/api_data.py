@@ -727,7 +727,7 @@ wiredtiger_open_common =\
     Config('hazard_max', '1000', r'''
         maximum number of simultaneous hazard pointers per session
         handle''',
-        min='15'),
+        min=15, undoc=True),
     Config('mmap', 'true', r'''
         Use memory mapping to access files when possible''',
         type='boolean'),
