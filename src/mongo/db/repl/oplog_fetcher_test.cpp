@@ -552,7 +552,7 @@ BSONObj makeCursorResponse(CursorId cursorId,
 
 TEST_F(OplogFetcherTest, InvalidMetadataInResponseStopsTheOplogFetcher) {
     auto shutdownState = processSingleBatch(
-        {makeCursorResponse(0, {}),
+        {makeCursorResponse(0, {makeNoopOplogEntry(lastFetched)}),
          BSON(rpc::kReplSetMetadataFieldName << BSON("invalid_repl_metadata_field" << 1)),
          Milliseconds(0)});
 
@@ -564,10 +564,27 @@ TEST_F(OplogFetcherTest, VaidMetadataInResponseShouldBeForwardedToProcessMetadat
     BSONObjBuilder bob;
     ASSERT_OK(metadata.writeToMetadata(&bob));
     auto metadataObj = bob.obj();
-    processSingleBatch(
-        {makeCursorResponse(0, {makeNoopOplogEntry(lastFetched)}), metadataObj, Milliseconds(0)});
+    ASSERT_OK(processSingleBatch({makeCursorResponse(0, {makeNoopOplogEntry(lastFetched)}),
+                                  metadataObj,
+                                  Milliseconds(0)})
+                  ->getStatus());
+    ASSERT_TRUE(dataReplicatorExternalState->metadataWasProcessed);
     ASSERT_EQUALS(metadata.getPrimaryIndex(),
                   dataReplicatorExternalState->metadataProcessed.getPrimaryIndex());
+}
+
+TEST_F(OplogFetcherTest, MetadataIsNotProcessedOnBatchThatTriggersRollback) {
+    rpc::ReplSetMetadata metadata(1, lastFetched.opTime, lastFetched.opTime, 1, OID::gen(), 2, 2);
+    BSONObjBuilder bob;
+    ASSERT_OK(metadata.writeToMetadata(&bob));
+    auto metadataObj = bob.obj();
+    ASSERT_EQUALS(ErrorCodes::OplogStartMissing,
+                  processSingleBatch(
+                      {makeCursorResponse(0, {makeNoopOplogEntry(Seconds(456), lastFetched.value)}),
+                       metadataObj,
+                       Milliseconds(0)})
+                      ->getStatus());
+    ASSERT_FALSE(dataReplicatorExternalState->metadataWasProcessed);
 }
 
 TEST_F(OplogFetcherTest, EmptyFirstBatchStopsOplogFetcherWithRemoteOplogStaleError) {

@@ -369,7 +369,7 @@ TEST_F(ReplCoordHBV1Test, ArbiterRecordsCommittedOpTimeFromHeartbeatMetadata) {
                                            << "syncSourceIndex"
                                            << 1)));
         ASSERT_OK(metadata.getStatus());
-        getReplCoord()->processReplSetMetadata(metadata.getValue());
+        getReplCoord()->processReplSetMetadata(metadata.getValue(), true);
 
         ASSERT_EQ(getReplCoord()->getMyLastAppliedOpTime().getTimestamp(), expected.getTimestamp());
     };

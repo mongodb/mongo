@@ -17,18 +17,23 @@ function shardCollectionWithChunks(st, coll) {
     assert.eq(coll.count(), numberDoc);
 }
 
-// Stops replication at a server.
+// Stops replication on the given server(s).
 function stopServerReplication(conn) {
-    var errMsg = 'Failed to enable rsSyncApplyStop failpoint.';
+    if (conn.length) {
+        conn.forEach(function(n) {
+            stopServerReplication(n);
+        });
+        return;
+    }
+    var errMsg = 'Failed to enable stopOplogFetcher failpoint.';
     assert.commandWorked(
-        conn.getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}),
+        conn.getDB('admin').runCommand({configureFailPoint: 'stopOplogFetcher', mode: 'alwaysOn'}),
         errMsg);
 }
 
 // Stops replication at all replicaset secondaries.
 function stopReplicationOnSecondaries(rs) {
-    var secondaries = rs.getSecondaries();
-    secondaries.forEach(stopServerReplication);
+    stopServerReplication(rs.getSecondaries());
 }
 
 // Stops replication at all shard secondaries.
@@ -36,23 +41,29 @@ function stopReplicationOnSecondariesOfAllShards(st) {
     st._rsObjects.forEach(stopReplicationOnSecondaries);
 }
 
-// Restarts replication at a server.
+// Restarts replication on the given server(s).
 function restartServerReplication(conn) {
-    var errMsg = 'Failed to disable rsSyncApplyStop failpoint.';
+    if (conn.length) {
+        conn.forEach(function(n) {
+            restartServerReplication(n);
+        });
+        return;
+    }
+
+    var errMsg = 'Failed to disable stopOplogFetcher failpoint.';
     assert.commandWorked(
-        conn.getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}),
+        conn.getDB('admin').runCommand({configureFailPoint: 'stopOplogFetcher', mode: 'off'}),
         errMsg);
 }
 
 // Restarts replication at all nodes in a replicaset.
 function restartReplSetReplication(rs) {
-    rs.nodes.forEach(restartServerReplication);
+    restartServerReplication(rs.nodes);
 }
 
 // Restarts replication at all replicaset secondaries.
 function restartReplicationOnSecondaries(rs) {
-    var secondaries = rs.getSecondaries();
-    secondaries.forEach(restartServerReplication);
+    restartServerReplication(rs.getSecondaries());
 }
 
 // Restarts replication at all nodes in a sharded cluster.

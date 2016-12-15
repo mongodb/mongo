@@ -143,10 +143,10 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
     // now be visible as a committed read to both oldPrimary and newPrimary.
     assert.commandWorked(
         pureSecondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}));
-    var gleResponse =
-        newPrimaryColl.runCommand({getLastError: 1, w: 'majority', wtimeout: 5 * 1000 * 60});
-    assert.commandWorked(gleResponse);
-    assert.eq(null, gleResponse.err, "GLE detected write error: " + tojson(gleResponse));
+    // Do a write to the new primary so that the old primary can establish a sync source to learn
+    // about the new commit.
+    assert.writeOK(newPrimary.getDB(name).unrelatedCollection.insert(
+        {a: 1}, {writeConcern: {w: 'majority', wtimeout: replTest.kDefaultTimeoutMS}}));
     assert.eq(doCommittedRead(newPrimaryColl), 'new');
     assert.eq(doCommittedRead(oldPrimaryColl), 'new');
 }());

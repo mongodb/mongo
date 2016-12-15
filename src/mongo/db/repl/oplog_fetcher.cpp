@@ -433,24 +433,6 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
     }
 
     const auto& queryResponse = result.getValue();
-    rpc::ReplSetMetadata metadata;
-
-    // Forward metadata (containing liveness information) to data replicator external state.
-    bool receivedMetadata =
-        queryResponse.otherFields.metadata.hasElement(rpc::kReplSetMetadataFieldName);
-    if (receivedMetadata) {
-        const auto& metadataObj = queryResponse.otherFields.metadata;
-        auto metadataResult = rpc::ReplSetMetadata::readFromMetadata(metadataObj);
-        if (!metadataResult.isOK()) {
-            error() << "invalid replication metadata from sync source " << _fetcher->getSource()
-                    << ": " << metadataResult.getStatus() << ": " << metadataObj;
-            _finishCallback(metadataResult.getStatus());
-            return;
-        }
-        metadata = metadataResult.getValue();
-        _dataReplicatorExternalState->processMetadata(metadata);
-    }
-
     const auto& documents = queryResponse.documents;
     auto firstDocToApply = documents.cbegin();
 
@@ -486,6 +468,25 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
         return;
     }
     auto info = validateResult.getValue();
+
+    // Process replset metadata.  It is important that this happen after we've validated the
+    // first batch, so we don't progress our knowledge of the commit point from a
+    // response that triggers a rollback.
+    rpc::ReplSetMetadata metadata;
+    bool receivedMetadata =
+        queryResponse.otherFields.metadata.hasElement(rpc::kReplSetMetadataFieldName);
+    if (receivedMetadata) {
+        const auto& metadataObj = queryResponse.otherFields.metadata;
+        auto metadataResult = rpc::ReplSetMetadata::readFromMetadata(metadataObj);
+        if (!metadataResult.isOK()) {
+            error() << "invalid replication metadata from sync source " << _fetcher->getSource()
+                    << ": " << metadataResult.getStatus() << ": " << metadataObj;
+            _finishCallback(metadataResult.getStatus());
+            return;
+        }
+        metadata = metadataResult.getValue();
+        _dataReplicatorExternalState->processMetadata(metadata);
+    }
 
     // Increment stats. We read all of the docs in the query.
     opsReadStats.increment(info.networkDocumentCount);

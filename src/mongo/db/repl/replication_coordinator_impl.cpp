@@ -2138,12 +2138,13 @@ void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result)
     result->append("config", _rsConfig.toBSON());
 }
 
-void ReplicationCoordinatorImpl::processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) {
+void ReplicationCoordinatorImpl::processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata,
+                                                        bool advanceCommitPoint) {
     EventHandle evh;
 
     {
         LockGuard topoLock(_topoMutex);
-        evh = _processReplSetMetadata_incallback(replMetadata);
+        evh = _processReplSetMetadata_incallback(replMetadata, advanceCommitPoint);
     }
 
     if (evh) {
@@ -2157,11 +2158,13 @@ void ReplicationCoordinatorImpl::cancelAndRescheduleElectionTimeout() {
 }
 
 EventHandle ReplicationCoordinatorImpl::_processReplSetMetadata_incallback(
-    const rpc::ReplSetMetadata& replMetadata) {
+    const rpc::ReplSetMetadata& replMetadata, bool advanceCommitPoint) {
     if (replMetadata.getConfigVersion() != _rsConfig.getConfigVersion()) {
         return EventHandle();
     }
-    _setLastCommittedOpTime(replMetadata.getLastOpCommitted());
+    if (advanceCommitPoint) {
+        _setLastCommittedOpTime(replMetadata.getLastOpCommitted());
+    }
     return _updateTerm_incallback(replMetadata.getTerm());
 }
 
@@ -3150,7 +3153,7 @@ bool ReplicationCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& curre
 }
 
 void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
-    if (!_getMemberState_inlock().primary()) {
+    if (!_getMemberState_inlock().primary() || _stepDownPending) {
         return;
     }
 

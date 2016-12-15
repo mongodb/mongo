@@ -110,6 +110,9 @@ size_t getSize(const BSONObj& o) {
 
 MONGO_FP_DECLARE(pauseRsBgSyncProducer);
 
+// Failpoint which causes rollback to hang before starting.
+MONGO_FP_DECLARE(rollbackHangBeforeStart);
+
 // The count of items in the buffer
 static Counter64 bufferCountGauge;
 static ServerStatusMetricField<Counter64> displayBufferCount("repl.buffer.count",
@@ -622,6 +625,15 @@ void BackgroundSync::_rollback(OperationContext* txn,
                                const HostAndPort& source,
                                boost::optional<int> requiredRBID,
                                stdx::function<DBClientBase*()> getConnection) {
+    if (MONGO_FAIL_POINT(rollbackHangBeforeStart)) {
+        // This log output is used in js tests so please leave it.
+        log() << "rollback - rollbackHangBeforeStart fail point "
+                 "enabled. Blocking until fail point is disabled.";
+        while (MONGO_FAIL_POINT(rollbackHangBeforeStart) && !inShutdown()) {
+            mongo::sleepsecs(1);
+        }
+    }
+
     // Set state to ROLLBACK while we are in this function. This prevents serving reads, even from
     // the oplog. This can fail if we are elected PRIMARY, in which case we better not do any
     // rolling back. If we successfully enter ROLLBACK we will only exit this function fatally or

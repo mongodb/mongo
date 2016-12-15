@@ -206,7 +206,8 @@ public:
 
     virtual void processReplSetGetConfig(BSONObjBuilder* result) override;
 
-    virtual void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) override;
+    virtual void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata,
+                                        bool advanceCommitPoint) override;
 
     virtual void cancelAndRescheduleElectionTimeout() override;
 
@@ -983,11 +984,13 @@ private:
 
     /**
      * Callback that processes the ReplSetMetadata returned from a command run against another
-     * replica set member and updates protocol version 1 information (most recent optime that is
-     * committed, member id of the current PRIMARY, the current config version and the current term)
+     * replica set member and so long as the config version in the metadata matches the replica set
+     * config version this node currently has, updates the current term and optionally updates
+     * this node's notion of the commit point.
      * Returns the finish event which is invalid if the process has already finished.
      */
-    EventHandle _processReplSetMetadata_incallback(const rpc::ReplSetMetadata& replMetadata);
+    EventHandle _processReplSetMetadata_incallback(const rpc::ReplSetMetadata& replMetadata,
+                                                   bool advanceCommitPoint);
 
     /**
      * Blesses a snapshot to be used for new committed reads.

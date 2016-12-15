@@ -72,6 +72,7 @@ public:
 
     // Set by processMetadata.
     rpc::ReplSetMetadata metadataProcessed;
+    bool metadataWasProcessed = false;
 
     // Set by shouldStopFetching.
     HostAndPort lastSyncSourceChecked;
