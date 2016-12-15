@@ -2,7 +2,6 @@ command_type: system
 stepback: false
 
 pre:
-    - command: shell.track
     - command: shell.exec
       params:
         silent: true
@@ -40,6 +39,14 @@ modules:
 
 
 functions:
+  "download analysis scripts":
+    - command: shell.exec
+      params:
+        script: |
+          set -v
+          rm -rf ./dsi
+          mkdir -p ./src
+          git clone git@github.com:10gen/dsi.git
   "start server":
     - command: shell.exec
       params:
@@ -50,33 +57,33 @@ functions:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: perf-3.0/${version_id}/${revision}/mongod-${version_id}
+        remote_file: ${project}/${version_id}/${revision}/mongod-${version_id}
         bucket: mciuploads
         local_file: src/mongod
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: perf-3.0/${version_id}/${revision}/mongo-${version_id}
+        remote_file: ${project}/${version_id}/${revision}/mongo-${version_id}
         bucket: mciuploads
         local_file: src/mongo
     - command: shell.exec
       params:
         working_dir: src
         script: |
-          set -e 
+          set -e
           set -v
           chmod +x mongod
           chmod +x mongo
-          git clone https://github.com/mongodb/mongo-perf perf-3.0
-          cd perf-3.0
+          git clone https://github.com/mongodb/mongo-perf perf
+          cd perf
           git checkout r20161214
     - command: shell.exec
       params:
         background: true
         working_dir: src
         script: |
-          set -e 
+          set -e
           set -o verbose
           mkdir -p ./dbdata
           ${mongod_exec_wrapper} ./mongod --dbpath ./dbdata ${mongod_flags}
@@ -99,13 +106,6 @@ functions:
                            admin
             echo "MONGOD STARTED."
   "analyze":
-    - command: s3.get
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        remote_file: perf-3.0/${version_id}/${revision}/perf_regression_check.py-${version_id}
-        bucket: mciuploads
-        local_file: src/perf_regression_check.py
     - command: shell.exec
       params:
         working_dir: src
@@ -114,7 +114,7 @@ functions:
           set -v
           virtualenv ./venv
           source ./venv/bin/activate
-          pip install argparse python-dateutil
+          pip install -r ../dsi/requirements/analysis.txt
     - command: json.get_history
       params:
         task: ${task_name}
@@ -134,7 +134,15 @@ functions:
           set -o errexit
           set -o verbose
           source ./venv/bin/activate
-          python perf_regression_check.py -f history.json --rev ${revision} -t tags.json --refTag 3.0.14-Baseline
+
+          # Any tasks that want the analysis scripts to analyze mongod.log files should pass in
+          # `reports_analysis: true` as a var to this function. The following line will select the
+          # appropriate flags if it's `true`.
+          reports_analysis_flags="--reports-analysis . --perf-file perf/perf.json"
+          cmd_flags=$([ "${reports_analysis}" = "true" ] && echo "$reports_analysis_flags" || echo "")
+          REFTAG="3.0.14-Baseline"
+          OVERRIDE="../dsi/analysis/v3.0/perf_override.json" # Note use of master here cannot use ${project}
+          python ../dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag $REFTAG --overrideFile $OVERRIDE --variant ${build_variant} --task ${task_name} --threshold 0.10 --threadThreshold 0.15
   "run perf tests":
     - command: shell.exec
       params:
@@ -152,14 +160,14 @@ functions:
           set -e
           set -v
           source ./venv/bin/activate
-          cd perf-3.0
+          cd perf
           #  give mongod a few seconds to start up so that we can connect.
           sleep 5
           ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t ${threads} --trialCount 5 -f testcases/*.js --readCmd ${readCmd} --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed --username admin --password password
     - command: "json.send"
       params:
         name: "perf"
-        file: "src/perf-3.0/perf.json"
+        file: "src/perf/perf.json"
 
 tasks:
 - name: compile
@@ -184,7 +192,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongod
-        remote_file: perf-3.0/${version_id}/${revision}/mongod-${version_id}
+        remote_file: ${project}/${version_id}/${revision}/mongod-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
@@ -194,34 +202,25 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/build/linux2/release/mongo/mongo
-        remote_file: perf-3.0/${version_id}/${revision}/mongo-${version_id}
+        remote_file: ${project}/${version_id}/${revision}/mongo-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
         display_name: mongo
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/buildscripts/perf_regression_check.py
-        remote_file: perf-3.0/${version_id}/${revision}/perf_regression_check.py-${version_id}
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/octet-stream}
-        display_name: perf_regression_check.py
 
 - name: query
   depends_on:
   - variant: linux-wt-standalone
     name: compile
-    commands:
+  commands:
     - func: "start server"
     - func: "run perf tests"
       vars:
         includeFilter1: "query"
-        includeFilter2 : "core regression" 
+        includeFilter2 : "core regression"
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "download analysis scripts"
     - func: "analyze"
 - name: where
   depends_on:
@@ -232,9 +231,10 @@ tasks:
     - func: "run perf tests"
       vars:
         includeFilter1: "where"
-        includeFilter2 : "core regression" 
+        includeFilter2 : "core regression"
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "download analysis scripts"
     - func: "analyze"
 - name: update
   depends_on:
@@ -245,9 +245,10 @@ tasks:
     - func: "run perf tests"
       vars:
         includeFilter1: "update"
-        includeFilter2 : "core regression" 
+        includeFilter2 : "core regression"
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "download analysis scripts"
     - func: "analyze"
 - name: insert
   depends_on:
@@ -258,9 +259,10 @@ tasks:
     - func: "run perf tests"
       vars:
         includeFilter1: "insert"
-        includeFilter2 : "core regression" 
+        includeFilter2 : "core regression"
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "download analysis scripts"
     - func: "analyze"
 - name: geo
   depends_on:
@@ -271,9 +273,10 @@ tasks:
     - func: "run perf tests"
       vars:
         includeFilter1: "geo"
-        includeFilter2 : "core regression" 
+        includeFilter2 : "core regression"
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "download analysis scripts"
     - func: "analyze"
 - name: misc
   depends_on:
@@ -284,9 +287,10 @@ tasks:
     - func: "run perf tests"
       vars:
         includeFilter1: "command multi remove mixed"
-        includeFilter2 : "core regression" 
+        includeFilter2 : "core regression"
         excludeFilter : "single_threaded"
         threads : "1 2 4 8"
+    - func: "download analysis scripts"
     - func: "analyze"
 - name: singleThreaded
   depends_on:
@@ -297,11 +301,12 @@ tasks:
     - func: "run perf tests"
       vars:
         includeFilter1: "single_threaded"
-        includeFilter2 : "core regression" 
+        includeFilter2 : "core regression"
         excludeFilter : "none"
         threads : "1"
+    - func: "download analysis scripts"
     - func: "analyze"
- 
+
 buildvariants:
 - name: linux-wt-standalone
   display_name: Standalone Linux WT
@@ -313,6 +318,8 @@ buildvariants:
     mongod_exec_wrapper: &exec_wrapper "numactl --physcpubind=4,5,6,7 -i 1"
     perf_exec_wrapper: &perf_wrapper "numactl --physcpubind=1,2,3 -i 0"
     mongod_flags: "--storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --wiredTigerCacheSizeGB 16 --auth"
+    project: &project perf-3.0
+
 
   run_on:
   - "centos6-perf"
@@ -336,6 +343,7 @@ buildvariants:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
     mongod_flags: "--storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --auth"
+    project: *project
 
   run_on:
   - "centos6-perf"
@@ -352,10 +360,11 @@ buildvariants:
   display_name: 1-Node ReplSet Linux WT
   batchtime: 360 # 6 hours
   expansions:
-    compile_flags: *compile_flags 
+    compile_flags: *compile_flags
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
     mongod_flags: "--replSet=test --storageEngine=wiredTiger --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --wiredTigerCacheSizeGB 16 --oplogSize 100000 --auth"
+    project: *project
 
   run_on:
   - "centos6-perf"
@@ -369,10 +378,11 @@ buildvariants:
   display_name: 1-Node ReplSet Linux MMAPv1
   batchtime: 360 # 6 hours
   expansions:
-    compile_flags: *compile_flags 
+    compile_flags: *compile_flags
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
     mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --oplogSize 100000 --auth"
+    project: *project
 
   run_on:
   - "centos6-perf"
