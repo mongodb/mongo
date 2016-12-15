@@ -19,8 +19,6 @@
 /*
  * Add MSVC-specific attributes and pragmas to types and function declarations.
  */
-#define	WT_COMPILER_TYPE_ALIGN(x)	__declspec(align(x))
-
 #define	WT_PACKED_STRUCT_BEGIN(name)					\
 	__pragma(pack(push,1))						\
 	struct name {

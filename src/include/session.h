@@ -41,7 +41,7 @@ struct __wt_hazard {
  * WT_SESSION_IMPL --
  *	Implementation of WT_SESSION.
  */
-struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
+struct __wt_session_impl {
 	WT_SESSION iface;
 
 	void	*lang_private;		/* Language specific private storage */

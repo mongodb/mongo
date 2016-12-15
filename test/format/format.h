@@ -242,7 +242,7 @@ typedef struct {
 } GLOBAL;
 extern GLOBAL g;
 
-typedef struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) {
+typedef struct {
 	WT_RAND_STATE rnd;			/* thread RNG state */
 
 	uint64_t search;			/* operations */

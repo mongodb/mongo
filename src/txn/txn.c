@@ -777,7 +777,6 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_RET(__wt_calloc_def(
 	    session, conn->session_size, &txn_global->states));
-	WT_CACHE_LINE_ALIGNMENT_VERIFY(session, txn_global->states);
 
 	for (i = 0, s = txn_global->states; i < conn->session_size; i++, s++)
 		s->id = s->metadata_pinned = s->pinned_id = WT_TXN_NONE;

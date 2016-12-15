@@ -22,6 +22,10 @@ AC_PROG_CC(cc gcc)
 AC_PROG_CXX(c++ g++)
 AM_PROG_AS(as gas)
 
+# WiredTiger uses anonymous unions to pad structures. It's part of C11, but
+# some compilers require a flag to support them.
+AX_CHECK_COMPILE_FLAG([-std=c11], [AM_CFLAGS="$AM_CFLAGS -std=c11"])
+
 # Configure options.
 AM_OPTIONS
 

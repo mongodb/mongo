@@ -50,7 +50,7 @@ static void  print_item(const char *, WT_ITEM *);
 void
 wts_ops(int lastrun)
 {
-	TINFO *tinfo, total;
+	TINFO **tinfo_list, *tinfo, total;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	pthread_t backup_tid, compact_tid, lrt_tid;
@@ -102,13 +102,16 @@ wts_ops(int lastrun)
 		    "=============== thread ops start ===============");
 	}
 
-	/* Create thread structure; start the worker threads. */
-	tinfo = dcalloc((size_t)g.c_threads, sizeof(*tinfo));
+	/*
+	 * Create the per-thread structures and start the worker threads.
+	 * Allocate the thread structures separately to minimize false sharing.
+	 */
+	tinfo_list = dcalloc((size_t)g.c_threads, sizeof(TINFO *));
 	for (i = 0; i < g.c_threads; ++i) {
-		tinfo[i].id = (int)i + 1;
-		tinfo[i].state = TINFO_RUNNING;
-		testutil_check(
-		    pthread_create(&tinfo[i].tid, NULL, ops, &tinfo[i]));
+		tinfo_list[i] = tinfo = dcalloc(1, sizeof(TINFO));
+		tinfo->id = (int)i + 1;
+		tinfo->state = TINFO_RUNNING;
+		testutil_check(pthread_create(&tinfo->tid, NULL, ops, tinfo));
 	}
 
 	/*
@@ -128,21 +131,22 @@ wts_ops(int lastrun)
 		/* Clear out the totals each pass. */
 		memset(&total, 0, sizeof(total));
 		for (i = 0, running = 0; i < g.c_threads; ++i) {
-			total.commit += tinfo[i].commit;
-			total.deadlock += tinfo[i].deadlock;
-			total.insert += tinfo[i].insert;
-			total.remove += tinfo[i].remove;
-			total.rollback += tinfo[i].rollback;
-			total.search += tinfo[i].search;
-			total.update += tinfo[i].update;
+			tinfo = tinfo_list[i];
+			total.commit += tinfo->commit;
+			total.deadlock += tinfo->deadlock;
+			total.insert += tinfo->insert;
+			total.remove += tinfo->remove;
+			total.rollback += tinfo->rollback;
+			total.search += tinfo->search;
+			total.update += tinfo->update;
 
-			switch (tinfo[i].state) {
+			switch (tinfo->state) {
 			case TINFO_RUNNING:
 				running = 1;
 				break;
 			case TINFO_COMPLETE:
-				tinfo[i].state = TINFO_JOINED;
-				(void)pthread_join(tinfo[i].tid, NULL);
+				tinfo->state = TINFO_JOINED;
+				(void)pthread_join(tinfo->tid, NULL);
 				break;
 			case TINFO_JOINED:
 				break;
@@ -154,7 +158,7 @@ wts_ops(int lastrun)
 			 */
 			if (fourths == 0 ||
 			    (thread_ops != -1 &&
-			    tinfo[i].ops >= (uint64_t)thread_ops)) {
+			    tinfo->ops >= (uint64_t)thread_ops)) {
 				/*
 				 * On the last execution, optionally drop core
 				 * for recovery testing.
@@ -163,7 +167,7 @@ wts_ops(int lastrun)
 					static char *core = NULL;
 					*core = 0;
 				}
-				tinfo[i].quit = 1;
+				tinfo->quit = 1;
 			}
 		}
 		track("ops", 0ULL, &total);
@@ -173,7 +177,9 @@ wts_ops(int lastrun)
 		if (fourths != -1)
 			--fourths;
 	}
-	free(tinfo);
+	for (i = 0; i < g.c_threads; ++i)
+		free(tinfo_list[i]);
+	free(tinfo_list);
 
 	/* Wait for the backup, compaction, long-running reader threads. */
 	g.workers_finished = 1;
