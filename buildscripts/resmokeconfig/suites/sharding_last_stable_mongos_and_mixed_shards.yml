@@ -93,7 +93,6 @@ executor:
   js_test:
     config:
       shell_options:
-        eval: "load('jstests/libs/override_methods/multiversion_override_balancer_control.js');"
         global_vars:
           TestData:
             mongosBinVersion: 'last-stable'
