@@ -17,6 +17,7 @@ endif
 
 bin_PROGRAMS = wt
 wt_SOURCES =\
+	src/utilities/util_alter.c \
 	src/utilities/util_backup.c \
 	src/utilities/util_cpyright.c \
 	src/utilities/util_compact.c \

@@ -137,6 +137,42 @@ __session_clear(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __session_alter --
+ *	Alter a table setting.
+ */
+static int
+__session_alter(WT_SESSION *wt_session, const char *uri, const char *config)
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	SESSION_API_CALL(session, alter, config, cfg);
+
+	/* Disallow objects in the WiredTiger name space. */
+	WT_ERR(__wt_str_name_check(session, uri));
+
+	/*
+	 * We replace the default configuration listing with the current
+	 * configuration.  Otherwise the defaults for values that can be
+	 * altered would override settings used by the user in create.
+	 */
+	cfg[0] = cfg[1];
+	cfg[1] = NULL;
+	WT_WITH_CHECKPOINT_LOCK(session,
+	    WT_WITH_SCHEMA_LOCK(session,
+		WT_WITH_TABLE_LOCK(session,
+		    ret = __wt_schema_alter(session, uri, cfg))));
+
+err:	if (ret != 0)
+		WT_STAT_CONN_INCR(session, session_table_alter_fail);
+	else
+		WT_STAT_CONN_INCR(session, session_table_alter_success);
+	API_END_RET_NOTFOUND_MAP(session, ret);
+}
+
+/*
  * __session_close --
  *	WT_SESSION->close method.
  */
@@ -1691,6 +1727,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 	static const WT_SESSION stds = {
 		NULL,
 		NULL,
+		__session_alter,
 		__session_close,
 		__session_reconfigure,
 		__wt_session_strerror,
@@ -1718,6 +1755,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 	}, stds_readonly = {
 		NULL,
 		NULL,
+		__session_alter,
 		__session_close,
 		__session_reconfigure,
 		__wt_session_strerror,

@@ -364,7 +364,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	/* Lock the tree, mark the chunk as on disk and update the metadata. */
 	__wt_lsm_tree_writelock(session, lsm_tree);
 	F_SET(chunk, WT_LSM_CHUNK_ONDISK);
-	ret = __wt_lsm_meta_write(session, lsm_tree);
+	ret = __wt_lsm_meta_write(session, lsm_tree, NULL);
 	++lsm_tree->dsk_gen;
 
 	/* Update the throttle time. */
@@ -469,7 +469,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	/* Ensure the bloom filter is in the metadata. */
 	__wt_lsm_tree_writelock(session, lsm_tree);
 	F_SET(chunk, WT_LSM_CHUNK_BLOOM);
-	ret = __wt_lsm_meta_write(session, lsm_tree);
+	ret = __wt_lsm_meta_write(session, lsm_tree, NULL);
 	++lsm_tree->dsk_gen;
 	__wt_lsm_tree_writeunlock(session, lsm_tree);
 
@@ -659,7 +659,7 @@ __wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 err:	/* Flush the metadata unless the system is in panic */
 	if (flush_metadata && ret != WT_PANIC) {
 		__wt_lsm_tree_writelock(session, lsm_tree);
-		WT_TRET(__wt_lsm_meta_write(session, lsm_tree));
+		WT_TRET(__wt_lsm_meta_write(session, lsm_tree, NULL));
 		__wt_lsm_tree_writeunlock(session, lsm_tree);
 	}
 	__lsm_unpin_chunks(session, &cookie);
