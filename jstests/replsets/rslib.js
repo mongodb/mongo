@@ -7,6 +7,7 @@ var reconfig;
 var awaitOpTime;
 var startSetIfSupportsReadMajority;
 var waitUntilAllNodesCaughtUp;
+var waitForState;
 var reInitiateWithoutThrowingOnAbortedMember;
 var awaitRSClientHosts;
 var getLastOpTime;
@@ -209,6 +210,17 @@ var getLastOpTime;
                     " (" + tojson(otherOt) + ") are different in " + tojson(rsStatus);
             },
             timeout);
+    };
+
+    /**
+     * Waits for the given node to reach the given state, ignoring network errors.
+     */
+    waitForState = function(node, state) {
+        assert.soonNoExcept(function() {
+            assert.commandWorked(node.adminCommand(
+                {replSetTest: 1, waitForMemberState: state, timeoutMillis: 60 * 1000 * 5}));
+            return true;
+        });
     };
 
     /**

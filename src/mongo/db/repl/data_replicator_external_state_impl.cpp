@@ -61,7 +61,7 @@ OpTimeWithTerm DataReplicatorExternalStateImpl::getCurrentTermAndLastCommittedOp
 }
 
 void DataReplicatorExternalStateImpl::processMetadata(const rpc::ReplSetMetadata& metadata) {
-    _replicationCoordinator->processReplSetMetadata(metadata);
+    _replicationCoordinator->processReplSetMetadata(metadata, true /*advance the commit point*/);
     if (metadata.getPrimaryIndex() != rpc::ReplSetMetadata::kNoPrimary) {
         _replicationCoordinator->cancelAndRescheduleElectionTimeout();
     }

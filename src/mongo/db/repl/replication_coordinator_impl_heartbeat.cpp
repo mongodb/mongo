@@ -164,7 +164,9 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         if (replMetadata.isOK()) {
             // Asynchronous stepdown could happen, but it will wait for _topoMutex and execute
             // after this function, so we cannot and don't need to wait for it to finish.
-            _processReplSetMetadata_incallback(replMetadata.getValue());
+            // Arbiters are the only nodes allowed to advance their commit point via heartbeats.
+            bool advanceCommitPoint = getMemberState().arbiter();
+            _processReplSetMetadata_incallback(replMetadata.getValue(), advanceCommitPoint);
         }
     }
     const Date_t now = _replExecutor.now();
@@ -176,10 +178,11 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         networkTime = cbData.response.elapsedMillis.value_or(Milliseconds{0});
         // TODO(sz) Because the term is duplicated in ReplSetMetaData, we can get rid of this
         // and update tests.
-        _updateTerm_incallback(hbStatusResponse.getValue().getTerm());
-        // Postpone election timeout if we have a successful heartbeat response from the primary.
         const auto& hbResponse = hbStatusResponse.getValue();
-        if (hbResponse.hasState() && hbResponse.getState().primary()) {
+        _updateTerm_incallback(hbResponse.getTerm());
+        // Postpone election timeout if we have a successful heartbeat response from the primary.
+        if (hbResponse.hasState() && hbResponse.getState().primary() &&
+            hbResponse.getTerm() == _topCoord->getTerm()) {
             cancelAndRescheduleElectionTimeout();
         }
     } else {

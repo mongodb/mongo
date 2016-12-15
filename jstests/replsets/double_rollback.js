@@ -12,7 +12,9 @@
 
 (function() {
     'use strict';
+
     load("jstests/libs/check_log.js");
+    load("jstests/replsets/rslib.js");
 
     var name = "double_rollback";
     var dbName = "test";
@@ -31,14 +33,6 @@
     });
     var nodes = rst.startSet();
     rst.initiate();
-
-    function waitForState(node, state) {
-        assert.soonNoExcept(function() {
-            assert.commandWorked(node.adminCommand(
-                {replSetTest: 1, waitForMemberState: state, timeoutMillis: rst.kDefaultTimeoutMS}));
-            return true;
-        });
-    }
 
     function stepUp(rst, node) {
         var primary = rst.getPrimary();

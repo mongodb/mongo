@@ -55,6 +55,7 @@ OpTimeWithTerm DataReplicatorExternalStateMock::getCurrentTermAndLastCommittedOp
 
 void DataReplicatorExternalStateMock::processMetadata(const rpc::ReplSetMetadata& metadata) {
     metadataProcessed = metadata;
+    metadataWasProcessed = true;
 }
 
 bool DataReplicatorExternalStateMock::shouldStopFetching(const HostAndPort& source,

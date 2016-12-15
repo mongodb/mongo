@@ -155,7 +155,8 @@ public:
 
     virtual void processReplSetGetConfig(BSONObjBuilder* result);
 
-    virtual void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata);
+    void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata,
+                                bool advanceCommitPoint) override;
 
     virtual void cancelAndRescheduleElectionTimeout() override;
 
