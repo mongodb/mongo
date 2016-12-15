@@ -134,7 +134,7 @@ functions:
           set -o errexit
           set -o verbose
           source ./venv/bin/activate
-          python perf_regression_check.py -f history.json --rev ${revision} -t tags.json --refTag 3.0.6-Baseline
+          python perf_regression_check.py -f history.json --rev ${revision} -t tags.json --refTag 3.0.14-Baseline
   "run perf tests":
     - command: shell.exec
       params:
