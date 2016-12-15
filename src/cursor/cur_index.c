@@ -281,33 +281,38 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
 	 * (usually) doesn't contain the primary key, so it is just a prefix of
 	 * any matching index key.  That said, if there is an exact match, we
 	 * want to find the first matching index entry and set exact equal to
-	 * zero. Do a search_near, step to the next entry if we land on one
-	 * that is too small, then check that the prefix matches.
+	 * zero.
+	 *
+	 * Do a search_near, and if we find an entry that is too small, step to
+	 * the next one.  In the unlikely event of a search past the end of the
+	 * tree, go back to the last key.
 	 */
 	__wt_cursor_set_raw_key(child, &cursor->key);
 	WT_ERR(child->search_near(child, &cmp));
 
-	if (cmp < 0)
-		WT_ERR(child->next(child));
+	if (cmp < 0) {
+		if ((ret = child->next(child)) == WT_NOTFOUND)
+			ret = child->prev(child);
+		WT_ERR(ret);
+	}
 
 	/*
 	 * We expect partial matches, and want the smallest record with a key
 	 * greater than or equal to the search key.
 	 *
-	 * If the key we find is shorter than the search key, it can't possibly
-	 * match.
+	 * If the found key starts with the search key, we indicate a match by
+	 * setting exact equal to zero.
 	 *
-	 * The only way for the key to be exactly equal is if there is an index
-	 * on the primary key, because otherwise the primary key columns will
-	 * be appended to the index key, but we don't disallow that (odd) case.
+	 * The compare function expects application-supplied keys to come first
+	 * so we flip the sign of the result to match what callers expect.
 	 */
 	found_key = child->key;
-	if (found_key.size < cursor->key.size)
-		WT_ERR(WT_NOTFOUND);
-	found_key.size = cursor->key.size;
+	if (found_key.size > cursor->key.size)
+		found_key.size = cursor->key.size;
 
 	WT_ERR(__wt_compare(
 	    session, cindex->index->collator, &cursor->key, &found_key, exact));
+	*exact = -*exact;
 
 	WT_ERR(__curindex_move(cindex));
 
