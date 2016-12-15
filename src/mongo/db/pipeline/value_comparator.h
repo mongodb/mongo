@@ -149,7 +149,7 @@ public:
     }
 
     /**
-     * Construct an empty ordered set of Value whose ordering and equivalence classes are given by
+     * Construct an empty ordered set of Values whose ordering and equivalence classes are given by
      * this comparator. This comparator must outlive the returned set.
      */
     std::set<Value, LessThan> makeOrderedValueSet() const {
@@ -157,7 +157,7 @@ public:
     }
 
     /**
-     * Construct an empty unordered set of Value whose equivalence classes are given by this
+     * Construct an empty unordered set of Values whose equivalence classes are given by this
      * comparator. This comparator must outlive the returned set.
      */
     stdx::unordered_set<Value, Hasher, EqualTo> makeUnorderedValueSet() const {
