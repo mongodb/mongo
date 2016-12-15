@@ -40,26 +40,26 @@ namespace mongo {
 namespace {
 
 TEST(ValueComparatorTest, EqualToEvaluatesCorrectly) {
-    Value val1("bar");
-    Value val2("bar");
-    Value val3("baz");
+    Value val1("bar"_sd);
+    Value val2("bar"_sd);
+    Value val3("baz"_sd);
     ASSERT_TRUE(ValueComparator().evaluate(val1 == val2));
     ASSERT_FALSE(ValueComparator().evaluate(val1 == val3));
 }
 
 TEST(ValueComparatorTest, EqualToEvaluatesCorrectlyWithNonSimpleCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    Value val1("abc");
-    Value val2("def");
+    Value val1("abc"_sd);
+    Value val2("def"_sd);
     ASSERT_TRUE(ValueComparator(&collator).evaluate(val1 == val2));
 }
 
 TEST(ValueComparatorTest, EqualToFunctorEvaluatesCorrectly) {
     ValueComparator valueComparator;
     auto equalFunc = valueComparator.getEqualTo();
-    Value val1("bar");
-    Value val2("bar");
-    Value val3("baz");
+    Value val1("bar"_sd);
+    Value val2("bar"_sd);
+    Value val3("baz"_sd);
     ASSERT_TRUE(equalFunc(val1, val2));
     ASSERT_FALSE(equalFunc(val1, val3));
 }
@@ -68,37 +68,37 @@ TEST(ValueComparatorTest, EqualToFunctorEvaluatesCorrectlyWithNonSimpleCollator)
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     ValueComparator valueComparator(&collator);
     auto equalFunc = valueComparator.getEqualTo();
-    Value val1("abc");
-    Value val2("def");
+    Value val1("abc"_sd);
+    Value val2("def"_sd);
     ASSERT_TRUE(equalFunc(val1, val2));
 }
 
 TEST(ValueComparatorTest, NotEqualEvaluatesCorrectly) {
-    Value val1("bar");
-    Value val2("bar");
-    Value val3("baz");
+    Value val1("bar"_sd);
+    Value val2("bar"_sd);
+    Value val3("baz"_sd);
     ASSERT_FALSE(ValueComparator().evaluate(val1 != val2));
     ASSERT_TRUE(ValueComparator().evaluate(val1 != val3));
 }
 
 TEST(ValueComparatorTest, NotEqualEvaluatesCorrectlyWithNonSimpleCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    Value val1("abc");
-    Value val2("def");
+    Value val1("abc"_sd);
+    Value val2("def"_sd);
     ASSERT_FALSE(ValueComparator(&collator).evaluate(val1 != val2));
 }
 
 TEST(ValueComparatorTest, LessThanEvaluatesCorrectly) {
-    Value val1("a");
-    Value val2("b");
+    Value val1("a"_sd);
+    Value val2("b"_sd);
     ASSERT_TRUE(ValueComparator().evaluate(val1 < val2));
     ASSERT_FALSE(ValueComparator().evaluate(val2 < val1));
 }
 
 TEST(ValueComparatorTest, LessThanEvaluatesCorrectlyWithNonSimpleCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    Value val1("za");
-    Value val2("yb");
+    Value val1("za"_sd);
+    Value val2("yb"_sd);
     ASSERT_TRUE(ValueComparator(&collator).evaluate(val1 < val2));
     ASSERT_FALSE(ValueComparator(&collator).evaluate(val2 < val1));
 }
@@ -106,8 +106,8 @@ TEST(ValueComparatorTest, LessThanEvaluatesCorrectlyWithNonSimpleCollator) {
 TEST(ValueComparatorTest, LessThanFunctorEvaluatesCorrectly) {
     ValueComparator valueComparator;
     auto lessThanFunc = valueComparator.getLessThan();
-    Value val1("a");
-    Value val2("b");
+    Value val1("a"_sd);
+    Value val2("b"_sd);
     ASSERT_TRUE(lessThanFunc(val1, val2));
     ASSERT_FALSE(lessThanFunc(val2, val1));
 }
@@ -116,16 +116,16 @@ TEST(ValueComparatorTest, LessThanFunctorEvaluatesCorrectlyWithNonSimpleCollator
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ValueComparator valueComparator(&collator);
     auto lessThanFunc = valueComparator.getLessThan();
-    Value val1("za");
-    Value val2("yb");
+    Value val1("za"_sd);
+    Value val2("yb"_sd);
     ASSERT_TRUE(lessThanFunc(val1, val2));
     ASSERT_FALSE(lessThanFunc(val2, val1));
 }
 
 TEST(ValueComparatorTest, LessThanOrEqualEvaluatesCorrectly) {
-    Value val1("a");
-    Value val2("a");
-    Value val3("b");
+    Value val1("a"_sd);
+    Value val2("a"_sd);
+    Value val3("b"_sd);
     ASSERT_TRUE(ValueComparator().evaluate(val1 <= val2));
     ASSERT_TRUE(ValueComparator().evaluate(val2 <= val1));
     ASSERT_TRUE(ValueComparator().evaluate(val1 <= val3));
@@ -134,9 +134,9 @@ TEST(ValueComparatorTest, LessThanOrEqualEvaluatesCorrectly) {
 
 TEST(ValueComparatorTest, LessThanOrEqualEvaluatesCorrectlyWithNonSimpleCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    Value val1("za");
-    Value val2("za");
-    Value val3("yb");
+    Value val1("za"_sd);
+    Value val2("za"_sd);
+    Value val3("yb"_sd);
     ASSERT_TRUE(ValueComparator(&collator).evaluate(val1 <= val2));
     ASSERT_TRUE(ValueComparator(&collator).evaluate(val2 <= val1));
     ASSERT_TRUE(ValueComparator(&collator).evaluate(val1 <= val3));
@@ -144,24 +144,24 @@ TEST(ValueComparatorTest, LessThanOrEqualEvaluatesCorrectlyWithNonSimpleCollator
 }
 
 TEST(ValueComparatorTest, GreaterThanEvaluatesCorrectly) {
-    Value val1("b");
-    Value val2("a");
+    Value val1("b"_sd);
+    Value val2("a"_sd);
     ASSERT_TRUE(ValueComparator().evaluate(val1 > val2));
     ASSERT_FALSE(ValueComparator().evaluate(val2 > val1));
 }
 
 TEST(ValueComparatorTest, GreaterThanEvaluatesCorrectlyWithNonSimpleCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    Value val1("yb");
-    Value val2("za");
+    Value val1("yb"_sd);
+    Value val2("za"_sd);
     ASSERT_TRUE(ValueComparator(&collator).evaluate(val1 > val2));
     ASSERT_FALSE(ValueComparator(&collator).evaluate(val2 > val1));
 }
 
 TEST(ValueComparatorTest, GreaterThanOrEqualEvaluatesCorrectly) {
-    Value val1("b");
-    Value val2("b");
-    Value val3("a");
+    Value val1("b"_sd);
+    Value val2("b"_sd);
+    Value val3("a"_sd);
     ASSERT_TRUE(ValueComparator().evaluate(val1 >= val2));
     ASSERT_TRUE(ValueComparator().evaluate(val2 >= val1));
     ASSERT_TRUE(ValueComparator().evaluate(val1 >= val3));
@@ -170,9 +170,9 @@ TEST(ValueComparatorTest, GreaterThanOrEqualEvaluatesCorrectly) {
 
 TEST(ValueComparatorTest, GreaterThanOrEqualEvaluatesCorrectlyWithNonSimpleCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    Value val1("yb");
-    Value val2("yb");
-    Value val3("za");
+    Value val1("yb"_sd);
+    Value val2("yb"_sd);
+    Value val3("za"_sd);
     ASSERT_TRUE(ValueComparator(&collator).evaluate(val1 >= val2));
     ASSERT_TRUE(ValueComparator(&collator).evaluate(val2 >= val1));
     ASSERT_TRUE(ValueComparator(&collator).evaluate(val1 >= val3));
@@ -183,13 +183,13 @@ TEST(ValueComparatorTest, OrderedValueSetRespectsTheComparator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     ValueComparator valueComparator(&collator);
     ValueSet set = valueComparator.makeOrderedValueSet();
-    set.insert(Value("yb"));
-    set.insert(Value("za"));
+    set.insert(Value("yb"_sd));
+    set.insert(Value("za"_sd));
 
     auto it = set.begin();
-    ASSERT_VALUE_EQ(*it, Value("za"));
+    ASSERT_VALUE_EQ(*it, Value("za"_sd));
     ++it;
-    ASSERT_VALUE_EQ(*it, Value("yb"));
+    ASSERT_VALUE_EQ(*it, Value("yb"_sd));
     ++it;
     ASSERT(it == set.end());
 }
@@ -204,17 +204,17 @@ TEST(ValueComparatorTest, EqualToEvaluatesCorrectlyWithNumbers) {
 
 TEST(ValueComparatorTest, NestedObjectEqualityRespectsCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    Value val1(Document{{"foo", "abc"}});
-    Value val2(Document{{"foo", "def"}});
+    Value val1(Document{{"foo", "abc"_sd}});
+    Value val2(Document{{"foo", "def"_sd}});
     ASSERT_TRUE(ValueComparator(&collator).evaluate(val1 == val2));
     ASSERT_TRUE(ValueComparator(&collator).evaluate(val2 == val1));
 }
 
 TEST(ValueComparatorTest, NestedArrayEqualityRespectsCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    Value val1(std::vector<Value>{Value("a"), Value("b")});
-    Value val2(std::vector<Value>{Value("c"), Value("d")});
-    Value val3(std::vector<Value>{Value("c"), Value("d"), Value("e")});
+    Value val1(std::vector<Value>{Value("a"_sd), Value("b"_sd)});
+    Value val2(std::vector<Value>{Value("c"_sd), Value("d"_sd)});
+    Value val3(std::vector<Value>{Value("c"_sd), Value("d"_sd), Value("e"_sd)});
     ASSERT_TRUE(ValueComparator(&collator).evaluate(val1 == val2));
     ASSERT_TRUE(ValueComparator(&collator).evaluate(val2 == val1));
     ASSERT_FALSE(ValueComparator(&collator).evaluate(val1 == val3));
@@ -224,24 +224,24 @@ TEST(ValueComparatorTest, NestedArrayEqualityRespectsCollator) {
 TEST(ValueComparatorTest, ValueHasherRespectsCollator) {
     CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
     ValueComparator valueCmp(&toLowerCollator);
-    ASSERT_EQ(valueCmp.hash(Value("foo")), valueCmp.hash(Value("FOO")));
-    ASSERT_NE(valueCmp.hash(Value("foo")), valueCmp.hash(Value("FOOz")));
+    ASSERT_EQ(valueCmp.hash(Value("foo"_sd)), valueCmp.hash(Value("FOO"_sd)));
+    ASSERT_NE(valueCmp.hash(Value("foo"_sd)), valueCmp.hash(Value("FOOz"_sd)));
 }
 
 TEST(ValueComparatorTest, ValueHasherRespectsCollatorWithNestedObjects) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     ValueComparator valueCmp(&collator);
-    Value val1(Document{{"foo", "abc"}});
-    Value val2(Document{{"foo", "def"}});
+    Value val1(Document{{"foo", "abc"_sd}});
+    Value val2(Document{{"foo", "def"_sd}});
     ASSERT_EQ(valueCmp.hash(val1), valueCmp.hash(val2));
 }
 
 TEST(ValueComparatorTest, ValueHasherRespectsCollatorWithNestedArrays) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
     ValueComparator valueCmp(&collator);
-    Value val1(std::vector<Value>{Value("a"), Value("b")});
-    Value val2(std::vector<Value>{Value("c"), Value("d")});
-    Value val3(std::vector<Value>{Value("c"), Value("d"), Value("e")});
+    Value val1(std::vector<Value>{Value("a"_sd), Value("b"_sd)});
+    Value val2(std::vector<Value>{Value("c"_sd), Value("d"_sd)});
+    Value val3(std::vector<Value>{Value("c"_sd), Value("d"_sd), Value("e"_sd)});
     ASSERT_EQ(valueCmp.hash(val1), valueCmp.hash(val2));
     ASSERT_NE(valueCmp.hash(val1), valueCmp.hash(val3));
     ASSERT_NE(valueCmp.hash(val2), valueCmp.hash(val3));
@@ -251,24 +251,24 @@ TEST(ValueComparatorTest, UnorderedSetOfValueRespectsCollation) {
     CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
     ValueComparator valueCmp(&toLowerCollator);
     auto set = valueCmp.makeUnorderedValueSet();
-    ASSERT_TRUE(set.insert(Value("foo")).second);
-    ASSERT_FALSE(set.insert(Value("FOO")).second);
-    ASSERT_TRUE(set.insert(Value("FOOz")).second);
+    ASSERT_TRUE(set.insert(Value("foo"_sd)).second);
+    ASSERT_FALSE(set.insert(Value("FOO"_sd)).second);
+    ASSERT_TRUE(set.insert(Value("FOOz"_sd)).second);
     ASSERT_EQ(set.size(), 2U);
-    ASSERT_EQ(set.count(Value("FoO")), 1U);
-    ASSERT_EQ(set.count(Value("fooZ")), 1U);
+    ASSERT_EQ(set.count(Value("FoO"_sd)), 1U);
+    ASSERT_EQ(set.count(Value("fooZ"_sd)), 1U);
 }
 
 TEST(ValueComparatorTest, UnorderedMapOfValueRespectsCollation) {
     CollatorInterfaceMock toLowerCollator(CollatorInterfaceMock::MockType::kToLowerString);
     ValueComparator valueCmp(&toLowerCollator);
     auto map = valueCmp.makeUnorderedValueMap<int>();
-    map[Value("foo")] = 1;
-    map[Value("FOO")] = 2;
-    map[Value("FOOz")] = 3;
+    map[Value("foo"_sd)] = 1;
+    map[Value("FOO"_sd)] = 2;
+    map[Value("FOOz"_sd)] = 3;
     ASSERT_EQ(map.size(), 2U);
-    ASSERT_EQ(map[Value("FoO")], 2);
-    ASSERT_EQ(map[Value("fooZ")], 3);
+    ASSERT_EQ(map[Value("FoO"_sd)], 2);
+    ASSERT_EQ(map[Value("fooZ"_sd)], 3);
 }
 
 TEST(ValueComparatorTest, ComparingCodeWScopeShouldNotRespectCollation) {

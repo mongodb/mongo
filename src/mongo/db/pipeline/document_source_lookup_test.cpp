@@ -56,13 +56,14 @@ using DocumentSourceLookUpTest = AggregationContextFixture;
 TEST_F(DocumentSourceLookUpTest, ShouldTruncateOutputSortOnAsField) {
     intrusive_ptr<DocumentSourceMock> source = DocumentSourceMock::create();
     source->sorts = {BSON("a" << 1 << "d.e" << 1 << "c" << 1)};
-    auto lookup = DocumentSourceLookUp::createFromBson(
-        Document{
-            {"$lookup",
-             Document{{"from", "a"}, {"localField", "b"}, {"foreignField", "c"}, {"as", "d.e"}}}}
-            .toBson()
-            .firstElement(),
-        getExpCtx());
+    auto lookup = DocumentSourceLookUp::createFromBson(Document{{"$lookup",
+                                                                 Document{{"from", "a"_sd},
+                                                                          {"localField", "b"_sd},
+                                                                          {"foreignField", "c"_sd},
+                                                                          {"as", "d.e"_sd}}}}
+                                                           .toBson()
+                                                           .firstElement(),
+                                                       getExpCtx());
     lookup->setSource(source.get());
 
     BSONObjSet outputSort = lookup->getOutputSorts();
@@ -74,12 +75,14 @@ TEST_F(DocumentSourceLookUpTest, ShouldTruncateOutputSortOnAsField) {
 TEST_F(DocumentSourceLookUpTest, ShouldTruncateOutputSortOnSuffixOfAsField) {
     intrusive_ptr<DocumentSourceMock> source = DocumentSourceMock::create();
     source->sorts = {BSON("a" << 1 << "d.e" << 1 << "c" << 1)};
-    auto lookup = DocumentSourceLookUp::createFromBson(
-        Document{{"$lookup",
-                  Document{{"from", "a"}, {"localField", "b"}, {"foreignField", "c"}, {"as", "d"}}}}
-            .toBson()
-            .firstElement(),
-        getExpCtx());
+    auto lookup = DocumentSourceLookUp::createFromBson(Document{{"$lookup",
+                                                                 Document{{"from", "a"_sd},
+                                                                          {"localField", "b"_sd},
+                                                                          {"foreignField", "c"_sd},
+                                                                          {"as", "d"_sd}}}}
+                                                           .toBson()
+                                                           .firstElement(),
+                                                       getExpCtx());
     lookup->setSource(source.get());
 
     BSONObjSet outputSort = lookup->getOutputSorts();
@@ -173,9 +176,9 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePauses) {
     // Set up the $lookup stage.
     auto lookupSpec = Document{{"$lookup",
                                 Document{{"from", fromNs.coll()},
-                                         {"localField", "foreignId"},
-                                         {"foreignField", "_id"},
-                                         {"as", "foreignDocs"}}}}
+                                         {"localField", "foreignId"_sd},
+                                         {"foreignField", "_id"_sd},
+                                         {"as", "foreignDocs"_sd}}}}
                           .toBson();
     auto parsed = DocumentSourceLookUp::createFromBson(lookupSpec.firstElement(), expCtx);
     auto lookup = static_cast<DocumentSourceLookUp*>(parsed.get());
@@ -224,9 +227,9 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
     // Set up the $lookup stage.
     auto lookupSpec = Document{{"$lookup",
                                 Document{{"from", fromNs.coll()},
-                                         {"localField", "foreignId"},
-                                         {"foreignField", "_id"},
-                                         {"as", "foreignDoc"}}}}
+                                         {"localField", "foreignId"_sd},
+                                         {"foreignField", "_id"_sd},
+                                         {"as", "foreignDoc"_sd}}}}
                           .toBson();
     auto parsed = DocumentSourceLookUp::createFromBson(lookupSpec.firstElement(), expCtx);
     auto lookup = static_cast<DocumentSourceLookUp*>(parsed.get());
@@ -278,9 +281,9 @@ TEST_F(DocumentSourceLookUpTest, LookupReportsAsFieldIsModified) {
     // Set up the $lookup stage.
     auto lookupSpec = Document{{"$lookup",
                                 Document{{"from", fromNs.coll()},
-                                         {"localField", "foreignId"},
-                                         {"foreignField", "_id"},
-                                         {"as", "foreignDocs"}}}}
+                                         {"localField", "foreignId"_sd},
+                                         {"foreignField", "_id"_sd},
+                                         {"as", "foreignDocs"_sd}}}}
                           .toBson();
     auto parsed = DocumentSourceLookUp::createFromBson(lookupSpec.firstElement(), expCtx);
     auto lookup = static_cast<DocumentSourceLookUp*>(parsed.get());
@@ -299,9 +302,9 @@ TEST_F(DocumentSourceLookUpTest, LookupReportsFieldsModifiedByAbsorbedUnwind) {
     // Set up the $lookup stage.
     auto lookupSpec = Document{{"$lookup",
                                 Document{{"from", fromNs.coll()},
-                                         {"localField", "foreignId"},
-                                         {"foreignField", "_id"},
-                                         {"as", "foreignDoc"}}}}
+                                         {"localField", "foreignId"_sd},
+                                         {"foreignField", "_id"_sd},
+                                         {"as", "foreignDoc"_sd}}}}
                           .toBson();
     auto parsed = DocumentSourceLookUp::createFromBson(lookupSpec.firstElement(), expCtx);
     auto lookup = static_cast<DocumentSourceLookUp*>(parsed.get());

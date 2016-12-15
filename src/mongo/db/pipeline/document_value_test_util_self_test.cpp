@@ -37,55 +37,55 @@ namespace mongo {
 namespace {
 
 TEST(DocumentValueTestUtilSelfTest, DocumentEQ) {
-    ASSERT_DOCUMENT_EQ(Document({{"foo", "bar"}}), Document({{"foo", "bar"}}));
+    ASSERT_DOCUMENT_EQ(Document({{"foo", "bar"_sd}}), Document({{"foo", "bar"_sd}}));
 }
 
 TEST(DocumentValueTestUtilSelfTest, DocumentNE) {
-    ASSERT_DOCUMENT_NE(Document({{"foo", "bar"}}), Document({{"foo", "baz"}}));
+    ASSERT_DOCUMENT_NE(Document({{"foo", "bar"_sd}}), Document({{"foo", "baz"_sd}}));
 }
 
 TEST(DocumentValueTestUtilSelfTest, DocumentLT) {
-    ASSERT_DOCUMENT_LT(Document({{"foo", "bar"}}), Document({{"foo", "baz"}}));
+    ASSERT_DOCUMENT_LT(Document({{"foo", "bar"_sd}}), Document({{"foo", "baz"_sd}}));
 }
 
 TEST(DocumentValueTestUtilSelfTest, DocumentLTE) {
-    ASSERT_DOCUMENT_LTE(Document({{"foo", "bar"}}), Document({{"foo", "baz"}}));
-    ASSERT_DOCUMENT_LTE(Document({{"foo", "bar"}}), Document({{"foo", "bar"}}));
+    ASSERT_DOCUMENT_LTE(Document({{"foo", "bar"_sd}}), Document({{"foo", "baz"_sd}}));
+    ASSERT_DOCUMENT_LTE(Document({{"foo", "bar"_sd}}), Document({{"foo", "bar"_sd}}));
 }
 
 TEST(DocumentValueTestUtilSelfTest, DocumentGT) {
-    ASSERT_DOCUMENT_GT(Document({{"foo", "baz"}}), Document({{"foo", "bar"}}));
+    ASSERT_DOCUMENT_GT(Document({{"foo", "baz"_sd}}), Document({{"foo", "bar"_sd}}));
 }
 
 TEST(DocumentValueTestUtilSelfTest, DocumentGTE) {
-    ASSERT_DOCUMENT_GTE(Document({{"foo", "baz"}}), Document({{"foo", "bar"}}));
-    ASSERT_DOCUMENT_GTE(Document({{"foo", "bar"}}), Document({{"foo", "bar"}}));
+    ASSERT_DOCUMENT_GTE(Document({{"foo", "baz"_sd}}), Document({{"foo", "bar"_sd}}));
+    ASSERT_DOCUMENT_GTE(Document({{"foo", "bar"_sd}}), Document({{"foo", "bar"_sd}}));
 }
 
 TEST(DocumentValueTestUtilSelfTest, ValueEQ) {
-    ASSERT_VALUE_EQ(Value("bar"), Value("bar"));
+    ASSERT_VALUE_EQ(Value("bar"_sd), Value("bar"_sd));
 }
 
 TEST(DocumentValueTestUtilSelfTest, ValueNE) {
-    ASSERT_VALUE_NE(Value("bar"), Value("baz"));
+    ASSERT_VALUE_NE(Value("bar"_sd), Value("baz"_sd));
 }
 
 TEST(DocumentValueTestUtilSelfTest, ValueLT) {
-    ASSERT_VALUE_LT(Value("bar"), Value("baz"));
+    ASSERT_VALUE_LT(Value("bar"_sd), Value("baz"_sd));
 }
 
 TEST(DocumentValueTestUtilSelfTest, ValueLTE) {
-    ASSERT_VALUE_LTE(Value("bar"), Value("baz"));
-    ASSERT_VALUE_LTE(Value("bar"), Value("bar"));
+    ASSERT_VALUE_LTE(Value("bar"_sd), Value("baz"_sd));
+    ASSERT_VALUE_LTE(Value("bar"_sd), Value("bar"_sd));
 }
 
 TEST(DocumentValueTestUtilSelfTest, ValueGT) {
-    ASSERT_VALUE_GT(Value("baz"), Value("bar"));
+    ASSERT_VALUE_GT(Value("baz"_sd), Value("bar"_sd));
 }
 
 TEST(DocumentValueTestUtilSelfTest, ValueGTE) {
-    ASSERT_VALUE_GTE(Value("baz"), Value("bar"));
-    ASSERT_VALUE_GTE(Value("bar"), Value("bar"));
+    ASSERT_VALUE_GTE(Value("baz"_sd), Value("bar"_sd));
+    ASSERT_VALUE_GTE(Value("bar"_sd), Value("bar"_sd));
 }
 
 }  // namespace

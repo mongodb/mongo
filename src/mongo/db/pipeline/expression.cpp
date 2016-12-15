@@ -1737,10 +1737,10 @@ Value ExpressionMeta::serialize(bool explain) const {
     switch (_metaType) {
         case MetaType::TEXT_SCORE:
             return Value(DOC("$meta"
-                             << "textScore"));
+                             << "textScore"_sd));
         case MetaType::RAND_VAL:
             return Value(DOC("$meta"
-                             << "randVal"));
+                             << "randVal"_sd));
     }
     MONGO_UNREACHABLE;
 }
@@ -3370,7 +3370,7 @@ Value ExpressionSubstrBytes::evaluateInternal(Variables* vars) const {
     if (lower >= str.length()) {
         // If lower > str.length() then string::substr() will throw out_of_range, so return an
         // empty string if lower is not a valid string index.
-        return Value("");
+        return Value(StringData());
     }
     return Value(str.substr(lower, length));
 }
@@ -3426,7 +3426,7 @@ Value ExpressionSubstrCP::evaluateInternal(Variables* vars) const {
 
     for (int i = 0; i < startIndexCodePoints; i++) {
         if (startIndexBytes >= str.size()) {
-            return Value("");
+            return Value(StringData());
         }
         uassert(34456,
                 str::stream() << getOpName() << ": invalid UTF-8 string",
@@ -3749,7 +3749,7 @@ const char* ExpressionTrunc::getOpName() const {
 
 Value ExpressionType::evaluateInternal(Variables* vars) const {
     Value val(vpOperand[0]->evaluateInternal(vars));
-    return Value(typeName(val.getType()));
+    return Value(StringData(typeName(val.getType())));
 }
 
 REGISTER_EXPRESSION(type, ExpressionType::parse);

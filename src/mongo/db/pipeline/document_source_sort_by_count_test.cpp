@@ -87,7 +87,7 @@ TEST_F(SortByCountReturnsGroupAndSort, ExpressionFieldPathSpec) {
     BSONObj spec = BSON("$sortByCount"
                         << "$x");
     Value expectedGroupExplain =
-        Value{Document{{"_id", "$x"}, {"count", Document{{"$sum", Document{{"$const", 1}}}}}}};
+        Value{Document{{"_id", "$x"_sd}, {"count", Document{{"$sum", Document{{"$const", 1}}}}}}};
     testCreateFromBsonResult(spec, expectedGroupExplain);
 }
 

@@ -174,8 +174,9 @@ TEST(ExclusionProjectionExecutionTest, ShouldCoerceNumericsToBools) {
     exclusion.parse(BSON("a" << Value(0) << "b" << Value(0LL) << "c" << Value(0.0) << "d"
                              << Value(Decimal128(0))));
 
-    auto result = exclusion.applyProjection(Document{{"_id", "ID"}, {"a", 1}, {"b", 2}, {"c", 3}});
-    auto expectedResult = Document{{"_id", "ID"}};
+    auto result =
+        exclusion.applyProjection(Document{{"_id", "ID"_sd}, {"a", 1}, {"b", 2}, {"c", 3}});
+    auto expectedResult = Document{{"_id", "ID"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -190,15 +191,15 @@ TEST(ExclusionProjectionExecutionTest, ShouldPreserveOrderOfExistingFields) {
 TEST(ExclusionProjectionExecutionTest, ShouldImplicitlyIncludeId) {
     ParsedExclusionProjection exclusion;
     exclusion.parse(BSON("a" << false));
-    auto result = exclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"}});
-    auto expectedResult = Document{{"b", 2}, {"_id", "ID"}};
+    auto result = exclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}});
+    auto expectedResult = Document{{"b", 2}, {"_id", "ID"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldExcludeIdIfExplicitlyExcluded) {
     ParsedExclusionProjection exclusion;
     exclusion.parse(BSON("a" << false << "_id" << false));
-    auto result = exclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"}});
+    auto result = exclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}});
     auto expectedResult = Document{{"b", 2}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -206,7 +207,7 @@ TEST(ExclusionProjectionExecutionTest, ShouldExcludeIdIfExplicitlyExcluded) {
 TEST(ExclusionProjectionExecutionTest, ShouldExcludeIdAndKeepAllOtherFields) {
     ParsedExclusionProjection exclusion;
     exclusion.parse(BSON("_id" << false));
-    auto result = exclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"}});
+    auto result = exclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}});
     auto expectedResult = Document{{"a", 1}, {"b", 2}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -259,8 +260,8 @@ TEST(ExclusionProjectionExecutionTest, ShouldNotCreateSubDocIfDottedExcludedFiel
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Should not replace non-documents with documents.
-    result = exclusion.applyProjection(Document{{"sub", "notADocument"}});
-    expectedResult = Document{{"sub", "notADocument"}};
+    result = exclusion.applyProjection(Document{{"sub", "notADocument"_sd}});
+    expectedResult = Document{{"sub", "notADocument"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -302,14 +303,14 @@ TEST(ExclusionProjectionExecutionTest, ShouldAlwaysKeepMetadataFromOriginalDoc) 
     ParsedExclusionProjection exclusion;
     exclusion.parse(BSON("a" << false));
 
-    MutableDocument inputDocBuilder(Document{{"_id", "ID"}, {"a", 1}});
+    MutableDocument inputDocBuilder(Document{{"_id", "ID"_sd}, {"a", 1}});
     inputDocBuilder.setRandMetaField(1.0);
     inputDocBuilder.setTextScore(10.0);
     Document inputDoc = inputDocBuilder.freeze();
 
     auto result = exclusion.applyProjection(inputDoc);
 
-    MutableDocument expectedDoc(Document{{"_id", "ID"}});
+    MutableDocument expectedDoc(Document{{"_id", "ID"_sd}});
     expectedDoc.copyMetaDataFrom(inputDoc);
     ASSERT_DOCUMENT_EQ(result, expectedDoc.freeze());
 }

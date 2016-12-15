@@ -282,7 +282,7 @@ TEST_F(DocumentSourceSortExecutionTest, CompoundSortSpecAlternateOrderSecondFiel
 
 /** Sorting different types is not supported. */
 TEST_F(DocumentSourceSortExecutionTest, InconsistentTypeSort) {
-    checkResults({Document{{"_id", 0}, {"a", 1}}, Document{{"_id", 1}, {"a", "foo"}}},
+    checkResults({Document{{"_id", 0}, {"a", 1}}, Document{{"_id", 1}, {"a", "foo"_sd}}},
                  BSON("a" << 1),
                  "[{_id:0,a:1},{_id:1,a:\"foo\"}]");
 }

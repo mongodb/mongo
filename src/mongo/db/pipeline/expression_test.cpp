@@ -951,7 +951,7 @@ class String {
 public:
     void run() {
         intrusive_ptr<ExpressionNary> expression = new ExpressionAdd();
-        expression->addOperand(ExpressionConstant::create(nullptr, Value("a")));
+        expression->addOperand(ExpressionConstant::create(nullptr, Value("a"_sd)));
         ASSERT_THROWS(expression->evaluate(Document()), UserException);
     }
 };
@@ -2070,7 +2070,7 @@ private:
 TEST(ExpressionFromAccumulators, Avg) {
     assertExpectedResults("$avg",
                           {// $avg ignores non-numeric inputs.
-                           {{Value("string"), Value(BSONNULL), Value(), Value(3)}, Value(3.0)},
+                           {{Value("string"_sd), Value(BSONNULL), Value(), Value(3)}, Value(3.0)},
                            // $avg always returns a double.
                            {{Value(10LL), Value(20LL)}, Value(15.0)},
                            // $avg returns null when no arguments are provided.
@@ -2080,8 +2080,8 @@ TEST(ExpressionFromAccumulators, Avg) {
 TEST(ExpressionFromAccumulators, Max) {
     assertExpectedResults("$max",
                           {// $max treats non-numeric inputs as valid arguments.
-                           {{Value(1), Value(BSONNULL), Value(), Value("a")}, Value("a")},
-                           {{Value("a"), Value("b")}, Value("b")},
+                           {{Value(1), Value(BSONNULL), Value(), Value("a"_sd)}, Value("a"_sd)},
+                           {{Value("a"_sd), Value("b"_sd)}, Value("b"_sd)},
                            // $max always preserves the type of the result.
                            {{Value(10LL), Value(0.0), Value(5)}, Value(10LL)},
                            // $max returns null when no arguments are provided.
@@ -2091,9 +2091,9 @@ TEST(ExpressionFromAccumulators, Max) {
 TEST(ExpressionFromAccumulators, Min) {
     assertExpectedResults("$min",
                           {// $min treats non-numeric inputs as valid arguments.
-                           {{Value("string")}, Value("string")},
-                           {{Value(1), Value(BSONNULL), Value(), Value("a")}, Value(1)},
-                           {{Value("a"), Value("b")}, Value("a")},
+                           {{Value("string"_sd)}, Value("string"_sd)},
+                           {{Value(1), Value(BSONNULL), Value(), Value("a"_sd)}, Value(1)},
+                           {{Value("a"_sd), Value("b"_sd)}, Value("a"_sd)},
                            // $min always preserves the type of the result.
                            {{Value(0LL), Value(20.0), Value(10)}, Value(0LL)},
                            // $min returns null when no arguments are provided.
@@ -2104,7 +2104,7 @@ TEST(ExpressionFromAccumulators, Sum) {
     assertExpectedResults(
         "$sum",
         {// $sum ignores non-numeric inputs.
-         {{Value("string"), Value(BSONNULL), Value(), Value(3)}, Value(3)},
+         {{Value("string"_sd), Value(BSONNULL), Value(), Value(3)}, Value(3)},
          // If any argument is a double, $sum returns a double
          {{Value(10LL), Value(10.0)}, Value(20.0)},
          // If no arguments are doubles and an argument is a long, $sum returns a long
@@ -2116,7 +2116,7 @@ TEST(ExpressionFromAccumulators, Sum) {
 TEST(ExpressionFromAccumulators, StdDevPop) {
     assertExpectedResults("$stdDevPop",
                           {// $stdDevPop ignores non-numeric inputs.
-                           {{Value("string"), Value(BSONNULL), Value(), Value(3)}, Value(0.0)},
+                           {{Value("string"_sd), Value(BSONNULL), Value(), Value(3)}, Value(0.0)},
                            // $stdDevPop always returns a double.
                            {{Value(1LL), Value(3LL)}, Value(1.0)},
                            // $stdDevPop returns null when no arguments are provided.
@@ -2124,13 +2124,14 @@ TEST(ExpressionFromAccumulators, StdDevPop) {
 }
 
 TEST(ExpressionFromAccumulators, StdDevSamp) {
-    assertExpectedResults("$stdDevSamp",
-                          {// $stdDevSamp ignores non-numeric inputs.
-                           {{Value("string"), Value(BSONNULL), Value(), Value(3)}, Value(BSONNULL)},
-                           // $stdDevSamp always returns a double.
-                           {{Value(1LL), Value(2LL), Value(3LL)}, Value(1.0)},
-                           // $stdDevSamp returns null when no arguments are provided.
-                           {{}, Value(BSONNULL)}});
+    assertExpectedResults(
+        "$stdDevSamp",
+        {// $stdDevSamp ignores non-numeric inputs.
+         {{Value("string"_sd), Value(BSONNULL), Value(), Value(3)}, Value(BSONNULL)},
+         // $stdDevSamp always returns a double.
+         {{Value(1LL), Value(2LL), Value(3LL)}, Value(1.0)},
+         // $stdDevSamp returns null when no arguments are provided.
+         {{}, Value(BSONNULL)}});
 }
 
 namespace FieldPath {
@@ -2372,7 +2373,7 @@ TEST(ExpressionObjectParse, ShouldAcceptLiteralsAsValues) {
                                                    << BSONNULL),
                                           vps);
     auto expectedResult =
-        Value(Document{{"a", literal(5)}, {"b", literal("string")}, {"c", literal(BSONNULL)}});
+        Value(Document{{"a", literal(5)}, {"b", literal("string"_sd)}, {"c", literal(BSONNULL)}});
     ASSERT_VALUE_EQ(expectedResult, object->serialize(false));
 }
 
@@ -2476,22 +2477,24 @@ TEST(ExpressionObjectEvaluate, EmptyObjectShouldEvaluateToEmptyDocument) {
     auto object = ExpressionObject::create({});
     ASSERT_VALUE_EQ(Value(Document()), object->evaluate(Document()));
     ASSERT_VALUE_EQ(Value(Document()), object->evaluate(Document{{"a", 1}}));
-    ASSERT_VALUE_EQ(Value(Document()), object->evaluate(Document{{"_id", "ID"}}));
+    ASSERT_VALUE_EQ(Value(Document()), object->evaluate(Document{{"_id", "ID"_sd}}));
 }
 
 TEST(ExpressionObjectEvaluate, ShouldEvaluateEachField) {
     auto object = ExpressionObject::create({{"a", makeConstant(1)}, {"b", makeConstant(5)}});
     ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}), object->evaluate(Document()));
     ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}), object->evaluate(Document{{"a", 1}}));
-    ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}), object->evaluate(Document{{"_id", "ID"}}));
+    ASSERT_VALUE_EQ(Value(Document{{"a", 1}, {"b", 5}}),
+                    object->evaluate(Document{{"_id", "ID"_sd}}));
 }
 
 TEST(ExpressionObjectEvaluate, OrderOfFieldsInOutputShouldMatchOrderInSpecification) {
     auto object = ExpressionObject::create({{"a", ExpressionFieldPath::create("a")},
                                             {"b", ExpressionFieldPath::create("b")},
                                             {"c", ExpressionFieldPath::create("c")}});
-    ASSERT_VALUE_EQ(Value(Document{{"a", "A"}, {"b", "B"}, {"c", "C"}}),
-                    object->evaluate(Document{{"c", "C"}, {"a", "A"}, {"b", "B"}, {"_id", "ID"}}));
+    ASSERT_VALUE_EQ(
+        Value(Document{{"a", "A"_sd}, {"b", "B"_sd}, {"c", "C"_sd}}),
+        object->evaluate(Document{{"c", "C"_sd}, {"a", "A"_sd}, {"b", "B"_sd}, {"_id", "ID"_sd}}));
 }
 
 TEST(ExpressionObjectEvaluate, ShouldRemoveFieldsThatHaveMissingValues) {
@@ -2507,8 +2510,8 @@ TEST(ExpressionObjectEvaluate, ShouldEvaluateFieldsWithinNestedObject) {
           ExpressionObject::create(
               {{"b", makeConstant(1)}, {"c", ExpressionFieldPath::create("_id")}})}});
     ASSERT_VALUE_EQ(Value(Document{{"a", Document{{"b", 1}}}}), object->evaluate(Document()));
-    ASSERT_VALUE_EQ(Value(Document{{"a", Document{{"b", 1}, {"c", "ID"}}}}),
-                    object->evaluate(Document{{"_id", "ID"}}));
+    ASSERT_VALUE_EQ(Value(Document{{"a", Document{{"b", 1}, {"c", "ID"_sd}}}}),
+                    object->evaluate(Document{{"_id", "ID"_sd}}));
 }
 
 TEST(ExpressionObjectEvaluate, ShouldEvaluateToEmptyDocumentIfAllFieldsAreMissing) {
@@ -2948,8 +2951,8 @@ TEST(ParseExpression, ShouldParseExpressionWithMultipleArguments) {
                                                                              << "FOO")));
     auto strCaseCmpExpression = dynamic_cast<ExpressionStrcasecmp*>(resultExpression.get());
     ASSERT_TRUE(strCaseCmpExpression);
-    vector<Value> arguments = {Value(Document{{"$const", "foo"}}),
-                               Value(Document{{"$const", "FOO"}})};
+    vector<Value> arguments = {Value(Document{{"$const", "foo"_sd}}),
+                               Value(Document{{"$const", "FOO"_sd}})};
     ASSERT_VALUE_EQ(strCaseCmpExpression->serialize(false),
                     Value(Document{{"$strcasecmp", arguments}}));
 }
@@ -3024,7 +3027,7 @@ TEST(ParseOperand, ShouldRecognizeFieldPath) {
                                               << "$field"));
     auto fieldPathExpression = dynamic_cast<ExpressionFieldPath*>(resultExpression.get());
     ASSERT_TRUE(fieldPathExpression);
-    ASSERT_VALUE_EQ(fieldPathExpression->serialize(false), Value("$field"));
+    ASSERT_VALUE_EQ(fieldPathExpression->serialize(false), Value("$field"_sd));
 }
 
 TEST(ParseOperand, ShouldRecognizeStringLiteral) {
@@ -3032,7 +3035,7 @@ TEST(ParseOperand, ShouldRecognizeStringLiteral) {
                                               << "foo"));
     auto constantExpression = dynamic_cast<ExpressionConstant*>(resultExpression.get());
     ASSERT_TRUE(constantExpression);
-    ASSERT_VALUE_EQ(constantExpression->serialize(false), Value(Document{{"$const", "foo"}}));
+    ASSERT_VALUE_EQ(constantExpression->serialize(false), Value(Document{{"$const", "foo"_sd}}));
 }
 
 TEST(ParseOperand, ShouldRecognizeNestedArray) {
@@ -3040,7 +3043,8 @@ TEST(ParseOperand, ShouldRecognizeNestedArray) {
                                                                << "$field")));
     auto arrayExpression = dynamic_cast<ExpressionArray*>(resultExpression.get());
     ASSERT_TRUE(arrayExpression);
-    vector<Value> expectedSerializedArray = {Value(Document{{"$const", "foo"}}), Value("$field")};
+    vector<Value> expectedSerializedArray = {Value(Document{{"$const", "foo"_sd}}),
+                                             Value("$field"_sd)};
     ASSERT_VALUE_EQ(arrayExpression->serialize(false), Value(expectedSerializedArray));
 }
 
@@ -3254,8 +3258,8 @@ class LastNull : public ExpectedResultBase {
                                                      << "$setDifference"
                                                      << BSONNULL)
                            << "error"
-                           << DOC_ARRAY("$setEquals"
-                                        << "$setIsSubset"));
+                           << DOC_ARRAY("$setEquals"_sd
+                                        << "$setIsSubset"_sd));
     }
 };
 
@@ -3266,8 +3270,8 @@ class FirstNull : public ExpectedResultBase {
                                                      << "$setDifference"
                                                      << BSONNULL)
                            << "error"
-                           << DOC_ARRAY("$setEquals"
-                                        << "$setIsSubset"));
+                           << DOC_ARRAY("$setEquals"_sd
+                                        << "$setIsSubset"_sd));
     }
 };
 
@@ -3277,9 +3281,9 @@ class NoArg : public ExpectedResultBase {
             "input" << vector<Value>() << "expected"
                     << DOC("$setIntersection" << vector<Value>() << "$setUnion" << vector<Value>())
                     << "error"
-                    << DOC_ARRAY("$setEquals"
-                                 << "$setIsSubset"
-                                 << "$setDifference"));
+                    << DOC_ARRAY("$setEquals"_sd
+                                 << "$setIsSubset"_sd
+                                 << "$setDifference"_sd));
     }
 };
 
@@ -3289,9 +3293,9 @@ class OneArg : public ExpectedResultBase {
                            << DOC("$setIntersection" << DOC_ARRAY(1 << 2) << "$setUnion"
                                                      << DOC_ARRAY(1 << 2))
                            << "error"
-                           << DOC_ARRAY("$setEquals"
-                                        << "$setIsSubset"
-                                        << "$setDifference"));
+                           << DOC_ARRAY("$setEquals"_sd
+                                        << "$setIsSubset"_sd
+                                        << "$setDifference"_sd));
     }
 };
 
@@ -3301,9 +3305,9 @@ class EmptyArg : public ExpectedResultBase {
             "input" << DOC_ARRAY(vector<Value>()) << "expected"
                     << DOC("$setIntersection" << vector<Value>() << "$setUnion" << vector<Value>())
                     << "error"
-                    << DOC_ARRAY("$setEquals"
-                                 << "$setIsSubset"
-                                 << "$setDifference"));
+                    << DOC_ARRAY("$setEquals"_sd
+                                 << "$setIsSubset"_sd
+                                 << "$setDifference"_sd));
     }
 };
 
@@ -3338,20 +3342,20 @@ class RightArgEmpty : public ExpectedResultBase {
 class ManyArgs : public ExpectedResultBase {
     Document getSpec() {
         return DOC(
-            "input" << DOC_ARRAY(DOC_ARRAY(8 << 3) << DOC_ARRAY("asdf"
-                                                                << "foo")
+            "input" << DOC_ARRAY(DOC_ARRAY(8 << 3) << DOC_ARRAY("asdf"_sd
+                                                                << "foo"_sd)
                                                    << DOC_ARRAY(80.3 << 34)
                                                    << vector<Value>()
-                                                   << DOC_ARRAY(80.3 << "foo" << 11 << "yay"))
+                                                   << DOC_ARRAY(80.3 << "foo"_sd << 11 << "yay"_sd))
                     << "expected"
                     << DOC("$setIntersection" << vector<Value>() << "$setEquals" << false
                                               << "$setUnion"
-                                              << DOC_ARRAY(3 << 8 << 11 << 34 << 80.3 << "asdf"
-                                                             << "foo"
-                                                             << "yay"))
+                                              << DOC_ARRAY(3 << 8 << 11 << 34 << 80.3 << "asdf"_sd
+                                                             << "foo"_sd
+                                                             << "yay"_sd))
                     << "error"
-                    << DOC_ARRAY("$setIsSubset"
-                                 << "$setDifference"));
+                    << DOC_ARRAY("$setIsSubset"_sd
+                                 << "$setDifference"_sd));
     }
 };
 
@@ -3366,8 +3370,8 @@ class ManyArgsEqual : public ExpectedResultBase {
                                                      << "$setUnion"
                                                      << DOC_ARRAY(1 << 2 << 4))
                            << "error"
-                           << DOC_ARRAY("$setIsSubset"
-                                        << "$setDifference"));
+                           << DOC_ARRAY("$setIsSubset"_sd
+                                        << "$setDifference"_sd));
     }
 };
 }  // namespace Set
@@ -3472,11 +3476,11 @@ class NullMiddleGt : public ExpectedResultBase {
 namespace StrLenBytes {
 
 TEST(ExpressionStrLenBytes, ComputesLengthOfString) {
-    assertExpectedResults("$strLenBytes", {{{Value("abc")}, Value(3)}});
+    assertExpectedResults("$strLenBytes", {{{Value("abc"_sd)}, Value(3)}});
 }
 
 TEST(ExpressionStrLenBytes, ComputesLengthOfEmptyString) {
-    assertExpectedResults("$strLenBytes", {{{Value("")}, Value(0)}});
+    assertExpectedResults("$strLenBytes", {{{Value(StringData())}, Value(0)}});
 }
 
 TEST(ExpressionStrLenBytes, ComputesLengthOfStringWithNull) {
@@ -3492,11 +3496,11 @@ TEST(ExpressionStrLenCP, ComputesLengthOfStringWithNullAtEnd) {
 namespace StrLenCP {
 
 TEST(ExpressionStrLenCP, ComputesLengthOfASCIIString) {
-    assertExpectedResults("$strLenCP", {{{Value("abc")}, Value(3)}});
+    assertExpectedResults("$strLenCP", {{{Value("abc"_sd)}, Value(3)}});
 }
 
 TEST(ExpressionStrLenCP, ComputesLengthOfEmptyString) {
-    assertExpectedResults("$strLenCP", {{{Value("")}, Value(0)}});
+    assertExpectedResults("$strLenCP", {{{Value(StringData())}, Value(0)}});
 }
 
 TEST(ExpressionStrLenCP, ComputesLengthOfStringWithNull) {
@@ -3512,7 +3516,7 @@ TEST(ExpressionStrLenCP, ComputesLengthOfStringWithAccent) {
 }
 
 TEST(ExpressionStrLenCP, ComputesLengthOfStringWithSpecialCharacters) {
-    assertExpectedResults("$strLenCP", {{{Value("ºabøåß")}, Value(6)}});
+    assertExpectedResults("$strLenCP", {{{Value("ºabøåß"_sd)}, Value(6)}});
 }
 
 }  // namespace StrLenCP
@@ -3651,7 +3655,7 @@ TEST(ExpressionSubstrCPTest, DoesThrowWithInvalidLeadingByte) {
 }
 
 TEST(ExpressionSubstrCPTest, WithStandardValue) {
-    assertExpectedResults("$substrCP", {{{Value("abc"), Value(0), Value(2)}, Value("ab")}});
+    assertExpectedResults("$substrCP", {{{Value("abc"_sd), Value(0), Value(2)}, Value("ab"_sd)}});
 }
 
 TEST(ExpressionSubstrCPTest, WithNullCharacter) {
@@ -3665,21 +3669,26 @@ TEST(ExpressionSubstrCPTest, WithNullCharacterAtEnd) {
 }
 
 TEST(ExpressionSubstrCPTest, WithOutOfRangeString) {
-    assertExpectedResults("$substrCP", {{{Value("abc"), Value(3), Value(2)}, Value("")}});
+    assertExpectedResults("$substrCP",
+                          {{{Value("abc"_sd), Value(3), Value(2)}, Value(StringData())}});
 }
 
 TEST(ExpressionSubstrCPTest, WithPartiallyOutOfRangeString) {
-    assertExpectedResults("$substrCP", {{{Value("abc"), Value(1), Value(4)}, Value("bc")}});
+    assertExpectedResults("$substrCP", {{{Value("abc"_sd), Value(1), Value(4)}, Value("bc"_sd)}});
 }
 
 TEST(ExpressionSubstrCPTest, WithUnicodeValue) {
-    assertExpectedResults("$substrCP", {{{Value("øø∫å"), Value(0), Value(4)}, Value("øø∫å")}});
-    assertExpectedResults("$substrBytes", {{{Value("øø∫å"), Value(0), Value(4)}, Value("øø")}});
+    assertExpectedResults("$substrCP",
+                          {{{Value("øø∫å"_sd), Value(0), Value(4)}, Value("øø∫å"_sd)}});
+    assertExpectedResults("$substrBytes",
+                          {{{Value("øø∫å"_sd), Value(0), Value(4)}, Value("øø"_sd)}});
 }
 
 TEST(ExpressionSubstrCPTest, WithMixedUnicodeAndASCIIValue) {
-    assertExpectedResults("$substrCP", {{{Value("a∫bøßabc"), Value(1), Value(4)}, Value("∫bøß")}});
-    assertExpectedResults("$substrBytes", {{{Value("a∫bøßabc"), Value(1), Value(4)}, Value("∫b")}});
+    assertExpectedResults("$substrCP",
+                          {{{Value("a∫bøßabc"_sd), Value(1), Value(4)}, Value("∫bøß"_sd)}});
+    assertExpectedResults("$substrBytes",
+                          {{{Value("a∫bøßabc"_sd), Value(1), Value(4)}, Value("∫b"_sd)}});
 }
 
 }  // namespace SubstrCP
@@ -3687,91 +3696,92 @@ TEST(ExpressionSubstrCPTest, WithMixedUnicodeAndASCIIValue) {
 namespace Type {
 
 TEST(ExpressionTypeTest, WithMinKeyValue) {
-    assertExpectedResults("$type", {{{Value(MINKEY)}, Value("minKey")}});
+    assertExpectedResults("$type", {{{Value(MINKEY)}, Value("minKey"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithDoubleValue) {
-    assertExpectedResults("$type", {{{Value(1.0)}, Value("double")}});
+    assertExpectedResults("$type", {{{Value(1.0)}, Value("double"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithStringValue) {
-    assertExpectedResults("$type", {{{Value("stringValue")}, Value("string")}});
+    assertExpectedResults("$type", {{{Value("stringValue"_sd)}, Value("string"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithObjectValue) {
     BSONObj objectVal = fromjson("{a: {$literal: 1}}");
-    assertExpectedResults("$type", {{{Value(objectVal)}, Value("object")}});
+    assertExpectedResults("$type", {{{Value(objectVal)}, Value("object"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithArrayValue) {
-    assertExpectedResults("$type", {{{Value(BSON_ARRAY(1 << 2))}, Value("array")}});
+    assertExpectedResults("$type", {{{Value(BSON_ARRAY(1 << 2))}, Value("array"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithBinDataValue) {
     BSONBinData binDataVal = BSONBinData("", 0, BinDataGeneral);
-    assertExpectedResults("$type", {{{Value(binDataVal)}, Value("binData")}});
+    assertExpectedResults("$type", {{{Value(binDataVal)}, Value("binData"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithUndefinedValue) {
-    assertExpectedResults("$type", {{{Value(BSONUndefined)}, Value("undefined")}});
+    assertExpectedResults("$type", {{{Value(BSONUndefined)}, Value("undefined"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithOIDValue) {
-    assertExpectedResults("$type", {{{Value(OID())}, Value("objectId")}});
+    assertExpectedResults("$type", {{{Value(OID())}, Value("objectId"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithBoolValue) {
-    assertExpectedResults("$type", {{{Value(true)}, Value("bool")}});
+    assertExpectedResults("$type", {{{Value(true)}, Value("bool"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithDateValue) {
     Date_t dateVal = BSON("" << DATENOW).firstElement().Date();
-    assertExpectedResults("$type", {{{Value(dateVal)}, Value("date")}});
+    assertExpectedResults("$type", {{{Value(dateVal)}, Value("date"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithNullValue) {
-    assertExpectedResults("$type", {{{Value(BSONNULL)}, Value("null")}});
+    assertExpectedResults("$type", {{{Value(BSONNULL)}, Value("null"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithRegexValue) {
-    assertExpectedResults("$type", {{{Value(BSONRegEx("a.b"))}, Value("regex")}});
+    assertExpectedResults("$type", {{{Value(BSONRegEx("a.b"))}, Value("regex"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithSymbolValue) {
-    assertExpectedResults("$type", {{{Value(BSONSymbol("a"))}, Value("symbol")}});
+    assertExpectedResults("$type", {{{Value(BSONSymbol("a"))}, Value("symbol"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithDBRefValue) {
-    assertExpectedResults("$type", {{{Value(BSONDBRef("", OID()))}, Value("dbPointer")}});
+    assertExpectedResults("$type", {{{Value(BSONDBRef("", OID()))}, Value("dbPointer"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithCodeWScopeValue) {
     assertExpectedResults(
-        "$type", {{{Value(BSONCodeWScope("var x = 3", BSONObj()))}, Value("javascriptWithScope")}});
+        "$type",
+        {{{Value(BSONCodeWScope("var x = 3", BSONObj()))}, Value("javascriptWithScope"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithCodeValue) {
-    assertExpectedResults("$type", {{{Value(BSONCode("var x = 3"))}, Value("javascript")}});
+    assertExpectedResults("$type", {{{Value(BSONCode("var x = 3"))}, Value("javascript"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithIntValue) {
-    assertExpectedResults("$type", {{{Value(1)}, Value("int")}});
+    assertExpectedResults("$type", {{{Value(1)}, Value("int"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithDecimalValue) {
-    assertExpectedResults("$type", {{{Value(Decimal128(0.3))}, Value("decimal")}});
+    assertExpectedResults("$type", {{{Value(Decimal128(0.3))}, Value("decimal"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithLongValue) {
-    assertExpectedResults("$type", {{{Value(1LL)}, Value("long")}});
+    assertExpectedResults("$type", {{{Value(1LL)}, Value("long"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithTimestampValue) {
-    assertExpectedResults("$type", {{{Value(Timestamp(0, 0))}, Value("timestamp")}});
+    assertExpectedResults("$type", {{{Value(Timestamp(0, 0))}, Value("timestamp"_sd)}});
 }
 
 TEST(ExpressionTypeTest, WithMaxKeyValue) {
-    assertExpectedResults("$type", {{{Value(MAXKEY)}, Value("maxKey")}});
+    assertExpectedResults("$type", {{{Value(MAXKEY)}, Value("maxKey"_sd)}});
 }
 
 }  // namespace Type
@@ -3993,8 +4003,8 @@ class FalseViaInt : public ExpectedResultBase {
 
 class Null : public ExpectedResultBase {
     Document getSpec() {
-        return DOC("input" << DOC_ARRAY(BSONNULL) << "error" << DOC_ARRAY("$allElementsTrue"
-                                                                          << "$anyElementTrue"));
+        return DOC("input" << DOC_ARRAY(BSONNULL) << "error" << DOC_ARRAY("$allElementsTrue"_sd
+                                                                          << "$anyElementTrue"_sd));
     }
 };
 

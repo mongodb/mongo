@@ -39,54 +39,54 @@ namespace mongo {
 namespace {
 
 TEST(DocumentComparatorTest, EqualToEvaluatesCorrectly) {
-    const Document doc1{{"foo", "bar"}};
-    const Document doc2{{"foo", "bar"}};
-    const Document doc3{{"foo", "baz"}};
+    const Document doc1{{"foo", "bar"_sd}};
+    const Document doc2{{"foo", "bar"_sd}};
+    const Document doc3{{"foo", "baz"_sd}};
     ASSERT_TRUE(DocumentComparator().evaluate(doc1 == doc2));
     ASSERT_FALSE(DocumentComparator().evaluate(doc1 == doc3));
 }
 
 TEST(DocumentComparatorTest, EqualToEvaluatesCorrectlyWithNonSimpleCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    const Document doc1{{"foo", "abc"}};
-    const Document doc2{{"foo", "def"}};
+    const Document doc1{{"foo", "abc"_sd}};
+    const Document doc2{{"foo", "def"_sd}};
     ASSERT_TRUE(DocumentComparator(&collator).evaluate(doc1 == doc2));
 }
 
 TEST(DocumentComparatorTest, NotEqualEvaluatesCorrectly) {
-    const Document doc1{{"foo", "bar"}};
-    const Document doc2{{"foo", "bar"}};
-    const Document doc3{{"foo", "baz"}};
+    const Document doc1{{"foo", "bar"_sd}};
+    const Document doc2{{"foo", "bar"_sd}};
+    const Document doc3{{"foo", "baz"_sd}};
     ASSERT_FALSE(DocumentComparator().evaluate(doc1 != doc2));
     ASSERT_TRUE(DocumentComparator().evaluate(doc1 != doc3));
 }
 
 TEST(DocumentComparatorTest, NotEqualEvaluatesCorrectlyWithNonSimpleCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    const Document doc1{{"foo", "abc"}};
-    const Document doc2{{"foo", "def"}};
+    const Document doc1{{"foo", "abc"_sd}};
+    const Document doc2{{"foo", "def"_sd}};
     ASSERT_FALSE(DocumentComparator(&collator).evaluate(doc1 != doc2));
 }
 
 TEST(DocumentComparatorTest, LessThanEvaluatesCorrectly) {
-    const Document doc1{{"foo", "a"}};
-    const Document doc2{{"foo", "b"}};
+    const Document doc1{{"foo", "a"_sd}};
+    const Document doc2{{"foo", "b"_sd}};
     ASSERT_TRUE(DocumentComparator().evaluate(doc1 < doc2));
     ASSERT_FALSE(DocumentComparator().evaluate(doc2 < doc1));
 }
 
 TEST(DocumentComparatorTest, LessThanEvaluatesCorrectlyWithNonSimpleCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    const Document doc1{{"foo", "za"}};
-    const Document doc2{{"foo", "yb"}};
+    const Document doc1{{"foo", "za"_sd}};
+    const Document doc2{{"foo", "yb"_sd}};
     ASSERT_TRUE(DocumentComparator(&collator).evaluate(doc1 < doc2));
     ASSERT_FALSE(DocumentComparator(&collator).evaluate(doc2 < doc1));
 }
 
 TEST(DocumentComparatorTest, LessThanOrEqualEvaluatesCorrectly) {
-    const Document doc1{{"foo", "a"}};
-    const Document doc2{{"foo", "a"}};
-    const Document doc3{{"foo", "b"}};
+    const Document doc1{{"foo", "a"_sd}};
+    const Document doc2{{"foo", "a"_sd}};
+    const Document doc3{{"foo", "b"_sd}};
     ASSERT_TRUE(DocumentComparator().evaluate(doc1 <= doc2));
     ASSERT_TRUE(DocumentComparator().evaluate(doc2 <= doc1));
     ASSERT_TRUE(DocumentComparator().evaluate(doc1 <= doc3));
@@ -95,9 +95,9 @@ TEST(DocumentComparatorTest, LessThanOrEqualEvaluatesCorrectly) {
 
 TEST(DocumentComparatorTest, LessThanOrEqualEvaluatesCorrectlyWithNonSimpleCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    const Document doc1{{"foo", "za"}};
-    const Document doc2{{"foo", "za"}};
-    const Document doc3{{"foo", "yb"}};
+    const Document doc1{{"foo", "za"_sd}};
+    const Document doc2{{"foo", "za"_sd}};
+    const Document doc3{{"foo", "yb"_sd}};
     ASSERT_TRUE(DocumentComparator(&collator).evaluate(doc1 <= doc2));
     ASSERT_TRUE(DocumentComparator(&collator).evaluate(doc2 <= doc1));
     ASSERT_TRUE(DocumentComparator(&collator).evaluate(doc1 <= doc3));
@@ -105,24 +105,24 @@ TEST(DocumentComparatorTest, LessThanOrEqualEvaluatesCorrectlyWithNonSimpleColla
 }
 
 TEST(DocumentComparatorTest, GreaterThanEvaluatesCorrectly) {
-    const Document doc1{{"foo", "b"}};
-    const Document doc2{{"foo", "a"}};
+    const Document doc1{{"foo", "b"_sd}};
+    const Document doc2{{"foo", "a"_sd}};
     ASSERT_TRUE(DocumentComparator().evaluate(doc1 > doc2));
     ASSERT_FALSE(DocumentComparator().evaluate(doc2 > doc1));
 }
 
 TEST(DocumentComparatorTest, GreaterThanEvaluatesCorrectlyWithNonSimpleCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    const Document doc1{{"foo", "yb"}};
-    const Document doc2{{"foo", "za"}};
+    const Document doc1{{"foo", "yb"_sd}};
+    const Document doc2{{"foo", "za"_sd}};
     ASSERT_TRUE(DocumentComparator(&collator).evaluate(doc1 > doc2));
     ASSERT_FALSE(DocumentComparator(&collator).evaluate(doc2 > doc1));
 }
 
 TEST(DocumentComparatorTest, GreaterThanOrEqualEvaluatesCorrectly) {
-    const Document doc1{{"foo", "b"}};
-    const Document doc2{{"foo", "b"}};
-    const Document doc3{{"foo", "a"}};
+    const Document doc1{{"foo", "b"_sd}};
+    const Document doc2{{"foo", "b"_sd}};
+    const Document doc3{{"foo", "a"_sd}};
     ASSERT_TRUE(DocumentComparator().evaluate(doc1 >= doc2));
     ASSERT_TRUE(DocumentComparator().evaluate(doc2 >= doc1));
     ASSERT_TRUE(DocumentComparator().evaluate(doc1 >= doc3));
@@ -131,9 +131,9 @@ TEST(DocumentComparatorTest, GreaterThanOrEqualEvaluatesCorrectly) {
 
 TEST(DocumentComparatorTest, GreaterThanOrEqualEvaluatesCorrectlyWithNonSimpleCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
-    const Document doc1{{"foo", "yb"}};
-    const Document doc2{{"foo", "yb"}};
-    const Document doc3{{"foo", "za"}};
+    const Document doc1{{"foo", "yb"_sd}};
+    const Document doc2{{"foo", "yb"_sd}};
+    const Document doc3{{"foo", "za"_sd}};
     ASSERT_TRUE(DocumentComparator(&collator).evaluate(doc1 >= doc2));
     ASSERT_TRUE(DocumentComparator(&collator).evaluate(doc2 >= doc1));
     ASSERT_TRUE(DocumentComparator(&collator).evaluate(doc1 >= doc3));
@@ -150,17 +150,17 @@ TEST(DocumentComparatorTest, EqualToEvaluatesCorrectlyWithNumbers) {
 
 TEST(DocumentComparatorTest, NestedObjectEqualityRespectsCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    const Document doc1{{"foo", Document{{"foo", "abc"}}}};
-    const Document doc2{{"foo", Document{{"foo", "def"}}}};
+    const Document doc1{{"foo", Document{{"foo", "abc"_sd}}}};
+    const Document doc2{{"foo", Document{{"foo", "def"_sd}}}};
     ASSERT_TRUE(DocumentComparator(&collator).evaluate(doc1 == doc2));
     ASSERT_TRUE(DocumentComparator(&collator).evaluate(doc2 == doc1));
 }
 
 TEST(DocumentComparatorTest, NestedArrayEqualityRespectsCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
-    const Document doc1{{"foo", std::vector<Value>{Value("a"), Value("b")}}};
-    const Document doc2{{"foo", std::vector<Value>{Value("c"), Value("d")}}};
-    const Document doc3{{"foo", std::vector<Value>{Value("c"), Value("d"), Value("e")}}};
+    const Document doc1{{"foo", std::vector<Value>{Value("a"_sd), Value("b"_sd)}}};
+    const Document doc2{{"foo", std::vector<Value>{Value("c"_sd), Value("d"_sd)}}};
+    const Document doc3{{"foo", std::vector<Value>{Value("c"_sd), Value("d"_sd), Value("e"_sd)}}};
     ASSERT_TRUE(DocumentComparator(&collator).evaluate(doc1 == doc2));
     ASSERT_TRUE(DocumentComparator(&collator).evaluate(doc2 == doc1));
     ASSERT_FALSE(DocumentComparator(&collator).evaluate(doc1 == doc3));

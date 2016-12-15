@@ -56,9 +56,9 @@ const char* DocumentSourceRedact::getSourceName() const {
     return "$redact";
 }
 
-static const Value descendVal = Value("descend");
-static const Value pruneVal = Value("prune");
-static const Value keepVal = Value("keep");
+static const Value descendVal = Value("descend"_sd);
+static const Value pruneVal = Value("prune"_sd);
+static const Value keepVal = Value("keep"_sd);
 
 DocumentSource::GetNextResult DocumentSourceRedact::getNext() {
     auto nextInput = pSource->getNext();

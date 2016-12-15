@@ -249,12 +249,12 @@ TEST(InclusionProjectionExecutionTest, ShouldAddComputedTopLevelField) {
     ParsedInclusionProjection inclusion;
     inclusion.parse(BSON("newField" << wrapInLiteral("computedVal")));
     auto result = inclusion.applyProjection(Document{});
-    auto expectedResult = Document{{"newField", "computedVal"}};
+    auto expectedResult = Document{{"newField", "computedVal"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Computed field should replace existing field.
-    result = inclusion.applyProjection(Document{{"newField", "preExisting"}});
-    expectedResult = Document{{"newField", "computedVal"}};
+    result = inclusion.applyProjection(Document{{"newField", "preExisting"_sd}});
+    expectedResult = Document{{"newField", "computedVal"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -262,7 +262,7 @@ TEST(InclusionProjectionExecutionTest, ShouldApplyBothInclusionsAndComputedField
     ParsedInclusionProjection inclusion;
     inclusion.parse(BSON("a" << true << "newField" << wrapInLiteral("computedVal")));
     auto result = inclusion.applyProjection(Document{{"a", 1}});
-    auto expectedResult = Document{{"a", 1}, {"newField", "computedVal"}};
+    auto expectedResult = Document{{"a", 1}, {"newField", "computedVal"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -279,43 +279,44 @@ TEST(InclusionProjectionExecutionTest, ShouldApplyComputedFieldsInOrderSpecified
     inclusion.parse(BSON("firstComputed" << wrapInLiteral("FIRST") << "secondComputed"
                                          << wrapInLiteral("SECOND")));
     auto result = inclusion.applyProjection(Document{{"first", 0}, {"second", 1}, {"third", 2}});
-    auto expectedResult = Document{{"firstComputed", "FIRST"}, {"secondComputed", "SECOND"}};
+    auto expectedResult = Document{{"firstComputed", "FIRST"_sd}, {"secondComputed", "SECOND"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldImplicitlyIncludeId) {
     ParsedInclusionProjection inclusion;
     inclusion.parse(BSON("a" << true));
-    auto result = inclusion.applyProjection(Document{{"_id", "ID"}, {"a", 1}, {"b", 2}});
-    auto expectedResult = Document{{"_id", "ID"}, {"a", 1}};
+    auto result = inclusion.applyProjection(Document{{"_id", "ID"_sd}, {"a", 1}, {"b", 2}});
+    auto expectedResult = Document{{"_id", "ID"_sd}, {"a", 1}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Should leave the "_id" in the same place as in the original document.
-    result = inclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"}});
-    expectedResult = Document{{"a", 1}, {"_id", "ID"}};
+    result = inclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}});
+    expectedResult = Document{{"a", 1}, {"_id", "ID"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldImplicitlyIncludeIdWithComputedFields) {
     ParsedInclusionProjection inclusion;
     inclusion.parse(BSON("newField" << wrapInLiteral("computedVal")));
-    auto result = inclusion.applyProjection(Document{{"_id", "ID"}, {"a", 1}});
-    auto expectedResult = Document{{"_id", "ID"}, {"newField", "computedVal"}};
+    auto result = inclusion.applyProjection(Document{{"_id", "ID"_sd}, {"a", 1}});
+    auto expectedResult = Document{{"_id", "ID"_sd}, {"newField", "computedVal"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldIncludeIdIfExplicitlyIncluded) {
     ParsedInclusionProjection inclusion;
     inclusion.parse(BSON("a" << true << "_id" << true << "b" << true));
-    auto result = inclusion.applyProjection(Document{{"_id", "ID"}, {"a", 1}, {"b", 2}, {"c", 3}});
-    auto expectedResult = Document{{"_id", "ID"}, {"a", 1}, {"b", 2}};
+    auto result =
+        inclusion.applyProjection(Document{{"_id", "ID"_sd}, {"a", 1}, {"b", 2}, {"c", 3}});
+    auto expectedResult = Document{{"_id", "ID"_sd}, {"a", 1}, {"b", 2}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
 TEST(InclusionProjectionExecutionTest, ShouldExcludeIdIfExplicitlyExcluded) {
     ParsedInclusionProjection inclusion;
     inclusion.parse(BSON("a" << true << "_id" << false));
-    auto result = inclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"}});
+    auto result = inclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}});
     auto expectedResult = Document{{"a", 1}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -323,8 +324,8 @@ TEST(InclusionProjectionExecutionTest, ShouldExcludeIdIfExplicitlyExcluded) {
 TEST(InclusionProjectionExecutionTest, ShouldReplaceIdWithComputedId) {
     ParsedInclusionProjection inclusion;
     inclusion.parse(BSON("_id" << wrapInLiteral("newId")));
-    auto result = inclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"}});
-    auto expectedResult = Document{{"_id", "newId"}};
+    auto result = inclusion.applyProjection(Document{{"a", 1}, {"b", 2}, {"_id", "ID"_sd}});
+    auto expectedResult = Document{{"_id", "newId"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -367,7 +368,7 @@ TEST(InclusionProjectionExecutionTest, ShouldNotCreateSubDocIfDottedIncludedFiel
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Should not replace the first part of the path if that part exists.
-    result = inclusion.applyProjection(Document{{"sub", "notADocument"}});
+    result = inclusion.applyProjection(Document{{"sub", "notADocument"_sd}});
     expectedResult = Document{};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
@@ -402,17 +403,17 @@ TEST(InclusionProjectionExecutionTest, ShouldAddComputedDottedFieldToSubDocument
 
     // Other fields exist in sub document, one of which is the specified field.
     auto result = inclusion.applyProjection(Document{{"sub", Document{{"target", 1}, {"c", 2}}}});
-    auto expectedResult = Document{{"sub", Document{{"target", "computedVal"}}}};
+    auto expectedResult = Document{{"sub", Document{{"target", "computedVal"_sd}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Specified field is not present in the sub document.
     result = inclusion.applyProjection(Document{{"sub", Document{{"c", 1}}}});
-    expectedResult = Document{{"sub", Document{{"target", "computedVal"}}}};
+    expectedResult = Document{{"sub", Document{{"target", "computedVal"_sd}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // There are no fields in sub document.
     result = inclusion.applyProjection(Document{{"sub", Document{}}});
-    expectedResult = Document{{"sub", Document{{"target", "computedVal"}}}};
+    expectedResult = Document{{"sub", Document{{"target", "computedVal"_sd}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -422,11 +423,11 @@ TEST(InclusionProjectionExecutionTest, ShouldCreateSubDocIfDottedComputedFieldDo
 
     // Should add the path if it doesn't exist.
     auto result = inclusion.applyProjection(Document{});
-    auto expectedResult = Document{{"sub", Document{{"target", "computedVal"}}}};
+    auto expectedResult = Document{{"sub", Document{{"target", "computedVal"_sd}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Should replace non-documents with documents.
-    result = inclusion.applyProjection(Document{{"sub", "notADocument"}});
+    result = inclusion.applyProjection(Document{{"sub", "notADocument"_sd}});
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -437,11 +438,11 @@ TEST(InclusionProjectionExecutionTest, ShouldCreateNestedSubDocumentsAllTheWayTo
     // Should add the path if it doesn't exist.
     auto result = inclusion.applyProjection(Document{});
     auto expectedResult =
-        Document{{"a", Document{{"b", Document{{"c", Document{{"d", "computedVal"}}}}}}}};
+        Document{{"a", Document{{"b", Document{{"c", Document{{"d", "computedVal"_sd}}}}}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     // Should replace non-documents with documents.
-    result = inclusion.applyProjection(Document{{"a", Document{{"b", "other"}}}});
+    result = inclusion.applyProjection(Document{{"a", Document{{"b", "other"_sd}}}});
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -455,13 +456,14 @@ TEST(InclusionProjectionExecutionTest, ShouldAddComputedDottedFieldToEachElement
                                   Value(Document{{"b", 1}, {"c", 2}}),
                                   Value(vector<Value>{}),
                                   Value(vector<Value>{Value(1), Value(Document{{"c", 1}})})};
-    vector<Value> expectedNestedValues = {Value(Document{{"b", "COMPUTED"}}),
-                                          Value(Document{{"b", "COMPUTED"}}),
-                                          Value(Document{{"b", "COMPUTED"}}),
-                                          Value(Document{{"b", "COMPUTED"}}),
-                                          Value(vector<Value>{}),
-                                          Value(vector<Value>{Value(Document{{"b", "COMPUTED"}}),
-                                                              Value(Document{{"b", "COMPUTED"}})})};
+    vector<Value> expectedNestedValues = {
+        Value(Document{{"b", "COMPUTED"_sd}}),
+        Value(Document{{"b", "COMPUTED"_sd}}),
+        Value(Document{{"b", "COMPUTED"_sd}}),
+        Value(Document{{"b", "COMPUTED"_sd}}),
+        Value(vector<Value>{}),
+        Value(vector<Value>{Value(Document{{"b", "COMPUTED"_sd}}),
+                            Value(Document{{"b", "COMPUTED"_sd}})})};
     auto result = inclusion.applyProjection(Document{{"a", nestedValues}});
     auto expectedResult = Document{{"a", expectedNestedValues}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
@@ -476,19 +478,19 @@ TEST(InclusionProjectionExecutionTest, ShouldApplyInclusionsAndAdditionsToEachEl
                                   Value(Document{{"inc", 1}}),
                                   Value(Document{{"inc", 1}, {"c", 2}}),
                                   Value(Document{{"c", 2}, {"inc", 1}}),
-                                  Value(Document{{"inc", 1}, {"c", 2}, {"comp", "original"}}),
+                                  Value(Document{{"inc", 1}, {"c", 2}, {"comp", "original"_sd}}),
                                   Value(vector<Value>{}),
                                   Value(vector<Value>{Value(1), Value(Document{{"inc", 1}})})};
     vector<Value> expectedNestedValues = {
-        Value(Document{{"comp", "COMPUTED"}}),
-        Value(Document{{"comp", "COMPUTED"}}),
-        Value(Document{{"inc", 1}, {"comp", "COMPUTED"}}),
-        Value(Document{{"inc", 1}, {"comp", "COMPUTED"}}),
-        Value(Document{{"inc", 1}, {"comp", "COMPUTED"}}),
-        Value(Document{{"inc", 1}, {"comp", "COMPUTED"}}),
+        Value(Document{{"comp", "COMPUTED"_sd}}),
+        Value(Document{{"comp", "COMPUTED"_sd}}),
+        Value(Document{{"inc", 1}, {"comp", "COMPUTED"_sd}}),
+        Value(Document{{"inc", 1}, {"comp", "COMPUTED"_sd}}),
+        Value(Document{{"inc", 1}, {"comp", "COMPUTED"_sd}}),
+        Value(Document{{"inc", 1}, {"comp", "COMPUTED"_sd}}),
         Value(vector<Value>{}),
-        Value(vector<Value>{Value(Document{{"comp", "COMPUTED"}}),
-                            Value(Document{{"inc", 1}, {"comp", "COMPUTED"}})})};
+        Value(vector<Value>{Value(Document{{"comp", "COMPUTED"_sd}}),
+                            Value(Document{{"inc", 1}, {"comp", "COMPUTED"_sd}})})};
     auto result = inclusion.applyProjection(Document{{"a", nestedValues}});
     auto expectedResult = Document{{"a", expectedNestedValues}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
@@ -498,7 +500,7 @@ TEST(InclusionProjectionExecutionTest, ShouldAddOrIncludeSubFieldsOfId) {
     ParsedInclusionProjection inclusion;
     inclusion.parse(BSON("_id.X" << true << "_id.Z" << wrapInLiteral("NEW")));
     auto result = inclusion.applyProjection(Document{{"_id", Document{{"X", 1}, {"Y", 2}}}});
-    auto expectedResult = Document{{"_id", Document{{"X", 1}, {"Z", "NEW"}}}};
+    auto expectedResult = Document{{"_id", Document{{"X", 1}, {"Z", "NEW"_sd}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -511,17 +513,18 @@ TEST(InclusionProjectionExecutionTest, ShouldAllowMixedNestedAndDottedFields) {
               << "a"
               << BSON("d" << true << "e" << true << "Y" << wrapInLiteral("Y") << "Z"
                           << wrapInLiteral("Z"))));
-    auto result = inclusion.applyProjection(
-        Document{{"a", Document{{"b", "b"}, {"c", "c"}, {"d", "d"}, {"e", "e"}, {"f", "f"}}}});
+    auto result = inclusion.applyProjection(Document{
+        {"a",
+         Document{{"b", "b"_sd}, {"c", "c"_sd}, {"d", "d"_sd}, {"e", "e"_sd}, {"f", "f"_sd}}}});
     auto expectedResult = Document{{"a",
-                                    Document{{"b", "b"},
-                                             {"c", "c"},
-                                             {"d", "d"},
-                                             {"e", "e"},
-                                             {"W", "W"},
-                                             {"X", "X"},
-                                             {"Y", "Y"},
-                                             {"Z", "Z"}}}};
+                                    Document{{"b", "b"_sd},
+                                             {"c", "c"_sd},
+                                             {"d", "d"_sd},
+                                             {"e", "e"_sd},
+                                             {"W", "W"_sd},
+                                             {"X", "X"_sd},
+                                             {"Y", "Y"_sd},
+                                             {"Z", "Z"_sd}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -529,7 +532,7 @@ TEST(InclusionProjectionExecutionTest, ShouldApplyNestedComputedFieldsInOrderSpe
     ParsedInclusionProjection inclusion;
     inclusion.parse(BSON("a" << wrapInLiteral("FIRST") << "b.c" << wrapInLiteral("SECOND")));
     auto result = inclusion.applyProjection(Document{});
-    auto expectedResult = Document{{"a", "FIRST"}, {"b", Document{{"c", "SECOND"}}}};
+    auto expectedResult = Document{{"a", "FIRST"_sd}, {"b", Document{{"c", "SECOND"_sd}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -537,7 +540,7 @@ TEST(InclusionProjectionExecutionTest, ShouldApplyComputedFieldsAfterAllInclusio
     ParsedInclusionProjection inclusion;
     inclusion.parse(BSON("b.c" << wrapInLiteral("NEW") << "a" << true));
     auto result = inclusion.applyProjection(Document{{"a", 1}});
-    auto expectedResult = Document{{"a", 1}, {"b", Document{{"c", "NEW"}}}};
+    auto expectedResult = Document{{"a", 1}, {"b", Document{{"c", "NEW"_sd}}}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     result = inclusion.applyProjection(Document{{"a", 1}, {"b", 4}});
@@ -548,7 +551,7 @@ TEST(InclusionProjectionExecutionTest, ShouldApplyComputedFieldsAfterAllInclusio
     // inconsistent, but the expected behavior, and a consequence of applying the projection
     // recursively to each sub-document.
     result = inclusion.applyProjection(Document{{"b", 4}, {"a", 1}});
-    expectedResult = Document{{"b", Document{{"c", "NEW"}}}, {"a", 1}};
+    expectedResult = Document{{"b", Document{{"c", "NEW"_sd}}}, {"a", 1}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
@@ -556,7 +559,7 @@ TEST(InclusionProjectionExecutionTest, ComputedFieldReplacingExistingShouldAppea
     ParsedInclusionProjection inclusion;
     inclusion.parse(BSON("b" << wrapInLiteral("NEW") << "a" << true));
     auto result = inclusion.applyProjection(Document{{"b", 1}, {"a", 1}});
-    auto expectedResult = Document{{"a", 1}, {"b", "NEW"}};
+    auto expectedResult = Document{{"a", 1}, {"b", "NEW"_sd}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 
     result = inclusion.applyProjection(Document{{"a", 1}, {"b", 4}});

@@ -683,21 +683,21 @@ class GroupNullUndefinedIds : public CheckResultsBase {
 class ComplexId : public CheckResultsBase {
     deque<DocumentSource::GetNextResult> inputData() {
         return {DOC("a"
-                    << "de"
+                    << "de"_sd
                     << "b"
-                    << "ad"
+                    << "ad"_sd
                     << "c"
-                    << "beef"
+                    << "beef"_sd
                     << "d"
-                    << ""),
+                    << ""_sd),
                 DOC("a"
-                    << "d"
+                    << "d"_sd
                     << "b"
-                    << "eadbe"
+                    << "eadbe"_sd
                     << "c"
-                    << ""
+                    << ""_sd
                     << "d"
-                    << "ef")};
+                    << "ef"_sd)};
     }
     virtual BSONObj groupSpec() {
         return BSON("_id" << BSON("$concat" << BSON_ARRAY("$a"
@@ -932,7 +932,7 @@ public:
         ASSERT_TRUE(res.isAdvanced());
         ASSERT_VALUE_EQ(res.getDocument().getField("_id")["sub"]["x"], Value(5));
         ASSERT_VALUE_EQ(res.getDocument().getField("_id")["sub"]["y"], Value(1));
-        ASSERT_VALUE_EQ(res.getDocument().getField("_id")["sub"]["z"], Value("c"));
+        ASSERT_VALUE_EQ(res.getDocument().getField("_id")["sub"]["z"], Value("c"_sd));
 
         ASSERT_TRUE(group()->isStreaming());
 

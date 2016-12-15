@@ -175,18 +175,18 @@ TEST(LookupSetCacheTest, CacheKeysRespectCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
     LookupSetCache cache(&collator);
 
-    cache.insert(Value("foo"), intToObj(1));
-    cache.insert(Value("FOO"), intToObj(2));
-    cache.insert(Value("FOOz"), intToObj(3));
+    cache.insert(Value("foo"_sd), intToObj(1));
+    cache.insert(Value("FOO"_sd), intToObj(2));
+    cache.insert(Value("FOOz"_sd), intToObj(3));
 
     {
-        auto fooResult = cache[Value("FoO")];
+        auto fooResult = cache[Value("FoO"_sd)];
         ASSERT_TRUE(fooResult);
         ASSERT_EQ(2U, fooResult->size());
     }
 
     {
-        auto foozResult = cache[Value("fooZ")];
+        auto foozResult = cache[Value("fooZ"_sd)];
         ASSERT_TRUE(foozResult);
         ASSERT_EQ(1U, foozResult->size());
     }
@@ -198,14 +198,14 @@ TEST(LookupSetCacheTest, CachedValuesDontRespectCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
     LookupSetCache cache(&collator);
 
-    cache.insert(Value("foo"),
+    cache.insert(Value("foo"_sd),
                  BSON("foo"
                       << "bar"));
-    cache.insert(Value("foo"),
+    cache.insert(Value("foo"_sd),
                  BSON("foo"
                       << "BAR"));
 
-    auto fooResult = cache[Value("foo")];
+    auto fooResult = cache[Value("foo"_sd)];
     ASSERT_TRUE(fooResult);
     ASSERT_EQ(2U, fooResult->size());
 }

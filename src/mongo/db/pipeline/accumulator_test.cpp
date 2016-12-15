@@ -220,7 +220,7 @@ TEST(Accumulators, MinRespectsCollation) {
     intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
     expCtx->setCollator(
         stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
-    assertExpectedResults("$min", expCtx, {{{Value("abc"), Value("cba")}, Value("cba")}});
+    assertExpectedResults("$min", expCtx, {{{Value("abc"_sd), Value("cba"_sd)}, Value("cba"_sd)}});
 }
 
 TEST(Accumulators, Max) {
@@ -246,7 +246,7 @@ TEST(Accumulators, MaxRespectsCollation) {
     intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
     expCtx->setCollator(
         stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString));
-    assertExpectedResults("$max", expCtx, {{{Value("abc"), Value("cba")}, Value("abc")}});
+    assertExpectedResults("$max", expCtx, {{{Value("abc"_sd), Value("cba"_sd)}, Value("abc"_sd)}});
 }
 
 TEST(Accumulators, Sum) {
@@ -343,10 +343,10 @@ TEST(Accumulators, AddToSetRespectsCollation) {
     intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext());
     expCtx->setCollator(
         stdx::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kAlwaysEqual));
-    assertExpectedResults(
-        "$addToSet",
-        expCtx,
-        {{{Value("a"), Value("b"), Value("c")}, Value(std::vector<Value>{Value("a")})}});
+    assertExpectedResults("$addToSet",
+                          expCtx,
+                          {{{Value("a"_sd), Value("b"_sd), Value("c"_sd)},
+                            Value(std::vector<Value>{Value("a"_sd)})}});
 }
 
 }  // namespace AccumulatorTests

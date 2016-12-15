@@ -523,7 +523,7 @@ TEST(GranularityRounderPreferredNumbersTest, ShouldFailOnRoundingNonNumericValue
         auto rounder = GranularityRounder::getGranularityRounder(series);
 
         // Make sure that each GranularityRounder fails when rounding a non-numeric value.
-        Value stringValue = Value("test");
+        Value stringValue = Value("test"_sd);
         ASSERT_THROWS_CODE(rounder->roundUp(stringValue), UserException, 40262);
         ASSERT_THROWS_CODE(rounder->roundDown(stringValue), UserException, 40262);
     }
