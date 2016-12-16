@@ -13,8 +13,7 @@
  *	Alter a file.
  */
 static int
-__alter_file(
-    WT_SESSION_IMPL *session, const char *uri, const char *newcfg[])
+__alter_file(WT_SESSION_IMPL *session, const char *uri, const char *newcfg[])
 {
 	WT_DECL_RET;
 	const char *cfg[4], *filename;
