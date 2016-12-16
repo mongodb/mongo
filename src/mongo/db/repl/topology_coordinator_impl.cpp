@@ -193,7 +193,8 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
             _syncSource = HostAndPort();
             return _syncSource;
         } else if (_memberIsBlacklisted(*_currentPrimaryMember(), now)) {
-            LOG(1) << "Cannot select primary member as sync source because they are blacklisted:"
+            LOG(1) << "Cannot select a sync source because chaining is not allowed and primary "
+                      "member is blacklisted: "
                    << _currentPrimaryMember()->getHostAndPort();
             _syncSource = HostAndPort();
             return _syncSource;
@@ -267,11 +268,11 @@ HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now,
                 continue;
             }
 
-            // Things to skip on the first attempt.
+            // On the first attempt, we skip candidates that do not match these criteria.
             if (attempts == 0) {
                 // Candidate must be a voter if we are a voter.
                 if (_selfConfig().isVoter() && !itMemberConfig.isVoter()) {
-                    LOG(2) << "Cannot select sync source because of voting differences: "
+                    LOG(2) << "Cannot select sync source because we are a voter and it is not: "
                            << itMemberConfig.getHostAndPort();
                     continue;
                 }
@@ -2419,17 +2420,25 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
 
     // If the user requested a sync source change, return true.
     if (_forceSyncSourceIndex != -1) {
+        log() << "Choosing new sync source because the user has requested to use "
+              << _rsConfig.getMemberAt(_forceSyncSourceIndex).getHostAndPort()
+              << " as a sync source";
         return true;
     }
 
     if (_rsConfig.getProtocolVersion() == 1 &&
         metadata.getConfigVersion() != _rsConfig.getConfigVersion()) {
+        log() << "Choosing new sync source because the config version supplied by " << currentSource
+              << ", " << metadata.getConfigVersion() << ", does not match ours, "
+              << _rsConfig.getConfigVersion();
         return true;
     }
 
     const int currentSourceIndex = _rsConfig.findMemberIndexByHostAndPort(currentSource);
     // PV0 doesn't use metadata, we have to consult _rsConfig.
     if (currentSourceIndex == -1) {
+        log() << "Choosing new sync source because " << currentSource.toString()
+              << " is not in our config";
         return true;
     }
 
@@ -2448,6 +2457,18 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
     // unless they are primary.
     if (_rsConfig.getProtocolVersion() == 1 && metadata.getSyncSourceIndex() == -1 &&
         currentSourceOpTime <= myLastOpTime && metadata.getPrimaryIndex() != currentSourceIndex) {
+        std::stringstream logMessage;
+        logMessage << "Choosing new sync source because our current sync source, "
+                   << currentSource.toString() << ", has an OpTime (" << currentSourceOpTime
+                   << ") which is not ahead of ours (" << myLastOpTime
+                   << "), it does not have a sync source, and it's not the primary";
+        if (metadata.getPrimaryIndex() >= 0) {
+            logMessage << " (" << _rsConfig.getMemberAt(metadata.getPrimaryIndex()).getHostAndPort()
+                       << " is)";
+        } else {
+            logMessage << " (sync source does not know the primary)";
+        }
+        log() << logMessage.str();
         return true;
     }
 
@@ -2462,9 +2483,9 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
             (candidateConfig.shouldBuildIndexes() || !_selfConfig().shouldBuildIndexes()) &&
             it->getState().readable() && !_memberIsBlacklisted(candidateConfig, now) &&
             goalSecs < it->getAppliedOpTime().getSecs()) {
-            log() << "re-evaluating sync source because our current sync source's most recent "
-                  << "OpTime is " << currentSourceOpTime.toString() << " which is more than "
-                  << _options.maxSyncSourceLagSecs << " behind member "
+            log() << "Choosing new sync source because the most recent OpTime of our sync source, "
+                  << currentSource << ", is " << currentSourceOpTime.toString()
+                  << " which is more than " << _options.maxSyncSourceLagSecs << " behind member "
                   << candidateConfig.getHostAndPort().toString() << " whose most recent OpTime is "
                   << it->getAppliedOpTime().toString();
             invariant(itIndex != _selfIndex);

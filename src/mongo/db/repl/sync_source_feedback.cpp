@@ -72,8 +72,17 @@ Reporter::PrepareReplSetUpdatePositionCommandFn makePrepareReplSetUpdatePosition
                                                commandStyle) -> StatusWith<BSONObj> {
         auto currentSyncTarget = bgsync->getSyncTarget();
         if (currentSyncTarget != syncTarget) {
-            // Change in sync target
-            return Status(ErrorCodes::InvalidSyncSource, "Sync target is no longer valid");
+            if (currentSyncTarget.empty()) {
+                // Sync source was cleared.
+                return Status(ErrorCodes::InvalidSyncSource,
+                              str::stream() << "Sync source was cleared. Was " << syncTarget);
+
+            } else {
+                // Sync source changed.
+                return Status(ErrorCodes::InvalidSyncSource,
+                              str::stream() << "Sync source changed from " << syncTarget << " to "
+                                            << currentSyncTarget);
+            }
         }
 
         stdx::lock_guard<stdx::mutex> lock(mtx);

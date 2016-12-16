@@ -417,8 +417,9 @@ void BackgroundSync::_produce(OperationContext* txn) {
         fassertFailedWithStatus(34440, exceptionToStatus());
     }
 
-    LOG(1) << "scheduling fetcher to read remote oplog on " << _syncSourceHost << " starting at "
-           << oplogFetcher->getCommandObject_forTest()["filter"];
+    const auto logLevel = Command::testCommandsEnabled ? 0 : 1;
+    LOG(logLevel) << "scheduling fetcher to read remote oplog on " << _syncSourceHost
+                  << " starting at " << oplogFetcher->getCommandObject_forTest()["filter"];
     auto scheduleStatus = oplogFetcher->startup();
     if (!scheduleStatus.isOK()) {
         warning() << "unable to schedule fetcher to read remote oplog on " << source << ": "
@@ -731,31 +732,32 @@ long long BackgroundSync::_readLastAppliedHash(OperationContext* txn) {
 
 bool BackgroundSync::shouldStopFetching() const {
     if (inShutdown()) {
-        LOG(2) << "Interrupted by shutdown while checking sync source.";
+        LOG(2) << "Stopping oplog fetcher due to shutdown.";
         return true;
     }
 
     // If we are transitioning to primary state, we need to stop fetching in order to go into
     // bgsync-stop mode.
     if (_replCoord->isWaitingForApplierToDrain()) {
-        LOG(2) << "Interrupted by waiting for applier to drain while checking sync source.";
+        LOG(2) << "Stopping oplog fetcher because we are waiting for the applier to drain.";
         return true;
     }
 
     if (_replCoord->getMemberState().primary() && !_replCoord->isCatchingUp()) {
-        LOG(2) << "Interrupted by becoming primary while checking sync source.";
+        LOG(2) << "Stopping oplog fetcher because we are primary.";
         return true;
     }
 
     // Check if we have been stopped.
     if (isStopped()) {
-        LOG(2) << "Interrupted by a stop request while checking sync source.";
+        LOG(2) << "Stopping oplog fetcher due to stop request.";
         return true;
     }
 
-    // Check current sync target.
+    // Check current sync source.
     if (getSyncTarget().empty()) {
-        LOG(1) << "Canceling oplog query because we have no valid sync source.";
+        LOG(1) << "Stopping oplog fetcher; canceling oplog query because we have no valid sync "
+                  "source.";
         return true;
     }
 

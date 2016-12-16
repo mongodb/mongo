@@ -5392,7 +5392,7 @@ TEST_F(HeartbeatResponseTest, ShouldNotChangeSyncSourceWhenNodeIsFreshByHeartbea
     ASSERT_FALSE(
         getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"), OpTime(), metadata, now()));
     stopCapturingLogMessages();
-    ASSERT_EQUALS(0, countLogLinesContaining("re-evaluating sync source"));
+    ASSERT_EQUALS(0, countLogLinesContaining("Choosing new sync source"));
 }
 
 TEST_F(HeartbeatResponseTest, ShouldNotChangeSyncSourceWhenNodeIsStaleByHeartbeatButNotMetadata) {
@@ -5426,7 +5426,7 @@ TEST_F(HeartbeatResponseTest, ShouldNotChangeSyncSourceWhenNodeIsStaleByHeartbea
     ASSERT_FALSE(
         getTopoCoord().shouldChangeSyncSource(HostAndPort("host2"), OpTime(), metadata, now()));
     stopCapturingLogMessages();
-    ASSERT_EQUALS(0, countLogLinesContaining("re-evaluating sync source"));
+    ASSERT_EQUALS(0, countLogLinesContaining("Choosing new sync source"));
 }
 
 TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceWhenFresherMemberExists) {
@@ -5458,7 +5458,7 @@ TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceWhenFresherMemberExists) {
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host2"), OpTime(), makeMetadata(), now()));
     stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countLogLinesContaining("re-evaluating sync source"));
+    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
 }
 
 TEST_F(HeartbeatResponseTest, ShouldNotChangeSyncSourceWhileFresherMemberIsBlackListed) {
@@ -5503,7 +5503,7 @@ TEST_F(HeartbeatResponseTest, ShouldNotChangeSyncSourceWhileFresherMemberIsBlack
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host2"), OpTime(), makeMetadata(), now()));
     stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countLogLinesContaining("re-evaluating sync source"));
+    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
 }
 
 TEST_F(HeartbeatResponseTest, ShouldNotChangeSyncSourceWhenFresherMemberIsDown) {
@@ -5663,7 +5663,7 @@ TEST_F(HeartbeatResponseTest,
     ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
         HostAndPort("host2"), OpTime(), makeMetadata(), now()));
     stopCapturingLogMessages();
-    ASSERT_EQUALS(1, countLogLinesContaining("re-evaluating sync source"));
+    ASSERT_EQUALS(1, countLogLinesContaining("Choosing new sync source"));
 }
 
 TEST_F(TopoCoordTest, ShouldNotStandForElectionWhileAwareOfPrimary) {

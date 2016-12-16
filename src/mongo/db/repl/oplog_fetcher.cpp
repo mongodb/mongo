@@ -510,8 +510,10 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
     if (_dataReplicatorExternalState->shouldStopFetching(_fetcher->getSource(), metadata)) {
         _finishCallback(Status(ErrorCodes::InvalidSyncSource,
                                str::stream() << "sync source " << _fetcher->getSource().toString()
-                                             << " (last optime: "
+                                             << " (last visible optime: "
                                              << metadata.getLastOpVisible().toString()
+                                             << "; config version: "
+                                             << metadata.getConfigVersion()
                                              << "; sync source index: "
                                              << metadata.getSyncSourceIndex()
                                              << "; primary index: "
