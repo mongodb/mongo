@@ -283,7 +283,7 @@ void ReplicationCoordinatorImpl::_recoverFromElectionTie(
     if (!status.isOK()) {
         LOG(2) << "ReplicationCoordinatorImpl::_recoverFromElectionTie -- " << status.reason();
     } else {
-        fassertStatusOK(28817, _topCoord->becomeCandidateIfElectable(now, lastOpApplied));
+        fassertStatusOK(28817, _topCoord->becomeCandidateIfElectable(now, lastOpApplied, false));
         _startElectSelf();
     }
 }

@@ -474,7 +474,9 @@ public:
     /**
      * Transitions to the candidate role if the node is electable.
      */
-    virtual Status becomeCandidateIfElectable(const Date_t now, const OpTime& lastOpApplied) = 0;
+    virtual Status becomeCandidateIfElectable(const Date_t now,
+                                              const OpTime& lastOpApplied,
+                                              bool isPriorityTakeover) = 0;
 
     /**
      * Updates the storage engine read committed support in the TopologyCoordinator options after

@@ -3839,7 +3839,7 @@ TEST_F(HeartbeatResponseTestV1,
     ASSERT_NO_ACTION(nextAction.getAction());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     // We are electable now.
-    ASSERT_OK(getTopoCoord().becomeCandidateIfElectable(now(), lastOpTimeApplied));
+    ASSERT_OK(getTopoCoord().becomeCandidateIfElectable(now(), lastOpTimeApplied, false));
     ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
 }
 
@@ -3871,7 +3871,7 @@ TEST_F(HeartbeatResponseTestV1, ScheduleElectionWhenPrimaryIsMarkedDownAndWeAreE
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     // We are electable now.
-    ASSERT_OK(getTopoCoord().becomeCandidateIfElectable(now(), lastOpTimeApplied));
+    ASSERT_OK(getTopoCoord().becomeCandidateIfElectable(now(), lastOpTimeApplied, false));
     ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
 }
 
