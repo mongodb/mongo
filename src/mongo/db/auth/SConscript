@@ -190,8 +190,30 @@ env.CppUnitTest('authorization_manager_test', 'authorization_manager_test.cpp',
                     'authcore',
                     'authmocks',
                     'saslauth'])
-env.CppUnitTest('authorization_session_test', 'authorization_session_test.cpp',
-                LIBDEPS=['authcore', 'authmocks', 'saslauth'])
+
+env.Library(
+    target='authorization_session_for_test',
+    source=[
+        'authorization_session_for_test.cpp',
+    ],
+    LIBDEPS=[
+        'authcore',
+    ]
+)
+
+env.CppUnitTest(
+    target='authorization_session_test',
+    source=[
+        'authorization_session_test.cpp',
+    ],
+    LIBDEPS=[
+        'authcore',
+        'authmocks',
+        'saslauth',
+        'authorization_session_for_test',
+    ]
+)
+
 env.CppUnitTest('sasl_scramsha1_test',
                 'sasl_scramsha1_test.cpp',
                 LIBDEPS=[

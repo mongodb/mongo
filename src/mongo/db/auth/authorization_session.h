@@ -276,15 +276,24 @@ public:
     // called.
     bool isImpersonating() const;
 
+protected:
+    // Builds a vector of all roles held by users who are authenticated on this connection. The
+    // vector is stored in _authenticatedRoleNames. This function is called when users are
+    // logged in or logged out, as well as when the user cache is determined to be out of date.
+    void _buildAuthenticatedRolesVector();
+
+    // All Users who have been authenticated on this connection.
+    UserSet _authenticatedUsers;
+
+    // The roles of the authenticated users. This vector is generated when the authenticated
+    // users set is changed.
+    std::vector<RoleName> _authenticatedRoleNames;
+
 private:
     // If any users authenticated on this session are marked as invalid this updates them with
     // up-to-date information. May require a read lock on the "admin" db to read the user data.
     void _refreshUserInfoAsNeeded(OperationContext* txn);
 
-    // Builds a vector of all roles held by users who are authenticated on this connection. The
-    // vector is stored in _authenticatedRoleNames. This function is called when users are
-    // logged in or logged out, as well as when the user cache is determined to be out of date.
-    void _buildAuthenticatedRolesVector();
 
     // Checks if this connection is authorized for the given Privilege, ignoring whether or not
     // we should even be doing authorization checks in general.  Note: this may acquire a read
@@ -299,12 +308,6 @@ private:
                                 bool haveRecursed = false);
 
     std::unique_ptr<AuthzSessionExternalState> _externalState;
-
-    // All Users who have been authenticated on this connection.
-    UserSet _authenticatedUsers;
-    // The roles of the authenticated users. This vector is generated when the authenticated
-    // users set is changed.
-    std::vector<RoleName> _authenticatedRoleNames;
 
     // A vector of impersonated UserNames and a vector of those users' RoleNames.
     // These are used in the auditing system. They are not used for authz checks.
