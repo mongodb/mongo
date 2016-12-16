@@ -37,8 +37,6 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/version_manager.h"
-#include "mongo/s/query/cluster_client_cursor_impl.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 
