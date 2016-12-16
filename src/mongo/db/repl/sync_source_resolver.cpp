@@ -214,7 +214,7 @@ OpTime SyncSourceResolver::_parseRemoteEarliestOpTime(const HostAndPort& candida
     if (queryResponse.documents.empty()) {
         // Remote oplog is empty.
         const auto until = _taskExecutor->now() + kOplogEmptyBlacklistDuration;
-        log() << "Blacklisting due to empty oplog on host " << candidate << " for "
+        log() << "Blacklisting " << candidate << " due to empty oplog for "
               << kOplogEmptyBlacklistDuration << " until: " << until;
         _syncSourceSelector->blacklistSyncSource(candidate, until);
         return OpTime();
@@ -224,7 +224,7 @@ OpTime SyncSourceResolver::_parseRemoteEarliestOpTime(const HostAndPort& candida
     if (firstObjFound.isEmpty()) {
         // First document in remote oplog is empty.
         const auto until = _taskExecutor->now() + kFirstOplogEntryEmptyBlacklistDuration;
-        log() << "Blacklisting due to empty first document from host " << candidate << " for "
+        log() << "Blacklisting " << candidate << " due to empty first document for "
               << kFirstOplogEntryEmptyBlacklistDuration << " until: " << until;
         _syncSourceSelector->blacklistSyncSource(candidate, until);
         return OpTime();
@@ -235,8 +235,8 @@ OpTime SyncSourceResolver::_parseRemoteEarliestOpTime(const HostAndPort& candida
     if (remoteEarliestOpTime.isNull()) {
         // First document in remote oplog is empty.
         const auto until = _taskExecutor->now() + kFirstOplogEntryNullTimestampBlacklistDuration;
-        log() << "Blacklisting due to null timestamp in first document from host " << candidate
-              << " for " << kFirstOplogEntryNullTimestampBlacklistDuration << " until: " << until;
+        log() << "Blacklisting " << candidate << " due to null timestamp in first document for "
+              << kFirstOplogEntryNullTimestampBlacklistDuration << " until: " << until;
         _syncSourceSelector->blacklistSyncSource(candidate, until);
         return OpTime();
     }
