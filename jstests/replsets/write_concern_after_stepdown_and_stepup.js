@@ -58,7 +58,7 @@
     // Stop the secondaries from replicating.
     secondaries.forEach(function(node) {
         assert.commandWorked(
-            node.adminCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}));
+            node.adminCommand({configureFailPoint: 'stopOplogFetcher', mode: 'alwaysOn'}));
     });
     // Stop the primary from calling into awaitReplication()
     assert.commandWorked(nodes[0].adminCommand(
@@ -88,7 +88,7 @@
     // Allow the secondaries to replicate again.
     secondaries.forEach(function(node) {
         assert.commandWorked(
-            node.adminCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}));
+            node.adminCommand({configureFailPoint: 'stopOplogFetcher', mode: 'off'}));
     });
 
     waitForPrimary(nodes[1]);
