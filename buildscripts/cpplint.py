@@ -1615,7 +1615,6 @@ def make_polyfill_regex():
   polyfill_required_names = [
     '_',
     'adopt_lock',
-    'align',
     'async',
     'bind',
     'chrono',
