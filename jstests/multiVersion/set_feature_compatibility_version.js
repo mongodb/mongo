@@ -203,9 +203,11 @@
     rst = new ReplSetTest({nodes: [{binVersion: latest}, {binVersion: downgrade}]});
     rst.startSet();
 
-    // Rig the election so that the node running latest version becomes the primary.
+    // Rig the election so that the node running latest version becomes the primary. Give the 3.2
+    // node no votes, so that the primary doesn't step down when it crashes.
     replSetConfig = rst.getReplSetConfig();
     replSetConfig.members[1].priority = 0;
+    replSetConfig.members[1].votes = 0;
     rst.initiate(replSetConfig);
 
     primaryAdminDB = rst.getPrimary().getDB("admin");
