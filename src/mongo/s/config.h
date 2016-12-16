@@ -120,10 +120,13 @@ public:
     ShardId getPrimaryId();
 
     /**
-     * Removes all cached metadata for the specified namespace so that subsequent attempts to
-     * retrieve it will cause a full reload.
+     * Removes the specified namespace from the set of collections under this database entry so that
+     * from then onwards it will be treated as unsharded.
+     *
+     * Note that this method doesn't do any writes to the config metadata, but simply drops the
+     * specified namespace from the cache.
      */
-    void invalidateNs(const std::string& ns);
+    void markNSNotSharded(const std::string& ns);
 
     void enableSharding(OperationContext* txn);
 
