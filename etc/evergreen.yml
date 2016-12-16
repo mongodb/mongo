@@ -456,7 +456,7 @@ functions:
           path_value="$path_value:${task_path_suffix}"
         fi
 
-        ${resmoke_wrapper} PATH="$path_value" ${san_symbolizer} ${san_options} ${rlp_environment} ${python|python} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
+        PATH="$path_value" ${san_symbolizer} ${san_options} ${rlp_environment} ${resmoke_wrapper} ${python|python} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
 
 
   "do jepsen setup" :
@@ -4765,8 +4765,11 @@ buildvariants:
     use_scons_cache: true
   tasks:
   - name: compile
+    requires:
+    - name: burn_in_tests
     distros:
     - windows-64-vs2015-large
+  - name: burn_in_tests
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_facet_unwind_passthrough_WT
