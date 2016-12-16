@@ -735,7 +735,7 @@ Status TopologyCoordinatorImpl::prepareHeartbeatResponse(Date_t now,
     }
 
     // Are we electable
-    response->setElectable(!_getMyUnelectableReason(now, lastOpApplied));
+    response->setElectable(!_getMyUnelectableReason(now, lastOpApplied, false));
 
     // Heartbeat status message
     response->setHbMsg(_getHbmsg(now));
@@ -1086,7 +1086,7 @@ HeartbeatResponseAction TopologyCoordinatorImpl::setMemberAsDown(Date_t now,
     MemberHeartbeatData& hbData = _hbdata.at(memberIndex);
     hbData.setDownValues(now, "no response within election timeout period");
 
-    if (CannotSeeMajority & _getMyUnelectableReason(now, myLastOpApplied)) {
+    if (CannotSeeMajority & _getMyUnelectableReason(now, myLastOpApplied, false)) {
         if (_stepDownPending) {
             return HeartbeatResponseAction::makeNoAction();
         }
@@ -1309,7 +1309,7 @@ HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBData(
     // If we are primary, check if we can still see majority of the set;
     // stepdown if we can't.
     if (_iAmPrimary()) {
-        if (CannotSeeMajority & _getMyUnelectableReason(now, lastOpApplied)) {
+        if (CannotSeeMajority & _getMyUnelectableReason(now, lastOpApplied, false)) {
             if (_stepDownPending) {
                 return HeartbeatResponseAction::makeNoAction();
             }
@@ -1344,7 +1344,7 @@ HeartbeatResponseAction TopologyCoordinatorImpl::_updatePrimaryFromHBData(
         LOG(2) << "TopologyCoordinatorImpl::_updatePrimaryFromHBData - " << status.reason();
         return HeartbeatResponseAction::makeNoAction();
     }
-    fassertStatusOK(28816, becomeCandidateIfElectable(now, lastOpApplied));
+    fassertStatusOK(28816, becomeCandidateIfElectable(now, lastOpApplied, false));
     return HeartbeatResponseAction::makeElectAction();
 }
 
@@ -1359,7 +1359,8 @@ Status TopologyCoordinatorImpl::checkShouldStandForElection(Date_t now,
         return {ErrorCodes::NodeNotElectable, "Not standing for election again; already candidate"};
     }
 
-    const UnelectableReasonMask unelectableReason = _getMyUnelectableReason(now, lastOpApplied);
+    const UnelectableReasonMask unelectableReason =
+        _getMyUnelectableReason(now, lastOpApplied, false);
     if (NotCloseEnoughToLatestOptime & unelectableReason) {
         return {ErrorCodes::NodeNotElectable,
                 str::stream() << "Not standing for election because "
@@ -1493,7 +1494,7 @@ int TopologyCoordinatorImpl::_getHighestPriorityElectableIndex(Date_t now,
     int maxIndex = -1;
     for (int currentIndex = 0; currentIndex < _rsConfig.getNumMembers(); currentIndex++) {
         UnelectableReasonMask reason = currentIndex == _selfIndex
-            ? _getMyUnelectableReason(now, lastOpApplied)
+            ? _getMyUnelectableReason(now, lastOpApplied, false)
             : _getUnelectableReason(currentIndex, lastOpApplied);
         if (None == reason && _isMemberHigherPriority(currentIndex, maxIndex)) {
             maxIndex = currentIndex;
@@ -2015,7 +2016,7 @@ TopologyCoordinatorImpl::UnelectableReasonMask TopologyCoordinatorImpl::_getUnel
 }
 
 TopologyCoordinatorImpl::UnelectableReasonMask TopologyCoordinatorImpl::_getMyUnelectableReason(
-    const Date_t now, const OpTime& lastApplied) const {
+    const Date_t now, const OpTime& lastApplied, bool isPriorityTakeover) const {
     UnelectableReasonMask result = None;
     if (lastApplied.isNull()) {
         result |= NoData;
@@ -2055,7 +2056,6 @@ TopologyCoordinatorImpl::UnelectableReasonMask TopologyCoordinatorImpl::_getMyUn
     } else {
         // Election rules only for protocol version 1.
         invariant(_rsConfig.getProtocolVersion() == 1);
-        bool isPriorityTakeover = _currentPrimaryIndex != -1;
         if (isPriorityTakeover && !_amIFreshEnoughForPriorityTakeover(lastApplied)) {
             result |= NotCloseEnoughToLatestForPriorityTakeover;
         }
@@ -2560,7 +2560,8 @@ void TopologyCoordinatorImpl::setPrimaryIndex(long long primaryIndex) {
 }
 
 Status TopologyCoordinatorImpl::becomeCandidateIfElectable(const Date_t now,
-                                                           const OpTime& lastOpApplied) {
+                                                           const OpTime& lastOpApplied,
+                                                           bool isPriorityTakeover) {
     if (_role == Role::leader) {
         return {ErrorCodes::NodeNotElectable, "Not standing for election again; already primary"};
     }
@@ -2569,7 +2570,8 @@ Status TopologyCoordinatorImpl::becomeCandidateIfElectable(const Date_t now,
         return {ErrorCodes::NodeNotElectable, "Not standing for election again; already candidate"};
     }
 
-    const UnelectableReasonMask unelectableReason = _getMyUnelectableReason(now, lastOpApplied);
+    const UnelectableReasonMask unelectableReason =
+        _getMyUnelectableReason(now, lastOpApplied, isPriorityTakeover);
     if (unelectableReason) {
         return {ErrorCodes::NodeNotElectable,
                 str::stream() << "Not standing for election because "

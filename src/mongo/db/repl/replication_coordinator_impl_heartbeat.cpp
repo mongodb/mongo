@@ -810,7 +810,7 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
         when, stdx::bind(&ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1, this, false));
 }
 
-void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(bool isPriorityTakeOver) {
+void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(bool isPriorityTakeover) {
     LockGuard topoLock(_topoMutex);
 
     if (!isV1ElectionProtocol()) {
@@ -829,10 +829,10 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(bool isPriorityTake
         }
     }
 
-    const auto status =
-        _topCoord->becomeCandidateIfElectable(_replExecutor.now(), getMyLastAppliedOpTime());
+    const auto status = _topCoord->becomeCandidateIfElectable(
+        _replExecutor.now(), getMyLastAppliedOpTime(), isPriorityTakeover);
     if (!status.isOK()) {
-        if (isPriorityTakeOver) {
+        if (isPriorityTakeover) {
             log() << "Not starting an election for a priority takeover, "
                   << "since we are not electable due to: " << status.reason();
         } else {
@@ -841,7 +841,7 @@ void ReplicationCoordinatorImpl::_startElectSelfIfEligibleV1(bool isPriorityTake
         }
         return;
     }
-    if (isPriorityTakeOver) {
+    if (isPriorityTakeover) {
         log() << "Starting an election for a priority takeover";
     } else {
         stdx::lock_guard<stdx::mutex> lock(_mutex);

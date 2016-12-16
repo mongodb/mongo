@@ -237,7 +237,9 @@ public:
     virtual HeartbeatResponseAction setMemberAsDown(Date_t now,
                                                     const int memberIndex,
                                                     const OpTime& myLastOpApplied);
-    virtual Status becomeCandidateIfElectable(const Date_t now, const OpTime& lastOpApplied);
+    virtual Status becomeCandidateIfElectable(const Date_t now,
+                                              const OpTime& lastOpApplied,
+                                              bool isPriorityTakeover);
     virtual void setStorageEngineSupportsReadCommitted(bool supported);
 
     ////////////////////////////////////////////////////////////
@@ -314,7 +316,8 @@ private:
 
     // Returns reason why "self" member is unelectable
     UnelectableReasonMask _getMyUnelectableReason(const Date_t now,
-                                                  const OpTime& lastOpApplied) const;
+                                                  const OpTime& lastOpApplied,
+                                                  bool isPriorityTakeover) const;
 
     // Returns reason why memberIndex is unelectable
     UnelectableReasonMask _getUnelectableReason(int memberIndex, const OpTime& lastOpApplied) const;
