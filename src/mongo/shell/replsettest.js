@@ -137,6 +137,14 @@ var ReplSetTest = function(opts) {
     }
 
     /**
+     * Returns 'true' if the test has been configured to run without journaling enabled.
+     */
+    function _isRunningWithoutJournaling() {
+        return jsTestOptions().noJournal || jsTestOptions().storageEngine == 'inMemory' ||
+            jsTestOptions().storageEngine == 'ephemeralForTest';
+    }
+
+    /**
      * Wait for a rs indicator to go to a particular state or states.
      *
      * @param node is a single node or list of nodes, by id or conn
@@ -292,10 +300,8 @@ var ReplSetTest = function(opts) {
         var replSetStatus =
             assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1}));
 
-        var runningWithoutJournaling = TestData.noJournal || "inMemory" == TestData.storageEngine ||
-            "ephemeralForTest" == TestData.storageEngine;
         var opTimeType = "durableOpTime";
-        if (runningWithoutJournaling) {
+        if (_isRunningWithoutJournaling()) {
             opTimeType = "appliedOpTime";
         }
         return replSetStatus.optimes[opTimeType];
@@ -620,11 +626,11 @@ var ReplSetTest = function(opts) {
         if (config.hasOwnProperty(wcMajorityJournalField)) {
             return config;
         }
-        var runningWithoutJournaling = TestData.noJournal || TestData.storageEngine == "inMemory" ||
-            TestData.storageEngine == "ephemeralForTest";
-        if (runningWithoutJournaling) {
+
+        if (_isRunningWithoutJournaling()) {
             config[wcMajorityJournalField] = false;
         }
+
         return config;
     };
 
