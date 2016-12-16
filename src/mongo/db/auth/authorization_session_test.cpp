@@ -31,11 +31,13 @@
  * Unit tests of the AuthorizationSession type.
  */
 #include "mongo/base/status.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/authorization_session_for_test.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/stdx/memory.h"
@@ -78,7 +80,7 @@ public:
     OperationContextNoop _txn;
     AuthzSessionExternalStateMock* sessionState;
     std::unique_ptr<AuthorizationManager> authzManager;
-    std::unique_ptr<AuthorizationSession> authzSession;
+    std::unique_ptr<AuthorizationSessionForTest> authzSession;
 
     void setUp() {
         auto localManagerState = stdx::make_unique<FailureCapableAuthzManagerExternalStateMock>();
@@ -88,16 +90,21 @@ public:
         auto localSessionState =
             stdx::make_unique<AuthzSessionExternalStateMock>(authzManager.get());
         sessionState = localSessionState.get();
-        authzSession = stdx::make_unique<AuthorizationSession>(std::move(localSessionState));
+        authzSession = stdx::make_unique<AuthorizationSessionForTest>(std::move(localSessionState));
         authzManager->setAuthEnabled(true);
     }
 };
 
+const NamespaceString testFooNss("test.foo");
+const NamespaceString testBarNss("test.bar");
+const NamespaceString testQuxNss("test.qux");
+
 const ResourcePattern testDBResource(ResourcePattern::forDatabaseName("test"));
 const ResourcePattern otherDBResource(ResourcePattern::forDatabaseName("other"));
 const ResourcePattern adminDBResource(ResourcePattern::forDatabaseName("admin"));
-const ResourcePattern testFooCollResource(
-    ResourcePattern::forExactNamespace(NamespaceString("test.foo")));
+const ResourcePattern testFooCollResource(ResourcePattern::forExactNamespace(testFooNss));
+const ResourcePattern testBarCollResource(ResourcePattern::forExactNamespace(testBarNss));
+const ResourcePattern testQuxCollResource(ResourcePattern::forExactNamespace(testQuxNss));
 const ResourcePattern otherFooCollResource(
     ResourcePattern::forExactNamespace(NamespaceString("other.foo")));
 const ResourcePattern thirdFooCollResource(
@@ -529,5 +536,232 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
         authzSession->isAuthorizedForActionsOnResource(testFooCollResource, ActionType::insert));
 }
 
+TEST_F(AuthorizationSessionTest, CheckAuthForAggregateFailsIfPipelineIsNotAnArray) {
+    BSONObj cmdObjIntPipeline = BSON("aggregate" << testFooNss.coll() << "pipeline" << 7);
+    ASSERT_EQ(ErrorCodes::TypeMismatch,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObjIntPipeline));
+
+    BSONObj cmdObjObjPipeline = BSON("aggregate" << testFooNss.coll() << "pipeline" << BSONObj());
+    ASSERT_EQ(ErrorCodes::TypeMismatch,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObjObjPipeline));
+
+    BSONObj cmdObjNoPipeline = BSON("aggregate" << testFooNss.coll());
+    ASSERT_EQ(ErrorCodes::TypeMismatch,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObjNoPipeline));
+}
+
+TEST_F(AuthorizationSessionTest, CheckAuthForAggregateFailsIfPipelineFirstStageIsNotAnObject) {
+    BSONObj cmdObjFirstStageInt =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << BSON_ARRAY(7));
+    ASSERT_EQ(ErrorCodes::TypeMismatch,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObjFirstStageInt));
+
+    BSONObj cmdObjFirstStageArray =
+        BSON("aggregate" << testFooNss.coll() << "pipeline" << BSON_ARRAY(BSONArray()));
+    ASSERT_EQ(ErrorCodes::TypeMismatch,
+              authzSession->checkAuthForAggregate(testFooNss, cmdObjFirstStageArray));
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateEmptyPipelineWithoutFindAction) {
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << BSONArray());
+    ASSERT_EQ(ErrorCodes::Unauthorized, authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
+TEST_F(AuthorizationSessionTest, CanAggregateEmptyPipelineWithFindAction) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << BSONArray());
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateWithoutFindActionIfFirstStageNotIndexOrCollStats) {
+    authzSession->assumePrivilegesForDB(
+        Privilege(testFooCollResource, {ActionType::indexStats, ActionType::collStats}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$limit" << 1) << BSON("$collStats" << BSONObj())
+                                                        << BSON("$indexStats" << BSONObj()));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_EQ(ErrorCodes::Unauthorized, authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
+TEST_F(AuthorizationSessionTest, CanAggregateWithFindActionIfFirstStageNotIndexOrCollStats) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$limit" << 1) << BSON("$collStats" << BSONObj())
+                                                        << BSON("$indexStats" << BSONObj()));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateCollStatsWithoutCollStatsAction) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$collStats" << BSONObj()));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_EQ(ErrorCodes::Unauthorized, authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
+TEST_F(AuthorizationSessionTest, CanAggregateCollStatsWithCollStatsAction) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::collStats}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$collStats" << BSONObj()));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateIndexStatsWithoutIndexStatsAction) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$indexStats" << BSONObj()));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_EQ(ErrorCodes::Unauthorized, authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
+TEST_F(AuthorizationSessionTest, CanAggregateIndexStatsWithIndexStatsAction) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::indexStats}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$indexStats" << BSONObj()));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
+TEST_F(AuthorizationSessionTest, AddPrivilegesForStageFailsIfOutNamespaceIsNotValid) {
+    BSONArray pipeline = BSON_ARRAY(BSON("$out"
+                                         << ""));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_THROWS_CODE(
+        authzSession->checkAuthForAggregate(testFooNss, cmdObj), UserException, 17139);
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateOutWithoutInsertAndRemoveOnTargetNamespace) {
+    // We only have find on the aggregation namespace.
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$out" << testBarNss.coll()));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_EQ(ErrorCodes::Unauthorized, authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+
+    // We have insert but not remove on the $out namespace.
+    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, {ActionType::find}),
+                                         Privilege(testBarCollResource, {ActionType::insert})});
+    ASSERT_EQ(ErrorCodes::Unauthorized, authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+
+    // We have remove but not insert on the $out namespace.
+    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, {ActionType::find}),
+                                         Privilege(testBarCollResource, {ActionType::remove})});
+    ASSERT_EQ(ErrorCodes::Unauthorized, authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
+TEST_F(AuthorizationSessionTest, CanAggregateOutWithInsertAndRemoveOnTargetNamespace) {
+    authzSession->assumePrivilegesForDB(
+        {Privilege(testFooCollResource, {ActionType::find}),
+         Privilege(testBarCollResource, {ActionType::insert, ActionType::remove})});
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$out" << testBarNss.coll()));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+
+    BSONObj cmdObjNoBypassDocumentValidation = BSON(
+        "aggregate" << testFooNss.coll() << "pipeline" << pipeline << "bypassDocumentValidation"
+                    << false);
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObjNoBypassDocumentValidation));
+}
+
+TEST_F(AuthorizationSessionTest,
+       CannotAggregateOutBypassingValidationWithoutBypassDocumentValidationOnTargetNamespace) {
+    authzSession->assumePrivilegesForDB(
+        {Privilege(testFooCollResource, {ActionType::find}),
+         Privilege(testBarCollResource, {ActionType::insert, ActionType::remove})});
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$out" << testBarNss.coll()));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline
+                                      << "bypassDocumentValidation"
+                                      << true);
+    ASSERT_EQ(ErrorCodes::Unauthorized, authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
+TEST_F(AuthorizationSessionTest,
+       CanAggregateOutBypassingValidationWithBypassDocumentValidationOnTargetNamespace) {
+    authzSession->assumePrivilegesForDB(
+        {Privilege(testFooCollResource, {ActionType::find}),
+         Privilege(
+             testBarCollResource,
+             {ActionType::insert, ActionType::remove, ActionType::bypassDocumentValidation})});
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$out" << testBarNss.coll()));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline
+                                      << "bypassDocumentValidation"
+                                      << true);
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateLookupWithoutFindOnJoinedNamespace) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << testBarNss.coll())));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_EQ(ErrorCodes::Unauthorized, authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
+TEST_F(AuthorizationSessionTest, CanAggregateLookupWithFindOnJoinedNamespace) {
+    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, {ActionType::find}),
+                                         Privilege(testBarCollResource, {ActionType::find})});
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$lookup" << BSON("from" << testBarNss.coll())));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
+TEST_F(AuthorizationSessionTest, CannotAggregateGraphLookupWithoutFindOnJoinedNamespace) {
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$graphLookup" << BSON("from" << testBarNss.coll())));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_EQ(ErrorCodes::Unauthorized, authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
+TEST_F(AuthorizationSessionTest, CanAggregateGraphLookupWithFindOnJoinedNamespace) {
+    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, {ActionType::find}),
+                                         Privilege(testBarCollResource, {ActionType::find})});
+
+    BSONArray pipeline = BSON_ARRAY(BSON("$graphLookup" << BSON("from" << testBarNss.coll())));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
+TEST_F(AuthorizationSessionTest,
+       CannotAggregateFacetWithLookupAndGraphLookupWithoutFindOnJoinedNamespaces) {
+    // We only have find on the aggregation namespace.
+    authzSession->assumePrivilegesForDB(Privilege(testFooCollResource, {ActionType::find}));
+
+    BSONArray pipeline =
+        BSON_ARRAY(fromjson("{$facet: {lookup: [{$lookup: {from: 'bar'}}], graphLookup: "
+                            "[{$graphLookup: {from: 'qux'}}]}}"));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_EQ(ErrorCodes::Unauthorized, authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+
+    // We have find on the $lookup namespace but not on the $graphLookup namespace.
+    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, {ActionType::find}),
+                                         Privilege(testBarCollResource, {ActionType::find})});
+    ASSERT_EQ(ErrorCodes::Unauthorized, authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+
+    // We have find on the $graphLookup namespace but not on the $lookup namespace.
+    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, {ActionType::find}),
+                                         Privilege(testQuxCollResource, {ActionType::find})});
+    ASSERT_EQ(ErrorCodes::Unauthorized, authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
+
+TEST_F(AuthorizationSessionTest,
+       CanAggregateFacetWithLookupAndGraphLookupWithFindOnJoinedNamespaces) {
+    authzSession->assumePrivilegesForDB({Privilege(testFooCollResource, {ActionType::find}),
+                                         Privilege(testBarCollResource, {ActionType::find}),
+                                         Privilege(testQuxCollResource, {ActionType::find})});
+
+    BSONArray pipeline =
+        BSON_ARRAY(fromjson("{$facet: {lookup: [{$lookup: {from: 'bar'}}], graphLookup: "
+                            "[{$graphLookup: {from: 'qux'}}]}}"));
+    BSONObj cmdObj = BSON("aggregate" << testFooNss.coll() << "pipeline" << pipeline);
+    ASSERT_OK(authzSession->checkAuthForAggregate(testFooNss, cmdObj));
+}
 }  // namespace
 }  // namespace mongo

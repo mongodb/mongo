@@ -67,7 +67,7 @@ const std::string ADMIN_DBNAME = "admin";
 Status checkAuthForCreateOrModifyView(AuthorizationSession* authzSession,
                                       const NamespaceString& viewNs,
                                       const NamespaceString& viewOnNs,
-                                      const BSONObj& viewPipeline) {
+                                      const BSONArray& viewPipeline) {
     // It's safe to allow a user to create or modify a view if they can't read it anyway.
     if (!authzSession->isAuthorizedForActionsOnNamespace(viewNs, ActionType::find)) {
         return Status::OK();
@@ -260,22 +260,43 @@ Status AuthorizationSession::checkAuthForAggregate(const NamespaceString& ns,
 
     PrivilegeVector privileges;
 
-    if (dps::extractElementAtPath(cmdObj, "pipeline.0.$indexStats")) {
-        Privilege::addPrivilegeToPrivilegeVector(&privileges,
-                                                 Privilege(inputResource, ActionType::indexStats));
-    } else if (dps::extractElementAtPath(cmdObj, "pipeline.0.$collStats")) {
-        Privilege::addPrivilegeToPrivilegeVector(&privileges,
-                                                 Privilege(inputResource, ActionType::collStats));
-    } else {
-        // If no source requiring an alternative permission scheme is specified then default to
-        // requiring find() privileges on the given namespace.
-        Privilege::addPrivilegeToPrivilegeVector(&privileges,
-                                                 Privilege(inputResource, ActionType::find));
+    BSONElement pipelineElem = cmdObj["pipeline"];
+    if (pipelineElem.type() != BSONType::Array) {
+        return Status(ErrorCodes::TypeMismatch, "'pipeline' must be specified as an array");
     }
 
-    BSONObj pipeline = cmdObj.getObjectField("pipeline");
-    for (auto&& stageElem : pipeline) {
-        _addPrivilegesForStage(db, cmdObj, &privileges, stageElem.embeddedObjectUserCheck());
+    BSONObj pipeline = pipelineElem.embeddedObject();
+    if (pipeline.isEmpty()) {
+        // The pipeline is empty, so we require only the find action.
+        Privilege::addPrivilegeToPrivilegeVector(&privileges,
+                                                 Privilege(inputResource, ActionType::find));
+    } else {
+        if (pipeline.firstElementType() != BSONType::Object) {
+            // The pipeline contains something that's not an object.
+            return Status(ErrorCodes::TypeMismatch,
+                          "'pipeline' cannot contain non-object elements");
+        }
+
+        // We treat the first stage in the pipeline specially, as some aggregation stages that are
+        // valid initial sources have different auth requirements.
+        BSONObj firstPipelineStage = pipeline.firstElement().embeddedObject();
+        if (str::equals("$indexStats", firstPipelineStage.firstElementFieldName())) {
+            Privilege::addPrivilegeToPrivilegeVector(
+                &privileges, Privilege(inputResource, ActionType::indexStats));
+        } else if (str::equals("$collStats", firstPipelineStage.firstElementFieldName())) {
+            Privilege::addPrivilegeToPrivilegeVector(
+                &privileges, Privilege(inputResource, ActionType::collStats));
+        } else {
+            // If no source requiring an alternative permission scheme is specified then default to
+            // requiring find() privileges on the given namespace.
+            Privilege::addPrivilegeToPrivilegeVector(&privileges,
+                                                     Privilege(inputResource, ActionType::find));
+        }
+
+        // Add additional required privileges for each stage in the pipeline.
+        for (auto&& stageElem : pipeline) {
+            _addPrivilegesForStage(db, cmdObj, &privileges, stageElem.embeddedObjectUserCheck());
+        }
     }
 
     if (isAuthorizedForPrivileges(privileges))
