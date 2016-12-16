@@ -27,7 +27,6 @@ env.Library(
         'cluster_count_cmd.cpp',
         'cluster_current_op.cpp',
         'cluster_db_stats_cmd.cpp',
-        'cluster_drop_cmd.cpp',
         'cluster_drop_database_cmd.cpp',
         'cluster_enable_sharding_cmd.cpp',
         'cluster_explain.cpp',

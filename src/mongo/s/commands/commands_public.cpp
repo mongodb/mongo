@@ -537,6 +537,55 @@ public:
 
 } createCmd;
 
+class DropCmd : public PublicGridCommand {
+public:
+    DropCmd() : PublicGridCommand("drop") {}
+    virtual void addRequiredPrivileges(const std::string& dbname,
+                                       const BSONObj& cmdObj,
+                                       std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(ActionType::dropCollection);
+        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+    }
+
+    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
+    }
+
+    bool run(OperationContext* txn,
+             const string& dbName,
+             BSONObj& cmdObj,
+             int options,
+             string& errmsg,
+             BSONObjBuilder& result) {
+        auto status = Grid::get(txn)->catalogCache()->getDatabase(txn, dbName);
+        if (!status.isOK()) {
+            if (status == ErrorCodes::NamespaceNotFound) {
+                return true;
+            }
+
+            return appendCommandStatus(result, status.getStatus());
+        }
+
+        const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
+
+        log() << "DROP: " << nss.ns();
+
+        const auto& db = status.getValue();
+        if (!db->isShardingEnabled() || !db->isSharded(nss.ns())) {
+            log() << "\tdrop going to do passthrough";
+            return passthrough(txn, db.get(), cmdObj, result);
+        }
+
+        uassertStatusOK(Grid::get(txn)->catalogClient(txn)->dropCollection(txn, nss));
+
+        // Force a full reload next time the just dropped namespace is accessed
+        db->invalidateNs(nss.ns());
+
+        return true;
+    }
+} dropCmd;
+
 class RenameCollectionCmd : public PublicGridCommand {
 public:
     RenameCollectionCmd() : PublicGridCommand("renameCollection") {}

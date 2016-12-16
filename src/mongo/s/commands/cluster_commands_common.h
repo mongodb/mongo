@@ -38,9 +38,16 @@
 
 namespace mongo {
 
+class BSONObj;
+
 class AScopedConnection;
+class ClusterCursorManager;
 class DBClientBase;
 class DBClientCursor;
+
+namespace executor {
+class TaskExecutor;
+}  // namespace executor
 
 /**
  * DEPRECATED - do not use in any new code. All new code must use the TaskExecutor interface
