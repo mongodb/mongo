@@ -43,7 +43,12 @@
     function stepUp(rst, node) {
         var primary = rst.getPrimary();
         if (primary != node) {
-            assert.commandWorked(primary.adminCommand({replSetStepDown: 1}));
+            try {
+                assert.commandWorked(primary.adminCommand({replSetStepDown: 1, force: true}));
+            } catch (ex) {
+                print("Caught exception while stepping down from node '" + tojson(node.host) +
+                      "': " + tojson(ex));
+            }
         }
         waitForState(node, ReplSetTest.State.PRIMARY);
     }
