@@ -20,7 +20,7 @@
     for (i = 0; i < 10; ++i) {
         assert.writeOK(coll.insert({a: i, b: i % 5}));
     }
-    assert.commandWorked(coll.createIndex({b: 1}));
+    assert.commandWorked(coll.createIndex({b: -1}));
 
     coll.group({
         key: {a: 1, b: 1},
@@ -35,7 +35,7 @@
     assert.eq(profileObj.op, "command", tojson(profileObj));
     assert.eq(profileObj.keysExamined, 2, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 2, tojson(profileObj));
-    assert.eq(profileObj.planSummary, "IXSCAN { b: 1.0 }", tojson(profileObj));
+    assert.eq(profileObj.planSummary, "IXSCAN { b: -1 }", tojson(profileObj));
     assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
     assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
     assert.eq(profileObj.command.group.key, {a: 1, b: 1}, tojson(profileObj));

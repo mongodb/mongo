@@ -35,7 +35,7 @@
     assert.eq(profileObj.keysExamined, 1, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 1, tojson(profileObj));
     assert.eq(profileObj.nreturned, 1, tojson(profileObj));
-    assert.eq(profileObj.planSummary, "IXSCAN { a: 1.0 }", tojson(profileObj));
+    assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
     assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
     assert.eq(profileObj.query.filter, {a: 1}, tojson(profileObj));
     if (isLegacyReadMode) {
