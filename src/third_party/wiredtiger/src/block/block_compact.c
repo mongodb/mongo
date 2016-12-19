@@ -61,7 +61,6 @@ __wt_block_compact_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 int
 __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
 {
-	WT_DECL_RET;
 	WT_EXT *ext;
 	WT_EXTLIST *el;
 	wt_off_t avail_eighty, avail_ninety, eighty, ninety;
@@ -138,7 +137,7 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
 
 	__wt_spin_unlock(session, &block->live_lock);
 
-	return (ret);
+	return (0);
 }
 
 /*
@@ -149,7 +148,6 @@ int
 __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
     WT_BLOCK *block, const uint8_t *addr, size_t addr_size, bool *skipp)
 {
-	WT_DECL_RET;
 	WT_EXT *ext;
 	WT_EXTLIST *el;
 	wt_off_t limit, offset;
@@ -194,7 +192,7 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
 	}
 #endif
 
-	return (ret);
+	return (0);
 }
 
 /*

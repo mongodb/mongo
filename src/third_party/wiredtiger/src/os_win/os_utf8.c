@@ -18,7 +18,6 @@ __wt_to_utf16_string(
 {
 	DWORD windows_error;
 	int bufferSize;
-	WT_DECL_RET;
 
 	bufferSize = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, NULL, 0);
 	windows_error = __wt_getlasterror();
@@ -55,7 +54,6 @@ __wt_to_utf8_string(
 {
 	DWORD windows_error;
 	int bufferSize;
-	WT_DECL_RET;
 
 	bufferSize = WideCharToMultiByte(
 	    CP_UTF8, 0, wide, -1, NULL, 0, NULL, NULL);

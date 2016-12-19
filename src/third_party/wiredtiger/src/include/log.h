@@ -159,7 +159,8 @@ union __wt_lsn {
     !FLD64_ISSET((uint64_t)(state), WT_LOG_SLOT_CLOSE) &&		\
     WT_LOG_SLOT_JOINED(state) < WT_LOG_SLOT_BUF_MAX)
 
-struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_logslot {
+struct __wt_logslot {
+	WT_CACHE_LINE_PAD_BEGIN
 	volatile int64_t slot_state;	/* Slot state */
 	int64_t	 slot_unbuffered;	/* Unbuffered data in this slot */
 	int32_t	 slot_error;		/* Error value */
@@ -176,6 +177,7 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_logslot {
 #define	WT_SLOT_SYNC		0x04		/* Needs sync on release */
 #define	WT_SLOT_SYNC_DIR	0x08		/* Directory sync on release */
 	uint32_t flags;			/* Flags */
+	WT_CACHE_LINE_PAD_END
 };
 
 #define	WT_SLOT_INIT_FLAGS	0

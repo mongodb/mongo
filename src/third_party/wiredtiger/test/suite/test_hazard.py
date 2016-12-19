@@ -26,34 +26,33 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
+# test_hazard.py
+#       Hazard pointer tests.
 
-import re, os, sys
-from distutils.core import setup, Extension
+import wiredtiger, wttest
+from wtdataset import SimpleDataSet
 
-# OS X hack: turn off the Universal binary support that is built into the
-# Python build machinery, just build for the default CPU architecture.
-if not 'ARCHFLAGS' in os.environ:
-    os.environ['ARCHFLAGS'] = ''
+# Regression tests.
+class test_hazard(wttest.WiredTigerTestCase):
 
-# Suppress warnings building SWIG generated code.  SWIG boiler plate
-# functions have sign conversion warnings, so those warnings must be disabled.
-extra_cflags = [ '-w', '-I../../src/include', '-Wno-sign-conversion']
+    # Allocate a large number of hazard pointers in a session, forcing the
+    # hazard pointer array to repeatedly grow.
+    def test_hazard(self):
+        uri = "table:hazard"
+        ds = SimpleDataSet(self, uri, 1000)
+        ds.populate()
 
-dir = os.path.dirname(__file__)
+        # Open 10,000 cursors and pin a page to set a hazard pointer.
+        cursors = []
+        for i in range(0, 10000):
+            c = self.session.open_cursor(uri, None)
+            c.set_key(ds.key(10))
+            c.search()
+            cursors.append(c)
 
-# Read the version information from the RELEASE_INFO file
-for l in open(os.path.join(dir, '..', '..', 'RELEASE_INFO')):
-    if re.match(r'WIREDTIGER_VERSION_(?:MAJOR|MINOR|PATCH)=', l):
-        exec(l)
+        # Close the cursors, clearing the hazard pointer.
+        for c in cursors:
+            c.close()
 
-wt_ver = '%d.%d' % (WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR)
-
-setup(name='wiredtiger', version=wt_ver,
-    ext_modules=[Extension('_wiredtiger',
-                [os.path.join(dir, 'wiredtiger_wrap.c')],
-        libraries=['wiredtiger'],
-        extra_compile_args=extra_cflags,
-    )],
-    package_dir={'' : dir},
-    packages=['wiredtiger'],
-)
+if __name__ == '__main__':
+    wttest.run()

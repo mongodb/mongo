@@ -1148,9 +1148,17 @@ retry:	while (slot < max_entries) {
 		    !__wt_cache_aggressive(session))
 			continue;
 
-		/* Skip files if we have used all available hazard pointers. */
-		if (btree->evict_ref == NULL && session->nhazard >=
-		    conn->hazard_max - WT_MIN(conn->hazard_max / 2, 10))
+		/*
+		 * Skip files if we have too many active walks.
+		 *
+		 * This used to be limited by the configured maximum number of
+		 * hazard pointers per session.  Even though that ceiling has
+		 * been removed, we need to test eviction with huge numbers of
+		 * active trees before allowing larger numbers of hazard
+		 * pointers in the walk session.
+		 */
+		if (btree->evict_ref == NULL &&
+		    session->nhazard > WT_EVICT_MAX_TREES)
 			continue;
 
 		/*

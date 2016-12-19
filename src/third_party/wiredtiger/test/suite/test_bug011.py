@@ -30,25 +30,28 @@ import random, wiredtiger, wttest
 from wtdataset import SimpleDataSet
 
 # test_bug011.py
-#    Eviction working on more files than there are hazard pointers.
+#    Eviction working on more trees than the eviction server can walk
+#    simultaneously.  There is a builtin limit of 1000 trees, we open double
+#    that, which makes this a long-running test.
 class test_bug011(wttest.WiredTigerTestCase):
     """
     Test having eviction working on more files than the number of
     allocated hazard pointers.
     """
     table_name = 'test_bug011'
-    ntables = 50
+    ntables = 2000
     nrows = 10000
     nops = 10000
     # Add connection configuration for this test.
     def conn_config(self, dir):
-        return 'cache_size=10MB,eviction_dirty_target=99,eviction_dirty_trigger=99,hazard_max=' + str(self.ntables / 2)
+        return 'cache_size=1GB'
 
+    @wttest.longtest("Eviction copes with lots of files")
     def test_eviction(self):
         cursors = []
         datasets = []
         for i in range(0, self.ntables):
-            this_uri = 'table:%s-%03d' % (self.table_name, i)
+            this_uri = 'table:%s-%05d' % (self.table_name, i)
             ds = SimpleDataSet(self, this_uri, self.nrows,
                                config='allocation_size=1KB,leaf_page_max=1KB')
             ds.populate()
@@ -57,9 +60,9 @@ class test_bug011(wttest.WiredTigerTestCase):
         # Switch over to on-disk trees with multiple leaf pages
         self.reopen_conn()
 
-        # Make sure we have a cursor for the table so it stays in cache.
+        # Make sure we have a cursor for every table so it stays in cache.
         for i in range(0, self.ntables):
-            this_uri = 'table:%s-%03d' % (self.table_name, i)
+            this_uri = 'table:%s-%05d' % (self.table_name, i)
             cursors.append(self.session.open_cursor(this_uri, None))
 
         # Make use of the cache.

@@ -162,6 +162,14 @@ static const WT_CONFIG_CHECK confchk_WT_CURSOR_reconfigure[] = {
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
+static const WT_CONFIG_CHECK confchk_WT_SESSION_alter[] = {
+	{ "access_pattern_hint", "string",
+	    NULL, "choices=[\"none\",\"random\",\"sequential\"]",
+	    NULL, 0 },
+	{ "cache_resident", "boolean", NULL, NULL, NULL, 0 },
+	{ NULL, NULL, NULL, NULL, NULL, 0 }
+};
+
 static const WT_CONFIG_CHECK confchk_WT_SESSION_begin_transaction[] = {
 	{ "isolation", "string",
 	    NULL, "choices=[\"read-uncommitted\",\"read-committed\","
@@ -1065,6 +1073,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	{ "WT_CURSOR.reconfigure",
 	  "append=false,overwrite=true",
 	  confchk_WT_CURSOR_reconfigure, 2
+	},
+	{ "WT_SESSION.alter",
+	  "access_pattern_hint=none,cache_resident=false",
+	  confchk_WT_SESSION_alter, 2
 	},
 	{ "WT_SESSION.begin_transaction",
 	  "isolation=,name=,priority=0,snapshot=,sync=",

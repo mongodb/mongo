@@ -22,33 +22,12 @@ AC_PROG_CC(cc gcc)
 AC_PROG_CXX(c++ g++)
 AM_PROG_AS(as gas)
 
-# Configure options.
-AM_OPTIONS
-
 define([AC_LIBTOOL_LANG_CXX_CONFIG], [:])dnl
 define([AC_LIBTOOL_LANG_F77_CONFIG], [:])dnl
+
 LT_PREREQ(2.2.6)
 LT_INIT([pic-only])
 AC_SUBST([LIBTOOL_DEPS])
-
-# If enable-strict is configured, turn on as much error checking as we can for
-# this compiler. Intended for developers, and only works for gcc/clang, but it
-# fills a need.
-if test "$wt_cv_enable_strict" = "yes"; then
-	wt_cv_cc_version="`$CC --version | sed -eq`"
-	case "$wt_cv_cc_version" in
-	*clang*)
-		AM_CLANG_WARNINGS($wt_cv_cc_version);;
-	*cc*|*CC*)					# cc, CC, gcc, GCC
-		AM_GCC_WARNINGS($wt_cv_cc_version);;
-	*)
-		AC_MSG_ERROR(
-		    [--enable-strict does not support "$wt_cv_cc_version".]);;
-	esac
-
-	AM_CFLAGS="$AM_CFLAGS $wt_cv_strict_warnings"
-fi
-
 AM_CONDITIONAL([POSIX_HOST], [true])
 AM_CONDITIONAL([WINDOWS_HOST], [false])
 
@@ -69,6 +48,7 @@ AS_CASE([$host_cpu],
 	[aarch64*], [wt_cv_arm64="yes"],
 	[wt_cv_arm64="no"])
 AM_CONDITIONAL([ARM64_HOST], [test "$wt_cv_arm64" = "yes"])
+AS_CASE([$host_os], [*solaris*], [wt_cv_solaris="yes"], [wt_cv_solaris="no"])
 
 # This is a workaround as part of WT-2459. Currently, clang (v3.7) does not
 # support compiling the ASM code we have to perform the CRC checks on PowerPC.
@@ -82,9 +62,17 @@ if test "$wt_cv_powerpc" = "yes" -a "$CC" != "$CCAS"; then
 fi
 AC_SUBST(AM_LIBTOOLFLAGS)
 
+# WiredTiger uses anonymous unions to pad structures. It's part of C11, but
+# some compilers require -std=c11 to support them. Turn on that flag for any
+# compiler that supports it, except for Solaris, where gcc -std=c11 makes
+# some none-C11 prototypes unavailable.
+if test "$wt_cv_solaris" = "no"; then
+	AX_CHECK_COMPILE_FLAG([-std=c11], [AM_CFLAGS="$AM_CFLAGS -std=c11"])
+fi
+
 if test "$GCC" = "yes"; then
 	# The Solaris gcc compiler gets the additional -pthreads flag.
-	if test "`uname -s`" = "SunOS"; then
+	if test "$wt_cv_solaris" = "yes"; then
 		AM_CFLAGS="$AM_CFLAGS -pthreads"
 	fi
 
@@ -95,10 +83,34 @@ if test "$GCC" = "yes"; then
 	fi
 else
 	# The Solaris native compiler gets the additional -mt flag.
-	if test "`uname -s`" = "SunOS"; then
+	if test "$wt_cv_solaris" = "yes"; then
 		AM_CFLAGS="$AM_CFLAGS -mt"
 	fi
 fi
+
+# Linux requires _GNU_SOURCE to be defined
+AS_CASE([$host_os], [linux*], [AM_CFLAGS="$AM_CFLAGS -D_GNU_SOURCE"])
+
+# If enable-strict is configured, turn on as much error checking as we can for
+# this compiler. Intended for developers, and only works for gcc/clang, but it
+# fills a need.
+if test "$wt_cv_enable_strict" = "yes"; then
+	wt_cv_cc_version="`$CC --version | sed -eq`"
+	case "$wt_cv_cc_version" in
+	*clang*)
+		AM_CLANG_WARNINGS($wt_cv_cc_version);;
+	*cc*|*CC*)					# cc, CC, gcc, GCC
+		AM_GCC_WARNINGS($wt_cv_cc_version);;
+	*)
+		AC_MSG_ERROR(
+		    [--enable-strict does not support "$wt_cv_cc_version".]);;
+	esac
+
+	AM_CFLAGS="$AM_CFLAGS $wt_cv_strict_warnings"
+fi
+
+# Configure options.
+AM_OPTIONS
 
 # Java and Python APIs
 if test "$wt_cv_enable_java" = "yes" -o "$wt_cv_enable_python" = "yes"; then
@@ -121,7 +133,7 @@ if test "$wt_cv_enable_java" = "yes"; then
 fi
 
 if test "$wt_cv_enable_python" = "yes"; then
-	AM_PATH_PYTHON([2.6])
+	AM_PATH_PYTHON([2.7])
 	if test -n "$with_python_prefix" ; then
 		PYTHON_INSTALL_ARG="-d $with_python_prefix"
 	fi
@@ -158,11 +170,6 @@ if test "$ac_cv_sizeof_void_p" != "8" ; then
     AC_MSG_ERROR([WiredTiger requires a 64-bit build.])
 fi
 AC_MSG_RESULT(yes)
-
-# Linux requires _GNU_SOURCE to be defined
-case "$host_os" in
-linux*)	AM_CFLAGS="$AM_CFLAGS -D_GNU_SOURCE" ;;
-esac
 
 # Linux requires buffers aligned to 4KB boundaries for O_DIRECT to work.
 BUFFER_ALIGNMENT=0

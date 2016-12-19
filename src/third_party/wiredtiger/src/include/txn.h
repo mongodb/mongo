@@ -67,10 +67,12 @@ struct __wt_named_snapshot {
 	uint32_t snapshot_count;
 };
 
-struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_txn_state {
+struct __wt_txn_state {
+	WT_CACHE_LINE_PAD_BEGIN
 	volatile uint64_t id;
 	volatile uint64_t pinned_id;
 	volatile uint64_t metadata_pinned;
+	WT_CACHE_LINE_PAD_END
 };
 
 struct __wt_txn_global {

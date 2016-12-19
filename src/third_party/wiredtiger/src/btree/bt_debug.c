@@ -1104,9 +1104,9 @@ __debug_cell(WT_DBG *ds, const WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 	case WT_CELL_VALUE_OVFL_RM:
 		type = "ovfl";
 addr:		WT_RET(__wt_scr_alloc(session, 128, &buf));
-		WT_RET(ds->f(ds, ", %s %s", type,
+		ret = ds->f(ds, ", %s %s", type,
 		    __wt_addr_string(
-		    session, unpack->data, unpack->size, buf)));
+		    session, unpack->data, unpack->size, buf));
 		__wt_scr_free(session, &buf);
 		WT_RET(ret);
 		break;

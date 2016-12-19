@@ -16,7 +16,6 @@ static int
 __win_fs_exist(WT_FILE_SYSTEM *file_system,
     WT_SESSION *wt_session, const char *name, bool *existp)
 {
-	WT_DECL_RET;
 	WT_DECL_ITEM(name_wide);
 	WT_SESSION_IMPL *session;
 
@@ -43,8 +42,8 @@ __win_fs_remove(WT_FILE_SYSTEM *file_system,
     WT_SESSION *wt_session, const char *name, uint32_t flags)
 {
 	DWORD windows_error;
-	WT_DECL_RET;
 	WT_DECL_ITEM(name_wide);
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	WT_UNUSED(file_system);

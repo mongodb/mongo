@@ -579,7 +579,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	 * Any errors that happened after the tree was locked are
 	 * fatal - we can't guarantee the state of the tree.
 	 */
-	if ((ret = __wt_lsm_meta_write(session, lsm_tree)) != 0)
+	if ((ret = __wt_lsm_meta_write(session, lsm_tree, NULL)) != 0)
 		WT_PANIC_ERR(session, ret, "Failed finalizing LSM merge");
 
 	lsm_tree->dsk_gen++;

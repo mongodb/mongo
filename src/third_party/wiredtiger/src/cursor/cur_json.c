@@ -270,7 +270,6 @@ __wt_json_alloc_unpack(WT_SESSION_IMPL *session, const void *buffer,
     bool iskey, va_list ap)
 {
 	WT_CONFIG_ITEM *names;
-	WT_DECL_RET;
 	size_t needed;
 	char **json_bufp;
 
@@ -288,7 +287,7 @@ __wt_json_alloc_unpack(WT_SESSION_IMPL *session, const void *buffer,
 	WT_RET(__json_struct_unpackv(session, buffer, size, fmt,
 	    names, (u_char *)*json_bufp, needed + 1, iskey, ap));
 
-	return (ret);
+	return (0);
 }
 
 /*

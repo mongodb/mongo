@@ -9,8 +9,6 @@
 #define	WT_PTRDIFFT_FMT	"td"			/* ptrdiff_t format string */
 #define	WT_SIZET_FMT	"zu"			/* size_t format string */
 
-#define	WT_COMPILER_TYPE_ALIGN(x)
-
 #define	WT_PACKED_STRUCT_BEGIN(name)					\
 	struct name {
 #define	WT_PACKED_STRUCT_END						\

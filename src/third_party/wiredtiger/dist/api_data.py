@@ -118,8 +118,7 @@ lsm_config = [
     ]),
 ]
 
-# Per-file configuration
-file_config = format_meta + [
+file_runtime_config = [
     Config('access_pattern_hint', 'none', r'''
         It is recommended that workloads that consist primarily of
         updates and/or point queries specify \c random.  Workloads that
@@ -128,6 +127,14 @@ file_config = format_meta + [
         option leads to an advisory call to an appropriate operating
         system API where available''',
         choices=['none', 'random', 'sequential']),
+    Config('cache_resident', 'false', r'''
+        do not ever evict the object's pages from cache. Not compatible with
+        LSM tables; see @ref tuning_cache_resident for more information''',
+        type='boolean'),
+]
+
+# Per-file configuration
+file_config = format_meta + file_runtime_config + [
     Config('block_allocation', 'best', r'''
         configure block allocation. Permitted values are \c "first" or
         \c "best"; the \c "first" configuration uses a first-available
@@ -146,10 +153,6 @@ file_config = format_meta + [
         WT_CONNECTION::add_compressor.  If WiredTiger has builtin support for
         \c "lz4", \c "snappy", \c "zlib" or \c "zstd" compression, these names
         are also available.  See @ref compression for more information'''),
-    Config('cache_resident', 'false', r'''
-        do not ever evict the object's pages from cache. Not compatible with
-        LSM tables; see @ref tuning_cache_resident for more information''',
-        type='boolean'),
     Config('checksum', 'uncompressed', r'''
         configure block checksums; permitted values are <code>on</code>
         (checksum all blocks), <code>off</code> (checksum no blocks) and
@@ -727,7 +730,7 @@ wiredtiger_open_common =\
     Config('hazard_max', '1000', r'''
         maximum number of simultaneous hazard pointers per session
         handle''',
-        min='15'),
+        min=15, undoc=True),
     Config('mmap', 'true', r'''
         Use memory mapping to access files when possible''',
         type='boolean'),
@@ -833,6 +836,8 @@ methods = {
 'WT_CURSOR.close' : Method([]),
 
 'WT_CURSOR.reconfigure' : Method(cursor_runtime_config),
+
+'WT_SESSION.alter' : Method(file_runtime_config),
 
 'WT_SESSION.close' : Method([]),
 

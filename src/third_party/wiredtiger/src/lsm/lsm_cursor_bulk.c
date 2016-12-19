@@ -45,7 +45,7 @@ __clsm_close_bulk(WT_CURSOR *cursor)
 	    total_chunks /= avg_chunks)
 		++chunk->generation;
 
-	WT_RET(__wt_lsm_meta_write(session, lsm_tree));
+	WT_RET(__wt_lsm_meta_write(session, lsm_tree, NULL));
 	++lsm_tree->dsk_gen;
 
 	/* Close the LSM cursor */

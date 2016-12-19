@@ -65,6 +65,10 @@ static CONFIG c[] = {
 	  "if timed run should drop core",			/* 0% */
 	  C_BOOL, 0, 0, 0, &g.c_abort, NULL },
 
+	{ "alter",
+	  "if altering the table is enabled",			/* 10% */
+	  C_BOOL, 10, 0, 0, &g.c_alter, NULL },
+
 	{ "auto_throttle",
 	  "if LSM inserts are throttled",			/* 90% */
 	  C_BOOL, 90, 0, 0, &g.c_auto_throttle, NULL },
