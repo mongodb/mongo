@@ -41,39 +41,39 @@
         configsvr: '',
         storageEngine: 'wiredTiger',
         setParameter: {
-            "failpoint.transitionToPrimaryHangBeforeInitializingConfigDatabase":
+            "failpoint.transitionToPrimaryHangBeforeTakingGlobalExclusiveLock":
                 "{'mode':'alwaysOn'}"
         }
     });
     var conf = configRS.getReplSetConfig();
     conf.settings = {catchUpTimeoutMillis: 0};
-    configRS.initiate(conf);
 
-    var secondaries = configRS.getSecondaries();
-    var origPriConn = configRS.getPrimary();
+    // Ensure conf.members[0] is the only node that can become primary at first, so we know on which
+    // nodes to wait for transition to SECONDARY.
+    conf.members[1].priority = 0;
+    conf.members[2].priority = 0;
+    configRS.nodes[0].adminCommand({replSetInitiate: conf});
 
-    // Ensure the primary is waiting to write the config.version document before stopping the oplog
-    // fetcher on the secondaries.
-    checkLog.contains(
-        origPriConn,
-        'transition to primary - transitionToPrimaryHangBeforeInitializingConfigDatabase fail point enabled.');
+    jsTest.log("Waiting for " + nodes[1] + " and " + nodes[2] + " to transition to SECONDARY.");
+    configRS.waitForState([nodes[1], nodes[2]], ReplSetTest.State.SECONDARY);
 
-    jsTest.log("Stopping the OplogFetcher on the secondaries");
-    secondaries.forEach(function(node) {
+    jsTest.log("Stopping the OplogFetcher on all nodes");
+    // Now that the secondaries have finished initial sync and are electable, stop replication.
+    nodes.forEach(function(node) {
         assert.commandWorked(node.getDB('admin').runCommand(
             {configureFailPoint: 'stopOplogFetcher', mode: 'alwaysOn'}));
     });
 
     jsTest.log("Allowing the primary to write the config.version doc");
-    // Note: since we didn't know which node would be elected to be the first primary, we had to
-    // turn this failpoint on for all nodes earlier. Since we do want the all future primaries to
-    // write the config.version doc immediately, we turn the failpoint off for all nodes now.
     nodes.forEach(function(node) {
         assert.commandWorked(node.adminCommand({
-            configureFailPoint: "transitionToPrimaryHangBeforeInitializingConfigDatabase",
+            configureFailPoint: "transitionToPrimaryHangBeforeTakingGlobalExclusiveLock",
             mode: "off"
         }));
     });
+
+    var origPriConn = configRS.getPrimary();
+    var secondaries = configRS.getSecondaries();
 
     jsTest.log("Confirming that the primary has the config.version doc but the secondaries do not");
     var origConfigVersionDoc;
@@ -86,9 +86,19 @@
         assert.eq(null, secondary.getCollection('config.version').findOne());
     });
 
-    // Ensure manually deleting the config.version document is not allowed.
+    jsTest.log("Checking that manually deleting the config.version document is not allowed.");
     assert.writeErrorWithCode(origPriConn.getCollection('config.version').remove({}), 40302);
     assert.commandFailedWithCode(origPriConn.getDB('config').runCommand({drop: 'version'}), 40303);
+
+    jsTest.log("Making the secondaries electable by giving all nodes non-zero, equal priority.");
+    var res = configRS.getPrimary().adminCommand({replSetGetConfig: 1});
+    assert.commandWorked(res);
+    conf = res.config;
+    conf.members[0].priority = 1;
+    conf.members[1].priority = 1;
+    conf.members[2].priority = 1;
+    conf.version++;
+    configRS.getPrimary().adminCommand({replSetReconfig: conf});
 
     jsTest.log("Stepping down original primary");
     try {
@@ -106,7 +116,7 @@
     assert.neq(origConfigVersionDoc.clusterId, newConfigVersionDoc.clusterId);
 
     jsTest.log("Re-enabling replication on all nodes");
-    secondaries.forEach(function(node) {
+    nodes.forEach(function(node) {
         assert.commandWorked(
             node.getDB('admin').runCommand({configureFailPoint: 'stopOplogFetcher', mode: 'off'}));
     });
