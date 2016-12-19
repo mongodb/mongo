@@ -474,6 +474,12 @@ void AsyncResultsMerger::handleBatchResponse(
             return;
         } else {
             remote.status = cursorResponseStatus.getStatus();
+            if (remote.status == ErrorCodes::CallbackCanceled) {
+                // This callback should only be canceled as part of the shutdown sequence, so we
+                // promote a canceled callback error to an error that will make more sense to the
+                // client.
+                remote.status = Status(ErrorCodes::ShutdownInProgress, "shutdown in progress");
+            }
         }
 
         // Unreachable host errors are swallowed if the 'allowPartialResults' option is set. We

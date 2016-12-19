@@ -787,7 +787,7 @@ TEST_F(AsyncResultsMergerTest, NextEventAfterTaskExecutorShutdown) {
     BSONObj findCmd = fromjson("{find: 'testcoll'}");
     makeCursorFromFindCmd(findCmd, kTestShardIds);
     executor->shutdown();
-    ASSERT_NOT_OK(arm->nextEvent().getStatus());
+    ASSERT_EQ(ErrorCodes::ShutdownInProgress, arm->nextEvent().getStatus());
     auto killEvent = arm->kill();
     ASSERT_FALSE(killEvent.isValid());
 }
