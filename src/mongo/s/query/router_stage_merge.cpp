@@ -57,6 +57,10 @@ StatusWith<ClusterQueryResult> RouterStageMerge::next() {
 
 void RouterStageMerge::kill() {
     auto killEvent = _arm.kill();
+    if (!killEvent) {
+        // Mongos is shutting down.
+        return;
+    }
     _executor->waitForEvent(killEvent);
 }
 
