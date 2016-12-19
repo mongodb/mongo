@@ -51,26 +51,51 @@
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
-void mongo::execCommandClient(OperationContext* txn,
-                              Command* c,
-                              int queryOptions,
-                              const char* ns,
-                              BSONObj& cmdObj,
-                              BSONObjBuilder& result) {
+namespace mongo {
+
+using std::string;
+using std::stringstream;
+
+// called into by the web server. For now we just translate the parameters
+// to their old style equivalents.
+void Command::execCommand(OperationContext* txn,
+                          Command* command,
+                          const rpc::RequestInterface& request,
+                          rpc::ReplyBuilderInterface* replyBuilder) {
+    int queryFlags = 0;
+    BSONObj cmdObj;
+
+    std::tie(cmdObj, queryFlags) = uassertStatusOK(
+        rpc::downconvertRequestMetadata(request.getCommandArgs(), request.getMetadata()));
+
+    std::string db = request.getDatabase().rawData();
+    BSONObjBuilder result;
+
+    execCommandClient(txn, command, queryFlags, request.getDatabase().rawData(), cmdObj, result);
+
+    replyBuilder->setCommandReply(result.done()).setMetadata(rpc::makeEmptyMetadata());
+}
+
+void Command::execCommandClient(OperationContext* txn,
+                                Command* c,
+                                int queryOptions,
+                                const char* ns,
+                                BSONObj& cmdObj,
+                                BSONObjBuilder& result) {
     std::string dbname = nsToDatabase(ns);
 
     if (cmdObj.getBoolField("help")) {
-        std::stringstream help;
+        stringstream help;
         help << "help for: " << c->getName() << " ";
         c->help(help);
         result.append("help", help.str());
-        Command::appendCommandStatus(result, true, "");
+        appendCommandStatus(result, true, "");
         return;
     }
 
-    Status status = Command::checkAuthorization(c, txn, dbname, cmdObj);
+    Status status = checkAuthorization(c, txn, dbname, cmdObj);
     if (!status.isOK()) {
-        Command::appendCommandStatus(result, status);
+        appendCommandStatus(result, status);
         return;
     }
 
@@ -83,7 +108,7 @@ void mongo::execCommandClient(OperationContext* txn,
     StatusWith<WriteConcernOptions> wcResult =
         WriteConcernOptions::extractWCFromCommand(cmdObj, dbname);
     if (!wcResult.isOK()) {
-        Command::appendCommandStatus(result, wcResult.getStatus());
+        appendCommandStatus(result, wcResult.getStatus());
         return;
     }
 
@@ -92,7 +117,7 @@ void mongo::execCommandClient(OperationContext* txn,
         // This command doesn't do writes so it should not be passed a writeConcern.
         // If we did not use the default writeConcern, one was provided when it shouldn't have
         // been by the user.
-        Command::appendCommandStatus(
+        appendCommandStatus(
             result, Status(ErrorCodes::InvalidOptions, "Command does not support writeConcern"));
         return;
     }
@@ -133,39 +158,8 @@ void mongo::execCommandClient(OperationContext* txn,
         c->_commandsFailed.increment();
     }
 
-    Command::appendCommandStatus(result, ok, errmsg);
+    appendCommandStatus(result, ok, errmsg);
 }
-
-namespace mongo {
-
-using std::string;
-using std::stringstream;
-
-namespace {
-// called into by the web server. For now we just translate the parameters
-// to their old style equivalents.
-void execCommandHandler(OperationContext* txn,
-                        Command* command,
-                        const rpc::RequestInterface& request,
-                        rpc::ReplyBuilderInterface* replyBuilder) {
-    int queryFlags = 0;
-    BSONObj cmdObj;
-
-    std::tie(cmdObj, queryFlags) = uassertStatusOK(
-        rpc::downconvertRequestMetadata(request.getCommandArgs(), request.getMetadata()));
-
-    std::string db = request.getDatabase().rawData();
-    BSONObjBuilder result;
-
-    execCommandClient(txn, command, queryFlags, request.getDatabase().rawData(), cmdObj, result);
-
-    replyBuilder->setCommandReply(result.done()).setMetadata(rpc::makeEmptyMetadata());
-}
-MONGO_INITIALIZER(InitializeCommandExecCommandHandler)(InitializerContext* const) {
-    Command::registerExecCommand(execCommandHandler);
-    return Status::OK();
-}
-}  // namespace
 
 namespace {
 void registerErrorImpl(OperationContext* txn, const DBException& exception) {}

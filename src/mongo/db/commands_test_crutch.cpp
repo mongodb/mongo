@@ -26,35 +26,21 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/commands.h"
+
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
-class OperationContext;
-class Command;
-class BSONObj;
-class BSONObjBuilder;
 
-namespace rpc {
-class RequestInterface;
-class ReplyBuilderInterface;
-}  // namespace rpc
+void Command::execCommand(OperationContext*,
+                          Command*,
+                          const rpc::RequestInterface&,
+                          rpc::ReplyBuilderInterface*) {
+    invariant(false);
+}
 
-
-// Only one of these two functions will be implemented in a target binary.  They are provided in
-// this header to facilitate being made friends of `Command` as their original implementations were
-// both members, and defined to be the same symbol.
-
-// Implemented in `src/mongo/s/s_only.cpp`.
-void execCommandClient(OperationContext* txn,
-                       Command* c,
-                       int queryOptions,
-                       const char* ns,
-                       BSONObj& cmdObj,
-                       BSONObjBuilder& result);
-
-// Implemented in `src/mongo/db/commands/dbcommands.cpp`.
-void execCommandDatabase(OperationContext* txn,
-                         Command* command,
-                         const rpc::RequestInterface& request,
-                         rpc::ReplyBuilderInterface* replyBuilder);
 }  // namespace mongo

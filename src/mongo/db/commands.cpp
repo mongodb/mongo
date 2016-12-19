@@ -386,22 +386,4 @@ void Command::registerError(OperationContext* const txn, const DBException& exce
     registeredRegisterErrorHandler(txn, exception);
 }
 
-namespace {
-stdx::function<Command::ExecCommandHandler> execCommandHandler =
-    [](OperationContext* const,
-       Command* const,
-       const rpc::RequestInterface&,
-       rpc::ReplyBuilderInterface* const) { invariant(false); };
-}  // namespace
-
-void Command::execCommand(OperationContext* const txn,
-                          Command* const command,
-                          const rpc::RequestInterface& request,
-                          rpc::ReplyBuilderInterface* const replyBuilder) {
-    execCommandHandler(txn, command, request, replyBuilder);
-}
-
-void Command::registerExecCommand(stdx::function<Command::ExecCommandHandler> handler) {
-    execCommandHandler = std::move(handler);
-}
 }  // namespace mongo

@@ -108,7 +108,7 @@ void runAgainstRegistered(OperationContext* txn,
         return;
     }
 
-    execCommandClient(txn, c, queryOptions, ns, jsobj, anObjBuilder);
+    Command::execCommandClient(txn, c, queryOptions, ns, jsobj, anObjBuilder);
 }
 
 /**
