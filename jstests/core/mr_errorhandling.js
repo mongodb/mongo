@@ -48,3 +48,9 @@ res.drop();
 assert.throws(function() {
     t.mapReduce(m_good, r, {out: "xxx", query: "foo"});
 });
+
+// Test namespace does not exist.
+db.mr_nonexistent.drop();
+assert.commandFailedWithCode(
+    db.runCommand({mapReduce: "mr_nonexistent", map: m_good, reduce: r, out: "out_nonexistent"}),
+    ErrorCodes.NamespaceNotFound);

@@ -1434,8 +1434,10 @@ public:
         BSONObjBuilder timingBuilder;
         State state(txn, config);
         if (!state.sourceExists()) {
-            errmsg = "ns doesn't exist";
-            return false;
+            return appendCommandStatus(
+                result,
+                Status(ErrorCodes::NamespaceNotFound,
+                       str::stream() << "namespace does not exist: " << config.nss.ns()));
         }
         if (state.isOnDisk()) {
             // this means that it will be doing a write operation, make sure we are on Master
