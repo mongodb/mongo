@@ -51,12 +51,18 @@
     restartReplSetReplication(replTest);
 
     jsTestLog("Verifying primary shut down and cannot be connected to.");
-    // Successful shutdown throws network error.
+    // Successfully starting shutdown throws a network error.
     var exitCode = awaitShell({checkExitSuccess: false});
     assert.neq(0, exitCode, "expected shutdown to close the shell's connection");
-    assert.throws(function() {
-        new Mongo(primary.host);
-    });
+    assert.soonNoExcept(function() {
+        // The parallel shell exits while shutdown is in progress, and if this happens early enough,
+        // the primary can still accept connections despite successfully starting to shutdown.
+        // So, retry connecting until connections cannot be established and an error is thrown.
+        assert.throws(function() {
+            new Mongo(primary.host);
+        });
+        return true;
+    }, "expected primary node to shut down and not be connectable");
 
     replTest.stopSet();
 })();
