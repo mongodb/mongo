@@ -409,13 +409,11 @@ static int
 __clsm_resize_chunks(
     WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm, u_int nchunks)
 {
-	WT_DECL_RET;
 	WT_LSM_CURSOR_CHUNK *chunk;
 
 	/* Don't allocate more iterators if we don't need them. */
-	if (clsm->chunks_count >= nchunks) {
-		return (ret);
-	}
+	if (clsm->chunks_count >= nchunks)
+		return (0);
 
 	WT_RET(__wt_realloc_def(session, &clsm->chunks_alloc, nchunks,
 	    &clsm->chunks));
@@ -423,7 +421,7 @@ __clsm_resize_chunks(
 		WT_RET(__wt_calloc_one(session, &chunk));
 		clsm->chunks[clsm->chunks_count] = chunk;
 	}
-	return (ret);
+	return (0);
 }
 
 /*
@@ -434,9 +432,10 @@ static void
 __clsm_free_chunks(WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm)
 {
 	size_t i;
-	for (i = 0; i < clsm->chunks_count; i++) {
+
+	for (i = 0; i < clsm->chunks_count; i++)
 		__wt_free(session, clsm->chunks[i]);
-	}
+
 	__wt_free(session, clsm->chunks);
 }
 

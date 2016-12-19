@@ -44,7 +44,7 @@ __wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * Wait for up to a second for hazard pointers to be cleared.
 	 */
 	for (hp = NULL, i = 0; i < 100; i++) {
-		if ((hp = __wt_page_hazard_check(session, ref)) == NULL)
+		if ((hp = __wt_hazard_check(session, ref)) == NULL)
 			break;
 		__wt_sleep(0, 10000);
 	}

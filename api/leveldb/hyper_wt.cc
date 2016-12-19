@@ -27,6 +27,7 @@
 
 #include "leveldb_wt.h"
 #include <errno.h>
+#include <stdlib.h>
 #include <sstream>
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -143,7 +144,14 @@ class ReplayIteratorImpl : public ReplayIterator {
   }
 
  private:
-  void SeekTo(WT_LSN *lsn);
+  /*
+   * A log sequence number, representing a position in the transaction log.
+   */
+  typedef struct {
+	uint32_t file;				/* Log file number */
+	unsigned long long offset;		/* Log file offset */
+  } LSN;
+  void SeekTo(LSN *lsn);
   // No copying allowed
   ReplayIteratorImpl(const ReplayIterator&) { }
   void operator=(const ReplayIterator&) { }
@@ -151,7 +159,7 @@ class ReplayIteratorImpl : public ReplayIterator {
   Status status_;
   WT_CURSOR *cursor_;
   WT_ITEM key_, value_;
-  WT_LSN lsn_;
+  LSN lsn_;
   bool valid_;
   uint64_t txnid;
   uint32_t fileid, opcount, optype, rectype;
@@ -201,7 +209,7 @@ ReplayIteratorImpl::Next() {
 void
 ReplayIteratorImpl::SeekToLast() {
 	int ret = 0;
-	WT_LSN last_lsn;
+	LSN last_lsn;
 
 	last_lsn.file = 0;
 	if (cursor_ != NULL) {
@@ -235,7 +243,7 @@ ReplayIteratorImpl::SeekToLast() {
 
 void
 ReplayIteratorImpl::SeekTo(const std::string& timestamp) {
-	WT_LSN target_lsn;
+	LSN target_lsn;
 	int ret = 0;
 
 	if (timestamp == "all") {
@@ -260,7 +268,7 @@ ReplayIteratorImpl::SeekTo(const std::string& timestamp) {
 // Set the cursor on the first modification record at or after the
 // given LSN.
 void
-ReplayIteratorImpl::SeekTo(WT_LSN *target_lsn) {
+ReplayIteratorImpl::SeekTo(LSN *target_lsn) {
 	int ret = 0;
 
 	valid_ = false;

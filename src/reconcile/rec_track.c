@@ -35,7 +35,6 @@ __ovfl_discard_verbose(
 {
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_DECL_ITEM(tmp);
-	WT_DECL_RET;
 
 	WT_RET(__wt_scr_alloc(session, 512, &tmp));
 
@@ -50,7 +49,7 @@ __ovfl_discard_verbose(
 	    __wt_addr_string(session, unpack->data, unpack->size, tmp));
 
 	__wt_scr_free(session, &tmp);
-	return (ret);
+	return (0);
 }
 
 #if 0
@@ -83,7 +82,6 @@ static int
 __ovfl_discard_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CELL **cellp;
-	WT_DECL_RET;
 	WT_OVFL_TRACK *track;
 	uint32_t i;
 
@@ -101,7 +99,7 @@ __ovfl_discard_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	__wt_free(session, track->discard);
 	track->discard_entries = track->discard_allocated = 0;
 
-	return (ret);
+	return (0);
 }
 
 /*
@@ -170,7 +168,6 @@ __ovfl_reuse_verbose(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_OVFL_REUSE *reuse, const char *tag)
 {
 	WT_DECL_ITEM(tmp);
-	WT_DECL_RET;
 
 	WT_RET(__wt_scr_alloc(session, 64, &tmp));
 
@@ -188,7 +185,7 @@ __ovfl_reuse_verbose(WT_SESSION_IMPL *session,
 	    WT_MIN(reuse->value_size, 40), (char *)WT_OVFL_REUSE_VALUE(reuse));
 
 	__wt_scr_free(session, &tmp);
-	return (ret);
+	return (0);
 }
 
 #if 0
@@ -568,7 +565,6 @@ __ovfl_txnc_verbose(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_OVFL_TXNC *txnc, const char *tag)
 {
 	WT_DECL_ITEM(tmp);
-	WT_DECL_RET;
 
 	WT_RET(__wt_scr_alloc(session, 64, &tmp));
 
@@ -583,7 +579,7 @@ __ovfl_txnc_verbose(WT_SESSION_IMPL *session,
 	    WT_MIN(txnc->value_size, 40), (char *)WT_OVFL_TXNC_VALUE(txnc));
 
 	__wt_scr_free(session, &tmp);
-	return (ret);
+	return (0);
 }
 
 #if 0

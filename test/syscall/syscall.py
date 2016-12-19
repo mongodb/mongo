@@ -104,6 +104,9 @@ headpatterns = [ [ tracepat, 'trace_syscalls', 0],
                  [ systempat, 'required_system', 0],
                  [ runpat, 'run_args', 0] ]
 
+pwrite_in = r'pwrite64'
+pwrite_out = r'pwrite'
+
 # To create breakpoints while debugging this script
 def bp():
     import pdb
@@ -416,8 +419,11 @@ class Runner:
     def call_compare(self, callname, result, eargs, errline):
         if callname in calls_returning_zero:
             return self.compare("EQ", result, "0", errline)
-        elif callname == 'pwrite':
-            return self.compare("EQ", result, eargs[2], errline)
+        elif callname == 'pwrite' or callname == 'pwrite64':
+            return self.compare("EQ",
+                re.sub(pwrite_in, pwrite_out, result),
+                re.sub(pwrite_in, pwrite_out, eargs[2]),
+                errline)
         else:
             self.fail(errline, 'call ' + callname +
                       ': not known, use ASSERT_EQ()')
@@ -469,13 +475,12 @@ class Runner:
         if not em:
             self.fail(errline, 'Unknown strace/dtruss output: ' + errline)
             return False
-        gotcall = em.groups()[0]
+        gotcall = re.sub(pwrite_in, pwrite_out, em.groups()[0])
         # filtering syscalls here if needed.  If it's not a match,
         # mark the errline so it is retried.
         if self.strip_syscalls != None and gotcall not in self.strip_syscalls:
             errline.skip = True
             return False
-
         m = re.match(assignpat, runline)
         if m:
             if m.groups()[1] != gotcall:
@@ -545,10 +550,12 @@ class Runner:
         with outfile, errfile:
             runlines = self.order_runfile(self.runfile)
             errline = errfile.readline()
+            errline = re.sub(pwrite_in, pwrite_out, errline)
             if re.match(dtruss_init_pat, errline):
                 errline = errfile.readline()
             skiplines = False
             for runline in runlines:
+                runline = re.sub(pwrite_in, pwrite_out, runline)
                 if runline == '...':
                     skiplines = True
                     if self.args.verbose:
@@ -620,7 +627,8 @@ class Runner:
         elif self.args.systype == 'Darwin':
             # dtrace has no option to limit the syscalls to be traced,
             # so we'll filter the output.
-            self.strip_syscalls = self.headopts.trace_syscalls.split(',')
+            self.strip_syscalls = re.sub(pwrite_in, pwrite_out,
+                self.headopts.trace_syscalls).split(',')
         callargs.append(self.testexe)
         callargs.extend(self.runargs)
 

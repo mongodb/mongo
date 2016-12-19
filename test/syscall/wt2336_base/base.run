@@ -46,15 +46,15 @@ SYSTEM("Darwin");
 #define FTRUNCATE(fd, len)			/* do nothing */
 #endif
 
-TRACE("close,fdatasync,fsync,ftruncate,open,pwrite,rename");
+TRACE("close,fdatasync,fsync,ftruncate,open,pwrite64,rename");
 RUN("");
 ...
 OUTPUT("--------------wiredtiger_open");
 // lock == 3
 lock = open("./WiredTiger.lock", O_RDWR|O_CREAT|O_CLOEXEC, 0666);
-pwrite(lock, "WiredTiger lock file\n", 0x15, 0x0);
+pwrite64(lock, "WiredTiger lock file\n", 0x15, 0x0);
 fd = open("./WiredTiger", O_RDWR|O_CREAT|O_CLOEXEC, 0666);
-pwrite(fd, "WiredTiger\nWiredTiger"..., ...);
+pwrite64(fd, "WiredTiger\nWiredTiger"..., ...);
 #ifdef __linux__
 fdatasync(fd);
 #endif /* __linux__ */
@@ -63,7 +63,7 @@ close(fd);
 ...  // On Linux, there are calls to open and read "/proc/meminfo" here.
 
 fd = open("./WiredTiger.basecfg.set", O_RDWR|O_CREAT|O_EXCL|O_CLOEXEC, 0666);
-pwrite(fd, "# Do not modify this file."..., ...);
+pwrite64(fd, "# Do not modify this file."..., ...);
 #ifdef __linux__
 fdatasync(fd);
 #endif /* __linux__ */
@@ -84,7 +84,7 @@ fdatasync(dir);
 close(dir);
 #endif /* __linux__ */
 
-pwrite(fd, ""..., 0x1000, 0x0);
+pwrite64(fd, ""..., 0x1000, 0x0);
 #ifdef __linux__
 fdatasync(fd);
 #endif /* __linux__ */
@@ -94,7 +94,7 @@ wt = OPEN_EXISTING("./WiredTiger.wt\0", O_RDWR|O_NOATIME|O_CLOEXEC);
 FTRUNCATE(wt, 0x1000);
 
 fd = open("./WiredTiger.turtle.set\0", O_RDWR|O_CREAT|O_EXCL|O_CLOEXEC, 0666);
-pwrite(fd, "WiredTiger version string\nWiredTiger"..., ...);
+pwrite64(fd, "WiredTiger version string\nWiredTiger"..., ...);
 #ifdef __linux__
 fdatasync(fd);
 #endif /* __linux__ */
@@ -111,7 +111,7 @@ fdatasync(dir);
 close(dir);
 #endif /* __linux__ */
 
-pwrite(fd, ""..., 0x1000, 0x0);
+pwrite64(fd, ""..., 0x1000, 0x0);
 
 #ifdef __linux__
 fdatasync(fd);
@@ -122,14 +122,17 @@ fd = OPEN_EXISTING("./WiredTigerLAS.wt", O_RDWR|O_NOATIME|O_CLOEXEC);
 FTRUNCATE(fd, 0x1000);
 fd = OPEN_EXISTING("./WiredTiger.turtle", O_RDWR|O_CLOEXEC);
 close(fd);
-pwrite(wt, ""..., 0x1000, 0x1000);
-pwrite(wt, ""..., 0x1000, 0x2000);
-pwrite(wt, ""..., 0x1000, 0x3000);
+pwrite64(wt, ""..., 0x1000, 0x1000);
+pwrite64(wt, ""..., 0x1000, 0x2000);
+pwrite64(wt, ""..., 0x1000, 0x3000);
+#ifdef __linux__
+fdatasync(wt);
+#endif /* __linux__ */
 fd = OPEN_EXISTING("./WiredTiger.turtle", O_RDWR|O_CLOEXEC);
 
 close(fd);
 fd = open("./WiredTiger.turtle.set", O_RDWR|O_CREAT|O_EXCL|O_CLOEXEC, 0666);
-pwrite(fd, "WiredTiger version string\nWiredTiger"..., ...);
+pwrite64(fd, "WiredTiger version string\nWiredTiger"..., ...);
 #ifdef __linux__
 fdatasync(fd);
 #endif /* __linux__ */
@@ -139,6 +142,7 @@ rename("./WiredTiger.turtle.set", "./WiredTiger.turtle");
 dir = open("./", O_RDONLY); 
 fdatasync(dir);
 close(dir);
+fdatasync(wt);
 #endif /* __linux__ */
 
 OUTPUT("--------------open_session");
@@ -150,7 +154,7 @@ dir = open("./", O_RDONLY);
 fdatasync(dir);
 close(dir);
 #endif /* __linux__ */
-pwrite(hello, "A\330\001"..., 0x1000, 0x0);
+pwrite64(hello, "A\330\001"..., 0x1000, 0x0);
 #ifdef __linux__
 fdatasync(hello);
 #endif /* __linux__ */

@@ -37,7 +37,7 @@ __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * Check for a hazard pointer indicating another thread is using the
 	 * page, meaning the page cannot be evicted.
 	 */
-	if (__wt_page_hazard_check(session, ref) == NULL)
+	if (__wt_hazard_check(session, ref) == NULL)
 		return (0);
 
 	WT_STAT_DATA_INCR(session, cache_eviction_hazard);

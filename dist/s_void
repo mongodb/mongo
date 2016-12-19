@@ -12,6 +12,7 @@ file_parse()
 	sed -n \
 	    -e '/^int$/b loop' \
 	    -e '/^static int$/b loop' \
+	    -e '/^static inline int$/b loop' \
 	    -e 'd' \
 	    -e ': loop' \
 	    -e 'H' \
@@ -35,6 +36,7 @@ func_ok()
 	    -e '/int __compact_uri_analyze$/d' \
 	    -e '/int __config_parser_close$/d' \
 	    -e '/int __curlog_reset$/d' \
+	    -e '/int __cursor_fix_implicit$/d' \
 	    -e '/int __handle_close_default$/d' \
 	    -e '/int __handle_progress_default$/d' \
 	    -e '/int __im_file_close$/d' \
@@ -43,7 +45,7 @@ func_ok()
 	    -e '/int __im_file_sync$/d' \
 	    -e '/int __im_fs_directory_list_free$/d' \
 	    -e '/int __im_fs_exist$/d' \
-	    -e '/int __posix_file_close$/d' \
+	    -e '/int __page_write_gen_wrapped_check$/d' \
 	    -e '/int __posix_terminate$/d' \
 	    -e '/int __rec_destroy_session$/d' \
 	    -e '/int __win_terminate$/d' \
@@ -60,11 +62,14 @@ func_ok()
 	    -e '/int __wt_lsm_manager_pop_entry$/d' \
 	    -e '/int __wt_once$/d' \
 	    -e '/int __wt_posix_directory_list_free$/d' \
+	    -e '/int __wt_spin_init$/d' \
+	    -e '/int __wt_spin_trylock$/d' \
 	    -e '/int __wt_stat_connection_desc$/d' \
 	    -e '/int __wt_stat_dsrc_desc$/d' \
 	    -e '/int __wt_stat_join_desc$/d' \
 	    -e '/int __wt_win_directory_list_free$/d' \
 	    -e '/int bdb_compare_reverse$/d' \
+	    -e '/int copyout_val$/d' \
 	    -e '/int csv_error$/d' \
 	    -e '/int csv_terminate$/d' \
 	    -e '/int demo_file_close$/d' \
@@ -109,13 +114,14 @@ func_ok()
 	    -e '/int zstd_terminate$/d'
 }
 
-# Complain about functions which return an "int" but which don't return except
-# at the end of the function.
 for f in `find bench ext src test -name '*.[ci]'`; do
 	if expr "$f" : '.*/windows_shim.c' > /dev/null; then
 		continue
 	fi
 
+	# Complain about functions which return an "int" but which don't return
+	# except at the end of the function.
+	#
 	# Turn each function into a single line, then discard the function's
 	# final "return" call, then discard any function that still has some
 	# form of return assignment or call.
@@ -128,6 +134,9 @@ for f in `find bench ext src test -name '*.[ci]'`; do
 	    -e '/WT_ILLEGAL_VALUE[A-Z_]*(/d' \
 	    -e '/WT_PANIC[A-Z_]*(/d' \
 	    -e '/WT_RET[A-Z_]*(/d' \
+	    -e '/WT_SIZE_CHECK_PACK(/d' \
+	    -e '/WT_SIZE_CHECK_UNPACK(/d' \
+	    -e '/WT_SYSCALL(/d' \
 	    -e '/WT_TRET(/d' \
 	    -e '/[^a-z_]ret = /d' \
 	    -e '/[^a-z_]return (/d' \
@@ -139,6 +148,28 @@ for f in `find bench ext src test -name '*.[ci]'`; do
 		echo "$f:"
 		cat $t | sed 's/^/	/'
 		echo "Function could return void instead of int."
+		echo "Add false positives to the list in dist/s_void."
+		echo "=============================================="
+	}
+
+	# Complain about functions which declare a "ret" value but never use it.
+	file_parse $f |
+	grep 'WT_DECL_RET' |
+	sed -e '/ret =/d' \
+	    -e '/API_END_RET/d' \
+	    -e '/WT_CURSOR_NEEDKEY/d' \
+	    -e '/WT_CURSOR_NEEDVALUE/d' \
+	    -e '/WT_ERR/d' \
+	    -e '/WT_ILLEGAL_VALUE_ERR/d' \
+	    -e '/WT_SYSCALL.*ret/d' \
+	    -e '/WT_TRET/d' \
+	    -e 's/^\([^(]*\).*/\1/' \
+	    -e 's/^ *//' > $t
+	test -s $t && {
+		echo "=============================================="
+		echo "$f:"
+		cat $t | sed 's/^/	/'
+		echo "Function declares ret without using it."
 		echo "Add false positives to the list in dist/s_void."
 		echo "=============================================="
 	}

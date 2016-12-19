@@ -254,7 +254,6 @@ __wt_async_op_enqueue(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op)
 {
 	WT_ASYNC *async;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	uint64_t cur_head, cur_tail, my_alloc, my_slot;
 #ifdef	HAVE_DIAGNOSTIC
 	WT_ASYNC_OP_IMPL *my_op;
@@ -307,7 +306,7 @@ __wt_async_op_enqueue(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op)
 		WT_ORDERED_READ(cur_head, async->head);
 	}
 	WT_PUBLISH(async->head, my_alloc);
-	return (ret);
+	return (0);
 }
 
 /*

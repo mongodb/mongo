@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!usr/bin/env python
 #
 # Public Domain 2014-2016 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
@@ -48,8 +48,6 @@ class test_config03(test_base03.test_base03):
     eviction_trigger_scenarios = wtscenario.quick_scenarios(
         's_eviction_trigger',
         [50, 90, 95, 99], None)
-    hazard_max_scenarios = wtscenario.quick_scenarios('s_hazard_max',
-        [15, 50, 500], [0.4, 0.8, 0.8])
     multiprocess_scenarios = wtscenario.quick_scenarios('s_multiprocess',
         [True,False], [1.0,1.0])
     session_max_scenarios = wtscenario.quick_scenarios('s_session_max',
@@ -66,13 +64,13 @@ class test_config03(test_base03.test_base03):
     verbose_scenarios = wtscenario.quick_scenarios('s_verbose', [None], None)
 
     config_vars = [ 'cache_size', 'create', 'error_prefix', 'eviction_target',
-                    'eviction_trigger', 'hazard_max', 'multiprocess',
-                    'session_max', 'verbose' ]
+                    'eviction_trigger', 'multiprocess', 'session_max',
+                    'verbose' ]
 
     scenarios = wtscenario.make_scenarios(
         cache_size_scenarios, create_scenarios, error_prefix_scenarios,
         eviction_target_scenarios, eviction_trigger_scenarios,
-        hazard_max_scenarios, multiprocess_scenarios, session_max_scenarios,
+        multiprocess_scenarios, session_max_scenarios,
         transactional_scenarios, verbose_scenarios, prune=1000)
 
     #wttest.WiredTigerTestCase.printVerbose(2, 'test_config03: running ' + \

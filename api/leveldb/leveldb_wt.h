@@ -43,6 +43,7 @@
 #include "basho/perf_count.h"
 #endif
 
+#include <pthread.h>
 #include "wiredtiger.h"
 
 #define WT_URI          "table:data"
