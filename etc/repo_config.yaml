@@ -111,6 +111,7 @@ repos:
     component: main
     architectures:
       - amd64
+      - i386
     repos:
       - apt/debian/dists/jessie/mongodb-org
 
@@ -122,6 +123,7 @@ repos:
     component: main
     architectures:
       - amd64
+      - i386
     repos:
       - apt/debian/dists/wheezy/mongodb-org
 
@@ -133,6 +135,7 @@ repos:
     component: multiverse
     architectures:
       - amd64
+      - i386
     repos:
       - apt/ubuntu/dists/precise/mongodb-org
 
@@ -144,6 +147,7 @@ repos:
     component: multiverse
     architectures:
       - amd64
+      - i386
     repos:
       - apt/ubuntu/dists/trusty/mongodb-org
 
@@ -156,6 +160,7 @@ repos:
     architectures:
       - amd64
       - arm64
+      - i386
     repos:
       - apt/ubuntu/dists/xenial/mongodb-org
 
@@ -228,6 +233,7 @@ repos:
       - amd64
       - ppc64el
       - s390x
+      - i386
     repos:
       - apt/debian/dists/jessie/mongodb-enterprise
 
@@ -241,6 +247,7 @@ repos:
       - amd64
       - ppc64el
       - s390x
+      - i386
     repos:
       - apt/debian/dists/wheezy/mongodb-enterprise
 
@@ -254,6 +261,7 @@ repos:
       - amd64
       - ppc64el
       - s390x
+      - i386
     repos:
       - apt/ubuntu/dists/precise/mongodb-enterprise
 
@@ -267,6 +275,7 @@ repos:
       - amd64
       - ppc64el
       - s390x
+      - i386
     repos:
       - apt/ubuntu/dists/trusty/mongodb-enterprise
 
@@ -281,5 +290,6 @@ repos:
       - ppc64el
       - s390x
       - arm64
+      - i386
     repos:
       - apt/ubuntu/dists/xenial/mongodb-enterprise
