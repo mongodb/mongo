@@ -29,7 +29,7 @@
     assert.eq(profileObj.op, "command", tojson(profileObj));
     assert.eq(profileObj.keysExamined, 5, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 5, tojson(profileObj));
-    assert.eq(profileObj.planSummary, "IXSCAN { b: 1.0 }", tojson(profileObj));
+    assert.eq(profileObj.planSummary, "IXSCAN { b: 1 }", tojson(profileObj));
     assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
     assert.eq(profileObj.protocol, getProfilerProtocolStringForCommand(conn), tojson(profileObj));
     assert.eq(coll.getName(), profileObj.command.distinct, tojson(profileObj));

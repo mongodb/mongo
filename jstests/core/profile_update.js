@@ -39,7 +39,7 @@
     assert.eq(profileObj.keysDeleted, 1, tojson(profileObj));
     assert.eq(profileObj.nMatched, 1, tojson(profileObj));
     assert.eq(profileObj.nModified, 1, tojson(profileObj));
-    assert.eq(profileObj.planSummary, "IXSCAN { a: 1.0 }", tojson(profileObj));
+    assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
     assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
@@ -64,7 +64,7 @@
     assert.eq(profileObj.keysDeleted, 5, tojson(profileObj));
     assert.eq(profileObj.nMatched, 5, tojson(profileObj));
     assert.eq(profileObj.nModified, 5, tojson(profileObj));
-    assert.eq(profileObj.planSummary, "IXSCAN { a: 1.0 }", tojson(profileObj));
+    assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
     assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
     assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 

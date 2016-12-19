@@ -29,7 +29,7 @@
     assert.eq(profileObj.nreturned, 8, tojson(profileObj));
     assert.eq(profileObj.keysExamined, 8, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 8, tojson(profileObj));
-    assert.eq(profileObj.planSummary, "IXSCAN { a: 1.0 }", tojson(profileObj));
+    assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
     assert.eq(profileObj.protocol,
               getProfilerProtocolStringForCommand(testDB.getMongo()),
               tojson(profileObj));

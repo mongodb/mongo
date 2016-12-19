@@ -42,7 +42,7 @@
         assert.eq(profileObj.originatingCommand.filter, {a: {$gt: 0}});
         assert.eq(profileObj.originatingCommand.sort, {a: 1});
     }
-    assert.eq(profileObj.planSummary, "IXSCAN { a: 1.0 }", tojson(profileObj));
+    assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
     assert(profileObj.execStats.hasOwnProperty("stage"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("responseLength"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
@@ -117,7 +117,7 @@
     }
     assert.eq(profileObj.cursorid, cursorId, tojson(profileObj));
     assert.eq(profileObj.nreturned, 20, tojson(profileObj));
-    assert.eq(profileObj.planSummary, "IXSCAN { a: 1.0 }", tojson(profileObj));
+    assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
     assert.eq(profileObj.cursorExhausted, true, tojson(profileObj));
     assert.eq(profileObj.keysExamined, 20, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 20, tojson(profileObj));

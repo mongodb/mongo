@@ -31,6 +31,7 @@
 #include "mongo/db/query/explain.h"
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/count_scan.h"
 #include "mongo/db/exec/distinct_scan.h"
@@ -41,6 +42,7 @@
 #include "mongo/db/exec/pipeline_proxy.h"
 #include "mongo/db/exec/text.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -166,33 +168,39 @@ size_t getDocsExamined(StageType type, const SpecificStats* specific) {
 }
 
 /**
- * Adds to the plan summary string being built by 'ss' for the execution stage 'stage'.
+ * Adds to the plan summary string being built by 'sb' for the execution stage 'stage'.
  */
-void addStageSummaryStr(const PlanStage* stage, mongoutils::str::stream& ss) {
+void addStageSummaryStr(const PlanStage* stage, StringBuilder& sb) {
     // First add the stage type string.
     const CommonStats* common = stage->getCommonStats();
-    ss << common->stageTypeStr;
+    sb << common->stageTypeStr;
 
     // Some leaf nodes also provide info about the index they used.
     const SpecificStats* specific = stage->getSpecificStats();
     if (STAGE_COUNT_SCAN == stage->stageType()) {
         const CountScanStats* spec = static_cast<const CountScanStats*>(specific);
-        ss << " " << spec->keyPattern;
+        const KeyPattern keyPattern{spec->keyPattern};
+        sb << " " << keyPattern;
     } else if (STAGE_DISTINCT_SCAN == stage->stageType()) {
         const DistinctScanStats* spec = static_cast<const DistinctScanStats*>(specific);
-        ss << " " << spec->keyPattern;
+        const KeyPattern keyPattern{spec->keyPattern};
+        sb << " " << keyPattern;
     } else if (STAGE_GEO_NEAR_2D == stage->stageType()) {
         const NearStats* spec = static_cast<const NearStats*>(specific);
-        ss << " " << spec->keyPattern;
+        const KeyPattern keyPattern{spec->keyPattern};
+        sb << " " << keyPattern;
     } else if (STAGE_GEO_NEAR_2DSPHERE == stage->stageType()) {
         const NearStats* spec = static_cast<const NearStats*>(specific);
-        ss << " " << spec->keyPattern;
+        const KeyPattern keyPattern{spec->keyPattern};
+        sb << " " << keyPattern;
     } else if (STAGE_IXSCAN == stage->stageType()) {
         const IndexScanStats* spec = static_cast<const IndexScanStats*>(specific);
-        ss << " " << spec->keyPattern;
+        const KeyPattern keyPattern{spec->keyPattern};
+        sb << " " << keyPattern;
     } else if (STAGE_TEXT == stage->stageType()) {
         const TextStats* spec = static_cast<const TextStats*>(specific);
-        ss << " " << spec->indexPrefix;
+        const KeyPattern keyPattern{spec->indexPrefix};
+        sb << " " << keyPattern;
     }
 }
 
@@ -801,7 +809,7 @@ std::string Explain::getPlanSummary(const PlanStage* root) {
     flattenExecTree(root, &stages);
 
     // Use this stream to build the plan summary string.
-    mongoutils::str::stream ss;
+    StringBuilder sb;
     bool seenLeaf = false;
 
     for (size_t i = 0; i < stages.size(); i++) {
@@ -809,15 +817,15 @@ std::string Explain::getPlanSummary(const PlanStage* root) {
             // This is a leaf node. Add to the plan summary string accordingly. Unless
             // this is the first leaf we've seen, add a delimiting string first.
             if (seenLeaf) {
-                ss << ", ";
+                sb << ", ";
             } else {
                 seenLeaf = true;
             }
-            addStageSummaryStr(stages[i], ss);
+            addStageSummaryStr(stages[i], sb);
         }
     }
 
-    return ss;
+    return sb.str();
 }
 
 // static
