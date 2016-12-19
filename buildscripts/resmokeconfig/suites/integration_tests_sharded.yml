@@ -1,0 +1,22 @@
+selector:
+  cpp_integration_test:
+    root: build/integration_tests.txt
+    exclude_files:
+        - build/integration_tests/network_interface_asio_integration_test*
+
+executor:
+  cpp_integration_test:
+    config: {}
+    hooks:
+    - class: ValidateCollections
+    fixture:
+      class: ShardedClusterFixture
+      mongod_options:
+        set_parameters:
+          enableTestCommands: 1
+          numInitialSyncAttempts: 1
+      mongos_options:
+        set_parameters:
+          enableTestCommands: 1
+      enable_sharding:
+      - test

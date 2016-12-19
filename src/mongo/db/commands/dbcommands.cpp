@@ -34,6 +34,7 @@
 #include <time.h>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -1285,22 +1286,6 @@ private:
     bool maintenanceModeSet;
 };
 
-namespace {
-
-// Symbolic names for indexes to make code more readable.
-const std::size_t kCmdOptionMaxTimeMSField = 0;
-const std::size_t kHelpField = 1;
-const std::size_t kShardVersionFieldIdx = 2;
-const std::size_t kQueryOptionMaxTimeMSField = 3;
-
-// We make an array of the fields we need so we can call getFields once. This saves repeated
-// scans over the command object.
-const std::array<StringData, 4> neededFieldNames{QueryRequest::cmdOptionMaxTimeMS,
-                                                 Command::kHelpFieldName,
-                                                 ChunkVersion::kShardVersionField,
-                                                 QueryRequest::queryOptionMaxTimeMS};
-}  // namespace
-
 void appendReplyMetadata(OperationContext* opCtx,
                          const rpc::RequestInterface& request,
                          BSONObjBuilder* metadataBob) {
@@ -1520,11 +1505,31 @@ void mongo::execCommandDatabase(OperationContext* opCtx,
         std::string dbname = request.getDatabase().toString();
         unique_ptr<MaintenanceModeSetter> mmSetter;
 
-        std::array<BSONElement, std::tuple_size<decltype(neededFieldNames)>::value>
-            extractedFields{};
-        request.getCommandArgs().getFields(neededFieldNames, &extractedFields);
+        BSONElement cmdOptionMaxTimeMSField;
+        BSONElement helpField;
+        BSONElement shardVersionFieldIdx;
+        BSONElement queryOptionMaxTimeMSField;
 
-        if (Command::isHelpRequest(extractedFields[kHelpField])) {
+        StringMap<int> topLevelFields;
+        for (auto&& element : request.getCommandArgs()) {
+            StringData fieldName = element.fieldNameStringData();
+            if (fieldName == QueryRequest::cmdOptionMaxTimeMS) {
+                cmdOptionMaxTimeMSField = element;
+            } else if (fieldName == Command::kHelpFieldName) {
+                helpField = element;
+            } else if (fieldName == ChunkVersion::kShardVersionField) {
+                shardVersionFieldIdx = element;
+            } else if (fieldName == QueryRequest::queryOptionMaxTimeMS) {
+                queryOptionMaxTimeMSField = element;
+            }
+
+            uassert(ErrorCodes::FailedToParse,
+                    str::stream() << "Parsed command object contains duplicate top level key: "
+                                  << fieldName,
+                    topLevelFields[fieldName]++ == 0);
+        }
+
+        if (Command::isHelpRequest(helpField)) {
             CurOp::get(opCtx)->ensureStarted();
             // We disable last-error for help requests due to SERVER-11492, because config servers
             // use help requests to determine which commands are database writes, and so must be
@@ -1591,12 +1596,11 @@ void mongo::execCommandDatabase(OperationContext* opCtx,
         }
 
         // Handle command option maxTimeMS.
-        int maxTimeMS = uassertStatusOK(
-            QueryRequest::parseMaxTimeMS(extractedFields[kCmdOptionMaxTimeMSField]));
+        int maxTimeMS = uassertStatusOK(QueryRequest::parseMaxTimeMS(cmdOptionMaxTimeMSField));
 
         uassert(ErrorCodes::InvalidOptions,
                 "no such command option $maxTimeMs; use maxTimeMS instead",
-                extractedFields[kQueryOptionMaxTimeMSField].eoo());
+                queryOptionMaxTimeMSField.eoo());
 
         if (maxTimeMS > 0) {
             uassert(40119,
@@ -1611,7 +1615,7 @@ void mongo::execCommandDatabase(OperationContext* opCtx,
             // Handle a shard version that may have been sent along with the command.
             auto commandNS = NamespaceString(command->parseNs(dbname, request.getCommandArgs()));
             auto& oss = OperationShardingState::get(opCtx);
-            oss.initializeShardVersion(commandNS, extractedFields[kShardVersionFieldIdx]);
+            oss.initializeShardVersion(commandNS, shardVersionFieldIdx);
             auto shardingState = ShardingState::get(opCtx);
             if (oss.hasShardVersion()) {
                 uassertStatusOK(shardingState->canAcceptShardedCommands());

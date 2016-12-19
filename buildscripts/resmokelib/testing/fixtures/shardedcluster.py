@@ -170,6 +170,12 @@ class ShardedClusterFixture(interface.Fixture):
                 all(shard.is_running() for shard in self.shards) and
                 self.mongos is not None and self.mongos.is_running())
 
+    def get_connection_string(self):
+        if self.mongos is None:
+            raise ValueError("Must call setup() before calling get_connection_string()")
+
+        return "%s:%d" % (socket.gethostname(), self.mongos.port)
+
     def _new_configsvr(self):
         """
         Returns a replicaset.ReplicaSetFixture configured to be used as

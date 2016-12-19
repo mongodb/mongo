@@ -1925,6 +1925,15 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: integration_tests_sharded
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=integration_tests_sharded
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: external_auth_WT
   commands:
   - func: "do setup"
@@ -3451,6 +3460,7 @@ buildvariants:
   - name: httpinterface
   - name: integration_tests_standalone
   - name: integration_tests_replset
+  - name: integration_tests_sharded
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
@@ -3557,6 +3567,7 @@ buildvariants:
   - name: dbtest_WT
   - name: integration_tests_standalone
   - name: integration_tests_replset
+  - name: integration_tests_sharded
   - name: jsCore
   - name: jsCore_WT
   - name: parallel_WT
@@ -4502,6 +4513,7 @@ buildvariants:
   - name: gle_auth_write_cmd_WT
   - name: httpinterface
   - name: integration_tests_replset
+  - name: integration_tests_sharded
   - name: integration_tests_standalone
   - name: jsCore_WT
   - name: jsCore_WT_ese
@@ -5049,6 +5061,7 @@ buildvariants:
   - name: httpinterface
   - name: integration_tests_standalone
   - name: integration_tests_replset
+  - name: integration_tests_sharded
   - name: jsCore
   - name: jsCore_WT
   - name: jsCore_compatibility
@@ -5804,6 +5817,7 @@ buildvariants:
   - name: gle_auth_write_cmd_WT
   - name: httpinterface
   - name: integration_tests_replset
+  - name: integration_tests_sharded
   - name: integration_tests_standalone
   - name: jsCore
   - name: jsCore_WT
@@ -6051,6 +6065,7 @@ buildvariants:
   - name: gle_auth_write_cmd_WT
   - name: httpinterface
   - name: integration_tests_replset
+  - name: integration_tests_sharded
   - name: integration_tests_standalone
   - name: jsCore
   - name: jsCore_WT
@@ -6592,6 +6607,7 @@ buildvariants:
   - name: gle_auth_write_cmd_WT
   - name: httpinterface
   - name: integration_tests_replset
+  - name: integration_tests_sharded
   - name: integration_tests_standalone
   # - name: jsCore
   - name: jsCore_WT
@@ -6731,6 +6747,7 @@ buildvariants:
   - name: gle_auth_write_cmd_WT
   - name: httpinterface
   - name: integration_tests_replset
+  - name: integration_tests_sharded
   - name: integration_tests_standalone
   # - name: jsCore
   - name: jsCore_WT
@@ -7280,6 +7297,7 @@ buildvariants:
   - name: gle_auth_write_cmd_WT
   - name: httpinterface
   - name: integration_tests_replset
+  - name: integration_tests_sharded
   - name: integration_tests_standalone
   - name: jsCore_WT
   - name: jsCore_WT_ese
@@ -7556,6 +7574,7 @@ buildvariants:
   - name: gle_auth_write_cmd_WT
   - name: httpinterface
   - name: integration_tests_replset
+  - name: integration_tests_sharded
   - name: integration_tests_standalone
   - name: jsCore_WT
   - name: jsCore_WT_ese
@@ -8250,6 +8269,7 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_write_cmd
   - name: integration_tests_replset
+  - name: integration_tests_sharded
   - name: integration_tests_standalone
   - name: jsCore
   - name: jsCore_WT
@@ -8331,6 +8351,7 @@ buildvariants:
   - name: httpinterface
   - name: integration_tests_standalone
   - name: integration_tests_replset
+  - name: integration_tests_sharded
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: jsCore
@@ -8414,6 +8435,7 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_write_cmd
   - name: integration_tests_replset
+  - name: integration_tests_sharded
   - name: integration_tests_standalone
   - name: jsCore
   - name: jsCore_WT
@@ -8502,6 +8524,7 @@ buildvariants:
   - name: gle_auth_basics_passthrough_write_cmd
   - name: gle_auth_write_cmd
   - name: integration_tests_replset
+  - name: integration_tests_sharded
   - name: integration_tests_standalone
   - name: jsCore
   - name: jsCore_WT
@@ -8678,6 +8701,7 @@ buildvariants:
   - name: gle_auth_write_cmd_WT
   - name: httpinterface
   - name: integration_tests_replset
+  - name: integration_tests_sharded
   - name: integration_tests_standalone
   - name: jsCore
   - name: jsCore_WT
@@ -8860,6 +8884,7 @@ buildvariants:
   - name: gle_auth_write_cmd_WT
   - name: httpinterface
   - name: integration_tests_replset
+  - name: integration_tests_sharded
   - name: integration_tests_standalone
   - name: jsCore
   - name: jsCore_WT

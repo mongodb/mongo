@@ -200,6 +200,22 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/version_impl',
     ],
 )
+env.Library(
+    target='network_interface_asio_fixture',
+    source=[
+        'network_interface_asio_integration_fixture.cpp'
+    ],
+    LIBDEPS=[
+        'network_interface_asio',
+        '$BUILD_DIR/mongo/unittest/integration_test_main',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
+        '$BUILD_DIR/mongo/executor/network_interface_factory',
+        '$BUILD_DIR/mongo/rpc/command_status',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        '$BUILD_DIR/mongo/util/version_impl',
+    ]
+)
 
 env.CppIntegrationTest(
     target='network_interface_asio_integration_test',
@@ -207,13 +223,7 @@ env.CppIntegrationTest(
         'network_interface_asio_integration_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-        '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
-        '$BUILD_DIR/mongo/executor/network_interface_factory',
-        '$BUILD_DIR/mongo/rpc/command_status',
-        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
-        '$BUILD_DIR/mongo/util/version_impl',
-        'network_interface_asio',
+        'network_interface_asio_fixture',
     ],
 )
 
