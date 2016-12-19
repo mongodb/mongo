@@ -294,7 +294,7 @@ extern int __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin, WT
 extern int __wt_json_alloc_unpack(WT_SESSION_IMPL *session, const void *buffer, size_t size, const char *fmt, WT_CURSOR_JSON *json, bool iskey, va_list ap) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern void __wt_json_close(WT_SESSION_IMPL *session, WT_CURSOR *cursor) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern size_t __wt_json_unpack_char(u_char ch, u_char *buf, size_t bufsz, bool force_unicode) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
-extern void __wt_json_column_init(WT_CURSOR *cursor, const char *keyformat, const WT_CONFIG_ITEM *idxconf, const WT_CONFIG_ITEM *colconf) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
+extern void __wt_json_column_init(WT_CURSOR *cursor, const char *uri, const char *keyformat, const WT_CONFIG_ITEM *idxconf, const WT_CONFIG_ITEM *colconf) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
 extern int __wt_json_token(WT_SESSION *wt_session, const char *src, int *toktype, const char **tokstart, size_t *toklen) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default"))) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern const char *__wt_json_tokname(int toktype) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("default")));
 extern int __wt_json_to_item(WT_SESSION_IMPL *session, const char *jstr, const char *format, WT_CURSOR_JSON *json, bool iskey, WT_ITEM *item) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result)) WT_GCC_FUNC_DECL_ATTRIBUTE((visibility("hidden")));
