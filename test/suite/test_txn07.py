@@ -70,7 +70,8 @@ class test_txn07(wttest.WiredTigerTestCase, suite_subprocess):
         ('none', dict(compress='')),
     ]
 
-    scenarios = make_scenarios(types, op1s, txn1s, compress)
+    scenarios = make_scenarios(types, op1s, txn1s, compress,
+                               prune=30, prunelong=1000)
     # Overrides WiredTigerTestCase
     def setUpConnectionOpen(self, dir):
         self.home = dir

@@ -69,7 +69,7 @@ class test_join01(wttest.WiredTigerTestCase):
     ]
     scenarios = make_scenarios(type_scen, bloom0_scen, bloom1_scen,
                                projection_scen, nested_scen, stats_scen,
-                               order_scen)
+                               order_scen, prune=50, prunelong=1000)
 
     # We need statistics for these tests.
     conn_config = 'statistics=(all)'
