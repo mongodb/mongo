@@ -50,30 +50,21 @@ namespace mongo {
 
 using std::set;
 using std::string;
-using std::unique_ptr;
 using std::vector;
 
 CollectionInfo::CollectionInfo(OperationContext* txn,
                                const CollectionType& coll,
                                repl::OpTime opTime)
     : _configOpTime(std::move(opTime)) {
-    _dropped = coll.getDropped();
-
     // Do this *first* so we're invisible to everyone else
     std::unique_ptr<ChunkManager> manager(stdx::make_unique<ChunkManager>(txn, coll));
     manager->loadExistingRanges(txn, nullptr);
 
     // Collections with no chunks are unsharded, no matter what the collections entry says. This
     // helps prevent errors when dropping in a different process.
-    if (manager->numChunks() != 0) {
-        useChunkManager(std::move(manager));
-    } else {
-        warning() << "no chunks found for collection " << manager->getns()
-                  << ", assuming unsharded";
-        unshard();
+    if (manager->numChunks()) {
+        _cm = std::move(manager);
     }
-
-    _dirty = false;
 }
 
 CollectionInfo::~CollectionInfo() = default;
@@ -83,46 +74,6 @@ void CollectionInfo::resetCM(ChunkManager* cm) {
     invariant(_cm);
 
     _cm.reset(cm);
-}
-
-void CollectionInfo::unshard() {
-    _cm.reset();
-    _dropped = true;
-    _dirty = true;
-    _key = BSONObj();
-}
-
-void CollectionInfo::useChunkManager(std::shared_ptr<ChunkManager> manager) {
-    _cm = manager;
-    _key = manager->getShardKeyPattern().toBSON().getOwned();
-    _unique = manager->isUnique();
-    _dirty = true;
-    _dropped = false;
-}
-
-void CollectionInfo::save(OperationContext* txn, const string& ns) {
-    CollectionType coll;
-    coll.setNs(NamespaceString{ns});
-
-    if (_cm) {
-        invariant(!_dropped);
-        coll.setEpoch(_cm->getVersion().epoch());
-        // TODO(schwerin): The following isn't really a date, but is stored as one in-memory and
-        // in config.collections, as a historical oddity.
-        coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(_cm->getVersion().toLong()));
-        coll.setKeyPattern(_cm->getShardKeyPattern().toBSON());
-        coll.setDefaultCollation(
-            _cm->getDefaultCollator() ? _cm->getDefaultCollator()->getSpec().toBSON() : BSONObj());
-        coll.setUnique(_cm->isUnique());
-    } else {
-        invariant(_dropped);
-        coll.setDropped(true);
-        coll.setEpoch(ChunkVersion::DROPPED().epoch());
-        coll.setUpdatedAt(Date_t::now());
-    }
-
-    uassertStatusOK(grid.catalogClient(txn)->updateCollection(txn, ns, coll));
-    _dirty = false;
 }
 
 DBConfig::DBConfig(std::string name, const DatabaseType& dbt, repl::OpTime configOpTime)
@@ -172,6 +123,8 @@ void DBConfig::getChunkManagerOrPrimary(OperationContext* txn,
     manager.reset();
     primary.reset();
 
+    const auto shardRegistry = Grid::get(txn)->shardRegistry();
+
     {
         stdx::lock_guard<stdx::mutex> lk(_lock);
 
@@ -180,7 +133,7 @@ void DBConfig::getChunkManagerOrPrimary(OperationContext* txn,
         // No namespace
         if (i == _collections.end()) {
             // If we don't know about this namespace, it's unsharded by default
-            auto primaryStatus = grid.shardRegistry()->getShard(txn, _primaryId);
+            auto primaryStatus = shardRegistry->getShard(txn, _primaryId);
             if (primaryStatus.isOK()) {
                 primary = primaryStatus.getValue();
             }
@@ -194,7 +147,7 @@ void DBConfig::getChunkManagerOrPrimary(OperationContext* txn,
             if (_shardingEnabled && cInfo.isSharded()) {
                 manager = cInfo.getCM();
             } else {
-                auto primaryStatus = grid.shardRegistry()->getShard(txn, _primaryId);
+                auto primaryStatus = shardRegistry->getShard(txn, _primaryId);
                 if (primaryStatus.isOK()) {
                     primary = primaryStatus.getValue();
                 }
@@ -226,7 +179,6 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
                                                         const string& ns,
                                                         bool shouldReload,
                                                         bool forceReload) {
-    BSONObj key;
     ChunkVersion oldVersion;
     std::shared_ptr<ChunkManager> oldManager;
 
@@ -247,13 +199,9 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
                 str::stream() << "Collection is not sharded: " << ns,
                 ci.isSharded());
 
-        invariant(!ci.key().isEmpty());
-
         if (!(shouldReload || forceReload) || earlyReload) {
             return ci.getCM();
         }
-
-        key = ci.key().copy();
 
         if (ci.getCM()) {
             oldManager = ci.getCM();
@@ -261,21 +209,19 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
         }
     }
 
-    invariant(!key.isEmpty());
-
     // TODO: We need to keep this first one-chunk check in until we have a more efficient way of
     // creating/reusing a chunk manager, as doing so requires copying the full set of chunks
     // currently
     vector<ChunkType> newestChunk;
     if (oldVersion.isSet() && !forceReload) {
-        uassertStatusOK(
-            grid.catalogClient(txn)->getChunks(txn,
-                                               BSON(ChunkType::ns(ns)),
-                                               BSON(ChunkType::DEPRECATED_lastmod() << -1),
-                                               1,
-                                               &newestChunk,
-                                               nullptr,
-                                               repl::ReadConcernLevel::kMajorityReadConcern));
+        uassertStatusOK(Grid::get(txn)->catalogClient(txn)->getChunks(
+            txn,
+            BSON(ChunkType::ns(ns)),
+            BSON(ChunkType::DEPRECATED_lastmod() << -1),
+            1,
+            &newestChunk,
+            nullptr,
+            repl::ReadConcernLevel::kMajorityReadConcern));
 
         if (!newestChunk.empty()) {
             invariant(newestChunk.size() == 1);
@@ -295,9 +241,7 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
                   << " chunk manager; collection '" << ns << "' initially detected as sharded";
     }
 
-    // we are not locked now, and want to load a new ChunkManager
-
-    unique_ptr<ChunkManager> tempChunkManager;
+    std::unique_ptr<ChunkManager> tempChunkManager;
 
     {
         stdx::lock_guard<stdx::mutex> lll(_hitConfigServerLock);
@@ -319,6 +263,8 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
             }
         }
 
+        // Reload the chunk manager outside of the DBConfig's mutex so as to not block operations
+        // for different collections on the same database
         tempChunkManager.reset(new ChunkManager(
             oldManager->getns(),
             oldManager->getShardKeyPattern(),
@@ -326,7 +272,7 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
             oldManager->isUnique()));
         tempChunkManager->loadExistingRanges(txn, oldManager.get());
 
-        if (tempChunkManager->numChunks() == 0) {
+        if (!tempChunkManager->numChunks()) {
             // Maybe we're not sharded any more, so do a full reload
             reload(txn);
 
@@ -398,7 +344,9 @@ bool DBConfig::_loadIfNeeded(OperationContext* txn, Counter reloadIteration) {
         return true;
     }
 
-    auto status = grid.catalogClient(txn)->getDatabase(txn, _name);
+    const auto catalogClient = Grid::get(txn)->catalogClient(txn);
+
+    auto status = catalogClient->getDatabase(txn, _name);
     if (status == ErrorCodes::NamespaceNotFound) {
         return false;
     }
@@ -418,8 +366,8 @@ bool DBConfig::_loadIfNeeded(OperationContext* txn, Counter reloadIteration) {
     // Load all collections
     vector<CollectionType> collections;
     repl::OpTime configOpTimeWhenLoadingColl;
-    uassertStatusOK(grid.catalogClient(txn)->getCollections(
-        txn, &_name, &collections, &configOpTimeWhenLoadingColl));
+    uassertStatusOK(
+        catalogClient->getCollections(txn, &_name, &collections, &configOpTimeWhenLoadingColl));
 
     int numCollsErased = 0;
     int numCollsSharded = 0;
@@ -450,27 +398,6 @@ bool DBConfig::_loadIfNeeded(OperationContext* txn, Counter reloadIteration) {
     return true;
 }
 
-void DBConfig::_save(OperationContext* txn, bool db, bool coll) {
-    if (db) {
-        DatabaseType dbt;
-        dbt.setName(_name);
-        dbt.setPrimary(_primaryId);
-        dbt.setSharded(_shardingEnabled);
-
-        uassertStatusOK(grid.catalogClient(txn)->updateDatabase(txn, _name, dbt));
-    }
-
-    if (coll) {
-        for (CollectionInfoMap::iterator i = _collections.begin(); i != _collections.end(); ++i) {
-            if (!i->second.isDirty()) {
-                continue;
-            }
-
-            i->second.save(txn, i->first);
-        }
-    }
-}
-
 bool DBConfig::reload(OperationContext* txn) {
     bool successful = false;
     const auto currentReloadIteration = _reloadCount.load();
@@ -483,7 +410,7 @@ bool DBConfig::reload(OperationContext* txn) {
     // If we aren't successful loading the database entry, we don't want to keep the stale
     // object around which has invalid data.
     if (!successful) {
-        grid.catalogCache()->invalidate(_name);
+        Grid::get(txn)->catalogCache()->invalidate(_name);
     }
 
     return successful;

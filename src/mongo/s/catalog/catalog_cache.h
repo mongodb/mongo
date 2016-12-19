@@ -37,7 +37,6 @@
 
 namespace mongo {
 
-class ShardingCatalogClient;
 class DBConfig;
 class OperationContext;
 template <typename T>
