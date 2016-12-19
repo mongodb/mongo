@@ -61,6 +61,10 @@ public:
 
     /**
      * Constructs a new DatabaseType object from BSON. Also does validation of the contents.
+     *
+     * Dropped collections accumulate in the collections list, through 3.6, so that
+     * mongos <= 3.4.x, when it retrieves the list from the config server, can delete its
+     * cache entries for dropped collections.  See SERVER-27475, SERVER-27474
      */
     static StatusWith<CollectionType> fromBSON(const BSONObj& source);
 
