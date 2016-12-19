@@ -68,3 +68,16 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/base',
     ],
 )
+
+asioEnv = env.Clone()
+asioEnv.InjectThirdPartyIncludePaths('asio')
+
+asioEnv.CppIntegrationTest(
+    target='ugly_bson_integration_test',
+    source=[
+        'ugly_bson_integration_test.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/executor/network_interface_asio_fixture',
+    ],
+)

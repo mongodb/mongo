@@ -96,13 +96,22 @@ void Command::execCommandClient(OperationContext* txn,
                                 BSONObjBuilder& result) {
     std::string dbname = nsToDatabase(ns);
 
-    if (cmdObj.getBoolField("help")) {
-        stringstream help;
-        help << "help for: " << c->getName() << " ";
-        c->help(help);
-        result.append("help", help.str());
-        appendCommandStatus(result, true, "");
-        return;
+    StringMap<int> topLevelFields;
+    for (auto&& element : cmdObj) {
+        StringData fieldName = element.fieldNameStringData();
+        if (fieldName == "help" && element.type() == Bool && element.Bool()) {
+            std::stringstream help;
+            help << "help for: " << c->getName() << " ";
+            c->help(help);
+            result.append("help", help.str());
+            Command::appendCommandStatus(result, true, "");
+            return;
+        }
+
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << "Parsed command object contains duplicate top level key: "
+                              << fieldName,
+                topLevelFields[fieldName]++ == 0);
     }
 
     Status status = checkAuthorization(c, txn, dbname, cmdObj);
