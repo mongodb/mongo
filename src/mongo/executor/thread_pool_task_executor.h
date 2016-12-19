@@ -83,11 +83,6 @@ public:
 
     void appendConnectionStats(ConnectionPoolStats* stats) const override;
 
-    /**
-     * Cancels all commands on the network interface.
-     */
-    void cancelAllCommands();
-
 private:
     class CallbackState;
     class EventState;

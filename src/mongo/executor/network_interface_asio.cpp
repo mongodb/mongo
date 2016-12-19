@@ -450,18 +450,6 @@ void NetworkInterfaceASIO::cancelCommand(const TaskExecutor::CallbackHandle& cbH
     }
 }
 
-void NetworkInterfaceASIO::cancelAllCommands() {
-    decltype(_inGetConnection) newInGetConnection;
-    {
-        stdx::lock_guard<stdx::mutex> lk(_inProgressMutex);
-        _inGetConnection.swap(newInGetConnection);
-        for (auto&& kv : _inProgress) {
-            kv.first->cancel();
-        }
-        _numCanceledOps.fetchAndAdd(_inProgress.size());
-    }
-}
-
 Status NetworkInterfaceASIO::setAlarm(Date_t when, const stdx::function<void()>& action) {
     if (inShutdown()) {
         return {ErrorCodes::ShutdownInProgress, "NetworkInterfaceASIO shutdown in progress"};

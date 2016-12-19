@@ -417,10 +417,6 @@ void ThreadPoolTaskExecutor::appendConnectionStats(ConnectionPoolStats* stats) c
     _net->appendConnectionStats(stats);
 }
 
-void ThreadPoolTaskExecutor::cancelAllCommands() {
-    _net->cancelAllCommands();
-}
-
 StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::enqueueCallbackState_inlock(
     WorkQueue* queue, WorkQueue* wq) {
     if (_inShutdown) {

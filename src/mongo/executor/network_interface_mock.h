@@ -121,7 +121,6 @@ public:
     /**
      * Not implemented.
      */
-    void cancelAllCommands() override {}
     virtual Status setAlarm(Date_t when, const stdx::function<void()>& action);
 
     virtual bool onNetworkThread();
