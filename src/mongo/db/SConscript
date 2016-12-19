@@ -379,7 +379,6 @@ env.CppUnitTest(
         'range_deleter_test.cpp',
     ],
     LIBDEPS=[
-        'commands_test_crutch',
         'common',
         'range_deleter',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
@@ -408,10 +407,6 @@ env.Library(
         "$BUILD_DIR/mongo/util/processinfo",
         "$BUILD_DIR/mongo/util/signal_handlers",
         "auth/authorization_manager_global",
-    ],
-    LIBDEPS_TAGS=[
-        # Depends on Command::execCommand, which is not uniquely defined
-        'incomplete',
     ],
 )
 
@@ -537,21 +532,6 @@ env.Library(
         'commands/test_commands_enabled',
         'service_context',
     ],
-    LIBDEPS_TAGS=[
-        # Dependencies on Command::registerError and
-        # Command::execCommand, which are not uniquely defined.
-        'incomplete',
-    ],
-)
-
-env.Library(
-    target="commands_test_crutch",
-    source=[
-        "commands_test_crutch.cpp",
-    ],
-    LIBDEPS=[
-        "commands",
-    ],
 )
 
 env.CppUnitTest(
@@ -561,7 +541,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "commands",
-        "commands_test_crutch",
         "service_context_noop_init",
         "auth/authorization_manager_mock_init",
         "repl/replmocks",
@@ -590,11 +569,6 @@ env.Library(
     LIBDEPS=[
         "commands",
         "curop",
-    ],
-    LIBDEPS_TAGS=[
-        # Dependency on Command::execCommand, which is not uniquely
-        # defined.
-        'incomplete',
     ],
 )
 

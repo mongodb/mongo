@@ -46,6 +46,9 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/util/string_map.h"
 
+// Included for the purpose of granting friendship to `execCommandClient` and `execCommandDatabase`
+#include "mongo/db/commands_helpers.h"
+
 namespace mongo {
 
 class BSONObj;
@@ -313,15 +316,13 @@ public:
                             const rpc::RequestInterface& request,
                             rpc::ReplyBuilderInterface* replyBuilder);
 
-    // For mongos
-    // TODO: remove this entirely now that all instances of Client are instances
-    // of Client. This will happen as part of SERVER-18292
-    static void execCommandClient(OperationContext* txn,
-                                  Command* c,
-                                  int queryOptions,
-                                  const char* ns,
-                                  BSONObj& cmdObj,
-                                  BSONObjBuilder& result);
+    using ExecCommandHandler = decltype(Command::execCommand);
+
+    /**
+     * Registers the implementation of the `registerExecCommand` function. This must be called from
+     * a MONGO_INITIALIZER context and/or a single-threaded context.
+     */
+    static void registerExecCommand(stdx::function<ExecCommandHandler> handler);
 
     // Helper for setting errmsg and ok field in command result object.
     static void appendCommandStatus(BSONObjBuilder& result, bool ok, const std::string& errmsg);
@@ -486,6 +487,18 @@ private:
     // Pointers to hold the metrics tree references
     ServerStatusMetricField<Counter64> _commandsExecutedMetric;
     ServerStatusMetricField<Counter64> _commandsFailedMetric;
+
+    friend void mongo::execCommandClient(OperationContext* txn,
+                                         Command* c,
+                                         int queryOptions,
+                                         const char* ns,
+                                         BSONObj& cmdObj,
+                                         BSONObjBuilder& result);
+
+    friend void mongo::execCommandDatabase(OperationContext* txn,
+                                           Command* command,
+                                           const rpc::RequestInterface& request,
+                                           rpc::ReplyBuilderInterface* replyBuilder);
 };
 
 }  // namespace mongo

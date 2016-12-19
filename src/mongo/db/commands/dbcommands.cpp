@@ -1303,6 +1303,150 @@ void appendOpTimeMetadata(OperationContext* txn,
     }
 }
 
+namespace {
+void execCommandHandler(OperationContext* const txn,
+                        Command* const command,
+                        const rpc::RequestInterface& request,
+                        rpc::ReplyBuilderInterface* const replyBuilder) {
+    mongo::execCommandDatabase(txn, command, request, replyBuilder);
+}
+
+MONGO_INITIALIZER(InitializeCommandExecCommandHandler)(InitializerContext* const) {
+    Command::registerExecCommand(execCommandHandler);
+    return Status::OK();
+}
+}  // namespace
+
+// This really belongs in commands.cpp, but we need to move it here so we can
+// use shardingState and the repl coordinator without changing our entire library
+// structure.
+// It will be moved back as part of SERVER-18236.
+bool Command::run(OperationContext* txn,
+                  const rpc::RequestInterface& request,
+                  rpc::ReplyBuilderInterface* replyBuilder) {
+    auto bytesToReserve = reserveBytesForReply();
+
+// SERVER-22100: In Windows DEBUG builds, the CRT heap debugging overhead, in conjunction with the
+// additional memory pressure introduced by reply buffer pre-allocation, causes the concurrency
+// suite to run extremely slowly. As a workaround we do not pre-allocate in Windows DEBUG builds.
+#ifdef _WIN32
+    if (kDebugBuild)
+        bytesToReserve = 0;
+#endif
+
+    // run expects non-const bsonobj
+    BSONObj cmd = request.getCommandArgs();
+
+    // run expects const db std::string (can't bind to temporary)
+    const std::string db = request.getDatabase().toString();
+
+    BSONObjBuilder inPlaceReplyBob(replyBuilder->getInPlaceReplyBuilder(bytesToReserve));
+    auto readConcernArgsStatus = extractReadConcern(txn, cmd, supportsReadConcern());
+
+    if (!readConcernArgsStatus.isOK()) {
+        auto result = appendCommandStatus(inPlaceReplyBob, readConcernArgsStatus.getStatus());
+        inPlaceReplyBob.doneFast();
+        replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+        return result;
+    }
+
+    Status rcStatus = waitForReadConcern(txn, readConcernArgsStatus.getValue());
+    if (!rcStatus.isOK()) {
+        if (rcStatus == ErrorCodes::ExceededTimeLimit) {
+            const int debugLevel =
+                serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 0 : 2;
+            LOG(debugLevel) << "Command on database " << db
+                            << " timed out waiting for read concern to be satisfied. Command: "
+                            << redact(getRedactedCopyForLogging(request.getCommandArgs()));
+        }
+
+        auto result = appendCommandStatus(inPlaceReplyBob, rcStatus);
+        inPlaceReplyBob.doneFast();
+        replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+        return result;
+    }
+
+    std::string errmsg;
+    bool result;
+    if (!supportsWriteConcern(cmd)) {
+        if (commandSpecifiesWriteConcern(cmd)) {
+            auto result = appendCommandStatus(
+                inPlaceReplyBob,
+                {ErrorCodes::InvalidOptions, "Command does not support writeConcern"});
+            inPlaceReplyBob.doneFast();
+            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+            return result;
+        }
+
+        // TODO: remove queryOptions parameter from command's run method.
+        result = run(txn, db, cmd, 0, errmsg, inPlaceReplyBob);
+    } else {
+        auto wcResult = extractWriteConcern(txn, cmd, db);
+        if (!wcResult.isOK()) {
+            auto result = appendCommandStatus(inPlaceReplyBob, wcResult.getStatus());
+            inPlaceReplyBob.doneFast();
+            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+            return result;
+        }
+
+        // Change the write concern while running the command.
+        const auto oldWC = txn->getWriteConcern();
+        ON_BLOCK_EXIT([&] { txn->setWriteConcern(oldWC); });
+        txn->setWriteConcern(wcResult.getValue());
+
+        result = run(txn, db, cmd, 0, errmsg, inPlaceReplyBob);
+
+        // Nothing in run() should change the writeConcern.
+        dassert(SimpleBSONObjComparator::kInstance.evaluate(txn->getWriteConcern().toBSON() ==
+                                                            wcResult.getValue().toBSON()));
+
+        WriteConcernResult res;
+        auto waitForWCStatus =
+            waitForWriteConcern(txn,
+                                repl::ReplClientInfo::forClient(txn->getClient()).getLastOp(),
+                                wcResult.getValue(),
+                                &res);
+        appendCommandWCStatus(inPlaceReplyBob, waitForWCStatus, res);
+
+        // SERVER-22421: This code is to ensure error response backwards compatibility with the
+        // user management commands. This can be removed in 3.6.
+        if (!waitForWCStatus.isOK() && isUserManagementCommand(getName())) {
+            BSONObj temp = inPlaceReplyBob.asTempObj().copy();
+            inPlaceReplyBob.resetToEmpty();
+            appendCommandStatus(inPlaceReplyBob, waitForWCStatus);
+            inPlaceReplyBob.appendElementsUnique(temp);
+        }
+    }
+
+    // When a linearizable read command is passed in, check to make sure we're reading
+    // from the primary.
+    if (supportsReadConcern() && (readConcernArgsStatus.getValue().getLevel() ==
+                                  repl::ReadConcernLevel::kLinearizableReadConcern) &&
+        (request.getCommandName() != "getMore")) {
+
+        auto linearizableReadStatus = waitForLinearizableReadConcern(txn);
+
+        if (!linearizableReadStatus.isOK()) {
+            inPlaceReplyBob.resetToEmpty();
+            auto result = appendCommandStatus(inPlaceReplyBob, linearizableReadStatus);
+            inPlaceReplyBob.doneFast();
+            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
+            return result;
+        }
+    }
+
+    appendCommandStatus(inPlaceReplyBob, result, errmsg);
+    inPlaceReplyBob.doneFast();
+
+    BSONObjBuilder metadataBob;
+    appendOpTimeMetadata(txn, request, &metadataBob);
+    replyBuilder->setMetadata(metadataBob.done());
+
+    return result;
+}
+
+}  // namespace mongo
+
 /**
  * this handles
  - auth
@@ -1311,11 +1455,11 @@ void appendOpTimeMetadata(OperationContext* txn,
  - locking
  - context
  then calls run()
-*/
-void Command::execCommand(OperationContext* txn,
-                          Command* command,
-                          const rpc::RequestInterface& request,
-                          rpc::ReplyBuilderInterface* replyBuilder) {
+ */
+void mongo::execCommandDatabase(OperationContext* txn,
+                                Command* command,
+                                const rpc::RequestInterface& request,
+                                rpc::ReplyBuilderInterface* replyBuilder) {
     try {
         {
             stdx::lock_guard<Client> lk(*txn->getClient());
@@ -1336,18 +1480,19 @@ void Command::execCommand(OperationContext* txn,
             extractedFields{};
         request.getCommandArgs().getFields(neededFieldNames, &extractedFields);
 
-        if (isHelpRequest(extractedFields[kHelpField])) {
+        if (Command::isHelpRequest(extractedFields[kHelpField])) {
             CurOp::get(txn)->ensureStarted();
             // We disable last-error for help requests due to SERVER-11492, because config servers
             // use help requests to determine which commands are database writes, and so must be
             // forwarded to all config servers.
             LastError::get(txn->getClient()).disable();
-            generateHelpResponse(txn, request, replyBuilder, *command);
+            Command::generateHelpResponse(txn, request, replyBuilder, *command);
             return;
         }
 
         ImpersonationSessionGuard guard(txn);
-        uassertStatusOK(checkAuthorization(command, txn, dbname, request.getCommandArgs()));
+        uassertStatusOK(
+            Command::checkAuthorization(command, txn, dbname, request.getCommandArgs()));
 
         repl::ReplicationCoordinator* replCoord =
             repl::ReplicationCoordinator::get(txn->getClient()->getServiceContext());
@@ -1494,133 +1639,3 @@ void Command::execCommand(OperationContext* txn,
         Command::generateErrorResponse(txn, replyBuilder, e, request, command, metadataBob.done());
     }
 }
-
-// This really belongs in commands.cpp, but we need to move it here so we can
-// use shardingState and the repl coordinator without changing our entire library
-// structure.
-// It will be moved back as part of SERVER-18236.
-bool Command::run(OperationContext* txn,
-                  const rpc::RequestInterface& request,
-                  rpc::ReplyBuilderInterface* replyBuilder) {
-    auto bytesToReserve = reserveBytesForReply();
-
-// SERVER-22100: In Windows DEBUG builds, the CRT heap debugging overhead, in conjunction with the
-// additional memory pressure introduced by reply buffer pre-allocation, causes the concurrency
-// suite to run extremely slowly. As a workaround we do not pre-allocate in Windows DEBUG builds.
-#ifdef _WIN32
-    if (kDebugBuild)
-        bytesToReserve = 0;
-#endif
-
-    // run expects non-const bsonobj
-    BSONObj cmd = request.getCommandArgs();
-
-    // run expects const db std::string (can't bind to temporary)
-    const std::string db = request.getDatabase().toString();
-
-    BSONObjBuilder inPlaceReplyBob(replyBuilder->getInPlaceReplyBuilder(bytesToReserve));
-    auto readConcernArgsStatus = extractReadConcern(txn, cmd, supportsReadConcern());
-
-    if (!readConcernArgsStatus.isOK()) {
-        auto result = appendCommandStatus(inPlaceReplyBob, readConcernArgsStatus.getStatus());
-        inPlaceReplyBob.doneFast();
-        replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-        return result;
-    }
-
-    Status rcStatus = waitForReadConcern(txn, readConcernArgsStatus.getValue());
-    if (!rcStatus.isOK()) {
-        if (rcStatus == ErrorCodes::ExceededTimeLimit) {
-            const int debugLevel =
-                serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 0 : 2;
-            LOG(debugLevel) << "Command on database " << db
-                            << " timed out waiting for read concern to be satisfied. Command: "
-                            << redact(getRedactedCopyForLogging(request.getCommandArgs()));
-        }
-
-        auto result = appendCommandStatus(inPlaceReplyBob, rcStatus);
-        inPlaceReplyBob.doneFast();
-        replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-        return result;
-    }
-
-    std::string errmsg;
-    bool result;
-    if (!supportsWriteConcern(cmd)) {
-        if (commandSpecifiesWriteConcern(cmd)) {
-            auto result = appendCommandStatus(
-                inPlaceReplyBob,
-                {ErrorCodes::InvalidOptions, "Command does not support writeConcern"});
-            inPlaceReplyBob.doneFast();
-            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-            return result;
-        }
-
-        // TODO: remove queryOptions parameter from command's run method.
-        result = run(txn, db, cmd, 0, errmsg, inPlaceReplyBob);
-    } else {
-        auto wcResult = extractWriteConcern(txn, cmd, db);
-        if (!wcResult.isOK()) {
-            auto result = appendCommandStatus(inPlaceReplyBob, wcResult.getStatus());
-            inPlaceReplyBob.doneFast();
-            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-            return result;
-        }
-
-        // Change the write concern while running the command.
-        const auto oldWC = txn->getWriteConcern();
-        ON_BLOCK_EXIT([&] { txn->setWriteConcern(oldWC); });
-        txn->setWriteConcern(wcResult.getValue());
-
-        result = run(txn, db, cmd, 0, errmsg, inPlaceReplyBob);
-
-        // Nothing in run() should change the writeConcern.
-        dassert(SimpleBSONObjComparator::kInstance.evaluate(txn->getWriteConcern().toBSON() ==
-                                                            wcResult.getValue().toBSON()));
-
-        WriteConcernResult res;
-        auto waitForWCStatus =
-            waitForWriteConcern(txn,
-                                repl::ReplClientInfo::forClient(txn->getClient()).getLastOp(),
-                                wcResult.getValue(),
-                                &res);
-        appendCommandWCStatus(inPlaceReplyBob, waitForWCStatus, res);
-
-        // SERVER-22421: This code is to ensure error response backwards compatibility with the
-        // user management commands. This can be removed in 3.6.
-        if (!waitForWCStatus.isOK() && isUserManagementCommand(getName())) {
-            BSONObj temp = inPlaceReplyBob.asTempObj().copy();
-            inPlaceReplyBob.resetToEmpty();
-            appendCommandStatus(inPlaceReplyBob, waitForWCStatus);
-            inPlaceReplyBob.appendElementsUnique(temp);
-        }
-    }
-
-    // When a linearizable read command is passed in, check to make sure we're reading
-    // from the primary.
-    if (supportsReadConcern() && (readConcernArgsStatus.getValue().getLevel() ==
-                                  repl::ReadConcernLevel::kLinearizableReadConcern) &&
-        (request.getCommandName() != "getMore")) {
-
-        auto linearizableReadStatus = waitForLinearizableReadConcern(txn);
-
-        if (!linearizableReadStatus.isOK()) {
-            inPlaceReplyBob.resetToEmpty();
-            auto result = appendCommandStatus(inPlaceReplyBob, linearizableReadStatus);
-            inPlaceReplyBob.doneFast();
-            replyBuilder->setMetadata(rpc::makeEmptyMetadata());
-            return result;
-        }
-    }
-
-    appendCommandStatus(inPlaceReplyBob, result, errmsg);
-    inPlaceReplyBob.doneFast();
-
-    BSONObjBuilder metadataBob;
-    appendOpTimeMetadata(txn, request, &metadataBob);
-    replyBuilder->setMetadata(metadataBob.done());
-
-    return result;
-}
-
-}  // namespace mongo
