@@ -36,7 +36,6 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
@@ -719,7 +718,6 @@ class InsertSymbolIntoIndexWithCollationFails {
 public:
     void run() {
         auto opCtx = cc().makeOperationContext();
-        FeatureCompatibilityVersion::set(opCtx.get(), "3.4");
         DBDirectClient client(opCtx.get());
         client.dropCollection(_ns);
         IndexSpec indexSpec;
@@ -737,7 +735,6 @@ class InsertSymbolIntoIndexWithoutCollationSucceeds {
 public:
     void run() {
         auto opCtx = cc().makeOperationContext();
-        FeatureCompatibilityVersion::set(opCtx.get(), "3.4");
         DBDirectClient client(opCtx.get());
         client.dropCollection(_ns);
         IndexSpec indexSpec;
@@ -753,7 +750,6 @@ class InsertSymbolInsideNestedObjectIntoIndexWithCollationFails {
 public:
     void run() {
         auto opCtx = cc().makeOperationContext();
-        FeatureCompatibilityVersion::set(opCtx.get(), "3.4");
         DBDirectClient client(opCtx.get());
         client.dropCollection(_ns);
         IndexSpec indexSpec;
@@ -771,7 +767,6 @@ class InsertSymbolInsideNestedArrayIntoIndexWithCollationFails {
 public:
     void run() {
         auto opCtx = cc().makeOperationContext();
-        FeatureCompatibilityVersion::set(opCtx.get(), "3.4");
         DBDirectClient client(opCtx.get());
         client.dropCollection(_ns);
         IndexSpec indexSpec;
@@ -789,7 +784,6 @@ class BuildingIndexWithCollationWhenSymbolDataExistsShouldFail {
 public:
     void run() {
         auto opCtx = cc().makeOperationContext();
-        FeatureCompatibilityVersion::set(opCtx.get(), "3.4");
         DBDirectClient client(opCtx.get());
         client.dropCollection(_ns);
         client.insert(_ns, BSON("a" << BSON_ARRAY(99 << BSONSymbol("mySymbol"))));
@@ -806,7 +800,6 @@ class IndexingSymbolWithInheritedCollationShouldFail {
 public:
     void run() {
         auto opCtx = cc().makeOperationContext();
-        FeatureCompatibilityVersion::set(opCtx.get(), "3.4");
         DBDirectClient client(opCtx.get());
         client.dropCollection(_ns);
         BSONObj cmdResult;

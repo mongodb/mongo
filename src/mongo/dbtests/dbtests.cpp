@@ -33,6 +33,7 @@
 
 #include "mongo/dbtests/dbtests.h"
 
+#include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
@@ -42,6 +43,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
 #include "mongo/db/wire_version.h"
@@ -58,6 +60,12 @@ namespace mongo {
 namespace dbtests {
 namespace {
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
+
+MONGO_INITIALIZER(FeatureCompatibilityVersionForTest)(InitializerContext* context) {
+    serverGlobalParams.featureCompatibility.version.store(
+        ServerGlobalParams::FeatureCompatibility::Version::k34);
+    return Status::OK();
+}
 }  // namespace
 
 void initWireSpec() {
