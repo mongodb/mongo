@@ -64,6 +64,7 @@ static const char * const __stats_dsrc_desc[] = {
 	"cache: pages requested from the cache",
 	"cache: pages written from cache",
 	"cache: pages written requiring in-memory restoration",
+	"cache: tracked dirty bytes in the cache",
 	"cache: unmodified pages evicted",
 	"cache_walk: Average difference between current eviction generation when the page was last considered",
 	"cache_walk: Average on-disk page image size seen",
@@ -225,6 +226,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
 	stats->cache_pages_requested = 0;
 	stats->cache_write = 0;
 	stats->cache_write_restore = 0;
+		/* not clearing cache_bytes_dirty */
 	stats->cache_eviction_clean = 0;
 		/* not clearing cache_state_gen_avg_gap */
 		/* not clearing cache_state_avg_written_size */
@@ -372,6 +374,7 @@ __wt_stat_dsrc_aggregate_single(
 	to->cache_pages_requested += from->cache_pages_requested;
 	to->cache_write += from->cache_write;
 	to->cache_write_restore += from->cache_write_restore;
+	to->cache_bytes_dirty += from->cache_bytes_dirty;
 	to->cache_eviction_clean += from->cache_eviction_clean;
 	to->cache_state_gen_avg_gap += from->cache_state_gen_avg_gap;
 	to->cache_state_avg_written_size +=
@@ -535,6 +538,7 @@ __wt_stat_dsrc_aggregate(
 	    WT_STAT_READ(from, cache_pages_requested);
 	to->cache_write += WT_STAT_READ(from, cache_write);
 	to->cache_write_restore += WT_STAT_READ(from, cache_write_restore);
+	to->cache_bytes_dirty += WT_STAT_READ(from, cache_bytes_dirty);
 	to->cache_eviction_clean += WT_STAT_READ(from, cache_eviction_clean);
 	to->cache_state_gen_avg_gap +=
 	    WT_STAT_READ(from, cache_state_gen_avg_gap);
