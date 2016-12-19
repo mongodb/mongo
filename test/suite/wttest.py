@@ -287,6 +287,7 @@ class WiredTigerTestCase(unittest.TestCase):
             self.testsubdir = self.className() + '.' + str(self.__class__.wt_ntests)
         self.testdir = os.path.join(WiredTigerTestCase._parentTestdir, self.testsubdir)
         self.__class__.wt_ntests += 1
+        self.starttime = time.time()
         if WiredTigerTestCase._verbose > 2:
             self.prhead('started in ' + self.testdir, True)
         # tearDown needs connections list, set it here in case the open fails.
@@ -355,6 +356,9 @@ class WiredTigerTestCase(unittest.TestCase):
         else:
             self.pr('preserving directory ' + self.testdir)
 
+        elapsed = time.time() - self.starttime
+        if elapsed > 0.001 and WiredTigerTestCase._verbose >= 2:
+            print "%s: %.2f seconds" % (str(self), elapsed)
         if not passed and not skipped:
             print "ERROR in " + str(self)
             self.pr('FAIL')
