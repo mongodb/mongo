@@ -44,12 +44,8 @@ class DatabaseType;
 class OperationContext;
 
 struct CollectionInfo {
-    CollectionInfo() {
-        _dirty = false;
-        _dropped = false;
-    }
-
-    CollectionInfo(OperationContext* txn, const CollectionType& in, repl::OpTime);
+    CollectionInfo() = default;
+    CollectionInfo(OperationContext* txn, const CollectionType& coll, repl::OpTime opTime);
     ~CollectionInfo();
 
     bool isSharded() const {
@@ -62,43 +58,17 @@ struct CollectionInfo {
 
     void resetCM(ChunkManager* cm);
 
-    void unshard();
-
-    bool isDirty() const {
-        return _dirty;
-    }
-
-    bool wasDropped() const {
-        return _dropped;
-    }
-
-    void save(OperationContext* txn, const std::string& ns);
-
-    void useChunkManager(std::shared_ptr<ChunkManager> manager);
-
-    bool unique() const {
-        return _unique;
-    }
-
-    BSONObj key() const {
-        return _key;
-    }
-
     repl::OpTime getConfigOpTime() const {
         return _configOpTime;
     }
 
 private:
-    BSONObj _key;
-    bool _unique;
-    std::shared_ptr<ChunkManager> _cm;
-    bool _dirty;
-    bool _dropped;
     repl::OpTime _configOpTime;
+    std::shared_ptr<ChunkManager> _cm;
 };
 
 /**
- * top level configuration for a database
+ * Represents the cache entry for a database.
  */
 class DBConfig {
 public:
@@ -170,8 +140,6 @@ protected:
      * This is to avoid multiple threads attempting to reload do duplicate work.
      */
     bool _loadIfNeeded(OperationContext* txn, Counter reloadIteration);
-
-    void _save(OperationContext* txn, bool db = true, bool coll = true);
 
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
