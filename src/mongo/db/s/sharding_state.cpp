@@ -436,7 +436,7 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* txn,
             if (status.isOK()) {
                 _setInitializationState_inlock(InitializationState::kInitialized);
                 ReplicaSetMonitor::setSynchronousConfigChangeHook(
-                    &ConfigServer::replicaSetChangeShardRegistryUpdateHook);
+                    &ShardRegistry::replicaSetChangeShardRegistryUpdateHook);
                 ReplicaSetMonitor::setAsynchronousConfigChangeHook(
                     &updateShardIdentityConfigStringCB);
             } else {
@@ -474,7 +474,7 @@ void ShardingState::_initializeImpl(ConnectionString configSvr, string shardName
 
         if (status.isOK()) {
             ReplicaSetMonitor::setSynchronousConfigChangeHook(
-                &ConfigServer::replicaSetChangeShardRegistryUpdateHook);
+                &ShardRegistry::replicaSetChangeShardRegistryUpdateHook);
             ReplicaSetMonitor::setAsynchronousConfigChangeHook(&updateShardIdentityConfigStringCB);
 
             _initializeRangeDeleterTaskExecutor();
