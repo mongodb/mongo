@@ -49,6 +49,11 @@ env.Library('boost_program_options', [
         'libs/program_options/src/value_semantic.cpp',
         'libs/program_options/src/variables_map.cpp',
         'libs/program_options/src/winmain.cpp',
+        ],
+        # Because `::environ` is resolved in `/usr/lib/crt1.o` on FreeBSD, this library needs to be
+        # marked `incomplete` on FreeBSD.
+        LIBDEPS_TAGS=[] if not env.TargetOSIs('freebsd') else [
+            'incomplete',
         ])
 
 env.Library('boost_chrono', [

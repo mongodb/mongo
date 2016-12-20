@@ -292,6 +292,7 @@ if env.TargetOSIs('linux') or env.TargetOSIs('solaris'):
 if env.TargetOSIs('freebsd') or env.TargetOSIs('openbsd'):
     cpp_defines['LINUX'] = '1'
     cpp_defines['freebsd'] = '1'
+    libs.append('m')
 
 # Set Architecture Defines
 processor = env['TARGET_ARCH']
