@@ -40,7 +40,7 @@ ignore:
 ## Some variables for convenience:
 variables:
 
-# Used for tests that invoke resmoke.py and require no additional setup.
+# Used when the tests it runs depend only on mongod, mongos, the mongo shell and the tools.
 - &task_template
   name: template
   depends_on:
@@ -52,6 +52,45 @@ variables:
       resmoke_args: --help
       run_multiple_jobs: false
       max_jobs: 0  # If set in combination with run_multiple_jobs, will cap the number of jobs used.
+
+# Used for tests that invoke resmoke.py and require no additional setup.
+- &task_depending_on_all_template
+  <<: *task_template
+  depends_on:
+  - name: compile_all
+
+# Used to list modules to retrieve from GitHub.
+- &git_get_project
+  command: git.get_project
+  params:
+    directory: src
+    revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
+      enterprise: ${enterprise_rev}
+
+- &generate_compile_expansions
+  command: shell.exec
+  params:
+    working_dir: src
+    script: |
+      set -o errexit
+      set -o verbose
+
+      # We get the raw version string (r1.2.3-45-gabcdef) from git
+      MONGO_VERSION=$(git describe)
+      # If this is a patch build, we add the patch version id to the version string so we know
+      # this build was a patch, and which evergreen task it came from
+      if [ "${is_patch|}" = "true" ]; then
+        MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+      fi
+
+      # This script converts the generated version string into a sanitized version string for
+      # use by scons and uploading artifacts as well as information about for the scons cache.
+      echo $MONGO_VERSION | SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
+
+- &apply_compile_expansions
+  command: expansions.update
+  params:
+    file: src/compile_expansions.yml
 
 - &jepsen_config_vars
   jepsen_key_time_limit: --key-time-limit 15
@@ -1229,16 +1268,12 @@ timeout:
 
 tasks:
 
-## compile ##
+## compile - build all scons targets except unittests ##
 - name: compile
   depends_on: []
   commands:
     - command: manifest.load
-    - command: git.get_project
-      params:
-        directory: src
-        revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
-          enterprise: ${enterprise_rev}
+    - *git_get_project
     - command: git.apply_patch
       params:
         directory: src
@@ -1264,9 +1299,7 @@ tasks:
           # use by scons and uploading artifacts as well as information about for the scons cache.
           echo $MONGO_VERSION | SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
     # Then we load the generated version data into the agent so we can use it in task definitions
-    - command: expansions.update
-      params:
-        file: src/compile_expansions.yml
+    - *apply_compile_expansions
 
     - command: shell.exec
       type: test
@@ -1278,7 +1311,7 @@ tasks:
 
           rm -rf ${install_directory|/data/mongo-install-directory}
 
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" all dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|} ${additional_targets|} MONGO_VERSION=${version}
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" core tools dbtest integration_tests dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|} MONGO_VERSION=${version}
 
           mv mongodb-src-*.${ext|tgz} distsrc.${ext|tgz}
           mv mongodb-*-debugsymbols.${ext|tgz} mongo-debugsymbols.tgz || true
@@ -1287,15 +1320,11 @@ tasks:
           # If strip is on the path (everywhere except windows) then we should strip the test binaries
           # before tarring them up
           if [ -x ${strip_path|/usr/bin/strip} ]; then
-            cat build/unittests.txt | xargs ${strip_command|/usr/bin/strip}
             cat build/integration_tests.txt | xargs ${strip_command|/usr/bin/strip}
             ${strip_command|/usr/bin/strip} dbtest
             ${strip_command|/usr/bin/strip} mongobridge
           fi
 
-          # On windows we need to make sure the paths in unittests.txt are compatible with cygwin tar
-          sed 's|\\|/|g' build/unittests.txt > build/unittests-tarlist.txt
-          ${tar|tar} -czvf mongodb-unittests.tgz -T build/unittests-tarlist.txt build/unittests.txt
     - command: shell.exec
       params:
         working_dir: src
@@ -1380,17 +1409,6 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-unittests.tgz
-        remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/unittests/${build_id}.tgz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/x-gzip}
-        display_name: Unit tests (stripped)
-
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
         local_file: src/distsrc.${ext|tgz}
         remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
         bucket: mciuploads
@@ -1401,16 +1419,60 @@ tasks:
         # because it should be the same everywhere, so just use linux-64/windows-64-2k8.
         build_variants: [ linux-64, windows-64-2k8 ]
 
+## compile_all - build all scons targets including unittests ##
+- name: compile_all
+  depends_on: compile
+  commands:
+    - command: manifest.load
+    - *git_get_project
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "build new tools" # noop if ${newtools} is not "true"
+    - *generate_compile_expansions
+    # Then we load the generated version data into the agent so we can use it in task definitions
+    - *apply_compile_expansions
+
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          rm -rf ${install_directory|/data/mongo-install-directory}
+
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" all ${additional_targets|} MONGO_VERSION=${version}
+
+          # If strip is on the path (everywhere except windows) then we should strip the test binaries
+          # before tarring them up
+          if [ -x ${strip_path|/usr/bin/strip} ]; then
+            cat build/unittests.txt | xargs ${strip_command|/usr/bin/strip}
+          fi
+
+          # On windows we need to make sure the paths in unittests.txt are compatible with cygwin tar
+          sed 's|\\|/|g' build/unittests.txt > build/unittests-tarlist.txt
+          ${tar|tar} -czvf mongodb-unittests.tgz -T build/unittests-tarlist.txt build/unittests.txt
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongodb-unittests.tgz
+        remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/unittests/${build_id}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: Unit tests (stripped)
+
 ## lint ##
 - name: lint
   depends_on: []
   commands:
     - command: manifest.load
-    - command: git.get_project
-      params:
-        directory: src
-        revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
-          enterprise: ${enterprise_rev}
+    - *git_get_project
     - command: git.apply_patch
       params:
         directory: src
@@ -1719,7 +1781,7 @@ tasks:
       resmoke_args: --suites=jstestfuzz_sharded --storageEngine=wiredTiger
 
 ## unit tests ##
-- <<: *task_template
+- <<: *task_depending_on_all_template
   name: unittests
   commands:
   - func: "do setup"
@@ -3080,9 +3142,7 @@ tasks:
         bucket: mciuploads
         local_file: src/distsrc.${ext|tgz}
         build_variants: [ linux-64, windows-64-2k8 ]
-    - command: expansions.update
-      params:
-        file: src/compile_expansions.yml
+    - *apply_compile_expansions
     - func: "fetch debugsymbols archive"
     - command: shell.exec
       params:
@@ -3572,6 +3632,9 @@ buildvariants:
   - name: compile
     distros:
     - rhel62-large
+  - name: compile_all
+    distros:
+    - rhel62-large
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -3695,6 +3758,9 @@ buildvariants:
   - name: compile
     distros:
     - rhel62-large
+  - name: compile_all
+    distros:
+    - rhel62-large
   - name: dbtest
   - name: dbtest_WT
   - name: integration_tests_standalone
@@ -3727,6 +3793,11 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+    distros:
+    - rhel62-large
+  - name: compile_all
+    distros:
+    - rhel62-large
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -3816,6 +3887,9 @@ buildvariants:
   - name: compile
     distros:
     - rhel62-large
+  - name: compile_all
+    distros:
+    - rhel62-large
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -3878,6 +3952,9 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+    distros:
+    - rhel62-large
+  - name: compile_all
     distros:
     - rhel62-large
   - name: aggregation_WT
@@ -3943,6 +4020,9 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+    distros:
+    - ubuntu1404-build
+  - name: compile_all
     distros:
     - ubuntu1404-build
   - name: aggregation
@@ -4085,6 +4165,9 @@ buildvariants:
   - name: compile
     distros:
     - ubuntu1604-build
+  - name: compile_all
+    distros:
+    - ubuntu1604-build
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -4207,6 +4290,9 @@ buildvariants:
   - name: compile
     distros:
     - ubuntu1604-arm64-large
+  - name: compile_all
+    distros:
+    - ubuntu1604-arm64-large
   - name: aggregation_WT
   - name: aggregation_auth
   - name: auth_WT
@@ -4294,6 +4380,9 @@ buildvariants:
   - name: compile
     distros:
     - ubuntu1604-arm64-large
+  - name: compile_all
+    distros:
+    - ubuntu1604-arm64-large
   - name: dbtest_WT
   - name: jsCore_WT
   - name: unittests
@@ -4326,6 +4415,9 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+    distros:
+    - ubuntu1604-power8-build
+  - name: compile_all
     distros:
     - ubuntu1604-power8-build
   - name: aggregation_WT
@@ -4405,6 +4497,9 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+    distros:
+    - ubuntu1604-zseries-large
+  - name: compile_all
     distros:
     - ubuntu1604-zseries-large
   - name: aggregation_WT
@@ -4510,6 +4605,9 @@ buildvariants:
   - name: compile
     distros:
     - linux-64-amzn-build
+  - name: compile_all
+    distros:
+    - linux-64-amzn-build
   - name: aggregation_auth
   - name: aggregation_WT
   - name: audit
@@ -4595,6 +4693,9 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+    distros:
+    - linux-64-amzn-build
+  - name: compile_all
     distros:
     - linux-64-amzn-build
   - name: aggregation
@@ -4719,6 +4820,9 @@ buildvariants:
   - name: compile
     distros:
     - windows-64-vs2015-large
+  - name: compile_all
+    distros:
+    - windows-64-vs2015-large
   - name: aggregation
   - name: aggregation_WT
   - name: auth
@@ -4823,6 +4927,9 @@ buildvariants:
     use_scons_cache: true
   tasks:
   - name: compile
+    distros:
+    - windows-64-vs2015-large
+  - name: compile_all
     distros:
     - windows-64-vs2015-large
   - name: aggregation
@@ -4940,6 +5047,10 @@ buildvariants:
   - name: compile
     distros:
     - windows-64-vs2015-large
+  - name: compile_all
+    distros:
+    - windows-64-vs2015-large
+  - name: burn_in_tests
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_facet_unwind_passthrough_WT
@@ -5084,6 +5195,9 @@ buildvariants:
   - name: compile
     distros:
     - windows-64-vs2015-large
+  - name: compile_all
+    distros:
+    - windows-64-vs2015-large
   - name: audit
   - name: audit_WT
   - name: auth_audit
@@ -5152,6 +5266,9 @@ buildvariants:
   - name: compile
     distros:
     - windows-64-vs2015-large
+  - name: compile_all
+    distros:
+    - windows-64-vs2015-large
   - name: audit
   - name: audit_WT
   - name: auth_audit
@@ -5204,6 +5321,9 @@ buildvariants:
     use_scons_cache: true
   tasks:
   - name: compile
+    distros:
+    - windows-64-vs2015-large
+  - name: compile_all
     distros:
     - windows-64-vs2015-large
   - name: aggregation
@@ -5326,6 +5446,7 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+  - name: compile_all
   - name: aggregation
   - name: aggregation_WT
   - name: auth
@@ -5426,6 +5547,7 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+  - name: compile_all
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_read_concern_majority_passthrough_WT
@@ -5525,6 +5647,7 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+  - name: compile_all
   - name: aggregation
   - name: aggregation_WT
   - name: auth
@@ -5569,6 +5692,7 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+  - name: compile_all
   - name: audit
   - name: audit_WT
   - name: auth_audit
@@ -5630,6 +5754,9 @@ buildvariants:
   - name: compile
     requires:
     - name: burn_in_tests
+    distros:
+    - rhel62-large
+  - name: compile_all
     distros:
     - rhel62-large
   - name: lint
@@ -5855,6 +5982,11 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+    distros:
+    - rhel62-large
+  - name: compile_all
+    distros:
+    - rhel62-large
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_WT_ese
@@ -6005,6 +6137,9 @@ buildvariants:
   - name: compile
     distros:
     - rhel70
+  - name: compile_all
+    distros:
+    - rhel70
   - name: audit
   - name: audit_WT
   - name: dbtest
@@ -6062,6 +6197,9 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+    distros:
+    - rhel62-large
+  - name: compile_all
     distros:
     - rhel62-large
   - name: aggregation
@@ -6181,6 +6319,9 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+    distros:
+    - rhel70
+  - name: compile_all
     distros:
     - rhel70
   - name: aggregation
@@ -6320,6 +6461,9 @@ buildvariants:
   - name: compile
     distros:
     - rhel71-power8-build
+  - name: compile_all
+    distros:
+    - rhel71-power8-build
   - name: aggregation_WT
   - name: aggregation_WT_ese
   - name: aggregation_auth
@@ -6422,6 +6566,9 @@ buildvariants:
   - name: compile
     distros:
     - rhel72-zseries-build
+  - name: compile_all
+    distros:
+    - rhel72-zseries-build
   - name: aggregation_WT
   - name: aggregation_WT_ese
   - name: aggregation_auth
@@ -6522,6 +6669,9 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+    distros:
+    - rhel67-zseries-build
+  - name: compile_all
     distros:
     - rhel67-zseries-build
   # - name: aggregation
@@ -6662,6 +6812,9 @@ buildvariants:
   - name: compile
     distros:
     - ubuntu1404-build
+  - name: compile_all
+    distros:
+    - ubuntu1404-build
   - name: audit
   - name: audit_WT
   - name: dbtest
@@ -6742,6 +6895,9 @@ buildvariants:
   - name: compile
     distros:
     - ubuntu1604-build
+  - name: compile_all
+    distros:
+    - ubuntu1604-build
   - name: audit
   - name: audit_WT
   - name: dbtest
@@ -6789,6 +6945,9 @@ buildvariants:
   - name: compile
     distros:
     - ubuntu1404-build
+  - name: compile_all
+    distros:
+    - ubuntu1404-build
 
 ###########################################
 #          SUSE buildvariants             #
@@ -6819,6 +6978,9 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+    distros:
+    - suse12-build
+  - name: compile_all
     distros:
     - suse12-build
   - name: audit
@@ -6878,6 +7040,9 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+    distros:
+    - suse12-zseries-build
+  - name: compile_all
     distros:
     - suse12-zseries-build
   - name: aggregation_WT
@@ -6979,6 +7144,9 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+    distros:
+    - suse12-build
+  - name: compile_all
     distros:
     - suse12-build
   - name: aggregation
@@ -7098,6 +7266,9 @@ buildvariants:
   - name: compile
     distros:
     - suse11-build
+  - name: compile_all
+    distros:
+    - suse11-build
   - name: audit
   - name: audit_WT
   - name: dbtest
@@ -7153,6 +7324,7 @@ buildvariants:
     repo_edition: enterprise
   tasks:
   - name: compile
+  - name: compile_all
   - name: aggregation_WT
   - name: aggregation_WT_ese
   - name: aggregation_auth
@@ -7251,6 +7423,9 @@ buildvariants:
     use_scons_cache: true
   tasks:
   - name: compile
+    distros:
+    - suse11-build
+  - name: compile_all
     distros:
     - suse11-build
   - name: aggregation
@@ -7375,6 +7550,9 @@ buildvariants:
   - name: compile
     distros:
     - debian71-build
+  - name: compile_all
+    distros:
+    - debian71-build
   - name: audit
   - name: audit_WT
   - name: dbtest
@@ -7433,6 +7611,9 @@ buildvariants:
   - name: compile
     distros:
     - debian81-build
+  - name: compile_all
+    distros:
+    - debian81-build
   - name: audit
   - name: audit_WT
   - name: dbtest
@@ -7489,6 +7670,9 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+    distros:
+    - debian71-build
+  - name: compile_all
     distros:
     - debian71-build
   - name: aggregation
@@ -7612,6 +7796,9 @@ buildvariants:
   - name: compile
     distros:
     - debian81-build
+  - name: compile_all
+    distros:
+    - debian81-build
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_auth
@@ -7731,6 +7918,9 @@ buildvariants:
   - name: compile
     distros:
     - rhel62-large
+  - name: compile_all
+    distros:
+    - rhel62-large
   - name: aggregation_WT
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
@@ -7815,6 +8005,9 @@ buildvariants:
   - name: compile
     distros:
     - rhel62-large
+  - name: compile_all
+    distros:
+    - rhel62-large
   - name: aggregation_WT
   - name: aggregation_auth
   - name: auth
@@ -7897,6 +8090,9 @@ buildvariants:
   - name: compile
     distros:
     - rhel71-power8-build
+  - name: compile_all
+    distros:
+    - rhel71-power8-build
   - name: aggregation_WT
   - name: aggregation_auth
   - name: aggregation_read_concern_majority_passthrough_WT
@@ -7974,6 +8170,9 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+    distros:
+    - rhel72-zseries-build
+  - name: compile_all
     distros:
     - rhel72-zseries-build
   - name: aggregation_WT
@@ -8069,6 +8268,7 @@ buildvariants:
     hang_analyzer_dump_core: false
   tasks:
   - name: compile
+  - name: compile_all
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_WT_ese
@@ -8213,6 +8413,7 @@ buildvariants:
     hang_analyzer_dump_core: false
   tasks:
   - name: compile
+  - name: compile_all
   - name: jstestfuzz
   - name: jstestfuzz_WT
   - name: jstestfuzz_concurrent_WT
@@ -8246,6 +8447,11 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+    distros:
+    - ubuntu1604-build
+  - name: compile_all
+    distros:
+    - ubuntu1604-build
   - name: aggregation
   - name: aggregation_WT
   - name: aggregation_WT_ese
@@ -8389,6 +8595,9 @@ buildvariants:
   - name: compile
     distros:
     - ubuntu1604-build
+  - name: compile_all
+    distros:
+    - ubuntu1604-build
 
 - name: enterprise-debug-rhel-62-cxx14
   display_name: ~ Enterprise RHEL 6.2 C++14 DEBUG
@@ -8409,6 +8618,9 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+    distros:
+    - rhel62-large
+  - name: compile_all
     distros:
     - rhel62-large
   - name: aggregation
@@ -8542,6 +8754,9 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
+    distros:
+    - rhel62-large
+  - name: compile_all
     distros:
     - rhel62-large
   - name: auth
