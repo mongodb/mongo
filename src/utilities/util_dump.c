@@ -268,7 +268,7 @@ dump_add_config(WT_SESSION *session, char **bufp, size_t *leftp,
 	if (n < 0)
 		return (util_err(session, EINVAL, NULL));
 	*bufp += n;
-	*leftp -= n;
+	*leftp -= (size_t)n;
 	return (0);
 }
 
