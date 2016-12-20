@@ -308,7 +308,53 @@ bool ShardRegistry::reload(OperationContext* txn) {
     return true;
 }
 
+void ShardRegistry::replicaSetChangeShardRegistryUpdateHook(
+    const std::string& setName, const std::string& newConnectionString) {
+    // Inform the ShardRegsitry of the new connection string for the shard.
+    auto connString = fassertStatusOK(28805, ConnectionString::parse(newConnectionString));
+    invariant(setName == connString.getSetName());
+    grid.shardRegistry()->updateReplSetHosts(connString);
+}
+
+void ShardRegistry::replicaSetChangeConfigServerUpdateHook(const std::string& setName,
+                                                           const std::string& newConnectionString) {
+    // This is run in it's own thread. Exceptions escaping would result in a call to terminate.
+    Client::initThread("replSetChange");
+    auto txn = cc().makeOperationContext();
+
+    try {
+        std::shared_ptr<Shard> s = Grid::get(txn.get())->shardRegistry()->lookupRSName(setName);
+        if (!s) {
+            LOG(1) << "shard not found for set: " << newConnectionString
+                   << " when attempting to inform config servers of updated set membership";
+            return;
+        }
+
+        if (s->isConfig()) {
+            // No need to tell the config servers their own connection string.
+            return;
+        }
+
+        auto status = Grid::get(txn.get())->catalogClient(txn.get())->updateConfigDocument(
+            txn.get(),
+            ShardType::ConfigNS,
+            BSON(ShardType::name(s->getId().toString())),
+            BSON("$set" << BSON(ShardType::host(newConnectionString))),
+            false,
+            ShardingCatalogClient::kMajorityWriteConcern);
+        if (!status.isOK()) {
+            error() << "RSChangeWatcher: could not update config db for set: " << setName
+                    << " to: " << newConnectionString << causedBy(status.getStatus());
+        }
+    } catch (const std::exception& e) {
+        warning() << "caught exception while updating config servers: " << e.what();
+    } catch (...) {
+        warning() << "caught unknown exception while updating config servers";
+    }
+}
+
 ////////////// ShardRegistryData //////////////////
+
 ShardRegistryData::ShardRegistryData(OperationContext* txn, ShardFactory* shardFactory) {
     _init(txn, shardFactory);
 }

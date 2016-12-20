@@ -32,10 +32,7 @@
 
 #include "mongo/s/config.h"
 
-#include "mongo/db/client.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/write_concern.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -524,53 +521,6 @@ bool DBConfig::isShardingEnabled() {
 ShardId DBConfig::getPrimaryId() {
     stdx::lock_guard<stdx::mutex> lk(_lock);
     return _primaryId;
-}
-
-/* --- ConfigServer ---- */
-
-void ConfigServer::replicaSetChangeShardRegistryUpdateHook(const string& setName,
-                                                           const string& newConnectionString) {
-    // Inform the ShardRegsitry of the new connection string for the shard.
-    auto connString = fassertStatusOK(28805, ConnectionString::parse(newConnectionString));
-    invariant(setName == connString.getSetName());
-    grid.shardRegistry()->updateReplSetHosts(connString);
-}
-
-void ConfigServer::replicaSetChangeConfigServerUpdateHook(const string& setName,
-                                                          const string& newConnectionString) {
-    // This is run in it's own thread. Exceptions escaping would result in a call to terminate.
-    Client::initThread("replSetChange");
-    auto txn = cc().makeOperationContext();
-
-    try {
-        std::shared_ptr<Shard> s = grid.shardRegistry()->lookupRSName(setName);
-        if (!s) {
-            LOG(1) << "shard not found for set: " << newConnectionString
-                   << " when attempting to inform config servers of updated set membership";
-            return;
-        }
-
-        if (s->isConfig()) {
-            // No need to tell the config servers their own connection string.
-            return;
-        }
-
-        auto status = grid.catalogClient(txn.get())->updateConfigDocument(
-            txn.get(),
-            ShardType::ConfigNS,
-            BSON(ShardType::name(s->getId().toString())),
-            BSON("$set" << BSON(ShardType::host(newConnectionString))),
-            false,
-            ShardingCatalogClient::kMajorityWriteConcern);
-        if (!status.isOK()) {
-            error() << "RSChangeWatcher: could not update config db for set: " << setName
-                    << " to: " << newConnectionString << causedBy(status.getStatus());
-        }
-    } catch (const std::exception& e) {
-        warning() << "caught exception while updating config servers: " << e.what();
-    } catch (...) {
-        warning() << "caught unknown exception while updating config servers";
-    }
 }
 
 }  // namespace mongo

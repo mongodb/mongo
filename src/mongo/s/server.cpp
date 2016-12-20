@@ -254,9 +254,9 @@ static ExitCode runMongosServer() {
     shardConnectionPool.addHook(new ShardingConnectionHookForMongos(true));
 
     ReplicaSetMonitor::setAsynchronousConfigChangeHook(
-        &ConfigServer::replicaSetChangeConfigServerUpdateHook);
+        &ShardRegistry::replicaSetChangeConfigServerUpdateHook);
     ReplicaSetMonitor::setSynchronousConfigChangeHook(
-        &ConfigServer::replicaSetChangeShardRegistryUpdateHook);
+        &ShardRegistry::replicaSetChangeShardRegistryUpdateHook);
 
     // Mongos connection pools already takes care of authenticating new connections so the
     // replica set connection shouldn't need to.
