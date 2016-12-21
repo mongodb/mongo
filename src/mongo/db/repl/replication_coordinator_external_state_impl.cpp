@@ -87,7 +87,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
@@ -96,8 +95,6 @@
 
 namespace mongo {
 namespace repl {
-
-MONGO_FP_DECLARE(transitionToPrimaryHangBeforeInitializingConfigDatabase);
 
 namespace {
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
@@ -729,18 +726,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
     fassertStatusOK(40107, status);
 
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        if (MONGO_FAIL_POINT(transitionToPrimaryHangBeforeInitializingConfigDatabase)) {
-            log() << "transition to primary - "
-                     "transitionToPrimaryHangBeforeInitializingConfigDatabase fail point enabled. "
-                     "Blocking until fail point is disabled.";
-            while (MONGO_FAIL_POINT(transitionToPrimaryHangBeforeInitializingConfigDatabase)) {
-                mongo::sleepsecs(1);
-                if (inShutdown()) {
-                    break;
-                }
-            }
-        }
-
         status = Grid::get(txn)->catalogManager()->initializeConfigDatabaseIfNeeded(txn);
         if (!status.isOK() && status != ErrorCodes::AlreadyInitialized) {
             if (ErrorCodes::isShutdownError(status.code())) {
