@@ -97,6 +97,8 @@ public:
 
     bool isSharded(const NamespaceString& nss) final {
         AutoGetCollectionForRead autoColl(_ctx->opCtx, nss);
+        // TODO SERVER-24960: Use CollectionShardingState::collectionIsSharded() to confirm sharding
+        // state.
         auto css = CollectionShardingState::get(_ctx->opCtx, nss);
         return bool(css->getMetadata());
     }
@@ -192,6 +194,17 @@ public:
         pipeline.getValue()->optimizePipeline();
 
         AutoGetCollectionForRead autoColl(expCtx->opCtx, expCtx->ns);
+
+        // makePipeline() is only called to perform secondary aggregation requests and expects the
+        // collection representing the document source to be not-sharded. We confirm sharding state
+        // here to avoid taking a collection lock elsewhere for this purpose alone.
+        // TODO SERVER-27616: This check is incorrect in that we don't acquire a collection cursor
+        // until after we release the lock, leaving room for a collection to be sharded inbetween.
+        // TODO SERVER-24960: Use CollectionShardingState::collectionIsSharded() to confirm sharding
+        // state.
+        auto css = CollectionShardingState::get(_ctx->opCtx, expCtx->ns);
+        uassert(4567, "from collection cannot be sharded", !bool(css->getMetadata()));
+
         PipelineD::prepareCursorSource(autoColl.getCollection(), pipeline.getValue());
 
         return pipeline;

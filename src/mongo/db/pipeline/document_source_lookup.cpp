@@ -121,8 +121,6 @@ BSONObj buildEqualityOrQuery(const std::string& fieldName, const vector<Value>& 
 DocumentSource::GetNextResult DocumentSourceLookUp::getNext() {
     pExpCtx->checkForInterrupt();
 
-    uassert(4567, "from collection cannot be sharded", !_mongod->isSharded(_fromExpCtx->ns));
-
     if (!_additionalFilter && _matchSrc) {
         // We have internalized a $match, but have not yet computed the descended $match that should
         // be applied to our queries.
