@@ -270,13 +270,31 @@ var ReplSetTest = function(opts) {
     }
 
     /**
-     * Returns the optime for the specified host by issuing replSetGetStatus.
+     * Returns true if the OpTime is empty, else false.
+     *
+     * Empty OpTime Formats:
+     *   PV0: Timestamp(0,0)
+     *   PV1: {ts: Timestamp(0,0), t: NumberLong(-1)}
+     */
+    function _isEmptyOpTime(opTime) {
+        if (!opTime.hasOwnProperty("ts") || !opTime.hasOwnProperty("t")) {
+            return (opTime.getTime() == 0 && opTime.getInc() == 0);
+        }
+        return (opTime.ts.getTime() == 0 && opTime.ts.getInc() == 0 && opTime.t == -1);
+    }
+
+    /**
+     * Returns the OpTime for the specified host by issuing replSetGetStatus.
      */
     function _getLastOpTime(conn) {
         var replSetStatus =
             assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1}));
         var connStatus = replSetStatus.members.filter(m => m.self)[0];
-        return connStatus.optime;
+        var opTime = connStatus.optime;
+        if (_isEmptyOpTime(opTime)) {
+            throw new Error("last OpTime is empty -- connection: " + conn);
+        }
+        return opTime;
     }
 
     /**
@@ -304,7 +322,11 @@ var ReplSetTest = function(opts) {
         if (_isRunningWithoutJournaling()) {
             opTimeType = "appliedOpTime";
         }
-        return replSetStatus.optimes[opTimeType];
+        var opTime = replSetStatus.optimes[opTimeType];
+        if (_isEmptyOpTime(opTime)) {
+            throw new Error("last durable OpTime is empty -- connection: " + conn);
+        }
+        return opTime;
     }
 
     /*
@@ -849,7 +871,7 @@ var ReplSetTest = function(opts) {
                       " secondaries synced at optime " + tojson(masterLatestOpTime));
                 return true;
             } catch (e) {
-                print("ReplSetTest awaitReplication: caught exception " + e + ';\n' + e.stack);
+                print("ReplSetTest awaitReplication: caught exception " + e);
 
                 // We might have a new master now
                 awaitLastOpTimeWrittenFn();
