@@ -8395,12 +8395,6 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
     distros:
     - rhel62-large
-  - name: jsCore_small_oplog_rs_initsync
-    distros:
-    - rhel62-large
-  - name: jsCore_small_oplog_rs_initsync_WT
-    distros:
-    - rhel62-large
   - name: jsCore_small_oplog_rs_initsync_static
     distros:
     - rhel62-large
