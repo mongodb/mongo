@@ -209,10 +209,6 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
     SplitInfoVector splitCandidates;
 
     for (const auto& coll : collections) {
-        if (coll.getDropped()) {
-            continue;
-        }
-
         const NamespaceString nss(coll.getNs());
 
         auto candidatesStatus = _getSplitCandidatesForCollection(txn, nss, shardStats);
@@ -261,10 +257,6 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
     MigrateInfoVector candidateChunks;
 
     for (const auto& coll : collections) {
-        if (coll.getDropped()) {
-            continue;
-        }
-
         const NamespaceString nss(coll.getNs());
 
         if (!coll.getAllowBalance()) {
