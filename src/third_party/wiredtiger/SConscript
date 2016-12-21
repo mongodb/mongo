@@ -7,6 +7,7 @@ Import("get_option")
 Import("endian")
 
 env = env.Clone()
+
 env.InjectThirdPartyIncludePaths(libraries=['snappy', 'zlib'])
 
 if endian == "big":

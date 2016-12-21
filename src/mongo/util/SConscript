@@ -5,12 +5,17 @@ Import("get_option")
 Import("has_option")
 Import("use_system_version_of_library")
 
+env = env.Clone()
+
 env.SConscript(
     dirs=[
         'cmdline_utils',
         'concurrency',
         'net',
         'options_parser',
+    ],
+    exports=[
+        'env',
     ],
 )
 

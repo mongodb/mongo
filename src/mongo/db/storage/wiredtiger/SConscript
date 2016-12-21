@@ -3,6 +3,8 @@ Import("env")
 Import("wiredtiger")
 Import("get_option")
 
+env = env.Clone()
+
 using_ubsan = False
 sanitizer_list = get_option('sanitize')
 if sanitizer_list:

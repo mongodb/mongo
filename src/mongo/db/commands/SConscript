@@ -3,6 +3,8 @@
 Import("env")
 Import("has_option")
 
+env = env.Clone()
+
 env.Library(
     target="test_commands_enabled",
     source=[

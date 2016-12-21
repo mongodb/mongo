@@ -2,6 +2,8 @@
 
 Import("env")
 
+env = env.Clone()
+
 generateErrorCodes = env.Command(
     target=['error_codes.h', 'error_codes.cpp'],
     source=['generate_error_codes.py', 'error_codes.err'],

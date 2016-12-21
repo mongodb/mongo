@@ -96,6 +96,7 @@ def injectThirdPartyIncludePaths(thisEnv, libraries):
 env.AddMethod(injectAllThirdPartyIncludePaths, 'InjectAllThirdPartyIncludePaths')
 env.AddMethod(injectThirdPartyIncludePaths, 'InjectThirdPartyIncludePaths')
 
+env = env.Clone()
 
 murmurEnv = env.Clone()
 murmurEnv.SConscript('murmurhash3/SConscript', exports={ 'env' : murmurEnv })
@@ -196,7 +197,6 @@ if use_system_version_of_library("zlib"):
 else:
     zlibEnv = env.Clone()
     zlibEnv.InjectThirdPartyIncludePaths(libraries=['zlib'])
-    zlibEnv.InjectMongoIncludePaths()
     zlibEnv.SConscript('zlib' + zlibSuffix + '/SConscript', exports={ 'env' : zlibEnv })
     zlibEnv = zlibEnv.Clone(
         LIBDEPS=[
@@ -234,7 +234,6 @@ if (gperftoolsEnv['MONGO_ALLOCATOR'] == "tcmalloc"):
     else:
         gperftoolsEnv = env.Clone()
         gperftoolsEnv.InjectThirdPartyIncludePaths(libraries=['gperftools'])
-        gperftoolsEnv.InjectMongoIncludePaths()
         gperftoolsEnv.SConscript('gperftools' + gperftoolsSuffix + '/SConscript', exports={ 'env' : gperftoolsEnv })
         gperftoolsEnv = gperftoolsEnv.Clone(
             LIBDEPS=[

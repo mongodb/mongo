@@ -6,6 +6,7 @@ Import("env")
 Import("has_option")
 
 env = env.Clone()
+
 env['WIX'] = os.environ.get('WIX')
 env['WIXPATH'] = r'$WIX\bin'
 env['WIXHEAT'] = r'$WIXPATH\heat.exe'

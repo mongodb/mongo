@@ -2,6 +2,8 @@
 
 Import("env")
 
+env = env.Clone()
+
 # These commands are linked both in MongoS and MongoD
 env.Library(
     target='shared_cluster_commands',

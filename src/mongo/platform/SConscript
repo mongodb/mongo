@@ -2,6 +2,8 @@
 
 Import("env")
 
+env = env.Clone()
+
 env.CppUnitTest('atomic_proxy_test', 'atomic_proxy_test.cpp')
 env.CppUnitTest('atomic_word_test', 'atomic_word_test.cpp')
 env.CppUnitTest('bits_test', 'bits_test.cpp')

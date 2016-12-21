@@ -2,6 +2,7 @@
 Import("env")
 
 env = env.Clone()
+
 env.Append(CPPDEFINES=["HAVE_STDARG_H"])
 if not env.TargetOSIs('windows'):
     env.Append(CPPDEFINES=["HAVE_UNISTD_H"])

@@ -1,5 +1,7 @@
 Import("env")
 
+env = env.Clone()
+
 sorterEnv = env.Clone()
 sorterEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
 sorterEnv.CppUnitTest('sorter_test',

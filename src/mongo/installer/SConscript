@@ -2,8 +2,13 @@
 
 Import("env")
 
+env = env.Clone()
+
 env.SConscript(
     dirs=[
         'msi',
+    ],
+    exports=[
+        'env',
     ],
 )

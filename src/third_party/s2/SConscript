@@ -4,12 +4,17 @@ Import("env")
 
 env = env.Clone()
 
-env.SConscript( [
-	"base/SConscript",
-	"strings/SConscript",
-	"util/coding/SConscript",
-	"util/math/SConscript",
-        ], exports={ 'env' : env })
+env.SConscript(
+    dirs=[
+        "base",
+        "strings",
+        "util/coding",
+        "util/math",
+    ],
+    exports=[
+        'env',
+    ],
+)
 
 env.Append(CCFLAGS=['-DDEBUG_MODE=false'])
 

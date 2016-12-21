@@ -4,6 +4,8 @@ Import("env")
 Import("has_option")
 Import("debugBuild")
 
+env = env.Clone()
+
 files = [
     'src/base/dynamic_annotations.c',
     'src/base/elf_mem_image.cc',

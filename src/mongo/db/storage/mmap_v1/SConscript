@@ -3,6 +3,8 @@
 Import("env")
 Import("mmapv1")
 
+env = env.Clone()
+
 env.Library(
     target = 'storage_mmapv1',
     source = [ "aligned_builder.cpp",

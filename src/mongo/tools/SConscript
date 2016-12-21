@@ -2,6 +2,8 @@
 
 Import('env')
 
+env = env.Clone()
+
 mongobridge = env.Program(
     target="mongobridge",
     source=[

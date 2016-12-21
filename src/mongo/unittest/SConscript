@@ -2,6 +2,8 @@
 
 Import("env")
 
+env = env.Clone()
+
 env.Library(target="unittest",
             source=[
                 'bson_test_util.cpp',

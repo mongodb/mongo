@@ -2,10 +2,15 @@
 
 Import('env')
 
+env = env.Clone()
+
 env.SConscript(
     dirs=[
         'mutable',
         'util',
+    ],
+    exports=[
+        'env',
     ],
 )
 

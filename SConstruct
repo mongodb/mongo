@@ -2949,9 +2949,9 @@ module_sconscripts = moduleconfig.get_module_sconscripts(mongo_modules)
 # Currently, however, the SConscript files do need some predicates for
 # conditional decision making that hasn't been moved up to this SConstruct file,
 # and they are exported here, as well.
-Export("env")
 Export("get_option")
-Export("has_option use_system_version_of_library")
+Export("has_option")
+Export("use_system_version_of_library")
 Export("serverJs")
 Export("usemozjs")
 Export('module_sconscripts')
@@ -2982,7 +2982,16 @@ env.Alias("distsrc-tgz", env.GZip(
 env.Alias("distsrc-zip", env.DistSrc("mongodb-src-${MONGO_VERSION}.zip"))
 env.Alias("distsrc", "distsrc-tgz")
 
-env.SConscript('src/SConscript', variant_dir='$BUILD_DIR', duplicate=False)
+env.SConscript(
+    dirs=[
+        'src',
+    ],
+    duplicate=False,
+    exports=[
+        'env',
+    ],
+    variant_dir='$BUILD_DIR',
+)
 
 all = env.Alias('all', ['core', 'tools', 'dbtest', 'unittests', 'integration_tests'])
 

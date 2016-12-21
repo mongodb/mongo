@@ -4,6 +4,14 @@ Import("env")
 Import("has_option")
 Import("wiredtiger")
 
+env = env.Clone()
+
+# Ideally 's2' would be scoped narrowly but it is spammed in all over the place by
+# db/geo unfortunately.
+env.InjectThirdPartyIncludePaths(libraries=[
+    's2',
+])
+
 env.SConscript(
     dirs=[
         'auth',
@@ -26,6 +34,9 @@ env.SConscript(
         'stats',
         'storage',
         'views',
+    ],
+    exports=[
+        'env',
     ],
 )
 

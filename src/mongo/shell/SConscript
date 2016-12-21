@@ -2,6 +2,8 @@
 
 Import("env")
 
+env = env.Clone()
+
 generateJSErrorCodes = env.Command(
     target=['error_codes.js'],
     source=['$BUILD_DIR/mongo/base/generate_error_codes.py', '$BUILD_DIR/mongo/base/error_codes.err'],

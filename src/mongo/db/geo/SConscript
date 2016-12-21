@@ -2,6 +2,8 @@
 
 Import("env")
 
+env = env.Clone()
+
 # Core geometry shape libraries
 env.Library("geometry", [ "hash.cpp",
                           "shapes.cpp",

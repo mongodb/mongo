@@ -1,3 +1,5 @@
 Import("env")
 
+env = env.Clone()
+
 env.Library("tz", [ "timegm.c" ])

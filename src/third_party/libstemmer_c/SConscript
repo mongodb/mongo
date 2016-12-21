@@ -2,6 +2,8 @@
 
 Import("env")
 
+env = env.Clone()
+
 # We only use the utf8 stemmers.
 stemming_packages = [
     #"ISO_8859_1_danish",

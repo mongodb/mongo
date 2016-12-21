@@ -4,6 +4,7 @@ Import("env")
 Import("has_option")
 Import("debugBuild")
 
+env = env.Clone()
 
 files = [
     "LIBRARY/float128/dpml_exception.c",

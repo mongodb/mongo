@@ -2,6 +2,8 @@
 
 Import("env")
 
+env = env.Clone()
+
 # Should not be referenced outside this SConscript file.
 env.Library(
     target='kv_engine_core',

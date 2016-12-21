@@ -3,6 +3,7 @@
 Import("env")
 
 env = env.Clone()
+
 env.Append( CPPDEFINES=[ "HAVE_CONFIG_H",  ] )
 
 def removeIfPresent(lst, item):

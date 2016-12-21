@@ -2,6 +2,8 @@
 
 Import("env")
 
+env = env.Clone()
+
 optsEnv = env.Clone()
 optsEnv.InjectThirdPartyIncludePaths(libraries=['yaml'])
 

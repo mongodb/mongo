@@ -2,6 +2,8 @@
 
 Import("env")
 
+env = env.Clone()
+
 env.SConscript(
     dirs=[
         'catalog',
@@ -9,6 +11,9 @@ env.SConscript(
         'commands',
         'query',
         'write_ops',
+    ],
+    exports=[
+        'env',
     ],
 )
 
