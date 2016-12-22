@@ -944,15 +944,17 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* txn) {
 
     _externalState->onDrainComplete(txn);
 
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
-        MONGO_FAIL_POINT(transitionToPrimaryHangBeforeTakingGlobalExclusiveLock)) {
+    if (MONGO_FAIL_POINT(transitionToPrimaryHangBeforeTakingGlobalExclusiveLock)) {
         log() << "transition to primary - "
                  "transitionToPrimaryHangBeforeTakingGlobalExclusiveLock fail point enabled. "
                  "Blocking until fail point is disabled.";
         while (MONGO_FAIL_POINT(transitionToPrimaryHangBeforeTakingGlobalExclusiveLock)) {
             mongo::sleepsecs(1);
-            if (_inShutdown) {
-                break;
+            {
+                stdx::lock_guard<stdx::mutex> lock(_mutex);
+                if (_inShutdown) {
+                    break;
+                }
             }
         }
     }
