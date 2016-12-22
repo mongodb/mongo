@@ -495,7 +495,17 @@ functions:
           path_value="$path_value:${task_path_suffix}"
         fi
 
-        PATH="$path_value" ${san_symbolizer} ${san_options} ${rlp_environment} ${resmoke_wrapper} ${python|python} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
+        # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
+        # invocation. It doesn't set any environment variables and should therefore come last in
+        # this list of expansions.
+        PATH="$path_value"   \
+        ${gcov_environment}  \
+        ${rlp_environment}   \
+        ${san_options}       \
+        ${san_symbolizer}    \
+        ${snmp_config_path}  \
+        ${resmoke_wrapper}   \
+        ${python|python} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
 
 
   "do jepsen setup" :
@@ -679,10 +689,18 @@ functions:
         set -o verbose
 
         rm -rf /data/install /data/multiversion
-        # 3.2.1 is needed to check cross version compatibility as it is the final version
-        # to use the old style replSetUpdatePosition command.
-        # 3.2.1 is also needed to check for a correct implementation of SERVER-23299.
         ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${multiversion_edition|"base"} ${multiversion_platform_arch|"linux/x86_64"} "3.0" "3.2" "3.4"
+
+  "do snmp setup" :
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        mkdir -p snmpconf
+        cp -f src/mongo/db/modules/enterprise/docs/mongod.conf.master snmpconf/mongod.conf
 
   "cleanup environment" :
     - command: shell.exec
@@ -2658,35 +2676,23 @@ tasks:
   name: snmp
   commands:
   - func: "do setup"
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
-
-        cp mongodb*/bin/* .
-        mkdir -p snmpconf
-        cp -f src/mongo/db/modules/enterprise/docs/mongod.conf.master snmpconf/mongod.conf
-        SNMPCONFPATH=snmpconf ${san_symbolizer} ${san_options} ${python|python} buildscripts/resmoke.py --suites=snmp --jobs ${num_jobs_available|1} --shuffle --storageEngine=mmapv1 ${test_flags} --log=buildlogger --reportFile=report.json
+  - func: "do snmp setup"
+  - func: "run tests"
+    vars:
+      snmp_config_path: SNMPCONFPATH=snmpconf
+      resmoke_args: --suites=snmp --storageEngine=mmapv1
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: snmp_WT
   commands:
   - func: "do setup"
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
-
-        cp mongodb*/bin/* .
-        mkdir -p snmpconf
-        cp -f src/mongo/db/modules/enterprise/docs/mongod.conf.master snmpconf/mongod.conf
-        SNMPCONFPATH=snmpconf ${san_symbolizer} ${san_options} ${python|python} buildscripts/resmoke.py --suites=snmp --jobs ${num_jobs_available|1} --shuffle --storageEngine=wiredTiger ${test_flags} --log=buildlogger --reportFile=report.json
+  - func: "do snmp setup"
+  - func: "run tests"
+    vars:
+      snmp_config_path: SNMPCONFPATH=snmpconf
+      resmoke_args: --suites=snmp --storageEngine=wiredTiger
+      run_multiple_jobs: true
 
 - <<: *task_template
   name: ssl
@@ -5765,7 +5771,7 @@ buildvariants:
     # for the .gcda files. In Evergreen the path will start with /data/mci/[Hashed ID]/src/... where
     # the hashed ID is unique per task run. GCOV_PREFIX_STRIP is the number of directory levels to
     # strip from the top of the default path before appending to the GCOV_PREFIX (if any).
-    resmoke_wrapper: GCOV_PREFIX=$(pwd) GCOV_PREFIX_STRIP=4
+    gcov_environment: GCOV_PREFIX=$(pwd) GCOV_PREFIX_STRIP=4
     # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
     timeout_secs: 10800 # 3 hour timeout
     use_scons_cache: false
