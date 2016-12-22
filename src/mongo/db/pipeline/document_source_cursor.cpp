@@ -46,14 +46,6 @@ using boost::intrusive_ptr;
 using std::shared_ptr;
 using std::string;
 
-namespace {
-
-MONGO_EXPORT_SERVER_PARAMETER(internalDocumentSourceCursorBatchSizeBytes,
-                              int,
-                              FindCommon::kMaxBytesToReturnToClientAtOnce);
-
-}  // namespace
-
 const char* DocumentSourceCursor::getSourceName() const {
     return "$cursor";
 }

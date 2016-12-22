@@ -113,4 +113,6 @@ extern std::atomic<int> internalQueryFacetBufferSizeBytes;  // NOLINT
 
 extern std::atomic<int> internalInsertMaxBatchSize;  // NOLINT
 
+extern std::atomic<int> internalDocumentSourceCursorBatchSizeBytes;  // NOLINT
+
 }  // namespace mongo
