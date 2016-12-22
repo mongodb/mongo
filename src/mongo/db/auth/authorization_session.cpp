@@ -261,9 +261,8 @@ Status AuthorizationSession::checkAuthForAggregate(const NamespaceString& ns,
     PrivilegeVector privileges;
 
     if (dps::extractElementAtPath(cmdObj, "pipeline.0.$indexStats")) {
-        Privilege::addPrivilegeToPrivilegeVector(
-            &privileges,
-            Privilege(ResourcePattern::forAnyNormalResource(), ActionType::indexStats));
+        Privilege::addPrivilegeToPrivilegeVector(&privileges,
+                                                 Privilege(inputResource, ActionType::indexStats));
     } else if (dps::extractElementAtPath(cmdObj, "pipeline.0.$collStats")) {
         Privilege::addPrivilegeToPrivilegeVector(&privileges,
                                                  Privilege(inputResource, ActionType::collStats));
