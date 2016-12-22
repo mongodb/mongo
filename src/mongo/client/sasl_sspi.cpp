@@ -179,7 +179,7 @@ int sspiClientMechNew(void* glob_context,
     pcctx->userPlusRealm = userPlusRealm;
     TimeStamp ignored;
     SECURITY_STATUS status = AcquireCredentialsHandleW(NULL,  // principal
-                                                       L"kerberos",
+                                                       const_cast<LPWSTR>(L"kerberos"),
                                                        SECPKG_CRED_OUTBOUND,
                                                        NULL,           // LOGON id
                                                        &authIdentity,  // auth data

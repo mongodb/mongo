@@ -896,9 +896,11 @@ inline Status checkX509_STORE_error() {
 #if defined(_WIN32)
 // This imports the certificates in a given Windows certificate store into an X509_STORE for
 // openssl to use during certificate validation.
-Status importCertStoreToX509_STORE(LPWSTR storeName, DWORD storeLocation, X509_STORE* verifyStore) {
-    HCERTSTORE systemStore =
-        CertOpenStore(CERT_STORE_PROV_SYSTEM_W, 0, NULL, storeLocation, storeName);
+Status importCertStoreToX509_STORE(const wchar_t* storeName,
+                                   DWORD storeLocation,
+                                   X509_STORE* verifyStore) {
+    HCERTSTORE systemStore = CertOpenStore(
+        CERT_STORE_PROV_SYSTEM_W, 0, NULL, storeLocation, const_cast<LPWSTR>(storeName));
     if (systemStore == NULL) {
         return {ErrorCodes::InvalidSSLConfiguration,
                 str::stream() << "error opening system CA store: " << errnoWithDescription()};

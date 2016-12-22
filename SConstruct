@@ -1518,7 +1518,20 @@ elif env.TargetOSIs('windows'):
     # Support large object files since some unit-test sources contain a lot of code
     env.Append( CCFLAGS=["/bigobj"] )
 
-    # This gives 32-bit programs 4 GB of user address space in WOW64, ignored in 64-bit builds
+    # Set Source and Executable character sets to UTF-8, this will produce a warning C4828 if the
+    # file contains invalid UTF-8.
+    env.Append( CCFLAGS=["/utf-8" ])
+
+    # Enforce type conversion rules for rvalue reference types as a result of a cast operation.
+    env.Append( CCFLAGS=["/Zc:rvalueCast"] )
+
+    # Disable string literal type conversion, instead const_cast must be explicitly specified.
+    env.Append( CCFLAGS=["/Zc:strictStrings"] )
+
+    # Treat volatile according to the ISO standard and do not guarantee acquire/release semantics.
+    env.Append( CCFLAGS=["/volatile:iso"] )
+
+    # This gives 32-bit programs 4 GB of user address space in WOW64, ignored in 64-bit builds.
     env.Append( LINKFLAGS=["/LARGEADDRESSAWARE"] )
 
     env.Append(
