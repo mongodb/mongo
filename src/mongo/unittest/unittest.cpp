@@ -453,7 +453,7 @@ TestAssertionFailure& TestAssertionFailure::operator=(const TestAssertionFailure
     return *this;
 }
 
-TestAssertionFailure::~TestAssertionFailure() BOOST_NOEXCEPT_IF(false) {
+TestAssertionFailure::~TestAssertionFailure() noexcept(false) {
     if (!_enabled) {
         invariant(_stream.str().empty());
         return;

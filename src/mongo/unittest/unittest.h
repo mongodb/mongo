@@ -40,8 +40,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/config.hpp>
-
 #include "mongo/base/status_with.h"
 #include "mongo/logger/logstream_builder.h"
 #include "mongo/logger/message_log_domain.h"
@@ -502,7 +500,7 @@ class TestAssertionFailure {
 public:
     TestAssertionFailure(const std::string& file, unsigned line, const std::string& message);
     TestAssertionFailure(const TestAssertionFailure& other);
-    ~TestAssertionFailure() BOOST_NOEXCEPT_IF(false);
+    ~TestAssertionFailure() noexcept(false);
 
     TestAssertionFailure& operator=(const TestAssertionFailure& other);
 

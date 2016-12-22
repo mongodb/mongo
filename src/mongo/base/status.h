@@ -27,7 +27,6 @@
 
 #pragma once
 
-#include <boost/config.hpp>
 #include <iosfwd>
 #include <string>
 
@@ -91,8 +90,8 @@ public:
     inline Status(const Status& other);
     inline Status& operator=(const Status& other);
 
-    inline Status(Status&& other) BOOST_NOEXCEPT;
-    inline Status& operator=(Status&& other) BOOST_NOEXCEPT;
+    inline Status(Status&& other) noexcept;
+    inline Status& operator=(Status&& other) noexcept;
 
     inline ~Status();
 

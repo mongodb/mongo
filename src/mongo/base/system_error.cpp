@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/config.hpp>
 #include <string>
 
 #include "mongo/base/system_error.h"
@@ -44,7 +43,7 @@ class MongoErrorCategoryImpl final : public std::error_category {
 public:
     MongoErrorCategoryImpl() = default;
 
-    const char* name() const BOOST_NOEXCEPT override {
+    const char* name() const noexcept override {
         return "mongo";
     }
 
@@ -53,15 +52,12 @@ public:
     }
 
     // We don't really want to override this function, but to override the second we need to,
-    // otherwise there will be issues with overload resolution. Additionally, the use of
-    // BOOST_NOEXCEPT is necessitated by the libc++/libstdc++ STL having 'noexcept' on the
-    // overridden methods, but not the Dinkumware STL as of MSVC 2013.
-    bool equivalent(const int code,
-                    const std::error_condition& condition) const BOOST_NOEXCEPT override {
+    // otherwise there will be issues with overload resolution.
+    bool equivalent(const int code, const std::error_condition& condition) const noexcept override {
         return std::error_category::equivalent(code, condition);
     }
 
-    bool equivalent(const std::error_code& code, int condition) const BOOST_NOEXCEPT override {
+    bool equivalent(const std::error_code& code, int condition) const noexcept override {
         switch (ErrorCodes::fromInt(condition)) {
             case ErrorCodes::OK:
                 // Make ErrorCodes::OK to be equivalent to the default constructed error code.
