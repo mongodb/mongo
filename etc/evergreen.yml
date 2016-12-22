@@ -233,7 +233,9 @@ functions:
     params:
       working_dir: src
       script: |
+        set -o errexit
         ${decompress} mongo-binaries.tgz
+        cp mongodb*/bin/* .
 
   "check binary version" : &check_binary_version
     command: shell.exec
@@ -474,8 +476,6 @@ functions:
             . ./venv/bin/activate
           fi
         fi
-
-        cp mongodb*/bin/* .
 
         if [ -f /proc/self/coredump_filter ]; then
           # Set the shell process (and its children processes) to dump ELF headers (bit 4),
@@ -1432,7 +1432,7 @@ tasks:
     - func: "setup credentials"
     - func: "build new tools" # noop if ${newtools} is not "true"
     - *generate_compile_expansions
-    # Then we load the generated version data into the agent so we can use it in task definitions
+    # Then we load the generated version data into the agent so we can use it in task definitions.
     - *apply_compile_expansions
 
     - command: shell.exec
@@ -1447,25 +1447,12 @@ tasks:
 
           ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" all ${additional_targets|} MONGO_VERSION=${version}
 
-          # If strip is on the path (everywhere except windows) then we should strip the test binaries
-          # before tarring them up
-          if [ -x ${strip_path|/usr/bin/strip} ]; then
-            cat build/unittests.txt | xargs ${strip_command|/usr/bin/strip}
-          fi
-
-          # On windows we need to make sure the paths in unittests.txt are compatible with cygwin tar
-          sed 's|\\|/|g' build/unittests.txt > build/unittests-tarlist.txt
-          ${tar|tar} -czvf mongodb-unittests.tgz -T build/unittests-tarlist.txt build/unittests.txt
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/mongodb-unittests.tgz
-        remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/unittests/${build_id}.tgz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/x-gzip}
-        display_name: Unit tests (stripped)
+    # Run the C++ unittests as part of compile_all. The compiled binaries are automatically
+    # installed into the top-level directory by SCons.
+    - func: "run tests"
+      vars:
+        resmoke_args: --suites=unittests
+        run_multiple_jobs: true
 
 ## lint ##
 - name: lint
@@ -1779,23 +1766,6 @@ tasks:
     vars:
       <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_sharded --storageEngine=wiredTiger
-
-## unit tests ##
-- <<: *task_depending_on_all_template
-  name: unittests
-  commands:
-  - func: "do setup"
-  - command: s3.get
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      remote_file: mongodb-mongo-v3.4/${build_variant}/${revision}/unittests/${build_id}.tgz
-      bucket: mciuploads
-      extract_to: src
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=unittests
-      run_multiple_jobs: true
 
 ## integration test suites ##
 
@@ -3738,7 +3708,6 @@ buildvariants:
   - name: sharding_last_stable_mongos_and_mixed_shards
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: write_concern_majority_passthrough_WT
   - name: push
 
@@ -3775,7 +3744,6 @@ buildvariants:
   - name: concurrency_sharded_WT
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_WT
-  - name: unittests
 
 - name: linux-64-debug
   display_name: Linux DEBUG
@@ -3864,7 +3832,6 @@ buildvariants:
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: write_concern_majority_passthrough_WT
 
 - name: linux-64-duroff
@@ -3936,7 +3903,6 @@ buildvariants:
   - name: serial_run
   - name: sharding_jscore_passthrough
   - name: tool
-  - name: unittests
 
 - name: linux-64-lsm
   stepback: false
@@ -3994,7 +3960,6 @@ buildvariants:
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: tool_WT
-  - name: unittests
 
 - name: ubuntu1404
   display_name: SSL Ubuntu 14.04
@@ -4132,7 +4097,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: package
     distros:
     - ubuntu1604-packer
@@ -4254,7 +4218,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: package
     distros:
     - ubuntu1604-packer
@@ -4349,7 +4312,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
-  - name: unittests
   - name: push
     distros:
     - ubuntu1604-test
@@ -4385,7 +4347,6 @@ buildvariants:
     - ubuntu1604-arm64-large
   - name: dbtest_WT
   - name: jsCore_WT
-  - name: unittests
   - name: push
     distros:
     - ubuntu1604-test
@@ -4466,7 +4427,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
-  - name: unittests
   - name: push
     distros:
     - ubuntu1604-test
@@ -4573,7 +4533,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
-  - name: unittests
   - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
@@ -4663,7 +4622,6 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  - name: unittests
   - name: package
     distros:
     - ubuntu1604-packer
@@ -4787,7 +4745,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: package
     distros:
     - ubuntu1604-packer
@@ -4900,7 +4857,6 @@ buildvariants:
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: push
     distros:
     - rhel70-small
@@ -5020,7 +4976,6 @@ buildvariants:
   - name: sharding_last_stable_mongos_and_mixed_shards
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
@@ -5164,7 +5119,6 @@ buildvariants:
     - windows-64-vs2015-large
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: write_concern_majority_passthrough_WT
     distros:
     - windows-64-vs2015-large
@@ -5232,7 +5186,6 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  - name: unittests
   - name: push
     distros:
     - rhel70-small
@@ -5296,7 +5249,6 @@ buildvariants:
   - name: snmp
   - name: ssl
   - name: sslSpecial
-  - name: unittests
 
 - name: windows-64-2k8-ssl
   display_name: SSL Windows 2008R2
@@ -5391,7 +5343,6 @@ buildvariants:
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: ssl
   - name: sslSpecial
   - name: push
@@ -5525,7 +5476,6 @@ buildvariants:
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: push
     distros:
     - rhel70-small
@@ -5626,7 +5576,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
@@ -5671,7 +5620,6 @@ buildvariants:
   - name: master_slave_WT
   - name: tool
   - name: tool_WT
-  - name: unittests
 
 - name: enterprise-osx-108
   display_name: Enterprise OS X 10.8
@@ -5716,7 +5664,6 @@ buildvariants:
   - name: sasl
   - name: ssl
   - name: sslSpecial
-  - name: unittests
   - name: push
     distros:
     - rhel70-small
@@ -5947,7 +5894,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: write_concern_majority_passthrough_WT
     distros:
     - rhel62-large
@@ -6107,7 +6053,6 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  - name: unittests
   - name: write_concern_majority_passthrough_WT
 
 - name: enterprise-rhel-70-64-bit
@@ -6165,7 +6110,6 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  - name: unittests
   - name: package
     distros:
     - ubuntu1604-packer
@@ -6288,7 +6232,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: package
     distros:
     - ubuntu1604-packer
@@ -6426,7 +6369,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: package
     distros:
     - ubuntu1604-packer
@@ -6532,7 +6474,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
-  - name: unittests
   - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
@@ -6637,7 +6578,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
-  - name: unittests
   - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
@@ -6775,7 +6715,6 @@ buildvariants:
   - name: sslSpecial
   # - name: tool
   - name: tool_WT
-  - name: unittests
   - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
@@ -6860,7 +6799,6 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  - name: unittests
   - name: package
     distros:
     - ubuntu1604-packer
@@ -6922,7 +6860,6 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  - name: unittests
   - name: package
     distros:
     - ubuntu1604-packer
@@ -6943,9 +6880,6 @@ buildvariants:
     build_mongoreplay: true
   tasks:
   - name: compile
-    distros:
-    - ubuntu1404-build
-  - name: compile_all
     distros:
     - ubuntu1404-build
 
@@ -7007,7 +6941,6 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  - name: unittests
   - name: package
     distros:
     - ubuntu1604-packer
@@ -7113,7 +7046,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
-  - name: unittests
   - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
@@ -7233,7 +7165,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: package
     distros:
     - ubuntu1604-packer
@@ -7293,7 +7224,6 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  - name: unittests
   - name: package
     distros:
     - ubuntu1604-packer
@@ -7393,7 +7323,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
-  - name: unittests
   - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
@@ -7512,7 +7441,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: package
     distros:
     - ubuntu1604-packer
@@ -7577,7 +7505,6 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  - name: unittests
   - name: package
     distros:
     - ubuntu1604-packer
@@ -7638,7 +7565,6 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  - name: unittests
   - name: package
     distros:
     - ubuntu1604-packer
@@ -7762,7 +7688,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: package
     distros:
     - ubuntu1604-packer
@@ -7886,7 +7811,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: package
     distros:
     - ubuntu1604-packer
@@ -7986,7 +7910,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool
-  - name: unittests
   - name: write_concern_majority_passthrough_WT
 
 - name: linux-64-ephemeralForTest
@@ -8067,7 +7990,6 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: tool
-  - name: unittests
 
 - name: enterprise-rhel-71-ppc64le-inmem
   display_name: Enterprise RHEL 7.1 PPC64LE (inMemory) DEBUG
@@ -8149,7 +8071,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool
-  - name: unittests
   - name: write_concern_majority_passthrough_WT
 
 - name: enterprise-rhel-72-s390x-inmem
@@ -8239,7 +8160,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool
-  - name: unittests
   - name: write_concern_majority_passthrough_WT
 
 ###########################################
@@ -8392,7 +8312,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: write_concern_majority_passthrough_WT
 
 - name: ubuntu1604-asan
@@ -8423,7 +8342,6 @@ buildvariants:
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
-  - name: unittests
 
 - name: ubuntu1604-debug-ubsan
   display_name: ~ UBSAN Enterprise Ubuntu 16.04 DEBUG
@@ -8575,7 +8493,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: write_concern_majority_passthrough_WT
 
 - name: enterprise-ubuntu-dynamic-1604-64-bit
@@ -8732,7 +8649,6 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: tool_WT
-  - name: unittests
   - name: write_concern_majority_passthrough_WT
 
 - name: initsync-3dot2-rhel-62
