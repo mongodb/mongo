@@ -72,4 +72,6 @@ MONGO_EXPORT_SERVER_PARAMETER(internalInsertMaxBatchSize,
                               int,
                               internalQueryExecYieldIterations / 2);
 
+MONGO_EXPORT_SERVER_PARAMETER(internalDocumentSourceCursorBatchSizeBytes, int, 4 * 1024 * 1024);
+
 }  // namespace mongo

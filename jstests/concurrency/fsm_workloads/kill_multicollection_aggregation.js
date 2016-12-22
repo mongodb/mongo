@@ -280,8 +280,9 @@ var $config = (function() {
 
     function teardown(db, collName, cluster) {
         cluster.executeOnMongodNodes(function lowerDocumentSourceCursorBatchSize(db) {
+            // Restore DocumentSourceCursor batch size to the default.
             assertAlways.commandWorked(db.adminCommand(
-                {setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 16 * 1024 * 1024}));
+                {setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 4 * 1024 * 1024}));
         });
 
         var myDB = db.getSiblingDB(this.uniqueDBName);
