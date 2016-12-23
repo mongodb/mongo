@@ -1235,7 +1235,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 	WT_PAGE *page;
 	WT_SALVAGE_COOKIE *cookie, _cookie;
 	uint64_t recno, skip, take;
-	uint32_t *entriesp, save_entries;
+	uint32_t save_entries;
 
 	cookie = &_cookie;
 	WT_CLEAR(*cookie);
@@ -1244,11 +1244,8 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 	WT_RET(__wt_page_in(session, ref, 0));
 	page = ref->page;
 
-	entriesp =
-	    page->type == WT_PAGE_COL_VAR ? &page->entries : &page->entries;
-
 	save_col_var = page->pg_var;
-	save_entries = *entriesp;
+	save_entries = page->entries;
 
 	/*
 	 * Calculate the number of K/V entries we are going to skip, and
@@ -1304,7 +1301,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 
 	/* Reset the page. */
 	page->pg_var = save_col_var;
-	*entriesp = save_entries;
+	page->entries = save_entries;
 
 	ret = __wt_page_release(session, ref, 0);
 	if (ret == 0)
