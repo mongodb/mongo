@@ -2036,6 +2036,7 @@ __dump_txn_state(WT_SESSION_IMPL *session, FILE *fp)
 			continue;
 
 		txn = &conn->sessions[i].txn;
+		iso_tag = "INVALID";
 		switch (txn->isolation) {
 		case WT_ISO_READ_COMMITTED:
 			iso_tag = "WT_ISO_READ_COMMITTED";
@@ -2045,9 +2046,6 @@ __dump_txn_state(WT_SESSION_IMPL *session, FILE *fp)
 			break;
 		case WT_ISO_SNAPSHOT:
 			iso_tag = "WT_ISO_SNAPSHOT";
-			break;
-		default:
-			iso_tag = "INVALID";
 			break;
 		}
 
