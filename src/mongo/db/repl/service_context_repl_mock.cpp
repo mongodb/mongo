@@ -42,6 +42,8 @@ namespace repl {
 
 std::unique_ptr<OperationContext> ServiceContextReplMock::_newOpCtx(Client* client, unsigned opId) {
     auto opCtx = stdx::make_unique<OperationContextNoop>(client, opId);
+    opCtx->releaseLockState();
+    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
     return std::move(opCtx);
 }
 
