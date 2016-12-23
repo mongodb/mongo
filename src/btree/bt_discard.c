@@ -206,8 +206,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (mod->mod_col_update != NULL)
 			__free_skip_array(session, mod->mod_col_update,
 			    page->type ==
-			    WT_PAGE_COL_FIX ? 1 : page->pg_var_entries,
-			    update_ignore);
+			    WT_PAGE_COL_FIX ? 1 : page->entries, update_ignore);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		/*
@@ -219,12 +218,12 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		if (mod->mod_row_insert != NULL)
 			__free_skip_array(session, mod->mod_row_insert,
-			    page->pg_row_entries + 1, update_ignore);
+			    page->entries + 1, update_ignore);
 
 		/* Free the update array. */
 		if (mod->mod_row_update != NULL)
 			__free_update(session, mod->mod_row_update,
-			    page->pg_row_entries, update_ignore);
+			    page->entries, update_ignore);
 		break;
 	}
 
@@ -332,7 +331,7 @@ static void
 __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	/* Free the RLE lookup array. */
-	__wt_free(session, page->pg_var_repeats);
+	__wt_free(session, page->u.col_var.repeats);
 }
 
 /*

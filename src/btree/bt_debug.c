@@ -662,18 +662,18 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
 		break;
 	case WT_PAGE_COL_FIX:
 		WT_RET(ds->f(ds, " recno %" PRIu64, ref->ref_recno));
-		entries = page->pg_fix_entries;
+		entries = page->entries;
 		break;
 	case WT_PAGE_COL_VAR:
 		WT_RET(ds->f(ds, " recno %" PRIu64, ref->ref_recno));
-		entries = page->pg_var_entries;
+		entries = page->entries;
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_INTL_INDEX_GET(session, page, pindex);
 		entries = pindex->entries;
 		break;
 	case WT_PAGE_ROW_LEAF:
-		entries = page->pg_row_entries;
+		entries = page->entries;
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}

@@ -262,7 +262,7 @@ struct __wt_connection_impl {
 
 	WT_TXN_GLOBAL txn_global;	/* Global transaction state */
 
-	WT_RWLOCK *hot_backup_lock;	/* Hot backup serialization */
+	WT_RWLOCK hot_backup_lock;	/* Hot backup serialization */
 	bool hot_backup;		/* Hot backup in progress */
 	char **hot_backup_list;		/* Hot backup file list */
 

@@ -237,7 +237,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	 * We can only archive files if a hot backup is not in progress or
 	 * if we are the backup.
 	 */
-	__wt_readlock(session, conn->hot_backup_lock);
+	__wt_readlock(session, &conn->hot_backup_lock);
 	locked = true;
 	if (!conn->hot_backup || backup_file != 0) {
 		for (i = 0; i < logcount; i++) {
@@ -248,7 +248,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 				    session, WT_LOG_FILENAME, lognum));
 		}
 	}
-	__wt_readunlock(session, conn->hot_backup_lock);
+	__wt_readunlock(session, &conn->hot_backup_lock);
 	locked = false;
 
 	/*
@@ -260,7 +260,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
 	if (0)
 err:		__wt_err(session, ret, "log archive server error");
 	if (locked)
-		__wt_readunlock(session, conn->hot_backup_lock);
+		__wt_readunlock(session, &conn->hot_backup_lock);
 	WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
 	return (ret);
 }
@@ -355,9 +355,9 @@ __wt_log_truncate_files(
 	__wt_verbose(session, WT_VERB_LOG,
 	    "log_truncate_files: Archive once up to %" PRIu32, backup_file);
 
-	__wt_writelock(session, log->log_archive_lock);
+	__wt_writelock(session, &log->log_archive_lock);
 	ret = __log_archive_once(session, backup_file);
-	__wt_writeunlock(session, log->log_archive_lock);
+	__wt_writeunlock(session, &log->log_archive_lock);
 	return (ret);
 }
 
@@ -433,7 +433,7 @@ __log_file_server(void *arg)
 				 */
 				if (!conn->hot_backup) {
 					__wt_readlock(
-					    session, conn->hot_backup_lock);
+					    session, &conn->hot_backup_lock);
 					if (!conn->hot_backup)
 						WT_ERR_ERROR_OK(
 						    __wt_ftruncate(session,
@@ -441,7 +441,7 @@ __log_file_server(void *arg)
 						    close_end_lsn.l.offset),
 						    ENOTSUP);
 					__wt_readunlock(
-					    session, conn->hot_backup_lock);
+					    session, &conn->hot_backup_lock);
 				}
 				WT_SET_LSN(&close_end_lsn,
 				    close_end_lsn.l.file + 1, 0);
@@ -814,10 +814,11 @@ __log_server(void *arg)
 				 * agreed not to rename or remove any files in
 				 * the database directory.
 				 */
-				__wt_readlock(session, conn->hot_backup_lock);
+				__wt_readlock(session, &conn->hot_backup_lock);
 				if (!conn->hot_backup)
 					ret = __log_prealloc_once(session);
-				__wt_readunlock(session, conn->hot_backup_lock);
+				__wt_readunlock(
+				    session, &conn->hot_backup_lock);
 				WT_ERR(ret);
 			}
 
@@ -826,10 +827,10 @@ __log_server(void *arg)
 			 */
 			if (FLD_ISSET(conn->log_flags, WT_CONN_LOG_ARCHIVE)) {
 				if (__wt_try_writelock(
-				    session, log->log_archive_lock) == 0) {
+				    session, &log->log_archive_lock) == 0) {
 					ret = __log_archive_once(session, 0);
 					__wt_writeunlock(
-					    session, log->log_archive_lock);
+					    session, &log->log_archive_lock);
 					WT_ERR(ret);
 				} else
 					__wt_verbose(session, WT_VERB_LOG,
@@ -884,8 +885,7 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_RET(__wt_spin_init(session, &log->log_sync_lock, "log sync"));
 	WT_RET(__wt_spin_init(session, &log->log_writelsn_lock,
 	    "log write LSN"));
-	WT_RET(__wt_rwlock_alloc(session,
-	    &log->log_archive_lock, "log archive lock"));
+	__wt_rwlock_init(session, &log->log_archive_lock);
 	if (FLD_ISSET(conn->direct_io, WT_DIRECT_IO_LOG))
 		log->allocsize = (uint32_t)
 		    WT_MAX(conn->buffer_alignment, WT_LOG_ALIGN);

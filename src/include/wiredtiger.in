@@ -114,16 +114,16 @@ struct __wt_item {
 	size_t size;
 
 #ifndef DOXYGEN
-#define	WT_ITEM_ALIGNED					0x00000001
-#define	WT_ITEM_INUSE					0x00000002
-	/* This appears in the middle of the struct to avoid padding. */
-	/*! Object flags (internal use). */
-	uint32_t flags;
-
 	/*! Managed memory chunk (internal use). */
 	void *mem;
+
 	/*! Managed memory size (internal use). */
 	size_t memsize;
+
+#define	WT_ITEM_ALIGNED					0x00000001
+#define	WT_ITEM_INUSE					0x00000002
+	/*! Object flags (internal use). */
+	uint32_t flags;
 #endif
 };
 

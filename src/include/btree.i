@@ -1008,7 +1008,7 @@ __wt_cursor_row_leaf_key(WT_CURSOR_BTREE *cbt, WT_ITEM *key)
 	if (cbt->ins == NULL) {
 		session = (WT_SESSION_IMPL *)cbt->iface.session;
 		page = cbt->ref->page;
-		rip = &page->u.row.d[cbt->slot];
+		rip = &page->pg_row[cbt->slot];
 		WT_RET(__wt_row_leaf_key(session, page, rip, key, false));
 	} else {
 		key->data = WT_INSERT_KEY(cbt->ins);
@@ -1207,9 +1207,9 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 
 	ins_head = page->type == WT_PAGE_ROW_LEAF ?
-	    (page->pg_row_entries == 0 ?
+	    (page->entries == 0 ?
 	    WT_ROW_INSERT_SMALLEST(page) :
-	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1)) :
+	    WT_ROW_INSERT_SLOT(page, page->entries - 1)) :
 	    WT_COL_APPEND(page);
 	if (ins_head == NULL)
 		return (false);

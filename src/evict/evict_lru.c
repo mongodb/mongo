@@ -420,7 +420,7 @@ __wt_evict_destroy(WT_SESSION_IMPL *session)
 		return (0);
 
 	/* Wait for any eviction thread group changes to stabilize. */
-	__wt_writelock(session, conn->evict_threads.lock);
+	__wt_writelock(session, &conn->evict_threads.lock);
 
 	/*
 	 * Signal the threads to finish and stop populating the queue.

@@ -50,8 +50,7 @@ __thread_group_grow(
 {
 	WT_THREAD *thread;
 
-	WT_ASSERT(session,
-	    __wt_rwlock_islocked(session, group->lock));
+	WT_ASSERT(session, __wt_rwlock_islocked(session, &group->lock));
 
 	/*
 	 * Any bounds checking is done by the caller so we know that
@@ -84,8 +83,7 @@ __thread_group_shrink(WT_SESSION_IMPL *session,
 	WT_THREAD *thread;
 	uint32_t current_slot;
 
-	WT_ASSERT(session,
-	    __wt_rwlock_islocked(session, group->lock));
+	WT_ASSERT(session, __wt_rwlock_islocked(session, &group->lock));
 
 	for (current_slot = group->alloc; current_slot > new_count; ) {
 		/*
@@ -142,7 +140,7 @@ __thread_group_resize(
 
 	WT_ASSERT(session,
 	    group->current_threads <= group->alloc &&
-	    __wt_rwlock_islocked(session, group->lock));
+	    __wt_rwlock_islocked(session, &group->lock));
 
 	if (new_min == group->min && new_max == group->max)
 		return (0);
@@ -227,9 +225,9 @@ __wt_thread_group_resize(
 	    " from max: %" PRIu32 " -> %" PRIu32,
 	    (void *)group, group->min, new_min, group->max, new_max);
 
-	__wt_writelock(session, group->lock);
+	__wt_writelock(session, &group->lock);
 	WT_TRET(__thread_group_resize(session, group, new_min, new_max, flags));
-	__wt_writeunlock(session, group->lock);
+	__wt_writeunlock(session, &group->lock);
 	return (ret);
 }
 
@@ -255,17 +253,17 @@ __wt_thread_group_create(
 	__wt_verbose(session, WT_VERB_THREAD_GROUP,
 	    "Creating thread group: %p", (void *)group);
 
-	WT_RET(__wt_rwlock_alloc(session, &group->lock, "Thread group"));
+	__wt_rwlock_init(session, &group->lock);
 	WT_ERR(__wt_cond_alloc(
 	    session, "Thread group cond", false, &group->wait_cond));
 	cond_alloced = true;
 
-	__wt_writelock(session, group->lock);
+	__wt_writelock(session, &group->lock);
 	group->run_func = run_func;
 	group->name = name;
 
 	WT_TRET(__thread_group_resize(session, group, min, max, flags));
-	__wt_writeunlock(session, group->lock);
+	__wt_writeunlock(session, &group->lock);
 
 	/* Cleanup on error to avoid leaking resources */
 err:	if (ret != 0) {
@@ -288,7 +286,7 @@ __wt_thread_group_destroy(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group)
 	__wt_verbose(session, WT_VERB_THREAD_GROUP,
 	    "Destroying thread group: %p", (void *)group);
 
-	WT_ASSERT(session, __wt_rwlock_islocked(session, group->lock));
+	WT_ASSERT(session, __wt_rwlock_islocked(session, &group->lock));
 
 	/* Shut down all threads and free associated resources. */
 	WT_TRET(__thread_group_shrink(session, group, 0));
@@ -322,15 +320,15 @@ __wt_thread_group_start_one(
 		return (0);
 
 	if (wait)
-		__wt_writelock(session, group->lock);
-	else if (__wt_try_writelock(session, group->lock) != 0)
+		__wt_writelock(session, &group->lock);
+	else if (__wt_try_writelock(session, &group->lock) != 0)
 		return (0);
 
 	/* Recheck the bounds now that we hold the lock */
 	if (group->current_threads < group->max)
 		WT_TRET(__thread_group_grow(
 		    session, group, group->current_threads + 1));
-	__wt_writeunlock(session, group->lock);
+	__wt_writeunlock(session, &group->lock);
 
 	return (ret);
 }

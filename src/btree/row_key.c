@@ -26,7 +26,7 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	btree = S2BT(session);
 
-	if (page->pg_row_entries == 0) {		/* Just checking... */
+	if (page->entries == 0) {		/* Just checking... */
 		F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
 		return (0);
 	}
@@ -51,15 +51,15 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	WT_RET(__wt_scr_alloc(session, 0, &key));
 	WT_RET(__wt_scr_alloc(session,
-	    (uint32_t)__bitstr_size(page->pg_row_entries), &tmp));
+	    (uint32_t)__bitstr_size(page->entries), &tmp));
 	memset(tmp->mem, 0, tmp->memsize);
 
 	if ((gap = btree->key_gap) == 0)
 		gap = 1;
-	__inmem_row_leaf_slots(tmp->mem, 0, page->pg_row_entries, gap);
+	__inmem_row_leaf_slots(tmp->mem, 0, page->entries, gap);
 
 	/* Instantiate the keys. */
-	for (rip = page->pg_row_d, i = 0; i < page->pg_row_entries; ++rip, ++i)
+	for (rip = page->pg_row, i = 0; i < page->entries; ++rip, ++i)
 		if (__bit_test(tmp->mem, i))
 			WT_ERR(__wt_row_leaf_key_work(
 			    session, page, rip, key, true));
@@ -282,7 +282,7 @@ switch_and_jump:	/* Switching to a forward roll. */
 			 * the tracking cache.
 			 */
 			if (slot_offset == 0) {
-				__wt_readlock(session, btree->ovfl_lock);
+				__wt_readlock(session, &btree->ovfl_lock);
 				copy = WT_ROW_KEY_COPY(rip);
 				if (!__wt_row_leaf_key_info(page, copy,
 				    NULL, &cell, &keyb->data, &keyb->size)) {
@@ -290,7 +290,7 @@ switch_and_jump:	/* Switching to a forward roll. */
 					ret = __wt_dsk_cell_data_ref(session,
 					    WT_PAGE_ROW_LEAF, unpack, keyb);
 				}
-				__wt_readunlock(session, btree->ovfl_lock);
+				__wt_readunlock(session, &btree->ovfl_lock);
 				WT_ERR(ret);
 				break;
 			}

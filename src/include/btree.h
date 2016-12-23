@@ -114,7 +114,7 @@ struct __wt_btree {
 	int   split_pct;		/* Split page percent */
 	WT_COMPRESSOR *compressor;	/* Page compressor */
 	WT_KEYED_ENCRYPTOR *kencryptor;	/* Page encryptor */
-	WT_RWLOCK *ovfl_lock;		/* Overflow lock */
+	WT_RWLOCK ovfl_lock;		/* Overflow lock */
 
 	uint64_t last_recno;		/* Column-store last record number */
 

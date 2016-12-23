@@ -603,9 +603,9 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 		 */
 		WT_ERR(__wt_page_inmem(session, NULL, dsk, 0, 0, &page));
 		WT_ERR(__wt_row_leaf_key_copy(session,
-		    page, &page->pg_row_d[0], &trk->row_start));
-		WT_ERR(__wt_row_leaf_key_copy(session, page,
-		    &page->pg_row_d[page->pg_row_entries - 1], &trk->row_stop));
+		    page, &page->pg_row[0], &trk->row_start));
+		WT_ERR(__wt_row_leaf_key_copy(session,
+		    page, &page->pg_row[page->entries - 1], &trk->row_stop));
 
 		__wt_verbose(session, WT_VERB_SALVAGE,
 		    "%s start key %s",
@@ -1244,10 +1244,10 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 	WT_RET(__wt_page_in(session, ref, 0));
 	page = ref->page;
 
-	entriesp = page->type == WT_PAGE_COL_VAR ?
-	    &page->pg_var_entries : &page->pg_fix_entries;
+	entriesp =
+	    page->type == WT_PAGE_COL_VAR ? &page->entries : &page->entries;
 
-	save_col_var = page->pg_var_d;
+	save_col_var = page->pg_var;
 	save_entries = *entriesp;
 
 	/*
@@ -1303,7 +1303,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 	WT_ERR(__wt_reconcile(session, ref, cookie, WT_VISIBILITY_ERR, NULL));
 
 	/* Reset the page. */
-	page->pg_var_d = save_col_var;
+	page->pg_var = save_col_var;
 	*entriesp = save_entries;
 
 	ret = __wt_page_release(session, ref, 0);
@@ -1973,14 +1973,14 @@ __slvg_row_build_leaf(
 	/* We should have selected some entries, but not the entire page. */
 	WT_ASSERT(session,
 	    skip_start + skip_stop > 0 &&
-	    skip_start + skip_stop < page->pg_row_entries);
+	    skip_start + skip_stop < page->entries);
 
 	/*
 	 * Take a copy of this page's first key to define the start of
 	 * its range.  The key may require processing, otherwise, it's
 	 * a copy from the page.
 	 */
-	rip = page->pg_row_d + skip_start;
+	rip = page->pg_row + skip_start;
 	WT_ERR(__wt_row_leaf_key(session, page, rip, key, false));
 	WT_ERR(__wt_row_ikey_incr(
 	    session, ref->home, 0, key->data, key->size, ref));
@@ -1988,14 +1988,14 @@ __slvg_row_build_leaf(
 	/* Set the referenced flag on overflow pages we're using. */
 	if (trk->trk_ovfl_cnt != 0)
 		WT_ERR(__slvg_row_ovfl(session,
-		    trk, page, skip_start, page->pg_row_entries - skip_stop));
+		    trk, page, skip_start, page->entries - skip_stop));
 
 	/*
 	 * Change the page to reflect the correct record count: there is no
 	 * need to copy anything on the page itself, the entries value limits
 	 * the number of page items.
 	 */
-	page->pg_row_entries -= skip_stop;
+	page->entries -= skip_stop;
 	cookie->skip = skip_start;
 
 	/*
@@ -2014,7 +2014,7 @@ __slvg_row_build_leaf(
 	WT_ERR(__wt_reconcile(session, ref, cookie, WT_VISIBILITY_ERR, NULL));
 
 	/* Reset the page. */
-	page->pg_row_entries += skip_stop;
+	page->entries += skip_stop;
 
 	/*
 	 * Discard our hazard pointer and evict the page, updating the
@@ -2081,7 +2081,7 @@ __slvg_row_ovfl(WT_SESSION_IMPL *session,
 	 * We're merging a row-store page, and we took some number of records,
 	 * figure out which (if any) overflow records we used.
 	 */
-	for (rip = page->pg_row_d + start; start < stop; ++start, ++rip) {
+	for (rip = page->pg_row + start; start < stop; ++start, ++rip) {
 		copy = WT_ROW_KEY_COPY(rip);
 		(void)__wt_row_leaf_key_info(
 		    page, copy, NULL, &cell, NULL, NULL);

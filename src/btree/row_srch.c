@@ -486,14 +486,14 @@ leaf_only:
 	if (insert && descend_right) {
 		cbt->append_tree = 1;
 
-		if (page->pg_row_entries == 0) {
-			cbt->slot = WT_ROW_SLOT(page, page->pg_row_d);
+		if (page->entries == 0) {
+			cbt->slot = WT_ROW_SLOT(page, page->pg_row);
 
 			F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
 			ins_head = WT_ROW_INSERT_SMALLEST(page);
 		} else {
 			cbt->slot = WT_ROW_SLOT(page,
-			    page->pg_row_d + (page->pg_row_entries - 1));
+			    page->pg_row + (page->entries - 1));
 
 			ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
 		}
@@ -511,11 +511,11 @@ leaf_only:
 	 * doing the tests and error handling inside the loop costs about 5%.
 	 */
 	base = 0;
-	limit = page->pg_row_entries;
+	limit = page->entries;
 	if (collator == NULL && srch_key->size <= WT_COMPARE_SHORT_MAXLEN)
 		for (; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
-			rip = page->pg_row_d + indx;
+			rip = page->pg_row + indx;
 			WT_ERR(
 			    __wt_row_leaf_key(session, page, rip, item, true));
 
@@ -529,7 +529,7 @@ leaf_only:
 	else if (collator == NULL)
 		for (; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
-			rip = page->pg_row_d + indx;
+			rip = page->pg_row + indx;
 			WT_ERR(
 			    __wt_row_leaf_key(session, page, rip, item, true));
 
@@ -547,7 +547,7 @@ leaf_only:
 	else
 		for (; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
-			rip = page->pg_row_d + indx;
+			rip = page->pg_row + indx;
 			WT_ERR(
 			    __wt_row_leaf_key(session, page, rip, item, true));
 
@@ -591,13 +591,13 @@ leaf_match:	cbt->compare = 0;
 	 */
 	if (base == 0) {
 		cbt->compare = 1;
-		cbt->slot = WT_ROW_SLOT(page, page->pg_row_d);
+		cbt->slot = WT_ROW_SLOT(page, page->pg_row);
 
 		F_SET(cbt, WT_CBT_SEARCH_SMALLEST);
 		ins_head = WT_ROW_INSERT_SMALLEST(page);
 	} else {
 		cbt->compare = -1;
-		cbt->slot = WT_ROW_SLOT(page, page->pg_row_d + (base - 1));
+		cbt->slot = WT_ROW_SLOT(page, page->pg_row + (base - 1));
 
 		ins_head = WT_ROW_INSERT_SLOT(page, cbt->slot);
 	}
@@ -645,16 +645,16 @@ __wt_row_random_leaf(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	__cursor_pos_clear(cbt);
 
 	/* If the page has disk-based entries, select from them. */
-	if (page->pg_row_entries != 0) {
+	if (page->entries != 0) {
 		cbt->compare = 0;
-		cbt->slot = __wt_random(&session->rnd) % page->pg_row_entries;
+		cbt->slot = __wt_random(&session->rnd) % page->entries;
 
 		/*
 		 * The real row-store search function builds the key, so we
 		 * have to as well.
 		 */
 		return (__wt_row_leaf_key(session,
-		    page, page->pg_row_d + cbt->slot, cbt->tmp, false));
+		    page, page->pg_row + cbt->slot, cbt->tmp, false));
 	}
 
 	/*

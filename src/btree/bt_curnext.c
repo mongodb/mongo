@@ -338,7 +338,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		}
 
 		/* Check for the end of the page. */
-		if (cbt->row_iteration_slot >= page->pg_row_entries * 2 + 1)
+		if (cbt->row_iteration_slot >= page->entries * 2 + 1)
 			return (WT_NOTFOUND);
 		++cbt->row_iteration_slot;
 
@@ -356,7 +356,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		cbt->ins = NULL;
 
 		cbt->slot = cbt->row_iteration_slot / 2 - 1;
-		rip = &page->pg_row_d[cbt->slot];
+		rip = &page->pg_row[cbt->slot];
 		upd = __wt_txn_read(session, WT_ROW_UPDATE(page, rip));
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd)) {
 			if (__wt_txn_visible_all(session, upd->txnid))

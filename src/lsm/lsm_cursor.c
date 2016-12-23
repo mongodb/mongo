@@ -304,7 +304,7 @@ __clsm_leave(WT_CURSOR_LSM *clsm)
  * byte, if the application uses two leading DC4 byte for some reason, we'll do
  * a wasted data copy each time a new value is inserted into the object.
  */
-static const WT_ITEM __tombstone = { "\x14\x14", 2, 0, NULL, 0 };
+static const WT_ITEM __tombstone = { "\x14\x14", 2, NULL, 0, 0 };
 
 /*
  * __clsm_deleted --
