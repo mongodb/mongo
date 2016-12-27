@@ -290,9 +290,9 @@ TEST(Double, TestParsingNormal) {
     // not parseable by the Windows SDK libc or the Solaris libc in the mode we build.
     // See SERVER-14131.
 
-    ASSERT_PARSES(double, "0xff", 0xff);
-    ASSERT_PARSES(double, "-0xff", -0xff);
-    ASSERT_PARSES(double, "0xabcab.defdefP-10", 0xabcab.defdefP-10);
+    ASSERT_PARSES(double, "0xff", 255);
+    ASSERT_PARSES(double, "-0xff", -255);
+    ASSERT_PARSES(double, "0xabcab.defdefP-10", 687.16784283419838);
 #endif
 }
 
