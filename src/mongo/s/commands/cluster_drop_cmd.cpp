@@ -90,7 +90,7 @@ public:
 
         auto const db = scopedDbStatus.getValue().db();
 
-        if (!db->isShardingEnabled() || !db->isSharded(nss.ns())) {
+        if (!db->isSharded(nss.ns())) {
             _dropUnshardedCollectionFromShard(txn, db->getPrimaryId(), nss, &result);
         } else {
             uassertStatusOK(Grid::get(txn)->catalogClient(txn)->dropCollection(txn, nss));

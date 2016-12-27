@@ -60,6 +60,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/s/shard_util.h"
+#include "mongo/s/sharding_raii.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -76,27 +77,27 @@ class ShardCollectionCmd : public Command {
 public:
     ShardCollectionCmd() : Command("shardCollection", false, "shardcollection") {}
 
-    virtual bool slaveOk() const {
+    bool slaveOk() const override {
         return true;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
-    virtual void help(std::stringstream& help) const {
+    void help(std::stringstream& help) const override {
         help << "Shard a collection. Requires key. Optional unique."
              << " Sharding must already be enabled for the database.\n"
              << "   { enablesharding : \"<dbname>\" }\n";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) override {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                 ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
                 ActionType::enableSharding)) {
@@ -106,30 +107,36 @@ public:
         return Status::OK();
     }
 
-    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    virtual bool run(OperationContext* txn,
-                     const std::string& dbname,
-                     BSONObj& cmdObj,
-                     int options,
-                     std::string& errmsg,
-                     BSONObjBuilder& result) {
+    bool run(OperationContext* txn,
+             const std::string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             std::string& errmsg,
+             BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
-        uassert(ErrorCodes::InvalidNamespace, "Invalid namespace", nss.isValid());
 
-        auto config = uassertStatusOK(grid.catalogCache()->getDatabase(txn, nss.db().toString()));
+        auto const catalogClient = Grid::get(txn)->catalogClient(txn);
+        auto const shardRegistry = Grid::get(txn)->shardRegistry();
+
+        auto scopedShardedDb = uassertStatusOK(ScopedShardDatabase::getExisting(txn, nss.db()));
+        const auto config = scopedShardedDb.db();
+
+        // Ensure sharding is allowed on the database
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "sharding not enabled for db " << nss.db(),
                 config->isShardingEnabled());
 
+        // Ensure that the collection is not sharded already
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "sharding already enabled for collection " << nss.ns(),
                 !config->isSharded(nss.ns()));
 
-        // NOTE: We *must* take ownership of the key here - otherwise the shared BSONObj
-        // becomes corrupt as soon as the command ends.
+        // NOTE: We *must* take ownership of the key here - otherwise the shared BSONObj becomes
+        // corrupt as soon as the command ends.
         BSONObj proposedKey = cmdObj.getObjectField("key").getOwned();
         if (proposedKey.isEmpty()) {
             errmsg = "no shard key";
@@ -188,8 +195,8 @@ public:
         }
 
         vector<ShardId> shardIds;
-        grid.shardRegistry()->getAllShardIds(&shardIds);
-        int numShards = shardIds.size();
+        shardRegistry->getAllShardIds(&shardIds);
+        const int numShards = shardIds.size();
 
         // Cannot have more than 8192 initial chunks per shard. Setting a maximum of 1,000,000
         // chunks in total to limit the amount of memory this command consumes so there is less
@@ -205,12 +212,11 @@ public:
         }
 
         // The rest of the checks require a connection to the primary db
-        ConnectionString shardConnString;
-        {
+        const ConnectionString shardConnString = [&]() {
             const auto shard =
-                uassertStatusOK(grid.shardRegistry()->getShard(txn, config->getPrimaryId()));
-            shardConnString = shard->getConnString();
-        }
+                uassertStatusOK(shardRegistry->getShard(txn, config->getPrimaryId()));
+            return shard->getConnString();
+        }();
 
         ScopedDbConnection conn(shardConnString);
 
@@ -219,7 +225,7 @@ public:
         BSONObj res;
         {
             list<BSONObj> all =
-                conn->getCollectionInfos(config->name(), BSON("name" << nss.coll()));
+                conn->getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
             if (!all.empty()) {
                 res = all.front().getOwned();
             }
@@ -510,20 +516,19 @@ public:
 
         audit::logShardCollection(Client::getCurrent(), nss.ns(), proposedKey, careAboutUnique);
 
-        Status status = grid.catalogClient(txn)->shardCollection(txn,
-                                                                 nss.ns(),
-                                                                 proposedShardKey,
-                                                                 defaultCollation,
-                                                                 careAboutUnique,
-                                                                 initSplits,
-                                                                 std::set<ShardId>{});
+        Status status = catalogClient->shardCollection(txn,
+                                                       nss.ns(),
+                                                       proposedShardKey,
+                                                       defaultCollation,
+                                                       careAboutUnique,
+                                                       initSplits,
+                                                       std::set<ShardId>{});
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
 
         // Make sure the cached metadata for the collection knows that we are now sharded
-        config = uassertStatusOK(grid.catalogCache()->getDatabase(txn, nss.db().toString()));
-        config->getChunkManager(txn, nss.ns(), true /* force */);
+        config->getChunkManager(txn, nss.ns(), true /* reload */);
 
         result << "collectionsharded" << nss.ns();
 
@@ -538,7 +543,7 @@ public:
             int i = 0;
             for (ChunkMap::const_iterator c = chunkMap.begin(); c != chunkMap.end(); ++c, ++i) {
                 const ShardId& shardId = shardIds[i % numShards];
-                const auto toStatus = grid.shardRegistry()->getShard(txn, shardId);
+                const auto toStatus = shardRegistry->getShard(txn, shardId);
                 if (!toStatus.isOK()) {
                     continue;
                 }

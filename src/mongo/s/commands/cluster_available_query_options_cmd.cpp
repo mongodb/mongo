@@ -28,63 +28,42 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/catalog_cache.h"
-
-#include "mongo/base/status_with.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog/type_database.h"
-#include "mongo/s/config.h"
-#include "mongo/s/grid.h"
+#include "mongo/base/status.h"
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/db/commands.h"
 
 namespace mongo {
+namespace {
 
-using std::shared_ptr;
-using std::string;
+class AvailableQueryOptions : public Command {
+public:
+    AvailableQueryOptions() : Command("availableQueryOptions", false, "availablequeryoptions") {}
 
-
-CatalogCache::CatalogCache() {}
-
-StatusWith<shared_ptr<DBConfig>> CatalogCache::getDatabase(OperationContext* txn,
-                                                           const string& dbName) {
-    stdx::lock_guard<stdx::mutex> guard(_mutex);
-
-    ShardedDatabasesMap::iterator it = _databases.find(dbName);
-    if (it != _databases.end()) {
-        return it->second;
+    bool slaveOk() const override {
+        return true;
     }
 
-    // Need to load from the store
-    auto status = Grid::get(txn)->catalogClient(txn)->getDatabase(txn, dbName);
-    if (!status.isOK()) {
-        return status.getStatus();
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
     }
 
-    const auto dbOpTimePair = status.getValue();
-    shared_ptr<DBConfig> db = std::make_shared<DBConfig>(dbOpTimePair.value, dbOpTimePair.opTime);
-    try {
-        db->load(txn);
-    } catch (const DBException& excep) {
-        return excep.toStatus();
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) override {
+        return Status::OK();
     }
 
-    invariant(_databases.insert(std::make_pair(dbName, db)).second);
-
-    return db;
-}
-
-void CatalogCache::invalidate(const string& dbName) {
-    stdx::lock_guard<stdx::mutex> guard(_mutex);
-
-    ShardedDatabasesMap::iterator it = _databases.find(dbName);
-    if (it != _databases.end()) {
-        _databases.erase(it);
+    bool run(OperationContext* txn,
+             const std::string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             std::string& errmsg,
+             BSONObjBuilder& result) override {
+        result << "options" << QueryOption_AllSupportedForSharding;
+        return true;
     }
-}
 
-void CatalogCache::invalidateAll() {
-    stdx::lock_guard<stdx::mutex> guard(_mutex);
+} clusterAvailableQueryOptionsCmd;
 
-    _databases.clear();
-}
-
+}  // namespace
 }  // namespace mongo

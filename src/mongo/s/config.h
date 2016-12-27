@@ -72,7 +72,7 @@ private:
  */
 class DBConfig {
 public:
-    DBConfig(std::string name, const DatabaseType& dbt, repl::OpTime configOpTime);
+    DBConfig(const DatabaseType& dbt, repl::OpTime configOpTime);
     ~DBConfig();
 
     /**
@@ -82,12 +82,14 @@ public:
         return _name;
     }
 
-    /**
-     * Whether sharding is enabled for this database.
-     */
-    bool isShardingEnabled();
-
     ShardId getPrimaryId();
+
+    /**
+     * Returns whether 'enableSharding' has been called for this database.
+     */
+    bool isShardingEnabled() const {
+        return _shardingEnabled;
+    }
 
     /**
      * Removes the specified namespace from the set of collections under this database entry so that
@@ -127,7 +129,6 @@ public:
     bool reload(OperationContext* txn);
 
     void getAllShardIds(std::set<ShardId>* shardIds);
-    void getAllShardedCollections(std::set<std::string>& namespaces);
 
 protected:
     typedef std::map<std::string, CollectionInfo> CollectionInfoMap;
@@ -145,7 +146,6 @@ protected:
     // synchronization rules for accessing them.
     //
     // (L) Must hold _lock for access.
-    // (I) Immutable, can access freely.
     // (S) Self synchronizing, no explicit locking needed.
     //
     // Mutex lock order:
@@ -153,13 +153,13 @@ protected:
     //
 
     // Name of the database which this entry caches
-    const std::string _name;  // (I)
+    const std::string _name;
+
+    // Whether sharding is enabled for this database
+    const bool _shardingEnabled;
 
     // Primary shard id
     ShardId _primaryId;  // (L)
-
-    // Whether sharding has been enabled for this database
-    bool _shardingEnabled;  // (L)
 
     // Set of collections and lock to protect access
     stdx::mutex _lock;
