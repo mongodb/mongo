@@ -256,8 +256,7 @@ public:
                                      << " which lives on config servers"));
         }
 
-        const bool shardedInput =
-            confIn && confIn->isShardingEnabled() && confIn->isSharded(nss.ns());
+        const bool shardedInput = confIn && confIn->isSharded(nss.ns());
 
         if (!shardedOutput) {
             uassert(15920,
