@@ -49,8 +49,10 @@ selector:
     - jstests/core/temp_cleanup.js
     # apply_ops1.js is blacklisted since it uses non-idempotent applyOps commands (SERVER-27096).
     - jstests/core/apply_ops1.js
-    # operation_latency_histogram.js does not expect concurrent reads against its test collection.
+    # operation_latency_histogram.js and geo_s2cursorlimitskip.js do not expect concurrent reads
+    # against their test collections.
     - jstests/core/operation_latency_histogram.js
+    - jstests/core/geo_s2cursorlimitskip.js 
 
 run_hook_interval: &run_hook_interval 20
 executor:
