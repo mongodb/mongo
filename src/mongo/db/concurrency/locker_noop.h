@@ -160,6 +160,10 @@ public:
         invariant(false);
     }
 
+    virtual void assertEmptyAndReset() {
+        invariant(false);
+    }
+
     virtual bool hasLockPending() const {
         invariant(false);
     }
