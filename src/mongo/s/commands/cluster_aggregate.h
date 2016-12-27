@@ -82,14 +82,15 @@ private:
     // could be different from conn->getServerAddress() for connections that map to
     // multiple servers such as for replica sets. These also take care of registering
     // returned cursors.
-    static BSONObj aggRunCommand(DBClientBase* conn,
+    static BSONObj aggRunCommand(OperationContext* txn,
+                                 DBClientBase* conn,
                                  const Namespaces& namespaces,
                                  BSONObj cmd,
                                  int queryOptions);
 
     static Status aggPassthrough(OperationContext* txn,
                                  const Namespaces& namespaces,
-                                 std::shared_ptr<DBConfig> conf,
+                                 DBConfig* conf,
                                  BSONObj cmd,
                                  BSONObjBuilder* result,
                                  int queryOptions);
