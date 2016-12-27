@@ -467,6 +467,25 @@ TEST_F(DatabaseClonerTest, InvalidCollectionOptions) {
     ASSERT_FALSE(_databaseCloner->isActive());
 }
 
+TEST_F(DatabaseClonerTest, DatabaseClonerResendsListCollectionsRequestOnRetriableError) {
+    ASSERT_OK(_databaseCloner->startup());
+    auto net = getNet();
+    executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+    // Respond to first listCollections request with a retriable error.
+    assertRemoteCommandNameEquals("listCollections",
+                                  net->scheduleErrorResponse(Status(ErrorCodes::HostNotFound, "")));
+    net->runReadyNetworkOperations();
+
+    // DatabaseCloner stays active because it resends the listCollections request.
+    ASSERT_TRUE(_databaseCloner->isActive());
+
+    // DatabaseCloner should resend listCollections request.
+    auto noi = net->getNextReadyRequest();
+    assertRemoteCommandNameEquals("listCollections", noi->getRequest());
+    net->blackHole(noi);
+}
+
 TEST_F(DatabaseClonerTest, ListCollectionsReturnsEmptyCollectionName) {
     _databaseCloner.reset(new DatabaseCloner(
         &getExecutor(),

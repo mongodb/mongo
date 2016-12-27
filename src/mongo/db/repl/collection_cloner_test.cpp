@@ -427,6 +427,30 @@ TEST_F(CollectionClonerTest, ListIndexesReturnedNamespaceNotFound) {
     ASSERT_EQ(collNss, nss);
 }
 
+
+TEST_F(CollectionClonerTest, CollectionClonerResendsListIndexesCommandOnRetriableError) {
+    ASSERT_OK(collectionCloner->startup());
+
+    auto net = getNet();
+    executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+    // First request sent by CollectionCloner. CollectionCollection sends listIndexes request
+    // irrespective of collection size in a successful count response.
+    assertRemoteCommandNameEquals("count", net->scheduleSuccessfulResponse(createCountResponse(0)));
+    net->runReadyNetworkOperations();
+
+    // Respond to first listIndexes request with a retriable error.
+    assertRemoteCommandNameEquals("listIndexes",
+                                  net->scheduleErrorResponse(Status(ErrorCodes::HostNotFound, "")));
+    net->runReadyNetworkOperations();
+    ASSERT_TRUE(collectionCloner->isActive());
+
+    // Confirm that CollectionCloner resends the listIndexes request.
+    auto noi = net->getNextReadyRequest();
+    assertRemoteCommandNameEquals("listIndexes", noi->getRequest());
+    net->blackHole(noi);
+}
+
 TEST_F(CollectionClonerTest,
        ListIndexesReturnedNamespaceNotFoundAndCreateCollectionCallbackCanceled) {
     ASSERT_OK(collectionCloner->startup());
@@ -687,6 +711,36 @@ TEST_F(CollectionClonerTest, FindCommandFailed) {
 
     ASSERT_EQUALS(ErrorCodes::CursorNotFound, getStatus().code());
     ASSERT_FALSE(collectionCloner->isActive());
+}
+
+TEST_F(CollectionClonerTest, CollectionClonerResendsFindCommandOnRetriableError) {
+    ASSERT_OK(collectionCloner->startup());
+
+    auto net = getNet();
+    executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+    // CollectionCollection sends listIndexes request irrespective of collection size in a
+    // successful count response.
+    assertRemoteCommandNameEquals("count", net->scheduleSuccessfulResponse(createCountResponse(0)));
+    net->runReadyNetworkOperations();
+
+    // CollectionCloner requires a successful listIndexes response in order to send the find request
+    // for the documents in the collection.
+    assertRemoteCommandNameEquals(
+        "listIndexes",
+        net->scheduleSuccessfulResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec))));
+    net->runReadyNetworkOperations();
+
+    // Respond to the find request with a retriable error.
+    assertRemoteCommandNameEquals("find",
+                                  net->scheduleErrorResponse(Status(ErrorCodes::HostNotFound, "")));
+    net->runReadyNetworkOperations();
+    ASSERT_TRUE(collectionCloner->isActive());
+
+    // Confirm that CollectionCloner resends the find request.
+    auto noi = net->getNextReadyRequest();
+    assertRemoteCommandNameEquals("find", noi->getRequest());
+    net->blackHole(noi);
 }
 
 TEST_F(CollectionClonerTest, FindCommandCanceled) {

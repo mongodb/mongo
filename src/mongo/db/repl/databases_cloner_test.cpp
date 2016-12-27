@@ -472,6 +472,36 @@ TEST_F(DBsClonerTest, FailsOnListDatabases) {
     ASSERT_EQ(result, expectedResult);
 }
 
+TEST_F(DBsClonerTest, DatabasesClonerResendsListDatabasesRequestOnRetriableError) {
+    Status result{Status::OK()};
+    DatabasesCloner cloner{&getStorage(),
+                           &getExecutor(),
+                           &getDbWorkThreadPool(),
+                           HostAndPort{"local:1234"},
+                           [](const BSONObj&) { return true; },
+                           [](const Status&) {}};
+    ON_BLOCK_EXIT([this] { getExecutor().shutdown(); });
+
+    ASSERT_OK(cloner.startup());
+    ASSERT_TRUE(cloner.isActive());
+
+    auto net = getNet();
+    executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+    // Respond to first listDatabases request with a retriable error.
+    assertRemoteCommandNameEquals("listDatabases",
+                                  net->scheduleErrorResponse(Status(ErrorCodes::HostNotFound, "")));
+    net->runReadyNetworkOperations();
+
+    // DatabasesCloner stays active because it resends the listDatabases request.
+    ASSERT_TRUE(cloner.isActive());
+
+    // DatabasesCloner should resend listDatabases request.
+    auto noi = net->getNextReadyRequest();
+    assertRemoteCommandNameEquals("listDatabases", noi->getRequest());
+    net->blackHole(noi);
+}
+
 TEST_F(DBsClonerTest, DatabasesClonerReturnsCallbackCanceledIfShutdownDuringListDatabasesCommand) {
     Status result{Status::OK()};
     DatabasesCloner cloner{&getStorage(),

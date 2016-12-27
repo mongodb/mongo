@@ -643,6 +643,34 @@ TEST_F(DataReplicatorTest, DataReplicatorReturnsCallbackCanceledIfShutdownImmedi
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, _lastApplied);
 }
 
+TEST_F(DataReplicatorTest,
+       DataReplicatorRetriesSyncSourceSelectionIfChooseNewSyncSourceReturnsInvalidSyncSource) {
+    auto dr = &getDR();
+    auto txn = makeOpCtx();
+
+    // Override chooseNewSyncSource() result in SyncSourceSelectorMock before calling startup()
+    // because DataReplicator will look for a valid sync source immediately after startup.
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort());
+
+    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+
+    // Run first sync source selection attempt.
+    executor::NetworkInterfaceMock::InNetworkGuard(getNet())->runReadyNetworkOperations();
+
+    // DataReplicator will not drop user databases while looking for a valid sync source.
+    ASSERT_FALSE(_storageInterfaceWorkDone.droppedUserDBs);
+
+    // First sync source selection attempt failed. Update SyncSourceSelectorMock to return valid
+    // sync source next time chooseNewSyncSource() is called.
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+
+    // Advance clock until the next sync source selection attempt.
+    advanceClock(getNet(), _options.syncSourceRetryWait);
+
+    // DataReplictor drops user databases after obtaining a valid sync source.
+    ASSERT_TRUE(_storageInterfaceWorkDone.droppedUserDBs);
+}
+
 const std::uint32_t chooseSyncSourceMaxAttempts = 10U;
 
 /**
@@ -1083,6 +1111,33 @@ TEST_F(DataReplicatorTest,
 
     dr->join();
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument, _lastApplied);
+}
+
+TEST_F(DataReplicatorTest,
+       DataReplicatorResendsFindCommandIfLastOplogEntryFetcherReturnsRetriableError) {
+    auto dr = &getDR();
+    auto txn = makeOpCtx();
+
+    _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
+    ASSERT_OK(dr->startup(txn.get(), maxAttempts));
+
+    auto net = getNet();
+    executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+    // Base rollback ID.
+    net->scheduleSuccessfulResponse(makeRollbackCheckerResponse(1));
+    net->runReadyNetworkOperations();
+
+    // Last oplog entry first attempt - retriable error.
+    assertRemoteCommandNameEquals("find",
+                                  net->scheduleErrorResponse(Status(ErrorCodes::HostNotFound, "")));
+    net->runReadyNetworkOperations();
+
+    // DataReplicator stays active because it resends the find request for the last oplog entry.
+    ASSERT_TRUE(dr->isActive());
+
+    // Last oplog entry second attempt.
+    processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntry(1)});
 }
 
 TEST_F(DataReplicatorTest,
