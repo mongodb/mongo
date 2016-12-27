@@ -41,7 +41,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/apply_ops_cmd_common.h"
 #include "mongo/db/commands/copydb.h"
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/lasterror.h"
@@ -241,7 +240,7 @@ public:
 
         shared_ptr<DBConfig> conf = status.getValue();
 
-        if (!conf->isShardingEnabled() || !conf->isSharded(nss.ns())) {
+        if (!conf->isSharded(nss.ns())) {
             shardIds.push_back(conf->getPrimaryId());
         } else {
             Grid::get(txn)->shardRegistry()->getAllShardIds(&shardIds);
@@ -461,7 +460,7 @@ public:
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
         auto conf = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, dbName));
-        if (!conf->isShardingEnabled() || !conf->isSharded(nss.ns())) {
+        if (!conf->isSharded(nss.ns())) {
             return passthrough(txn, conf.get(), cmdObj, output);
         }
 
@@ -600,24 +599,27 @@ public:
 class CopyDBCmd : public PublicGridCommand {
 public:
     CopyDBCmd() : PublicGridCommand("copydb") {}
-    virtual bool adminOnly() const {
+
+    bool adminOnly() const override {
         return true;
     }
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) override {
         return copydb::checkAuthForCopydbCommand(client, dbname, cmdObj);
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
     bool run(OperationContext* txn,
              const string& dbName,
              BSONObj& cmdObj,
-             int,
+             int options,
              string& errmsg,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         const auto todbElt = cmdObj["todb"];
         uassert(ErrorCodes::InvalidNamespace,
                 "'todb' must be of type String",
@@ -629,46 +631,45 @@ public:
 
         auto scopedToDb = uassertStatusOK(ScopedShardDatabase::getOrCreate(txn, todb));
         uassert(ErrorCodes::IllegalOperation,
-                "cannot copy to a sharded database",
+                "Cannot copy to a sharded database",
                 !scopedToDb.db()->isShardingEnabled());
 
         const string fromhost = cmdObj.getStringField("fromhost");
         if (!fromhost.empty()) {
             return adminPassthrough(txn, scopedToDb.db(), cmdObj, result);
-        } else {
-            const auto fromDbElt = cmdObj["fromdb"];
-            uassert(ErrorCodes::InvalidNamespace,
-                    "'fromdb' must be of type String",
-                    fromDbElt.type() == BSONType::String);
-            const std::string fromdb = fromDbElt.str();
-            uassert(ErrorCodes::InvalidNamespace,
-                    "invalid fromdb argument",
-                    NamespaceString::validDBName(fromdb,
-                                                 NamespaceString::DollarInDbNameBehavior::Allow));
-
-            shared_ptr<DBConfig> confFrom =
-                uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, fromdb));
-
-            uassert(13400, "don't know where source DB is", confFrom);
-            uassert(13401, "cant copy from sharded DB", !confFrom->isShardingEnabled());
-
-            BSONObjBuilder b;
-            BSONForEach(e, cmdObj) {
-                if (strcmp(e.fieldName(), "fromhost") != 0) {
-                    b.append(e);
-                }
-            }
-
-            {
-                const auto shard = uassertStatusOK(
-                    Grid::get(txn)->shardRegistry()->getShard(txn, confFrom->getPrimaryId()));
-                b.append("fromhost", shard->getConnString().toString());
-            }
-            BSONObj fixed = b.obj();
-
-            return adminPassthrough(txn, scopedToDb.db(), fixed, result);
         }
+
+        const auto fromDbElt = cmdObj["fromdb"];
+        uassert(ErrorCodes::InvalidNamespace,
+                "'fromdb' must be of type String",
+                fromDbElt.type() == BSONType::String);
+        const std::string fromdb = fromDbElt.str();
+        uassert(
+            ErrorCodes::InvalidNamespace,
+            "invalid fromdb argument",
+            NamespaceString::validDBName(fromdb, NamespaceString::DollarInDbNameBehavior::Allow));
+
+        auto scopedFromDb = uassertStatusOK(ScopedShardDatabase::getExisting(txn, fromdb));
+        uassert(ErrorCodes::IllegalOperation,
+                "Cannot copy from a sharded database",
+                !scopedFromDb.db()->isShardingEnabled());
+
+        BSONObjBuilder b;
+        BSONForEach(e, cmdObj) {
+            if (strcmp(e.fieldName(), "fromhost") != 0) {
+                b.append(e);
+            }
+        }
+
+        {
+            const auto shard = uassertStatusOK(
+                Grid::get(txn)->shardRegistry()->getShard(txn, scopedFromDb.db()->getPrimaryId()));
+            b.append("fromhost", shard->getConnString().toString());
+        }
+
+        return adminPassthrough(txn, scopedToDb.db(), b.obj(), result);
     }
+
 } clusterCopyDBCmd;
 
 class CollectionStats : public PublicGridCommand {
@@ -695,7 +696,7 @@ public:
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
         auto conf = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, dbName));
-        if (!conf->isShardingEnabled() || !conf->isSharded(nss.ns())) {
+        if (!conf->isSharded(nss.ns())) {
             result.appendBool("sharded", false);
             result.append("primary", conf->getPrimaryId().toString());
 
@@ -874,7 +875,7 @@ public:
         const string nsDBName = nsToDatabase(fullns);
 
         auto conf = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, nsDBName));
-        if (!conf->isShardingEnabled() || !conf->isSharded(fullns)) {
+        if (!conf->isSharded(fullns)) {
             return passthrough(txn, conf.get(), cmdObj, result);
         }
 
@@ -1139,7 +1140,7 @@ public:
         }
 
         shared_ptr<DBConfig> conf = status.getValue();
-        if (!conf->isShardingEnabled() || !conf->isSharded(nss.ns())) {
+        if (!conf->isSharded(nss.ns())) {
 
             if (passthrough(txn, conf.get(), cmdObj, options, result)) {
                 return true;
@@ -1371,7 +1372,7 @@ public:
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
         auto conf = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, dbName));
-        if (!conf->isShardingEnabled() || !conf->isSharded(nss.ns())) {
+        if (!conf->isSharded(nss.ns())) {
             return passthrough(txn, conf.get(), cmdObj, result);
         }
 
@@ -1512,7 +1513,7 @@ public:
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
         auto conf = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, dbName));
-        if (!conf->isShardingEnabled() || !conf->isSharded(nss.ns())) {
+        if (!conf->isSharded(nss.ns())) {
             return passthrough(txn, conf.get(), cmdObj, options, result);
         }
 
@@ -1618,29 +1619,6 @@ public:
         return true;
     }
 } geo2dFindNearCmd;
-
-class ApplyOpsCmd : public PublicGridCommand {
-public:
-    ApplyOpsCmd() : PublicGridCommand("applyOps") {}
-
-    virtual Status checkAuthForOperation(OperationContext* txn,
-                                         const std::string& dbname,
-                                         const BSONObj& cmdObj) {
-        return checkAuthForApplyOpsCommand(txn, dbname, cmdObj);
-    }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
-    virtual bool run(OperationContext* txn,
-                     const string& dbName,
-                     BSONObj& cmdObj,
-                     int,
-                     string& errmsg,
-                     BSONObjBuilder& result) {
-        errmsg = "applyOps not allowed through mongos";
-        return false;
-    }
-} applyOpsCmd;
 
 class CompactCmd : public PublicGridCommand {
 public:
@@ -1793,34 +1771,6 @@ public:
     }
 
 } cmdListIndexes;
-
-class AvailableQueryOptions : public Command {
-public:
-    AvailableQueryOptions() : Command("availableQueryOptions", false, "availablequeryoptions") {}
-
-    virtual bool slaveOk() const {
-        return true;
-    }
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) {
-        return Status::OK();
-    }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    virtual bool run(OperationContext* txn,
-                     const string& dbname,
-                     BSONObj& cmdObj,
-                     int,
-                     string& errmsg,
-                     BSONObjBuilder& result) {
-        result << "options" << QueryOption_AllSupportedForSharding;
-        return true;
-    }
-
-} availableQueryOptionsCmd;
 
 }  // namespace
 }  // namespace mongo

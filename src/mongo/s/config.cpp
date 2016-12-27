@@ -76,21 +76,16 @@ void CollectionInfo::resetCM(ChunkManager* cm) {
     _cm.reset(cm);
 }
 
-DBConfig::DBConfig(std::string name, const DatabaseType& dbt, repl::OpTime configOpTime)
-    : _name(name), _configOpTime(std::move(configOpTime)) {
-    invariant(_name == dbt.getName());
-    _primaryId = dbt.getPrimary();
-    _shardingEnabled = dbt.getSharded();
-}
+DBConfig::DBConfig(const DatabaseType& dbt, repl::OpTime configOpTime)
+    : _name(dbt.getName()),
+      _shardingEnabled(dbt.getSharded()),
+      _primaryId(dbt.getPrimary()),
+      _configOpTime(std::move(configOpTime)) {}
 
 DBConfig::~DBConfig() = default;
 
 bool DBConfig::isSharded(const string& ns) {
     stdx::lock_guard<stdx::mutex> lk(_lock);
-
-    if (!_shardingEnabled) {
-        return false;
-    }
 
     CollectionInfoMap::iterator i = _collections.find(ns);
     if (i == _collections.end()) {
@@ -140,11 +135,7 @@ void DBConfig::getChunkManagerOrPrimary(OperationContext* txn,
         } else {
             CollectionInfo& cInfo = i->second;
 
-            // TODO: we need to be careful about handling shardingEnabled, b/c in some places we
-            // seem to use and some we don't.  If we use this function in combination with just
-            // getChunkManager() on a slightly borked config db, we'll get lots of staleconfig
-            // retries
-            if (_shardingEnabled && cInfo.isSharded()) {
+            if (cInfo.isSharded()) {
                 manager = cInfo.getCM();
             } else {
                 auto primaryStatus = shardRegistry->getShard(txn, _primaryId);
@@ -358,7 +349,6 @@ bool DBConfig::_loadIfNeeded(OperationContext* txn, Counter reloadIteration) {
     const auto& dbt = dbOpTimePair.value;
     invariant(_name == dbt.getName());
     _primaryId = dbt.getPrimary();
-    _shardingEnabled = dbt.getSharded();
 
     invariant(dbOpTimePair.opTime >= _configOpTime);
     _configOpTime = dbOpTimePair.opTime;
@@ -428,21 +418,6 @@ void DBConfig::getAllShardIds(set<ShardId>* shardIds) {
             it->second.getCM()->getAllShardIds(shardIds);
         }  // TODO: handle collections on non-primary shard
     }
-}
-
-void DBConfig::getAllShardedCollections(set<string>& namespaces) {
-    stdx::lock_guard<stdx::mutex> lk(_lock);
-
-    for (CollectionInfoMap::const_iterator i = _collections.begin(); i != _collections.end(); i++) {
-        log() << "Coll : " << i->first << " sharded? " << i->second.isSharded();
-        if (i->second.isSharded())
-            namespaces.insert(i->first);
-    }
-}
-
-bool DBConfig::isShardingEnabled() {
-    stdx::lock_guard<stdx::mutex> lk(_lock);
-    return _shardingEnabled;
 }
 
 ShardId DBConfig::getPrimaryId() {

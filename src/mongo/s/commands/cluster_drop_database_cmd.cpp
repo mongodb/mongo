@@ -113,13 +113,10 @@ public:
 
         auto const db = scopedDbStatus.getValue().db();
 
-        std::set<std::string> namespaces;
-        db->getAllShardedCollections(namespaces);
-
         // Drop the database's collections from metadata
-        for (const auto& ns : namespaces) {
-            uassertStatusOK(catalogClient->dropCollection(txn, NamespaceString(ns)));
-            db->markNSNotSharded(ns);
+        for (const auto& nss : getAllShardedCollectionsForDb(txn, dbname)) {
+            uassertStatusOK(catalogClient->dropCollection(txn, nss));
+            db->markNSNotSharded(nss.ns());
         }
 
         // Drop the database from the primary shard first

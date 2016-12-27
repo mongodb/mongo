@@ -35,8 +35,10 @@
 #include "mongo/client/parallel.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/version_manager.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 
@@ -216,6 +218,25 @@ bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::stri
     }
 
     return Command::appendCommandStatus(result, status);
+}
+
+std::vector<NamespaceString> getAllShardedCollectionsForDb(OperationContext* txn,
+                                                           StringData dbName) {
+    const auto dbNameStr = dbName.toString();
+
+    std::vector<CollectionType> collectionsOnConfig;
+    uassertStatusOK(Grid::get(txn)->catalogClient(txn)->getCollections(
+        txn, &dbNameStr, &collectionsOnConfig, nullptr));
+
+    std::vector<NamespaceString> collectionsToReturn;
+    for (const auto& coll : collectionsOnConfig) {
+        if (coll.getDropped())
+            continue;
+
+        collectionsToReturn.push_back(coll.getNs());
+    }
+
+    return collectionsToReturn;
 }
 
 }  // namespace mongo

@@ -28,63 +28,44 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/catalog_cache.h"
-
-#include "mongo/base/status_with.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog/type_database.h"
-#include "mongo/s/config.h"
-#include "mongo/s/grid.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/commands/apply_ops_cmd_common.h"
 
 namespace mongo {
+namespace {
 
-using std::shared_ptr;
-using std::string;
+class ApplyOpsCmd : public Command {
+public:
+    ApplyOpsCmd() : Command("applyOps") {}
 
-
-CatalogCache::CatalogCache() {}
-
-StatusWith<shared_ptr<DBConfig>> CatalogCache::getDatabase(OperationContext* txn,
-                                                           const string& dbName) {
-    stdx::lock_guard<stdx::mutex> guard(_mutex);
-
-    ShardedDatabasesMap::iterator it = _databases.find(dbName);
-    if (it != _databases.end()) {
-        return it->second;
+    bool slaveOk() const override {
+        return true;
     }
 
-    // Need to load from the store
-    auto status = Grid::get(txn)->catalogClient(txn)->getDatabase(txn, dbName);
-    if (!status.isOK()) {
-        return status.getStatus();
+    bool adminOnly() const override {
+        return false;
     }
 
-    const auto dbOpTimePair = status.getValue();
-    shared_ptr<DBConfig> db = std::make_shared<DBConfig>(dbOpTimePair.value, dbOpTimePair.opTime);
-    try {
-        db->load(txn);
-    } catch (const DBException& excep) {
-        return excep.toStatus();
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return true;
     }
 
-    invariant(_databases.insert(std::make_pair(dbName, db)).second);
-
-    return db;
-}
-
-void CatalogCache::invalidate(const string& dbName) {
-    stdx::lock_guard<stdx::mutex> guard(_mutex);
-
-    ShardedDatabasesMap::iterator it = _databases.find(dbName);
-    if (it != _databases.end()) {
-        _databases.erase(it);
+    Status checkAuthForOperation(OperationContext* txn,
+                                 const std::string& dbname,
+                                 const BSONObj& cmdObj) override {
+        return checkAuthForApplyOpsCommand(txn, dbname, cmdObj);
     }
-}
 
-void CatalogCache::invalidateAll() {
-    stdx::lock_guard<stdx::mutex> guard(_mutex);
+    bool run(OperationContext* txn,
+             const std::string& dbName,
+             BSONObj& cmdObj,
+             int options,
+             std::string& errmsg,
+             BSONObjBuilder& result) override {
+        uasserted(ErrorCodes::CommandNotSupported, "applyOps not allowed through mongos");
+    }
 
-    _databases.clear();
-}
+} clusterApplyOpsCmd;
 
+}  // namespace
 }  // namespace mongo
