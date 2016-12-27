@@ -154,18 +154,19 @@ unique_ptr<DBClientCursor> DBDirectClient::query(const string& ns,
 const HostAndPort DBDirectClient::dummyHost("0.0.0.0", 0);
 
 unsigned long long DBDirectClient::count(
-    const string& ns, const BSONObj& query, int options, int limit, int skip) {
-    BSONObj cmdObj = _countCmd(ns, query, options, limit, skip);
+    const string& ns, const Query& query, int options, int limit, int skip) {
+    const BSONObj query_obj = query.isComplex() ? query.obj["query"].embeddedObject() : BSONObj();
+    BSONObj cmdObj = _countCmd(ns, query_obj, options, limit, skip);
 
     NamespaceString nsString(ns);
-    std::string dbname = nsString.db().toString();
+    const std::string dbname = nsString.db().toString();
 
     Command* countCmd = Command::findCommand("count");
     invariant(countCmd);
 
     std::string errmsg;
     BSONObjBuilder result;
-    bool runRetval = countCmd->run(_txn, dbname, cmdObj, options, errmsg, result);
+    const bool runRetval = countCmd->run(_txn, dbname, cmdObj, options, errmsg, result);
     if (!runRetval) {
         Command::appendCommandStatus(result, runRetval, errmsg);
         Status commandStatus = getStatusFromCommandResult(result.obj());
@@ -173,7 +174,7 @@ unsigned long long DBDirectClient::count(
         uassertStatusOK(commandStatus);
     }
 
-    BSONObj resultObj = result.obj();
+    const BSONObj resultObj = result.obj();
     return static_cast<unsigned long long>(resultObj["n"].numberLong());
 }
 

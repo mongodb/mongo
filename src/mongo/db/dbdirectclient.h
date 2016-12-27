@@ -82,7 +82,7 @@ public:
     virtual void say(Message& toSend, bool isRetry = false, std::string* actualServer = 0);
 
     virtual unsigned long long count(const std::string& ns,
-                                     const BSONObj& query = BSONObj(),
+                                     const Query& query = Query(),
                                      int options = 0,
                                      int limit = 0,
                                      int skip = 0);
