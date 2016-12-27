@@ -1,0 +1,4 @@
+pymongo >= 3.0
+pypiwin32 == 219 ; sys_platform == "win32"
+PyYAML == 3.11
+subprocess32 >= 3.2.7 ; os_name == "posix" and python_version < "3"
