@@ -460,10 +460,23 @@ functions:
 
         extra_args=""
         if [ ${run_multiple_jobs|false} = true ]; then
-          if [ ${max_jobs|0} -gt 0 ] && [ ${max_jobs|0} -lt ${num_jobs_available|1} ]; then
+          processor_architecture=$(uname -m)
+          num_jobs_available=${num_jobs_available|1}
+          # Reduce the number of available jobs by half when running any sharding* or replicasets*
+          # task on Windows and ARM to avoid overwhelming test hosts.
+          if [ "Windows_NT" = "$OS" ] || [ "aarch64" = $processor_architecture ]; then
+            case "${task_name}" in
+            sharding*|replicasets*)
+              num_jobs_available=$((${num_jobs_available|2} / 2))
+              echo "Reducing jobs from ${num_jobs_available|1} to $num_jobs_available"
+              ;;
+            esac
+          fi
+
+          if [ ${max_jobs|0} -gt 0 ] && [ ${max_jobs|0} -lt $num_jobs_available ]; then
             extra_args="$extra_args --jobs=${max_jobs}"
           else
-            extra_args="$extra_args --jobs=${num_jobs_available|1}"
+            extra_args="$extra_args --jobs=$num_jobs_available"
           fi
         fi
 
