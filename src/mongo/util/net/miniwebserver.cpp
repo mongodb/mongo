@@ -124,7 +124,8 @@ bool MiniWebServer::fullReceive(const char* buf) {
     if (!lengthLoc)
         return true;
     lengthLoc += strlen(lenString);
-    long len = strtol(lengthLoc, 0, 10);
+    long len = 0;
+    parseNumberFromString<long>(lengthLoc, &len);
     if (long(strlen(bod)) == len)
         return true;
     return false;

@@ -167,7 +167,7 @@ void NumberLongInfo::construct(JSContext* cx, JS::CallArgs args) {
                     opt);
             numLong = *opt;
         } else if (arg.isString()) {
-            // For string values we call strtoll because we expect non-number string
+            // For string values we call parseLL because we expect non-number string
             // values to fail rather than return 0 (which is the behavior of ToInt64).
             std::string str = ValueWriter(cx, arg).toString();
             numLong = parseLL(str.c_str());

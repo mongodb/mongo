@@ -222,7 +222,10 @@ public:
                 b.append(cmd, 1);
 
                 if (cmd == "serverStatus" && params["repl"].type()) {
-                    b.append("repl", atoi(params["repl"].valuestr()));
+                    int repl_value = 0;
+                    if (parseNumberFromString<int>(params["repl"].valuestr(), &repl_value) == Status::OK()) {
+                        b.append("repl", repl_value);
+                    }
                 }
 
                 co = b.obj();

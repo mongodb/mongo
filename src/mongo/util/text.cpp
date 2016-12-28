@@ -42,6 +42,7 @@
 #endif
 
 #include "mongo/platform/basic.h"
+#include "mongo/base/parse_number.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -154,10 +155,8 @@ long long parseLL(const char* n) {
     long long ret;
     uassert(13307, "cannot convert empty string to long long", *n != 0);
 #if !defined(_WIN32)
-    char* endPtr = 0;
-    errno = 0;
-    ret = strtoll(n, &endPtr, 10);
-    uassert(13305, "could not convert string to long long", *endPtr == 0 && errno == 0);
+    const Status parse_res = parseNumberFromString<long long>(n, &ret);
+    uassert(13305, "could not convert string to long long", parse_res == Status::OK());
 #else
     size_t endLen = 0;
     try {

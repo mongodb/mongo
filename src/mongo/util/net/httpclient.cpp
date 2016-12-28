@@ -32,6 +32,7 @@
 #include "mongo/util/net/httpclient.h"
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/base/parse_number.h"
 #include "mongo/config.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/message.h"
@@ -85,8 +86,8 @@ int HttpClient::_go(const char* command, string url, const char* body, Result* r
     string::size_type idx = host.find(":");
     if (idx != string::npos) {
         server = host.substr(0, idx);
-        string t = host.substr(idx + 1);
-        port = atoi(t.c_str());
+        const string t = host.substr(idx + 1);
+        parseNumberFromString<int>(t.c_str(), &port);
     }
 
     HD("server [" << server << "]");

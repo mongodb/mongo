@@ -304,7 +304,7 @@ ProgramRunner::ProgramRunner(const BSONObj& args, const BSONObj& env) {
         if (str == "--port") {
             _port = -2;
         } else if (_port == -2) {
-            _port = strtol(str.c_str(), 0, 10);
+            parseNumberFromString<int>(str.c_str(), &_port);
         } else if (isMongodProgram && str == "--configsvr") {
             _name = "c";
         }

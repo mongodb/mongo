@@ -186,9 +186,9 @@ string ArtificialTreeBuilder<OnDiskFormat>::expectedKey(const char* spec) {
 
     // parsing a long long is a pain, so just allow shorter keys for now
     unsigned long long num = strtol(spec + 1, &endPtr, 16);
-    int len = 800;
+    long int len = 800;
     if (*endPtr == '$') {
-        len = strtol(endPtr + 1, 0, 16);
+        parseNumberFromStringWithBase<long int>(endPtr + 1, 16, &len);
     }
 
     return bigNumString(num, len);

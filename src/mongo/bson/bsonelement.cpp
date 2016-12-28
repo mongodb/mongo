@@ -145,8 +145,9 @@ string BSONElement::jsonString(JsonStringFormat format, bool includeFieldNames, 
                         for (int x = 0; x < pretty; x++)
                             s << "  ";
                     }
-
-                    if (strtol(e.fieldName(), 0, 10) > count) {
+                    long int field_digit = 0;
+                    if (parseNumberFromString<long int>(e.fieldName(), &field_digit) == Status::OK()
+                        && field_digit > count) {
                         s << "undefined";
                     } else {
                         s << e.jsonString(format, false, pretty ? pretty + 1 : 0);

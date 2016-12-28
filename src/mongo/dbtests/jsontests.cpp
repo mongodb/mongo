@@ -774,7 +774,9 @@ class SingleNumber : public Base {
 class RealNumber : public Base {
     virtual BSONObj bson() const {
         BSONObjBuilder b;
-        b.append("a", strtod("0.7", 0));
+        double num = 0;
+        parseNumberFromString<double>("0.7", &num);
+        b.append("a", num);
         return b.obj();
     }
     virtual string json() const {
@@ -785,7 +787,9 @@ class RealNumber : public Base {
 class FancyNumber : public Base {
     virtual BSONObj bson() const {
         BSONObjBuilder b;
-        b.append("a", strtod("-4.4433e-2", 0));
+        double num = 0;
+        parseNumberFromString<double>("-4.4433e-2", &num);
+        b.append("a", num);
         return b.obj();
     }
     virtual string json() const {

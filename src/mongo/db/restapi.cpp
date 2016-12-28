@@ -158,21 +158,20 @@ public:
         BSONObjIterator i(params);
         while (i.more()) {
             BSONElement e = i.next();
-            string name = e.fieldName();
+            const string name = e.fieldName();
             if (name.find("filter_") != 0)
                 continue;
 
-            string field = name.substr(7);
+            const string field = name.substr(7);
             const char* val = e.valuestr();
 
-            char* temp;
-
-            // TODO: this is how i guess if something is a number.  pretty lame right now
-            double number = strtod(val, &temp);
-            if (temp != val)
+            double number = 0;
+            if (parseNumberFromString<double>(val, &number) == Status::OK()) {
                 queryBuilder.append(field, number);
-            else
+            } else {
                 queryBuilder.append(field, val);
+            }
+
         }
 
         BSONObj query = queryBuilder.obj();
@@ -259,8 +258,11 @@ public:
     int _getOption(BSONElement e, int def) {
         if (e.isNumber())
             return e.numberInt();
-        if (e.type() == String)
-            return atoi(e.valuestr());
+        if (e.type() == String) {
+            int ret_value = 0;
+            parseNumberFromString<int>(e.valuestr(), &ret_value);
+            return ret_value;
+        }
         return def;
     }
 } restHandler;
