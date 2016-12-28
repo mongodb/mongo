@@ -41,7 +41,6 @@ const char kToShard[] = "toShard";
 const char kMigratedChunk[] = "migratedChunk";
 const char kControlChunk[] = "controlChunk";
 const char kFromShardCollectionVersion[] = "fromShardCollectionVersion";
-const char kShardHasDistributedLock[] = "shardHasDistributedLock";
 
 /**
  * Attempts to parse a (range-only!) ChunkType from "field" in "source".
@@ -133,14 +132,6 @@ StatusWith<CommitChunkMigrationRequest> CommitChunkMigrationRequest::createFromC
         request._collectionEpoch = statusWithChunkVersion.getValue().epoch();
     }
 
-    {
-        Status shardHasDistLockStatus = bsonExtractBooleanField(
-            obj, kShardHasDistributedLock, &request._shardHasDistributedLock);
-        if (!shardHasDistLockStatus.isOK()) {
-            return shardHasDistLockStatus;
-        }
-    }
-
     return request;
 }
 
@@ -150,8 +141,7 @@ void CommitChunkMigrationRequest::appendAsCommand(BSONObjBuilder* builder,
                                                   const ShardId& toShard,
                                                   const ChunkType& migratedChunk,
                                                   const boost::optional<ChunkType>& controlChunk,
-                                                  const ChunkVersion& fromShardCollectionVersion,
-                                                  const bool& shardHasDistributedLock) {
+                                                  const ChunkVersion& fromShardCollectionVersion) {
     invariant(builder->asTempObj().isEmpty());
     invariant(nss.isValid());
 
@@ -160,7 +150,6 @@ void CommitChunkMigrationRequest::appendAsCommand(BSONObjBuilder* builder,
     builder->append(kToShard, toShard.toString());
     builder->append(kMigratedChunk, migratedChunk.toBSON());
     fromShardCollectionVersion.appendWithFieldForCommands(builder, kFromShardCollectionVersion);
-    builder->append(kShardHasDistributedLock, shardHasDistributedLock);
 
     if (controlChunk) {
         builder->append(kControlChunk, controlChunk->toBSON());

@@ -72,8 +72,7 @@ public:
                                 ChunkVersion chunkVersion,
                                 int64_t maxChunkSizeBytes,
                                 const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                                bool waitForDelete,
-                                bool takeDistLock);
+                                bool waitForDelete);
 
     const NamespaceString& getNss() const {
         return _nss;
@@ -117,10 +116,6 @@ public:
 
     bool getWaitForDelete() const {
         return _waitForDelete;
-    }
-
-    bool getTakeDistLock() const {
-        return _takeDistLock;
     }
 
     /**
@@ -172,9 +167,6 @@ private:
     // Whether to block and wait for the range deleter to cleanup the orphaned documents at the end
     // of move.
     bool _waitForDelete;
-
-    // Whether to take the distributed lock for the collection or not.
-    bool _takeDistLock;
 };
 
 }  // namespace mongo

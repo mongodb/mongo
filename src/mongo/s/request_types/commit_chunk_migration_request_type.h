@@ -41,7 +41,7 @@ namespace mongo {
 struct CommitChunkMigrationRequest {
 
     CommitChunkMigrationRequest(const NamespaceString& nss, const ChunkType& chunk)
-        : _nss(nss), _migratedChunk(chunk), _shardHasDistributedLock() {}
+        : _nss(nss), _migratedChunk(chunk) {}
 
     /**
      * Parses the input command and produces a request corresponding to its arguments.
@@ -60,8 +60,7 @@ struct CommitChunkMigrationRequest {
                                 const ShardId& toShard,
                                 const ChunkType& migratedChunkType,
                                 const boost::optional<ChunkType>& controlChunkType,
-                                const ChunkVersion& fromShardChunkVersion,
-                                const bool& shardHasDistributedLock);
+                                const ChunkVersion& fromShardChunkVersion);
 
     const NamespaceString& getNss() const {
         return _nss;
@@ -78,11 +77,6 @@ struct CommitChunkMigrationRequest {
     const boost::optional<ChunkType>& getControlChunk() const {
         return _controlChunk;
     }
-
-    bool shardHasDistributedLock() {
-        return _shardHasDistributedLock;
-    }
-
     const OID& getCollectionEpoch() {
         return _collectionEpoch;
     }
@@ -101,9 +95,6 @@ struct CommitChunkMigrationRequest {
 
     // A chunk on the shard moved from, if any remain.
     boost::optional<ChunkType> _controlChunk;
-
-    // Flag to indicate whether the shard has the distlock.
-    bool _shardHasDistributedLock;
 
     OID _collectionEpoch;
 };

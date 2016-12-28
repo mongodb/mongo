@@ -58,7 +58,6 @@ TEST(MoveChunkRequest, Roundtrip) {
         chunkVersion,
         1024,
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
-        true,
         true);
 
     BSONObj cmdObj = builder.obj();
@@ -77,7 +76,6 @@ TEST(MoveChunkRequest, Roundtrip) {
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kOff,
               request.getSecondaryThrottle().getSecondaryThrottle());
     ASSERT_EQ(true, request.getWaitForDelete());
-    ASSERT_EQ(true, request.getTakeDistLock());
 }
 
 TEST(MoveChunkRequest, BackwardsCompatibilityNoChunkVersionAndDefaults) {
@@ -113,7 +111,6 @@ TEST(MoveChunkRequest, BackwardsCompatibilityNoChunkVersionAndDefaults) {
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault,
               request.getSecondaryThrottle().getSecondaryThrottle());
     ASSERT_EQ(false, request.getWaitForDelete());
-    ASSERT_EQ(true, request.getTakeDistLock());
 }
 
 TEST(MoveChunkRequest, EqualityOperatorSameValue) {
@@ -132,7 +129,6 @@ TEST(MoveChunkRequest, EqualityOperatorSameValue) {
         chunkVersion,
         1024,
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
-        true,
         true);
 
     BSONObj obj = builder.obj();
@@ -162,7 +158,6 @@ TEST(MoveChunkRequest, EqualityOperatorDifferentValues) {
         chunkVersion,
         1024,
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
-        true,
         true);
 
     auto value1 = assertGet(
@@ -180,7 +175,6 @@ TEST(MoveChunkRequest, EqualityOperatorDifferentValues) {
         chunkVersion,
         1024,
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
-        true,
         true);
     auto value2 = assertGet(
         MoveChunkRequest::createFromCommand(NamespaceString("TestDB", "TestColl"), builder2.obj()));

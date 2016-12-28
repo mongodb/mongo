@@ -145,7 +145,6 @@ protected:
             ChunkVersion(1, 0, OID::gen()),
             1024 * 1024,
             MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kDefault),
-            false,
             false);
 
         return assertGet(MoveChunkRequest::createFromCommand(kNss, cmdBuilder.obj()));

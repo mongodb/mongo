@@ -80,7 +80,6 @@ MoveChunkRequest createMoveChunkRequest(const NamespaceString& nss) {
         chunkVersion,
         1024,
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
-        true,
         true);
     return assertGet(MoveChunkRequest::createFromCommand(nss, builder.obj()));
 }

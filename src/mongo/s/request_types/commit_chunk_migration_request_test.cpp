@@ -40,7 +40,6 @@ using unittest::assertGet;
 namespace {
 
 const auto kNamespaceString = NamespaceString("TestDB", "TestColl");
-const auto kShardHasDistributedLock = false;
 
 const auto kShardId0 = ShardId("shard0");
 const auto kShardId1 = ShardId("shard1");
@@ -72,8 +71,7 @@ TEST(CommitChunkMigrationRequest, WithControlChunk) {
                                                  kShardId1,
                                                  migratedChunk,
                                                  controlChunkOpt,
-                                                 fromShardCollectionVersion,
-                                                 kShardHasDistributedLock);
+                                                 fromShardCollectionVersion);
 
     BSONObj cmdObj = builder.obj();
 
@@ -89,7 +87,6 @@ TEST(CommitChunkMigrationRequest, WithControlChunk) {
     ASSERT_BSONOBJ_EQ(kKey2, request.getControlChunk()->getMin());
     ASSERT_BSONOBJ_EQ(kKey3, request.getControlChunk()->getMax());
     ASSERT_EQ(fromShardCollectionVersion.epoch(), request.getCollectionEpoch());
-    ASSERT_EQ(kShardHasDistributedLock, request.shardHasDistributedLock());
 }
 
 TEST(CommitChunkMigrationRequest, WithoutControlChunk) {
@@ -107,8 +104,7 @@ TEST(CommitChunkMigrationRequest, WithoutControlChunk) {
                                                  kShardId1,
                                                  migratedChunk,
                                                  boost::none,
-                                                 fromShardCollectionVersion,
-                                                 kShardHasDistributedLock);
+                                                 fromShardCollectionVersion);
 
     BSONObj cmdObj = builder.obj();
 
@@ -122,7 +118,6 @@ TEST(CommitChunkMigrationRequest, WithoutControlChunk) {
     ASSERT_BSONOBJ_EQ(kKey1, request.getMigratedChunk().getMax());
     ASSERT(!request.getControlChunk());
     ASSERT_EQ(fromShardCollectionVersion.epoch(), request.getCollectionEpoch());
-    ASSERT_EQ(kShardHasDistributedLock, request.shardHasDistributedLock());
 }
 
 }  // namespace
