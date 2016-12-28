@@ -166,6 +166,13 @@ functions:
       params:
         script: |
           set -o verbose
+
+          # To force re-creation of existing instances, e.g. for a patch build, you can uncomment this:
+          #if [ -d "$HOME/infrastructure_provisioning" ]; then
+          #  $HOME/infrastructure_provisioning/terraform/infrastructure_teardown.sh \
+          #  && rm -rf $HOME/infrastructure_provisioning
+          #fi
+
           if [ ! -d "$HOME/infrastructure_provisioning" ]; then
             echo "copying terraform to Evergreen host"
             mkdir $HOME/infrastructure_provisioning
