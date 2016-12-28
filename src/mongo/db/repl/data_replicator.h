@@ -224,7 +224,7 @@ public:
         void append(BSONObjBuilder* builder) const;
     };
 
-    DataReplicator(DataReplicatorOptions opts,
+    DataReplicator(const DataReplicatorOptions& opts,
                    std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
                    StorageInterface* storage,
                    const OnCompletionFn& onCompletion);

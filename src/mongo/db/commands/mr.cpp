@@ -1212,12 +1212,12 @@ void State::dumpToInc() {
     if (!_onDisk)
         return;
 
-    for (InMemory::iterator i = _temp->begin(); i != _temp->end(); i++) {
+    for (InMemory::iterator i = _temp->begin(); i != _temp->end(); ++i) {
         BSONList& all = i->second;
         if (all.size() < 1)
             continue;
 
-        for (BSONList::iterator j = all.begin(); j != all.end(); j++)
+        for (BSONList::iterator j = all.begin(); j != all.end(); ++j)
             _insertToInc(*j);
     }
     _temp->clear();
@@ -1669,16 +1669,16 @@ public:
             }
         } catch (SendStaleConfigException& e) {
             log() << "mr detected stale config, should retry" << redact(e);
-            throw e;
+            throw;
         }
         // TODO:  The error handling code for queries is v. fragile,
         // *requires* rethrow AssertionExceptions - should probably fix.
         catch (AssertionException& e) {
             log() << "mr failed, removing collection" << redact(e);
-            throw e;
+            throw;
         } catch (std::exception& e) {
             log() << "mr failed, removing collection" << causedBy(e);
-            throw e;
+            throw;
         } catch (...) {
             log() << "mr failed for unknown reason, removing collection";
             throw;

@@ -98,7 +98,7 @@ protected:
      * Inserts a document into the config.collections collection to indicate that "collName" is
      * sharded with version "version". The shard key pattern defaults to "_id".
      */
-    void setUpCollection(const std::string collName, ChunkVersion version);
+    void setUpCollection(const std::string& collName, ChunkVersion version);
 
     /**
      * Inserts a document into the config.chunks collection so that the chunk defined by the
@@ -189,7 +189,7 @@ void MigrationManagerTest::setUpDatabase(const std::string& dbName, const ShardI
         operationContext(), DatabaseType::ConfigNS, db.toBSON(), kMajorityWriteConcern));
 }
 
-void MigrationManagerTest::setUpCollection(const std::string collName, ChunkVersion version) {
+void MigrationManagerTest::setUpCollection(const std::string& collName, ChunkVersion version) {
     CollectionType coll;
     coll.setNs(NamespaceString(collName));
     coll.setEpoch(version.epoch());

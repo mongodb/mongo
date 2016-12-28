@@ -144,7 +144,7 @@ Status Environment::setAll(const Environment& add_environment) {
     std::map<Key, Value> add_values = add_environment.values;
     for (std::map<Key, Value>::const_iterator iterator = add_values.begin();
          iterator != add_values.end();
-         iterator++) {
+         ++iterator) {
         values[iterator->first] = iterator->second;
     }
 
@@ -168,7 +168,7 @@ Status Environment::validate(bool setValid) {
     // 1. Iterate and check all KeyConstraints
     typedef std::vector<KeyConstraint*>::iterator it_keyConstraint;
     for (it_keyConstraint iterator = keyConstraints.begin(); iterator != keyConstraints.end();
-         iterator++) {
+         ++iterator) {
         Status ret = (**iterator)(*this);
         if (!ret.isOK()) {
             return ret;
@@ -177,7 +177,7 @@ Status Environment::validate(bool setValid) {
 
     // 2. Iterate and check all Constraints
     typedef std::vector<Constraint*>::iterator it_constraint;
-    for (it_constraint iterator = constraints.begin(); iterator != constraints.end(); iterator++) {
+    for (it_constraint iterator = constraints.begin(); iterator != constraints.end(); ++iterator) {
         Status ret = (**iterator)(*this);
         if (!ret.isOK()) {
             return ret;
@@ -230,7 +230,7 @@ namespace {
 Status valueMapToBSON(const std::map<Key, Value>& params,
                       BSONObjBuilder* builder,
                       const std::string& prefix = std::string()) {
-    for (std::map<Key, Value>::const_iterator it(params.begin()); it != params.end(); it++) {
+    for (std::map<Key, Value>::const_iterator it(params.begin()); it != params.end(); ++it) {
         Key key = it->first;
         Value value = it->second;
 
@@ -348,7 +348,7 @@ Status valueMapToBSON(const std::map<Key, Value>& params,
             StringMap_t stringMap = value.as<StringMap_t>();
             for (StringMap_t::iterator stringMapIt = stringMap.begin();
                  stringMapIt != stringMap.end();
-                 stringMapIt++) {
+                 ++stringMapIt) {
                 subBuilder.append(stringMapIt->first, stringMapIt->second);
             }
             subBuilder.done();

@@ -124,7 +124,7 @@ ReadPreferenceSetting* _extractReadPref(const BSONObj& query, int queryOptions) 
     }
 
     // Default read pref is primary only or secondary preferred with slaveOK
-    ReadPreference pref = queryOptions & QueryOption_SlaveOk
+    ReadPreference pref = (queryOptions & QueryOption_SlaveOk)
         ? mongo::ReadPreference::SecondaryPreferred
         : mongo::ReadPreference::PrimaryOnly;
     return new ReadPreferenceSetting(pref, TagSet());

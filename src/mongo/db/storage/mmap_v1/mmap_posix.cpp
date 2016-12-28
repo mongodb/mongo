@@ -64,7 +64,7 @@ const size_t g_minOSPageSizeBytes = fetchMinOSPageSizeBytes();
 
 void MemoryMappedFile::close() {
     LockMongoFilesShared::assertExclusivelyLocked();
-    for (vector<void*>::iterator i = views.begin(); i != views.end(); i++) {
+    for (vector<void*>::iterator i = views.begin(); i != views.end(); ++i) {
         munmap(*i, len);
     }
     views.clear();

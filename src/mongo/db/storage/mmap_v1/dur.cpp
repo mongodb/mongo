@@ -359,7 +359,7 @@ void remapPrivateViewImpl(double fraction) {
 
     // Skip to our starting position as remembered from the last remap cycle
     for (unsigned x = 0; x < remapFileToStartAt; x++) {
-        i++;
+        ++i;
         if (i == e)
             i = b;
     }
@@ -384,7 +384,7 @@ void remapPrivateViewImpl(double fraction) {
                 mmf->remapThePrivateView();
             }
 
-            i++;
+            ++i;
 
             if (i == e)
                 i = b;

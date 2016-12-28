@@ -974,7 +974,7 @@ void DBClientConnection::_checkConnection() {
     }
 
     LOG(_logLevel) << "reconnect " << toString() << " ok" << endl;
-    for (map<string, BSONObj>::const_iterator i = authCache.begin(); i != authCache.end(); i++) {
+    for (map<string, BSONObj>::const_iterator i = authCache.begin(); i != authCache.end(); ++i) {
         try {
             DBClientConnection::_auth(i->second);
         } catch (UserException& ex) {

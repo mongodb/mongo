@@ -171,7 +171,7 @@ bool planCacheContains(const PlanCache& planCache,
 
     // Search keys.
     bool found = false;
-    for (vector<PlanCacheEntry*>::const_iterator i = entries.begin(); i != entries.end(); i++) {
+    for (vector<PlanCacheEntry*>::const_iterator i = entries.begin(); i != entries.end(); ++i) {
         PlanCacheEntry* entry = *i;
 
         // Canonicalizing query shape in cache entry to get cache key.

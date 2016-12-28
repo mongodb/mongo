@@ -144,8 +144,7 @@ bool SockAddr::isLocalHost() const {
         default:
             return false;
     }
-    fassert(16502, false);
-    return false;
+	MONGO_UNREACHABLE;
 }
 
 std::string SockAddr::toString(bool includePort) const {

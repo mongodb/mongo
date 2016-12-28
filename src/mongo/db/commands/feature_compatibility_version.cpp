@@ -207,8 +207,6 @@ void FeatureCompatibilityVersion::set(OperationContext* txn, StringData version)
         // featureCompatibilityVersion to 3.4. This is a new index version that isn't supported by
         // versions of MongoDB earlier than 3.4 that will cause 3.2 secondaries to crash when it is
         // replicated.
-        std::vector<BSONObj> indexSpecs{k32IncompatibleIndexSpec};
-
         {
             ScopedTransaction transaction(txn, MODE_IX);
             AutoGetOrCreateDb autoDB(txn, nss.db(), MODE_X);
@@ -298,8 +296,6 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* txn,
         // featureCompatibilityVersion to 3.4. This is a new index version that isn't supported by
         // versions of MongoDB earlier than 3.4 that will cause 3.2 secondaries to crash when it is
         // cloned.
-        std::vector<BSONObj> indexSpecs{k32IncompatibleIndexSpec};
-
         {
             ScopedTransaction transaction(txn, MODE_IX);
             AutoGetOrCreateDb autoDB(txn, nss.db(), MODE_X);

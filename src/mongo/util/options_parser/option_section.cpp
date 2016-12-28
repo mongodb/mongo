@@ -46,7 +46,7 @@ using std::shared_ptr;
 Status OptionSection::addSection(const OptionSection& subSection) {
     std::list<OptionDescription>::const_iterator oditerator;
     for (oditerator = subSection._options.begin(); oditerator != subSection._options.end();
-         oditerator++) {
+         ++oditerator) {
         if (oditerator->_positionalStart != -1) {
             StringBuilder sb;
             sb << "Attempted to add subsection with positional option: " << oditerator->_dottedName;
@@ -86,7 +86,7 @@ OptionDescription& OptionSection::addOptionChaining(
     // Verify that single name, the dotted name and deprecated dotted names for this option
     // conflicts with the names for any options we have already registered.
     std::list<OptionDescription>::const_iterator oditerator;
-    for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
+    for (oditerator = _options.begin(); oditerator != _options.end(); ++oditerator) {
         if (option._dottedName == oditerator->_dottedName) {
             StringBuilder sb;
             sb << "Attempted to register option with duplicate dottedName: " << option._dottedName;
@@ -295,7 +295,7 @@ Status OptionSection::getBoostOptions(po::options_description* boostOptions,
                                       OptionSources sources,
                                       bool getEmptySections) const {
     std::list<OptionDescription>::const_iterator oditerator;
-    for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
+    for (oditerator = _options.begin(); oditerator != _options.end(); ++oditerator) {
         // Only include this option if it matches the sources we specified and the option is
         // either visible or we are requesting hidden options
         if ((!visibleOnly || (oditerator->_isVisible)) && (oditerator->_sources & sources)) {
@@ -328,7 +328,7 @@ Status OptionSection::getBoostOptions(po::options_description* boostOptions,
     }
 
     std::list<OptionSection>::const_iterator ositerator;
-    for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
+    for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ++ositerator) {
         po::options_description subGroup = ositerator->_name.empty()
             ? po::options_description()
             : po::options_description(ositerator->_name.c_str());
@@ -394,7 +394,7 @@ Status OptionSection::getBoostPositionalOptions(
     std::list<OptionDescription> positionalOptions;
 
     std::list<OptionDescription>::const_iterator oditerator;
-    for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
+    for (oditerator = _options.begin(); oditerator != _options.end(); ++oditerator) {
         // Check if this is a positional option, and extract it if it is
         if (oditerator->_positionalStart != -1) {
             positionalOptions.push_back(*oditerator);
@@ -435,10 +435,10 @@ Status OptionSection::getBoostPositionalOptions(
                 boostPositionalOptions->add(poditerator->_dottedName.c_str(), count);
                 nextPosition += count;
                 std::list<OptionDescription>::iterator old_poditerator = poditerator;
-                poditerator++;
+                ++poditerator;
                 positionalOptions.erase(old_poditerator);
             } else {
-                poditerator++;
+                ++poditerator;
             }
         }
         if (!foundAtPosition) {
@@ -458,7 +458,7 @@ Status OptionSection::getBoostPositionalOptions(
 
 Status OptionSection::getAllOptions(std::vector<OptionDescription>* options) const {
     std::list<OptionDescription>::const_iterator oditerator;
-    for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
+    for (oditerator = _options.begin(); oditerator != _options.end(); ++oditerator) {
         // We need to check here that we didn't register an option with an empty single name
         // that is allowed on the command line or in an old style config, since we don't have
         // this information available all at once when the option is registered
@@ -473,7 +473,7 @@ Status OptionSection::getAllOptions(std::vector<OptionDescription>* options) con
     }
 
     std::list<OptionSection>::const_iterator ositerator;
-    for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
+    for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ++ositerator) {
         ositerator->getAllOptions(options);
     }
 
@@ -482,14 +482,14 @@ Status OptionSection::getAllOptions(std::vector<OptionDescription>* options) con
 
 Status OptionSection::getDefaults(std::map<Key, Value>* values) const {
     std::list<OptionDescription>::const_iterator oditerator;
-    for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
+    for (oditerator = _options.begin(); oditerator != _options.end(); ++oditerator) {
         if (!oditerator->_default.isEmpty()) {
             (*values)[oditerator->_dottedName] = oditerator->_default;
         }
     }
 
     std::list<OptionSection>::const_iterator ositerator;
-    for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
+    for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ++ositerator) {
         ositerator->getDefaults(values);
     }
 
@@ -500,7 +500,7 @@ Status OptionSection::countOptions(int* numOptions, bool visibleOnly, OptionSour
     *numOptions = 0;
 
     std::list<OptionDescription>::const_iterator oditerator;
-    for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
+    for (oditerator = _options.begin(); oditerator != _options.end(); ++oditerator) {
         // Only count this option if it matches the sources we specified and the option is
         // either visible or we are requesting hidden options
         if ((!visibleOnly || (oditerator->_isVisible)) && (oditerator->_sources & sources)) {
@@ -509,7 +509,7 @@ Status OptionSection::countOptions(int* numOptions, bool visibleOnly, OptionSour
     }
 
     std::list<OptionSection>::const_iterator ositerator;
-    for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
+    for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ++ositerator) {
         int numSubOptions = 0;
         ositerator->countOptions(&numSubOptions, visibleOnly, sources);
         *numOptions += numSubOptions;
@@ -520,17 +520,17 @@ Status OptionSection::countOptions(int* numOptions, bool visibleOnly, OptionSour
 
 Status OptionSection::getConstraints(std::vector<std::shared_ptr<Constraint>>* constraints) const {
     std::list<OptionDescription>::const_iterator oditerator;
-    for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
+    for (oditerator = _options.begin(); oditerator != _options.end(); ++oditerator) {
         std::vector<std::shared_ptr<Constraint>>::const_iterator citerator;
         for (citerator = oditerator->_constraints.begin();
              citerator != oditerator->_constraints.end();
-             citerator++) {
+             ++citerator) {
             constraints->push_back(*citerator);
         }
     }
 
     std::list<OptionSection>::const_iterator ositerator;
-    for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
+    for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ++ositerator) {
         ositerator->getConstraints(constraints);
     }
 
@@ -597,7 +597,7 @@ std::string OptionSection::helpString() const {
 /* Debugging */
 void OptionSection::dump() const {
     std::list<OptionDescription>::const_iterator oditerator;
-    for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
+    for (oditerator = _options.begin(); oditerator != _options.end(); ++oditerator) {
         std::cout << " _dottedName: " << oditerator->_dottedName
                   << " _singleName: " << oditerator->_singleName << " _type: " << oditerator->_type
                   << " _description: " << oditerator->_description
@@ -605,7 +605,7 @@ void OptionSection::dump() const {
     }
 
     std::list<OptionSection>::const_iterator ositerator;
-    for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
+    for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ++ositerator) {
         std::cout << "Section Name: " << ositerator->_name << std::endl;
         ositerator->dump();
     }

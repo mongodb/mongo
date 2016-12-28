@@ -129,7 +129,7 @@ static void logCursorsWaiting(RangeDeleteEntry* entry) {
 }
 
 struct RangeDeleter::NSMinMax {
-    NSMinMax(std::string ns, const BSONObj min, const BSONObj max) : ns(ns), min(min), max(max) {}
+    NSMinMax(std::string ns, const BSONObj min, const BSONObj max) : ns(std::move(ns)), min(min), max(max) {}
 
     std::string ns;
 

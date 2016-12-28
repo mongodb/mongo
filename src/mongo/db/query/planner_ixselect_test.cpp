@@ -93,7 +93,7 @@ void testGetFields(const char* query, const char* prefix, const char* expectedFi
     // First, check that results contain a superset of expected fields.
     vector<string> expectedFields = StringSplitter::split(expectedFieldsStr, ",");
     for (vector<string>::const_iterator i = expectedFields.begin(); i != expectedFields.end();
-         i++) {
+         ++i) {
         if (fields.find(*i) == fields.end()) {
             mongoutils::str::stream ss;
             ss << "getFields(query=" << query << ", prefix=" << prefix << "): unable to find " << *i
@@ -235,7 +235,7 @@ void testRateIndices(const char* query,
     // Next, check that value and order of each element match between the two lists.
     for (vector<string>::const_iterator i = paths.begin(), j = expectedPaths.begin();
          i != paths.end();
-         i++, j++) {
+         ++i, ++j) {
         if (*i == *j) {
             continue;
         }

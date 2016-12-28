@@ -150,7 +150,7 @@ void MongoFile::closeAllFiles(stringstream& message) {
 
     ProgressMeter pm(mmfiles.size(), 2, 1, "files", "File Closing Progress");
     set<MongoFile*> temp = mmfiles;
-    for (set<MongoFile*>::iterator i = temp.begin(); i != temp.end(); i++) {
+    for (set<MongoFile*>::iterator i = temp.begin(); i != temp.end(); ++i) {
         (*i)->close();  // close() now removes from mmfiles
         pm.hit();
     }
@@ -163,7 +163,7 @@ void MongoFile::closeAllFiles(stringstream& message) {
 
     LockMongoFilesShared lk;
 
-    for (set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++)
+    for (set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); ++i)
         total += (*i)->length();
 
     return total;
@@ -177,7 +177,7 @@ void MongoFile::closeAllFiles(stringstream& message) {
     if (!sync) {
         int num = 0;
         LockMongoFilesShared lk;
-        for (set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++) {
+        for (set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); ++i) {
             num++;
             MongoFile* mmf = *i;
             if (!mmf)
@@ -197,7 +197,7 @@ void MongoFile::closeAllFiles(stringstream& message) {
     vector<Flushable*>& thingsToFlush = thingsToFlushWrapper.mutableVector();
     {
         LockMongoFilesShared lk;
-        for (set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++) {
+        for (set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); ++i) {
             MongoFile* mmf = *i;
             if (!mmf)
                 continue;

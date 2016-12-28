@@ -248,7 +248,7 @@ Status PlanCacheListQueryShapes::list(const PlanCache& planCache, BSONObjBuilder
     vector<PlanCacheEntry*> solutions = planCache.getAllEntries();
 
     BSONArrayBuilder arrayBuilder(bob->subarrayStart("shapes"));
-    for (vector<PlanCacheEntry*>::const_iterator i = solutions.begin(); i != solutions.end(); i++) {
+    for (vector<PlanCacheEntry*>::const_iterator i = solutions.begin(); i != solutions.end(); ++i) {
         PlanCacheEntry* entry = *i;
         invariant(entry);
 

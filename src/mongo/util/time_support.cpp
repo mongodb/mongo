@@ -277,7 +277,7 @@ StringData getNextToken(StringData currentString,
 bool isOnlyDigits(StringData toCheck) {
     StringData digits("0123456789");
     for (StringData::const_iterator iterator = toCheck.begin(); iterator != toCheck.end();
-         iterator++) {
+         ++iterator) {
         if (digits.find(*iterator) == std::string::npos) {
             return false;
         }

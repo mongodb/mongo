@@ -677,7 +677,7 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
 
     for (vector<QuerySolution*>::const_iterator it = solutions.begin();
          bounds.size() == 0 && it != solutions.end();
-         it++) {
+         ++it) {
         // Try next solution if we failed to generate index bounds, i.e. bounds.size() == 0
         bounds = collapseQuerySolution((*it)->root.get());
     }
@@ -716,7 +716,7 @@ IndexBounds ChunkManager::collapseQuerySolution(const QuerySolutionNode* node) {
     IndexBounds bounds;
     for (vector<QuerySolutionNode*>::const_iterator it = node->children.begin();
          it != node->children.end();
-         it++) {
+         ++it) {
         // The first branch under OR
         if (it == node->children.begin()) {
             invariant(bounds.size() == 0);

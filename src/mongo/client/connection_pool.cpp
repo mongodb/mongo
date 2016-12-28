@@ -110,7 +110,7 @@ void ConnectionPool::closeAllInUseConnections() {
 void ConnectionPool::_cleanUpStaleHosts_inlock(Date_t now) {
     if (now > _lastCleanUpTime + kCleanUpInterval) {
         for (HostLastUsedMap::iterator itr = _lastUsedHosts.begin(); itr != _lastUsedHosts.end();
-             itr++) {
+             ++itr) {
             if (itr->second <= _lastCleanUpTime) {
                 ConnectionList connList = _connections.find(itr->first)->second;
                 _cleanUpOlderThan_inlock(now, &connList);

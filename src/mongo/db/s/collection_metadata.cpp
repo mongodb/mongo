@@ -158,7 +158,7 @@ bool CollectionMetadata::keyBelongsToMe(const BSONObj& key) const {
 
     RangeMap::const_iterator it = _rangesMap.upper_bound(key);
     if (it != _rangesMap.begin())
-        it--;
+        --it;
 
     return rangeContains(it->first, it->second.getMaxKey(), key);
 }
@@ -175,7 +175,7 @@ bool CollectionMetadata::keyIsPending(const BSONObj& key) const {
 
     RangeMap::const_iterator it = _pendingMap.upper_bound(key);
     if (it != _pendingMap.begin())
-        it--;
+        --it;
 
     bool isPending = rangeContains(it->first, it->second.getMaxKey(), key);
     return isPending;

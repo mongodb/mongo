@@ -1555,7 +1555,7 @@ public:
         double objectsLoaded = 0;
         for (list<shared_ptr<Future::CommandResult>>::iterator i = futures.begin();
              i != futures.end();
-             i++) {
+             ++i) {
             shared_ptr<Future::CommandResult> res = *i;
             if (!res->join(txn)) {
                 errmsg = res->result()["errmsg"].String();

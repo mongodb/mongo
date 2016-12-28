@@ -93,7 +93,7 @@ MONGO_STATIC_ASSERT(sizeof(RecordStoreV1Base::bucketSizes) /
                     RecordStoreV1Base::Buckets);
 
 SavedCursorRegistry::~SavedCursorRegistry() {
-    for (SavedCursorSet::iterator it = _cursors.begin(); it != _cursors.end(); it++) {
+    for (SavedCursorSet::iterator it = _cursors.begin(); it != _cursors.end(); ++it) {
         (*it)->_registry = NULL;  // prevent SavedCursor destructor from accessing this
     }
 }
@@ -125,7 +125,7 @@ void SavedCursorRegistry::invalidateCursorsForBucket(DiskLoc bucket) {
             (*it)->_registry = NULL;  // prevent ~SavedCursor from trying to unregister
             _cursors.erase(it++);
         } else {
-            it++;
+            ++it;
         }
     }
 }

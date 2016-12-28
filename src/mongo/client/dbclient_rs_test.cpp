@@ -98,7 +98,7 @@ private:
 
 void assertOneOfNodesSelected(MockReplicaSet* replSet,
                               ReadPreference rp,
-                              const std::vector<std::string> hostNames) {
+                              const std::vector<std::string>& hostNames) {
     DBClientReplicaSet replConn(replSet->getSetName(), replSet->getHosts(), StringData());
     ReplicaSetMonitor::get(replSet->getSetName())->startOrContinueRefresh().refreshAll();
     bool secondaryOk = (rp != ReadPreference::PrimaryOnly);

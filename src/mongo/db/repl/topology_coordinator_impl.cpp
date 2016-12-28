@@ -2167,7 +2167,7 @@ int TopologyCoordinatorImpl::_getTotalPings() {
     int totalPings = 0;
     while (it != end) {
         totalPings += it->second.getCount();
-        it++;
+        ++it;
     }
     return totalPings;
 }

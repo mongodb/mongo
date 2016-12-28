@@ -108,7 +108,7 @@ void appendReplicationInfo(OperationContext* txn, BSONObjBuilder& result, int le
             invariant(PlanExecutor::IS_EOF == state);
         }
 
-        for (list<BSONObj>::const_iterator i = src.begin(); i != src.end(); i++) {
+        for (list<BSONObj>::const_iterator i = src.begin(); i != src.end(); ++i) {
             BSONObj s = *i;
             BSONObjBuilder bb;
             bb.append(s["host"]);

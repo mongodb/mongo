@@ -103,7 +103,7 @@ public:
                 _millis / 1000.0);
         ss << result;
 
-        for (std::vector<std::string>::iterator i = _messages.begin(); i != _messages.end(); i++) {
+        for (std::vector<std::string>::iterator i = _messages.begin(); i != _messages.end(); ++i) {
             ss << "\t" << *i << '\n';
         }
 
@@ -270,7 +270,7 @@ Result* Suite::run(const std::string& filter, int runsPerTest) {
     Result::cur = r;
 
     for (std::vector<std::shared_ptr<TestHolder>>::iterator i = _tests.begin(); i != _tests.end();
-         i++) {
+         ++i) {
         std::shared_ptr<TestHolder>& tc = *i;
         if (filter.size() && tc->getName().find(filter) == std::string::npos) {
             LOG(1) << "\t skipping test: " << tc->getName() << " because doesn't match filter"
@@ -341,7 +341,7 @@ int Suite::run(const std::vector<std::string>& suites, const std::string& filter
 
     std::vector<Result*> results;
 
-    for (std::vector<std::string>::iterator i = torun.begin(); i != torun.end(); i++) {
+    for (std::vector<std::string>::iterator i = torun.begin(); i != torun.end(); ++i) {
         std::string name = *i;
         std::shared_ptr<Suite>& s = _allSuites()[name];
         fassert(16145, s != NULL);
@@ -362,7 +362,7 @@ int Suite::run(const std::vector<std::string>& suites, const std::string& filter
     std::vector<std::string> failedSuites;
 
     Result::cur = NULL;
-    for (std::vector<Result*>::iterator i = results.begin(); i != results.end(); i++) {
+    for (std::vector<Result*>::iterator i = results.begin(); i != results.end(); ++i) {
         Result* r = *i;
         log() << r->toString();
         if (abs(r->rc()) > abs(rc))
@@ -373,7 +373,7 @@ int Suite::run(const std::vector<std::string>& suites, const std::string& filter
             failedSuites.push_back(r->toString());
             for (std::vector<std::string>::const_iterator j = r->_fails.begin();
                  j != r->_fails.end();
-                 j++) {
+                 ++j) {
                 const std::string& s = (*j);
                 totals._fails.push_back(r->_name + "/" + s);
             }
@@ -395,7 +395,7 @@ int Suite::run(const std::vector<std::string>& suites, const std::string& filter
         log() << "Failing tests:" << std::endl;
         for (std::vector<std::string>::const_iterator i = totals._fails.begin();
              i != totals._fails.end();
-             i++) {
+             ++i) {
             const std::string& s = (*i);
             log() << "\t " << s << " Failed";
         }

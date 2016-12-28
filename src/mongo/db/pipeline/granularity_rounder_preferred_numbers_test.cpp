@@ -52,7 +52,7 @@ const vector<string> preferredNumberSeries{
  * we check to see if the values are approximately equal with tolerance 'delta'.
  */
 void testEquals(Value actual, Value expected, double delta = DELTA) {
-    if (actual.getType() == BSONType::NumberDouble || actual.getType() == BSONType::NumberDouble) {
+    if (actual.getType() == BSONType::NumberDouble || expected.getType() == BSONType::NumberDouble) {
         ASSERT_APPROX_EQUAL(actual.coerceToDouble(), expected.coerceToDouble(), delta);
     } else {
         ASSERT_VALUE_EQ(actual, expected);

@@ -510,7 +510,7 @@ Status validateServerOptions(const moe::Environment& params) {
         // Skip this for backwards compatibility.  See SERVER-11471.
         if (verbosity != "true") {
             for (std::string::iterator iterator = verbosity.begin(); iterator != verbosity.end();
-                 iterator++) {
+                 ++iterator) {
                 if (*iterator != 'v') {
                     return Status(ErrorCodes::BadValue,
                                   "The \"verbose\" option string cannot contain any characters "
@@ -1033,7 +1033,7 @@ Status storeServerOptions(const moe::Environment& params) {
             params["setParameter"].as<std::map<std::string, std::string>>();
         for (std::map<std::string, std::string>::iterator parametersIt = parameters.begin();
              parametersIt != parameters.end();
-             parametersIt++) {
+             ++parametersIt) {
             ServerParameter* parameter =
                 mapFindWithDefault(ServerParameterSet::getGlobal()->getMap(),
                                    parametersIt->first,

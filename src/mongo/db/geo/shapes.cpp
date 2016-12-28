@@ -727,7 +727,7 @@ bool polygonIntersectsWithBox(const Polygon& polygon, const Box& box) {
     // 2. Box contains polygon.
     // Check the relaxed condition that whether the box include any vertex of the polygon.
     for (vector<Point>::const_iterator it = polygon.points().begin(); it != polygon.points().end();
-         it++) {
+         ++it) {
         if (box.inside(*it))
             return true;
     }

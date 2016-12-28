@@ -180,7 +180,7 @@ void MergeSortStage::doInvalidate(OperationContext* txn,
     // Go through our data and see if we're holding on to the invalidated RecordId.
     for (list<StageWithValue>::iterator valueIt = _mergingData.begin();
          valueIt != _mergingData.end();
-         valueIt++) {
+         ++valueIt) {
         WorkingSetMember* member = _ws->get(valueIt->id);
         if (member->hasRecordId() && (dl == member->recordId)) {
             // Fetch the about-to-be mutated result.

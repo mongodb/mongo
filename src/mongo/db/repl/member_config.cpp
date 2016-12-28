@@ -272,7 +272,7 @@ Status MemberConfig::validate() const {
 
 bool MemberConfig::hasTags(const ReplicaSetTagConfig& tagConfig) const {
     for (std::vector<ReplicaSetTag>::const_iterator tag = _tags.begin(); tag != _tags.end();
-         tag++) {
+         ++tag) {
         std::string tagKey = tagConfig.getTagKey(*tag);
         if (tagKey[0] == '$') {
             // Filter out internal tags
@@ -294,7 +294,7 @@ BSONObj MemberConfig::toBSON(const ReplicaSetTagConfig& tagConfig) const {
 
     BSONObjBuilder tags(configBuilder.subobjStart("tags"));
     for (std::vector<ReplicaSetTag>::const_iterator tag = _tags.begin(); tag != _tags.end();
-         tag++) {
+         ++tag) {
         std::string tagKey = tagConfig.getTagKey(*tag);
         if (tagKey[0] == '$') {
             // Filter out internal tags

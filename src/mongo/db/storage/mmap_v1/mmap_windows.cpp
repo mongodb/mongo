@@ -157,7 +157,7 @@ void MemoryMappedFile::close() {
     {
         stdx::lock_guard<stdx::mutex> lk(mapViewMutex);
 
-        for (vector<void*>::iterator i = views.begin(); i != views.end(); i++) {
+        for (vector<void*>::iterator i = views.begin(); i != views.end(); ++i) {
             UnmapViewOfFile(*i);
         }
     }
@@ -184,8 +184,8 @@ void* MemoryMappedFile::map(const char* filenameIn, unsigned long long& length) 
     strncpy(filename, filenameIn, 255);
     filename[255] = 0;
     {
-        size_t len = strlen(filename);
-        for (size_t i = len - 1; i >= 0; i--) {
+        int len = strlen(filename);
+        for (int i = len - 1; i >= 0; i--) {
             if (filename[i] == '/' || filename[i] == '\\')
                 break;
 

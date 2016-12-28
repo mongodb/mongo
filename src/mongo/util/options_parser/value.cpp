@@ -196,7 +196,7 @@ std::string Value::toString() const {
                 // Convert all but the last element to avoid a trailing ","
                 for (StringVector_t::const_iterator iterator = _stringVectorVal.begin();
                      iterator != _stringVectorVal.end() - 1;
-                     iterator++) {
+                     ++iterator) {
                     sb << *iterator << ",";
                 }
 

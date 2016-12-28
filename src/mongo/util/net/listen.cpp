@@ -662,14 +662,14 @@ void ListeningSockets::closeAll() {
         _socketPaths = new std::set<std::string>();
     }
 
-    for (std::set<int>::iterator i = sockets->begin(); i != sockets->end(); i++) {
+    for (std::set<int>::iterator i = sockets->begin(); i != sockets->end(); ++i) {
         int sock = *i;
         log() << "closing listening socket: " << sock;
         closesocket(sock);
     }
     delete sockets;
 
-    for (std::set<std::string>::iterator i = paths->begin(); i != paths->end(); i++) {
+    for (std::set<std::string>::iterator i = paths->begin(); i != paths->end(); ++i) {
         std::string path = *i;
         log() << "removing socket file: " << path;
         ::remove(path.c_str());

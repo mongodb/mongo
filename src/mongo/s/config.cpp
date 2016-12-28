@@ -433,7 +433,7 @@ void DBConfig::getAllShardIds(set<ShardId>* shardIds) {
 void DBConfig::getAllShardedCollections(set<string>& namespaces) {
     stdx::lock_guard<stdx::mutex> lk(_lock);
 
-    for (CollectionInfoMap::const_iterator i = _collections.begin(); i != _collections.end(); i++) {
+    for (CollectionInfoMap::const_iterator i = _collections.begin(); i != _collections.end(); ++i) {
         log() << "Coll : " << i->first << " sharded? " << i->second.isSharded();
         if (i->second.isSharded())
             namespaces.insert(i->first);

@@ -217,7 +217,7 @@ StatusWith<OpTimeWithHash> parseOpTimeWithHash(const QueryResponseStatus& fetchR
 
 // Data Replicator
 DataReplicator::DataReplicator(
-    DataReplicatorOptions opts,
+    const DataReplicatorOptions& opts,
     std::unique_ptr<DataReplicatorExternalState> dataReplicatorExternalState,
     StorageInterface* storage,
     const OnCompletionFn& onCompletion)

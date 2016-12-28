@@ -1155,7 +1155,7 @@ bool operator==(const MemberConfig& a, const MemberConfig& b) {
 bool operator==(const ReplicaSetConfig& a, const ReplicaSetConfig& b) {
     // compare WriteConcernModes
     std::vector<std::string> modeNames = a.getWriteConcernNames();
-    for (std::vector<std::string>::iterator it = modeNames.begin(); it != modeNames.end(); it++) {
+    for (std::vector<std::string>::iterator it = modeNames.begin(); it != modeNames.end(); ++it) {
         ReplicaSetTagPattern patternA = a.findCustomWriteMode(*it).getValue();
         ReplicaSetTagPattern patternB = b.findCustomWriteMode(*it).getValue();
         for (ReplicaSetTagPattern::ConstraintIterator itrA = patternA.constraintsBegin();

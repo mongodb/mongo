@@ -60,7 +60,7 @@ void FieldRef::parse(StringData path) {
     const std::string::iterator end = _dotted.end();
     while (true) {
         if (cur != end && *cur != '.') {
-            cur++;
+            ++cur;
             continue;
         }
 

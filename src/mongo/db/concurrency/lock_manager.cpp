@@ -232,7 +232,6 @@ struct LockHead {
 
     // Methods to maintain the granted queue
     void incGrantedModeCount(LockMode mode) {
-        invariant(grantedCounts[mode] >= 0);
         if (++grantedCounts[mode] == 1) {
             invariant((grantedModes & modeMask(mode)) == 0);
             grantedModes |= modeMask(mode);
@@ -249,7 +248,6 @@ struct LockHead {
 
     // Methods to maintain the conflict queue
     void incConflictModeCount(LockMode mode) {
-        invariant(conflictCounts[mode] >= 0);
         if (++conflictCounts[mode] == 1) {
             invariant((conflictModes & modeMask(mode)) == 0);
             conflictModes |= modeMask(mode);
@@ -682,7 +680,7 @@ void LockManager::_cleanupUnusedLocksInBucket(LockBucket* bucket) {
             deletedLockHeads++;
             delete lock;
         } else {
-            it++;
+            ++it;
         }
     }
 }
@@ -884,7 +882,7 @@ void LockManager::getLockInfoBSON(const std::map<LockerId, BSONObj>& lockToClien
 
 void LockManager::_dumpBucket(const LockBucket* bucket) const {
     for (LockBucket::Map::const_iterator it = bucket->data.begin(); it != bucket->data.end();
-         it++) {
+         ++it) {
         const LockHead* lock = it->second;
 
         if (lock->grantedList.empty()) {
@@ -994,13 +992,13 @@ bool DeadlockDetector::hasCycle() const {
 std::string DeadlockDetector::toString() const {
     StringBuilder sb;
 
-    for (WaitForGraph::const_iterator it = _graph.begin(); it != _graph.end(); it++) {
+    for (WaitForGraph::const_iterator it = _graph.begin(); it != _graph.end(); ++it) {
         sb << "Locker " << it->first << " waits for resource " << it->second.resId.toString()
            << " held by [";
 
         const ConflictingOwnersList owners = it->second.owners;
         for (ConflictingOwnersList::const_iterator itW = owners.begin(); itW != owners.end();
-             itW++) {
+             ++itW) {
             sb << *itW << ", ";
         }
 

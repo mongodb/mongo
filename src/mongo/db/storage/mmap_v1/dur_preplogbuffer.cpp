@@ -149,7 +149,7 @@ static void prepBasicWrites(AlignedBuilder& bb, const std::vector<WriteIntent>& 
     invariant(!intents.empty());
 
     WriteIntent last;
-    for (std::vector<WriteIntent>::const_iterator i = intents.begin(); i != intents.end(); i++) {
+    for (std::vector<WriteIntent>::const_iterator i = intents.begin(); i != intents.end(); ++i) {
         if (i->start() < last.end()) {
             // overlaps
             last.absorb(*i);
@@ -185,7 +185,7 @@ static void _PREPLOGBUFFER(JSectHeader& h,
     // Ops other than basic writes (DurOp's) go first
     const std::vector<std::shared_ptr<DurOp>>& durOps = commitJob.ops();
     for (std::vector<std::shared_ptr<DurOp>>::const_iterator i = durOps.begin(); i != durOps.end();
-         i++) {
+         ++i) {
         (*i)->serialize(bb);
     }
 
