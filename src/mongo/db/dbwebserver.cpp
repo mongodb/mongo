@@ -223,7 +223,7 @@ public:
 
                 if (cmd == "serverStatus" && params["repl"].type()) {
                     int repl_value = 0;
-                    if (parseNumberFromString<int>(params["repl"].valuestr(), &repl_value) == Status::OK()) {
+                    if (parseNumberFromString<int>(params["repl"].valuestr(), &repl_value).isOK()) {
                         b.append("repl", repl_value);
                     }
                 }

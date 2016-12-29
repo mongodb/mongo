@@ -156,7 +156,7 @@ long long parseLL(const char* n) {
     uassert(13307, "cannot convert empty string to long long", *n != 0);
 #if !defined(_WIN32)
     const Status parse_res = parseNumberFromString<long long>(n, &ret);
-    uassert(13305, "could not convert string to long long", parse_res == Status::OK());
+    uassert(13305, parse_res.toString(), parse_res.isOK());
 #else
     size_t endLen = 0;
     try {

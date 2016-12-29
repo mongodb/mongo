@@ -87,7 +87,7 @@ int HttpClient::_go(const char* command, string url, const char* body, Result* r
     if (idx != string::npos) {
         server = host.substr(0, idx);
         const string t = host.substr(idx + 1);
-        parseNumberFromString<int>(t.c_str(), &port);
+        uassertStatusOK(parseNumberFromString<int>(t, &port));
     }
 
     HD("server [" << server << "]");

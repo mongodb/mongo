@@ -166,7 +166,7 @@ public:
             const char* val = e.valuestr();
 
             double number = 0;
-            if (parseNumberFromString<double>(val, &number) == Status::OK()) {
+            if (parseNumberFromString<double>(val, &number).isOK()) {
                 queryBuilder.append(field, number);
             } else {
                 queryBuilder.append(field, val);
