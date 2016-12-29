@@ -6776,23 +6776,25 @@ buildvariants:
   - name: push
 
 
-# TODO (SERVER-27434) re-enable this after Ubuntu 16.04 images come with clang 3.7
-# - name: enterprise-ubuntu1604-clang-3.7-libcpp
-#   display_name: "! Enterprise Ubuntu 16.04 (Clang 3.7/libc++)"
-#   modules:
-#   - enterprise
-#   run_on:
-#   - ubuntu1604-test
-#   expansions:
-#     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
-#     tooltags: "-tags 'ssl sasl'"
-#     compile_flags: --ssl CC=/usr/bin/clang-3.7 CXX=/usr/bin/clang++-3.7 --libc++ -j$(grep -c ^processor /proc/cpuinfo)
-#     use_scons_cache: true
-#     build_mongoreplay: true
-#   tasks:
-#   - name: compile_all
-#     distros:
-#     - ubuntu1404-build
+- name: enterprise-ubuntu1604-clang-3.7-libcxx
+  display_name: "! Enterprise Ubuntu 16.04 (Clang 3.7/libc++)"
+  modules:
+  - enterprise
+  run_on:
+   - ubuntu1604-test
+  expansions:
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    tooltags: "-tags 'ssl sasl'"
+    compile_flags: --ssl CC=/usr/bin/clang-3.7 CXX=/usr/bin/clang++-3.7 --libc++ -j$(grep -c ^processor /proc/cpuinfo) CPPPATH=/usr/include/libcxxabi/
+    use_scons_cache: true
+    build_mongoreplay: true
+  tasks:
+  - name: compile
+    distros:
+    - ubuntu1604-build
+  - name: compile_all
+    distros:
+    - ubuntu1604-build
 
 ###########################################
 #          SUSE buildvariants             #
