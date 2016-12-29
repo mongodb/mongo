@@ -13,7 +13,7 @@
  */
 (function() {
     load("jstests/libs/write_concern_util.js");  // for stopReplicationOnSecondaries,
-                                                 // restartReplSetReplication
+                                                 // restartReplicationOnSecondaries
 
     "use strict";
 
@@ -48,7 +48,7 @@
     }, primary.port);
 
     jsTestLog("Resuming replication.");
-    restartReplSetReplication(replTest);
+    restartReplicationOnSecondaries(replTest);
 
     jsTestLog("Verifying primary shut down and cannot be connected to.");
     // Successfully starting shutdown throws a network error.
