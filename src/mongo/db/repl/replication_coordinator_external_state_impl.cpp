@@ -258,13 +258,11 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
     auto oldSSF = std::move(_syncSourceFeedbackThread);
     auto oldBgSync = std::move(_bgSync);
     auto oldApplier = std::move(_applierThread);
-    if (oldSSF) {
-        log() << "Stopping replication reporter thread";
-        _syncSourceFeedback.shutdown();
-    }
     lock->unlock();
 
     if (oldSSF) {
+        log() << "Stopping replication reporter thread";
+        _syncSourceFeedback.shutdown();
         oldSSF->join();
     }
 
