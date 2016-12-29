@@ -390,8 +390,8 @@ template <class whichmutex, class scoped>
 class Slack : public ThreadedTest<17> {
 public:
     Slack() {
-        k = 0;
-        done = false;
+        k.store(0);
+        done.store(false);
         a = b = 0;
         locks = 0;
     }
@@ -403,7 +403,7 @@ private:
     char pad2[128];
     unsigned locks;
     char pad3[128];
-    volatile int k;
+    AtomicInt32 k;
 
     virtual void validate() {
         if (once++ == 0) {
@@ -417,15 +417,15 @@ private:
         while (1) {
             b++;
             //__sync_synchronize();
-            if (k) {
+            if (k.load()) {
                 a++;
             }
             sleepmillis(0);
-            if (done)
+            if (done.load())
                 break;
         }
     }
-    volatile bool done;
+    AtomicBool done;
     virtual void subthread(int x) {
         if (x == 1) {
             watch();
@@ -435,19 +435,19 @@ private:
         unsigned lks = 0;
         while (1) {
             scoped lk(m);
-            k = 1;
+            k.store(1);
             // not very long, we'd like to simulate about 100K locks per second
             sleepalittle();
             lks++;
-            if (done || t.millis() > 1500) {
+            if (done.load() || t.millis() > 1500) {
                 locks += lks;
-                k = 0;
+                k.store(0);
                 break;
             }
-            k = 0;
+            k.store(0);
             //__sync_synchronize();
         }
-        done = true;
+        done.store(true);
     }
 };
 

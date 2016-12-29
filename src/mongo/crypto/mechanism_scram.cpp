@@ -209,7 +209,9 @@ std::string generateClientProof(const unsigned char saltedPassword[hashSize],
  * TODO: evaluate if LTO inlines or changes the code flow of this function.
  */
 NOINLINE_DECL
-bool memequal(volatile const unsigned char* s1, volatile const unsigned char* s2, size_t length) {
+bool memequal(volatile const unsigned char* s1,  // NOLINT - using volatile to
+              volatile const unsigned char* s2,  // NOLINT - disable compiler optimizations
+              size_t length) {
     unsigned char ret = 0;
 
     for (size_t i = 0; i < length; ++i) {

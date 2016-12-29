@@ -1668,6 +1668,13 @@ def CheckForMongoAtomic(filename, clean_lines, linenum, error):
           'Illegal use of prohibited std::atomic<T>, use AtomicWord<T> or other types '
           'from "mongo/platform/atomic_word.h"')
 
+def CheckForMongoVolatile(filename, clean_lines, linenum, error):
+  line = clean_lines.elided[linenum]
+  if re.search('[^_]volatile', line) and not "__asm__" in line:
+    error(filename, linenum, 'mongodb/volatile', 5,
+          'Illegal use of the volatile storage keyword, use AtomicWord instead '
+          'from "mongo/platform/atomic_word.h"')
+
 def CheckForCopyright(filename, lines, error):
   """Logs an error if no Copyright message appears at the top of the file."""
 
@@ -5811,6 +5818,7 @@ def ProcessLine(filename, file_extension, clean_lines, line,
                                error)
   CheckForMongoPolyfill(filename, clean_lines, line, error)
   CheckForMongoAtomic(filename, clean_lines, line, error)
+  CheckForMongoVolatile(filename, clean_lines, line, error)
   if nesting_state.InAsmBlock(): return
   CheckForFunctionLengths(filename, clean_lines, line, function_state, error)
   CheckForMultilineCommentsAndStrings(filename, clean_lines, line, error)

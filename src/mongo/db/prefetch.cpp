@@ -126,7 +126,8 @@ void prefetchRecordPages(OperationContext* txn, Database* db, const char* ns, co
         try {
             if (Helpers::findById(txn, db, ns, builder.done(), result)) {
                 // do we want to use Record::touch() here?  it's pretty similar.
-                volatile char _dummy_char = '\0';
+                // volatile - avoid compiler optimizations for touching a mmap page
+                volatile char _dummy_char = '\0';  // NOLINT
 
                 // Touch the first word on every page in order to fault it into memory
                 for (int i = 0; i < result.objsize(); i += g_minOSPageSizeBytes) {

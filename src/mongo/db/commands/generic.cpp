@@ -310,7 +310,7 @@ public:
 namespace {
 MONGO_FP_DECLARE(crashOnShutdown);
 
-int* volatile illegalAddress;
+int* volatile illegalAddress;  // NOLINT - used for fail point only
 }  // namespace
 
 void CmdShutdown::addRequiredPrivileges(const std::string& dbname,

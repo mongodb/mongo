@@ -132,15 +132,15 @@ public:
         // reloaded with new saved state on next pass.
         Timer t;
         while (1) {
-            if (syncing == 0 || t.millis() > 30000)
+            if (syncing.load() == 0 || t.millis() > 30000)
                 break;
             {
                 Lock::TempRelease t(txn->lockState());
-                relinquishSyncingSome = 1;
+                relinquishSyncingSome.store(1);
                 sleepmillis(1);
             }
         }
-        if (syncing) {
+        if (syncing.load()) {
             errmsg = "timeout waiting for sync() to finish";
             return false;
         }

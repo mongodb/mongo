@@ -28,8 +28,8 @@
 
 #pragma once
 
-
 #include "mongo/db/repl/oplogreader.h"
+#include "mongo/platform/atomic_word.h"
 
 /* replication data overview
 
@@ -53,8 +53,8 @@ namespace repl {
 void startMasterSlave(OperationContext* txn);
 
 // externed for use with resync.cpp
-extern volatile int relinquishSyncingSome;
-extern volatile int syncing;
+extern AtomicInt32 relinquishSyncingSome;
+extern AtomicInt32 syncing;
 
 extern const char* replInfo;
 

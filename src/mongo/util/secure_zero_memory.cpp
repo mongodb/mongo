@@ -53,7 +53,8 @@ void secureZeroMemory(void* mem, size_t size) {
     fassert(28752, memset_s(mem, size, 0, size) == 0);
 #else
     // fall back to using volatile pointer
-    volatile char* p = reinterpret_cast<volatile char*>(mem);
+    // using volatile to disable compiler optimizations
+    volatile char* p = reinterpret_cast<volatile char*>(mem);  // NOLINT
     while (size--) {
         *p++ = 0;
     }

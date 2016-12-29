@@ -69,6 +69,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -98,8 +99,8 @@ void pretouchOperation(OperationContext* txn, const BSONObj& op);
 void pretouchN(vector<BSONObj>&, unsigned a, unsigned b);
 
 /* if 1 sync() is running */
-volatile int syncing = 0;
-volatile int relinquishSyncingSome = 0;
+AtomicInt32 syncing(0);
+AtomicInt32 relinquishSyncingSome(0);
 
 /* output by the web console */
 const char* replInfo = "";
@@ -1257,8 +1258,7 @@ static void replMain(OperationContext* txn) {
             }
 
             // i.e., there is only one sync thread running. we will want to change/fix this.
-            verify(syncing == 0);
-            syncing++;
+            invariant(syncing.swap(1) == 0);
         }
 
         try {
@@ -1281,12 +1281,11 @@ static void replMain(OperationContext* txn) {
         {
             ScopedTransaction transaction(txn, MODE_X);
             Lock::GlobalWrite lk(txn->lockState());
-            verify(syncing == 1);
-            syncing--;
+            invariant(syncing.swap(0) == 1);
         }
 
-        if (relinquishSyncingSome) {
-            relinquishSyncingSome = 0;
+        if (relinquishSyncingSome.load()) {
+            relinquishSyncingSome.store(0);
             s = restartSyncAfterSleep;  // sleep before going back in to syncing=1
         }
 

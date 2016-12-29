@@ -501,7 +501,7 @@ double distanceCompare(const Point& p1, const Point& p2, double radius) {
         // inline will make certain geo tests fail.  Of course this check will force volatile
         // for all 32-bit systems, not just affected systems.
         if (sizeof(void*) <= 4) {
-            volatile double sum = p2.y > p1.y ? p1.y + radius : p2.y + radius;
+            volatile double sum = p2.y > p1.y ? p1.y + radius : p2.y + radius;  // NOLINT
             return p2.y > p1.y ? p2.y - sum : p1.y - sum;
         } else {
             // Original math, correct for most systems
@@ -511,7 +511,7 @@ double distanceCompare(const Point& p1, const Point& p2, double radius) {
 
     if (b == 0) {
         if (sizeof(void*) <= 4) {
-            volatile double sum = p2.x > p1.x ? p1.x + radius : p2.x + radius;
+            volatile double sum = p2.x > p1.x ? p1.x + radius : p2.x + radius;  // NOLINT
             return p2.x > p1.x ? p2.x - sum : p1.x - sum;
         } else {
             return p2.x > p1.x ? p2.x - (p1.x + radius) : p1.x - (p2.x + radius);
