@@ -49,6 +49,12 @@ function restartReplSetReplication(rs) {
     rs.nodes.forEach(restartServerReplication);
 }
 
+// Restarts replication at all replicaset secondaries.
+function restartReplicationOnSecondaries(rs) {
+    var secondaries = rs.getSecondaries();
+    secondaries.forEach(restartServerReplication);
+}
+
 // Restarts replication at all nodes in a sharded cluster.
 function restartReplicationOnAllShards(st) {
     st._rsObjects.forEach(restartReplSetReplication);
