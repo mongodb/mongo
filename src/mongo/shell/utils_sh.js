@@ -80,7 +80,7 @@ sh.help = function() {
     print(
         "\tsh.stopBalancer()                         stops the balancer so chunks are not balanced automatically");
     print("\tsh.disableAutoSplit()                   disable autoSplit on one collection");
-    print("\tsh.enableAutoSplit()                    re-eable autoSplit on one colleciton");
+    print("\tsh.enableAutoSplit()                    re-enable autoSplit on one collection");
     print("\tsh.getShouldAutoSplit()                 returns whether autosplit is enabled");
 };
 
