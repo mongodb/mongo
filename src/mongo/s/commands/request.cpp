@@ -112,8 +112,4 @@ void Request::process(OperationContext* txn) {
            << " op: " << op;
 }
 
-const transport::SessionHandle& Request::session() const {
-    return _clientInfo->session();
-}
-
 }  // namespace mongo

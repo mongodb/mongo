@@ -37,7 +37,6 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/parallel.h"
 #include "mongo/db/audit.h"
@@ -45,12 +44,10 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/max_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/query_request.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -145,7 +142,7 @@ bool handleSpecialNamespaces(OperationContext* txn, Request& request, const Quer
         return false;
     }
 
-    replyToQuery(0, request.session(), request.m(), reply.done());
+    replyToQuery(0, txn->getClient()->session(), request.m(), reply.done());
     return true;
 }
 
@@ -216,7 +213,7 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
 
         BSONObj explainObj = explainBuilder.done();
         replyToQuery(0,  // query result flags
-                     request.session(),
+                     txn->getClient()->session(),
                      request.m(),
                      static_cast<const void*>(explainObj.objdata()),
                      explainObj.objsize(),
@@ -253,7 +250,7 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
         obj.appendSelfToBufBuilder(reply.bufBuilderForResults());
         numResults++;
     }
-    reply.send(request.session(),
+    reply.send(txn->getClient()->session(),
                0,  // query result flags
                request.m(),
                numResults,
@@ -323,7 +320,7 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
                 BSONObjBuilder builder(reply.bufBuilderForResults());
                 runAgainstRegistered(txn, q.ns, cmdObj, builder, q.queryOptions);
             }
-            reply.sendCommandReply(request.session(), request.m());
+            reply.sendCommandReply(txn->getClient()->session(), request.m());
             return;
         } catch (const StaleConfigException& e) {
             if (loops <= 0)
@@ -347,7 +344,7 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
                 BSONObjBuilder builder(reply.bufBuilderForResults());
                 Command::appendCommandStatus(builder, e.toStatus());
             }
-            reply.sendCommandReply(request.session(), request.m());
+            reply.sendCommandReply(txn->getClient()->session(), request.m());
             return;
         }
     }
@@ -393,9 +390,9 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
     // TODO: Handle stale config exceptions here from coll being dropped or sharded during op for
     // now has same semantics as legacy request.
     const NamespaceString nss(ns);
-    auto statusGetDb = grid.catalogCache()->getDatabase(txn, nss.db().toString());
+    auto statusGetDb = Grid::get(txn)->catalogCache()->getDatabase(txn, nss.db().toString());
     if (statusGetDb == ErrorCodes::NamespaceNotFound) {
-        replyToQuery(ResultFlag_CursorNotFound, request.session(), request.m(), 0, 0, 0);
+        replyToQuery(ResultFlag_CursorNotFound, txn->getClient()->session(), request.m(), 0, 0, 0);
         return;
     }
 
@@ -410,7 +407,7 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
 
     auto cursorResponse = ClusterFind::runGetMore(txn, getMoreRequest);
     if (cursorResponse == ErrorCodes::CursorNotFound) {
-        replyToQuery(ResultFlag_CursorNotFound, request.session(), request.m(), 0, 0, 0);
+        replyToQuery(ResultFlag_CursorNotFound, txn->getClient()->session(), request.m(), 0, 0, 0);
         return;
     }
     uassertStatusOK(cursorResponse.getStatus());
@@ -425,7 +422,7 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
     }
 
     replyToQuery(0,
-                 request.session(),
+                 txn->getClient()->session(),
                  request.m(),
                  buffer.buf(),
                  buffer.len(),
@@ -450,7 +447,7 @@ void Strategy::killCursors(OperationContext* txn, Request& request) {
     ConstDataCursor cursors(dbMessage.getArray(numCursors));
     Client* client = txn->getClient();
     AuthorizationSession* authSession = AuthorizationSession::get(client);
-    ClusterCursorManager* manager = grid.getCursorManager();
+    ClusterCursorManager* manager = Grid::get(txn)->getCursorManager();
 
     for (int i = 0; i < numCursors; ++i) {
         CursorId cursorId = cursors.readAndAdvance<LittleEndian<int64_t>>();
@@ -483,20 +480,20 @@ void Strategy::killCursors(OperationContext* txn, Request& request) {
 }
 
 void Strategy::writeOp(OperationContext* txn, int op, Request& request) {
-    // make sure we have a last error
-    dassert(&LastError::get(cc()));
-
     OwnedPointerVector<BatchedCommandRequest> commandRequestsOwned;
     vector<BatchedCommandRequest*>& commandRequests = commandRequestsOwned.mutableVector();
 
     msgToBatchRequests(request.m(), &commandRequests);
 
+    auto& clientLastError = LastError::get(txn->getClient());
+
     for (vector<BatchedCommandRequest*>::iterator it = commandRequests.begin();
          it != commandRequests.end();
          ++it) {
         // Multiple commands registered to last error as multiple requests
-        if (it != commandRequests.begin())
-            LastError::get(cc()).startRequest();
+        if (it != commandRequests.begin()) {
+            clientLastError.startRequest();
+        }
 
         BatchedCommandRequest* commandRequest = *it;
 
@@ -511,7 +508,7 @@ void Strategy::writeOp(OperationContext* txn, int op, Request& request) {
 
         {
             // Disable the last error object for the duration of the write cmd
-            LastError::Disabled disableLastError(&LastError::get(cc()));
+            LastError::Disabled disableLastError(&clientLastError);
             runAgainstRegistered(txn, cmdNS.c_str(), requestBSON, builder, 0);
         }
 
@@ -521,9 +518,9 @@ void Strategy::writeOp(OperationContext* txn, int op, Request& request) {
         dassert(parsed && commandResponse.isValid(NULL));
 
         // Populate the lastError object based on the write response
-        LastError::get(cc()).reset();
-        bool hadError =
-            batchErrorToLastError(*commandRequest, commandResponse, &LastError::get(cc()));
+        clientLastError.reset();
+        const bool hadError =
+            batchErrorToLastError(*commandRequest, commandResponse, &clientLastError);
 
         // Check if this is an ordered batch and we had an error which should stop processing
         if (commandRequest->getOrdered() && hadError)

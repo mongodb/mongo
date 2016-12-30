@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/dbmessage.h"
-#include "mongo/transport/session.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
@@ -67,8 +66,6 @@ public:
     DbMessage& d() {
         return _d;
     }
-
-    const transport::SessionHandle& session() const;
 
     void process(OperationContext* txn);
 
