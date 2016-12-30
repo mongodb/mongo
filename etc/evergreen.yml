@@ -163,6 +163,7 @@ variables:
   - enterprise-debian71-64
   - enterprise-debian81-64
   - linux-64
+  - linux-64-debug
   - amazon
   - rhel62
   - rhel70
