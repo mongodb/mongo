@@ -56,12 +56,6 @@ public:
         return _m.operation();
     }
 
-    bool expectResponse() const {
-        return op() == dbQuery || op() == dbGetMore;
-    }
-
-    bool isCommand() const;
-
     int32_t id() const {
         return _id;
     }
@@ -69,13 +63,14 @@ public:
     Message& m() {
         return _m;
     }
+
     DbMessage& d() {
         return _d;
     }
 
     const transport::SessionHandle& session() const;
 
-    void process(OperationContext* txn, int attempt = 0);
+    void process(OperationContext* txn);
 
     void init(OperationContext* txn);
 
