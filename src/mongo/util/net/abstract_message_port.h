@@ -33,6 +33,7 @@
 #include "mongo/config.h"
 #include "mongo/logger/log_severity.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/ssl_types.h"

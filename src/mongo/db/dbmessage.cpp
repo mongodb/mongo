@@ -211,7 +211,7 @@ void OpQueryReplyBuilder::putInMessage(
 
 void replyToQuery(int queryResultFlags,
                   const transport::SessionHandle& session,
-                  Message& requestMsg,
+                  const Message& requestMsg,
                   const void* data,
                   int size,
                   int nReturned,
@@ -224,7 +224,7 @@ void replyToQuery(int queryResultFlags,
 
 void replyToQuery(int queryResultFlags,
                   const transport::SessionHandle& session,
-                  Message& requestMsg,
+                  const Message& requestMsg,
                   const BSONObj& responseObj) {
     replyToQuery(queryResultFlags,
                  session,
@@ -234,7 +234,7 @@ void replyToQuery(int queryResultFlags,
                  1);
 }
 
-void replyToQuery(int queryResultFlags, Message& m, DbResponse& dbresponse, BSONObj obj) {
+void replyToQuery(int queryResultFlags, const Message& m, DbResponse& dbresponse, BSONObj obj) {
     Message resp;
     replyToQuery(queryResultFlags, resp, obj);
     dbresponse.response = std::move(resp);

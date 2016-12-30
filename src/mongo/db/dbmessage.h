@@ -378,7 +378,7 @@ private:
 
 void replyToQuery(int queryResultFlags,
                   const transport::SessionHandle& session,
-                  Message& requestMsg,
+                  const Message& requestMsg,
                   const void* data,
                   int size,
                   int nReturned,
@@ -388,11 +388,11 @@ void replyToQuery(int queryResultFlags,
 /* object reply helper. */
 void replyToQuery(int queryResultFlags,
                   const transport::SessionHandle& session,
-                  Message& requestMsg,
+                  const Message& requestMsg,
                   const BSONObj& responseObj);
 
 /* helper to do a reply using a DbResponse object */
-void replyToQuery(int queryResultFlags, Message& m, DbResponse& dbresponse, BSONObj obj);
+void replyToQuery(int queryResultFlags, const Message& m, DbResponse& dbresponse, BSONObj obj);
 
 /**
  * Helper method for setting up a response object.
