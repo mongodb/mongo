@@ -31,8 +31,8 @@
 
 #include "mongo/util/net/httpclient.h"
 
-#include "mongo/bson/util/builder.h"
 #include "mongo/base/parse_number.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/config.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/message.h"

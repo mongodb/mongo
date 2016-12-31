@@ -42,6 +42,7 @@
 #endif
 
 #include "mongo/platform/basic.h"
+
 #include "mongo/base/parse_number.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/mongoutils/str.h"
