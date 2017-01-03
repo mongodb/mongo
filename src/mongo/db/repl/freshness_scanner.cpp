@@ -44,14 +44,14 @@ namespace mongo {
 namespace repl {
 
 using executor::RemoteCommandRequest;
-
+// what this do?
 FreshnessScanner::Algorithm::Algorithm(const ReplicaSetConfig& rsConfig,
                                        int myIndex,
                                        Milliseconds timeout)
     : _rsConfig(rsConfig), _myIndex(myIndex), _timeout(timeout) {
     for (int index = 0; index < _rsConfig.getNumMembers(); index++) {
         if (index != _myIndex) {
-            _targets.push_back(_rsConfig.getMemberAt(index).getHostAndPort());
+            _targets.push_back(_rsConfig.getMemberAt(index).getInternalHostAndPort());
         }
     }
     _totalRequests = _targets.size();
@@ -64,7 +64,7 @@ std::vector<RemoteCommandRequest> FreshnessScanner::Algorithm::getRequests() con
 
     std::vector<RemoteCommandRequest> requests;
     for (auto& target : _targets) {
-        requests.push_back(RemoteCommandRequest(target, "admin", getStatusCmd, nullptr, _timeout));
+        requests.push_back(RemoteCommandRequest(target, "admin", getStatusCmd, _timeout));
     }
     return requests;
 }
@@ -74,28 +74,23 @@ void FreshnessScanner::Algorithm::processResponse(const RemoteCommandRequest& re
     _responsesProcessed++;
     if (!response.isOK()) {  // failed response
         LOG(2) << "FreshnessScanner: Got failed response from " << request.target << ": "
-               << response.status;
+               << response.getStatus();
     } else {
-        BSONObj opTimesObj = response.data.getObjectField("optimes");
+        BSONObj opTimesObj = response.getValue().data.getObjectField("optimes");
         OpTime lastOpTime;
         Status status = bsonExtractOpTimeField(opTimesObj, "appliedOpTime", &lastOpTime);
         if (!status.isOK()) {
-            LOG(2) << "FreshnessScanner: failed to parse opTime in " << opTimesObj << " from "
-                   << request.target << causedBy(status);
             return;
         }
 
         int index = _rsConfig.findMemberIndexByHostAndPort(request.target);
         FreshnessInfo freshnessInfo{index, lastOpTime};
 
-        auto cmp = [](const FreshnessInfo& a, const FreshnessInfo& b) {
-            return a.opTime > b.opTime;
-        };
+        auto cmp =
+            [](const FreshnessInfo& a, const FreshnessInfo& b) { return a.opTime > b.opTime; };
         auto iter =
             std::upper_bound(_freshnessInfos.begin(), _freshnessInfos.end(), freshnessInfo, cmp);
         _freshnessInfos.insert(iter, freshnessInfo);
-        LOG(2) << "FreshnessScanner: processed response " << opTimesObj << " from "
-               << request.target;
     }
 }
 

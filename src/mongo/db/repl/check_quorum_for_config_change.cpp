@@ -59,7 +59,7 @@ QuorumChecker::QuorumChecker(const ReplicaSetConfig* rsConfig, int myIndex)
     const MemberConfig& myConfig = _rsConfig->getMemberAt(_myIndex);
 
     if (myConfig.isVoter()) {
-        _voters.push_back(myConfig.getHostAndPort());
+        _voters.push_back(myConfig.getInternalHostAndPort());
     }
     if (myConfig.isElectable()) {
         _numElectable = 1;
@@ -86,7 +86,7 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
     hbArgs.setProtocolVersion(1);
     hbArgs.setConfigVersion(_rsConfig->getConfigVersion());
     hbArgs.setCheckEmpty(isInitialConfig);
-    hbArgs.setSenderHost(myConfig.getHostAndPort());
+    hbArgs.setSenderHost(myConfig.getInternalHostAndPort());
     hbArgs.setSenderId(myConfig.getId());
     const BSONObj hbRequest = hbArgs.toBSON();
 
@@ -99,11 +99,10 @@ std::vector<RemoteCommandRequest> QuorumChecker::getRequests() const {
             // No need to check self for liveness or unreadiness.
             continue;
         }
-        requests.push_back(RemoteCommandRequest(_rsConfig->getMemberAt(i).getHostAndPort(),
+        requests.push_back(RemoteCommandRequest(_rsConfig->getMemberAt(i).getInternalHostAndPort(),
                                                 "admin",
                                                 hbRequest,
                                                 BSON(rpc::kReplSetMetadataFieldName << 1),
-                                                nullptr,
                                                 _rsConfig->getHeartbeatTimeoutPeriodMillis()));
     }
 
@@ -181,12 +180,12 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
     ++_numResponses;
     if (!response.isOK()) {
         warning() << "Failed to complete heartbeat request to " << request.target << "; "
-                  << response.status;
-        _badResponses.push_back(std::make_pair(request.target, response.status));
+                  << response.getStatus();
+        _badResponses.push_back(std::make_pair(request.target, response.getStatus()));
         return;
     }
 
-    BSONObj resBSON = response.data;
+    BSONObj resBSON = response.getValue().data;
     ReplSetHeartbeatResponse hbResp;
     Status hbStatus = hbResp.initialize(resBSON, 0);
 
@@ -219,7 +218,7 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
 
     if (_rsConfig->hasReplicaSetId()) {
         StatusWith<rpc::ReplSetMetadata> replMetadata =
-            rpc::ReplSetMetadata::readFromMetadata(response.metadata);
+            rpc::ReplSetMetadata::readFromMetadata(response.getValue().metadata);
         if (replMetadata.isOK() && replMetadata.getValue().getReplicaSetId().isSet() &&
             _rsConfig->getReplicaSetId() != replMetadata.getValue().getReplicaSetId()) {
             std::string message = str::stream()
@@ -242,7 +241,7 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
 
     for (int i = 0; i < _rsConfig->getNumMembers(); ++i) {
         const MemberConfig& memberConfig = _rsConfig->getMemberAt(i);
-        if (memberConfig.getHostAndPort() != request.target) {
+        if (memberConfig.getInternalHostAndPort() != request.target) {
             continue;
         }
         if (memberConfig.isElectable()) {

@@ -86,19 +86,19 @@ ReplSetHeartbeatResponse ReplCoordHBV1Test::receiveHeartbeatFrom(const ReplicaSe
 TEST_F(ReplCoordHBV1Test,
        NodeJoinsExistingReplSetWhenReceivingAConfigContainingTheNodeViaHeartbeat) {
     logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
-    ReplicaSetConfig rsConfig = assertMakeRSConfig(BSON("_id"
-                                                        << "mySet"
-                                                        << "version"
-                                                        << 3
-                                                        << "members"
-                                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                                 << "h1:1")
-                                                                      << BSON("_id" << 2 << "host"
-                                                                                    << "h2:1")
-                                                                      << BSON("_id" << 3 << "host"
-                                                                                    << "h3:1"))
-                                                        << "protocolVersion"
-                                                        << 1));
+    ReplicaSetConfig rsConfig =
+        assertMakeRSConfig(BSON("_id"
+                                << "mySet"
+                                << "version" << 3 << "members"
+                                << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                         << "h1:1"
+                                                         << "hostinternal"
+                                                         << "h1internal:1")
+                                              << BSON("_id" << 2 << "host"
+                                                            << "h2:1")
+                                              << BSON("_id" << 3 << "host"
+                                                            << "h3:1"))
+                                << "protocolVersion" << 1));
     init("mySet");
     addSelf(HostAndPort("h2", 1));
     const Date_t startDate = getNet()->now();
@@ -108,7 +108,7 @@ TEST_F(ReplCoordHBV1Test,
     NetworkInterfaceMock* net = getNet();
     ASSERT_FALSE(net->hasReadyRequests());
     exitNetwork();
-    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
+    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1internal", 1));
 
     enterNetwork();
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();

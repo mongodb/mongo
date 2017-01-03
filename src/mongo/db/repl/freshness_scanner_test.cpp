@@ -58,29 +58,25 @@ public:
     }
 
     virtual void setUp() {
-        ASSERT_OK(_config.initialize(BSON("_id"
-                                          << "rs0"
-                                          << "version"
-                                          << 1
-                                          << "members"
-                                          << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                   << "host0")
-                                                        << BSON("_id" << 1 << "host"
-                                                                      << "host1")
-                                                        << BSON("_id" << 2 << "host"
-                                                                      << "host2")
-                                                        << BSON("_id" << 3 << "host"
-                                                                      << "host3"
-                                                                      << "votes"
-                                                                      << 0
-                                                                      << "priority"
-                                                                      << 0)
-                                                        << BSON("_id" << 4 << "host"
-                                                                      << "host4"
-                                                                      << "votes"
-                                                                      << 0
-                                                                      << "priority"
-                                                                      << 0)))));
+        ASSERT_OK(
+            _config.initialize(BSON("_id"
+                                    << "rs0"
+                                    << "version" << 1 << "members"
+                                    << BSON_ARRAY(
+                                           BSON("_id" << 0 << "host"
+                                                      << "host0" )
+                                           << BSON("_id" << 1 << "host"
+                                                         << "host1"
+                                                         << "hostinternal"
+                                                         << "hostinternal1")
+                                           << BSON("_id" << 2 << "host"
+                                                         << "host2")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "host3"
+                                                         << "votes" << 0 << "priority" << 0)
+                                           << BSON("_id" << 4 << "host"
+                                                         << "host4"
+                                                         << "votes" << 0 << "priority" << 0)))));
         ASSERT_OK(_config.validate());
 
         _net = new NetworkInterfaceMock;
@@ -132,7 +128,7 @@ TEST_F(FreshnessScannerTest, ImmediateGoodResponse) {
     FreshnessScanner::Algorithm algo(_config, 0, Milliseconds(2000));
 
     ASSERT_FALSE(algo.hasReceivedSufficientResponses());
-    algo.processResponse(requestFrom("host1"), goodResponseStatus(Timestamp(1, 100), 1));
+    algo.processResponse(requestFrom("hostinternal1"), goodResponseStatus(Timestamp(1, 100), 1));
     ASSERT_FALSE(algo.hasReceivedSufficientResponses());
     algo.processResponse(requestFrom("host2"), goodResponseStatus(Timestamp(1, 200), 1));
     ASSERT_FALSE(algo.hasReceivedSufficientResponses());
@@ -152,7 +148,7 @@ TEST_F(FreshnessScannerTest, ImmediateBadResponse) {
 
     // Cannot access host 1 and host 2.
     ASSERT_FALSE(algo.hasReceivedSufficientResponses());
-    algo.processResponse(requestFrom("host1"), badResponseStatus());
+    algo.processResponse(requestFrom("hostinternal1"), badResponseStatus());
     ASSERT_FALSE(algo.hasReceivedSufficientResponses());
     algo.processResponse(requestFrom("host2"), badResponseStatus());
     ASSERT_FALSE(algo.hasReceivedSufficientResponses());
