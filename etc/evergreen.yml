@@ -5711,6 +5711,7 @@ buildvariants:
   - name: compile
     requires:
     - name: burn_in_tests
+    - name: lint
     distros:
     - rhel62-large
   - name: compile_all
