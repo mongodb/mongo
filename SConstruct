@@ -126,6 +126,11 @@ def make_variant_dir_generator():
         return memoized_variant_dir[0]
     return generate_variant_dir
 
+
+# Always randomize the build order to shake out missing edges, and to help the cache:
+# http://scons.org/doc/production/HTML/scons-user/ch24s06.html
+SetOption('random', 1)
+
 # Options TODOs:
 #
 # - We should either alphabetize the entire list of options, or split them into logical groups
