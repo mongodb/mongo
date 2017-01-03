@@ -3261,7 +3261,7 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
         _topCoord->processReplSetRequestVotes(args, response, _getMyLastAppliedOpTime_inlock());
     }
 
-    if (response->getVoteGranted()) {
+    if (!args.isADryRun() && response->getVoteGranted()) {
         LastVote lastVote;
         lastVote.setTerm(args.getTerm());
         lastVote.setCandidateIndex(args.getCandidateIndex());
