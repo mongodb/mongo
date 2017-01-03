@@ -3204,7 +3204,7 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
         return cbh.getStatus();
     }
     _replExecutor.wait(cbh.getValue());
-    if (response->getVoteGranted()) {
+    if (!args.isADryRun() && response->getVoteGranted()) {
         LastVote lastVote;
         lastVote.setTerm(args.getTerm());
         lastVote.setCandidateIndex(args.getCandidateIndex());
