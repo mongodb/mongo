@@ -278,7 +278,6 @@ public:
         BSONObjBuilder b;
         b.appendUndefined("a");
         ASSERT_EQUALS("{ \"a\" : { \"$undefined\" : true } }", b.done().jsonString(Strict));
-        ASSERT_EQUALS("{ \"a\" : undefined }", b.done().jsonString(JS));
         ASSERT_EQUALS("{ \"a\" : undefined }", b.done().jsonString(TenGen));
     }
 };
@@ -336,9 +335,6 @@ public:
         ASSERT_EQUALS(
             "{ \"a\" : { \"$ref\" : \"namespace\", \"$id\" : \"ffffffffffffffffffffffff\" } }",
             built.jsonString(Strict));
-        ASSERT_EQUALS(
-            "{ \"a\" : { \"$ref\" : \"namespace\", \"$id\" : \"ffffffffffffffffffffffff\" } }",
-            built.jsonString(JS));
         ASSERT_EQUALS("{ \"a\" : Dbref( \"namespace\", \"ffffffffffffffffffffffff\" ) }",
                       built.jsonString(TenGen));
     }
@@ -464,7 +460,6 @@ public:
         ASSERT_EQUALS("{ \"a\" : { \"$date\" : \"1969-12-31T19:00:00.000-0500\" } }",
                       built.jsonString(Strict));
         ASSERT_EQUALS("{ \"a\" : Date( 0 ) }", built.jsonString(TenGen));
-        ASSERT_EQUALS("{ \"a\" : Date( 0 ) }", built.jsonString(JS));
 
         // Test dates above our maximum formattable date.  See SERVER-13760.
         BSONObjBuilder b2;
@@ -487,7 +482,6 @@ public:
         ASSERT_EQUALS("{ \"a\" : { \"$date\" : { \"$numberLong\" : \"-1\" } } }",
                       built.jsonString(Strict));
         ASSERT_EQUALS("{ \"a\" : Date( -1 ) }", built.jsonString(TenGen));
-        ASSERT_EQUALS("{ \"a\" : Date( -1 ) }", built.jsonString(JS));
     }
 };
 
@@ -500,7 +494,6 @@ public:
         ASSERT_EQUALS("{ \"a\" : { \"$regex\" : \"abc\", \"$options\" : \"i\" } }",
                       built.jsonString(Strict));
         ASSERT_EQUALS("{ \"a\" : /abc/i }", built.jsonString(TenGen));
-        ASSERT_EQUALS("{ \"a\" : /abc/i }", built.jsonString(JS));
     }
 };
 
@@ -513,7 +506,6 @@ public:
         ASSERT_EQUALS("{ \"a\" : { \"$regex\" : \"/\\\"\", \"$options\" : \"i\" } }",
                       built.jsonString(Strict));
         ASSERT_EQUALS("{ \"a\" : /\\/\\\"/i }", built.jsonString(TenGen));
-        ASSERT_EQUALS("{ \"a\" : /\\/\\\"/i }", built.jsonString(JS));
     }
 };
 
@@ -526,7 +518,6 @@ public:
         ASSERT_EQUALS("{ \"a\" : { \"$regex\" : \"z\", \"$options\" : \"abcgimx\" } }",
                       built.jsonString(Strict));
         ASSERT_EQUALS("{ \"a\" : /z/gim }", built.jsonString(TenGen));
-        ASSERT_EQUALS("{ \"a\" : /z/gim }", built.jsonString(JS));
     }
 };
 
@@ -566,8 +557,6 @@ public:
         BSONObj o = b.obj();
         ASSERT_EQUALS("{ \"x\" : { \"$timestamp\" : { \"t\" : 4, \"i\" : 10 } } }",
                       o.jsonString(Strict));
-        ASSERT_EQUALS("{ \"x\" : { \"$timestamp\" : { \"t\" : 4, \"i\" : 10 } } }",
-                      o.jsonString(JS));
         ASSERT_EQUALS("{ \"x\" : Timestamp( 4, 10 ) }", o.jsonString(TenGen));
     }
 };
@@ -630,7 +619,6 @@ public:
         assertEquals(bson(), fromjson(tojson(bson())), "mode: <default>");
         assertEquals(bson(), fromjson(tojson(bson(), Strict)), "mode: strict");
         assertEquals(bson(), fromjson(tojson(bson(), TenGen)), "mode: tengen");
-        assertEquals(bson(), fromjson(tojson(bson(), JS)), "mode: js");
     }
 
 protected:

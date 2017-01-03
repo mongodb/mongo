@@ -73,7 +73,7 @@ bool isArray(StringData str);
  * Convert a BSONArray to a JSON string.
  *
  * @param arr The BSON Array.
- * @param format The JSON format (JS, TenGen, Strict).
+ * @param format The JSON format (TenGen, Strict).
  * @param pretty Enables pretty output.
  */
 std::string tojson(const BSONArray& arr, JsonStringFormat format = Strict, bool pretty = false);

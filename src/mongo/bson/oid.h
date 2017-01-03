@@ -235,8 +235,6 @@ enum JsonStringFormat {
     /** 10gen format, which is close to JS format.  This form is understandable by
         javascript running inside the Mongo server via eval() */
     TenGen,
-    /** Javascript JSON compatible */
-    JS
 };
 
 inline bool operator==(const OID& lhs, const OID& rhs) {

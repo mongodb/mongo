@@ -70,7 +70,7 @@ string BSONElement::jsonString(JsonStringFormat format, bool includeFieldNames, 
             }
             break;
         case NumberInt:
-            if (format == JS) {
+            if (format == TenGen) {
                 s << "NumberInt(" << _numberInt() << ")";
                 break;
             }
