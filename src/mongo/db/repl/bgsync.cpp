@@ -317,7 +317,7 @@ void BackgroundSync::_produce(OperationContext* txn) {
         _replCoord->signalUpstreamUpdater();
     }
 
-    const Milliseconds oplogSocketTimeout(OplogReader::kSocketTimeout);
+    const Milliseconds kRollbackOplogSocketTimeout(10 * 60 * 1000);
 
     const auto isV1ElectionProtocol = _replCoord->isV1ElectionProtocol();
     // Under protocol version 1, make the awaitData timeout (maxTimeMS) dependent on the election
@@ -409,10 +409,10 @@ void BackgroundSync::_produce(OperationContext* txn) {
         ConnectionPool connectionPool(messagingPortTags);
         std::unique_ptr<ConnectionPool::ConnectionPtr> connection;
         auto getConnection =
-            [&connection, &connectionPool, oplogSocketTimeout, source]() -> DBClientBase* {
+            [&connection, &connectionPool, kRollbackOplogSocketTimeout, source]() -> DBClientBase* {
                 if (!connection.get()) {
                     connection.reset(new ConnectionPool::ConnectionPtr(
-                        &connectionPool, source, Date_t::now(), oplogSocketTimeout));
+                        &connectionPool, source, Date_t::now(), kRollbackOplogSocketTimeout));
                 };
                 return connection->get();
             };
