@@ -104,7 +104,7 @@ public:
      * Gets the canonical internal replication name for this member.
      This will be used for all internal replication traffic.
      */
-    const HostAndPort& getHostInternalAndPort() const {
+    const HostAndPort& getInternalHostAndPort() const {
         return _hostInternal;
     }
 

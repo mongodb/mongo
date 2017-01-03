@@ -271,12 +271,12 @@ ReplicaSetConfig _getConfigWithMemberRemoved(const ReplicaSetConfig& oldConfig,
     for (ReplicaSetConfig::MemberIterator member = oldConfig.membersBegin();
          member != oldConfig.membersEnd();
          ++member) {
-        if (member->getHostInternalAndPort() == toRemove) {
+        if (member->getInternalHostAndPort() == toRemove) {
             continue;
         }
 
         membersBuilder.append(
-            BSON("_id" << member->getId() << "host" << member->getHostInternalAndPort().toString()));
+            BSON("_id" << member->getId() << "host" << member->getInternalHostAndPort().toString()));
     }
 
     membersBuilder.done();

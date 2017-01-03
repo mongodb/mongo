@@ -66,7 +66,7 @@ std::vector<RemoteCommandRequest> ElectCmdRunner::Algorithm::getRequests() const
     BSONObjBuilder electCmdBuilder;
     electCmdBuilder.append("replSetElect", 1);
     electCmdBuilder.append("set", _rsConfig.getReplSetName());
-    electCmdBuilder.append("who", selfConfig.getHostInternalAndPort().toString());
+    electCmdBuilder.append("who", selfConfig.getInternalHostAndPort().toString());
     electCmdBuilder.append("whoid", selfConfig.getId());
     electCmdBuilder.appendIntOrLL("cfgver", _rsConfig.getConfigVersion());
     electCmdBuilder.append("round", _round);
@@ -75,12 +75,11 @@ std::vector<RemoteCommandRequest> ElectCmdRunner::Algorithm::getRequests() const
     // Schedule a RemoteCommandRequest for each non-DOWN node
     for (std::vector<HostAndPort>::const_iterator it = _targets.begin(); it != _targets.end();
          ++it) {
-        invariant(*it != selfConfig.getHostInternalAndPort());
+        invariant(*it != selfConfig.getInternalHostAndPort());
         requests.push_back(RemoteCommandRequest(
             *it,
             "admin",
             replSetElectCmd,
-            nullptr,
             Milliseconds(30 * 1000)));  // trying to match current Socket timeout
     }
 
@@ -108,7 +107,7 @@ void ElectCmdRunner::Algorithm::processResponse(const RemoteCommandRequest& requ
     ++_actualResponses;
 
     if (response.isOK()) {
-        BSONObj res = response.data;
+        BSONObj res = response.getValue().data;
         log() << "received " << res["vote"] << " votes from " << request.target;
         LOG(1) << "full elect res: " << res.toString();
         BSONElement vote(res["vote"]);
@@ -121,7 +120,7 @@ void ElectCmdRunner::Algorithm::processResponse(const RemoteCommandRequest& requ
 
         _receivedVotes += vote._numberInt();
     } else {
-        warning() << "elect command to " << request.target << " failed: " << response.status;
+        warning() << "elect command to " << request.target << " failed: " << response.getStatus();
     }
 }
 

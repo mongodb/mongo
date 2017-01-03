@@ -28,20 +28,21 @@
 
 #include "mongo/platform/basic.h"
 
-#include <set>
-#include <vector>
-
 #include "mongo/client/connpool.h"
-#include "mongo/client/dbclient_rs.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/client/dbclient_rs.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_internal.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/unittest/unittest.h"
 
-namespace mongo {
+#include <set>
+#include <vector>
+
 namespace {
+
+using namespace mongo;
 
 using std::map;
 using std::vector;
@@ -92,13 +93,13 @@ TEST_F(ReplicaSetMonitorTest, SeedWithPriOnlySecDown) {
     const string replSetName(replSet->getSetName());
     set<HostAndPort> seedList;
     seedList.insert(HostAndPort(replSet->getPrimary()));
-    auto monitor = ReplicaSetMonitor::createIfNeeded(replSetName, seedList);
+    ReplicaSetMonitor::createIfNeeded(replSetName, seedList);
 
     replSet->kill(replSet->getPrimary());
 
+    ReplicaSetMonitorPtr monitor = ReplicaSetMonitor::get(replSet->getSetName());
     // Trigger calls to Node::getConnWithRefresh
     monitor->startOrContinueRefresh().refreshAll();
-    monitor.reset();
 }
 
 namespace {
@@ -117,12 +118,12 @@ repl::ReplicaSetConfig _getConfigWithMemberRemoved(const repl::ReplicaSetConfig&
     for (repl::ReplicaSetConfig::MemberIterator member = oldConfig.membersBegin();
          member != oldConfig.membersEnd();
          ++member) {
-        if (member->getHostInternalAndPort() == toRemove) {
+        if (member->getInternalHostAndPort() == toRemove) {
             continue;
         }
 
         membersBuilder.append(
-            BSON("_id" << member->getId() << "host" << member->getHostInternalAndPort().toString()));
+            BSON("_id" << member->getId() << "host" << member->getInternalHostAndPort().toString()));
     }
 
     membersBuilder.done();
@@ -146,9 +147,10 @@ TEST(ReplicaSetMonitorTest, PrimaryRemovedFromSetStress) {
     const string replSetName(replSet.getSetName());
     set<HostAndPort> seedList;
     seedList.insert(HostAndPort(replSet.getPrimary()));
-    auto replMonitor = ReplicaSetMonitor::createIfNeeded(replSetName, seedList);
+    ReplicaSetMonitor::createIfNeeded(replSetName, seedList);
 
     const repl::ReplicaSetConfig& origConfig = replSet.getReplConfig();
+    mongo::ReplicaSetMonitorPtr replMonitor = ReplicaSetMonitor::get(replSetName);
 
     for (size_t idxToRemove = 0; idxToRemove < NODE_COUNT; idxToRemove++) {
         replSet.setConfig(origConfig);
@@ -169,16 +171,14 @@ TEST(ReplicaSetMonitorTest, PrimaryRemovedFromSetStress) {
         replSet.setPrimary(hostToRemove);
         // Make sure the monitor sees the new primary
         replMonitor->startOrContinueRefresh().refreshAll();
-        // FIND_THIS
         repl::ReplicaSetConfig newConfig =
             _getConfigWithMemberRemoved(origConfig, HostAndPort(hostToRemove));
         replSet.setConfig(newConfig);
-        replSet.setPrimary(newConfig.getMemberAt(0).getHostInternalAndPort().toString());
+        replSet.setPrimary(newConfig.getMemberAt(0).getInternalHostAndPort().toString());
         // Force refresh -> should not crash
         replMonitor->startOrContinueRefresh().refreshAll();
     }
 
-    replMonitor.reset();
     ReplicaSetMonitor::cleanup();
     ConnectionString::setConnectionHook(originalConnHook);
     mongo::ScopedDbConnection::clearPool();
@@ -256,11 +256,12 @@ TEST_F(TwoNodeWithTags, SecDownRetryNoTag) {
 
     set<HostAndPort> seedList;
     seedList.insert(HostAndPort(replSet->getPrimary()));
-    auto monitor = ReplicaSetMonitor::createIfNeeded(replSet->getSetName(), seedList);
+    ReplicaSetMonitor::createIfNeeded(replSet->getSetName(), seedList);
 
     const string secHost(replSet->getSecondaries().front());
     replSet->kill(secHost);
 
+    ReplicaSetMonitorPtr monitor = ReplicaSetMonitor::get(replSet->getSetName());
     // Make sure monitor sees the dead secondary
     monitor->startOrContinueRefresh().refreshAll();
 
@@ -271,7 +272,6 @@ TEST_F(TwoNodeWithTags, SecDownRetryNoTag) {
 
     ASSERT_FALSE(monitor->isPrimary(node));
     ASSERT_EQUALS(secHost, node.toString());
-    monitor.reset();
 }
 
 // Tests the case where the connection to secondary went bad and the replica set
@@ -282,11 +282,12 @@ TEST_F(TwoNodeWithTags, SecDownRetryWithTag) {
 
     set<HostAndPort> seedList;
     seedList.insert(HostAndPort(replSet->getPrimary()));
-    auto monitor = ReplicaSetMonitor::createIfNeeded(replSet->getSetName(), seedList);
+    ReplicaSetMonitor::createIfNeeded(replSet->getSetName(), seedList);
 
     const string secHost(replSet->getSecondaries().front());
     replSet->kill(secHost);
 
+    ReplicaSetMonitorPtr monitor = ReplicaSetMonitor::get(replSet->getSetName());
     // Make sure monitor sees the dead secondary
     monitor->startOrContinueRefresh().refreshAll();
 
@@ -299,8 +300,6 @@ TEST_F(TwoNodeWithTags, SecDownRetryWithTag) {
 
     ASSERT_FALSE(monitor->isPrimary(node));
     ASSERT_EQUALS(secHost, node.toString());
-    monitor.reset();
 }
 
-}  // namespace
 }  // namespace mongo

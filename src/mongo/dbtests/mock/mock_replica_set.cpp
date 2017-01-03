@@ -132,8 +132,8 @@ vector<string> MockReplicaSet::getSecondaries() const {
     for (ReplicaSetConfig::MemberIterator member = _replConfig.membersBegin();
          member != _replConfig.membersEnd();
          ++member) {
-        if (member->getHostInternalAndPort() != HostAndPort(_primaryHost)) {
-            secondaries.push_back(member->getHostInternalAndPort().toString());
+        if (member->getInternalHostAndPort() != HostAndPort(_primaryHost)) {
+            secondaries.push_back(member->getInternalHostAndPort().toString());
         }
     }
 
@@ -304,9 +304,7 @@ void MockReplicaSet::mockReplSetGetStatusCmd() {
             hostsField.push_back(hostMemberBuilder.obj());
         }
 
-        std::sort(hostsField.begin(),
-                  hostsField.end(),
-                  SimpleBSONObjComparator::kInstance.makeLessThan());
+        sort(hostsField.begin(), hostsField.end());
 
         // TODO: syncingTo
 
