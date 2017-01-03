@@ -46,6 +46,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
+#include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -5147,6 +5148,115 @@ TEST_F(ReplCoordTest, PopulateUnsetWriteConcernOptionsSyncModeReturnsInputIfWMod
     wc.wMode = "like literally anythingelse";
     ASSERT(WriteConcernOptions::SyncMode::NONE ==
            getReplCoord()->populateUnsetWriteConcernOptionsSyncMode(wc).syncMode);
+}
+
+TEST_F(ReplCoordTest, NodeStoresElectionVotes) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 2
+                            << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id"
+                                               << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id"
+                                                  << 1)
+                                          << BSON("host"
+                                                  << "node3:12345"
+                                                  << "_id"
+                                                  << 2))),
+                       HostAndPort("node1", 12345));
+    auto time = OpTimeWithTermOne(100, 0);
+    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    getReplCoord()->setMyLastAppliedOpTime(time);
+    getReplCoord()->setMyLastDurableOpTime(time);
+    simulateSuccessfulV1Election();
+
+    auto txn = makeOperationContext();
+
+    ReplSetRequestVotesArgs args;
+    ASSERT_OK(args.initialize(BSON("replSetRequestVotes" << 1 << "setName"
+                                                         << "mySet"
+                                                         << "term"
+                                                         << 7LL
+                                                         << "candidateIndex"
+                                                         << 2LL
+                                                         << "configVersion"
+                                                         << 2LL
+                                                         << "dryRun"
+                                                         << false
+                                                         << "lastCommittedOp"
+                                                         << time.asOpTime().toBSON())));
+    ReplSetRequestVotesResponse response;
+
+    ASSERT_OK(getReplCoord()->processReplSetRequestVotes(txn.get(), args, &response));
+    ASSERT_EQUALS("", response.getReason());
+    ASSERT_TRUE(response.getVoteGranted());
+
+    auto lastVote = getExternalState()->loadLocalLastVoteDocument(txn.get());
+    ASSERT_OK(lastVote.getStatus());
+
+    // This is not a dry-run election so the last vote should include the new term and candidate.
+    ASSERT_EQUALS(lastVote.getValue().getTerm(), 7);
+    ASSERT_EQUALS(lastVote.getValue().getCandidateIndex(), 2);
+}
+
+TEST_F(ReplCoordTest, NodeDoesNotStoreDryRunVotes) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 2
+                            << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id"
+                                               << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id"
+                                                  << 1)
+                                          << BSON("host"
+                                                  << "node3:12345"
+                                                  << "_id"
+                                                  << 2))),
+                       HostAndPort("node1", 12345));
+    auto time = OpTimeWithTermOne(100, 0);
+    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    getReplCoord()->setMyLastAppliedOpTime(time);
+    getReplCoord()->setMyLastDurableOpTime(time);
+    simulateSuccessfulV1Election();
+
+    auto txn = makeOperationContext();
+
+    ReplSetRequestVotesArgs args;
+    ASSERT_OK(args.initialize(BSON("replSetRequestVotes" << 1 << "setName"
+                                                         << "mySet"
+                                                         << "term"
+                                                         << 7LL
+                                                         << "candidateIndex"
+                                                         << 2LL
+                                                         << "configVersion"
+                                                         << 2LL
+                                                         << "dryRun"
+                                                         << true
+                                                         << "lastCommittedOp"
+                                                         << time.asOpTime().toBSON())));
+    ReplSetRequestVotesResponse response;
+
+    ASSERT_OK(getReplCoord()->processReplSetRequestVotes(txn.get(), args, &response));
+    ASSERT_EQUALS("", response.getReason());
+    ASSERT_TRUE(response.getVoteGranted());
+
+    auto lastVote = getExternalState()->loadLocalLastVoteDocument(txn.get());
+    ASSERT_OK(lastVote.getStatus());
+
+    // This is a dry-run election so the last vote should not be updated with the new term and
+    // candidate.
+    ASSERT_EQUALS(lastVote.getValue().getTerm(), 1);
+    ASSERT_EQUALS(lastVote.getValue().getCandidateIndex(), 0);
 }
 
 // TODO(schwerin): Unit test election id updating
