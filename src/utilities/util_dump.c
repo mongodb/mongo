@@ -81,13 +81,13 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		return (usage());
 
 	if (json &&
-	    ((ret = dump_json_begin(session)) != 0 ||
-	    (ret = dump_prefix(session, hex, json)) != 0))
+	    (dump_json_begin(session) != 0 ||
+	    dump_prefix(session, hex, json) != 0))
 		goto err;
 
 	for (i = 0; i < argc; i++) {
 		if (json && i > 0)
-			if ((ret = dump_json_separator(session)) != 0)
+			if (dump_json_separator(session) != 0)
 				goto err;
 		free(name);
 		free(simplename);
@@ -120,7 +120,7 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		}
 
 		if ((simplename = strdup(name)) == NULL) {
-			ret = util_err(session, errno, NULL);
+			(void)util_err(session, errno, NULL);
 			goto err;
 		}
 		if ((p = strchr(simplename, '(')) != NULL)
@@ -128,19 +128,19 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		if (dump_config(session, simplename, cursor, hex, json) != 0)
 			goto err;
 
-		if ((ret = dump_record(cursor, reverse, json)) != 0)
+		if (dump_record(cursor, reverse, json) != 0)
 			goto err;
-		if (json && (ret = dump_json_table_end(session)) != 0)
+		if (json && dump_json_table_end(session) != 0)
 			goto err;
 
 		ret = cursor->close(cursor);
 		cursor = NULL;
 		if (ret != 0) {
-			ret = util_err(session, ret, NULL);
+			(void)util_err(session, ret, NULL);
 			goto err;
 		}
 	}
-	if (json && ((ret = dump_json_end(session)) != 0))
+	if (json && dump_json_end(session) != 0)
 		goto err;
 
 	if (0) {

@@ -40,7 +40,7 @@ of these blocks is defined by a parameter called allocation_size, which is the
 underlying unit of allocation for the file the data gets stored in.  An
 application might choose to have data compressed before it gets stored to disk
 by enabling block compression.
- - A database’s tables are usually much larger than the main memory available.
+ - A database's tables are usually much larger than the main memory available.
 Not all of the data can be kept in memory at any given time. A process called
 eviction takes care of making space for new data by freeing the memory of data
 infrequently accessed. An eviction server regularly finds in-memory pages that
@@ -52,7 +52,7 @@ associated key is used to refer to an in-memory page. In the case of this page
 not being in memory, appropriate on-disk page(s) are read and an in-memory page
 constructed (the opposite of reconciliation). A data structure is maintained on
 every in-memory page to store any insertions or modifications to the data done
-on that page. As more and more data gets written to this page, the page’s memory
+on that page. As more and more data gets written to this page, the page's memory
 footprint keeps growing.
  - An application can choose to set the maximum size a page is allowed to grow
 in-memory. A default size is set by WiredTiger if the application doesn't
@@ -81,7 +81,7 @@ There are additional configuration settings that tune more esoteric and
 specialized data. Those are included for completeness but are rarely changed.
 
 @subsection memory_page_max memory_page_max
-The maximum size a table’s page is allowed to grow to in memory before being
+The maximum size a table's page is allowed to grow to in memory before being
 reconciled to disk.
  - An integer, with acceptable values between 512B and 10TB
  - Default size: 5 MB
@@ -98,7 +98,7 @@ both require exclusive access to the page which makes an application's write
 operations wait. Having a large memory_page_max means that the pages will need
 to be split and reconciled less often. But when that happens, the duration that
 an exclusive access to the page is required is longer, increasing the latency of
-an application’s insert or update operations. Conversely, having a smaller
+an application's insert or update operations. Conversely, having a smaller
 memory_page_max reduces the time taken for splitting and reconciling the pages,
 but causes it to happen more frequently, forcing more frequent but shorter
 exclusive accesses to the pages.
