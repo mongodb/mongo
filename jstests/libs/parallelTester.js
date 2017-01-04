@@ -161,7 +161,6 @@ if (typeof _threadInject != "undefined") {
             "indexh.js",
             "evald.js",
             "evalf.js",
-            "killop.js",
             "run_program1.js",
             "notablescan.js",
             "dropdb_race.js",
