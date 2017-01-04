@@ -2,13 +2,11 @@ stepback: false
 command_type: system
 
 pre:
-    - command: shell.track
 
 post:
     - command: attach.results
       params:
         file_location: src/dsi/dsi/report.json
-    - command: shell.cleanup
     - command: shell.exec
       # destroy the cluster
       params:

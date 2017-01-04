@@ -857,7 +857,6 @@ functions:
 
 
 pre:
-  - command: shell.track
   - func: "kill processes"
   - func: "cleanup environment"
   - command: expansions.update

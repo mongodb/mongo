@@ -2,7 +2,6 @@ stepback: false
 command_type: system
 
 pre:
-    - command: shell.track
 
 post:
     - command: shell.exec
