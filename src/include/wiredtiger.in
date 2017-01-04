@@ -1985,9 +1985,9 @@ struct __wt_connection {
 	 * "evictserver"\, \c "fileops"\, \c "handleops"\, \c "log"\, \c "lsm"\,
 	 * \c "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c
 	 * "read"\, \c "rebalance"\, \c "reconcile"\, \c "recovery"\, \c
-	 * "salvage"\, \c "shared_cache"\, \c "split"\, \c "temporary"\, \c
-	 * "thread_group"\, \c "transaction"\, \c "verify"\, \c "version"\, \c
-	 * "write"; default empty.}
+	 * "recovery_progress"\, \c "salvage"\, \c "shared_cache"\, \c "split"\,
+	 * \c "temporary"\, \c "thread_group"\, \c "transaction"\, \c "verify"\,
+	 * \c "version"\, \c "write"; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -2516,9 +2516,9 @@ struct __wt_connection {
  * "checkpoint"\, \c "compact"\, \c "evict"\, \c "evictserver"\, \c "fileops"\,
  * \c "handleops"\, \c "log"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c
  * "mutex"\, \c "overflow"\, \c "read"\, \c "rebalance"\, \c "reconcile"\, \c
- * "recovery"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c "temporary"\,
- * \c "thread_group"\, \c "transaction"\, \c "verify"\, \c "version"\, \c
- * "write"; default empty.}
+ * "recovery"\, \c "recovery_progress"\, \c "salvage"\, \c "shared_cache"\, \c
+ * "split"\, \c "temporary"\, \c "thread_group"\, \c "transaction"\, \c
+ * "verify"\, \c "version"\, \c "write"; default empty.}
  * @config{write_through, Use \c FILE_FLAG_WRITE_THROUGH on Windows to write to
  * files.  Ignored on non-Windows systems.  Options are given as a list\, such
  * as <code>"write_through=[data]"</code>. Configuring \c write_through requires

@@ -501,7 +501,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session)
 	 * Pass WT_LOGSCAN_RECOVER so that old logs get truncated.
 	 */
 	r.metadata_only = false;
-	__wt_verbose(session, WT_VERB_RECOVERY,
+	__wt_verbose(session, WT_VERB_RECOVERY | WT_VERB_RECOVERY_PROGRESS,
 	    "Main recovery loop: starting at %" PRIu32 "/%" PRIu32,
 	    r.ckpt_lsn.l.file, r.ckpt_lsn.l.offset);
 	WT_ERR(__wt_log_needs_recovery(session, &r.ckpt_lsn, &needs_rec));

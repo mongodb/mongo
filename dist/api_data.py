@@ -537,6 +537,7 @@ connection_runtime_config = [
             'rebalance',
             'reconcile',
             'recovery',
+            'recovery_progress',
             'salvage',
             'shared_cache',
             'split',

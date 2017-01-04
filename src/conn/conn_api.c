@@ -1811,6 +1811,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "rebalance",		WT_VERB_REBALANCE },
 		{ "reconcile",		WT_VERB_RECONCILE },
 		{ "recovery",		WT_VERB_RECOVERY },
+		{ "recovery_progress",	WT_VERB_RECOVERY_PROGRESS },
 		{ "salvage",		WT_VERB_SALVAGE },
 		{ "shared_cache",	WT_VERB_SHARED_CACHE },
 		{ "split",		WT_VERB_SPLIT },
