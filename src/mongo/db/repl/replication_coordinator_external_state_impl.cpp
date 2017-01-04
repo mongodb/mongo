@@ -548,11 +548,11 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbWriteLock(txn->lockState(), lastVoteDatabaseName, MODE_X);
             Helpers::putSingleton(txn, lastVoteCollectionName, lastVoteObj);
-            return Status::OK();
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
             txn, "save replica set lastVote", lastVoteCollectionName);
-        MONGO_UNREACHABLE;
+        txn->recoveryUnit()->waitUntilDurable();
+        return Status::OK();
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
