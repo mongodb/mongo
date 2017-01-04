@@ -131,7 +131,7 @@ static CONFIG c[] = {
 
 	{ "delete_pct",
 	  "percent operations that are deletes",
-	  0x0, 0, 45, 90, &g.c_delete_pct, NULL },
+	  C_IGNORE, 0, 0, 100, &g.c_delete_pct, NULL },
 
 	{ "dictionary",
 	  "if values are dictionary compressed",		/* 20% */
@@ -171,7 +171,7 @@ static CONFIG c[] = {
 
 	{ "insert_pct",
 	  "percent operations that are inserts",
-	  0x0, 0, 45, 90, &g.c_insert_pct, NULL },
+	  C_IGNORE, 0, 0, 100, &g.c_insert_pct, NULL },
 
 	{ "internal_key_truncation",
 	  "if internal keys are truncated",			/* 95% */
@@ -254,6 +254,14 @@ static CONFIG c[] = {
 	  "quiet run (same as -q)",
 	  C_IGNORE|C_BOOL, 0, 0, 0, &g.c_quiet, NULL },
 
+	{ "read_pct",
+	  "percent operations that are reads",
+	  C_IGNORE, 0, 0, 100, &g.c_read_pct, NULL },
+
+	{ "rebalance",
+	  "rebalance testing",					/* 100% */
+	  C_BOOL, 100, 1, 0, &g.c_rebalance, NULL },
+
 	{ "repeat_data_pct",
 	  "percent duplicate values in row- or var-length column-stores",
 	  0x0, 0, 90, 90, &g.c_repeat_data_pct, NULL },
@@ -269,10 +277,6 @@ static CONFIG c[] = {
 	{ "runs",
 	  "the number of runs",
 	  C_IGNORE, 0, UINT_MAX, UINT_MAX, &g.c_runs, NULL },
-
-	{ "rebalance",
-	  "rebalance testing",					/* 100% */
-	  C_BOOL, 100, 1, 0, &g.c_rebalance, NULL },
 
 	{ "salvage",
 	  "salvage testing",					/* 100% */
@@ -320,7 +324,7 @@ static CONFIG c[] = {
 
 	{ "write_pct",
 	  "percent operations that are writes",
-	  0x0, 0, 90, 90, &g.c_write_pct, NULL },
+	  C_IGNORE, 0, 0, 100, &g.c_write_pct, NULL },
 
 	{ NULL, NULL, 0x0, 0, 0, 0, NULL, NULL }
 };

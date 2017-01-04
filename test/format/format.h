@@ -192,6 +192,7 @@ typedef struct {
 	uint32_t c_reverse;
 	uint32_t c_rows;
 	uint32_t c_runs;
+	uint32_t c_read_pct;
 	uint32_t c_rebalance;
 	uint32_t c_salvage;
 	uint32_t c_split_pct;
