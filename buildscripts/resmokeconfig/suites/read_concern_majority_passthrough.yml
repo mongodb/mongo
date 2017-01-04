@@ -64,7 +64,6 @@ selector:
     # Tests that need triaging & remediation | blacklist decision
     # Comments list possible problem point under review.
     - jstests/core/capped6.js # Uses captrunc test command.
-    - jstests/core/convert_to_capped_nonexistant.js # Uses convertToCapped and captrunc command.
     - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
 
 executor:
