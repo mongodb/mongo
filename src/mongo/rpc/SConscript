@@ -141,7 +141,7 @@ env.Library(
     ],
 )
 
-env.Library(
+env.Clone().InjectModule("enterprise").Library(
     target=[
         'metadata',
     ],

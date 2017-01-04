@@ -351,7 +351,7 @@ env.Library(
     ],
 )
 
-env.Library(
+env.Clone().InjectModule("enterprise").Library(
     target="server_options",
     source=[
         "server_options_helpers.cpp",
@@ -525,7 +525,7 @@ env.Library(
     ],
 )
 
-env.Library(
+env.Clone().InjectModule("enterprise").Library(
     target="audit",
     source=[
         "audit.cpp",

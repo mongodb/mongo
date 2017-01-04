@@ -226,7 +226,8 @@ generatedVersionFile = env.Substfile(
 env.Alias('generated-sources', generatedVersionFile)
 
 if env.TargetOSIs('windows'):
-    generatedResourceConstantFile = env.Substfile(
+    enterpriseEnv = env.Clone().InjectModule("enterprise")
+    generatedResourceConstantFile = enterpriseEnv.Substfile(
         'util/resource_constants.h.in',
         SUBST_DICT=[
             ('@mongo_version@', env['MONGO_VERSION']),
