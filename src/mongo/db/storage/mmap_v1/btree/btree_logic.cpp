@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <mutex>
 #include <numeric>
 
 #include "mongo/db/client.h"
@@ -68,6 +69,10 @@ using std::vector;
 //   we get to the root and it is full, a new root is created above the current root. When
 //   creating a new right sibling, it is set as its parent's nextChild as all keys in the right
 //   sibling will be higher than all keys currently in the parent.
+
+namespace {
+std::once_flag assertValidFlag;
+}  // namespace
 
 //
 // Public Builder logic
@@ -2136,9 +2141,7 @@ void BtreeLogic<BtreeLayout>::assertValid(const std::string& ns,
             // wassert( z <= 0 );
             if (z > 0) {
                 log() << "Btree keys out of order in collection " << ns;
-                ONCE {
-                    dumpBucket(bucket);
-                }
+                std::call_once(assertValidFlag, [&bucket]() { dumpBucket(bucket); });
                 invariant(false);
             }
         }

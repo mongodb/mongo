@@ -32,6 +32,7 @@
 #include "mongo/util/debugger.h"
 
 #include <cstdlib>
+#include <mutex>
 
 #if defined(USE_GDBSERVER)
 #include <cstdio>
@@ -44,6 +45,12 @@
 
 #include "mongo/util/debug_util.h"
 
+#ifndef _WIN32
+namespace {
+std::once_flag breakpointOnceFlag;
+}  // namespace
+#endif
+
 namespace mongo {
 void breakpoint() {
 #ifdef _WIN32
@@ -53,7 +60,7 @@ void breakpoint() {
 #endif
 #ifndef _WIN32
     // code to raise a breakpoint in GDB
-    ONCE {
+    std::call_once(breakpointOnceFlag, []() {
         // prevent SIGTRAP from crashing the program if default action is specified and we are not
         // in gdb
         struct sigaction current;
@@ -63,7 +70,7 @@ void breakpoint() {
         if (current.sa_handler == SIG_DFL) {
             signal(SIGTRAP, SIG_IGN);
         }
-    }
+    });
 
     raise(SIGTRAP);
 #endif

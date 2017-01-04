@@ -54,7 +54,4 @@ const bool kDebugBuild = false;
 #define MONGO_RARELY SOMETIMES(rarely, 128)
 #define RARELY MONGO_RARELY
 
-#define MONGO_ONCE for (static bool undone = true; undone; undone = false)
-#define ONCE MONGO_ONCE
-
 }  // namespace mongo
