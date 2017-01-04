@@ -499,7 +499,7 @@ config_pct(void)
 		if (config_is_perm(list[i].name))
 			pct += *list[i].vp;
 		else
-			list[i].order = mmrand(NULL, 0, 1000);
+			list[i].order = mmrand(NULL, 1, 1000);
 	if (pct > 100)
 		testutil_die(EINVAL,
 		    "operation percentages total to more than 100%%");
