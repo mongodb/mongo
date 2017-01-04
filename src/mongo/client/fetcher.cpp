@@ -41,6 +41,7 @@
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -329,15 +330,21 @@ Status Fetcher::_scheduleGetMore(const BSONObj& cmdObj) {
 }
 
 void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batchFieldName) {
+    QueryResponse batchData;
+    auto finishCallbackGuard = MakeGuard([this, &batchData] {
+        if (batchData.cursorId && !batchData.nss.isEmpty()) {
+            _sendKillCursors(batchData.cursorId, batchData.nss);
+        }
+        _finishCallback();
+    });
+
     if (!rcbd.response.isOK()) {
         _work(StatusWith<Fetcher::QueryResponse>(rcbd.response.status), nullptr, nullptr);
-        _finishCallback();
         return;
     }
 
     if (_isShuttingDown()) {
         _work(Status(ErrorCodes::CallbackCanceled, "fetcher shutting down"), nullptr, nullptr);
-        _finishCallback();
         return;
     }
 
@@ -345,15 +352,12 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
     Status status = getStatusFromCommandResult(queryResponseObj);
     if (!status.isOK()) {
         _work(StatusWith<Fetcher::QueryResponse>(status), nullptr, nullptr);
-        _finishCallback();
         return;
     }
 
-    QueryResponse batchData;
     status = parseCursorResponse(queryResponseObj, batchFieldName, &batchData);
     if (!status.isOK()) {
         _work(StatusWith<Fetcher::QueryResponse>(status), nullptr, nullptr);
-        _finishCallback();
         return;
     }
 
@@ -369,7 +373,6 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
 
     if (!batchData.cursorId) {
         _work(StatusWith<QueryResponse>(batchData), &nextAction, nullptr);
-        _finishCallback();
         return;
     }
 
@@ -381,8 +384,6 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
     // Callback function _work may modify nextAction to request the fetcher
     // not to schedule a getMore command.
     if (nextAction != NextAction::kGetMore) {
-        _sendKillCursors(batchData.cursorId, batchData.nss);
-        _finishCallback();
         return;
     }
 
@@ -390,8 +391,6 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
     // BSONObjBuilder for the getMore command.
     auto cmdObj = bob.obj();
     if (cmdObj.isEmpty()) {
-        _sendKillCursors(batchData.cursorId, batchData.nss);
-        _finishCallback();
         return;
     }
 
@@ -399,10 +398,10 @@ void Fetcher::_callback(const RemoteCommandCallbackArgs& rcbd, const char* batch
     if (!status.isOK()) {
         nextAction = NextAction::kNoAction;
         _work(StatusWith<Fetcher::QueryResponse>(status), nullptr, nullptr);
-        _sendKillCursors(batchData.cursorId, batchData.nss);
-        _finishCallback();
         return;
     }
+
+    finishCallbackGuard.Dismiss();
 }
 
 void Fetcher::_sendKillCursors(const CursorId id, const NamespaceString& nss) {
