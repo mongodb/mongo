@@ -3,28 +3,23 @@ var s = new ShardingTest({ shards: 2, verbose: 1, other: otherOptions });
 s.config.settings.update({ _id: "balancer" },
                          { $set: { stopped: true }}, true );
 
-db = s.getDB( "test" );
-var bulk = db.foo.initializeUnorderedBulkOp();
+coll = s.s0.getCollection("test.foo");
+
+var bulk = coll.initializeUnorderedBulkOp();
 for (var i = 0; i < 2100; i++) {
     bulk.insert({ _id: i, x: i });
 }
 assert.writeOK(bulk.execute());
 
-serverName = s.getServerName( "test" ) 
-other = s.config.shards.findOne( { _id : { $ne : serverName } } );
-
-s.adminCommand( { enablesharding : "test" } )
-s.ensurePrimaryShard('test', 'test-rs0');
-s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
+s.adminCommand( { enablesharding : coll.getDB() + "" } )
+s.ensurePrimaryShard(coll.getDB() + "", s.shard0.shardName);
+s.adminCommand( { shardcollection : coll + "" , key : { _id : 1 } } );
 
 for ( i=0; i<20; i++ )
-    s.adminCommand( { split : "test.foo" , middle : { _id : i * 100 } } );
+    s.adminCommand( { split : coll + "" , middle : { _id : i * 100 } } );
 
-assert.eq( 2100, db.foo.find().itcount() );
-coll = db.foo;
+assert.eq( 2100, coll.find().itcount() );
 coll.setSlaveOk();
-
-
 
 for ( i=0; i<20; i++ ) {
     // Needs to waitForDelete because we'll be performing a slaveOk query,
@@ -32,7 +27,7 @@ for ( i=0; i<20; i++ ) {
     // filter out docs it doesn't own.
     s.adminCommand({ moveChunk: "test.foo",
                      find: { _id: i * 100 },
-                     to : other._id,
+                     to : s.shard1.shardName,
                      _secondaryThrottle: true,
                      writeConcern: { w: 2 },
                      _waitForDelete: true });
