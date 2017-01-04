@@ -559,7 +559,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 			prev = now;
 
 		if (conn->evict_threads.threads[0]->session == session)
-			__evict_tune_workers(session);
+			WT_RET(__evict_tune_workers(session));
 		/*
 		 * Increment the shared read generation. Do this occasionally
 		 * even if eviction is not currently required, so that pages
