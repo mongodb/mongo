@@ -71,6 +71,7 @@ def generate(env):
         return env.ShlibNode(arg)
 
     env['BUILDERS']['SharedLibrary'].target_factory = shlib_target_factory
+    env['BUILDERS']['LoadableModule'].target_factory = shlib_target_factory
 
 def exists(env):
     result = _detect(env) != None

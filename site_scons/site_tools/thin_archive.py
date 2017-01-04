@@ -70,7 +70,6 @@ def generate(env):
     def archive_target_factory(arg):
         return env.ThinArchiveNode(arg)
 
-    env['BUILDERS']['Library'].target_factory = archive_target_factory
     env['BUILDERS']['StaticLibrary'].target_factory = archive_target_factory
 
     env['ARFLAGS'] = SCons.Util.CLVar([arflag if arflag != "rc" else "rcsTD" for arflag in env['ARFLAGS']])
