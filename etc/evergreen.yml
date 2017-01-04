@@ -7404,6 +7404,9 @@ buildvariants:
   - name: jsCore_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded
