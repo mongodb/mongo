@@ -43,6 +43,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_common.h"
@@ -52,15 +53,12 @@
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
-#include "mongo/s/bson_serializable.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/version_manager.h"
 #include "mongo/s/commands/cluster_explain.h"
-#include "mongo/s/commands/request.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
@@ -68,6 +66,7 @@
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/write_ops/batch_upconvert.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/timer.h"
@@ -79,7 +78,6 @@ using std::shared_ptr;
 using std::set;
 using std::string;
 using std::stringstream;
-using std::vector;
 
 namespace {
 
@@ -108,113 +106,73 @@ void runAgainstRegistered(OperationContext* txn,
     execCommandClient(txn, c, queryOptions, ns, jsobj, anObjBuilder);
 }
 
-/**
- * This code handles the $cmd.sys.inprog queries.
- */
-bool handleSpecialNamespaces(OperationContext* txn, Request& request, const QueryMessage& q) {
-    const char* ns = strstr(request.getns(), ".$cmd.sys.");
-    if (!ns)
-        return false;
-
-    ns += 10;
-
-    BSONObjBuilder reply;
-
-    const auto upgradeToRealCommand = [txn, &q, &reply](StringData commandName) {
-        BSONObjBuilder cmdBob;
-        cmdBob.append(commandName, 1);
-        cmdBob.appendElements(q.query);  // fields are validated by Commands
-        auto interposedCmd = cmdBob.done();
-
-        // Rewrite upgraded pseudoCommands to run on the 'admin' database.
-        const NamespaceString interposedNss("admin", "$cmd");
-        runAgainstRegistered(txn, interposedNss.ns().c_str(), interposedCmd, reply, q.queryOptions);
-    };
-
-    if (strcmp(ns, "inprog") == 0) {
-        upgradeToRealCommand("currentOp");
-    } else if (strcmp(ns, "killop") == 0) {
-        upgradeToRealCommand("killOp");
-    } else if (strcmp(ns, "unlock") == 0) {
-        reply.append("err", "can't do unlock through mongos");
-    } else {
-        warning() << "unknown sys command [" << ns << "]";
-        return false;
-    }
-
-    replyToQuery(0, txn->getClient()->session(), request.m(), reply.done());
-    return true;
-}
-
 }  // namespace
 
-void Strategy::queryOp(OperationContext* txn, Request& request) {
-    verify(!NamespaceString(request.getns()).isCommand());
+void Strategy::queryOp(OperationContext* txn, DbMessage* dbm) {
+    const NamespaceString nss(dbm->getns());
+    invariant(!nss.isCommand() && !nss.isSpecialCommand());
 
     globalOpCounters.gotQuery();
 
-    QueryMessage q(request.d());
+    const QueryMessage q(*dbm);
 
-    NamespaceString ns(q.ns);
-    Client* client = txn->getClient();
-    AuthorizationSession* authSession = AuthorizationSession::get(client);
-    Status status = authSession->checkAuthForFind(ns, false);
-    audit::logQueryAuthzCheck(client, ns, q.query, status.code());
+    Client* const client = txn->getClient();
+    AuthorizationSession* const authSession = AuthorizationSession::get(client);
+
+    Status status = authSession->checkAuthForFind(nss, false);
+    audit::logQueryAuthzCheck(client, nss, q.query, status.code());
     uassertStatusOK(status);
 
     LOG(3) << "query: " << q.ns << " " << redact(q.query) << " ntoreturn: " << q.ntoreturn
            << " options: " << q.queryOptions;
 
-    if (q.ntoreturn == 1 && strstr(q.ns, ".$cmd"))
-        throw UserException(8010, "something is wrong, shouldn't see a command here");
-
     if (q.queryOptions & QueryOption_Exhaust) {
         uasserted(18526,
-                  string("the 'exhaust' query option is invalid for mongos queries: ") + q.ns +
-                      " " + q.query.toString());
+                  str::stream() << "The 'exhaust' query option is invalid for mongos queries: "
+                                << nss.ns()
+                                << " "
+                                << q.query.toString());
     }
 
     // Determine the default read preference mode based on the value of the slaveOk flag.
-    ReadPreference readPreferenceOption = (q.queryOptions & QueryOption_SlaveOk)
-        ? ReadPreference::SecondaryPreferred
-        : ReadPreference::PrimaryOnly;
-    ReadPreferenceSetting readPreference(readPreferenceOption, TagSet());
+    const ReadPreferenceSetting readPreference = [&]() {
+        BSONElement rpElem;
+        auto readPrefExtractStatus = bsonExtractTypedField(
+            q.query, QueryRequest::kWrappedReadPrefField, mongo::Object, &rpElem);
+        if (readPrefExtractStatus == ErrorCodes::NoSuchKey) {
+            return ReadPreferenceSetting(q.queryOptions & QueryOption_SlaveOk
+                                             ? ReadPreference::SecondaryPreferred
+                                             : ReadPreference::PrimaryOnly);
+        }
 
-    BSONElement rpElem;
-    auto readPrefExtractStatus =
-        bsonExtractTypedField(q.query, QueryRequest::kWrappedReadPrefField, mongo::Object, &rpElem);
-
-    if (readPrefExtractStatus.isOK()) {
-        auto parsedRps = ReadPreferenceSetting::fromBSON(rpElem.Obj());
-        uassertStatusOK(parsedRps.getStatus());
-        readPreference = parsedRps.getValue();
-    } else if (readPrefExtractStatus != ErrorCodes::NoSuchKey) {
         uassertStatusOK(readPrefExtractStatus);
-    }
 
-    auto canonicalQuery = CanonicalQuery::canonicalize(txn, q, ExtensionsCallbackNoop());
-    uassertStatusOK(canonicalQuery.getStatus());
+        return uassertStatusOK(ReadPreferenceSetting::fromBSON(rpElem.Obj()));
+    }();
+
+    auto canonicalQuery =
+        uassertStatusOK(CanonicalQuery::canonicalize(txn, q, ExtensionsCallbackNoop()));
 
     // If the $explain flag was set, we must run the operation on the shards as an explain command
     // rather than a find command.
-    if (canonicalQuery.getValue()->getQueryRequest().isExplain()) {
-        const QueryRequest& qr = canonicalQuery.getValue()->getQueryRequest();
-        BSONObj findCommand = qr.asFindCommand();
+    const QueryRequest& queryRequest = canonicalQuery->getQueryRequest();
+    if (queryRequest.isExplain()) {
+        const BSONObj findCommand = queryRequest.asFindCommand();
 
         // We default to allPlansExecution verbosity.
-        auto verbosity = ExplainCommon::EXEC_ALL_PLANS;
+        const auto verbosity = ExplainCommon::EXEC_ALL_PLANS;
 
         const bool secondaryOk = (readPreference.pref != ReadPreference::PrimaryOnly);
-        rpc::ServerSelectionMetadata metadata(secondaryOk, readPreference);
+        const rpc::ServerSelectionMetadata metadata(secondaryOk, readPreference);
 
         BSONObjBuilder explainBuilder;
-        uassertStatusOK(
-            Strategy::explainFind(txn, findCommand, qr, verbosity, metadata, &explainBuilder));
+        uassertStatusOK(Strategy::explainFind(
+            txn, findCommand, queryRequest, verbosity, metadata, &explainBuilder));
 
         BSONObj explainObj = explainBuilder.done();
         replyToQuery(0,  // query result flags
-                     txn->getClient()->session(),
-                     request.m(),
+                     client->session(),
+                     dbm->msg(),
                      static_cast<const void*>(explainObj.objdata()),
                      explainObj.objsize(),
                      1,  // numResults
@@ -231,7 +189,7 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
     // be retrieved via the ClusterCursorManager.
     auto cursorId =
         ClusterFind::runQuery(txn,
-                              *canonicalQuery.getValue(),
+                              *canonicalQuery,
                               readPreference,
                               &batch,
                               nullptr /*Argument is for views which OP_QUERY doesn't support*/);
@@ -250,31 +208,70 @@ void Strategy::queryOp(OperationContext* txn, Request& request) {
         obj.appendSelfToBufBuilder(reply.bufBuilderForResults());
         numResults++;
     }
-    reply.send(txn->getClient()->session(),
+
+    reply.send(client->session(),
                0,  // query result flags
-               request.m(),
+               dbm->msg(),
                numResults,
                0,  // startingFrom
                cursorId.getValue());
 }
 
-void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
-    const QueryMessage q(request.d());
+void Strategy::clientCommandOp(OperationContext* txn, DbMessage* dbm) {
+    const NamespaceString nss(dbm->getns());
+    invariant(nss.isCommand() || nss.isSpecialCommand());
+
+    const QueryMessage q(*dbm);
+
+    Client* const client = txn->getClient();
 
     LOG(3) << "command: " << q.ns << " " << redact(q.query) << " ntoreturn: " << q.ntoreturn
            << " options: " << q.queryOptions;
 
     if (q.queryOptions & QueryOption_Exhaust) {
         uasserted(18527,
-                  string("the 'exhaust' query option is invalid for mongos commands: ") + q.ns +
-                      " " + q.query.toString());
+                  str::stream() << "The 'exhaust' query option is invalid for mongos commands: "
+                                << nss.ns()
+                                << " "
+                                << q.query.toString());
     }
 
-    const NamespaceString nss(request.getns());
-    invariant(nss.isCommand() || nss.isSpecialCommand());
+    uassert(16978,
+            str::stream() << "Bad numberToReturn (" << q.ntoreturn
+                          << ") for $cmd type ns - can only be 1 or -1",
+            q.ntoreturn == 1 || q.ntoreturn == -1);
 
-    if (handleSpecialNamespaces(txn, request, q))
-        return;
+    // Handle the $cmd.sys pseudo-commands
+    if (nss.isSpecialCommand()) {
+        BSONObjBuilder reply;
+
+        const auto upgradeToRealCommand = [&](StringData commandName) {
+            BSONObjBuilder cmdBob;
+            cmdBob.append(commandName, 1);
+            cmdBob.appendElements(q.query);  // fields are validated by Commands
+            auto interposedCmd = cmdBob.done();
+
+            // Rewrite upgraded pseudoCommands to run on the 'admin' database.
+            const NamespaceString interposedNss("admin", "$cmd");
+            runAgainstRegistered(
+                txn, interposedNss.ns().c_str(), interposedCmd, reply, q.queryOptions);
+            replyToQuery(0, client->session(), dbm->msg(), reply.done());
+        };
+
+        if (nss.coll() == "$cmd.sys.inprog") {
+            upgradeToRealCommand("currentOp");
+            return;
+        } else if (nss.coll() == "$cmd.sys.killop") {
+            upgradeToRealCommand("killOp");
+            return;
+        } else if (nss.coll() == "$cmd.sys.unlock") {
+            reply.append("err", "can't do unlock through mongos");
+            replyToQuery(0, client->session(), dbm->msg(), reply.done());
+            return;
+        }
+
+        // No pseudo-command found, fall through to execute as a regular query
+    }
 
     BSONObj cmdObj = q.query;
 
@@ -320,7 +317,7 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
                 BSONObjBuilder builder(reply.bufBuilderForResults());
                 runAgainstRegistered(txn, q.ns, cmdObj, builder, q.queryOptions);
             }
-            reply.sendCommandReply(txn->getClient()->session(), request.m());
+            reply.sendCommandReply(client->session(), dbm->msg());
             return;
         } catch (const StaleConfigException& e) {
             if (loops <= 0)
@@ -331,20 +328,22 @@ void Strategy::clientCommandOp(OperationContext* txn, Request& request) {
             log() << "Retrying command " << redact(q.query) << causedBy(e);
 
             // For legacy reasons, ns may not actually be set in the exception :-(
-            string staleNS = e.getns();
-            if (staleNS.size() == 0)
+            std::string staleNS = e.getns();
+            if (staleNS.empty()) {
                 staleNS = q.ns;
+            }
 
             ShardConnection::checkMyConnectionVersions(txn, staleNS);
-            if (loops < 4)
+            if (loops < 4) {
                 versionManager.forceRemoteCheckShardVersionCB(txn, staleNS);
+            }
         } catch (const DBException& e) {
             OpQueryReplyBuilder reply;
             {
                 BSONObjBuilder builder(reply.bufBuilderForResults());
                 Command::appendCommandStatus(builder, e.toStatus());
             }
-            reply.sendCommandReply(txn->getClient()->session(), request.m());
+            reply.sendCommandReply(client->session(), dbm->msg());
             return;
         }
     }
@@ -357,7 +356,7 @@ void Strategy::commandOp(OperationContext* txn,
                          const string& versionedNS,
                          const BSONObj& targetingQuery,
                          const BSONObj& targetingCollation,
-                         vector<CommandResult>* results) {
+                         std::vector<CommandResult>* results) {
     QuerySpec qSpec(db + ".$cmd", command, BSONObj(), 0, 1, options);
 
     ParallelSortClusteredCursor cursor(
@@ -380,34 +379,37 @@ void Strategy::commandOp(OperationContext* txn,
     }
 }
 
-void Strategy::getMore(OperationContext* txn, Request& request) {
-    const char* ns = request.getns();
-    const int ntoreturn = request.d().pullInt();
+void Strategy::getMore(OperationContext* txn, DbMessage* dbm) {
+    const NamespaceString nss(dbm->getns());
+    const int ntoreturn = dbm->pullInt();
     uassert(
         34424, str::stream() << "Invalid ntoreturn for OP_GET_MORE: " << ntoreturn, ntoreturn >= 0);
-    const long long id = request.d().pullInt64();
+    const long long cursorId = dbm->pullInt64();
+
+    globalOpCounters.gotGetMore();
+
+    Client* const client = txn->getClient();
 
     // TODO: Handle stale config exceptions here from coll being dropped or sharded during op for
     // now has same semantics as legacy request.
-    const NamespaceString nss(ns);
+
     auto statusGetDb = Grid::get(txn)->catalogCache()->getDatabase(txn, nss.db().toString());
     if (statusGetDb == ErrorCodes::NamespaceNotFound) {
-        replyToQuery(ResultFlag_CursorNotFound, txn->getClient()->session(), request.m(), 0, 0, 0);
+        replyToQuery(ResultFlag_CursorNotFound, client->session(), dbm->msg(), 0, 0, 0);
         return;
     }
-
     uassertStatusOK(statusGetDb);
 
     boost::optional<long long> batchSize;
     if (ntoreturn) {
         batchSize = ntoreturn;
     }
-    GetMoreRequest getMoreRequest(
-        NamespaceString(ns), id, batchSize, boost::none, boost::none, boost::none);
+
+    GetMoreRequest getMoreRequest(nss, cursorId, batchSize, boost::none, boost::none, boost::none);
 
     auto cursorResponse = ClusterFind::runGetMore(txn, getMoreRequest);
     if (cursorResponse == ErrorCodes::CursorNotFound) {
-        replyToQuery(ResultFlag_CursorNotFound, txn->getClient()->session(), request.m(), 0, 0, 0);
+        replyToQuery(ResultFlag_CursorNotFound, client->session(), dbm->msg(), 0, 0, 0);
         return;
     }
     uassertStatusOK(cursorResponse.getStatus());
@@ -422,8 +424,8 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
     }
 
     replyToQuery(0,
-                 txn->getClient()->session(),
-                 request.m(),
+                 client->session(),
+                 dbm->msg(),
                  buffer.buf(),
                  buffer.len(),
                  numResults,
@@ -431,26 +433,30 @@ void Strategy::getMore(OperationContext* txn, Request& request) {
                  cursorResponse.getValue().getCursorId());
 }
 
-void Strategy::killCursors(OperationContext* txn, Request& request) {
-    DbMessage& dbMessage = request.d();
-    const int numCursors = dbMessage.pullInt();
+void Strategy::killCursors(OperationContext* txn, DbMessage* dbm) {
+    const int numCursors = dbm->pullInt();
     massert(34425,
             str::stream() << "Invalid killCursors message. numCursors: " << numCursors
                           << ", message size: "
-                          << dbMessage.msg().dataSize()
+                          << dbm->msg().dataSize()
                           << ".",
-            dbMessage.msg().dataSize() == 8 + (8 * numCursors));
+            dbm->msg().dataSize() == 8 + (8 * numCursors));
     uassert(28794,
             str::stream() << "numCursors must be between 1 and 29999.  numCursors: " << numCursors
                           << ".",
             numCursors >= 1 && numCursors < 30000);
-    ConstDataCursor cursors(dbMessage.getArray(numCursors));
-    Client* client = txn->getClient();
-    AuthorizationSession* authSession = AuthorizationSession::get(client);
-    ClusterCursorManager* manager = Grid::get(txn)->getCursorManager();
+
+    globalOpCounters.gotOp(dbKillCursors, false);
+
+    ConstDataCursor cursors(dbm->getArray(numCursors));
+
+    Client* const client = txn->getClient();
+    AuthorizationSession* const authSession = AuthorizationSession::get(client);
+    ClusterCursorManager* const manager = Grid::get(txn)->getCursorManager();
 
     for (int i = 0; i < numCursors; ++i) {
-        CursorId cursorId = cursors.readAndAdvance<LittleEndian<int64_t>>();
+        const CursorId cursorId = cursors.readAndAdvance<LittleEndian<int64_t>>();
+
         boost::optional<NamespaceString> nss = manager->getNamespaceForCursorId(cursorId);
         if (!nss) {
             LOG(3) << "Can't find cursor to kill.  Cursor id: " << cursorId << ".";
@@ -475,56 +481,57 @@ void Strategy::killCursors(OperationContext* txn, Request& request) {
                    << "', cursor id: " << cursorId << ".";
             continue;
         }
+
         LOG(3) << "Killed cursor.  Namespace: '" << *nss << "', cursor id: " << cursorId << ".";
     }
 }
 
-void Strategy::writeOp(OperationContext* txn, int op, Request& request) {
+void Strategy::writeOp(OperationContext* txn, int op, DbMessage* dbm) {
     OwnedPointerVector<BatchedCommandRequest> commandRequestsOwned;
-    vector<BatchedCommandRequest*>& commandRequests = commandRequestsOwned.mutableVector();
+    std::vector<BatchedCommandRequest*>& commandRequests = commandRequestsOwned.mutableVector();
 
-    msgToBatchRequests(request.m(), &commandRequests);
+    msgToBatchRequests(dbm->msg(), &commandRequests);
 
     auto& clientLastError = LastError::get(txn->getClient());
 
-    for (vector<BatchedCommandRequest*>::iterator it = commandRequests.begin();
-         it != commandRequests.end();
-         ++it) {
+    for (auto it = commandRequests.begin(); it != commandRequests.end(); ++it) {
         // Multiple commands registered to last error as multiple requests
         if (it != commandRequests.begin()) {
             clientLastError.startRequest();
         }
 
-        BatchedCommandRequest* commandRequest = *it;
+        BatchedCommandRequest* const commandRequest = *it;
 
-        // Adjust namespaces for command
-        NamespaceString fullNS(commandRequest->getNS());
-        string cmdNS = fullNS.getCommandNS();
-        // We only pass in collection name to command
-        commandRequest->setNS(fullNS);
-
-        BSONObjBuilder builder;
-        BSONObj requestBSON = commandRequest->toBSON();
+        BatchedCommandResponse commandResponse;
 
         {
             // Disable the last error object for the duration of the write cmd
             LastError::Disabled disableLastError(&clientLastError);
-            runAgainstRegistered(txn, cmdNS.c_str(), requestBSON, builder, 0);
-        }
 
-        BatchedCommandResponse commandResponse;
-        bool parsed = commandResponse.parseBSON(builder.done(), NULL);
-        (void)parsed;  // for compile
-        dassert(parsed && commandResponse.isValid(NULL));
+            // Adjust namespace for command
+            const NamespaceString& fullNS(commandRequest->getNS());
+            const std::string cmdNS = fullNS.getCommandNS();
+
+            BSONObj commandBSON = commandRequest->toBSON();
+
+            BSONObjBuilder builder;
+            runAgainstRegistered(txn, cmdNS.c_str(), commandBSON, builder, 0);
+
+            bool parsed = commandResponse.parseBSON(builder.done(), nullptr);
+            (void)parsed;  // for compile
+            dassert(parsed && commandResponse.isValid(nullptr));
+        }
 
         // Populate the lastError object based on the write response
         clientLastError.reset();
+
         const bool hadError =
             batchErrorToLastError(*commandRequest, commandResponse, &clientLastError);
 
         // Check if this is an ordered batch and we had an error which should stop processing
-        if (commandRequest->getOrdered() && hadError)
+        if (commandRequest->getOrdered() && hadError) {
             break;
+        }
     }
 }
 

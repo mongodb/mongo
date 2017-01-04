@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/write_ops/batched_command_request.h"

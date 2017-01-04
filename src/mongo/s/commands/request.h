@@ -59,14 +59,6 @@ public:
         return _id;
     }
 
-    Message& m() {
-        return _m;
-    }
-
-    DbMessage& d() {
-        return _d;
-    }
-
     void process(OperationContext* txn);
 
     void init(OperationContext* txn);

@@ -36,8 +36,6 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/stats/counters.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/util/log.h"
 
@@ -81,31 +79,20 @@ void Request::process(OperationContext* txn) {
 
     _d.markSet();
 
-    bool iscmd = false;
     if (op == dbKillCursors) {
-        Strategy::killCursors(txn, *this);
-        globalOpCounters.gotOp(op, iscmd);
+        Strategy::killCursors(txn, &_d);
     } else if (op == dbQuery) {
-        NamespaceString nss(getns());
-        iscmd = nss.isCommand() || nss.isSpecialCommand();
+        const NamespaceString nss(getns());
 
-        if (iscmd) {
-            int n = _d.getQueryNToReturn();
-            uassert(16978,
-                    str::stream() << "bad numberToReturn (" << n
-                                  << ") for $cmd type ns - can only be 1 or -1",
-                    n == 1 || n == -1);
-
-            Strategy::clientCommandOp(txn, *this);
+        if (nss.isCommand() || nss.isSpecialCommand()) {
+            Strategy::clientCommandOp(txn, &_d);
         } else {
-            Strategy::queryOp(txn, *this);
+            Strategy::queryOp(txn, &_d);
         }
     } else if (op == dbGetMore) {
-        Strategy::getMore(txn, *this);
-        globalOpCounters.gotOp(op, iscmd);
+        Strategy::getMore(txn, &_d);
     } else {
-        Strategy::writeOp(txn, op, *this);
-        // globalOpCounters are handled by write commands.
+        Strategy::writeOp(txn, op, &_d);
     }
 
     LOG(3) << "Request::process end ns: " << getnsIfPresent() << " msg id: " << msgId
