@@ -59,7 +59,7 @@ variables:
   depends_on:
   - name: compile_all
 
-# Used to list modules to retrieve from GitHub.
+# Used to list modules to retrieve from GitHub and apply patches if necessary.
 - &git_get_project
   command: git.get_project
   params:
@@ -1130,9 +1130,6 @@ tasks:
   commands:
     - command: manifest.load
     - *git_get_project
-    - command: git.apply_patch
-      params:
-        directory: src
     - func: "get buildnumber"
     - func: "setup credentials"
     - func: "build new tools" # noop if ${newtools} is not "true"
@@ -1259,9 +1256,6 @@ tasks:
   commands:
     - command: manifest.load
     - *git_get_project
-    - command: git.apply_patch
-      params:
-        directory: src
     - func: "get buildnumber"
     - func: "setup credentials"
     - func: "build new tools" # noop if ${newtools} is not "true"
@@ -1308,9 +1302,6 @@ tasks:
   commands:
     - command: manifest.load
     - *git_get_project
-    - command: git.apply_patch
-      params:
-        directory: src
     - command: shell.exec
       type: test
       params:

@@ -73,9 +73,6 @@ functions:
           dsi: ${dsi_rev}
           workloads: ${workloads_rev}
           YCSB: ${YCSB_rev}
-    - command: git.apply_patch
-      params:
-        directory: src
     - command: shell.exec
       params:
         working_dir: work

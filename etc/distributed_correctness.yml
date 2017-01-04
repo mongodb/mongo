@@ -42,9 +42,6 @@ functions:
         revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
           dsi: ${dsi_rev}
           workloads: ${workloads_rev}
-    - command: git.apply_patch
-      params:
-        directory: src
     - command: shell.exec
       # configure environment, has private information, no logging
       params:
