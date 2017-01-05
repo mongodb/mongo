@@ -130,6 +130,7 @@ private:
 
         // Get all TTL indexes from every collection.
         for (const std::string& collectionNS : ttlCollections) {
+            ScopedTransaction st(&txn, MODE_IS);
             NamespaceString collectionNSS(collectionNS);
             AutoGetCollection autoGetCollection(&txn, collectionNSS, MODE_IS);
             Collection* coll = autoGetCollection.getCollection();
