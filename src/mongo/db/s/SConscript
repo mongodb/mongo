@@ -71,15 +71,22 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/s/sharding_initialization',
+        '$BUILD_DIR/mongo/db/range_deleter',
+        '$BUILD_DIR/mongo/db/rw_concern_d',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/query/internal_plans',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_impl',
+        '$BUILD_DIR/mongo/s/client/shard_local',
+        '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/is_mongos',
+        '$BUILD_DIR/mongo/s/sharding_initialization',
+        '$BUILD_DIR/mongo/util/elapsed_tracker',
         'metadata',
         'migration_types',
         'type_shard_identity',
     ],
     LIBDEPS_TAGS=[
-        # Depends on symbols defined in files in serverOnlyFiles, and has
-        # many other missing dependencies.
+        # Depends on parts of catalog.
         'incomplete',
     ],
 )

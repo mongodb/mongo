@@ -24,15 +24,14 @@ env.Library(
         'framework_options_init.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/op_observer_noop',
+        '$BUILD_DIR/mongo/db/service_context_d',
         '$BUILD_DIR/mongo/db/s/sharding',
         '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/scripting/scripting_common',
         '$BUILD_DIR/mongo/unittest/unittest',
         'framework_options',
-    ],
-    LIBDEPS_TAGS=[
-        # Depends on service_context_d.cpp which is in serveronly
-        'incomplete',
     ],
 )
 

@@ -43,7 +43,9 @@ env.Library(
         'compress',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/commands/core',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/diag_log',
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/storage/journal_listener',
@@ -51,10 +53,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
     ],
     LIBDEPS_TAGS=[
-        # Many undefined symbols
+        # Depends upon parts of catalog which form a cycle.
         'incomplete',
     ],
-    )
+)
 
 compressEnv = env.Clone()
 compressEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
