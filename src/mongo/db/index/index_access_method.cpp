@@ -117,7 +117,7 @@ bool IndexAccessMethod::ignoreKeyTooLong(OperationContext* txn) {
     const auto shouldRelaxConstraints =
         repl::ReplicationCoordinator::get(txn)->shouldRelaxIndexConstraints(
             NamespaceString(_btreeState->ns()));
-    return shouldRelaxConstraints || !failIndexKeyTooLong;
+    return shouldRelaxConstraints || !failIndexKeyTooLong.load();
 }
 
 // Find the keys for obj, put them in the tree pointing to loc

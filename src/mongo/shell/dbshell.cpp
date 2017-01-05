@@ -622,7 +622,7 @@ int _main(int argc, char* argv[], char** envp) {
         }
     }
 
-    if (!mongo::serverGlobalParams.quiet)
+    if (!mongo::serverGlobalParams.quiet.load())
         cout << mongoShellVersion(VersionInfoInterface::instance()) << endl;
 
     mongo::StartupTest::runTests();
@@ -635,7 +635,7 @@ int _main(int argc, char* argv[], char** envp) {
 
     if (!shellGlobalParams.nodb) {  // connect to db
         stringstream ss;
-        if (mongo::serverGlobalParams.quiet)
+        if (mongo::serverGlobalParams.quiet.load())
             ss << "__quiet = true;";
         ss << "db = connect( \""
            << getURIFromArgs(
@@ -798,7 +798,8 @@ int _main(int argc, char* argv[], char** envp) {
             f.open(rcLocation.c_str(), false);  // Create empty .mongorc.js file
         }
 
-        if (!shellGlobalParams.nodb && !mongo::serverGlobalParams.quiet && isatty(fileno(stdin))) {
+        if (!shellGlobalParams.nodb && !mongo::serverGlobalParams.quiet.load() &&
+            isatty(fileno(stdin))) {
             scope->exec(
                 "shellHelper( 'show', 'startupWarnings' )", "(shellwarnings)", false, true, false);
 
@@ -839,7 +840,7 @@ int _main(int argc, char* argv[], char** envp) {
             }
 
             if (!linePtr || (strlen(linePtr) == 4 && strstr(linePtr, "exit"))) {
-                if (!mongo::serverGlobalParams.quiet)
+                if (!mongo::serverGlobalParams.quiet.load())
                     cout << "bye" << endl;
                 if (line)
                     free(line);

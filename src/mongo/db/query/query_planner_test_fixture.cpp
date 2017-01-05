@@ -51,7 +51,7 @@ const NamespaceString QueryPlannerTest::nss("test.collection");
 
 void QueryPlannerTest::setUp() {
     opCtx = serviceContext.makeOperationContext();
-    internalQueryPlannerEnableHashIntersection = true;
+    internalQueryPlannerEnableHashIntersection.store(true);
     params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(BSON("_id" << 1));
 }

@@ -74,7 +74,7 @@ void AssertionCount::condrollover(int newvalue) {
         rollover();
 }
 
-std::atomic<bool> DBException::traceExceptions(false);  // NOLINT
+AtomicBool DBException::traceExceptions(false);
 
 string DBException::toString() const {
     stringstream ss;
@@ -83,7 +83,7 @@ string DBException::toString() const {
 }
 
 void DBException::traceIfNeeded(const DBException& e) {
-    if (traceExceptions) {
+    if (traceExceptions.load()) {
         warning() << "DBException thrown" << causedBy(e) << endl;
         printStackTrace();
     }

@@ -28,9 +28,8 @@
 
 #pragma once
 
-#include <atomic>
-
 #include "mongo/platform/atomic_proxy.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
@@ -40,79 +39,79 @@ namespace mongo {
 
 // Max number of times we call work() on plans before comparing them,
 // for small collections.
-extern std::atomic<int> internalQueryPlanEvaluationWorks;  // NOLINT
+extern AtomicInt32 internalQueryPlanEvaluationWorks;
 
 // For large collections, the number times we work() candidate plans is
 // taken as this fraction of the collection size.
-extern AtomicDouble internalQueryPlanEvaluationCollFraction;  // NOLINT
+extern AtomicDouble internalQueryPlanEvaluationCollFraction;
 
 // Stop working plans once a plan returns this many results.
-extern std::atomic<int> internalQueryPlanEvaluationMaxResults;  // NOLINT
+extern AtomicInt32 internalQueryPlanEvaluationMaxResults;
 
 // Do we give a big ranking bonus to intersection plans?
-extern std::atomic<bool> internalQueryForceIntersectionPlans;  // NOLINT
+extern AtomicBool internalQueryForceIntersectionPlans;
 
 // Do we have ixisect on at all?
-extern std::atomic<bool> internalQueryPlannerEnableIndexIntersection;  // NOLINT
+extern AtomicBool internalQueryPlannerEnableIndexIntersection;
 
 // Do we use hash-based intersection for rooted $and queries?
-extern std::atomic<bool> internalQueryPlannerEnableHashIntersection;  // NOLINT
+extern AtomicBool internalQueryPlannerEnableHashIntersection;
 
 //
 // plan cache
 //
 
 // How many entries in the cache?
-extern std::atomic<int> internalQueryCacheSize;  // NOLINT
+extern AtomicInt32 internalQueryCacheSize;
 
 // How many feedback entries do we collect before possibly evicting from the cache based on bad
 // performance?
-extern std::atomic<int> internalQueryCacheFeedbacksStored;  // NOLINT
+extern AtomicInt32 internalQueryCacheFeedbacksStored;
 
 // How many times more works must we perform in order to justify plan cache eviction
 // and replanning?
-extern AtomicDouble internalQueryCacheEvictionRatio;  // NOLINT
+extern AtomicDouble internalQueryCacheEvictionRatio;
 
 //
 // Planning and enumeration.
 //
 
 // How many indexed solutions will QueryPlanner::plan output?
-extern std::atomic<int> internalQueryPlannerMaxIndexedSolutions;  // NOLINT
+extern AtomicInt32 internalQueryPlannerMaxIndexedSolutions;
 
 // How many solutions will the enumerator consider at each OR?
-extern std::atomic<int> internalQueryEnumerationMaxOrSolutions;  // NOLINT
+extern AtomicInt32 internalQueryEnumerationMaxOrSolutions;
 
 // How many intersections will the enumerator consider at each AND?
-extern std::atomic<int> internalQueryEnumerationMaxIntersectPerAnd;  // NOLINT
+extern AtomicInt32 internalQueryEnumerationMaxIntersectPerAnd;
 
 // Do we want to plan each child of the OR independently?
-extern std::atomic<bool> internalQueryPlanOrChildrenIndependently;  // NOLINT
+extern AtomicBool internalQueryPlanOrChildrenIndependently;
 
 // How many index scans are we willing to produce in order to obtain a sort order
 // during explodeForSort?
-extern std::atomic<int> internalQueryMaxScansToExplode;  // NOLINT
+extern AtomicInt32 internalQueryMaxScansToExplode;
 
 //
 // Query execution.
 //
 
-extern std::atomic<int> internalQueryExecMaxBlockingSortBytes;  // NOLINT
+extern AtomicInt32 internalQueryExecMaxBlockingSortBytes;
 
 // Yield after this many "should yield?" checks.
-extern std::atomic<int> internalQueryExecYieldIterations;  // NOLINT
+extern AtomicInt32 internalQueryExecYieldIterations;
 
 // Yield if it's been at least this many milliseconds since we last yielded.
-extern std::atomic<int> internalQueryExecYieldPeriodMS;  // NOLINT
+extern AtomicInt32 internalQueryExecYieldPeriodMS;
 
 // Limit the size that we write without yielding to 16MB / 64 (max expected number of indexes)
 const int64_t insertVectorMaxBytes = 256 * 1024;
 
 // The number of bytes to buffer at once during a $facet stage.
-extern std::atomic<int> internalQueryFacetBufferSizeBytes;  // NOLINT
+extern AtomicInt32 internalQueryFacetBufferSizeBytes;
 
-extern std::atomic<int> internalInsertMaxBatchSize;  // NOLINT
+extern AtomicInt32 internalInsertMaxBatchSize;
 
-extern std::atomic<int> internalDocumentSourceCursorBatchSizeBytes;  // NOLINT
+extern AtomicInt32 internalDocumentSourceCursorBatchSizeBytes;
 
 }  // namespace mongo

@@ -84,6 +84,7 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -161,7 +162,7 @@ void fillOutPlannerParams(OperationContext* txn,
     // We will not output collection scans unless there are no indexed solutions. NO_TABLE_SCAN
     // overrides this behavior by not outputting a collscan even if there are no indexed
     // solutions.
-    if (storageGlobalParams.noTableScan) {
+    if (storageGlobalParams.noTableScan.load()) {
         const string& ns = canonicalQuery->ns();
         // There are certain cases where we ignore this restriction:
         bool ignore = canonicalQuery->getQueryObj().isEmpty() ||
@@ -183,7 +184,7 @@ void fillOutPlannerParams(OperationContext* txn,
         }
     }
 
-    if (internalQueryPlannerEnableIndexIntersection) {
+    if (internalQueryPlannerEnableIndexIntersection.load()) {
         plannerParams->options |= QueryPlannerParams::INDEX_INTERSECTION;
     }
 
@@ -363,7 +364,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
         }
     }
 
-    if (internalQueryPlanOrChildrenIndependently &&
+    if (internalQueryPlanOrChildrenIndependently.load() &&
         SubplanStage::canUseSubplanning(*canonicalQuery)) {
         LOG(2) << "Running query as sub-queries: " << redact(canonicalQuery->toStringShort());
 

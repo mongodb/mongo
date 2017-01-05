@@ -211,7 +211,7 @@ Status DatabasesCloner::startup() noexcept {
         listDBsReq,
         stdx::bind(&DatabasesCloner::_onListDatabaseFinish, this, stdx::placeholders::_1),
         RemoteCommandRetryScheduler::makeRetryPolicy(
-            numInitialSyncListDatabasesAttempts,
+            numInitialSyncListDatabasesAttempts.load(),
             executor::RemoteCommandRequest::kNoTimeout,
             RemoteCommandRetryScheduler::kAllRetriableErrors));
     _status = _listDBsScheduler->startup();

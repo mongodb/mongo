@@ -97,7 +97,7 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
                                            RemoteCommandRequest::kNoTimeout),
                       stdx::bind(&CollectionCloner::_countCallback, this, stdx::placeholders::_1),
                       RemoteCommandRetryScheduler::makeRetryPolicy(
-                          numInitialSyncCollectionCountAttempts,
+                          numInitialSyncCollectionCountAttempts.load(),
                           executor::RemoteCommandRequest::kNoTimeout,
                           RemoteCommandRetryScheduler::kAllRetriableErrors)),
       _listIndexesFetcher(_executor,
@@ -112,7 +112,7 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
                           rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
                           RemoteCommandRequest::kNoTimeout,
                           RemoteCommandRetryScheduler::makeRetryPolicy(
-                              numInitialSyncListIndexesAttempts,
+                              numInitialSyncListIndexesAttempts.load(),
                               executor::RemoteCommandRequest::kNoTimeout,
                               RemoteCommandRetryScheduler::kAllRetriableErrors)),
       _findFetcher(
@@ -130,7 +130,7 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
           rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
           RemoteCommandRequest::kNoTimeout,
           RemoteCommandRetryScheduler::makeRetryPolicy(
-              numInitialSyncCollectionFindAttempts,
+              numInitialSyncCollectionFindAttempts.load(),
               executor::RemoteCommandRequest::kNoTimeout,
               RemoteCommandRetryScheduler::kAllRetriableErrors)),
 

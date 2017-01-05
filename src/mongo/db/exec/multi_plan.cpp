@@ -172,13 +172,13 @@ Status MultiPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
 size_t MultiPlanStage::getTrialPeriodWorks(OperationContext* txn, const Collection* collection) {
     // Run each plan some number of times. This number is at least as great as
     // 'internalQueryPlanEvaluationWorks', but may be larger for big collections.
-    size_t numWorks = internalQueryPlanEvaluationWorks;
+    size_t numWorks = internalQueryPlanEvaluationWorks.load();
     if (NULL != collection) {
         // For large collections, the number of works is set to be this
         // fraction of the collection size.
         double fraction = internalQueryPlanEvaluationCollFraction;
 
-        numWorks = std::max(static_cast<size_t>(internalQueryPlanEvaluationWorks),
+        numWorks = std::max(static_cast<size_t>(internalQueryPlanEvaluationWorks.load()),
                             static_cast<size_t>(fraction * collection->numRecords(txn)));
     }
 
@@ -189,7 +189,7 @@ size_t MultiPlanStage::getTrialPeriodWorks(OperationContext* txn, const Collecti
 size_t MultiPlanStage::getTrialPeriodNumToReturn(const CanonicalQuery& query) {
     // Determine the number of results which we will produce during the plan
     // ranking phase before stopping.
-    size_t numResults = static_cast<size_t>(internalQueryPlanEvaluationMaxResults);
+    size_t numResults = static_cast<size_t>(internalQueryPlanEvaluationMaxResults.load());
     if (query.getQueryRequest().getNToReturn()) {
         numResults =
             std::min(static_cast<size_t>(*query.getQueryRequest().getNToReturn()), numResults);

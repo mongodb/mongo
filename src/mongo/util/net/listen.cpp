@@ -340,7 +340,7 @@ void Listener::initAndListen() {
 
             long long myConnectionNumber = globalConnectionNumber.addAndFetch(1);
 
-            if (_logConnect && !serverGlobalParams.quiet) {
+            if (_logConnect && !serverGlobalParams.quiet.load()) {
                 int conns = globalTicketHolder.used() + 1;
                 const char* word = (conns == 1 ? " connection" : " connections");
                 log() << "connection accepted from " << from.toString() << " #"
@@ -556,7 +556,7 @@ void Listener::initAndListen() {
 
         long long myConnectionNumber = globalConnectionNumber.addAndFetch(1);
 
-        if (_logConnect && !serverGlobalParams.quiet) {
+        if (_logConnect && !serverGlobalParams.quiet.load()) {
             int conns = globalTicketHolder.used() + 1;
             const char* word = (conns == 1 ? " connection" : " connections");
             log() << "connection accepted from " << from.toString() << " #" << myConnectionNumber

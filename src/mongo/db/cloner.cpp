@@ -251,7 +251,7 @@ struct Cloner::Fun {
                 str::stream ss;
                 ss << "Cloner: found corrupt document in " << from_collection.toString() << ": "
                    << redact(status);
-                if (skipCorruptDocumentsWhenCloning) {
+                if (skipCorruptDocumentsWhenCloning.load()) {
                     warning() << ss.ss.str() << "; skipping";
                     continue;
                 }

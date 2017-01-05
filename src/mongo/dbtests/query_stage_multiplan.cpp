@@ -59,7 +59,7 @@ namespace mongo {
 const std::unique_ptr<ClockSource> clockSource = stdx::make_unique<ClockSourceMock>();
 
 // How we access the external setParameter testing bool.
-extern std::atomic<bool> internalQueryForceIntersectionPlans;  // NOLINT
+extern AtomicBool internalQueryForceIntersectionPlans;
 
 }  // namespace mongo
 
@@ -240,8 +240,8 @@ public:
         ASSERT(NULL != cq.get());
 
         // Force index intersection.
-        bool forceIxisectOldValue = internalQueryForceIntersectionPlans;
-        internalQueryForceIntersectionPlans = true;
+        bool forceIxisectOldValue = internalQueryForceIntersectionPlans.load();
+        internalQueryForceIntersectionPlans.store(true);
 
         // Get planner params.
         QueryPlannerParams plannerParams;
@@ -309,7 +309,7 @@ public:
             soln->root.get()));
 
         // Restore index intersection force parameter.
-        internalQueryForceIntersectionPlans = forceIxisectOldValue;
+        internalQueryForceIntersectionPlans.store(forceIxisectOldValue);
     }
 };
 
@@ -368,7 +368,7 @@ public:
         auto allPlansStats = explained["executionStats"]["allPlansExecution"].Array();
         ASSERT_EQ(allPlansStats.size(), 2UL);
         for (auto&& planStats : allPlansStats) {
-            int maxEvaluationResults = internalQueryPlanEvaluationMaxResults;
+            int maxEvaluationResults = internalQueryPlanEvaluationMaxResults.load();
             ASSERT_EQ(planStats["executionStages"]["stage"].String(), "QUEUED_DATA");
             if (planStats["executionStages"]["needTime"].Int() > 0) {
                 // This is the losing plan. Should only have advanced about half the time.

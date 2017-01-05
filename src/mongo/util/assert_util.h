@@ -128,7 +128,7 @@ private:
     static void traceIfNeeded(const DBException& e);
 
 public:
-    static std::atomic<bool> traceExceptions;  // NOLINT
+    static AtomicBool traceExceptions;
 
 protected:
     ExceptionInfo _ei;

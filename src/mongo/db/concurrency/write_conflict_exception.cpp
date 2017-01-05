@@ -37,11 +37,11 @@
 
 namespace mongo {
 
-std::atomic<bool> WriteConflictException::trace(false);  // NOLINT
+AtomicBool WriteConflictException::trace(false);
 
 WriteConflictException::WriteConflictException()
     : DBException("WriteConflict", ErrorCodes::WriteConflict) {
-    if (trace) {
+    if (trace.load()) {
         printStackTrace();
     }
 }

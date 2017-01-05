@@ -51,10 +51,10 @@ SASLGlobalParams::SASLGlobalParams() {
     authenticationMechanisms.push_back("SCRAM-SHA-1");
 
     // Default iteration count for SCRAM authentication.
-    scramIterationCount = defaultScramIterationCount;
+    scramIterationCount.store(defaultScramIterationCount);
 
     // Default value for auth failed delay
-    authFailedDelay = 0;
+    authFailedDelay.store(0);
 }
 
 Status addSASLOptions(moe::OptionSection* options) {
@@ -139,8 +139,8 @@ Status storeSASLOptions(const moe::Environment& params) {
         saslGlobalParams.authdPath = params["security.sasl.saslauthdSocketPath"].as<std::string>();
     }
     if (params.count("security.sasl.scramIterationCount") && !haveScramIterationCount) {
-        saslGlobalParams.scramIterationCount =
-            params["security.sasl.scramIterationCount"].as<int>();
+        saslGlobalParams.scramIterationCount.store(
+            params["security.sasl.scramIterationCount"].as<int>());
     }
 
     return Status::OK();

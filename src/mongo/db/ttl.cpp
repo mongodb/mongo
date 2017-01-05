@@ -87,11 +87,11 @@ public:
         AuthorizationSession::get(cc())->grantInternalAuthorization();
 
         while (!inShutdown()) {
-            sleepsecs(ttlMonitorSleepSecs);
+            sleepsecs(ttlMonitorSleepSecs.load());
 
             LOG(3) << "thread awake";
 
-            if (!ttlMonitorEnabled) {
+            if (!ttlMonitorEnabled.load()) {
                 LOG(1) << "disabled";
                 continue;
             }

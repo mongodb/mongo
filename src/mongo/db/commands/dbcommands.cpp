@@ -469,7 +469,7 @@ public:
 
         int was = _diaglog.setLevel(cmdObj.firstElement().numberInt());
         _diaglog.flush();
-        if (!serverGlobalParams.quiet) {
+        if (!serverGlobalParams.quiet.load()) {
             LOG(0) << "CMD: diagLogging set to " << _diaglog.getLevel() << " from: " << was;
         }
         result.append("was", was);

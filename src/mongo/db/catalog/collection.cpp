@@ -1189,7 +1189,7 @@ public:
         auto totalKeys = numLongKeys + numIndexedKeys;
 
         bool hasTooFewKeys = false;
-        bool noErrorOnTooFewKeys = !failIndexKeyTooLong && (_level != kValidateFull);
+        bool noErrorOnTooFewKeys = !failIndexKeyTooLong.load() && (_level != kValidateFull);
 
         if (idx->isIdIndex() && totalKeys != numRecs) {
             hasTooFewKeys = totalKeys < numRecs ? true : hasTooFewKeys;

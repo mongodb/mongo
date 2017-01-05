@@ -106,7 +106,7 @@ void DocumentSourceCursor::loadBatch() {
 
             memUsageBytes += _currentBatch.back().getApproximateSize();
 
-            if (memUsageBytes > internalDocumentSourceCursorBatchSizeBytes) {
+            if (memUsageBytes > internalDocumentSourceCursorBatchSizeBytes.load()) {
                 // End this batch and prepare PlanExecutor for yielding.
                 _exec->saveState();
                 return;

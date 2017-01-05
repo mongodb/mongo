@@ -1187,7 +1187,7 @@ Status DataReplicator::_scheduleLastOplogEntryFetcher_inlock(Fetcher::CallbackFn
                                    rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
                                    RemoteCommandRequest::kNoTimeout,
                                    RemoteCommandRetryScheduler::makeRetryPolicy(
-                                       numInitialSyncOplogFindAttempts,
+                                       numInitialSyncOplogFindAttempts.load(),
                                        executor::RemoteCommandRequest::kNoTimeout,
                                        RemoteCommandRetryScheduler::kAllRetriableErrors));
     Status scheduleStatus = _lastOplogEntryFetcher->schedule();

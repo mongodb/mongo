@@ -909,7 +909,7 @@ bool ReplicationCoordinatorExternalStateImpl::shouldUseDataReplicatorInitialSync
 }
 
 std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherMaxFetcherRestarts() const {
-    return oplogFetcherMaxFetcherRestarts;
+    return oplogFetcherMaxFetcherRestarts.load();
 }
 
 JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken() {

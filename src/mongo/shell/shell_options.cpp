@@ -255,7 +255,7 @@ Status storeMongoShellOptions(const moe::Environment& params,
                               const std::vector<std::string>& args) {
     Status ret = Status::OK();
     if (params.count("quiet")) {
-        mongo::serverGlobalParams.quiet = true;
+        mongo::serverGlobalParams.quiet.store(true);
     }
 #ifdef MONGO_CONFIG_SSL
     ret = storeSSLClientOptions(params);

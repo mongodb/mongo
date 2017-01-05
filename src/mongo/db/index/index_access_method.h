@@ -42,7 +42,7 @@
 
 namespace mongo {
 
-extern std::atomic<bool> failIndexKeyTooLong;  // NOLINT
+extern AtomicBool failIndexKeyTooLong;
 
 class BSONObjBuilder;
 class MatchExpression;

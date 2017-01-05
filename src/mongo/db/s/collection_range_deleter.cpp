@@ -180,7 +180,8 @@ int CollectionRangeDeleter::_doDeletion(OperationContext* txn,
                                    InternalPlanner::FORWARD,
                                    InternalPlanner::IXSCAN_FETCH));
     int numDeleted = 0;
-    const int maxItersBeforeYield = std::max(static_cast<int>(internalQueryExecYieldIterations), 1);
+    const int maxItersBeforeYield =
+        std::max(static_cast<int>(internalQueryExecYieldIterations.load()), 1);
 
     while (numDeleted < maxItersBeforeYield) {
         RecordId rloc;

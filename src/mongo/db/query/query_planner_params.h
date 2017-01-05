@@ -40,7 +40,7 @@ struct QueryPlannerParams {
     QueryPlannerParams()
         : options(DEFAULT),
           indexFiltersApplied(false),
-          maxIndexedSolutions(internalQueryPlannerMaxIndexedSolutions) {}
+          maxIndexedSolutions(internalQueryPlannerMaxIndexedSolutions.load()) {}
 
     enum Options {
         // You probably want to set this.

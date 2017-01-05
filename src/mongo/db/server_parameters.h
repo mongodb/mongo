@@ -37,6 +37,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_proxy.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
@@ -162,7 +163,7 @@ class is_safe_runtime_parameter_type<double> : public std::true_type {};
 template <typename T, ServerParameterType paramType>
 class server_parameter_storage_type {
 public:
-    using value_type = std::atomic<T>;  // NOLINT
+    using value_type = AtomicWord<T>;
 };
 
 template <typename T>
@@ -217,9 +218,7 @@ public:
           _value(value) {}
     virtual ~ExportedServerParameter() {}
 
-    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
-        b.append(name, *_value);
-    }
+    virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name);
 
     virtual Status set(const BSONElement& newValueElement);
     virtual Status set(const T& newValue);

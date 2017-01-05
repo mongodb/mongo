@@ -481,9 +481,9 @@ std::string SolutionCacheData::toString() const {
 // PlanCache
 //
 
-PlanCache::PlanCache() : _cache(internalQueryCacheSize) {}
+PlanCache::PlanCache() : _cache(internalQueryCacheSize.load()) {}
 
-PlanCache::PlanCache(const std::string& ns) : _cache(internalQueryCacheSize), _ns(ns) {}
+PlanCache::PlanCache(const std::string& ns) : _cache(internalQueryCacheSize.load()), _ns(ns) {}
 
 PlanCache::~PlanCache() {}
 
@@ -704,7 +704,7 @@ Status PlanCache::feedback(const CanonicalQuery& cq, PlanCacheEntryFeedback* fee
     invariant(entry);
 
     // We store up to a constant number of feedback entries.
-    if (entry->feedback.size() < size_t(internalQueryCacheFeedbacksStored)) {
+    if (entry->feedback.size() < static_cast<size_t>(internalQueryCacheFeedbacksStored.load())) {
         entry->feedback.push_back(autoFeedback.release());
     }
 

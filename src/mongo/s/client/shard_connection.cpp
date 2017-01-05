@@ -241,7 +241,7 @@ public:
             warning() << "Detected additional sharded connection in the "
                       << "thread local pool for " << addr;
 
-            if (DBException::traceExceptions) {
+            if (DBException::traceExceptions.load()) {
                 // There shouldn't be more than one connection checked out to the same
                 // host on the same thread.
                 printStackTrace();

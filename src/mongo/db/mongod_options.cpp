@@ -1084,11 +1084,10 @@ Status storeMongodOptions(const moe::Environment& params) {
         // don't check if dur is false here as many will just use the default, and will default
         // to off on win32.  ie no point making life a little more complex by giving an error on
         // a dev environment.
-        storageGlobalParams.journalCommitIntervalMs =
-            params["storage.journal.commitIntervalMs"].as<int>();
-        if (storageGlobalParams.journalCommitIntervalMs < 1 ||
-            storageGlobalParams.journalCommitIntervalMs >
-                StorageGlobalParams::kMaxJournalCommitIntervalMs) {
+        auto journalCommitIntervalMs = params["storage.journal.commitIntervalMs"].as<int>();
+        storageGlobalParams.journalCommitIntervalMs.store(journalCommitIntervalMs);
+        if (journalCommitIntervalMs < 1 ||
+            journalCommitIntervalMs > StorageGlobalParams::kMaxJournalCommitIntervalMs) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "--journalCommitInterval out of allowed range (1-"
                                         << StorageGlobalParams::kMaxJournalCommitIntervalMs
@@ -1144,7 +1143,7 @@ Status storeMongodOptions(const moe::Environment& params) {
         storageGlobalParams.upgrade = 1;
     }
     if (params.count("notablescan")) {
-        storageGlobalParams.noTableScan = params["notablescan"].as<bool>();
+        storageGlobalParams.noTableScan.store(params["notablescan"].as<bool>());
     }
 
     repl::ReplSettings replSettings;

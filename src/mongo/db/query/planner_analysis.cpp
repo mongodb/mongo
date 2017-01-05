@@ -432,7 +432,7 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
     }
 
     // Too many ixscans spoil the performance.
-    if (totalNumScans > (size_t)internalQueryMaxScansToExplode) {
+    if (totalNumScans > (size_t)internalQueryMaxScansToExplode.load()) {
         LOG(5) << "Could expand ixscans to pull out sort order but resulting scan count"
                << "(" << totalNumScans << ") is too high.";
         return false;

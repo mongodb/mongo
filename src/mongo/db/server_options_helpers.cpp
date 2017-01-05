@@ -864,11 +864,11 @@ Status storeServerOptions(const moe::Environment& params) {
     }
 
     if (params.count("systemLog.quiet")) {
-        serverGlobalParams.quiet = params["systemLog.quiet"].as<bool>();
+        serverGlobalParams.quiet.store(params["systemLog.quiet"].as<bool>());
     }
 
     if (params.count("systemLog.traceAllExceptions")) {
-        DBException::traceExceptions = params["systemLog.traceAllExceptions"].as<bool>();
+        DBException::traceExceptions.store(params["systemLog.traceAllExceptions"].as<bool>());
     }
 
     if (params.count("net.maxIncomingConnections")) {

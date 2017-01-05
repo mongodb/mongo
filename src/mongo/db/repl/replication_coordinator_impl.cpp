@@ -654,7 +654,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn,
             }
             // DataReplicator::startup() must be called outside lock because it uses features (eg.
             // setting the initial sync flag) which depend on the ReplicationCoordinatorImpl.
-            uassertStatusOK(drCopy->startup(txn, numInitialSyncAttempts));
+            uassertStatusOK(drCopy->startup(txn, numInitialSyncAttempts.load()));
         } catch (...) {
             auto status = exceptionToStatus();
             log() << "Initial Sync failed to start: " << status;

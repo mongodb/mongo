@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include <atomic>
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 
@@ -39,24 +39,24 @@ namespace mongo {
 /**
  * The maximum number of cells to use for 2D geo query covering for predicate queries
  */
-extern std::atomic<int> internalGeoPredicateQuery2DMaxCoveringCells;  // NOLINT
+extern AtomicInt32 internalGeoPredicateQuery2DMaxCoveringCells;
 
 /**
  * The maximum number of cells to use for 2D geo query covering for predicate queries
  */
-extern std::atomic<int> internalGeoNearQuery2DMaxCoveringCells;  // NOLINT
+extern AtomicInt32 internalGeoNearQuery2DMaxCoveringCells;
 
 //
 // Geo query.
 //
 
 // What is the finest level we will cover a queried region or geoNear annulus?
-extern std::atomic<int> internalQueryS2GeoFinestLevel;  // NOLINT
+extern AtomicInt32 internalQueryS2GeoFinestLevel;
 
 // What is the coarsest level we will cover a queried region or geoNear annulus?
-extern std::atomic<int> internalQueryS2GeoCoarsestLevel;  // NOLINT
+extern AtomicInt32 internalQueryS2GeoCoarsestLevel;
 
 // What is the maximum cell count that we want? (advisory, not a hard threshold)
-extern std::atomic<int> internalQueryS2GeoMaxCells;  // NOLINT
+extern AtomicInt32 internalQueryS2GeoMaxCells;
 
 }  // namespace mongo

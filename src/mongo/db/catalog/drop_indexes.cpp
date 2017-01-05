@@ -54,7 +54,7 @@ Status wrappedRun(OperationContext* txn,
                   Database* const db,
                   const BSONObj& jsobj,
                   BSONObjBuilder* anObjBuilder) {
-    if (!serverGlobalParams.quiet) {
+    if (!serverGlobalParams.quiet.load()) {
         LOG(0) << "CMD: dropIndexes " << toDeleteNs;
     }
     Collection* collection = db ? db->getCollection(toDeleteNs) : nullptr;

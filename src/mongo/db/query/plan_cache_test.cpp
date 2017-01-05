@@ -1103,11 +1103,11 @@ TEST_F(CachePlanSelectionTest,
        CachedPlanForSelfIntersectionOfMultikeyIndexNonPointRangesCannotIntersectBounds) {
     // Enable a hash-based index intersection plan to be generated because we are scanning a
     // non-point range on the "a" field.
-    bool oldEnableHashIntersection = internalQueryPlannerEnableHashIntersection;
+    bool oldEnableHashIntersection = internalQueryPlannerEnableHashIntersection.load();
     ON_BLOCK_EXIT([oldEnableHashIntersection] {
-        internalQueryPlannerEnableHashIntersection = oldEnableHashIntersection;
+        internalQueryPlannerEnableHashIntersection.store(oldEnableHashIntersection);
     });
-    internalQueryPlannerEnableHashIntersection = true;
+    internalQueryPlannerEnableHashIntersection.store(true);
     params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 
     const bool multikey = true;
@@ -1144,11 +1144,11 @@ TEST_F(CachePlanSelectionTest, CachedPlanForIntersectionOfMultikeyIndexesWhenUsi
 TEST_F(CachePlanSelectionTest, CachedPlanForIntersectionWithNonMultikeyIndexCanIntersectBounds) {
     // Enable a hash-based index intersection plan to be generated because we are scanning a
     // non-point range on the "a.c" field.
-    bool oldEnableHashIntersection = internalQueryPlannerEnableHashIntersection;
+    bool oldEnableHashIntersection = internalQueryPlannerEnableHashIntersection.load();
     ON_BLOCK_EXIT([oldEnableHashIntersection] {
-        internalQueryPlannerEnableHashIntersection = oldEnableHashIntersection;
+        internalQueryPlannerEnableHashIntersection.store(oldEnableHashIntersection);
     });
-    internalQueryPlannerEnableHashIntersection = true;
+    internalQueryPlannerEnableHashIntersection.store(true);
     params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 
     const bool multikey = true;

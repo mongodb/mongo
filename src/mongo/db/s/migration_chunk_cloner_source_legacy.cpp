@@ -405,7 +405,7 @@ Status MigrationChunkClonerSourceLegacy::nextCloneBatch(OperationContext* txn,
     dassert(txn->lockState()->isCollectionLockedForMode(_args.getNss().ns(), MODE_IS));
 
     ElapsedTracker tracker(txn->getServiceContext()->getFastClockSource(),
-                           internalQueryExecYieldIterations,
+                           internalQueryExecYieldIterations.load(),
                            Milliseconds(internalQueryExecYieldPeriodMS.load()));
 
     stdx::lock_guard<stdx::mutex> sl(_mutex);

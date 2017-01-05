@@ -52,7 +52,7 @@ public:
      * 'bufferSizeBytes' is a soft cap, and may be exceeded by one document's worth (~16MB).
      */
     static boost::intrusive_ptr<TeeBuffer> create(
-        size_t nConsumers, int bufferSizeBytes = internalQueryFacetBufferSizeBytes);
+        size_t nConsumers, int bufferSizeBytes = internalQueryFacetBufferSizeBytes.load());
 
     void setSource(const boost::intrusive_ptr<DocumentSource>& source) {
         _source = source;

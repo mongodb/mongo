@@ -183,7 +183,7 @@ Status doSaslStep(const Client* client,
               << session->getPrincipalId() << " on " << session->getAuthenticationDatabase()
               << " from client " << client->getRemote().toString() << " ; " << redact(status);
 
-        sleepmillis(saslGlobalParams.authFailedDelay);
+        sleepmillis(saslGlobalParams.authFailedDelay.load());
         // All the client needs to know is that authentication has failed.
         return Status(ErrorCodes::AuthenticationFailed, "Authentication failed.");
     }
@@ -200,7 +200,7 @@ Status doSaslStep(const Client* client,
             return status;
         }
 
-        if (!serverGlobalParams.quiet) {
+        if (!serverGlobalParams.quiet.load()) {
             log() << "Successfully authenticated as principal " << session->getPrincipalId()
                   << " on " << session->getAuthenticationDatabase();
         }

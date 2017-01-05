@@ -63,7 +63,7 @@ FTDCController* getGlobalFTDCController() {
     return getFTDCController(getGlobalServiceContext()).get();
 }
 
-std::atomic<bool> localEnabledFlag(FTDCConfig::kEnabledDefault);  // NOLINT
+AtomicBool localEnabledFlag(FTDCConfig::kEnabledDefault);
 
 class ExportedFTDCEnabledParameter
     : public ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime> {
@@ -85,7 +85,7 @@ public:
 
 } exportedFTDCEnabledParameter;
 
-std::atomic<std::int32_t> localPeriodMillis(FTDCConfig::kPeriodMillisDefault);  // NOLINT
+AtomicInt32 localPeriodMillis(FTDCConfig::kPeriodMillisDefault);
 
 class ExportedFTDCPeriodParameter
     : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {
@@ -114,11 +114,9 @@ public:
 } exportedFTDCPeriodParameter;
 
 // Scale the values down since are defaults are in bytes, but the user interface is MB
-std::atomic<std::int32_t> localMaxDirectorySizeMB(  // NOLINT
-    FTDCConfig::kMaxDirectorySizeBytesDefault / (1024 * 1024));
+AtomicInt32 localMaxDirectorySizeMB(FTDCConfig::kMaxDirectorySizeBytesDefault / (1024 * 1024));
 
-std::atomic<std::int32_t> localMaxFileSizeMB(FTDCConfig::kMaxFileSizeBytesDefault /  // NOLINT
-                                             (1024 * 1024));
+AtomicInt32 localMaxFileSizeMB(FTDCConfig::kMaxFileSizeBytesDefault / (1024 * 1024));
 
 class ExportedFTDCDirectorySizeParameter
     : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {
@@ -136,12 +134,12 @@ public:
                 "diagnosticDataCollectionDirectorySizeMB must be greater than or equal to 10");
         }
 
-        if (potentialNewValue < localMaxFileSizeMB) {
+        if (potentialNewValue < localMaxFileSizeMB.load()) {
             return Status(
                 ErrorCodes::BadValue,
                 str::stream()
                     << "diagnosticDataCollectionDirectorySizeMB must be greater than or equal to '"
-                    << localMaxFileSizeMB
+                    << localMaxFileSizeMB.load()
                     << "' which is the current value of diagnosticDataCollectionFileSizeMB.");
         }
 
@@ -170,12 +168,12 @@ public:
                           "diagnosticDataCollectionFileSizeMB must be greater than or equal to 1");
         }
 
-        if (potentialNewValue > localMaxDirectorySizeMB) {
+        if (potentialNewValue > localMaxDirectorySizeMB.load()) {
             return Status(
                 ErrorCodes::BadValue,
                 str::stream()
                     << "diagnosticDataCollectionFileSizeMB must be less than or equal to '"
-                    << localMaxDirectorySizeMB
+                    << localMaxDirectorySizeMB.load()
                     << "' which is the current value of diagnosticDataCollectionDirectorySizeMB.");
         }
 
@@ -189,7 +187,7 @@ public:
 
 } exportedFTDCFileSizeParameter;
 
-std::atomic<std::int32_t> localMaxSamplesPerArchiveMetricChunk(  // NOLINT
+AtomicInt32 localMaxSamplesPerArchiveMetricChunk(
     FTDCConfig::kMaxSamplesPerArchiveMetricChunkDefault);
 
 class ExportedFTDCArchiveChunkSizeParameter
@@ -218,7 +216,7 @@ public:
 
 } exportedFTDCArchiveChunkSizeParameter;
 
-std::atomic<std::int32_t> localMaxSamplesPerInterimMetricChunk(  // NOLINT
+AtomicInt32 localMaxSamplesPerInterimMetricChunk(
     FTDCConfig::kMaxSamplesPerInterimMetricChunkDefault);
 
 class ExportedFTDCInterimChunkSizeParameter
@@ -296,11 +294,11 @@ void startFTDC() {
 
     FTDCConfig config;
     config.period = Milliseconds(localPeriodMillis.load());
-    config.enabled = localEnabledFlag;
-    config.maxFileSizeBytes = localMaxFileSizeMB * 1024 * 1024;
-    config.maxDirectorySizeBytes = localMaxDirectorySizeMB * 1024 * 1024;
-    config.maxSamplesPerArchiveMetricChunk = localMaxSamplesPerArchiveMetricChunk;
-    config.maxSamplesPerInterimMetricChunk = localMaxSamplesPerInterimMetricChunk;
+    config.enabled = localEnabledFlag.load();
+    config.maxFileSizeBytes = localMaxFileSizeMB.load() * 1024 * 1024;
+    config.maxDirectorySizeBytes = localMaxDirectorySizeMB.load() * 1024 * 1024;
+    config.maxSamplesPerArchiveMetricChunk = localMaxSamplesPerArchiveMetricChunk.load();
+    config.maxSamplesPerInterimMetricChunk = localMaxSamplesPerInterimMetricChunk.load();
 
     auto controller = stdx::make_unique<FTDCController>(dir, config);
 

@@ -686,7 +686,7 @@ public:
             // Add SCRAM credentials for appropriate authSchemaVersions.
             if (authzVersion > AuthorizationManager::schemaVersion26Final) {
                 BSONObj scramCred = scram::generateCredentials(
-                    args.hashedPassword, saslGlobalParams.scramIterationCount);
+                    args.hashedPassword, saslGlobalParams.scramIterationCount.load());
                 credentialsBuilder.append("SCRAM-SHA-1", scramCred);
             } else {  // Otherwise default to MONGODB-CR.
                 credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
@@ -801,7 +801,7 @@ public:
             // Add SCRAM credentials for appropriate authSchemaVersions
             if (authzVersion > AuthorizationManager::schemaVersion26Final) {
                 BSONObj scramCred = scram::generateCredentials(
-                    args.hashedPassword, saslGlobalParams.scramIterationCount);
+                    args.hashedPassword, saslGlobalParams.scramIterationCount.load());
                 credentialsBuilder.append("SCRAM-SHA-1", scramCred);
             } else {  // Otherwise default to MONGODB-CR
                 credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
@@ -2785,7 +2785,7 @@ void updateUserCredentials(OperationContext* txn,
         BSONObjBuilder toSetBuilder(updateBuilder.subobjStart("$set"));
         toSetBuilder << "credentials"
                      << BSON("SCRAM-SHA-1" << scram::generateCredentials(
-                                 hashedPassword, saslGlobalParams.scramIterationCount));
+                                 hashedPassword, saslGlobalParams.scramIterationCount.load()));
     }
 
     uassertStatusOK(updateOneAuthzDocument(

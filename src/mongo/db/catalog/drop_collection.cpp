@@ -52,7 +52,7 @@ namespace mongo {
 Status dropCollection(OperationContext* txn,
                       const NamespaceString& collectionName,
                       BSONObjBuilder& result) {
-    if (!serverGlobalParams.quiet) {
+    if (!serverGlobalParams.quiet.load()) {
         log() << "CMD: drop " << collectionName;
     }
 

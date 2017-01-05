@@ -105,7 +105,7 @@ public:
             return false;
         }
 
-        if (!serverGlobalParams.quiet) {
+        if (!serverGlobalParams.quiet.load()) {
             LOG(0) << "CMD: validate " << nss.ns();
         }
 

@@ -115,7 +115,7 @@ public:
     class OpQueue {
     public:
         OpQueue() : _bytes(0) {
-            _batch.reserve(replBatchLimitOperations);
+            _batch.reserve(replBatchLimitOperations.load());
         }
 
         size_t getBytes() const {
@@ -214,7 +214,7 @@ public:
      */
     OldThreadPool* getWriterPool();
 
-    static std::atomic<int> replBatchLimitOperations;  // NOLINT (server param must use std::atomic)
+    static AtomicInt32 replBatchLimitOperations;
 
 protected:
     static const unsigned int replBatchLimitBytes = 100 * 1024 * 1024;

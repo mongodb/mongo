@@ -255,7 +255,8 @@ Status ClusterAggregate::runAggregate(OperationContext* txn,
     // Run merging command on random shard, unless a stage needs the primary shard. Need to use
     // ShardConnection so that the merging mongod is sent the config servers on connection init.
     auto& prng = txn->getClient()->getPrng();
-    const auto& mergingShardId = (needPrimaryShardMerger || internalQueryAlwaysMergeOnPrimaryShard)
+    const auto& mergingShardId =
+        (needPrimaryShardMerger || internalQueryAlwaysMergeOnPrimaryShard.load())
         ? conf->getPrimaryId()
         : shardResults[prng.nextInt32(shardResults.size())].shardTargetId;
     const auto mergingShard =

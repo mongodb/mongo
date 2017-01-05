@@ -69,7 +69,7 @@ namespace {
  * - setting to false will fail.
  */
 // Unused, needed for server parameter.
-std::atomic<bool> newCollectionsUsePowerOf2SizesFlag(true);  // NOLINT
+AtomicBool newCollectionsUsePowerOf2SizesFlag(true);
 
 class NewCollectionsUsePowerOf2SizesParameter
     : public ExportedServerParameter<bool, ServerParameterType::kStartupAndRuntime> {

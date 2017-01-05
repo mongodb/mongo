@@ -498,7 +498,7 @@ void Stats::S::_asObj(BSONObjBuilder* builder) const {
                    << "commitsInWriteLock"
                    << (unsigned)(_commitsInWriteLockMicros / 1000));
 
-    if (storageGlobalParams.journalCommitIntervalMs != 0) {
+    if (storageGlobalParams.journalCommitIntervalMs.load() != 0) {
         b << "journalCommitIntervalMs" << storageGlobalParams.journalCommitIntervalMs.load();
     }
 }
@@ -686,7 +686,7 @@ static void durThread(ClockSource* cs, int64_t serverStartMs) {
     uint64_t remapLastTimestamp(0);
 
     while (shutdownRequested.loadRelaxed() == 0) {
-        unsigned ms = storageGlobalParams.journalCommitIntervalMs;
+        unsigned ms = storageGlobalParams.journalCommitIntervalMs.load();
         if (ms == 0) {
             ms = samePartition ? 100 : 30;
         }

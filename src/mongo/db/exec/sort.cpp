@@ -101,7 +101,7 @@ bool SortStage::isEOF() {
 }
 
 PlanStage::StageState SortStage::doWork(WorkingSetID* out) {
-    const size_t maxBytes = static_cast<size_t>(internalQueryExecMaxBlockingSortBytes);
+    const size_t maxBytes = static_cast<size_t>(internalQueryExecMaxBlockingSortBytes.load());
     if (_memUsage > maxBytes) {
         mongoutils::str::stream ss;
         ss << "Sort operation used more than the maximum " << maxBytes
@@ -219,7 +219,7 @@ void SortStage::doInvalidate(OperationContext* txn, const RecordId& dl, Invalida
 
 unique_ptr<PlanStageStats> SortStage::getStats() {
     _commonStats.isEOF = isEOF();
-    const size_t maxBytes = static_cast<size_t>(internalQueryExecMaxBlockingSortBytes);
+    const size_t maxBytes = static_cast<size_t>(internalQueryExecMaxBlockingSortBytes.load());
     _specificStats.memLimit = maxBytes;
     _specificStats.memUsage = _memUsage;
     _specificStats.limit = _limit;

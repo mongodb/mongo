@@ -157,7 +157,7 @@ bool CmdAuthenticate::run(OperationContext* txn,
                           int,
                           string& errmsg,
                           BSONObjBuilder& result) {
-    if (!serverGlobalParams.quiet) {
+    if (!serverGlobalParams.quiet.load()) {
         mutablebson::Document cmdToLog(cmdObj, mutablebson::Document::kInPlaceDisabled);
         redactForLogging(&cmdToLog);
         log() << " authenticate db: " << dbname << " " << cmdToLog;
@@ -185,7 +185,7 @@ bool CmdAuthenticate::run(OperationContext* txn,
     Status status = _authenticate(txn, mechanism, user, cmdObj);
     audit::logAuthentication(Client::getCurrent(), mechanism, user, status.code());
     if (!status.isOK()) {
-        if (!serverGlobalParams.quiet) {
+        if (!serverGlobalParams.quiet.load()) {
             log() << "Failed to authenticate " << user << " with mechanism " << mechanism << ": "
                   << status;
         }
@@ -196,7 +196,7 @@ bool CmdAuthenticate::run(OperationContext* txn,
         } else {
             appendCommandStatus(result, status);
         }
-        sleepmillis(saslGlobalParams.authFailedDelay);
+        sleepmillis(saslGlobalParams.authFailedDelay.load());
         return false;
     }
     result.append("dbname", user.getDB());

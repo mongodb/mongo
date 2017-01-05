@@ -249,7 +249,7 @@ double PlanRanker::scoreTree(const PlanStageStats* stats) {
     std::string scoreStr = ss;
     LOG(2) << scoreStr;
 
-    if (internalQueryForceIntersectionPlans) {
+    if (internalQueryForceIntersectionPlans.load()) {
         if (hasStage(STAGE_AND_HASH, stats) || hasStage(STAGE_AND_SORTED, stats)) {
             // The boost should be >2.001 to make absolutely sure the ixisect plan will win due
             // to the combination of 1) productivity, 2) eof bonus, and 3) no ixisect bonus.

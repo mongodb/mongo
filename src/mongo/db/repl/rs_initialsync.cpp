@@ -540,7 +540,7 @@ void syncDoInitialSync(OperationContext* txn,
     });
 
     int failedAttempts = 0;
-    while (failedAttempts < num3Dot2InitialSyncAttempts) {
+    while (failedAttempts < num3Dot2InitialSyncAttempts.load()) {
         try {
             // leave loop when successful
             Status status = _initialSync(txn, bgsync.get());
@@ -562,12 +562,12 @@ void syncDoInitialSync(OperationContext* txn,
         }
 
         error() << "initial sync attempt failed, "
-                << (num3Dot2InitialSyncAttempts - ++failedAttempts) << " attempts remaining";
+                << (num3Dot2InitialSyncAttempts.load() - ++failedAttempts) << " attempts remaining";
         sleepmillis(durationCount<Milliseconds>(kInitialSyncRetrySleepDuration));
     }
 
     // No need to print a stack
-    if (failedAttempts >= num3Dot2InitialSyncAttempts) {
+    if (failedAttempts >= num3Dot2InitialSyncAttempts.load()) {
         severe() << "The maximum number of retries have been exhausted for initial sync.";
         fassertFailedNoTrace(16233);
     }

@@ -76,8 +76,8 @@ bool setUpSecurityKey(const string& filename) {
     credentials.password =
         mongo::createPasswordDigest(internalSecurity.user->getName().getUser().toString(), str);
 
-    BSONObj creds =
-        scram::generateCredentials(credentials.password, saslGlobalParams.scramIterationCount);
+    BSONObj creds = scram::generateCredentials(credentials.password,
+                                               saslGlobalParams.scramIterationCount.load());
     credentials.scram.iterationCount = creds[scram::iterationCountFieldName].Int();
     credentials.scram.salt = creds[scram::saltFieldName].String();
     credentials.scram.storedKey = creds[scram::storedKeyFieldName].String();

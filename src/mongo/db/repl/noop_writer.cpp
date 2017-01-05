@@ -160,7 +160,7 @@ void NoopWriter::_writeNoop(OperationContext* txn) {
         LOG(1) << "Not scheduling a noop write. Last known OpTime: " << _lastKnownOpTime
                << " != last primary OpTime: " << lastAppliedOpTime;
     } else {
-        if (writePeriodicNoops) {
+        if (writePeriodicNoops.load()) {
             const auto logLevel = Command::testCommandsEnabled ? 0 : 1;
             LOG(logLevel)
                 << "Writing noop to oplog as there has been no writes to this replica set in over "

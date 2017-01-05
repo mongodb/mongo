@@ -474,7 +474,7 @@ void DBClientWithCommands::_auth(const BSONObj& params) {
 
 bool DBClientWithCommands::authenticateInternalUser() {
     if (!isInternalAuthSet()) {
-        if (!serverGlobalParams.quiet) {
+        if (!serverGlobalParams.quiet.load()) {
             log() << "ERROR: No authentication parameters set for internal user";
         }
         return false;
@@ -484,7 +484,7 @@ bool DBClientWithCommands::authenticateInternalUser() {
         auth(getInternalUserAuthParams());
         return true;
     } catch (const UserException& ex) {
-        if (!serverGlobalParams.quiet) {
+        if (!serverGlobalParams.quiet.load()) {
             log() << "can't authenticate to " << toString()
                   << " as internal user, error: " << ex.what();
         }

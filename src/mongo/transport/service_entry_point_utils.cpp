@@ -90,7 +90,7 @@ void* runFunc(void* ptr) {
 
     tl->end(ctx->session);
 
-    if (!serverGlobalParams.quiet) {
+    if (!serverGlobalParams.quiet.load()) {
         auto conns = tl->sessionStats().numOpenSessions;
         const char* word = (conns == 1 ? " connection" : " connections");
         log() << "end connection " << ctx->session->remote() << " (" << conns << word

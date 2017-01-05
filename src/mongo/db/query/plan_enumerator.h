@@ -43,8 +43,8 @@ namespace mongo {
 struct PlanEnumeratorParams {
     PlanEnumeratorParams()
         : intersect(false),
-          maxSolutionsPerOr(internalQueryEnumerationMaxOrSolutions),
-          maxIntersectPerAnd(internalQueryEnumerationMaxIntersectPerAnd) {}
+          maxSolutionsPerOr(internalQueryEnumerationMaxOrSolutions.load()),
+          maxIntersectPerAnd(internalQueryEnumerationMaxIntersectPerAnd.load()) {}
 
     // Do we provide solutions that use more indices than the minimum required to provide
     // an indexed solution?

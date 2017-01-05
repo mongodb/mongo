@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/platform/atomic_proxy.h"
+#include "mongo/platform/atomic_word.h"
 
 /*
  * This file defines the storage for options that come from the command line related to data file
@@ -81,11 +82,11 @@ struct StorageGlobalParams {
 
     // --journalCommitInterval
     static const int kMaxJournalCommitIntervalMs;
-    std::atomic<int> journalCommitIntervalMs;  // NOLINT
+    AtomicInt32 journalCommitIntervalMs;
 
     // --notablescan
     // no table scans allowed
-    std::atomic<bool> noTableScan{false};  // NOLINT
+    AtomicBool noTableScan{false};
 
     // --directoryperdb
     // Stores each database’s files in its own folder in the data directory.

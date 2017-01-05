@@ -699,7 +699,7 @@ StatusWith<NearStage::CoveredInterval*>  //
     const int twoDFieldPosition = 0;
 
     std::vector<GeoHash> unorderedCovering = ExpressionMapping::get2dCovering(
-        *coverRegion, _twoDIndex->infoObj(), internalGeoNearQuery2DMaxCoveringCells);
+        *coverRegion, _twoDIndex->infoObj(), internalGeoNearQuery2DMaxCoveringCells.load());
 
     // Make sure the same index key isn't visited twice
     R2CellUnion diffUnion;

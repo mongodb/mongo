@@ -972,7 +972,7 @@ QuerySolutionNode* QueryPlannerAccess::buildIndexedAnd(const CanonicalQuery& que
             AndSortedNode* asn = new AndSortedNode();
             asn->children.swap(ixscanNodes);
             andResult = asn;
-        } else if (internalQueryPlannerEnableHashIntersection) {
+        } else if (internalQueryPlannerEnableHashIntersection.load()) {
             AndHashNode* ahn = new AndHashNode();
             ahn->children.swap(ixscanNodes);
             andResult = ahn;

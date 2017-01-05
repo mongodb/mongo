@@ -41,18 +41,18 @@ using std::string;
 using std::vector;
 
 TEST(ServerParameters, Simple1) {
-    std::atomic<int> f(5);  // NOLINT
+    AtomicInt32 f(5);
     ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> ff(NULL, "ff", &f);
     ASSERT_EQUALS("ff", ff.name());
 
     ff.set(6);
-    ASSERT_EQUALS(6, f);
+    ASSERT_EQUALS(6, f.load());
 
     ff.set(BSON("x" << 7).firstElement());
-    ASSERT_EQUALS(7, f);
+    ASSERT_EQUALS(7, f.load());
 
     ff.setFromString("8");
-    ASSERT_EQUALS(8, f);
+    ASSERT_EQUALS(8, f.load());
 }
 
 TEST(ServerParameters, Vector1) {

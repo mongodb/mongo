@@ -838,7 +838,7 @@ void ReplSource::syncToTailOfRemoteLog() {
     }
 }
 
-std::atomic<int> replApplyBatchSize(1);  // NOLINT
+AtomicInt32 replApplyBatchSize(1);
 
 class ReplApplyBatchSize
     : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {
@@ -1065,7 +1065,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
 
             BSONObj op = oplogReader.nextSafe();
 
-            int b = replApplyBatchSize;
+            int b = replApplyBatchSize.load();
             bool justOne = b == 1;
             unique_ptr<Lock::GlobalWrite> lk(justOne ? 0 : new Lock::GlobalWrite(txn->lockState()));
             while (1) {
@@ -1137,7 +1137,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* txn, int& nApplied) {
 int ReplSource::sync(OperationContext* txn, int& nApplied) {
     _sleepAdviceTime = 0;
     ReplInfo r("sync");
-    if (!serverGlobalParams.quiet) {
+    if (!serverGlobalParams.quiet.load()) {
         LogstreamBuilder l = log();
         l << "syncing from ";
         if (sourceName() != "main") {
@@ -1293,7 +1293,7 @@ static void replMain(OperationContext* txn) {
             stringstream ss;
             ss << "sleep " << s << " sec before next pass";
             string msg = ss.str();
-            if (!serverGlobalParams.quiet)
+            if (!serverGlobalParams.quiet.load())
                 log() << msg << endl;
             ReplInfo r(msg.c_str());
             sleepsecs(s);

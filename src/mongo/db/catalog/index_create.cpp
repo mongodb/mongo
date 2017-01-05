@@ -66,7 +66,7 @@ MONGO_FP_DECLARE(crashAfterStartingIndexBuild);
 MONGO_FP_DECLARE(hangAfterStartingIndexBuild);
 MONGO_FP_DECLARE(hangAfterStartingIndexBuildUnlocked);
 
-std::atomic<std::int32_t> maxIndexBuildMemoryUsageMegabytes(500);  // NOLINT
+AtomicInt32 maxIndexBuildMemoryUsageMegabytes(500);
 
 class ExportedMaxIndexBuildMemoryUsageParameter
     : public ExportedServerParameter<std::int32_t, ServerParameterType::kStartupAndRuntime> {
@@ -213,7 +213,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(const std::vector<BSONObj
     std::size_t eachIndexBuildMaxMemoryUsageBytes = 0;
     if (!indexSpecs.empty()) {
         eachIndexBuildMaxMemoryUsageBytes =
-            std::size_t(maxIndexBuildMemoryUsageMegabytes) * 1024 * 1024 / indexSpecs.size();
+            static_cast<std::size_t>(maxIndexBuildMemoryUsageMegabytes.load()) * 1024 * 1024 /
+            indexSpecs.size();
     }
 
     for (size_t i = 0; i < indexSpecs.size(); i++) {

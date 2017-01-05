@@ -43,8 +43,7 @@ namespace {
 
 // Period of time after which mortal cursors are killed for inactivity. Configurable with server
 // parameter "cursorTimeoutMillis".
-std::atomic<long long> cursorTimeoutMillis(  // NOLINT
-    durationCount<Milliseconds>(Minutes(10)));
+AtomicInt64 cursorTimeoutMillis(durationCount<Milliseconds>(Minutes(10)));
 
 ExportedServerParameter<long long, ServerParameterType::kStartupAndRuntime>
     cursorTimeoutMillisConfig(ServerParameterSet::getGlobal(),
@@ -71,7 +70,7 @@ void ClusterCursorCleanupJob::run() {
         manager->killMortalCursorsInactiveSince(Date_t::now() -
                                                 Milliseconds(cursorTimeoutMillis.load()));
         manager->incrementCursorsTimedOut(manager->reapZombieCursors());
-        sleepsecs(clientCursorMonitorFrequencySecs);
+        sleepsecs(clientCursorMonitorFrequencySecs.load());
     }
 }
 

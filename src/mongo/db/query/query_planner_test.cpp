@@ -3281,15 +3281,15 @@ TEST_F(QueryPlannerTest, IntersectCanBeVeryBig) {
                  "{ 'a' : null, 'b' : 9, 'c' : null, 'd' : null },"
                  "{ 'a' : null, 'b' : 16, 'c' : null, 'd' : null }]}"));
 
-    assertNumSolutions(internalQueryEnumerationMaxOrSolutions);
+    assertNumSolutions(internalQueryEnumerationMaxOrSolutions.load());
 }
 
 // Ensure that disabling AND_HASH intersection works properly.
 TEST_F(QueryPlannerTest, IntersectDisableAndHash) {
-    bool oldEnableHashIntersection = internalQueryPlannerEnableHashIntersection;
+    bool oldEnableHashIntersection = internalQueryPlannerEnableHashIntersection.load();
 
     // Turn index intersection on but disable hash-based intersection.
-    internalQueryPlannerEnableHashIntersection = false;
+    internalQueryPlannerEnableHashIntersection.store(false);
     params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
 
     addIndex(BSON("a" << 1));
@@ -3315,7 +3315,7 @@ TEST_F(QueryPlannerTest, IntersectDisableAndHash) {
         "{ixscan: {filter: null, pattern: {c:1}}}]}}}}");
 
     // Restore the old value of the has intersection switch.
-    internalQueryPlannerEnableHashIntersection = oldEnableHashIntersection;
+    internalQueryPlannerEnableHashIntersection.store(oldEnableHashIntersection);
 }
 
 //
@@ -3556,7 +3556,7 @@ TEST_F(QueryPlannerTest, OrEnumerationLimit) {
                  "{a: 5, b: 5},"
                  "{a: 6, b: 6}]}"));
 
-    assertNumSolutions(internalQueryEnumerationMaxOrSolutions);
+    assertNumSolutions(internalQueryEnumerationMaxOrSolutions.load());
 }
 
 TEST_F(QueryPlannerTest, OrEnumerationLimit2) {
@@ -3573,7 +3573,7 @@ TEST_F(QueryPlannerTest, OrEnumerationLimit2) {
                  "{a: 2, b: 2, c: 2, d: 2},"
                  "{a: 3, b: 3, c: 3, d: 3}]}"));
 
-    assertNumSolutions(internalQueryEnumerationMaxOrSolutions);
+    assertNumSolutions(internalQueryEnumerationMaxOrSolutions.load());
 }
 
 // SERVER-13104: test that we properly enumerate all solutions for nested $or.

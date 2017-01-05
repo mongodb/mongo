@@ -141,7 +141,7 @@ bool ClientCursor::shouldTimeout(int millis) {
     if (_isNoTimeout || _isPinned) {
         return false;
     }
-    return _idleAgeMillis > cursorTimeoutMillis;
+    return _idleAgeMillis > cursorTimeoutMillis.load();
 }
 
 void ClientCursor::resetIdleTime() {
@@ -273,7 +273,7 @@ public:
                 cursorStatsTimedOut.increment(
                     CursorManager::timeoutCursorsGlobal(&txn, t.millisReset()));
             }
-            sleepsecs(clientCursorMonitorFrequencySecs);
+            sleepsecs(clientCursorMonitorFrequencySecs.load());
         }
     }
 };
