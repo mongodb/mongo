@@ -75,6 +75,10 @@ const BSONObj kReplSecondaryOkMetadata{[] {
     return o.obj();
 }()};
 
+// TODO (SERVER-27029): This value was chosen to be greater than the time it takes for the hang
+// analyzer to kick in. Remove once the cause for the test failure has been figured out.
+const Hours kLongFutureTimeout(8);
+
 class AddShardTest : public ConfigServerTestFixture {
 protected:
     /**
@@ -404,7 +408,7 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
     // Wait for the addShard to complete before checking the config database
-    future.timed_get(kFutureTimeout);
+    future.timed_get(kLongFutureTimeout);
 
     // Ensure that the shard document was properly added to config.shards.
     assertShardExists(expectedShard);
@@ -483,7 +487,7 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
     // Wait for the addShard to complete before checking the config database
-    future.timed_get(kFutureTimeout);
+    future.timed_get(kLongFutureTimeout);
 
     // Ensure that the shard document was properly added to config.shards.
     assertShardExists(expectedShard);
@@ -509,7 +513,7 @@ TEST_F(AddShardTest, AddSCCCConnectionStringAsShard) {
         ASSERT_STRING_CONTAINS(status.getStatus().reason(), "Invalid connection string");
     });
 
-    future.timed_get(kFutureTimeout);
+    future.timed_get(kLongFutureTimeout);
 }
 
 TEST_F(AddShardTest, EmptyShardName) {
@@ -527,7 +531,7 @@ TEST_F(AddShardTest, EmptyShardName) {
         ASSERT_EQUALS("shard name cannot be empty", status.getStatus().reason());
     });
 
-    future.timed_get(kFutureTimeout);
+    future.timed_get(kLongFutureTimeout);
 }
 
 // Host is unreachable, cannot verify host.
@@ -552,7 +556,7 @@ TEST_F(AddShardTest, UnreachableHost) {
     Status hostUnreachableStatus = Status(ErrorCodes::HostUnreachable, "host unreachable");
     expectIsMaster(shardTarget, hostUnreachableStatus);
 
-    future.timed_get(kFutureTimeout);
+    future.timed_get(kLongFutureTimeout);
 }
 
 // Cannot add mongos as a shard.
@@ -577,7 +581,7 @@ TEST_F(AddShardTest, AddMongosAsShard) {
         Status(ErrorCodes::RPCProtocolNegotiationFailed, "Unable to communicate");
     expectIsMaster(shardTarget, rpcProtocolNegFailedStatus);
 
-    future.timed_get(kFutureTimeout);
+    future.timed_get(kLongFutureTimeout);
 }
 
 // Attempt to add a pre-v3.4 mongod.
@@ -603,7 +607,7 @@ TEST_F(AddShardTest, AddVersion32Shard) {
         BSON("ok" << 1 << "ismaster" << true << "maxWireVersion" << WireVersion::FIND_COMMAND);
     expectIsMaster(shardTarget, commandResponse);
 
-    future.timed_get(kFutureTimeout);
+    future.timed_get(kLongFutureTimeout);
 }
 
 // A replica set name was found for the host but no name was provided with the host.
@@ -631,7 +635,7 @@ TEST_F(AddShardTest, AddReplicaSetShardAsStandalone) {
                                         << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     expectIsMaster(shardTarget, commandResponse);
 
-    future.timed_get(kFutureTimeout);
+    future.timed_get(kLongFutureTimeout);
 }
 
 // A replica set name was provided with the host but no name was found for the host.
@@ -659,7 +663,7 @@ TEST_F(AddShardTest, AddStandaloneHostShardAsReplicaSet) {
                                         << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     expectIsMaster(shardTarget, commandResponse);
 
-    future.timed_get(kFutureTimeout);
+    future.timed_get(kLongFutureTimeout);
 }
 
 // Provided replica set name does not match found replica set name.
@@ -689,7 +693,7 @@ TEST_F(AddShardTest, ReplicaSetMistmatchedReplicaSetName) {
                                         << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     expectIsMaster(shardTarget, commandResponse);
 
-    future.timed_get(kFutureTimeout);
+    future.timed_get(kLongFutureTimeout);
 }
 
 // Cannot add config server as a shard.
@@ -722,7 +726,7 @@ TEST_F(AddShardTest, ShardIsCSRSConfigServer) {
                                         << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     expectIsMaster(shardTarget, commandResponse);
 
-    future.timed_get(kFutureTimeout);
+    future.timed_get(kLongFutureTimeout);
 }
 
 // One of the hosts is not part of the found replica set.
@@ -757,7 +761,7 @@ TEST_F(AddShardTest, ReplicaSetMissingHostsProvidedInSeedList) {
                                         << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     expectIsMaster(shardTarget, commandResponse);
 
-    future.timed_get(kFutureTimeout);
+    future.timed_get(kLongFutureTimeout);
 }
 
 // Cannot add a shard with the shard name "config".
@@ -793,7 +797,7 @@ TEST_F(AddShardTest, AddShardWithNameConfigFails) {
                                         << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
     expectIsMaster(shardTarget, commandResponse);
 
-    future.timed_get(kFutureTimeout);
+    future.timed_get(kLongFutureTimeout);
 }
 
 TEST_F(AddShardTest, ShardContainsExistingDatabase) {
@@ -844,7 +848,7 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
 
     expectListDatabases(shardTarget, {BSON("name" << existingDB.getName())});
 
-    future.timed_get(kFutureTimeout);
+    future.timed_get(kLongFutureTimeout);
 }
 
 TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
@@ -896,7 +900,7 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
     // Wait for the addShard to complete before checking the config database
-    future.timed_get(kFutureTimeout);
+    future.timed_get(kLongFutureTimeout);
 
     // Ensure that the shard document was properly added to config.shards.
     assertShardExists(expectedShard);
@@ -958,7 +962,7 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
     // Wait for the addShard to complete before checking the config database
-    future.timed_get(kFutureTimeout);
+    future.timed_get(kLongFutureTimeout);
 
     // Ensure that the shard document was properly added to config.shards.
     assertShardExists(expectedShard);
@@ -1034,7 +1038,7 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
     expectShardIdentityUpsertReturnSuccess(shardTarget, expectedShardName);
 
     // Wait for the addShard to complete before checking the config database
-    future.timed_get(kFutureTimeout);
+    future.timed_get(kLongFutureTimeout);
 
     // Ensure that the shard document was properly added to config.shards.
     assertShardExists(expectedShard);
@@ -1511,7 +1515,7 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
                                                  ConnectionString(shardTarget),
                                                  existingShard.getMaxSizeMB()));
     });
-    future1.timed_get(kFutureTimeout);
+    future1.timed_get(kLongFutureTimeout);
 
     // Ensure that the shard document was unchanged.
     assertShardExists(existingShard);
@@ -1525,7 +1529,7 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
                                                  ConnectionString(shardTarget),
                                                  existingShard.getMaxSizeMB() + 100));
     });
-    future2.timed_get(kFutureTimeout);
+    future2.timed_get(kLongFutureTimeout);
 
     // Adding the same standalone host but as part of a replica set should fail.
     // Ensures that even if the user changed the standalone shard to a single-node replica set, you
@@ -1540,7 +1544,7 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
                                        ConnectionString::forReplicaSet("mySet", {shardTarget}),
                                        existingShard.getMaxSizeMB()));
     });
-    future3.timed_get(kFutureTimeout);
+    future3.timed_get(kLongFutureTimeout);
 
     // Ensure that the shard document was unchanged.
     assertShardExists(existingShard);
@@ -1554,7 +1558,7 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
                                                               existingShard.getMaxSizeMB()));
         ASSERT_EQUALS(existingShardName, shardName);
     });
-    future4.timed_get(kFutureTimeout);
+    future4.timed_get(kLongFutureTimeout);
 
     // Ensure that the shard document was unchanged.
     assertShardExists(existingShard);
@@ -1569,7 +1573,7 @@ TEST_F(AddShardTest, AddExistingShardStandalone) {
                                                               existingShard.getMaxSizeMB()));
         ASSERT_EQUALS(existingShardName, shardName);
     });
-    future5.timed_get(kFutureTimeout);
+    future5.timed_get(kLongFutureTimeout);
 
     // Ensure that the shard document was unchanged.
     assertShardExists(existingShard);
@@ -1610,7 +1614,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
             catalogManager()->addShard(
                 operationContext(), &differentName, connString, existingShard.getMaxSizeMB()));
     });
-    future1.timed_get(kFutureTimeout);
+    future1.timed_get(kLongFutureTimeout);
 
     // Ensure that the shard document was unchanged.
     assertShardExists(existingShard);
@@ -1623,7 +1627,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
             catalogManager()->addShard(
                 operationContext(), nullptr, connString, existingShard.getMaxSizeMB() + 100));
     });
-    future2.timed_get(kFutureTimeout);
+    future2.timed_get(kLongFutureTimeout);
 
     // Ensure that the shard document was unchanged.
     assertShardExists(existingShard);
@@ -1641,7 +1645,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
                                                  ConnectionString(shardTarget),
                                                  existingShard.getMaxSizeMB()));
     });
-    future3.timed_get(kFutureTimeout);
+    future3.timed_get(kLongFutureTimeout);
 
     // Ensure that the shard document was unchanged.
     assertShardExists(existingShard);
@@ -1659,7 +1663,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
                                                      differentSetName, connString.getServers()),
                                                  existingShard.getMaxSizeMB()));
     });
-    future4.timed_get(kFutureTimeout);
+    future4.timed_get(kLongFutureTimeout);
 
     // Ensure that the shard document was unchanged.
     assertShardExists(existingShard);
@@ -1671,7 +1675,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
             operationContext(), &existingShardName, connString, existingShard.getMaxSizeMB()));
         ASSERT_EQUALS(existingShardName, shardName);
     });
-    future5.timed_get(kFutureTimeout);
+    future5.timed_get(kLongFutureTimeout);
 
     // Adding the same host with the same options (without explicitly specifying the shard name)
     // should succeed.
@@ -1681,7 +1685,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
             operationContext(), nullptr, connString, existingShard.getMaxSizeMB()));
         ASSERT_EQUALS(existingShardName, shardName);
     });
-    future6.timed_get(kFutureTimeout);
+    future6.timed_get(kLongFutureTimeout);
 
     // Ensure that the shard document was unchanged.
     assertShardExists(existingShard);
@@ -1704,7 +1708,7 @@ TEST_F(AddShardTest, AddExistingShardReplicaSet) {
             operationContext(), nullptr, otherHostConnString, existingShard.getMaxSizeMB()));
         ASSERT_EQUALS(existingShardName, shardName);
     });
-    future7.timed_get(kFutureTimeout);
+    future7.timed_get(kLongFutureTimeout);
 
     // Ensure that the shard document was unchanged.
     assertShardExists(existingShard);
