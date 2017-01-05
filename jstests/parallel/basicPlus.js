@@ -26,9 +26,3 @@ for (var i = 4; i < 8; ++i) {
 }
 
 t.run("one or more tests failed", true);
-
-assert(c.validate().valid, "validate failed");
-db.getCollectionNames().forEach(function(x) {
-    v = db[x].validate();
-    assert(v.valid, "validate failed for " + x + " with " + tojson(v));
-});

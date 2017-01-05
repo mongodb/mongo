@@ -10,8 +10,3 @@ for (i in params) {
 }
 
 t.run("one or more tests failed", true);
-
-db.getCollectionNames().forEach(function(x) {
-    v = db[x].validate();
-    assert(v.valid, "validate failed for " + x + " with " + tojson(v));
-});
