@@ -800,6 +800,34 @@ struct __wt_session {
 #endif
 
 	/*!
+	 * Alter a table.
+	 *
+	 * This will allow modification of some table settings after
+	 * creation.
+	 *
+	 * @snippet ex_all.c Alter a table
+	 *
+	 * @param session the session handle
+	 * @param name the URI of the object to alter, such as \c "table:stock"
+	 * @configstart{WT_SESSION.alter, see dist/api_data.py}
+	 * @config{access_pattern_hint, It is recommended that workloads that
+	 * consist primarily of updates and/or point queries specify \c random.
+	 * Workloads that do many cursor scans through large ranges of data
+	 * specify \c sequential and other workloads specify \c none.  The
+	 * option leads to an advisory call to an appropriate operating system
+	 * API where available., a string\, chosen from the following options:
+	 * \c "none"\, \c "random"\, \c "sequential"; default \c none.}
+	 * @config{cache_resident, do not ever evict the object's pages from
+	 * cache.  Not compatible with LSM tables; see @ref
+	 * tuning_cache_resident for more information., a boolean flag; default
+	 * \c false.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(alter)(WT_HANDLE_CLOSED(WT_SESSION) *session,
+	    const char *name, const char *config);
+
+	/*!
 	 * Close the session handle.
 	 *
 	 * This will release the resources associated with the session handle,
@@ -995,6 +1023,13 @@ struct __wt_session {
 	 * \c "table:stock". For a description of URI formats
 	 * see @ref data_sources.
 	 * @configstart{WT_SESSION.create, see dist/api_data.py}
+	 * @config{access_pattern_hint, It is recommended that workloads that
+	 * consist primarily of updates and/or point queries specify \c random.
+	 * Workloads that do many cursor scans through large ranges of data
+	 * specify \c sequential and other workloads specify \c none.  The
+	 * option leads to an advisory call to an appropriate operating system
+	 * API where available., a string\, chosen from the following options:
+	 * \c "none"\, \c "random"\, \c "sequential"; default \c none.}
 	 * @config{allocation_size, the file unit allocation size\, in bytes\,
 	 * must a power-of-two; smaller values decrease the file space required
 	 * by overflow items\, and the default value of 4KB is a good choice
@@ -1641,6 +1676,10 @@ struct __wt_session {
 	 * including the specified name., a string; default empty.}
 	 * @config{
 	 * ),,}
+	 * @config{include_updates, make updates from the current transaction
+	 * visible to users of the named snapshot.  Transactions started with
+	 * such a named snapshot are restricted to being read-only., a boolean
+	 * flag; default \c false.}
 	 * @config{name, specify a name for the snapshot., a string; default
 	 * empty.}
 	 * @configend
@@ -2344,8 +2383,6 @@ struct __wt_connection {
  * in seconds at which to check for files that are inactive and close them., an
  * integer between 1 and 100000; default \c 10.}
  * @config{ ),,}
- * @config{hazard_max, maximum number of simultaneous hazard pointers per
- * session handle., an integer greater than or equal to 15; default \c 1000.}
  * @config{in_memory, keep data in-memory only.  See @ref in_memory for more
  * information., a boolean flag; default \c false.}
  * @config{log = (, enable logging.  Enabling logging uses three sessions from
@@ -3428,6 +3465,14 @@ struct __wt_compressor {
  */
 struct __wt_data_source {
 	/*!
+	 * Callback to alter an object.
+	 *
+	 * @snippet ex_data_source.c WT_DATA_SOURCE alter
+	 */
+	int (*alter)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+	    const char *uri, WT_CONFIG_ARG *config);
+
+	/*!
 	 * Callback to create a new object.
 	 *
 	 * @snippet ex_data_source.c WT_DATA_SOURCE create
@@ -3730,21 +3775,25 @@ typedef enum {
 	WT_FS_OPEN_FILE_TYPE_REGULAR	/*!< open a regular file */
 } WT_FS_OPEN_FILE_TYPE;
 
+/*! WT_FILE_SYSTEM::open_file flags: random access pattern */
+#define	WT_FS_OPEN_ACCESS_RAND	0x001
+/*! WT_FILE_SYSTEM::open_file flags: sequential access pattern */
+#define	WT_FS_OPEN_ACCESS_SEQ	0x002
 /*! WT_FILE_SYSTEM::open_file flags: create if does not exist */
-#define	WT_FS_OPEN_CREATE	0x001
+#define	WT_FS_OPEN_CREATE	0x004
 /*! WT_FILE_SYSTEM::open_file flags: direct I/O requested */
-#define	WT_FS_OPEN_DIRECTIO	0x002
+#define	WT_FS_OPEN_DIRECTIO	0x008
 /*! WT_FILE_SYSTEM::open_file flags: file creation must be durable */
-#define	WT_FS_OPEN_DURABLE	0x004
+#define	WT_FS_OPEN_DURABLE	0x010
 /*!
  * WT_FILE_SYSTEM::open_file flags: return EBUSY if exclusive use not available
  */
-#define	WT_FS_OPEN_EXCLUSIVE	0x008
+#define	WT_FS_OPEN_EXCLUSIVE	0x020
 #ifndef DOXYGEN
-#define	WT_FS_OPEN_FIXED	0x010	/* Path not home relative (internal) */
+#define	WT_FS_OPEN_FIXED	0x040	/* Path not home relative (internal) */
 #endif
 /*! WT_FILE_SYSTEM::open_file flags: open is read-only */
-#define	WT_FS_OPEN_READONLY	0x020
+#define	WT_FS_OPEN_READONLY	0x080
 
 /*!
  * WT_FILE_SYSTEM::remove or WT_FILE_SYSTEM::rename flags: the remove or rename
@@ -4656,114 +4705,120 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1186
 /*! session: open session count */
 #define	WT_STAT_CONN_SESSION_OPEN			1187
+/*! session: table alter failed calls */
+#define	WT_STAT_CONN_SESSION_TABLE_ALTER_FAIL		1188
+/*! session: table alter successful calls */
+#define	WT_STAT_CONN_SESSION_TABLE_ALTER_SUCCESS	1189
+/*! session: table alter unchanged and skipped */
+#define	WT_STAT_CONN_SESSION_TABLE_ALTER_SKIP		1190
 /*! session: table compact failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_FAIL		1188
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_FAIL		1191
 /*! session: table compact successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_SUCCESS	1189
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_SUCCESS	1192
 /*! session: table create failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_CREATE_FAIL		1190
+#define	WT_STAT_CONN_SESSION_TABLE_CREATE_FAIL		1193
 /*! session: table create successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_CREATE_SUCCESS	1191
+#define	WT_STAT_CONN_SESSION_TABLE_CREATE_SUCCESS	1194
 /*! session: table drop failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_DROP_FAIL		1192
+#define	WT_STAT_CONN_SESSION_TABLE_DROP_FAIL		1195
 /*! session: table drop successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_DROP_SUCCESS		1193
+#define	WT_STAT_CONN_SESSION_TABLE_DROP_SUCCESS		1196
 /*! session: table rebalance failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_REBALANCE_FAIL	1194
+#define	WT_STAT_CONN_SESSION_TABLE_REBALANCE_FAIL	1197
 /*! session: table rebalance successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_REBALANCE_SUCCESS	1195
+#define	WT_STAT_CONN_SESSION_TABLE_REBALANCE_SUCCESS	1198
 /*! session: table rename failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_RENAME_FAIL		1196
+#define	WT_STAT_CONN_SESSION_TABLE_RENAME_FAIL		1199
 /*! session: table rename successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_RENAME_SUCCESS	1197
+#define	WT_STAT_CONN_SESSION_TABLE_RENAME_SUCCESS	1200
 /*! session: table salvage failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_FAIL		1198
+#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_FAIL		1201
 /*! session: table salvage successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_SUCCESS	1199
+#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_SUCCESS	1202
 /*! session: table truncate failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_FAIL	1200
+#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_FAIL	1203
 /*! session: table truncate successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_SUCCESS	1201
+#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_SUCCESS	1204
 /*! session: table verify failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_FAIL		1202
+#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_FAIL		1205
 /*! session: table verify successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_SUCCESS	1203
+#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_SUCCESS	1206
 /*! thread-state: active filesystem fsync calls */
-#define	WT_STAT_CONN_THREAD_FSYNC_ACTIVE		1204
+#define	WT_STAT_CONN_THREAD_FSYNC_ACTIVE		1207
 /*! thread-state: active filesystem read calls */
-#define	WT_STAT_CONN_THREAD_READ_ACTIVE			1205
+#define	WT_STAT_CONN_THREAD_READ_ACTIVE			1208
 /*! thread-state: active filesystem write calls */
-#define	WT_STAT_CONN_THREAD_WRITE_ACTIVE		1206
+#define	WT_STAT_CONN_THREAD_WRITE_ACTIVE		1209
 /*! thread-yield: application thread time evicting (usecs) */
-#define	WT_STAT_CONN_APPLICATION_EVICT_TIME		1207
+#define	WT_STAT_CONN_APPLICATION_EVICT_TIME		1210
 /*! thread-yield: application thread time waiting for cache (usecs) */
-#define	WT_STAT_CONN_APPLICATION_CACHE_TIME		1208
+#define	WT_STAT_CONN_APPLICATION_CACHE_TIME		1211
 /*! thread-yield: page acquire busy blocked */
-#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1209
+#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1212
 /*! thread-yield: page acquire eviction blocked */
-#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1210
+#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1213
 /*! thread-yield: page acquire locked blocked */
-#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1211
+#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1214
 /*! thread-yield: page acquire read blocked */
-#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1212
+#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1215
 /*! thread-yield: page acquire time sleeping (usecs) */
-#define	WT_STAT_CONN_PAGE_SLEEP				1213
+#define	WT_STAT_CONN_PAGE_SLEEP				1216
 /*! transaction: number of named snapshots created */
-#define	WT_STAT_CONN_TXN_SNAPSHOTS_CREATED		1214
+#define	WT_STAT_CONN_TXN_SNAPSHOTS_CREATED		1217
 /*! transaction: number of named snapshots dropped */
-#define	WT_STAT_CONN_TXN_SNAPSHOTS_DROPPED		1215
+#define	WT_STAT_CONN_TXN_SNAPSHOTS_DROPPED		1218
 /*! transaction: transaction begins */
-#define	WT_STAT_CONN_TXN_BEGIN				1216
+#define	WT_STAT_CONN_TXN_BEGIN				1219
 /*! transaction: transaction checkpoint currently running */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1217
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1220
 /*! transaction: transaction checkpoint generation */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_GENERATION		1218
+#define	WT_STAT_CONN_TXN_CHECKPOINT_GENERATION		1221
 /*! transaction: transaction checkpoint max time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MAX		1219
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MAX		1222
 /*! transaction: transaction checkpoint min time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MIN		1220
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MIN		1223
 /*! transaction: transaction checkpoint most recent time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_RECENT		1221
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_RECENT		1224
 /*! transaction: transaction checkpoint scrub dirty target */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TARGET	1222
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TARGET	1225
 /*! transaction: transaction checkpoint scrub time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TIME		1223
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TIME		1226
 /*! transaction: transaction checkpoint total time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1224
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1227
 /*! transaction: transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1225
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1228
 /*!
  * transaction: transaction checkpoints skipped because database was
  * clean
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SKIPPED		1226
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SKIPPED		1229
 /*! transaction: transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1227
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1230
 /*!
  * transaction: transaction fsync calls for checkpoint after allocating
  * the transaction ID
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST		1228
+#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST		1231
 /*!
  * transaction: transaction fsync duration for checkpoint after
  * allocating the transaction ID (usecs)
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST_DURATION	1229
+#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST_DURATION	1232
 /*! transaction: transaction range of IDs currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_RANGE			1230
+#define	WT_STAT_CONN_TXN_PINNED_RANGE			1233
 /*! transaction: transaction range of IDs currently pinned by a checkpoint */
-#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1231
+#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1234
 /*!
  * transaction: transaction range of IDs currently pinned by named
  * snapshots
  */
-#define	WT_STAT_CONN_TXN_PINNED_SNAPSHOT_RANGE		1232
+#define	WT_STAT_CONN_TXN_PINNED_SNAPSHOT_RANGE		1235
 /*! transaction: transaction sync calls */
-#define	WT_STAT_CONN_TXN_SYNC				1233
+#define	WT_STAT_CONN_TXN_SYNC				1236
 /*! transaction: transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1234
+#define	WT_STAT_CONN_TXN_COMMIT				1237
 /*! transaction: transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1235
+#define	WT_STAT_CONN_TXN_ROLLBACK			1238
 
 /*!
  * @}

@@ -87,7 +87,7 @@ int
 usleep(useconds_t useconds);
 
 /*
- * Emulate the <pthread.h> support we need for the tests
+ * Emulate the <pthread.h> support we need for tests and example code.
  */
 typedef CRITICAL_SECTION  pthread_mutex_t;
 typedef CONDITION_VARIABLE pthread_cond_t;

@@ -763,16 +763,13 @@ err:	API_END_RET(session, ret);
 static int
 __curtable_complete(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
-	WT_DECL_RET;
 	bool complete;
 
 	if (table->cg_complete)
 		return (0);
 
 	/* If the table is incomplete, wait on the table lock and recheck. */
-	complete = false;
-	WT_WITH_TABLE_LOCK(session, ret, complete = table->cg_complete);
-	WT_RET(ret);
+	WT_WITH_TABLE_LOCK(session, complete = table->cg_complete);
 	if (!complete)
 		WT_RET_MSG(session, EINVAL,
 		    "'%s' not available until all column groups are created",
@@ -927,7 +924,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 	if (columns != NULL) {
 		WT_ERR(__wt_struct_reformat(session, table,
-		    columns, strlen(columns), NULL, true, tmp));
+		    columns, strlen(columns), NULL, false, tmp));
 		WT_ERR(__wt_strndup(
 		    session, tmp->data, tmp->size, &cursor->value_format));
 

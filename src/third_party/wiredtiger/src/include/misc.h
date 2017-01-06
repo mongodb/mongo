@@ -275,6 +275,3 @@ union __wt_rand_state {
 		uint32_t w, z;
 	} x;
 };
-
-/* Shared array for converting to hex */
-extern const u_char __wt_hex[];

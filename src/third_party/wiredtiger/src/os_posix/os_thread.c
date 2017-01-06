@@ -47,6 +47,7 @@ __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid)
  */
 void
 __wt_thread_id(char *buf, size_t buflen)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	pthread_t self;
 

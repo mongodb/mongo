@@ -29,35 +29,49 @@
  * 	demonstrates how to use the custom file system interface
  */
 
-/*
- * Include WiredTiger internal functions: we need architecture portable locking
- * in this example, and we use the TAILQ_XXX functions to keep the code simple.
- *
- * Application-writers SHOULD NOT INCLUDE "wt_internal.h", the public WiredTiger
- * include files should be used instead:
- *
- *	#include <wiredtiger.h>
- *	#include <wiredtiger_ext.h>
- */
-#include "wt_internal.h"
+#include <assert.h>
+#include <errno.h>
+#include <inttypes.h>
+#include <queue.h>
+#include <stdlib.h>
+#include <string.h>
+
+#ifndef _WIN32
+#include <pthread.h>
+#else
+#include "windows_shim.h"
+#endif
+
+#include <wiredtiger.h>
+#include <wiredtiger_ext.h>
 
 /*
- * This example code uses internal WiredTiger functions for portable locking.
- * We use #defines to clarify the meaning and ignore errors to simplify the
- * code.
- *
- * Application writers SHOULD NOT COPY THIS LOCKING CODE, it's special-case code
- * to make this example portable across platforms.
+ * This example code uses pthread functions for portable locking, we ignore
+ * errors for simplicity.
  */
-#define	ALLOCATE_FILE_SYSTEM_LOCK(demo_fs)				\
-	(void)__wt_spin_init(NULL, &(demo_fs)->lock, "demo file handle lock")
-#define	DESTROY_FILE_SYSTEM_LOCK(wt_session, demo_fs)			\
-	__wt_spin_destroy((WT_SESSION_IMPL *)(wt_session), &(demo_fs)->lock)
-#define	LOCK_FILE_SYSTEM(wt_session, demo_fs)				\
-	__wt_spin_lock((WT_SESSION_IMPL *)(wt_session), &(demo_fs)->lock)
-#define	UNLOCK_FILE_SYSTEM(wt_session, demo_fs)				\
-	__wt_spin_unlock(						\
-	    (WT_SESSION_IMPL *)(wt_session), &(demo_fs)->lock)
+static void
+allocate_file_system_lock(pthread_rwlock_t *lockp)
+{
+	assert(pthread_rwlock_init(lockp, NULL) == 0);
+}
+
+static void
+destroy_file_system_lock(pthread_rwlock_t *lockp)
+{
+	assert(pthread_rwlock_destroy(lockp) == 0);
+}
+
+static void
+lock_file_system(pthread_rwlock_t *lockp)
+{
+	assert(pthread_rwlock_wrlock(lockp) == 0);
+}
+
+static void
+unlock_file_system(pthread_rwlock_t *lockp)
+{
+	assert(pthread_rwlock_unlock(lockp) == 0);
+}
 
 /*
  * Example file system implementation, using memory buffers to represent files.
@@ -72,7 +86,7 @@ typedef struct {
 	 * might require finer granularity, for example, a single lock for the
 	 * file system handle list and per-handle locks serializing I/O.
 	 */
-	WT_SPINLOCK lock;			/* Lock */
+	pthread_rwlock_t lock;			/* Lock */
 
 	int opened_file_count;
 	int opened_unique_file_count;
@@ -239,7 +253,7 @@ demo_file_system_create(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
 		goto err;
 	}
 
-	ALLOCATE_FILE_SYSTEM_LOCK(demo_fs);
+	allocate_file_system_lock(&demo_fs->lock);
 
 	/* Initialize the in-memory jump table. */
 	file_system->fs_directory_list = demo_fs_directory_list;
@@ -288,7 +302,7 @@ demo_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 	demo_fh = NULL;
 	wtext = demo_fs->wtext;
 
-	LOCK_FILE_SYSTEM(session, demo_fs);
+	lock_file_system(&demo_fs->lock);
 	++demo_fs->opened_file_count;
 
 	/*
@@ -308,7 +322,7 @@ demo_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 
 		*file_handlep = (WT_FILE_HANDLE *)demo_fh;
 
-		UNLOCK_FILE_SYSTEM(session, demo_fs);
+		unlock_file_system(&demo_fs->lock);
 		return (0);
 	}
 
@@ -366,7 +380,7 @@ err:		free(demo_fh->buf);
 		free(demo_fh);
 	}
 
-	UNLOCK_FILE_SYSTEM(session, demo_fs);
+	unlock_file_system(&demo_fs->lock);
 	return (ret);
 }
 
@@ -386,6 +400,8 @@ demo_fs_directory_list(WT_FILE_SYSTEM *file_system,
 	int ret = 0;
 	char *name, **entries;
 
+	(void)session;						/* Unused */
+
 	demo_fs = (DEMO_FILE_SYSTEM *)file_system;
 
 	*dirlistp = NULL;
@@ -396,7 +412,7 @@ demo_fs_directory_list(WT_FILE_SYSTEM *file_system,
 	len = strlen(directory);
 	prefix_len = prefix == NULL ? 0 : strlen(prefix);
 
-	LOCK_FILE_SYSTEM(session, demo_fs);
+	lock_file_system(&demo_fs->lock);
 	TAILQ_FOREACH(demo_fh, &demo_fs->fileq, q) {
 		name = demo_fh->iface.name;
 		if (strncmp(name, directory, len) != 0 ||
@@ -424,7 +440,7 @@ demo_fs_directory_list(WT_FILE_SYSTEM *file_system,
 	*dirlistp = entries;
 	*countp = count;
 
-err:	UNLOCK_FILE_SYSTEM(session, demo_fs);
+err:	unlock_file_system(&demo_fs->lock);
 	if (ret == 0)
 		return (0);
 
@@ -466,11 +482,13 @@ demo_fs_exist(WT_FILE_SYSTEM *file_system,
 {
 	DEMO_FILE_SYSTEM *demo_fs;
 
+	(void)session;						/* Unused */
+
 	demo_fs = (DEMO_FILE_SYSTEM *)file_system;
 
-	LOCK_FILE_SYSTEM(session, demo_fs);
+	lock_file_system(&demo_fs->lock);
 	*existp = demo_handle_search(file_system, name) != NULL;
-	UNLOCK_FILE_SYSTEM(session, demo_fs);
+	unlock_file_system(&demo_fs->lock);
 
 	return (0);
 }
@@ -487,15 +505,16 @@ demo_fs_remove(WT_FILE_SYSTEM *file_system,
 	DEMO_FILE_HANDLE *demo_fh;
 	int ret = 0;
 
-	(void)flags;					/* Unused */
+	(void)session;						/* Unused */
+	(void)flags;						/* Unused */
 
 	demo_fs = (DEMO_FILE_SYSTEM *)file_system;
 
 	ret = ENOENT;
-	LOCK_FILE_SYSTEM(session, demo_fs);
+	lock_file_system(&demo_fs->lock);
 	if ((demo_fh = demo_handle_search(file_system, name)) != NULL)
 		ret = demo_handle_remove(session, demo_fh);
-	UNLOCK_FILE_SYSTEM(session, demo_fs);
+	unlock_file_system(&demo_fs->lock);
 
 	return (ret);
 }
@@ -513,11 +532,12 @@ demo_fs_rename(WT_FILE_SYSTEM *file_system,
 	char *copy;
 	int ret = 0;
 
-	(void)flags;					/* Unused */
+	(void)session;						/* Unused */
+	(void)flags;						/* Unused */
 
 	demo_fs = (DEMO_FILE_SYSTEM *)file_system;
 
-	LOCK_FILE_SYSTEM(session, demo_fs);
+	lock_file_system(&demo_fs->lock);
 	if ((demo_fh = demo_handle_search(file_system, from)) == NULL)
 		ret = ENOENT;
 	else if ((copy = strdup(to)) == NULL)
@@ -526,7 +546,7 @@ demo_fs_rename(WT_FILE_SYSTEM *file_system,
 		free(demo_fh->iface.name);
 		demo_fh->iface.name = copy;
 	}
-	UNLOCK_FILE_SYSTEM(session, demo_fs);
+	unlock_file_system(&demo_fs->lock);
 	return (ret);
 }
 
@@ -545,10 +565,10 @@ demo_fs_size(WT_FILE_SYSTEM *file_system,
 	demo_fs = (DEMO_FILE_SYSTEM *)file_system;
 
 	ret = ENOENT;
-	LOCK_FILE_SYSTEM(session, demo_fs);
+	lock_file_system(&demo_fs->lock);
 	if ((demo_fh = demo_handle_search(file_system, name)) != NULL)
 		ret = demo_file_size((WT_FILE_HANDLE *)demo_fh, session, sizep);
-	UNLOCK_FILE_SYSTEM(session, demo_fs);
+	unlock_file_system(&demo_fs->lock);
 
 	return (ret);
 }
@@ -578,7 +598,7 @@ demo_fs_terminate(WT_FILE_SYSTEM *file_system, WT_SESSION *session)
 	printf("\t%d reads, %d writes\n",
 	    demo_fs->read_ops, demo_fs->write_ops);
 
-	DESTROY_FILE_SYSTEM_LOCK(session, demo_fs);
+	destroy_file_system_lock(&demo_fs->lock);
 	free(demo_fs);
 
 	return (ret);
@@ -594,13 +614,15 @@ demo_file_close(WT_FILE_HANDLE *file_handle, WT_SESSION *session)
 	DEMO_FILE_HANDLE *demo_fh;
 	DEMO_FILE_SYSTEM *demo_fs;
 
+	(void)session;						/* Unused */
+
 	demo_fh = (DEMO_FILE_HANDLE *)file_handle;
 	demo_fs = demo_fh->demo_fs;
 
-	LOCK_FILE_SYSTEM(session, demo_fs);
+	lock_file_system(&demo_fs->lock);
 	if (--demo_fh->ref == 0)
 		++demo_fs->closed_file_count;
-	UNLOCK_FILE_SYSTEM(session, demo_fs);
+	unlock_file_system(&demo_fs->lock);
 
 	return (0);
 }
@@ -638,7 +660,7 @@ demo_file_read(WT_FILE_HANDLE *file_handle,
 	wtext = demo_fs->wtext;
 	off = (size_t)offset;
 
-	LOCK_FILE_SYSTEM(session, demo_fs);
+	lock_file_system(&demo_fs->lock);
 	++demo_fs->read_ops;
 	if (off < demo_fh->size) {
 		if (len > demo_fh->size - off)
@@ -646,7 +668,7 @@ demo_file_read(WT_FILE_HANDLE *file_handle,
 		memcpy(buf, (uint8_t *)demo_fh->buf + off, len);
 	} else
 		ret = EIO;		/* EOF */
-	UNLOCK_FILE_SYSTEM(session, demo_fs);
+	unlock_file_system(&demo_fs->lock);
 	if (ret == 0)
 		return (0);
 
@@ -667,12 +689,14 @@ demo_file_size(
 	DEMO_FILE_HANDLE *demo_fh;
 	DEMO_FILE_SYSTEM *demo_fs;
 
+	(void)session;						/* Unused */
+
 	demo_fh = (DEMO_FILE_HANDLE *)file_handle;
 	demo_fs = demo_fh->demo_fs;
 
-	LOCK_FILE_SYSTEM(session, demo_fs);
+	lock_file_system(&demo_fs->lock);
 	*sizep = (wt_off_t)demo_fh->size;
-	UNLOCK_FILE_SYSTEM(session, demo_fs);
+	unlock_file_system(&demo_fs->lock);
 	return (0);
 }
 
@@ -739,10 +763,10 @@ demo_file_truncate(
 	demo_fh = (DEMO_FILE_HANDLE *)file_handle;
 	demo_fs = demo_fh->demo_fs;
 
-	LOCK_FILE_SYSTEM(session, demo_fs);
+	lock_file_system(&demo_fs->lock);
 	if ((ret = demo_buffer_resize(session, demo_fh, offset)) == 0)
 		demo_fh->size = (size_t)offset;
-	UNLOCK_FILE_SYSTEM(session, demo_fs);
+	unlock_file_system(&demo_fs->lock);
 	return (ret);
 }
 
@@ -765,7 +789,7 @@ demo_file_write(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
 	wtext = demo_fs->wtext;
 	off = (size_t)offset;
 
-	LOCK_FILE_SYSTEM(session, demo_fs);
+	lock_file_system(&demo_fs->lock);
 	++demo_fs->write_ops;
 	if ((ret = demo_buffer_resize(session, demo_fh,
 	    offset + (wt_off_t)(len + DEMO_FILE_SIZE_INCREMENT))) == 0) {
@@ -773,7 +797,7 @@ demo_file_write(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
 		if (off + len > demo_fh->size)
 			demo_fh->size = off + len;
 	}
-	UNLOCK_FILE_SYSTEM(session, demo_fs);
+	unlock_file_system(&demo_fs->lock);
 	if (ret == 0)
 		return (0);
 

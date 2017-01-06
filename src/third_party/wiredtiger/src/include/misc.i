@@ -19,6 +19,16 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs)
 }
 
 /*
+ * __wt_hex --
+ *	Convert a byte to a hex character.
+ */
+static inline u_char
+__wt_hex(int c)
+{
+	return ((u_char)"0123456789abcdef"[c]);
+}
+
+/*
  * __wt_strdup --
  *	ANSI strdup function.
  */

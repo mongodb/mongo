@@ -50,10 +50,10 @@ static void  print_item(const char *, WT_ITEM *);
 void
 wts_ops(int lastrun)
 {
-	TINFO *tinfo, total;
+	TINFO **tinfo_list, *tinfo, total;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	pthread_t backup_tid, compact_tid, lrt_tid;
+	pthread_t alter_tid, backup_tid, compact_tid, lrt_tid;
 	int64_t fourths, thread_ops;
 	uint32_t i;
 	int running;
@@ -61,6 +61,7 @@ wts_ops(int lastrun)
 	conn = g.wts_conn;
 
 	session = NULL;			/* -Wconditional-uninitialized */
+	memset(&alter_tid, 0, sizeof(alter_tid));
 	memset(&backup_tid, 0, sizeof(backup_tid));
 	memset(&compact_tid, 0, sizeof(compact_tid));
 	memset(&lrt_tid, 0, sizeof(lrt_tid));
@@ -102,19 +103,24 @@ wts_ops(int lastrun)
 		    "=============== thread ops start ===============");
 	}
 
-	/* Create thread structure; start the worker threads. */
-	tinfo = dcalloc((size_t)g.c_threads, sizeof(*tinfo));
+	/*
+	 * Create the per-thread structures and start the worker threads.
+	 * Allocate the thread structures separately to minimize false sharing.
+	 */
+	tinfo_list = dcalloc((size_t)g.c_threads, sizeof(TINFO *));
 	for (i = 0; i < g.c_threads; ++i) {
-		tinfo[i].id = (int)i + 1;
-		tinfo[i].state = TINFO_RUNNING;
-		testutil_check(
-		    pthread_create(&tinfo[i].tid, NULL, ops, &tinfo[i]));
+		tinfo_list[i] = tinfo = dcalloc(1, sizeof(TINFO));
+		tinfo->id = (int)i + 1;
+		tinfo->state = TINFO_RUNNING;
+		testutil_check(pthread_create(&tinfo->tid, NULL, ops, tinfo));
 	}
 
 	/*
 	 * If a multi-threaded run, start optional backup, compaction and
 	 * long-running reader threads.
 	 */
+	if (g.c_alter)
+		testutil_check(pthread_create(&alter_tid, NULL, alter, NULL));
 	if (g.c_backups)
 		testutil_check(pthread_create(&backup_tid, NULL, backup, NULL));
 	if (g.c_compact)
@@ -128,21 +134,22 @@ wts_ops(int lastrun)
 		/* Clear out the totals each pass. */
 		memset(&total, 0, sizeof(total));
 		for (i = 0, running = 0; i < g.c_threads; ++i) {
-			total.commit += tinfo[i].commit;
-			total.deadlock += tinfo[i].deadlock;
-			total.insert += tinfo[i].insert;
-			total.remove += tinfo[i].remove;
-			total.rollback += tinfo[i].rollback;
-			total.search += tinfo[i].search;
-			total.update += tinfo[i].update;
+			tinfo = tinfo_list[i];
+			total.commit += tinfo->commit;
+			total.deadlock += tinfo->deadlock;
+			total.insert += tinfo->insert;
+			total.remove += tinfo->remove;
+			total.rollback += tinfo->rollback;
+			total.search += tinfo->search;
+			total.update += tinfo->update;
 
-			switch (tinfo[i].state) {
+			switch (tinfo->state) {
 			case TINFO_RUNNING:
 				running = 1;
 				break;
 			case TINFO_COMPLETE:
-				tinfo[i].state = TINFO_JOINED;
-				(void)pthread_join(tinfo[i].tid, NULL);
+				tinfo->state = TINFO_JOINED;
+				(void)pthread_join(tinfo->tid, NULL);
 				break;
 			case TINFO_JOINED:
 				break;
@@ -154,7 +161,7 @@ wts_ops(int lastrun)
 			 */
 			if (fourths == 0 ||
 			    (thread_ops != -1 &&
-			    tinfo[i].ops >= (uint64_t)thread_ops)) {
+			    tinfo->ops >= (uint64_t)thread_ops)) {
 				/*
 				 * On the last execution, optionally drop core
 				 * for recovery testing.
@@ -163,7 +170,7 @@ wts_ops(int lastrun)
 					static char *core = NULL;
 					*core = 0;
 				}
-				tinfo[i].quit = 1;
+				tinfo->quit = 1;
 			}
 		}
 		track("ops", 0ULL, &total);
@@ -173,10 +180,14 @@ wts_ops(int lastrun)
 		if (fourths != -1)
 			--fourths;
 	}
-	free(tinfo);
+	for (i = 0; i < g.c_threads; ++i)
+		free(tinfo_list[i]);
+	free(tinfo_list);
 
 	/* Wait for the backup, compaction, long-running reader threads. */
 	g.workers_finished = 1;
+	if (g.c_alter)
+		(void)pthread_join(alter_tid, NULL);
 	if (g.c_backups)
 		(void)pthread_join(backup_tid, NULL);
 	if (g.c_compact)
@@ -455,7 +466,7 @@ ops(void *arg)
 			 * 10% of the time, perform some read-only operations
 			 * from a checkpoint.
 			 *
-			 * Skip that if we single-threaded and doing checks
+			 * Skip that if we are single-threaded and doing checks
 			 * against a Berkeley DB database, because that won't
 			 * work because the Berkeley DB database records won't
 			 * match the checkpoint.  Also skip if we are using

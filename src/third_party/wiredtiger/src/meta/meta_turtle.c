@@ -47,7 +47,7 @@ __metadata_init(WT_SESSION_IMPL *session)
 	 * We're single-threaded, but acquire the schema lock regardless: the
 	 * lower level code checks that it is appropriately synchronized.
 	 */
-	WT_WITH_SCHEMA_LOCK(session, ret,
+	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_create(session, WT_METAFILE_URI, NULL));
 
 	return (ret);
@@ -220,9 +220,8 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 
 		/* Create the turtle file. */
 		WT_RET(__metadata_config(session, &metaconf));
-		WT_WITH_TURTLE_LOCK(session, ret,
-		    ret = __wt_turtle_update(
-		    session, WT_METAFILE_URI, metaconf));
+		WT_WITH_TURTLE_LOCK(session, ret =
+		    __wt_turtle_update(session, WT_METAFILE_URI, metaconf));
 		WT_ERR(ret);
 	}
 

@@ -37,6 +37,39 @@ In general, commands that modify the database or tables will run recovery
 by default and commands that only read data will not run recovery.
 
 <hr>
+@section util_alter wt alter
+Alter a table.
+
+@subsection util_alter_synopsis Synopsis
+<code>wt [-RVv] [-C config] [-E secretkey ] [-h directory] alter uri configuration ...</code>
+
+The \c uri and \c configuration pairs may be specified to the
+\c alter command.  These configuration pairs can be used to modify the
+configuration values from those passed to the WT_SESSION::create
+call.
+
+The \c uri part of the configuration pair should match only one of the
+objects being altered, but may be a prefix of the object being matched.
+For example, the following two sets of configuration pairs are
+equivalent in the case of altering a single table named \c xxx.
+
+@code
+table access_pattern_hint=sequential
+table:xxx access_pattern_hint=sequential
+@endcode
+
+It's an error, however, to specify a matching prefix that matches more
+than a single object being altered.
+
+Multiple \c configuration arguments may be specified. For example, the
+following two sets of configuration pairs are equivalent:
+
+@code
+table:xxx access_pattern_hint=random,cache_resident=false
+table:xxx access_pattern_hint=random table:xxx cache_resident=false
+@endcode
+
+<hr>
 @section util_backup wt backup
 Perform a backup of a database or set of data sources.
 

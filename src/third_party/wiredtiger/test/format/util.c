@@ -459,3 +459,47 @@ fclose_and_clear(FILE **fpp)
 		testutil_die(errno, "fclose");
 	return;
 }
+
+/*
+ * alter --
+ *	Periodically alter a table's metadata.
+ */
+void *
+alter(void *arg)
+{
+	WT_CONNECTION *conn;
+	WT_SESSION *session;
+	u_int period;
+	bool access_value;
+	char buf[32];
+
+	(void)(arg);
+	conn = g.wts_conn;
+
+	/*
+	 * Only alter the access pattern hint.  If we alter the cache resident
+	 * setting we may end up with a setting that fills cache and doesn't
+	 * allow it to be evicted.
+	 */
+	access_value = false;
+
+	/* Open a session */
+	testutil_check(conn->open_session(conn, NULL, NULL, &session));
+
+	while (!g.workers_finished) {
+		period = mmrand(NULL, 1, 10);
+
+		snprintf(buf, sizeof(buf),
+		    "access_pattern_hint=%s", access_value ? "random" : "none");
+		access_value = !access_value;
+		if (session->alter(session, g.uri, buf) != 0)
+			break;
+		while (period > 0 && !g.workers_finished) {
+			--period;
+			sleep(1);
+		}
+	}
+
+	testutil_check(session->close(session, NULL));
+	return (NULL);
+}

@@ -99,6 +99,11 @@ while test "$run" -le "$runmax"; do
 	if test "$?" -ne "0"; then
 		exit 1
 	fi
+
+	# Copy the artifacts from the run
+	backup_dir=${home}_$(basename $wttest)_${run}_$(date +"%s")
+	rsync -r -m --include="*Stat*" --include="CONFIG.wtperf" --include="*monitor" --include="latency*" --include="test.stat" --exclude="*" $home/ $backup_dir
+
 	# Load is always using floating point, so handle separately
 	l=`grep "^Load time:" ./WT_TEST/test.stat`
 	if test "$?" -eq "0"; then

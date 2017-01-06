@@ -107,10 +107,13 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 	__wt_verbose(session, WT_VERB_MUTEX, "signal %s", cond->name);
 
 	/*
-	 * Our callers are often setting flags to cause a thread to exit. Add
-	 * a barrier to ensure the flags are seen by the threads.
+	 * Our callers often set flags to cause a thread to exit. Add a barrier
+	 * to ensure exit flags are seen by the sleeping threads, otherwise we
+	 * can wake up a thread, it immediately goes back to sleep, and we'll
+	 * hang. Use a full barrier (we may not write before waiting on thread
+	 * join).
 	 */
-	WT_WRITE_BARRIER();
+	WT_FULL_BARRIER();
 
 	/*
 	 * Fast path if we are in (or can enter), a state where the next waiter

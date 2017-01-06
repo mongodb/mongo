@@ -408,11 +408,7 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Update pages and bytes evicted. */
 	(void)__wt_atomic_add64(&cache->bytes_evict, page->memory_footprint);
-
-	if (F_ISSET(session, WT_SESSION_IN_SPLIT))
-		(void)__wt_atomic_subv64(&cache->pages_inmem, 1);
-	else
-		(void)__wt_atomic_addv64(&cache->pages_evict, 1);
+	(void)__wt_atomic_addv64(&cache->pages_evict, 1);
 }
 
 /*
@@ -1359,7 +1355,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	    F_ISSET(session, WT_SESSION_NO_EVICTION) ||
 	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 	    !__wt_page_can_evict(session, ref, NULL))
-		return (__wt_hazard_clear(session, page));
+		return (__wt_hazard_clear(session, ref));
 
 	WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));
 	return (0);
@@ -1438,53 +1434,6 @@ __wt_page_swap_func(
 		    EINVAL, "page-release WT_RESTART error mapped to EINVAL");
 
 	return (ret);
-}
-
-/*
- * __wt_page_hazard_check --
- *	Return if there's a hazard pointer to the page in the system.
- */
-static inline WT_HAZARD *
-__wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_HAZARD *hp;
-	WT_SESSION_IMPL *s;
-	uint32_t i, j, hazard_size, max, session_cnt;
-
-	conn = S2C(session);
-
-	/*
-	 * No lock is required because the session array is fixed size, but it
-	 * may contain inactive entries.  We must review any active session
-	 * that might contain a hazard pointer, so insert a barrier before
-	 * reading the active session count.  That way, no matter what sessions
-	 * come or go, we'll check the slots for all of the sessions that could
-	 * have been active when we started our check.
-	 */
-	WT_STAT_CONN_INCR(session, cache_hazard_checks);
-	WT_ORDERED_READ(session_cnt, conn->session_cnt);
-	for (s = conn->sessions, i = 0, j = 0, max = 0;
-	    i < session_cnt; ++s, ++i) {
-		if (!s->active)
-			continue;
-		WT_ORDERED_READ(hazard_size, s->hazard_size);
-		if (s->hazard_size > max) {
-			max = s->hazard_size;
-			WT_STAT_CONN_SET(session,
-			    cache_hazard_max, max);
-		}
-		for (hp = s->hazard; hp < s->hazard + hazard_size; ++hp) {
-			++j;
-			if (hp->page == page) {
-				WT_STAT_CONN_INCRV(session,
-				    cache_hazard_walks, j);
-				return (hp);
-			}
-		}
-	}
-	WT_STAT_CONN_INCRV(session, cache_hazard_walks, j);
-	return (NULL);
 }
 
 /*

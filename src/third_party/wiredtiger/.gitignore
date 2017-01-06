@@ -122,4 +122,5 @@ _wiredtiger.pyd
 **/test/recovery/random-abort
 **/test/recovery/truncated-log
 **/test/salvage/t
+**/test/syscall/test_wt2336_base
 **/test/thread/t

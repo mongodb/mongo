@@ -271,7 +271,7 @@ __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 	 * can be closed.
 	 */
 	if (thread->id == 0) {
-		WT_WITH_PASS_LOCK(session, ret,
+		WT_WITH_PASS_LOCK(session,
 		    ret = __evict_clear_all_walks(session));
 		WT_ERR(ret);
 		/*
@@ -351,8 +351,15 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 		cache->pages_evicted = cache->pages_evict;
 #ifdef HAVE_DIAGNOSTIC
 		__wt_epoch(session, &cache->stuck_ts);
-	} else {
-		/* After being stuck for 5 minutes, give up. */
+	} else if (!F_ISSET(conn, WT_CONN_IN_MEMORY)) {
+		/*
+		 * After being stuck for 5 minutes, give up.
+		 *
+		 * We don't do this check for in-memory workloads because
+		 * application threads are not blocked by the cache being full.
+		 * If the cache becomes full of clean pages, we can be
+		 * servicing reads while the cache appears stuck to eviction.
+		 */
 		__wt_epoch(session, &now);
 		if (WT_TIMEDIFF_SEC(now, cache->stuck_ts) > 300) {
 			ret = ETIMEDOUT;
@@ -767,7 +774,7 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
 	(void)__wt_atomic_addv32(&cache->pass_intr, 1);
 
 	/* Clear any existing LRU eviction walk for the file. */
-	WT_WITH_PASS_LOCK(session, ret,
+	WT_WITH_PASS_LOCK(session,
 	    ret = __evict_clear_walk(session, true));
 	(void)__wt_atomic_subv32(&cache->pass_intr, 1);
 	WT_ERR(ret);
@@ -1141,9 +1148,17 @@ retry:	while (slot < max_entries) {
 		    !__wt_cache_aggressive(session))
 			continue;
 
-		/* Skip files if we have used all available hazard pointers. */
-		if (btree->evict_ref == NULL && session->nhazard >=
-		    conn->hazard_max - WT_MIN(conn->hazard_max / 2, 10))
+		/*
+		 * Skip files if we have too many active walks.
+		 *
+		 * This used to be limited by the configured maximum number of
+		 * hazard pointers per session.  Even though that ceiling has
+		 * been removed, we need to test eviction with huge numbers of
+		 * active trees before allowing larger numbers of hazard
+		 * pointers in the walk session.
+		 */
+		if (btree->evict_ref == NULL &&
+		    session->nhazard > WT_EVICT_MAX_TREES)
 			continue;
 
 		/*

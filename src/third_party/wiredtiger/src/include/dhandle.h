@@ -62,6 +62,8 @@ struct __wt_data_handle {
 	const char *checkpoint;		/* Checkpoint name (or NULL) */
 	const char **cfg;		/* Configuration information */
 
+	bool compact_skip;		/* If the handle failed to compact */
+
 	WT_DATA_SOURCE *dsrc;		/* Data source for this handle */
 	void *handle;			/* Generic handle */
 

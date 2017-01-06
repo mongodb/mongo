@@ -73,13 +73,8 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_schema_worker(session, idx->source,
 		    file_func, name_func, cfg, open_flags));
 	} else if (WT_PREFIX_MATCH(uri, "lsm:")) {
-		/*
-		 * LSM compaction is handled elsewhere, but if we get here
-		 * trying to compact files, don't descend into an LSM tree.
-		 */
-		if (file_func != __wt_compact)
-			WT_ERR(__wt_lsm_tree_worker(session,
-			    uri, file_func, name_func, cfg, open_flags));
+		WT_ERR(__wt_lsm_tree_worker(session,
+		    uri, file_func, name_func, cfg, open_flags));
 	} else if (WT_PREFIX_SKIP(tablename, "table:")) {
 		WT_ERR(__wt_schema_get_table(session,
 		    tablename, strlen(tablename), false, &table));
@@ -115,10 +110,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		}
 	} else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL) {
 		wt_session = (WT_SESSION *)session;
-		if (file_func == __wt_compact && dsrc->compact != NULL)
-			WT_ERR(dsrc->compact(
-			    dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
-		else if (file_func == __wt_salvage && dsrc->salvage != NULL)
+		if (file_func == __wt_salvage && dsrc->salvage != NULL)
 			WT_ERR(dsrc->salvage(
 			   dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
 		else if (file_func == __wt_verify && dsrc->verify != NULL)
