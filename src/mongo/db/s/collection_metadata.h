@@ -114,9 +114,7 @@ public:
     bool getDifferentChunk(const BSONObj& chunkMinKey, ChunkType* differentChunk) const;
 
     /**
-     * Validates that the passed-in chunk's bounds exactly match a chunk in the metadata cache. If
-     * the chunk's version has been set as well (it might not be in the case of request coming from
-     * a 3.2 shard), also ensures that the versions are the same.
+     * Validates that the passed-in chunk's bounds exactly match a chunk in the metadata cache.
      */
     Status checkChunkIsValid(const ChunkType& chunk);
 

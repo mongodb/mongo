@@ -151,9 +151,6 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn,
     ChunkType chunkToMove;
     chunkToMove.setMin(_args.getMinKey());
     chunkToMove.setMax(_args.getMaxKey());
-    if (_args.hasChunkVersion()) {
-        chunkToMove.setVersion(_args.getChunkVersion());
-    }
 
     Status chunkValidateStatus = _collectionMetadata->checkChunkIsValid(chunkToMove);
     if (!chunkValidateStatus.isOK()) {
