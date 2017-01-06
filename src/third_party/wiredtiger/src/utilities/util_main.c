@@ -117,6 +117,10 @@ main(int argc, char *argv[])
 
 	func = NULL;
 	switch (command[0]) {
+	case 'a':
+		if (strcmp(command, "alter") == 0)
+			func = util_alter;
+		break;
 	case 'b':
 		if (strcmp(command, "backup") == 0)
 			func = util_backup;
@@ -252,6 +256,7 @@ usage(void)
 	    "\t" "-v\t" "verbose\n");
 	fprintf(stderr,
 	    "commands:\n"
+	    "\t" "alter\t  alter an object\n"
 	    "\t" "backup\t  database backup\n"
 	    "\t" "compact\t  compact an object\n"
 	    "\t" "copyright copyright information\n"

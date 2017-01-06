@@ -38,6 +38,7 @@ BTREE
 BUF
 BZ
 Barack
+BerkeleyDB
 Bitfield
 Bitwise
 Brueckner
@@ -88,6 +89,7 @@ DNE
 DOI
 DONTNEED
 DUPLICATEV
+DataSet
 DbCursor
 DbEnv
 Decrement
@@ -126,6 +128,7 @@ FNV
 FORALL
 FOREACH
 FS
+FTRUNCATE
 FULLFSYNC
 Facebook
 FindClose
@@ -156,6 +159,7 @@ HHHHLL
 HHHLL
 Hendrik
 HyperLevelDB
+ID's
 IEC
 IEEE
 IKEY
@@ -167,6 +171,7 @@ INITIALIZER
 INMEM
 INSN
 INTL
+INULL
 ISA
 ITEMs
 ITER
@@ -247,6 +252,7 @@ NONINFRINGEMENT
 NOTFOUND
 NOTREACHED
 NOVALUE
+NOWAIT
 NUL
 NUM
 NetBSD
@@ -269,6 +275,7 @@ PRIu
 PRNG
 PTHREAD
 PTR
+PackInputStream
 Pandis
 Phong
 PlatformSDK
@@ -300,6 +307,7 @@ Readonly
 Rebalance
 RedHat
 Redistributions
+Refactor
 Resize
 RocksDB
 SIMD
@@ -397,14 +405,18 @@ WiredTigerPreplog
 WiredTigerTmplog
 WiredTigerTxn
 WithSeeds
+Wpedantic
 WriteFile
 Wuninitialized
 Wunused
 XP
+Xcode
+Xcode/
 Yann
 ZSTD
 Zlib
 Zlib's
+Zstandard
 Zstd
 Zstd's
 abcdef
@@ -428,6 +440,7 @@ argc
 args
 argv
 asm
+aspell
 assertfmt
 async
 asyncopp
@@ -547,6 +560,7 @@ create's
 createCStream
 crypto
 cryptobad
+csuite
 csv
 ctime
 ctype
@@ -598,6 +612,7 @@ dequeue
 dequeued
 der
 dereference
+dereferenced
 desc
 designator
 dest
@@ -610,6 +625,7 @@ difftime
 dir
 dirlist
 disjunction
+disjunctions
 dlclose
 dlh
 dll
@@ -633,6 +649,7 @@ dumpcmp
 dumpfile
 dup
 eg
+egrep
 emp
 encodings
 encryptor
@@ -723,6 +740,7 @@ gettime
 gettimeofday
 getv
 github
+gitignore
 gobare
 goesc
 gostring
@@ -834,6 +852,7 @@ libdatasource
 libs
 libtool
 libwiredtiger
+linkers
 llll
 llu
 loadtext
@@ -935,6 +954,7 @@ nowait
 nset
 nsnap
 nul
+nullptr
 nuls
 numSymbols
 numbare
@@ -948,6 +968,7 @@ oo
 opcode
 opendir
 openfile
+oplog
 optimizations
 optype
 ori
@@ -969,6 +990,7 @@ pclose
 pcpu
 perf
 pfx
+pluggable
 popen
 poptable
 popthreads
@@ -1117,6 +1139,7 @@ subtree
 sunique
 superset
 sw
+sx
 sy
 sys
 sz
@@ -1225,6 +1248,7 @@ walk's
 warmup
 wb
 wcursor
+whitespace
 wiredTiger
 wiredtiger
 workFactor
@@ -1238,6 +1262,7 @@ ws
 wtbench
 wti
 wtperf
+wtperf's
 wts
 wtstats
 xF
@@ -1250,6 +1275,7 @@ zf
 zfree
 zlib
 zlib's
+zseries
 zstd
 zstd's
 zu

@@ -198,7 +198,8 @@ def get_default(c):
         return 'false'
     elif c.default == 'true':
         return 'true'
-    elif t == 'string' and c.default == 'none':
+    elif t == 'string' and c.default == 'none' and \
+        not c.flags.get('choices', []):
         return ''
     elif t == 'category':
         return '(%s)' % (','.join('%s=%s' % (subc.name, get_default(subc))

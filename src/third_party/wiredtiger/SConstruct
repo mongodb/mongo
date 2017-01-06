@@ -294,6 +294,7 @@ env.Depends(wtdll, [filelistfile, version_file])
 Default(wtlib, wtdll)
 
 wtbin = env.Program("wt", [
+    "src/utilities/util_alter.c",
     "src/utilities/util_backup.c",
     "src/utilities/util_cpyright.c",
     "src/utilities/util_compact.c",

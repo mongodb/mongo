@@ -1333,7 +1333,7 @@ __wt_curjoin_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_scr_alloc(session, 0, &tmp));
 	if (columns != NULL) {
 		WT_ERR(__wt_struct_reformat(session, table,
-		    columns, strlen(columns), NULL, 1, tmp));
+		    columns, strlen(columns), NULL, false, tmp));
 		WT_ERR(__wt_strndup(
 		    session, tmp->data, tmp->size, &cursor->value_format));
 		WT_ERR(__wt_strdup(session, columns, &cjoin->projection));

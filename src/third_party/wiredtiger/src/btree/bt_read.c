@@ -324,7 +324,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * If this session has more than one hazard pointer, eviction will fail
 	 * and there is no point trying.
 	 */
-	if (__wt_hazard_count(session, page) > 1)
+	if (__wt_hazard_count(session, ref) > 1)
 		return (false);
 
 	/* If we can do an in-memory split, do it. */

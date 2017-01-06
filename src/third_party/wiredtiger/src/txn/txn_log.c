@@ -551,6 +551,7 @@ __txn_printlog(WT_SESSION_IMPL *session,
  */
 int
 __wt_txn_printlog(WT_SESSION *wt_session, uint32_t flags)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_SESSION_IMPL *session;
 	WT_TXN_PRINTLOG_ARGS args;

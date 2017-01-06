@@ -192,6 +192,7 @@ __wt_block_buffer_to_ckpt(WT_SESSION_IMPL *session,
 int
 __wt_block_ckpt_decode(WT_SESSION *wt_session,
     size_t allocsize, const uint8_t *p, WT_BLOCK_CKPT *ci)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_SESSION_IMPL *session;
 

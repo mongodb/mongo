@@ -575,7 +575,7 @@ __posix_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 	WT_FILE_HANDLE_POSIX *pfh;
 	WT_SESSION_IMPL *session;
 	mode_t mode;
-	int f;
+	int advise_flag, f;
 
 	WT_UNUSED(file_system);
 
@@ -676,17 +676,24 @@ __posix_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session,
 
 #if defined(HAVE_POSIX_FADVISE)
 	/*
-	 * Disable read-ahead on trees: it slows down random read workloads.
+	 * If the user set an access pattern hint, call fadvise now.
 	 * Ignore fadvise when doing direct I/O, the kernel cache isn't
 	 * interesting.
 	 */
-	if (!pfh->direct_io && file_type == WT_FS_OPEN_FILE_TYPE_DATA) {
-		WT_SYSCALL(
-		    posix_fadvise(pfh->fd, 0, 0, POSIX_FADV_RANDOM), ret);
+	if (!pfh->direct_io && file_type == WT_FS_OPEN_FILE_TYPE_DATA &&
+	    LF_ISSET(WT_FS_OPEN_ACCESS_RAND | WT_FS_OPEN_ACCESS_SEQ)) {
+		advise_flag = 0;
+		if (LF_ISSET(WT_FS_OPEN_ACCESS_RAND))
+			advise_flag = POSIX_FADV_RANDOM;
+		if (LF_ISSET(WT_FS_OPEN_ACCESS_SEQ))
+			advise_flag = POSIX_FADV_SEQUENTIAL;
+		WT_SYSCALL(posix_fadvise(pfh->fd, 0, 0, advise_flag), ret);
 		if (ret != 0)
 			WT_ERR_MSG(session, ret,
 			    "%s: handle-open: posix_fadvise", name);
 	}
+#else
+	WT_UNUSED(advise_flag);
 #endif
 
 directory_open:

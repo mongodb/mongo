@@ -38,7 +38,7 @@ from wtscenario import make_scenarios
 class test_compact02(wttest.WiredTigerTestCase):
 
     types = [
-        ('file', dict(uri='file:test_compact02')),
+        ('table', dict(uri='table:test_compact02')),
     ]
     cacheSize = [
         ('default', dict(cacheSize='')),
@@ -69,8 +69,9 @@ class test_compact02(wttest.WiredTigerTestCase):
     # 1. Create a table with the data, alternating record size.
     # 2. Checkpoint and get stats on the table to confirm the size.
     # 3. Delete the half of the records with the larger record size.
-    # 4. Call compact.
-    # 5. Get stats on compacted table.
+    # 4. Checkpoint so compact finds something to work with.
+    # 5. Call compact.
+    # 6. Get stats on compacted table.
     #
     nrecords = 22000
     bigvalue = "abcdefghi" * 1074          # 9*1074 == 9666
@@ -99,7 +100,8 @@ class test_compact02(wttest.WiredTigerTestCase):
         self.home = '.'
         conn_params = 'create,' + \
             cacheSize + ',error_prefix="%s: ",' % self.shortid() + \
-            'statistics=(all),eviction_dirty_target=99,eviction_dirty_trigger=99'
+            'statistics=(all),' + \
+            'eviction_dirty_target=99,eviction_dirty_trigger=99'
         try:
             self.conn = wiredtiger.wiredtiger_open(self.home, conn_params)
         except wiredtiger.WiredTigerError as e:
@@ -140,10 +142,13 @@ class test_compact02(wttest.WiredTigerTestCase):
         c.close()
         self.pr('Removed total ' + str((count * 9666) / mb) + 'MB')
 
-        # 4. Call compact.
+        # 4. Checkpoint
+        self.session.checkpoint()
+
+        # 5. Call compact.
         self.session.compact(self.uri, None)
 
-        # 5. Get stats on compacted table.
+        # 6. Get stats on compacted table.
         sz = self.getSize()
         self.pr('After compact ' + str(sz / mb) + 'MB')
 

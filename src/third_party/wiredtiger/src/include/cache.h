@@ -16,6 +16,8 @@
 #define	WT_EVICT_WALK_BASE	300	/* Pages tracked across file visits */
 #define	WT_EVICT_WALK_INCR	100	/* Pages added each walk */
 
+#define	WT_EVICT_MAX_TREES	1000	/* Maximum walk points */
+
 /*
  * WT_EVICT_ENTRY --
  *	Encapsulation of an eviction candidate.
@@ -185,9 +187,9 @@ struct __wt_cache {
 	uint32_t flags;
 };
 
-#define	WT_WITH_PASS_LOCK(session, ret, op) do {			\
+#define	WT_WITH_PASS_LOCK(session, op) do {				\
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_PASS));	\
-	WT_WITH_LOCK(session, ret,					\
+	WT_WITH_LOCK_WAIT(session,					\
 	    &cache->evict_pass_lock, WT_SESSION_LOCKED_PASS, op);	\
 } while (0)
 

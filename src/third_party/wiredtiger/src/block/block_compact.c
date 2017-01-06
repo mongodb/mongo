@@ -22,6 +22,12 @@ __wt_block_compact_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	/* Switch to first-fit allocation. */
 	__wt_block_configure_first_fit(block, true);
 
+	/* Reset the compaction state information. */
+	block->compact_pct_tenths = 0;
+	block->compact_pages_reviewed = 0;
+	block->compact_pages_skipped = 0;
+	block->compact_pages_written = 0;
+
 	return (0);
 }
 
@@ -55,7 +61,6 @@ __wt_block_compact_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 int
 __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
 {
-	WT_DECL_RET;
 	WT_EXT *ext;
 	WT_EXTLIST *el;
 	wt_off_t avail_eighty, avail_ninety, eighty, ninety;
@@ -70,16 +75,6 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
 	 */
 	if (block->size <= WT_MEGABYTE)
 		return (0);
-
-	/*
-	 * Reset the compaction state information. This is done here, not in the
-	 * compaction "start" routine, because this function is called first to
-	 * determine if compaction is useful.
-	 */
-	block->compact_pct_tenths = 0;
-	block->compact_pages_reviewed = 0;
-	block->compact_pages_skipped = 0;
-	block->compact_pages_written = 0;
 
 	__wt_spin_lock(session, &block->live_lock);
 
@@ -142,7 +137,7 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
 
 	__wt_spin_unlock(session, &block->live_lock);
 
-	return (ret);
+	return (0);
 }
 
 /*
@@ -153,7 +148,6 @@ int
 __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
     WT_BLOCK *block, const uint8_t *addr, size_t addr_size, bool *skipp)
 {
-	WT_DECL_RET;
 	WT_EXT *ext;
 	WT_EXTLIST *el;
 	wt_off_t limit, offset;
@@ -198,7 +192,7 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
 	}
 #endif
 
-	return (ret);
+	return (0);
 }
 
 /*

@@ -30,14 +30,13 @@
  *	table from multiple threads.
  */
 
-#ifndef _WIN32
-#include <pthread.h>
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef _WIN32
+#ifndef _WIN32
+#include <pthread.h>
+#else
 #include "windows_shim.h"
 #endif
 

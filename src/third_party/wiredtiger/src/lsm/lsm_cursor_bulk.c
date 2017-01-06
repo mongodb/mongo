@@ -45,7 +45,7 @@ __clsm_close_bulk(WT_CURSOR *cursor)
 	    total_chunks /= avg_chunks)
 		++chunk->generation;
 
-	WT_RET(__wt_lsm_meta_write(session, lsm_tree));
+	WT_RET(__wt_lsm_meta_write(session, lsm_tree, NULL));
 	++lsm_tree->dsk_gen;
 
 	/* Close the LSM cursor */
@@ -113,7 +113,7 @@ __wt_clsm_open_bulk(WT_CURSOR_LSM *clsm, const char *cfg[])
 	 * switch inline, since switch needs a schema lock and online index
 	 * creation opens a bulk cursor while holding the schema lock.
 	 */
-	WT_WITH_SCHEMA_LOCK(session, ret,
+	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_lsm_tree_switch(session, lsm_tree));
 	WT_RET(ret);
 

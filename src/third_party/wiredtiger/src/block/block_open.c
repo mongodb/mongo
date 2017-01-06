@@ -201,6 +201,12 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	 * "direct_io=checkpoint" configures direct I/O for readonly data files.
 	 */
 	flags = 0;
+	WT_ERR(__wt_config_gets(session, cfg, "access_pattern_hint", &cval));
+	if (WT_STRING_MATCH("random", cval.str, cval.len))
+		LF_SET(WT_FS_OPEN_ACCESS_RAND);
+	else if (WT_STRING_MATCH("sequential", cval.str, cval.len))
+		LF_SET(WT_FS_OPEN_ACCESS_SEQ);
+
 	if (readonly && FLD_ISSET(conn->direct_io, WT_DIRECT_IO_CHECKPOINT))
 		LF_SET(WT_FS_OPEN_DIRECTIO);
 	if (!readonly && FLD_ISSET(conn->direct_io, WT_DIRECT_IO_DATA))

@@ -159,6 +159,7 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 	uint64_t fsync_duration_usecs;
 
 	log = S2C(session)->log;
+	log_fh = NULL;
 
 	/*
 	 * We need to wait for the previous log file to get written
@@ -214,11 +215,12 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 		WT_STAT_CONN_INCR(session, log_sync);
 		WT_STAT_CONN_INCRV(session,
 		    log_sync_duration, fsync_duration_usecs);
-		WT_ERR(__wt_close(session, &log_fh));
 		__wt_cond_signal(session, log->log_sync_cond);
 	}
 err:
 	__wt_spin_unlock(session, &log->log_sync_lock);
+	if (log_fh != NULL)
+		WT_TRET(__wt_close(session, &log_fh));
 	return (ret);
 }
 
@@ -1274,7 +1276,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	 * where the previous log file ends.
 	 */
 	if (!F_ISSET(conn, WT_CONN_READONLY)) {
-		WT_WITH_SLOT_LOCK(session, log, ret,
+		WT_WITH_SLOT_LOCK(session, log,
 		    ret = __log_newfile(session, true, NULL));
 		WT_ERR(ret);
 	}

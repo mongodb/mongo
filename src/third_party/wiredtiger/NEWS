@@ -1,3 +1,368 @@
+WiredTiger release 2.9.0, 2016-09-06
+------------------------------------
+
+New features and API changes; refer to the API documentation for full details:
+
+* WT-2360	Add nesting and disjunction functionality to cursor joins
+* WT-2552	Add a public API to allow custom filesystem implementations
+* WT-2738	Remove the ability to change the default checkpoint name. See the upgrading documentation for details.
+* WT-2711	Change the statistics log configuration options. Restrict where statistics log files can be created to remove security vulnerability. See upgrading documentation for details.
+* WT-2764	Enhance the checkpoint implementation, which led to a change in default eviction settings. See the upgrading documentation for details.
+* WT-2880	Add Zstandard compression support
+* See the upgrading documentation for information about renamed and removed statistics.
+
+Significant changes and bug fixes:
+
+* WT-2026	Fix a bug where in-memory pages were allowed to grow too large
+* WT-2343	Ensure we cannot rename/drop when a backup cursor is open
+* WT-2520	Ensure WT_SESSION::verify does not alter tables
+* WT-2576	Ensure variable-length column-store cannot out-of-order return
+* WT-2664	Change eviction so any eviction thread can find candidates
+* WT-2702	Resolve an issue where under high thread load, WiredTiger exceeds cache size
+* WT-2731	Resolve an issue where raw compression can create pages that are larger than expected
+* WT-2737	Allow reconciliation to scrub dirty pages rather than evicting them
+* WT-2757	Fix a bug in column stores where it was not possible to retrieve the new record number after an append
+* WT-2816	Improve eviction performance
+
+Issues fixed in MongoDB:
+
+* SERVER-23504	Resolve a resource leak
+* SERVER-23588	Stop using _open_osfhandle on Windows
+* SERVER-23659	Improve log error message at startup
+* SERVER-23661	Fix an issue where $sample takes disproportionately long time on newly created collection
+* SERVER-24306	Fix stall in log_flush switching to new files
+* SERVER-24580	Add more eviction stats to track efficiency
+* SERVER-24580	Enhance eviction when application threads are contributing
+* SERVER-24971	Don't cache buffers after application eviction
+* SERVER-25843	Remove a redundant test
+* SERVER-25845	Resolve an explicit null dereferenced
+* SERVER-25846	Resolve a dereference after null with a check
+* SERVER-26753	Don't spin on a read-lock in a tight loop
+
+Other noteworthy changes since the previous release:
+
+* WT-2103	Add incremental backup testing to test/format
+* WT-2330	Ensure In-memory configurations do not create on-disk collection files
+* WT-2450	Resolve an issue where salvage releases pages, then explicitly evicts them. Which can race with the eviction server
+* WT-2453	Add multiple eviction queues
+* WT-2504	Remove READONLY conditional for base config
+* WT-2505	Resolve clang analyzer warnings
+* WT-2508	Ensure test programs should remove test directories on the "clean" target
+* WT-2512	Change how wtperf throttle values per thread are calculated
+* WT-2513	Fix a type conversion warning
+* WT-2517	Resolve incorrect uses of setvbuf on Windows
+* WT-2518	Optimization of LSM checkpoint handle acquisition
+* WT-2522	Resolve incorrect format code in message
+* WT-2525	Miscellaneous cleanups of In-memory configurations
+* WT-2526	Prevent mixing and matching readonly file-handles and read/write data-handles
+* WT-2528	Fix a style error in WiredTiger build
+* WT-2529	Be less aggressive asserting in readonly connections
+* WT-2531	Resolve a case where in-memory tables are wasting space in truncation
+* WT-2532	Change the WT_STREAM_APPEND and WT_STREAM_LINE_BUFFER flags as they overlap
+* WT-2533	Don't let in-memory tables return a zero size
+* WT-2534	Use atomic add when allocating transaction IDs
+* WT-2535	Extend test/format to test for transactions reading their writes
+* WT-2537	Check for an old and new uninitialized LSN for recovery
+* WT-2539	Make streams a separate handle type from files
+* WT-2540	Separate stream and file handle methods
+* WT-2542	Resolve fixed-length column store reconciliation overwriting original values
+* WT-2544	Fix eviction stats when clear is used
+* WT-2546	Change evict server to be smarter when it decides whether or not to evict pages
+* WT-2547	Add eviction testing configurations for 1 thread
+* WT-2548	Cap the amount of data handed to raw compression
+* WT-2550	Add support for raw mode cursors in java
+* WT-2553	Add some In-memory documentation and stress testing
+* WT-2556	Fix a typo in the Java example code
+* WT-2557	Ensure that we truncate logs before closing backup cursor
+* WT-2558	Reorganize WT_PAGE structure
+* WT-2559	Resolve a potential segfault in Windows logging code
+* WT-2560	Add a rwlock to protect transaction state, don't spin on this lock
+* WT-2562	Add sleep loop to adapt for slow machines like PPC
+* WT-2565	Further limit the amount of data passed to raw compression
+* WT-2566	Add explicit memory barriers to Lock/unlock operations
+* WT-2567	Add a check to see if logging is enabled for truncate rather than assuming it is
+* WT-2568	Add a backward compatible constructor for PackInputStream
+* WT-2569	Ensure __win_handle_read is followed by a call to GetLastError()
+* WT-2570	Minor lint and cleanups to code
+* WT-2571	Join code clean up
+* WT-2572	Ensure test/format doesn't select an incompatible set of options for in-memory options configured
+* WT-2573	Resolve a potential case where a double free can occur
+* WT-2574	Ensure test/format frees all allocated configure memory
+* WT-2576	Ensure variable-length column-store cannot out-of-order return
+* WT-2577	Resolve a potential double-free following an in-memory split
+* WT-2579	Change so diagnostic only code can use file streams directly
+* WT-2580	Fix potential SWIG naming conflict in Java
+* WT-2581	Resolve a case where we fail to track saved updates during a page split
+* WT-2582	Fix a case where eviction can return WT_RESTART when running in-memory
+* WT-2584	Change to not use periods at the end of error messages
+* WT-2586	Fix examples/ex_config
+* WT-2589	Ensure we clear the cursor statistics for LAS when 'clear' is set
+* WT-2592	Fix joins for the non-recno, non-raw case
+* WT-2593	Free the dirlist at the end of the function
+* WT-2595	Fix compiler warning in packing test
+* WT-2598	Change so that in-memory has faster lookup on file names
+* WT-2599	Split out the checksum code from the support directory
+* WT-2600	Clean up test program includes
+* WT-2602	In LSM, use the chunk size to set maximum page size in memory
+* WT-2605	Add C tests used in testing joins
+* WT-2609	Resolve incorrect "skips API_END call" error
+* WT-2610	Reduce hazard pointer array size
+* WT-2611	Modify wtperf to handle escaped quotes
+* WT-2612	Ensure the  dist/s_prototypes script does not create a debugging file
+* WT-2613	Add WT_UNUSED to a variable to fix Windows compilation
+* WT-2615	Enabling checkpoints in test/format leads to reduced concurrency
+* WT-2616	Fix a deadlock with in-memory size lookups
+* WT-2617	Don't use u_int in the example code. It's not Windows native
+* WT-2621	Fix missing parentheses on call to __wt_errno
+* WT-2622	Clear old position for all random lookups
+* WT-2624	Fix example program build with MSVC 2013
+* WT-2626	Fix MSVC 2015 snprintf redefinition
+* WT-2627	Resolve Coverity complaints
+* WT-2628	Ensure reconciliation doesn't return without unlocking the page lock
+* WT-2629	Ensure stacks are not executable in assembly source
+* WT-2630	Rename pluggable filesystem methods to avoid reserved names
+* WT-2631	Ensure nullptr is not passed for parameters marked with attribute non-null
+* WT-2632	Tolerate EBUSY when a checkpoint cursor is open
+* WT-2637	Update file-extension documentation to cover not-supported cases
+* WT-2638	Add extension to the Windows file system implementation
+* WT-2644	Fix 'wt load -r' (rename) with LSM
+* WT-2645	Move the complexity of dump from the dump utility to the metadata cursor
+* WT-2646	Add checkpoint_wait configuration option to drop
+* WT-2648	Change cache-line alignment for new ports
+* WT-2651	Fix a Coverity found resource leak
+* WT-2652	Remove unnecessary wt_ftruncate call
+* WT-2653	Add display of device configuration to custom file-system example
+* WT-2656	Fix GCC 4.7 compiler warnings
+* WT-2658	Ensure we only include PPC-specific files in PPC builds
+* WT-2659	Assorted lint and cleanup to csuite tests
+* WT-2660	Fix a hang between eviction and connection close
+* WT-2662	For spell check, strip out double quote literals, they confuse aspell
+* WT-2664	Add ability for eviction workers to populate eviction queues
+* WT-2665	Limit allocator fragmentation from the WiredTiger cache
+* WT-2667	Add fops to Evergreen testing for Windows and Linux
+* WT-2668	Create join statistics that are useful and are easy to understand
+* WT-2671	Dump more information about the file layout in verify debug mode
+* WT-2672	Handle system calls that don't set errno
+* WT-2673	Stop automatically increasing memory page max
+* WT-2674	Simplify metadata file check
+* WT-2676	Don't use key size in column store in-memory splits
+* WT-2677	Fix JSON output so only printable ASCII is produced
+* WT-2678	Fix cases where metadata implies that an empty value is true
+* WT-2682	Add option to configure WiredTiger with strict compiler flags
+* WT-2683	Allow in memory storage engine to report zero disk usage
+* WT-2685	Fix clear walk hazard pointer failure
+* WT-2686	Report an error any time we fail to scan the log
+* WT-2687	Provide ability for test suite to verify the exit status of the wt utility
+* WT-2688	Improve build error messages when SWIG is unavailable
+* WT-2689	Fix heap-use-after-free on cursor error path
+* WT-2691	Use wrappers for ctype functions to avoid sign extension errors
+* WT-2692	Fix race in file system example
+* WT-2693	Ensure open_cursor error paths have consistent error handling
+* WT-2695	Integrate s390x accelerated crc32c support
+* WT-2696	Wait if we find an unbuffered flag without the size set yet
+* WT-2698	Change flag into atomically manipulated field to avoid deadlock
+* WT-2702	Block operations when the cache is 100% full
+* WT-2704	Fix bug in diagnostic code tracking duration of stuck cache
+* WT-2706	Fix lost log writes when switching files
+* WT-2707	Add stricter checks in dist/s_label, and add some WT_ERR calls
+* WT-2708	Fix a split child-update race with reconciliation/eviction
+* WT-2709	Resolve a connection reconfigure segfault in __wt_conn_cache_pool_destroy
+* WT-2710	WT_FILE_HANDLE_INMEM no longer needs an off field
+* WT-2713	Document WT_PANIC so pluggable filesystems can panic
+* WT-2715	Resolve random abort test failure with partial write
+* WT-2719	Allow make check without verbose configured
+* WT-2719	Fix memory leak in reconfig test
+* WT-2720	Change the return codes in run.py to error on failures
+* WT-2722	Escape regular expression meta-character so egrep works on all systems
+* WT-2724	Pass in session address, not pointer to it
+* WT-2728	Only verify the log file header during recovery
+* WT-2729	Focus eviction on the largest trees in cache
+* WT-2730	Btree can incorrectly match key slots on new pages
+* WT-2731	Finer adjustment for page size with raw compression
+* WT-2732	Coverity analysis defect 99665, Remove redundant test
+* WT-2734	Improve documentation of eviction configuration settings
+* WT-2739	pluggable file systems documentation cleanups
+* WT-2743	Fixup new I/O thread count statistics
+* WT-2744	Detect and ignore partial line
+* WT-2746	Add a new statistic tracking I/O for checkpoints
+* WT-2751	column-store statistics incorrectly calculates the number of entries
+* WT-2752	Fix errors in wtperf config
+* WT-2755	Fix for cases where tools treats size_t as 4B type
+* WT-2756	Upgrade the autoconf archive package to check for swig 3.0
+* WT-2757	Column tables behave differently when column names are provided
+* WT-2759	Releasing the hot-backup lock doesn't require the schema lock
+* WT-2760	Fix a bug in backup related to directory sync. Change the filesystem API to make durable the default
+* WT-2762	Handle 'Y' as an options from wtperf monitor file
+* WT-2763	Change test ID's in test_intpack to fix OS X test errors
+* WT-2764	Fix a bug calculating the dirty percentage of cache
+* WT-2765	Ensure indices are shown in the dump output
+* WT-2766	Don't sweep LAS cache when aren't making progress in eviction
+* WT-2767	In test/suite/run.py, add -s N option to run an individual scenario
+* WT-2769	Update documentation to reflect correct limits of memory_page_max
+* WT-2770	Add statistics tracking schema operations
+* WT-2772	Adjust log.wtperf config. Remove unneeded config entries
+* WT-2773	Ensure that search_near in an index finds exact matches
+* WT-2774	Minor cleanups/improvements
+* WT-2778	Enhance output formatting when running Python test suite
+* WT-2779	Fix large pages getting generated with raw compression
+* WT-2781	Don't take checkpoint lock if checkpoint_wait=0 for bulk cursor open
+* WT-2782	Minor text changes for file system functions
+* WT-2783	Clean up wtperf configuration object management
+* WT-2785	Scrub dirty pages rather than evicting them single-page reconciliation
+* WT-2787	Include src/include/wiredtiger_ext.h is problematic
+* WT-2788	Do not touch memory already freed during a close API call
+* WT-2791	Have evergreen upload artifacts for each build. Rename current artifacts to "Binaries"
+* WT-2793	Enhance statistics related to overflow values
+* WT-2795	Update documentation about read-only mode
+* WT-2796	Fix a memory leak when using the lookaside table
+* WT-2798	Fix data consistency bug with table creates during a checkpoint
+* WT-2800	Fix incorrect error message
+* WT-2801	Prevent eviction of metadata updates by a running checkpoint
+* WT-2802	Copy values during commit before releasing snapshot
+* WT-2803	Add VERBOSE=1 to all make check jobs
+* WT-2804	Don't read values in a tree without a snapshot
+* WT-2805	Avoid infinite recursion on error stream failure
+* WT-2806	Fix an off-by-one allocation in wtperf
+* WT-2807	Change the memory allocator for wtperf performance tests
+* WT-2811	The checkpoint session should not ignore it's own transaction ID
+* WT-2812	Verify cache_size before dividing to avoid division by 0
+* WT-2813	Configure eviction dirty settings explicitly for LSM in test/format
+* WT-2814	Add new single op truncate mode to wtperf
+* WT-2816	General improvements to WiredTiger eviction performance
+* WT-2817	Add wtperf conf to stress test checkpoints with updates
+* WT-2818	Change the page visibility check when queuing pages for eviction
+* WT-2820	Add gcc warn_unused_result attribute
+* WT-2822	Simplify error handling by using a panic mutex in functions that cannot fail
+* WT-2823	Support file handles without a truncate method
+* WT-2824	Fix double concatenation the config strings
+* WT-2826	Fix a clang38 false positive on uninitialized variable
+* WT-2827	Set a reasonable minimum for log_size
+* WT-2828	Change wtperf long tests to better match MongoDB workloads
+* WT-2829	Fix missing define for BerkeleyDB
+* WT-2831	Skip checkpointing if there have been no modifications
+* WT-2832	Python test uses hard-coded temporary directory
+* WT-2834	Fix sign-change warning with auto conversion from uint to int
+* WT-2834	Shared bloom filters allow only a partial shortcut
+* WT-2835	Stop WT_CONNECTION.leak-memory skipping memory map and cache cleanup
+* WT-2838	Don't free session handles on close if leak memory is configured
+* WT-2839	Remove cases ignoring return value of function
+* WT-2840	Fix garbage values found with clang analysis
+* WT-2841	Initialize verbose checkpoint timer at start of checkpoint
+* WT-2842	Add explicit include in wtperf to resolve build warning
+* WT-2843	If there is no truncate available, manually zero the log file
+* WT-2846	Ensure that all resources are released when destroying a thread group
+* WT-2846	Fixes for new thread group code
+* WT-2847	Merge fair locks into read/write locks
+* WT-2850	Fix clang 4.1 attribute warnings
+* WT-2853	Don't force eviction if multiple cursors are pinning the page
+* WT-2857	POSIX ftruncate calls should be use HAVE_FTRUNCATE define
+* WT-2858	Rename wtperf's CONFIG structure
+* WT-2859	Restructure statistics gathering macros
+* WT-2863	Support UTF-8 paths on Windows
+* WT-2864	Update reconfigure test to detect hangs
+* WT-2865	Fix a bug where the eviction server could panic after a WT_NOTFOUND
+* WT-2866	Don't set eviction stuck unless the cache is full
+* WT-2867	Review and fix barrier usage in __lsm_tree_close
+* WT-2868	Add sample_interval to checkpoint-stress.wtperf
+* WT-2869	Fix a performance regression on secondaries
+* WT-2870	Rename wtperf jobs for consistency
+* WT-2871	Make verbose formats and argument types match
+* WT-2872	Ensure tests with tiny caches don't get stuck due to the dirty trigger
+* WT-2873	Refactor CRC32 code
+* WT-2874	Change test_compact01 to avoid eviction
+* WT-2875	Add environment variable to disable long csuite tests
+* WT-2876	Add an oplog-like ability to wtperf utility
+* WT-2878	Fix an issue where verbose changes affected performance
+* WT-2881	Add -Wpedantic to clang compiler warning flags
+* WT-2883	Remove potentially recursive call for verbose handleops
+* WT-2885	Lint __wt_checkpoint_signal function
+* WT-2886	Ignore dirty eviction settings when in_memory is true
+* WT-2888	Switch functions to return void where possible
+* WT-2892	Fix case where hot backup can race with block truncate
+* WT-2894	Add wtperf stress workload that tries to induce negative scaling
+* WT-2895	Reduce the runtime of make check testing with disable long
+* WT-2896	Fix a resource leak
+* WT-2897	Fix an issue where checkpoints can become corrupted on failure
+* WT-2900	Add ARM8 build support to WiredTiger and fix ARM CRC assembler tags
+* WT-2901	Make checkpoint scrubbing configurable
+* WT-2902	Track per-tree the efficiency of eviction walks
+* WT-2903	Change the eviction_scrub_target default to 15%
+* WT-2904	Fix a bug where the reported checkpoint size could be many times data size
+* WT-2904	Revert overly strong assertion
+* WT-2905	Remove dead code
+* WT-2907	Fixed java concurrent close test to have both insert threads and scan threads
+* WT-2908	Add a dry-run option to python suite
+* WT-2910	When running in-memory, only evict dirty pages
+* WT-2911	Add support for gcc6
+* WT-2912	Make --enable-strict run on the zseries test box
+* WT-2913	Re-sort eviction queues if we find no new candidates
+* WT-2914	In test/csuite program, added explicit call to wiredtiger_open to satisfy some linkers
+* WT-2916	Fix and simplify s_whitespace
+* WT-2917	Split wtperf's configuration into per-database and per-run parts
+* WT-2918	The dist scripts create C files s_whitespace complains about
+* WT-2919	Don't mask error returns from style checking scripts
+* WT-2920	New eviction statistics
+* WT-2921	Reset the count when the last hazard pointer is cleared
+* WT-2923	Fix heap-use-after-free on address in compaction
+* WT-2924	Ensure we are doing eviction when threads are waiting for it
+* WT-2925	Change where the WT_THREAD_PANIC_FAIL flag lives
+* WT-2926	WT_CONNECTION.reconfigure can attempt unlock of not-locked lock
+* WT-2928	Don't give up when the urgent queue is half empty
+* WT-2928	Eviction failing to switch queues can lead to starvation
+* WT-2931	Enforce limits on dirty data for in-memory
+* WT-2932	Add a configuration option allowing tables to ignore cache limits
+* WT-2933	Fix a race between named snapshots and checkpoints
+* WT-2937	Only do an eviction walk after a page has been taken from the current queue
+* WT-2938	Change assembly file extensions from .S to .sx
+* WT-2941	Improve test/format to use faster key-generation functions
+* WT-2942	Verbose messages should not have newlines
+* WT-2945	Occasional hang running reconfigure fuzz test
+* WT-2946	Fix dist/s_docs being incompatible with OS X Xcode installation
+* WT-2947	Replace test suite populate functions with *DataSet classes
+* WT-2948	Simplify error handling by making __wt_epoch return never fail
+* WT-2949	Add option to skip closing the connection after test runs
+* WT-2950	Free all reconciliation memory between calls to eviction
+* WT-2953	Only test for checkpoint/LAS collision if LAS was used
+* WT-2954	Evict pages that exceed memory_page_max even if the transaction ID is stuck
+* WT-2955	Add statistics tracking the amount of time threads spend waiting for high level locks
+* WT-2959	Ensure WT_SESSION_IMPL is never used before it's initialized
+* WT-2961	Add a version drop-down to the web version of the docs
+* WT-2962	Allow configuration of builtin extensions
+* WT-2963	Fix a race bounding eviction in small caches
+* WT-2964	Alter evict walk to not fill all its slots with internal pages when running in aggressive mode
+* WT-2965	Remove sleep and retry loop from __evict_exclusive
+* WT-2968	Don't open file handles on backup
+* WT-2971	Add details on raw-compression into WT documentation
+* WT-2975	Fix a leak of statistics data when reopening handles
+* WT-2976	Add a statistic tracking how long app threads spend reading and writing
+* WT-2977	Remove stash and check code from LSM test
+* WT-2984	Keep sufficient history in the metadata for queries
+* WT-2985	Fix a race during checkpoint that can cause a core dump
+* WT-2987	Fix a bug where opening a cursor on an incomplete table drops core
+* WT-2988	Fix __wt_epoch potentially returning garbage values
+* WT-2991	Fix Coverity REVERSE_INULL
+* WT-2998	Add error messages to error returns that might be confusing
+* WT-2999	Added contributed test case that demonstrated the leak
+* WT-3000	Wait for previous writes on first write to new log file
+* WT-3001	Fix WT_EXTENSION_API references that are named inconsistently
+* WT-3002	Allow applications to exempt threads from eviction
+* WT-3003	Don't generate log record and op types
+* WT-3003	Fix doxygen comment blocks
+* WT-3004	Lint, declare functions that don't return a value as void
+* WT-3005	Add top-level .gitignore file
+* WT-3008	Move wtperf stress jobs to new stress runner folder
+* WT-3009	Remove the eviction_dirty_target from test/format runs with less than 20MB cache
+* WT-3011	Fix __wt_curjoin_open() saving the wrong URI in the cursor
+* WT-3012	Check a btree is LSM primary before switching
+* WT-3012	Don't track the LSM Primary as part of dirty bytes in cache
+* WT-3015	Change when we will evict internal pages
+* WT-3016	Change how file size is determined during compact tests to allow
+* WT-3017	Don't set NULL hazard pointers
+* WT-3020	Always make LSM chunks evictable when they are switched out
+* WT-3022	Change lsm_tree flags to fields to prevent race conditions
+* WT-3023	Don't treat splits as eviction making progress
+* WT-3024	Fix a hang on close caused by leaving a transaction ID pinned
+
 WiredTiger release 2.8.0, 2015-03-24
 ------------------------------------
 

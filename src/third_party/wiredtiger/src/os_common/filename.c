@@ -72,6 +72,7 @@ __wt_remove_if_exists(WT_SESSION_IMPL *session, const char *name, bool durable)
  */
 int
 __wt_copy_and_sync(WT_SESSION *wt_session, const char *from, const char *to)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
