@@ -441,7 +441,7 @@ ExitCode _initAndListen(int listenPort) {
 
     {
         LogstreamBuilder l = log(LogComponent::kControl);
-        l << "MongoDB starting :" << "port=" << serverGlobalParams.port
+        l << "MongoDB starting :" << " port=" << serverGlobalParams.port
           << " dbpath=" << storageGlobalParams.dbpath;
         if (replSettings.isMaster())
             l << " master=" << replSettings.isMaster();
