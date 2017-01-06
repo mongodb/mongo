@@ -184,7 +184,36 @@ if (typeof _threadInject != "undefined") {
 
             // Assumes that other tests are not creating cursors.
             "kill_cursors.js",
+
+            // Views tests
+            "views/invalid_system_views.js",  // Creates invalid view definitions in system.views.
+            "views/views_all_commands.js",    // Drops test DB.
         ]);
+
+        // The following tests cannot run when shell readMode is legacy.
+        if (db.getMongo().readMode() === "legacy") {
+            var requires_find_command = [
+                "views/views_aggregation.js",
+                "views/views_change.js",
+                "views/views_drop.js",
+                "views/views_find.js"
+            ];
+            Object.assign(skipTests, makeKeys(requires_find_command));
+        }
+
+        // Get files, including files in subdirectories.
+        var getFilesRecursive = function(dir) {
+            var files = listFiles(dir);
+            var fileList = [];
+            files.forEach(file => {
+                if (file.isDirectory) {
+                    getFilesRecursive(file.name).forEach(subDirFile => fileList.push(subDirFile));
+                } else {
+                    fileList.push(file);
+                }
+            });
+            return fileList;
+        };
 
         var parallelFilesDir = "jstests/core";
 
@@ -226,7 +255,7 @@ if (typeof _threadInject != "undefined") {
         // prefix the first thread with the serialTests
         // (which we will exclude from the rest of the threads below)
         params[0] = serialTestsArr;
-        var files = listFiles(parallelFilesDir);
+        var files = getFilesRecursive(parallelFilesDir);
         files = Array.shuffle(files);
 
         var i = 0;
