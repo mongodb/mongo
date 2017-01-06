@@ -97,22 +97,26 @@ def parse_command_line():
     parser.add_option("--dbtest", dest="dbtest_executable", metavar="PATH",
                       help="The path to the dbtest executable for resmoke to use.")
 
-    parser.add_option("--excludeWithAllTags", dest="exclude_with_all_tags", metavar="TAG1,TAG2",
+    parser.add_option("--excludeWithAllTags", action="append", dest="exclude_with_all_tags",
+                      metavar="TAG1,TAG2",
                       help=("Comma separated list of tags. Any jstest that contains all of the"
                             " specified tags will be excluded from any suites that are run."))
 
-    parser.add_option("--excludeWithAnyTags", dest="exclude_with_any_tags", metavar="TAG1,TAG2",
+    parser.add_option("--excludeWithAnyTags", action="append", dest="exclude_with_any_tags",
+                      metavar="TAG1,TAG2",
                       help=("Comma separated list of tags. Any jstest that contains any of the"
                             " specified tags will be excluded from any suites that are run."))
 
     parser.add_option("-f", "--findSuites", action="store_true", dest="find_suites",
                       help="List the names of the suites that will execute the specified tests.")
 
-    parser.add_option("--includeWithAllTags", dest="include_with_all_tags", metavar="TAG1,TAG2",
+    parser.add_option("--includeWithAllTags", action="append", dest="include_with_all_tags",
+                      metavar="TAG1,TAG2",
                       help=("Comma separated list of tags. For the jstest portion of the suite(s),"
                             " only tests which have all of the specified tags will be run."))
 
-    parser.add_option("--includeWithAnyTags", dest="include_with_any_tags", metavar="TAG1,TAG2",
+    parser.add_option("--includeWithAnyTags", action="append", dest="include_with_any_tags",
+                      metavar="TAG1,TAG2",
                       help=("Comma separated list of tags. For the jstest portion of the suite(s),"
                             " only tests which have at least one of the specified tags will be"
                             " run."))
