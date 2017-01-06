@@ -64,14 +64,17 @@ std::ostream& MessageEventDetailsEncoder::encode(const MessageEventEphemeral& ev
     _dateFormatter(os, event.getDate());
     os << ' ';
 
+    os << event.getProcessId().toString();
+    os << ' ';
+
     os << event.getSeverity().toChar();
     os << ' ';
 
-    LogComponent component = event.getComponent();
+    const LogComponent component = event.getComponent();
     os << component;
     os << ' ';
 
-    StringData contextName = event.getContextName();
+    const StringData contextName = event.getContextName();
     if (!contextName.empty()) {
         os << '[' << contextName << "] ";
     }

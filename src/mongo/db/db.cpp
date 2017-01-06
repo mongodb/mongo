@@ -440,9 +440,8 @@ ExitCode _initAndListen(int listenPort) {
     const repl::ReplSettings& replSettings = repl::getGlobalReplicationCoordinator()->getSettings();
 
     {
-        ProcessId pid = ProcessId::getCurrent();
         LogstreamBuilder l = log(LogComponent::kControl);
-        l << "MongoDB starting : pid=" << pid << " port=" << serverGlobalParams.port
+        l << "MongoDB starting :" << "port=" << serverGlobalParams.port
           << " dbpath=" << storageGlobalParams.dbpath;
         if (replSettings.isMaster())
             l << " master=" << replSettings.isMaster();

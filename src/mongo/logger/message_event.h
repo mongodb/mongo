@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/log_severity.h"
+#include "mongo/platform/process_id.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -60,7 +61,8 @@ public:
           _severity(severity),
           _component(component),
           _contextName(contextName),
-          _message(message) {}
+          _message(message),
+          _processId(ProcessId::getCurrent()) {}
 
     MessageEventEphemeral& setIsTruncatable(bool value) {
         _isTruncatable = value;
@@ -85,6 +87,9 @@ public:
     bool isTruncatable() const {
         return _isTruncatable;
     }
+    ProcessId getProcessId() const {
+        return _processId;
+    }
 
 private:
     Date_t _date;
@@ -93,6 +98,7 @@ private:
     StringData _contextName;
     StringData _message;
     bool _isTruncatable = true;
+    const ProcessId _processId;
 };
 
 }  // namespace logger
