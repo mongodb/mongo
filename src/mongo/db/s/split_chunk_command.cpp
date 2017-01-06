@@ -202,15 +202,6 @@ public:
         const BSONObj min = chunkRange.getMin();
         const BSONObj max = chunkRange.getMax();
 
-        boost::optional<ChunkVersion> expectedChunkVersion;
-        auto statusWithChunkVersion =
-            ChunkVersion::parseFromBSONWithFieldForCommands(cmdObj, kChunkVersion);
-        if (statusWithChunkVersion.isOK()) {
-            expectedChunkVersion = std::move(statusWithChunkVersion.getValue());
-        } else if (statusWithChunkVersion != ErrorCodes::NoSuchKey) {
-            uassertStatusOK(statusWithChunkVersion);
-        }
-
         vector<BSONObj> splitKeys;
         {
             BSONElement splitKeysElem;
@@ -329,10 +320,6 @@ public:
             ChunkType chunkToMove;
             chunkToMove.setMin(min);
             chunkToMove.setMax(max);
-            if (expectedChunkVersion) {
-                chunkToMove.setVersion(*expectedChunkVersion);
-            }
-
             uassertStatusOK(collMetadata->checkChunkIsValid(chunkToMove));
         }
 

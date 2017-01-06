@@ -246,15 +246,6 @@ Status CollectionMetadata::checkChunkIsValid(const ChunkType& chunk) {
                               << getCollVersion().toString()};
     }
 
-    if (chunk.isVersionSet() && !chunk.getVersion().isStrictlyEqualTo(existingChunk.getVersion())) {
-        return {ErrorCodes::IncompatibleShardingMetadata,
-                str::stream() << "Chunk with the specified bounds exists but the version does not "
-                                 "match. Expected: "
-                              << chunk.getVersion().toString()
-                              << ", actual: "
-                              << existingChunk.getVersion().toString()};
-    }
-
     return Status::OK();
 }
 
