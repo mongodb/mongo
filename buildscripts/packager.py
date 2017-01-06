@@ -28,18 +28,15 @@
 
 import argparse
 import errno
-import getopt
-import httplib2
 from glob import glob
 import os
 import re
+import requests
 import shutil
-import stat
 import subprocess
 import sys
 import tempfile
 import time
-import urlparse
 
 # The MongoDB names for the architectures we support.
 ARCH_CHOICES=["x86_64", "arm64"]
@@ -389,22 +386,15 @@ def setupdir(distro, build_os, arch, spec):
 def httpget(url, filename):
     """Download the contents of url to filename, return filename."""
     print "Fetching %s to %s." % (url, filename)
-    conn = None
-    u=urlparse.urlparse(url)
-    assert(u.scheme=='http')
-    try:
-        h = httplib2.Http(cache = os.environ["HOME"] + "/.cache")
-        resp, content = h.request(url, "GET")
-        t=filename+'.TMP'
-        if resp.status==200:
-            with open(t, 'w') as f:
-                f.write(content)
-        else:
-            raise Exception("HTTP error %d" % resp.status)
-        os.rename(t, filename)
-    finally:
-        if conn:
-            conn.close()
+
+    r = requests.get(url, stream=True)
+    if r.status_code == 200:
+        with open(filename, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=16384):
+                f.write(chunk)
+    else:
+        raise Exception("HTTP error %d" % r.status_code)
+
     return filename
 
 def unpack_binaries_into(build_os, arch, spec, where):
