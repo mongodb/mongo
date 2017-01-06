@@ -30,7 +30,6 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	/* WT_SESSION_IMPL array. */
 	WT_RET(__wt_calloc(session,
 	    conn->session_size, sizeof(WT_SESSION_IMPL), &conn->sessions));
-	WT_CACHE_LINE_ALIGNMENT_VERIFY(session, conn->sessions);
 
 	/*
 	 * Open the default session.  We open this before starting service

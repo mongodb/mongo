@@ -44,7 +44,7 @@
  * Record numbers are stored in 64-bit unsigned integers, meaning the largest
  * record number is "really, really big".
  */
-#define	WT_BTREE_MAX_OBJECT_SIZE	(UINT32_MAX - 1024)
+#define	WT_BTREE_MAX_OBJECT_SIZE	((uint32_t)(UINT32_MAX - 1024))
 
 /*
  * A location in a file is a variable-length cookie, but it has a maximum size

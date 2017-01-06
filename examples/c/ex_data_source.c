@@ -46,6 +46,21 @@ my_data_source_init(WT_CONNECTION *connection)
 }
 /*! [WT_EXTENSION_API declaration] */
 
+/*! [WT_DATA_SOURCE alter] */
+static int
+my_alter(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+    const char *uri, WT_CONFIG_ARG *config)
+/*! [WT_DATA_SOURCE alter] */
+{
+	/* Unused parameters */
+	(void)dsrc;
+	(void)session;
+	(void)uri;
+	(void)config;
+
+	return (0);
+}
+
 /*! [WT_DATA_SOURCE create] */
 static int
 my_create(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
@@ -604,6 +619,7 @@ main(void)
 	{
 	/*! [WT_DATA_SOURCE register] */
 	static WT_DATA_SOURCE my_dsrc = {
+		my_alter,
 		my_create,
 		my_compact,
 		my_drop,

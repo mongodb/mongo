@@ -559,7 +559,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 		 * get the handle while holding the checkpoint lock.
 		 */
 		if (LF_ISSET(WT_DHANDLE_EXCLUSIVE) && checkpoint_wait)
-			WT_WITH_CHECKPOINT_LOCK(session, ret,
+			WT_WITH_CHECKPOINT_LOCK(session,
 			    ret = __wt_session_get_btree_ckpt(
 			    session, uri, cfg, flags));
 		else

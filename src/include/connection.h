@@ -255,12 +255,6 @@ struct __wt_connection_impl {
 
 	size_t     session_scratch_max;	/* Max scratch memory per session */
 
-	/*
-	 * WiredTiger allocates space for a fixed number of hazard pointers
-	 * in each thread of control.
-	 */
-	uint32_t   hazard_max;		/* Hazard array size */
-
 	WT_CACHE  *cache;		/* Page cache */
 	volatile uint64_t cache_size;	/* Cache size (either statically
 					   configured or the current size

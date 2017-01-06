@@ -304,6 +304,7 @@ void
 __wt_err(WT_SESSION_IMPL *session, int error, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((cold))
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	va_list ap;
 
@@ -470,6 +471,7 @@ __wt_assert(WT_SESSION_IMPL *session,
 #ifdef HAVE_DIAGNOSTIC
     WT_GCC_FUNC_ATTRIBUTE((noreturn))
 #endif
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	va_list ap;
 
@@ -491,6 +493,7 @@ __wt_assert(WT_SESSION_IMPL *session,
 int
 __wt_panic(WT_SESSION_IMPL *session)
     WT_GCC_FUNC_ATTRIBUTE((cold))
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	F_SET(S2C(session), WT_CONN_PANIC);
 	__wt_err(session, WT_PANIC, "the process must exit and restart");
@@ -515,6 +518,7 @@ __wt_panic(WT_SESSION_IMPL *session)
 int
 __wt_illegal_value(WT_SESSION_IMPL *session, const char *name)
     WT_GCC_FUNC_ATTRIBUTE((cold))
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	__wt_errx(session, "%s%s%s",
 	    name == NULL ? "" : name, name == NULL ? "" : ": ",

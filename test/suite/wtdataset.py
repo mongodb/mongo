@@ -49,7 +49,7 @@ class BaseDataSet(object):
 
     def fill(self):
         c = self.testcase.session.open_cursor(self.uri, None)
-        for i in range(1, self.rows + 1):
+        for i in xrange(1, self.rows + 1):
             c[self.key(i)] = self.value(i)
         c.close()
 
@@ -166,7 +166,7 @@ class SimpleIndexDataSet(SimpleDataSet):
 
         # Check values in the index.
         idxcursor = self.testcase.session.open_cursor(self.indexname)
-        for i in range(1, self.rows + 1):
+        for i in xrange(1, self.rows + 1):
             k = self.key(i)
             v = self.value(i)
             ik = (v, k)  # The index key is columns=(v,k).

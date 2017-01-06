@@ -19,16 +19,19 @@
 // under the License.
 //
 // -------------------------------------------------------------------
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 
+#include <errno.h>
 #include <limits.h>
+#include <memory.h>
 #include <stdio.h>
+
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <syslog.h>
-#include <memory.h>
-#include <errno.h>
 
 #ifndef STORAGE_LEVELDB_INCLUDE_PERF_COUNT_H_
 #include "perf_count.h"
@@ -36,8 +39,6 @@
 
 #include "util/coding.h"
 
-#define __STDC_FORMAT_MACROS
-#include <inttypes.h>
 
 #ifdef OS_SOLARIS
 #  include <atomic.h>

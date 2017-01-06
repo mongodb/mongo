@@ -68,7 +68,6 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	    session, &conn->hot_backup_lock, "hot backup"));
 
 	WT_RET(__wt_calloc_def(session, WT_PAGE_LOCKS, &conn->page_lock));
-	WT_CACHE_LINE_ALIGNMENT_VERIFY(session, conn->page_lock);
 	for (i = 0; i < WT_PAGE_LOCKS; ++i)
 		WT_RET(
 		    __wt_spin_init(session, &conn->page_lock[i], "btree page"));

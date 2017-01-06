@@ -197,7 +197,7 @@ __wt_log_slot_switch(
 	 * because we are responsible for setting up the new slot.
 	 */
 	do {
-		WT_WITH_SLOT_LOCK(session, log, ret,
+		WT_WITH_SLOT_LOCK(session, log,
 		    ret = __log_slot_switch_internal(session, myslot, forced));
 		if (ret == EBUSY) {
 			WT_STAT_CONN_INCR(session, log_slot_switch_busy);
@@ -283,7 +283,6 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 	log = conn->log;
-	WT_CACHE_LINE_ALIGNMENT_VERIFY(session, log->slot_pool);
 	for (i = 0; i < WT_SLOT_POOL; i++)
 		log->slot_pool[i].slot_state = WT_LOG_SLOT_FREE;
 
@@ -360,8 +359,7 @@ __wt_log_slot_destroy(WT_SESSION_IMPL *session)
 
 /*
  * __wt_log_slot_join --
- *	Join a consolidated logging slot.  Must be called with
- *	the read lock held.
+ *	Join a consolidated logging slot.
  */
 void
 __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
@@ -379,11 +377,6 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	conn = S2C(session);
 	log = conn->log;
 
-	/*
-	 * Make sure the length cannot overflow.  The caller should not
-	 * even call this function if it doesn't fit but use direct
-	 * writes.
-	 */
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SLOT));
 
 	/*
@@ -469,6 +462,11 @@ __wt_log_slot_release(WT_SESSION_IMPL *session, WT_MYSLOT *myslot, int64_t size)
 	WT_UNUSED(session);
 	slot = myslot->slot;
 	my_start = slot->slot_start_offset + myslot->offset;
+	/*
+	 * We maintain the last starting offset within this slot.
+	 * This is used to know the offset of the last record that
+	 * was written rather than the beginning record of the slot.
+	 */
 	while ((cur_offset = slot->slot_last_offset) < my_start) {
 		/*
 		 * Set our offset if we are larger.

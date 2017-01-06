@@ -23,7 +23,7 @@ struct __wt_data_handle_cache {
  *	A hazard pointer.
  */
 struct __wt_hazard {
-	WT_PAGE *page;			/* Page address */
+	WT_REF *ref;			/* Page reference */
 #ifdef HAVE_DIAGNOSTIC
 	const char *file;		/* File/line where hazard acquired */
 	int	    line;
@@ -41,7 +41,7 @@ struct __wt_hazard {
  * WT_SESSION_IMPL --
  *	Implementation of WT_SESSION.
  */
-struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
+struct __wt_session_impl {
 	WT_SESSION iface;
 
 	void	*lang_private;		/* Language specific private storage */
@@ -75,7 +75,7 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
 
 	WT_CURSOR_BACKUP *bkp_cursor;	/* Hot backup cursor */
 
-	WT_COMPACT	 *compact;	/* Compaction information */
+	WT_COMPACT_STATE *compact;	/* Compaction information */
 	enum { WT_COMPACT_NONE=0,
 	    WT_COMPACT_RUNNING, WT_COMPACT_SUCCESS } compact_state;
 
@@ -200,9 +200,13 @@ struct WT_COMPILER_TYPE_ALIGN(WT_CACHE_LINE_ALIGNMENT) __wt_session_impl {
 #define	WT_SESSION_FIRST_USE(s)						\
 	((s)->hazard == NULL)
 
-	/* The number of hazard pointers grows dynamically. */
-#define	WT_HAZARD_INCR		1
-	uint32_t   hazard_size;		/* Allocated slots in hazard array. */
+	/*
+	 * The hazard pointer array grows as necessary, initialize with 250
+	 * slots.
+	 */
+#define	WT_SESSION_INITIAL_HAZARD_SLOTS	250
+	uint32_t   hazard_size;		/* Hazard pointer array slots */
+	uint32_t   hazard_inuse;	/* Hazard pointer array slots in-use */
 	uint32_t   nhazard;		/* Count of active hazard pointers */
 	WT_HAZARD *hazard;		/* Hazard pointer array */
 };

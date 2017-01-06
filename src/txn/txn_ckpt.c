@@ -555,9 +555,6 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	saved_isolation = session->isolation;
 	full = idle = logging = tracking = false;
 
-	/* Ensure the metadata table is open before taking any locks. */
-	WT_RET(__wt_metadata_cursor(session, NULL));
-
 	/*
 	 * Do a pass over the configuration arguments and figure out what kind
 	 * of checkpoint this is.
@@ -641,8 +638,8 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * then release any clean handles.
 	 */
 	WT_ASSERT(session, session->ckpt_handle_next == 0);
-	WT_WITH_SCHEMA_LOCK(session, ret,
-	    WT_WITH_TABLE_LOCK(session, ret,
+	WT_WITH_SCHEMA_LOCK(session,
+	    WT_WITH_TABLE_LOCK(session,
 		WT_WITH_HANDLE_LIST_LOCK(session,
 		    ret = __checkpoint_apply_all(
 		    session, cfg, __wt_checkpoint_get_handles, NULL))));
@@ -784,7 +781,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		/* Disable metadata tracking during the metadata checkpoint. */
 		saved_meta_next = session->meta_track_next;
 		session->meta_track_next = NULL;
-		WT_WITH_METADATA_LOCK(session, ret,
+		WT_WITH_METADATA_LOCK(session,
 		    WT_WITH_DHANDLE(session,
 			WT_SESSION_META_DHANDLE(session),
 			ret = __wt_checkpoint(session, cfg)));
@@ -878,13 +875,39 @@ err:	/*
 }
 
 /*
+ * __txn_checkpoint_wrapper --
+ *	Checkpoint wrapper.
+ */
+static int
+__txn_checkpoint_wrapper(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_DECL_RET;
+	WT_TXN_GLOBAL *txn_global;
+
+	txn_global = &S2C(session)->txn_global;
+
+	WT_STAT_CONN_SET(session, txn_checkpoint_running, 1);
+	txn_global->checkpoint_running = true;
+	WT_FULL_BARRIER();
+
+	ret = __txn_checkpoint(session, cfg);
+
+	WT_STAT_CONN_SET(session, txn_checkpoint_running, 0);
+	txn_global->checkpoint_running = false;
+	WT_FULL_BARRIER();
+
+	return (ret);
+}
+
+/*
  * __wt_txn_checkpoint --
  *	Checkpoint a database or a list of objects in the database.
  */
 int
-__wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[], bool waiting)
 {
 	WT_DECL_RET;
+	uint32_t mask;
 
 	/*
 	 * Reset open cursors.  Do this explicitly, even though it will happen
@@ -894,13 +917,22 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	WT_RET(__wt_session_reset_cursors(session, false));
 
+	/* Ensure the metadata table is open before taking any locks. */
+	WT_RET(__wt_metadata_cursor(session, NULL));
+
 	/*
 	 * Don't highjack the session checkpoint thread for eviction.
 	 *
 	 * Application threads are not generally available for potentially slow
 	 * operations, but checkpoint does enough I/O it may be called upon to
 	 * perform slow operations for the block manager.
+	 *
+	 * Application checkpoints wait until the checkpoint lock is available,
+	 * compaction checkpoints don't.
 	 */
+#define	WT_TXN_SESSION_MASK						\
+	(WT_SESSION_CAN_WAIT | WT_SESSION_NO_EVICTION)
+	mask = F_MASK(session, WT_TXN_SESSION_MASK);
 	F_SET(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_EVICTION);
 
 	/*
@@ -910,14 +942,15 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * calls checkpoint directly, it can be tough to avoid. Serialize here
 	 * to ensure we don't get into trouble.
 	 */
-	WT_STAT_CONN_SET(session, txn_checkpoint_running, 1);
+	if (waiting)
+		WT_WITH_CHECKPOINT_LOCK(session,
+		    ret = __txn_checkpoint_wrapper(session, cfg));
+	else
+		WT_WITH_CHECKPOINT_LOCK_NOWAIT(session, ret,
+		    ret = __txn_checkpoint_wrapper(session, cfg));
 
-	WT_WITH_CHECKPOINT_LOCK(session, ret,
-	    ret = __txn_checkpoint(session, cfg));
-
-	WT_STAT_CONN_SET(session, txn_checkpoint_running, 0);
-
-	F_CLR(session, WT_SESSION_CAN_WAIT | WT_SESSION_NO_EVICTION);
+	F_CLR(session, WT_TXN_SESSION_MASK);
+	F_SET(session, mask);
 
 	return (ret);
 }

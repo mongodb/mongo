@@ -75,7 +75,7 @@ __drop_colgroup(
 
 /*
  * __drop_index --
- *	WT_SESSION::drop for a colgroup.
+ *	WT_SESSION::drop for an index.
  */
 static int
 __drop_index(
@@ -85,7 +85,7 @@ __drop_index(
 	WT_DECL_RET;
 	WT_TABLE *table;
 
-	/* If we can get the colgroup, detach it from the table. */
+	/* If we can get the index, detach it from the table. */
 	if ((ret = __wt_schema_get_index(
 	    session, uri, force, &table, &idx)) == 0) {
 		table->idx_complete = false;
@@ -136,7 +136,7 @@ __drop_table(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 		if ((idx = table->indices[i]) == NULL)
 			continue;
 		/*
-		 * Drop the column group before updating the metadata to avoid
+		 * Drop the index before updating the metadata to avoid
 		 * the metadata for the table becoming inconsistent if we can't
 		 * get exclusive access.
 		 */
