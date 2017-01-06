@@ -326,7 +326,7 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 	 * otherwise we can block applications evicting large pages.
 	 */
 	if (!__wt_cache_stuck(session)) {
-		for (spins = 0; (ret = __wt_spin_trylock(
+		for (spins = 0; (ret = __wt_spin_trylock_track(
 		    session, &conn->dhandle_lock)) == EBUSY &&
 		    cache->pass_intr == 0; spins++) {
 			if (spins < WT_THOUSAND)
@@ -1264,7 +1264,7 @@ retry:	while (slot < max_entries) {
 		 * reference count to keep it alive while we sweep.
 		 */
 		if (!dhandle_locked) {
-			for (spins = 0; (ret = __wt_spin_trylock(
+			for (spins = 0; (ret = __wt_spin_trylock_track(
 			    session, &conn->dhandle_lock)) == EBUSY &&
 			    cache->pass_intr == 0;
 			    spins++) {

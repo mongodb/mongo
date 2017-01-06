@@ -102,7 +102,7 @@ struct __wt_table {
 	ret = 0;							\
 	if (F_ISSET(session, (flag))) {					\
 		op;							\
-	} else if ((ret = __wt_spin_trylock(session, lock)) == 0) {	\
+	} else if ((ret = __wt_spin_trylock_track(session, lock)) == 0) {\
 		F_SET(session, (flag));					\
 		op;							\
 		F_CLR(session, (flag));					\
