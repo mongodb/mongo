@@ -525,9 +525,6 @@ functions:
         fi
         set -o errexit
 
-        # Combine the exclusion tags from both the variant and the task.
-        extra_args="$extra_args --excludeWithAnyTags=${task_excluded_tags},${variant_excluded_flags}"
-
         path_value="$PATH"
         if [ ${variant_path_suffix} ]; then
           path_value="$path_value:${variant_path_suffix}"
@@ -1625,7 +1622,6 @@ tasks:
     vars:
       resmoke_args: --suites=aggregation_facet_unwind_passthrough --storageEngine=wiredTiger
       run_multiple_jobs: true
-      task_excluded_tags: do_not_wrap_aggregations_in_facets
 
 - <<: *task_template
   name: aggregation_read_concern_majority_passthrough_WT
@@ -1799,9 +1795,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=gle_auth --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=mmapv1
+      resmoke_args: --suites=gle_auth --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=mmapv1 --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
-      task_excluded_tags: requires_find_command
 
 - <<: *task_template
   name: gle_auth_WT
@@ -1809,9 +1804,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=gle_auth --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger
+      resmoke_args: --suites=gle_auth --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
-      task_excluded_tags: requires_find_command
 
 - <<: *task_template
   name: gle_auth_write_cmd
@@ -1837,9 +1831,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=mmapv1
+      resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=mmapv1 --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
-      task_excluded_tags: requires_find_command
 
 - <<: *task_template
   name: gle_auth_basics_passthrough_WT
@@ -1847,9 +1840,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger
+      resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
-      task_excluded_tags: requires_find_command
 
 - <<: *task_template
   name: gle_auth_basics_passthrough_write_cmd
@@ -1912,9 +1904,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=mmapv1
+      resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=mmapv1 --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
-      task_excluded_tags: requires_find_command
 
 - <<: *task_template
   name: sharding_gle_auth_basics_passthrough_WT
@@ -1924,9 +1915,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger
+      resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
-      task_excluded_tags: requires_find_command
 
 - <<: *task_template
   name: sharding_gle_auth_basics_passthrough_write_cmd
@@ -1996,9 +1986,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=core --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=mmapv1
+      resmoke_args: --suites=core --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=mmapv1 --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
-      task_excluded_tags: requires_find_command
 
 - <<: *task_template
   name: jsCore_compatibility_WT
@@ -2008,9 +1997,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=core --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=wiredTiger
+      resmoke_args: --suites=core --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
-      task_excluded_tags: requires_find_command
 
 - <<: *task_template
   name: jsCore_compression
@@ -2225,9 +2213,8 @@ tasks:
   - func: "run tests"
     vars:
       task_path_suffix: /data/multiversion
-      resmoke_args: --suites=multiversion --storageEngine=mmapv1
+      resmoke_args: --suites=multiversion --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger
       run_multiple_jobs: true
-      task_excluded_tags: requires_wiredtiger
 
 - <<: *task_template
   name: multiversion_WT
@@ -2237,9 +2224,8 @@ tasks:
   - func: "run tests"
     vars:
       task_path_suffix: /data/multiversion
-      resmoke_args: --suites=multiversion --storageEngine=wiredTiger
+      resmoke_args: --suites=multiversion --storageEngine=wiredTiger --excludeWithAnyTags=requires_mmapv1
       run_multiple_jobs: true
-      task_excluded_tags: requires_mmapv1
 
 - <<: *task_template
   name: multiversion_multistorage_engine
@@ -2394,9 +2380,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=sharding_jscore_passthrough --storageEngine=wiredTiger --shellReadMode=legacy --shellWriteMode=compatibility
+      resmoke_args: --suites=sharding_jscore_passthrough --storageEngine=wiredTiger --shellReadMode=legacy --shellWriteMode=compatibility --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
-      task_excluded_tags: requires_find_command
 
 - <<: *task_template
   name: parallel
@@ -2426,8 +2411,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=parallel --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=mmapv1
-      task_excluded_tags: requires_find_command
+      resmoke_args: --suites=parallel --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=mmapv1 --excludeWithAnyTags=requires_find_command
 
 - <<: *task_template
   name: parallel_compatibility_WT
@@ -2437,8 +2421,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=parallel --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=wiredTiger
-      task_excluded_tags: requires_find_command
+      resmoke_args: --suites=parallel --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
 
 - <<: *task_template
   name: concurrency
@@ -2699,9 +2682,8 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=sharding --shellReadMode=legacy --storageEngine=wiredTiger
+      resmoke_args: --suites=sharding --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
-      task_excluded_tags: requires_find_command
 
 - <<: *task_template
   name: sharding_auth
@@ -3635,8 +3617,7 @@ buildvariants:
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --nojournal
-    variant_excluded_flags: requires_journaling
+    test_flags: --nojournal --excludeWithAnyTags=requires_journaling
     use_scons_cache: true
     build_mongoreplay: true
   tasks:
@@ -4147,8 +4128,7 @@ buildvariants:
     push_name: linux
     push_arch: arm64-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    variant_excluded_flags: requires_mmapv1
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo) --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: arm64
@@ -4225,8 +4205,7 @@ buildvariants:
     push_name: linux
     push_arch: arm64-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release CCFLAGS="-march=armv8-a+crc -mtune=generic" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    variant_excluded_flags: requires_mmapv1
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo) --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager.py
     packager_arch: arm64
@@ -4306,7 +4285,7 @@ buildvariants:
     push_arch: ppc64le-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) --release CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: 2
-    variant_excluded_flags: requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: ppc64le
@@ -4387,7 +4366,7 @@ buildvariants:
     push_arch: s390x-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: 2
-    variant_excluded_flags: requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: s390x
@@ -5153,8 +5132,7 @@ buildvariants:
     content_type: application/zip
     compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2 VARIANT_DIR=win32
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --storageEngine=inMemory
-    variant_excluded_flags: requires_persistence,requires_journaling
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
     ext: zip
     use_scons_cache: true
   tasks:
@@ -6421,7 +6399,7 @@ buildvariants:
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
     compile_flags: --ssl MONGO_DISTMOD=rhel71 --release -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(echo "$(grep -c processor /proc/cpuinfo)/4" | bc)
-    variant_excluded_flags: requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: ppc64le
@@ -6560,7 +6538,7 @@ buildvariants:
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)" -tags 'sasl ssl'
     compile_flags: --ssl MONGO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: 2
-    variant_excluded_flags: requires_mmapv1
+    test_flags: -excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: s390x
@@ -6991,7 +6969,7 @@ buildvariants:
     push_arch: s390x-enterprise-suse12
     compile_flags: --ssl MONGO_DISTMOD=suse12 --release -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) CCFLAGS="-march=z196 -mtune=zEC12" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    variant_excluded_flags: requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: s390x
@@ -7271,7 +7249,7 @@ buildvariants:
     push_arch: s390x-enterprise-suse11
     compile_flags: --ssl MONGO_DISTMOD=suse11 --release -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy --use-s390x-crc32=off
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    variant_excluded_flags: requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: s390x
@@ -7959,10 +7937,9 @@ buildvariants:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
-    test_flags: --storageEngine=inMemory
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    variant_excluded_flags: requires_persistence,requires_journaling
     use_scons_cache: true
     build_mongoreplay: true
   tasks:
@@ -8044,10 +8021,9 @@ buildvariants:
   - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
-    test_flags: --storageEngine=ephemeralForTest
+    test_flags: --storageEngine=ephemeralForTest --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    variant_excluded_flags: requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling
     use_scons_cache: true
     build_mongoreplay: true
   tasks:
@@ -8132,8 +8108,7 @@ buildvariants:
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
     compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel71 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: $(echo "$(grep -c processor /proc/cpuinfo)/4" | bc)
-    test_flags: --storageEngine=inMemory
-    variant_excluded_flags: requires_persistence,requires_mmapv1,requires_journaling
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_mmapv1,requires_journaling
     build_mongoreplay: true
   tasks:
   - name: compile
@@ -8213,8 +8188,7 @@ buildvariants:
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)" -tags 'sasl ssl'
     compile_flags: --dbg=on --opt=on --ssl --link-model=static MONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: 2
-    test_flags: --storageEngine=inMemory
-    variant_excluded_flags: requires_persistence,requires_mmapv1,requires_journaling
+    test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_mmapv1,requires_journaling
     build_mongoreplay: true
   tasks:
   - name: compile
