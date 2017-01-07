@@ -54,6 +54,10 @@ using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
+ReplicationExecutor* ReplCoordTest::getReplExec() {
+    return _repl->getExecutor();
+}
+
 ReplicaSetConfig ReplCoordTest::assertMakeRSConfig(const BSONObj& configBson) {
     ReplicaSetConfig config;
     ASSERT_OK(config.initialize(configBson));
@@ -118,17 +122,10 @@ void ReplCoordTest::init() {
 
     TopologyCoordinatorImpl::Options settings;
     _topo = new TopologyCoordinatorImpl(settings);
-    stdx::function<bool()> _durablityLambda = [this]() -> bool { return _isStorageEngineDurable; };
     _net = new NetworkInterfaceMock;
-    _replExec = stdx::make_unique<ReplicationExecutor>(_net, seed);
     _externalState = new ReplicationCoordinatorExternalStateMock;
-    _repl.reset(new ReplicationCoordinatorImpl(_settings,
-                                               _externalState,
-                                               _topo,
-                                               storageInterface,
-                                               _replExec.get(),
-                                               seed,
-                                               &_durablityLambda));
+    _repl.reset(new ReplicationCoordinatorImpl(
+        _settings, _externalState, _net, _topo, storageInterface, seed));
     auto service = getGlobalServiceContext();
     service->setFastClockSource(stdx::make_unique<executor::NetworkInterfaceMockClockSource>(_net));
     service->setPreciseClockSource(

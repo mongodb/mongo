@@ -108,15 +108,21 @@ class ReplicaSetFixture(interface.ReplFixture):
 
         initiate_cmd_obj = {"replSetInitiate": {"_id": self.replset_name, "members": members}}
 
-        if self.write_concern_majority_journal_default is not None:
-            initiate_cmd_obj["replSetInitiate"]["writeConcernMajorityJournalDefault"] = self.write_concern_majority_journal_default
-
         client = utils.new_mongo_client(port=self.port)
         if self.auth_options is not None:
             auth_db = client[self.auth_options["authenticationDatabase"]]
             auth_db.authenticate(self.auth_options["username"],
                                  password=self.auth_options["password"],
                                  mechanism=self.auth_options["authenticationMechanism"])
+
+        if self.write_concern_majority_journal_default is not None:
+            initiate_cmd_obj["replSetInitiate"]["writeConcernMajorityJournalDefault"] = self.write_concern_majority_journal_default
+        else:
+            serverStatus = client.admin.command({"serverStatus": 1})
+            cmdLineOpts = client.admin.command({"getCmdLineOpts": 1})
+            if not (serverStatus["storageEngine"]["persistent"] and
+                    cmdLineOpts["parsed"].get("storage", {}).get("journal", {}).get("enabled", True)):
+                initiate_cmd_obj["replSetInitiate"]["writeConcernMajorityJournalDefault"] = False
 
         if self.replset_config_options.get("configsvr", False):
             initiate_cmd_obj["replSetInitiate"]["configsvr"] = True

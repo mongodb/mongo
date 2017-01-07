@@ -305,17 +305,14 @@ std::string ReplicationCoordinatorImpl::SnapshotInfo::toString() const {
 ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
     const ReplSettings& settings,
     ReplicationCoordinatorExternalState* externalState,
+    NetworkInterface* network,
     TopologyCoordinator* topCoord,
     StorageInterface* storage,
-    int64_t prngSeed,
-    NetworkInterface* network,
-    ReplicationExecutor* replExec,
-    stdx::function<bool()>* isDurableStorageEngineFn)
+    int64_t prngSeed)
     : _settings(settings),
       _replMode(getReplicationModeFromSettings(settings)),
       _topCoord(topCoord),
-      _replExecutorIfOwned(replExec ? nullptr : new ReplicationExecutor(network, prngSeed)),
-      _replExecutor(replExec ? *replExec : *_replExecutorIfOwned),
+      _replExecutor(network, prngSeed),
       _externalState(externalState),
       _inShutdown(false),
       _memberState(MemberState::RS_STARTUP),
@@ -325,10 +322,7 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _sleptLastElection(false),
       _canAcceptNonLocalWrites(!(settings.usingReplSets() || settings.isSlave())),
       _canServeNonLocalReads(0U),
-      _storage(storage),
-      _isDurableStorageEngine(isDurableStorageEngineFn ? *isDurableStorageEngineFn : []() -> bool {
-          return getGlobalServiceContext()->getGlobalStorageEngine()->isDurable();
-      }) {
+      _storage(storage) {
     if (!isReplEnabled()) {
         return;
     }
@@ -347,33 +341,6 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
 
     _externalState->setupNoopWriter(kNoopWriterPeriod);
 }
-
-ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
-    const ReplSettings& settings,
-    ReplicationCoordinatorExternalState* externalState,
-    NetworkInterface* network,
-    TopologyCoordinator* topCoord,
-    StorageInterface* storage,
-    int64_t prngSeed)
-    : ReplicationCoordinatorImpl(
-          settings, externalState, topCoord, storage, prngSeed, network, nullptr, nullptr) {}
-
-ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
-    const ReplSettings& settings,
-    ReplicationCoordinatorExternalState* externalState,
-    TopologyCoordinator* topCoord,
-    StorageInterface* storage,
-    ReplicationExecutor* replExec,
-    int64_t prngSeed,
-    stdx::function<bool()>* isDurableStorageEngineFn)
-    : ReplicationCoordinatorImpl(settings,
-                                 externalState,
-                                 topCoord,
-                                 storage,
-                                 prngSeed,
-                                 nullptr,
-                                 replExec,
-                                 isDurableStorageEngineFn) {}
 
 ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
 
@@ -3650,9 +3617,10 @@ void ReplicationCoordinatorImpl::_scheduleElectionWinNotification() {
 
 WriteConcernOptions ReplicationCoordinatorImpl::populateUnsetWriteConcernOptionsSyncMode(
     WriteConcernOptions wc) {
+
     WriteConcernOptions writeConcern(wc);
     if (writeConcern.syncMode == WriteConcernOptions::SyncMode::UNSET) {
-        if (writeConcern.wMode == WriteConcernOptions::kMajority && _isDurableStorageEngine() &&
+        if (writeConcern.wMode == WriteConcernOptions::kMajority &&
             getWriteConcernMajorityShouldJournal()) {
             writeConcern.syncMode = WriteConcernOptions::SyncMode::JOURNAL;
         } else {

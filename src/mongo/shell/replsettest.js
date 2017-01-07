@@ -136,12 +136,40 @@ var ReplSetTest = function(opts) {
         return self.liveNodes.master || false;
     }
 
+    function asCluster(conn, fn) {
+        if (self.keyFile) {
+            return authutil.asCluster(conn, self.keyFile, fn);
+        } else {
+            return fn();
+        }
+    }
+
     /**
-     * Returns 'true' if the test has been configured to run without journaling enabled.
+     * Returns 'true' if the "conn" has been configured to run without journaling enabled.
      */
-    function _isRunningWithoutJournaling() {
-        return jsTestOptions().noJournal || jsTestOptions().storageEngine == 'inMemory' ||
-            jsTestOptions().storageEngine == 'ephemeralForTest';
+    function _isRunningWithoutJournaling(conn) {
+        var result = asCluster(conn, function() {
+            var serverStatus = assert.commandWorked(conn.adminCommand({serverStatus: 1}));
+            if (serverStatus.storageEngine.hasOwnProperty('persistent')) {
+                if (!serverStatus.storageEngine.persistent) {
+                    return true;
+                }
+            } else if (serverStatus.storageEngine.name == 'inMemory' ||
+                       serverStatus.storageEngine.name == 'ephemeralForTest') {
+                return true;
+            }
+            var cmdLineOpts = assert.commandWorked(conn.adminCommand({getCmdLineOpts: 1}));
+            var getWithDefault = function(dict, key, dflt) {
+                if (dict[key] === undefined)
+                    return dflt;
+                return dict[key];
+            };
+            return !getWithDefault(
+                getWithDefault(getWithDefault(cmdLineOpts.parsed, "storage", {}), "journal", {}),
+                "enabled",
+                true);
+        });
+        return result;
     }
 
     /**
@@ -194,16 +222,9 @@ var ReplSetTest = function(opts) {
                 if (!conn)
                     return false;
 
-                var getStatusFunc = function() {
+                asCluster(conn, function() {
                     status = conn.getDB('admin').runCommand({replSetGetStatus: 1});
-                };
-
-                if (self.keyFile) {
-                    // Authenticate connection used for running replSetGetStatus if needed
-                    authutil.asCluster(conn, self.keyFile, getStatusFunc);
-                } else {
-                    getStatusFunc();
-                }
+                });
             } catch (ex) {
                 print("ReplSetTest waitForIndicator could not get status: " + tojson(ex));
                 return false;
@@ -319,7 +340,7 @@ var ReplSetTest = function(opts) {
             assert.commandWorked(conn.getDB("admin").runCommand({replSetGetStatus: 1}));
 
         var opTimeType = "durableOpTime";
-        if (_isRunningWithoutJournaling()) {
+        if (_isRunningWithoutJournaling(conn)) {
             opTimeType = "appliedOpTime";
         }
         var opTime = replSetStatus.optimes[opTimeType];
@@ -450,6 +471,10 @@ var ReplSetTest = function(opts) {
      */
     this.startSet = function(options) {
         print("ReplSetTest starting set");
+
+        if (options && options.keyFile) {
+            self.keyFile = options.keyFile;
+        }
 
         var nodes = [];
         for (var n = 0; n < this.ports.length; n++) {
@@ -649,7 +674,7 @@ var ReplSetTest = function(opts) {
             return config;
         }
 
-        if (_isRunningWithoutJournaling()) {
+        if (_isRunningWithoutJournaling(replNode)) {
             config[wcMajorityJournalField] = false;
         }
 

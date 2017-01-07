@@ -103,9 +103,7 @@ protected:
     /**
      * Gets the replication executor under test.
      */
-    ReplicationExecutor* getReplExec() {
-        return _replExec.get();
-    }
+    ReplicationExecutor* getReplExec();
 
     /**
      * Gets the replication coordinator under test.
@@ -243,16 +241,6 @@ protected:
     void replyToReceivedHeartbeat();
     void replyToReceivedHeartbeatV1();
 
-    /**
-     * Sets how the test fixture reports the storage engine's durability feature.
-     */
-    void setStorageEngineDurable(bool val = true) {
-        _isStorageEngineDurable = val;
-    }
-    bool isStorageEngineDurable() const {
-        return _isStorageEngineDurable;
-    }
-
     void simulateEnoughHeartbeatsForAllNodesUp();
 
     /**
@@ -276,12 +264,10 @@ private:
     TopologyCoordinatorImpl* _topo = nullptr;
     // Owned by ReplicationExecutor
     executor::NetworkInterfaceMock* _net = nullptr;
-    std::unique_ptr<ReplicationExecutor> _replExec;
     // Owned by ReplicationCoordinatorImpl
     ReplicationCoordinatorExternalStateMock* _externalState = nullptr;
     ReplSettings _settings;
     bool _callShutdown = false;
-    bool _isStorageEngineDurable = true;
     ServiceContext::UniqueClient _client = getGlobalServiceContext()->makeClient("testClient");
 };
 

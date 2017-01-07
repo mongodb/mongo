@@ -51,7 +51,8 @@ function ClusterSpawnHelper(clusterType, startWithAuth, startWithTransitionToAut
         var replSetTestConfig = {
             name: baseName + "_source",
             nodes: 3,
-            nodeOptions: singleNodeConfig
+            nodeOptions: singleNodeConfig,
+            keyFile: singleNodeConfig.keyFile
         };
         var replSetTest = new ReplSetTest(replSetTestConfig);
         replSetTest.startSet();

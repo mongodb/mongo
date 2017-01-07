@@ -878,7 +878,7 @@ static void startupConfigActions(const std::vector<std::string>& args) {
 }
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
-                                     ("SetGlobalEnvironment", "SSLManager"))
+                                     ("SetGlobalEnvironment", "SSLManager", "default"))
 (InitializerContext* context) {
     auto serviceContext = getGlobalServiceContext();
     repl::StorageInterface::set(serviceContext, stdx::make_unique<repl::StorageInterfaceImpl>());

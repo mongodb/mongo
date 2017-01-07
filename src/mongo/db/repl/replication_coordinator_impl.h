@@ -95,14 +95,7 @@ public:
                                TopologyCoordinator* topoCoord,
                                StorageInterface* storage,
                                int64_t prngSeed);
-    // Takes ownership of the "externalState" and "topCoord" objects.
-    ReplicationCoordinatorImpl(const ReplSettings& settings,
-                               ReplicationCoordinatorExternalState* externalState,
-                               TopologyCoordinator* topoCoord,
-                               StorageInterface* storage,
-                               ReplicationExecutor* replExec,
-                               int64_t prngSeed,
-                               stdx::function<bool()>* isDurableStorageEngineFn);
+
     virtual ~ReplicationCoordinatorImpl();
 
     // ================== Members of public ReplicationCoordinator API ===================
@@ -421,14 +414,6 @@ private:
     class LoseElectionGuardV1;
     class LoseElectionDryRunGuardV1;
 
-    ReplicationCoordinatorImpl(const ReplSettings& settings,
-                               ReplicationCoordinatorExternalState* externalState,
-                               TopologyCoordinator* topCoord,
-                               StorageInterface* storage,
-                               int64_t prngSeed,
-                               executor::NetworkInterface* network,
-                               ReplicationExecutor* replExec,
-                               stdx::function<bool()>* isDurableStorageEngineFn);
     /**
      * Configuration states for a replica set node.
      *
@@ -1177,11 +1162,8 @@ private:
     // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
     std::unique_ptr<TopologyCoordinator> _topCoord;  // (X)
 
-    // If the executer is owned then this will be set, but should not be used.
-    // This is only used to clean up and destroy the replExec if owned
-    std::unique_ptr<ReplicationExecutor> _replExecutorIfOwned;  // (S)
     // Executor that drives the topology coordinator.
-    ReplicationExecutor& _replExecutor;  // (S)
+    ReplicationExecutor _replExecutor;  // (S)
 
     // Pointer to the ReplicationCoordinatorExternalState owned by this ReplicationCoordinator.
     std::unique_ptr<ReplicationCoordinatorExternalState> _externalState;  // (PS)
@@ -1359,9 +1341,6 @@ private:
 
     // Cached copy of the current config protocol version.
     AtomicInt64 _protVersion;  // (S)
-
-    // Lambda indicating durability of storageEngine.
-    stdx::function<bool()> _isDurableStorageEngine;  // (R)
 
     // This setting affects the Applier prefetcher behavior.
     mutable stdx::mutex _indexPrefetchMutex;

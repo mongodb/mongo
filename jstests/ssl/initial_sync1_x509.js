@@ -11,12 +11,26 @@ var common_options = {
 function runInitialSyncTest() {
     load("jstests/replsets/rslib.js");
 
+    // The mongo shell cannot authenticate as the internal __system user in tests that use x509 for
+    // cluster authentication. Choosing the default value for wcMajorityJournalDefault in
+    // ReplSetTest cannot be done automatically without the shell performing such authentication, so
+    // in this test we must make the choice explicitly, based on the global test options.
+    var wcMajorityJournalDefault;
+    if (jsTestOptions().noJournal || jsTestOptions().storageEngine == "ephemeralForTest" ||
+        jsTestOptions().storageEngine == "inMemory") {
+        wcMajorityJournalDefault = false;
+    } else {
+        wcMajorityJournalDefault = true;
+    }
     print("1. Bring up set");
-    var replTest = new ReplSetTest(
-        {name: "jstests_initsync1_x509", nodes: {node0: x509_options1, node1: x509_options2}});
-
+    var replTest = new ReplSetTest({
+        name: "jstests_initsync1_x509",
+        nodes: {node0: x509_options1, node1: x509_options2},
+    });
     var conns = replTest.startSet();
-    replTest.initiate();
+    replTest.initiate(
+        Object.extend(replTest.getReplSetConfig(),
+                      {writeConcernMajorityJournalDefault: wcMajorityJournalDefault}));
 
     var master = replTest.getPrimary();
     var foo = master.getDB("foo");
