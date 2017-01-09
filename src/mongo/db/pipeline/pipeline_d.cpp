@@ -48,6 +48,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_match.h"
@@ -95,7 +96,7 @@ public:
     }
 
     bool isSharded(const NamespaceString& nss) final {
-        AutoGetCollectionForRead autoColl(_ctx->opCtx, nss.ns());
+        AutoGetCollectionForRead autoColl(_ctx->opCtx, nss);
         auto css = CollectionShardingState::get(_ctx->opCtx, nss);
         return bool(css->getMetadata());
     }
