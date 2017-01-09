@@ -64,7 +64,7 @@ public:
         options.streamFactory = stdx::make_unique<AsyncStreamFactory>();
         options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
 #ifdef _WIN32
-        // Connections won't queue on widnows, so attempting to open too many connections
+        // Connections won't queue on windows, so attempting to open too many connections
         // concurrently will result in refused connections and test failure.
         options.connectionPoolOptions.maxConnections = 16u;
 #else
@@ -238,7 +238,7 @@ private:
 };
 
 TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
-    const std::size_t numOps = 1000;
+    const std::size_t numOps = 500;
     std::vector<Status> testResults(numOps, {ErrorCodes::InternalError, "uninitialized"});
     ErrorCodes::Error expectedResults[numOps];
     CountdownLatch cl(numOps);
@@ -255,7 +255,7 @@ TEST_F(NetworkInterfaceASIOIntegrationTest, StressTest) {
 
     for (std::size_t i = 0; i < numOps; ++i) {
         // stagger operations slightly to mitigate connection pool contention
-        sleepmillis(rng.nextInt32(16));
+        sleepmillis(rng.nextInt32(50));
 
         auto r = rng.nextCanonicalDouble();
 
