@@ -30,18 +30,9 @@
         });
     }
 
-    function stepUp(node) {
-        var primary = rst.getPrimary();
-        if (primary != node) {
-            assert.throws(function() {
-                primary.adminCommand({replSetStepDown: 60 * 5});
-            });
-        }
-        waitForPrimary(node);
-    }
-
+    // SERVER-20844 ReplSetTest starts up a single node replica set then reconfigures to the correct
+    // size for faster startup, so nodes[0] is always the first primary.
     jsTestLog("Make sure node 0 is primary.");
-    stepUp(nodes[0]);
     var primary = rst.getPrimary();
     var secondaries = rst.getSecondaries();
     assert.eq(nodes[0], primary);

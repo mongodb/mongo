@@ -27,6 +27,7 @@
     const conns = replTest.nodes;
     nodes = replTest.nodeList();
     var port = replTest.ports;
+    var nextVersion = replTest.getReplSetConfigFromNode().version + 1;
     const replSetConfig = {
         _id: name,
         members: [
@@ -104,7 +105,7 @@
                 },
             },
         },
-        version: 2,
+        version: nextVersion,
     };
 
     reconfig(replTest, replSetConfig);

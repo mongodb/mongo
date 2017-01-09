@@ -119,8 +119,9 @@ var agreeOnPrimaryAndSetVersion = function(setVersion) {
 };
 
 var master = replTest.getPrimary();
+var expectedVersion = replTest.getReplSetConfigFromNode().version;
 assert.soon(function() {
-    return agreeOnPrimaryAndSetVersion(1);
+    return agreeOnPrimaryAndSetVersion(expectedVersion);
 }, "Nodes did not initiate in less than a minute", 60000);
 
 // check to see if the information from isMaster() is correct at each node
@@ -128,7 +129,8 @@ assert.soon(function() {
 checkMember({
     conn: master,
     name: "master",
-    goodValues: {setName: "ismaster", setVersion: 1, ismaster: true, secondary: false, ok: 1},
+    goodValues:
+        {setName: "ismaster", setVersion: expectedVersion, ismaster: true, secondary: false, ok: 1},
     wantedFields:
         ["hosts", "passives", "arbiters", "primary", "me", "maxBsonObjectSize", "localTime"],
     unwantedFields: ["arbiterOnly", "passive", "slaveDelay", "hidden", "tags", "buildIndexes"]
@@ -139,7 +141,7 @@ checkMember({
     name: "slave",
     goodValues: {
         setName: "ismaster",
-        setVersion: 1,
+        setVersion: expectedVersion,
         ismaster: false,
         secondary: true,
         passive: true,
@@ -155,7 +157,7 @@ checkMember({
     name: "delayed_slave",
     goodValues: {
         setName: "ismaster",
-        setVersion: 1,
+        setVersion: expectedVersion,
         ismaster: false,
         secondary: true,
         passive: true,
@@ -173,7 +175,7 @@ checkMember({
     name: "arbiter",
     goodValues: {
         setName: "ismaster",
-        setVersion: 1,
+        setVersion: expectedVersion,
         ismaster: false,
         secondary: false,
         arbiterOnly: true,
@@ -205,8 +207,9 @@ try {
 }
 
 master = replTest.getPrimary();
+expectedVersion = config.version;
 assert.soon(function() {
-    return agreeOnPrimaryAndSetVersion(2);
+    return agreeOnPrimaryAndSetVersion(expectedVersion);
 }, "Nodes did not sync in less than a minute", 60000);
 
 // check nodes for their new settings
@@ -215,7 +218,7 @@ checkMember({
     name: "master2",
     goodValues: {
         setName: "ismaster",
-        setVersion: 2,
+        setVersion: expectedVersion,
         ismaster: true,
         secondary: false,
         tags: {"disk": "ssd"},
@@ -231,7 +234,7 @@ checkMember({
     name: "first_slave",
     goodValues: {
         setName: "ismaster",
-        setVersion: 2,
+        setVersion: expectedVersion,
         ismaster: false,
         secondary: true,
         tags: {"disk": "ssd"},
@@ -248,7 +251,7 @@ checkMember({
     name: "very_delayed_slave",
     goodValues: {
         setName: "ismaster",
-        setVersion: 2,
+        setVersion: expectedVersion,
         ismaster: false,
         secondary: true,
         tags: {"disk": "hdd"},
@@ -267,7 +270,7 @@ checkMember({
     name: "arbiter",
     goodValues: {
         setName: "ismaster",
-        setVersion: 2,
+        setVersion: expectedVersion,
         ismaster: false,
         secondary: false,
         arbiterOnly: true,

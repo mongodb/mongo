@@ -360,6 +360,13 @@ var ReplSetTest = function(opts) {
         return ts1.getTime() < ts2.getTime();
     }
 
+    /*
+     * Returns true if the node can be elected primary of a replica set.
+     */
+    function _isElectable(node) {
+        return !node.arbiterOnly && (node.priority === undefined || node.priority != 0);
+    }
+
     /**
      * Returns list of nodes as host:port strings.
      */
@@ -697,13 +704,49 @@ var ReplSetTest = function(opts) {
         var cmdKey = initCmd || 'replSetInitiate';
         timeout = timeout || self.kDefaultTimeoutMS;
 
+        // Throw an exception if nodes[0] is unelectable in the given config.
+        if (!_isElectable(config.members[0])) {
+            throw Error("The node at index 0 must be electable");
+        }
+
+        // Start up a single node replica set then reconfigure to the correct size (if the config
+        // contains more than 1 node), so the primary is elected more quickly.
+        var originalMembers, originalSettings;
+        if (config.members && config.members.length > 1) {
+            originalMembers = config.members.slice();
+            config.members = config.members.slice(0, 1);
+            originalSettings = config.settings;
+            delete config.settings;  // Clear settings to avoid tags referencing sliced nodes.
+        }
         this._setDefaultConfigOptions(config);
 
         cmd[cmdKey] = config;
         printjson(cmd);
 
         assert.commandWorked(master.runCommand(cmd), tojson(cmd));
-        this.awaitSecondaryNodes(timeout);
+        this.getPrimary();  // Blocks until there is a primary.
+
+        // Reconfigure the set to contain the correct number of nodes (if necessary).
+        if (originalMembers) {
+            config.members = originalMembers;
+            if (originalSettings) {
+                config.settings = originalSettings;
+            }
+            config.version = 2;
+
+            // Nodes started with the --configsvr flag must have configsvr = true in their config.
+            if (this.nodes[0].hasOwnProperty("fullOptions") &&
+                this.nodes[0].fullOptions.hasOwnProperty("configsvr")) {
+                config.configsvr = true;
+            }
+
+            cmd = {replSetReconfig: config};
+            print("Reconfiguring replica set to add in other nodes");
+            printjson(cmd);
+
+            assert.commandWorked(master.runCommand(cmd), tojson(cmd));
+            this.awaitSecondaryNodes(timeout);
+        }
 
         // Setup authentication if running test with authentication
         if ((jsTestOptions().keyFile) && cmdKey == 'replSetInitiate') {

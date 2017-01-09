@@ -57,7 +57,7 @@ var local_s2 = slave2.getDB("local");
 var admin_s2 = slave2.getDB("admin");
 
 var config = replTest.getReplSetConfig();
-config.version = 2;
+config.version = replTest.getReplSetConfigFromNode().version + 1;
 config.members.push({_id: 2, host: slave2.host});
 try {
     admin.runCommand({replSetReconfig: config});
