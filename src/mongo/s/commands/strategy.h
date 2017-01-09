@@ -37,6 +37,7 @@
 namespace mongo {
 
 class DbMessage;
+class NamespaceString;
 class OperationContext;
 class QueryRequest;
 
@@ -55,13 +56,13 @@ public:
      *
      * Must not be called with legacy '.$cmd' commands.
      */
-    static void queryOp(OperationContext* txn, DbMessage* dbm);
+    static void queryOp(OperationContext* txn, const NamespaceString& nss, DbMessage* dbm);
 
     /**
      * Handles a legacy-style getMore request and sends the response back on success (or cursor not
      * found) or throws on error.
      */
-    static void getMore(OperationContext* txn, DbMessage* dbm);
+    static void getMore(OperationContext* txn, const NamespaceString& nss, DbMessage* dbm);
 
     /**
      * Handles a legacy-style killCursors request. Doesn't send any response on success or throws on
@@ -74,7 +75,7 @@ public:
      * with the result from the operation. Doesn't send any response back and does not throw on
      * errors.
      */
-    static void writeOp(OperationContext* txn, int op, DbMessage* dbm);
+    static void writeOp(OperationContext* txn, DbMessage* dbm);
 
     /**
      * Executes a legacy-style ($cmd namespace) command. Does not throw and returns the response
@@ -83,7 +84,7 @@ public:
      * Catches StaleConfigException errors and retries the command automatically after refreshing
      * the metadata for the failing namespace.
      */
-    static void clientCommandOp(OperationContext* txn, DbMessage* dbm);
+    static void clientCommandOp(OperationContext* txn, const NamespaceString& nss, DbMessage* dbm);
 
     /**
      * Helper to run an explain of a find operation on the shards. Fills 'out' with the result of

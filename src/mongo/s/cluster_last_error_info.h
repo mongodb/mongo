@@ -71,13 +71,6 @@ public:
         return _prev->hostOpTimes;
     }
 
-    /**
-     * resets the information stored for the current request
-     */
-    void clearRequestInfo() {
-        _cur->clear();
-    }
-
     void disableForCommand();
 
 private:

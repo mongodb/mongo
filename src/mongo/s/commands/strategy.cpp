@@ -108,10 +108,7 @@ void runAgainstRegistered(OperationContext* txn,
 
 }  // namespace
 
-void Strategy::queryOp(OperationContext* txn, DbMessage* dbm) {
-    const NamespaceString nss(dbm->getns());
-    invariant(!nss.isCommand() && !nss.isSpecialCommand());
-
+void Strategy::queryOp(OperationContext* txn, const NamespaceString& nss, DbMessage* dbm) {
     globalOpCounters.gotQuery();
 
     const QueryMessage q(*dbm);
@@ -217,10 +214,7 @@ void Strategy::queryOp(OperationContext* txn, DbMessage* dbm) {
                cursorId.getValue());
 }
 
-void Strategy::clientCommandOp(OperationContext* txn, DbMessage* dbm) {
-    const NamespaceString nss(dbm->getns());
-    invariant(nss.isCommand() || nss.isSpecialCommand());
-
+void Strategy::clientCommandOp(OperationContext* txn, const NamespaceString& nss, DbMessage* dbm) {
     const QueryMessage q(*dbm);
 
     Client* const client = txn->getClient();
@@ -243,8 +237,6 @@ void Strategy::clientCommandOp(OperationContext* txn, DbMessage* dbm) {
 
     // Handle the $cmd.sys pseudo-commands
     if (nss.isSpecialCommand()) {
-        BSONObjBuilder reply;
-
         const auto upgradeToRealCommand = [&](StringData commandName) {
             BSONObjBuilder cmdBob;
             cmdBob.append(commandName, 1);
@@ -253,6 +245,7 @@ void Strategy::clientCommandOp(OperationContext* txn, DbMessage* dbm) {
 
             // Rewrite upgraded pseudoCommands to run on the 'admin' database.
             const NamespaceString interposedNss("admin", "$cmd");
+            BSONObjBuilder reply;
             runAgainstRegistered(
                 txn, interposedNss.ns().c_str(), interposedCmd, reply, q.queryOptions);
             replyToQuery(0, client->session(), dbm->msg(), reply.done());
@@ -265,8 +258,11 @@ void Strategy::clientCommandOp(OperationContext* txn, DbMessage* dbm) {
             upgradeToRealCommand("killOp");
             return;
         } else if (nss.coll() == "$cmd.sys.unlock") {
-            reply.append("err", "can't do unlock through mongos");
-            replyToQuery(0, client->session(), dbm->msg(), reply.done());
+            replyToQuery(0,
+                         client->session(),
+                         dbm->msg(),
+                         BSON("err"
+                              << "can't do unlock through mongos"));
             return;
         }
 
@@ -379,8 +375,7 @@ void Strategy::commandOp(OperationContext* txn,
     }
 }
 
-void Strategy::getMore(OperationContext* txn, DbMessage* dbm) {
-    const NamespaceString nss(dbm->getns());
+void Strategy::getMore(OperationContext* txn, const NamespaceString& nss, DbMessage* dbm) {
     const int ntoreturn = dbm->pullInt();
     uassert(
         34424, str::stream() << "Invalid ntoreturn for OP_GET_MORE: " << ntoreturn, ntoreturn >= 0);
@@ -486,7 +481,7 @@ void Strategy::killCursors(OperationContext* txn, DbMessage* dbm) {
     }
 }
 
-void Strategy::writeOp(OperationContext* txn, int op, DbMessage* dbm) {
+void Strategy::writeOp(OperationContext* txn, DbMessage* dbm) {
     OwnedPointerVector<BatchedCommandRequest> commandRequestsOwned;
     std::vector<BatchedCommandRequest*>& commandRequests = commandRequestsOwned.mutableVector();
 
