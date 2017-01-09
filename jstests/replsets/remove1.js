@@ -32,7 +32,8 @@ for (var i = 0; i < config.members.length; i++) {
         break;
     }
 }
-config.version = 2;
+var nextVersion = replTest.getReplSetConfigFromNode().version + 1;
+config.version = nextVersion;
 
 assert.eq(secondary.getDB("admin").runCommand({ping: 1}).ok,
           1,
@@ -62,12 +63,13 @@ reconnect(master);
 
 assert.soon(function() {
     var c = master.getDB("local").system.replset.findOne();
-    return c.version == 2;
+    return c.version == nextVersion;
 });
 
 print("Add it back as a secondary");
 config.members.push({_id: 2, host: secondary.host});
-config.version = 3;
+nextVersion++;
+config.version = nextVersion;
 // Need to keep retrying reconfig here, as it will not work at first due to the primary's
 // perception that the secondary is still "down".
 assert.soon(function() {
@@ -79,10 +81,11 @@ assert.soon(function() {
     }
 });
 master = replTest.getPrimary();
+secondary = replTest.getSecondary();
 printjson(master.getDB("admin").runCommand({replSetGetStatus: 1}));
 var newConfig = master.getDB("local").system.replset.findOne();
 print("newConfig: " + tojson(newConfig));
-assert.eq(newConfig.version, 3);
+assert.eq(newConfig.version, nextVersion);
 
 print("reconfig with minority");
 replTest.stop(secondary);
@@ -95,8 +98,9 @@ assert.soon(function() {
     }
 }, "waiting for primary to step down", (60 * 1000), 1000);
 
-config.version = 4;
-config.members.pop();
+nextVersion++;
+config.version = nextVersion;
+config.members = config.members.filter(node => node.host == master.host);
 try {
     master.getDB("admin").runCommand({replSetReconfig: config, force: true});
 } catch (e) {
@@ -110,6 +114,6 @@ assert.soon(function() {
 
 config = master.getDB("local").system.replset.findOne();
 printjson(config);
-assert.gt(config.version, 4);
+assert.gt(config.version, nextVersion);
 
 replTest.stopSet();

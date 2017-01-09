@@ -15,7 +15,6 @@
     // Set tags and getLastErrorModes
     var conf = {
         _id: replTest.name,
-        version: 1,
         members: [
             {_id: 0, host: host + ":" + ports[0], tags: {"dc": "bbb"}},
             {_id: 1, host: host + ":" + ports[1], tags: {"dc": "bbb"}},

@@ -9,7 +9,6 @@
     var ports = replTest.ports;
     var conf = {
         _id: replTest.name,
-        version: 1,
         members: [
             {_id: 0, host: host + ":" + ports[0], tags: {"backup": "A"}},
             {_id: 1, host: host + ":" + ports[1], tags: {"backup": "B"}},
@@ -37,7 +36,8 @@
 
     assert.writeOK(db.foo.insert({x: 1}, {writeConcern: {w: 'backedUp', wtimeout: wtimeout}}));
 
-    conf.version = 2;
+    var nextVersion = replTest.getReplSetConfigFromNode().version + 1;
+    conf.version = nextVersion;
     conf.settings.getLastErrorModes.backedUp.backup = 3;
     master.getDB("admin").runCommand({replSetReconfig: conf});
     replTest.awaitReplication();
@@ -46,7 +46,8 @@
     var db = master.getDB("test");
     assert.writeOK(db.foo.insert({x: 2}, {writeConcern: {w: 'backedUp', wtimeout: wtimeout}}));
 
-    conf.version = 3;
+    nextVersion++;
+    conf.version = nextVersion;
     conf.members[0].priorty = 3;
     conf.members[2].priorty = 0;
     master.getDB("admin").runCommand({replSetReconfig: conf});

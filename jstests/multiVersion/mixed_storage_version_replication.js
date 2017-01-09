@@ -688,7 +688,7 @@ function doMultiThreadedWork(primary, numThreads) {
     // primary/secondary syncing.
     config.settings = {chainingAllowed: false};
     config.protocolVersion = 0;
-    config.version = 2;
+    config.version = replTest.getReplSetConfigFromNode().version + 1;
     reconfig(replTest, config);
 
     // Ensure all are synced.

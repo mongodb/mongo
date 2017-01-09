@@ -30,7 +30,7 @@ hostname = getHostName();
 s = MongoRunner.runMongod({replSet: basename, oplogSize: 2});
 
 var config = replTest.getReplSetConfig();
-config.version = 2;
+config.version = replTest.getReplSetConfigFromNode().version + 1;
 config.members.push({_id: 2, host: hostname + ":" + s.port});
 try {
     m.getDB("admin").runCommand({replSetReconfig: config});

@@ -42,16 +42,6 @@
         });
     }
 
-    function stepUp(node) {
-        var primary = rst.getPrimary();
-        if (primary != node) {
-            assert.throws(function() {
-                primary.adminCommand({replSetStepDown: 60 * 5});
-            });
-        }
-        waitForPrimary(node);
-    }
-
     // Asserts that the given document is not visible in the committed snapshot on the given node.
     function checkDocNotCommitted(node, doc) {
         var docs =
@@ -59,9 +49,9 @@
         assert.eq(0, docs.length, tojson(docs));
     }
 
+    // SERVER-20844 ReplSetTest starts up a single node replica set then reconfigures to the correct
+    // size for faster startup, so nodes[0] is always the first primary.
     jsTestLog("Make sure node 0 is primary.");
-    rst.getPrimary();
-    stepUp(nodes[0]);
     var primary = rst.getPrimary();
     var secondaries = rst.getSecondaries();
     assert.eq(nodes[0], primary);
