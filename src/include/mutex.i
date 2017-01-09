@@ -309,24 +309,13 @@ __wt_spin_lock_track(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 static inline int
 __wt_spin_trylock_track(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
-	struct timespec enter, leave;
-	WT_DECL_RET;
 	int64_t **stats;
 
 	if (t->stat_count_off != -1 && WT_STAT_ENABLED(session)) {
-		__wt_epoch(session, &enter);
-		ret = __wt_spin_trylock(session, t);
-		__wt_epoch(session, &leave);
-		WT_RET(ret);
+		WT_RET(__wt_spin_trylock(session, t));
 		stats = (int64_t **)S2C(session)->stats;
 		stats[session->stat_bucket][t->stat_count_off]++;
-		if (F_ISSET(session, WT_SESSION_INTERNAL))
-			stats[session->stat_bucket][t->stat_int_usecs_off] +=
-			    (int64_t)WT_TIMEDIFF_US(leave, enter);
-		else
-			stats[session->stat_bucket][t->stat_app_usecs_off] +=
-			    (int64_t)WT_TIMEDIFF_US(leave, enter);
+		return (0);
 	} else
-		ret = __wt_spin_trylock(session, t);
-	return (ret);
+		return (__wt_spin_trylock(session, t));
 }
