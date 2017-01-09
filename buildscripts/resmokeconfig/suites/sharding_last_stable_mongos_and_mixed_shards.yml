@@ -75,8 +75,8 @@ selector:
     - jstests/sharding/mongos_wait_csrs_initiate.js
     # v3.2 cluster does not support parallel migrations.
     - jstests/sharding/migration_ignore_interrupts_1.js
-    # Temporarily blacklisted (see SERVER-26615).
-    - jstests/sharding/addshard2.js
+    # v3.2 mongos fails to talk to a config server with featureCompatibilityVersion 3.4
+    - jstests/sharding/addshard6.js
     # This test checks the behavior of a singleBatch fix for mongos that does not exist in 3.2.
     # Enable when 3.4 becomes last-stable or after backporting SERVER-26112 to the 3.2 branch.
     - jstests/sharding/sharded_limit_batchsize.js

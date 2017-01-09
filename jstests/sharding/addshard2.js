@@ -1,3 +1,7 @@
+/**
+ * Tests adding standalones and replica sets as shards under a variety of configurations (setName,
+ * valid and invalid hosts, shardName matching or not matching a setName, etc).
+ */
 (function() {
 
     var addShardRes;
@@ -51,6 +55,8 @@
     // shards so that the same shard host can be re-used for multiple addShard calls without being
     // restarted in between each addShard (the shardIdentity cannot be deleted while the shard host
     // is running with --shardsvr).
+    // Note: such a failpoint is not necessary for the addShard compatibility path for 3.2 (for the
+    // last_stable suite), since a 3.2 mongos will ignore the shard's shardIdentity during addShard.
     var st = new ShardingTest({
         shards: 0,
         mongos: 1,
@@ -173,30 +179,10 @@
     addShardRes = st.s.adminCommand({addShard: rst.getURL()});
     assertAddShardSucceeded(addShardRes);
     assert.writeOK(st.s.getDB('test').foo.insert({x: 1}));
+    assert.commandWorked(st.s.getDB('test').runCommand({dropDatabase: 1}));
+    removeShardWithName(addShardRes.shardAdded);
 
     rst.stopSet();
-
-    // 5. Test adding a --configsvr replica set.
-
-    var configRS = new ReplSetTest({nodes: 1});
-    configRS.startSet({configsvr: '', storageEngine: 'wiredTiger'});
-    configRS.initiate();
-
-    jsTest.log("Adding a config server replica set without a specified shardName should fail.");
-    addShardRes = st.s.adminCommand({addShard: configRS.getURL()});
-    assertAddShardFailed(addShardRes);
-
-    jsTest.log(
-        "Adding a config server replica set  with a shardName that matches the set's name should fail.");
-    addShardRes = st.s.adminCommand({addShard: configRS.getURL(), name: configRS.name});
-    assertAddShardFailed(addShardRes, configRS.name);
-
-    jsTest.log(
-        "Adding a config server replica set even with a non-'config' shardName should fail.");
-    addShardRes = st.s.adminCommand({addShard: configRS.getURL(), name: "nonConfig"});
-    assertAddShardFailed(addShardRes, "nonConfig");
-
-    configRS.stopSet();
 
     st.stop();
 
