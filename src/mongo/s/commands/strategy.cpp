@@ -327,15 +327,15 @@ void Strategy::clientCommandOp(OperationContext* txn, DbMessage* dbm) {
 
             log() << "Retrying command " << redact(q.query) << causedBy(e);
 
-            // For legacy reasons, ns may not actually be set in the exception :-(
-            std::string staleNS = e.getns();
-            if (staleNS.empty()) {
-                staleNS = q.ns;
-            }
+            // For legacy reasons, ns may not actually be set in the exception
+            const std::string staleNS(e.getns().empty() ? std::string(q.ns) : e.getns());
 
             ShardConnection::checkMyConnectionVersions(txn, staleNS);
             if (loops < 4) {
-                versionManager.forceRemoteCheckShardVersionCB(txn, staleNS);
+                if (!versionManager.forceRemoteCheckShardVersionCB(txn, staleNS)) {
+                    LOG(1) << "Database does not exist or collection no longer sharded after a "
+                              "StaleConfigException.";
+                }
             }
         } catch (const DBException& e) {
             OpQueryReplyBuilder reply;
