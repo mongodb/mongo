@@ -49,6 +49,7 @@ int	 util_rename(WT_SESSION *, int, char *[]);
 int	 util_salvage(WT_SESSION *, int, char *[]);
 int	 util_stat(WT_SESSION *, int, char *[]);
 int	 util_str2recno(WT_SESSION *, const char *p, uint64_t *recnop);
+int	 util_truncate(WT_SESSION *, int, char *[]);
 int	 util_upgrade(WT_SESSION *, int, char *[]);
 int	 util_verify(WT_SESSION *, int, char *[]);
 int	 util_write(WT_SESSION *, int, char *[]);

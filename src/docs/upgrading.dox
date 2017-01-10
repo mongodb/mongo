@@ -1,6 +1,13 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
 @section version_292 Upgrading to Version 2.9.2
+<dl>
+<dt>WiredTiger Utility now supports truncate</dt>
+<dd>
+The WiredTiger Utility can now \c truncate an object. Removing all contents
+from the specified object.
+</dd>
+</dl>
 
 @section version_291 Upgrading to Version 2.9.1
 
