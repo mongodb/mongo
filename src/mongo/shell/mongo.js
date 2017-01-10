@@ -228,6 +228,8 @@ connect = function(url, user, pass) {
         }
         if (slash == -1 && colon == -1) {
             url = "mongodb://127.0.0.1:27017/" + url;
+        } else if (slash != -1) {
+            url = "mongodb://" + url;
         }
     }
 

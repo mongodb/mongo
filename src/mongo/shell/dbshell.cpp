@@ -231,9 +231,17 @@ string getURIFromArgs(const std::string& url, const std::string& host, const std
 
     // If host looks like a full URI (i.e. has a slash and isn't a unix socket) and the other fields
     // are empty, then just return host.
+    std::string::size_type slashPos;
     if (url.size() == 0 && port.size() == 0 &&
-        (!hostEndsInSock && host.find("/") != string::npos)) {
-        return host;
+        (!hostEndsInSock && ((slashPos = host.find("/")) != string::npos))) {
+        if (str::startsWith(host, "mongodb://")) {
+            return host;
+        }
+        // If there's a slash in the host field, then it's the replica set name, not a database name
+        stringstream ss;
+        ss << "mongodb://" << host.substr(slashPos + 1)
+           << "/?replicaSet=" << host.substr(0, slashPos);
+        return ss.str();
     }
 
     stringstream ss;
@@ -716,7 +724,7 @@ int _main(int argc, char* argv[], char** envp) {
 
     auto poolGuard = MakeGuard([] { ScriptEngine::dropScopeCache(); });
 
-    unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScopeForCurrentThread());
+    unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScope());
     shellMainScope = scope.get();
 
     if (shellGlobalParams.runShell)
