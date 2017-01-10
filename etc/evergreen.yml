@@ -418,6 +418,11 @@ functions:
           # exit immediately if virtualenv is not found
           set -o errexit
           set -o verbose
+
+          # Due to an issue with how the contents of the httplib2 package are installed on SUSE 12,
+          # some files within the system's site-packages aren't world-readable. This results in a
+          # "Permission denied" error message when attempting to install the system's site-packages
+          # into the virtual environment.
           if [ ${build_variant} == enterprise-suse12-64 ]; then
               virtualenv ./venv
           else
