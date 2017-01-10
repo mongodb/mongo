@@ -28,17 +28,20 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
+
 namespace mongo {
 
 class BSONObj;
 class BSONObjBuilder;
-class Status;
 
 namespace repl {
 
 class LastVote {
 public:
-    Status initialize(const BSONObj& argsObj);
+    LastVote(long long term, long long candidateIndex);
+
+    static StatusWith<LastVote> readFromLastVote(const BSONObj& doc);
 
     long long getTerm() const;
     long long getCandidateIndex() const;
@@ -48,8 +51,8 @@ public:
     BSONObj toBSON() const;
 
 private:
-    long long _candidateIndex = -1;
-    long long _term = -1;
+    long long _candidateIndex;
+    long long _term;
 };
 
 }  // namespace repl

@@ -348,7 +348,13 @@ void ReplicationCoordinatorImpl::_updateLastVote(const LastVote& lastVote) {
 bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* txn) {
     StatusWith<LastVote> lastVote = _externalState->loadLocalLastVoteDocument(txn);
     if (!lastVote.isOK()) {
-        log() << "Did not find local voted for document at startup;  " << lastVote.getStatus();
+        if (lastVote.getStatus() == ErrorCodes::NoMatchingDocument) {
+            log() << "Did not find local voted for document at startup.";
+        } else {
+            severe() << "Error loading local voted for document at startup; "
+                     << lastVote.getStatus();
+            fassertFailedNoTrace(40367);
+        }
     } else {
         LastVote vote = lastVote.getValue();
         _replExecutor.scheduleWork(
@@ -3205,9 +3211,7 @@ Status ReplicationCoordinatorImpl::processReplSetRequestVotes(
     }
     _replExecutor.wait(cbh.getValue());
     if (!args.isADryRun() && response->getVoteGranted()) {
-        LastVote lastVote;
-        lastVote.setTerm(args.getTerm());
-        lastVote.setCandidateIndex(args.getCandidateIndex());
+        LastVote lastVote{args.getTerm(), args.getCandidateIndex()};
 
         Status status = _externalState->storeLocalLastVoteDocument(txn, lastVote);
         if (!status.isOK()) {
@@ -3628,9 +3632,7 @@ void ReplicationCoordinatorImpl::_resetElectionInfoOnProtocolVersionUpgrade(
         }
         invariant(cbData.txn);
 
-        LastVote lastVote;
-        lastVote.setTerm(OpTime::kInitialTerm);
-        lastVote.setCandidateIndex(-1);
+        LastVote lastVote{OpTime::kInitialTerm, -1};
         auto status = _externalState->storeLocalLastVoteDocument(cbData.txn, lastVote);
         invariant(status.isOK());
     });

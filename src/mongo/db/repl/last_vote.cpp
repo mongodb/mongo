@@ -38,27 +38,31 @@ namespace {
 
 const std::string kCandidateIndexFieldName = "candidateIndex";
 const std::string kTermFieldName = "term";
+const std::string kIdFieldName = "_id";
 
-const std::string kLegalFieldNames[] = {
-    kCandidateIndexFieldName, kTermFieldName,
-};
+const std::string kLegalFieldNames[] = {kCandidateIndexFieldName, kTermFieldName, kIdFieldName};
 
 }  // namespace
 
-Status LastVote::initialize(const BSONObj& argsObj) {
-    Status status = bsonCheckOnlyHasFields("VotedFar", argsObj, kLegalFieldNames);
+LastVote::LastVote(long long term, long long candidateIndex)
+    : _candidateIndex(candidateIndex), _term(term) {}
+
+StatusWith<LastVote> LastVote::readFromLastVote(const BSONObj& doc) {
+    Status status = bsonCheckOnlyHasFields("LastVote", doc, kLegalFieldNames);
     if (!status.isOK())
         return status;
 
-    status = bsonExtractIntegerField(argsObj, kTermFieldName, &_term);
+    long long term;
+    status = bsonExtractIntegerField(doc, kTermFieldName, &term);
     if (!status.isOK())
         return status;
 
-    status = bsonExtractIntegerField(argsObj, kCandidateIndexFieldName, &_candidateIndex);
+    long long candidateIndex;
+    status = bsonExtractIntegerField(doc, kCandidateIndexFieldName, &candidateIndex);
     if (!status.isOK())
         return status;
 
-    return Status::OK();
+    return LastVote{term, candidateIndex};
 }
 
 void LastVote::setTerm(long long term) {
