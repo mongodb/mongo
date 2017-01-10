@@ -17,9 +17,7 @@ load("./jstests/multiVersion/libs/verify_versions.js");
             {binVersion: "latest"}
         ],
         mongos: 1,
-        other: {mongosOptions: {binVersion: "last-stable"}},
-        // TODO: SERVER-24163 remove after v3.4
-        waitForCSRSSecondaries: false
+        other: {mongosOptions: {binVersion: "last-stable"}}
     };
 
     var st = new ShardingTest(options);

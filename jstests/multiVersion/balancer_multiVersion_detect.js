@@ -5,13 +5,10 @@
 jsTest.log("Starting cluster...");
 
 var options = {
-
     mongosOptions: {verbose: 1, useLogFiles: true},
     configOptions: {},
     shardOptions: {binVersion: ["latest", "last-stable"]},
-    enableBalancer: true,
-    // TODO: SERVER-24163 remove after v3.4
-    waitForCSRSSecondaries: false
+    enableBalancer: true
 };
 
 var st = new ShardingTest({shards: 3, mongos: 1, other: options});

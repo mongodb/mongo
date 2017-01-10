@@ -59,9 +59,7 @@ function multiVersionDumpRestoreTest(configObj) {
                 binVersion: configObj.serverSourceVersion,
                 storageEngine: configObj.storageEngine
             }],
-            config: [{binVersion: configObj.serverSourceVersion}],
-            // TODO: SERVER-24163 remove after v3.4
-            waitForCSRSSecondaries: false
+            config: [{binVersion: configObj.serverSourceVersion}]
         };
         var shardingTest = new ShardingTest(shardingTestConfig);
         var serverSource = shardingTest.s;
@@ -125,9 +123,7 @@ function multiVersionDumpRestoreTest(configObj) {
             mongos: [{binVersion: configObj.serverDestVersion}],
             shards:
                 [{binVersion: configObj.serverDestVersion, storageEngine: configObj.storageEngine}],
-            config: [{binVersion: configObj.serverDestVersion}],
-            // TODO: SERVER-24163 remove after v3.4
-            waitForCSRSSecondaries: false
+            config: [{binVersion: configObj.serverDestVersion}]
         };
         var shardingTest = new ShardingTest(shardingTestConfig);
         serverDest = shardingTest.s;
