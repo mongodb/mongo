@@ -459,7 +459,7 @@ private:
     } _voteLease;
 
     // V1 last vote info for elections
-    LastVote _lastVote;
+    LastVote _lastVote{OpTime::kInitialTerm, -1};
 
     enum class ReadCommittedSupport {
         kUnknown,

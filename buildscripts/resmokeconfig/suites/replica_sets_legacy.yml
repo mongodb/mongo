@@ -21,6 +21,8 @@ selector:
     - jstests/replsets/sync2.js
     # PV0's w:majority guarantees aren't strong enough for this test to pass.
     - jstests/replsets/write_concern_after_stepdown_and_stepup.js
+    # PV0 does not persist the last vote
+    - jstests/replsets/last_vote.js
 
 executor:
   js_test:
