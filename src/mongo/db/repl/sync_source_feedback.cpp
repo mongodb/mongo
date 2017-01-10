@@ -114,13 +114,9 @@ void SyncSourceFeedback::forwardSlaveProgress() {
     }
 }
 
-Status SyncSourceFeedback::_updateUpstream(OperationContext* txn, BackgroundSync* bgsync) {
-    Reporter* reporter;
-    {
-        stdx::lock_guard<stdx::mutex> lock(_mtx);
-        reporter = _reporter;
-    }
-
+Status SyncSourceFeedback::_updateUpstream(OperationContext* txn,
+                                           BackgroundSync* bgsync,
+                                           Reporter* reporter) {
     auto syncTarget = reporter->getTarget();
 
     auto triggerStatus = reporter->trigger();
@@ -240,6 +236,9 @@ void SyncSourceFeedback::run(executor::TaskExecutor* executor, BackgroundSync* b
             keepAliveInterval);
         {
             stdx::lock_guard<stdx::mutex> lock(_mtx);
+            if (_shutdownSignaled) {
+                break;
+            }
             _reporter = &reporter;
         }
         ON_BLOCK_EXIT([this]() {
@@ -247,7 +246,7 @@ void SyncSourceFeedback::run(executor::TaskExecutor* executor, BackgroundSync* b
             _reporter = nullptr;
         });
 
-        auto status = _updateUpstream(txn.get(), bgsync);
+        auto status = _updateUpstream(txn.get(), bgsync, &reporter);
         if (!status.isOK()) {
             LOG(1) << "The replication progress command (replSetUpdatePosition) failed and will be "
                       "retried: "
