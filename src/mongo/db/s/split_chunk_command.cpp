@@ -63,8 +63,6 @@ using std::vector;
 
 namespace {
 
-const char kChunkVersion[] = "chunkVersion";
-
 const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOnly};
 
 bool checkIfSingleDoc(OperationContext* txn,

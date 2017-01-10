@@ -49,7 +49,6 @@ namespace {
 
 const char kMinKey[] = "min";
 const char kMaxKey[] = "max";
-const char kChunkVersion[] = "chunkVersion";
 const char kShouldMigrate[] = "shouldMigrate";
 
 }  // namespace
@@ -178,7 +177,6 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     ChunkVersion collectionVersion,
     const BSONObj& minKey,
     const BSONObj& maxKey,
-    ChunkVersion chunkVersion,
     const std::vector<BSONObj>& splitPoints) {
     invariant(!splitPoints.empty());
     invariant(minKey.woCompare(maxKey) < 0);
@@ -200,7 +198,6 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     collectionVersion.appendForCommands(&cmd);
     cmd.append(kMinKey, minKey);
     cmd.append(kMaxKey, maxKey);
-    chunkVersion.appendWithFieldForCommands(&cmd, kChunkVersion);
     cmd.append("splitKeys", splitPoints);
 
     BSONObj cmdObj = cmd.obj();
