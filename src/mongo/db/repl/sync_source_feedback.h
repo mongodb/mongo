@@ -72,7 +72,7 @@ private:
     /* Inform the sync target of our current position in the oplog, as well as the positions
      * of all secondaries chained through us.
      */
-    Status _updateUpstream(OperationContext* txn, BackgroundSync* bgsync);
+    Status _updateUpstream(OperationContext* txn, BackgroundSync* bgsync, Reporter* reporter);
 
     // protects cond, _shutdownSignaled, _keepAliveInterval, and _positionChanged.
     stdx::mutex _mtx;
