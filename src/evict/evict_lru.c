@@ -437,18 +437,11 @@ __wt_evict_create(WT_SESSION_IMPL *session)
 
 	/*
 	 * Create the eviction thread group.
-	 * We don't set the group size to the maximum allowed sessions,
-	 * because this may have adverse memory effects. Instead,
-	 * we set the group's maximum to a small value. The code
-	 * that tunes the number of workers will increase the
-	 * maximum if necessary.
+	 * Set the group size to the maximum allowed sessions.
 	 */
 	WT_RET(__wt_thread_group_create(session, &conn->evict_threads,
-	    "eviction-server", conn->evict_threads_min,
-	     WT_MAX(conn->evict_threads_min,
-	     WT_MIN(conn->evict_threads_max, EVICT_GROUP_INCR)),
-	     WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL,
-	    __wt_evict_thread_run));
+	    "eviction-server", conn->evict_threads_min, conn->evict_threads_max,
+	     WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL, __wt_evict_thread_run));
 
 	/*
 	 * Allow queues to be populated now that the eviction threads
@@ -921,7 +914,7 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	uint64_t cur_threads, delta_msec, delta_pages, i, target_threads;
 	uint64_t pgs_evicted_cur, pgs_evicted_persec_cur;
-	uint32_t new_max, thread_surplus;
+	uint32_t thread_surplus;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -1033,23 +1026,8 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 		target_threads = WT_MIN(cur_threads + EVICT_TUNE_BATCH,
 		    conn->evict_threads_max);
 		/*
-		 * Resize the group to allow for an additional batch of threads.
-		 * We resize the group in increments of a few sessions.
-		 * Allocating the group to accommodate the maximum number of
-		 * workers has adverse effects on performance due to memory
-		 * effects, so we gradually ramp up the allocation.
+		 * Start the new threads.
 		 */
-		if (conn->evict_threads.max < target_threads) {
-			new_max = WT_MIN(conn->evict_threads.max +
-			    EVICT_GROUP_INCR, conn->evict_threads_max);
-
-			WT_RET(__wt_thread_group_resize(
-			    session, &conn->evict_threads,
-			    conn->evict_threads_min, new_max,
-			    WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL));
-		}
-
-		/* Now actually start the new threads. */
 		for (i = 0; i < (target_threads - cur_threads); ++i) {
 			WT_RET(__wt_thread_group_start_one(session,
 			    &conn->evict_threads, false));
