@@ -296,7 +296,6 @@ StatusWith<boost::optional<ChunkRange>> Chunk::split(OperationContext* txn,
                                                              _manager->getVersion(),
                                                              _min,
                                                              _max,
-                                                             getLastmod(),
                                                              splitPoints);
     if (!splitStatus.isOK()) {
         return splitStatus.getStatus();

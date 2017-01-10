@@ -602,7 +602,6 @@ public:
                             chunkManager->getVersion(),
                             currentChunk->getMin(),
                             currentChunk->getMax(),
-                            currentChunk->getLastmod(),
                             subSplits);
                         if (!splitStatus.isOK()) {
                             warning() << "couldn't split chunk " << redact(currentChunk->toString())

@@ -234,7 +234,6 @@ public:
                                                                   cm->getVersion(),
                                                                   chunk->getMin(),
                                                                   chunk->getMax(),
-                                                                  chunk->getLastmod(),
                                                                   {middle}));
         }
 

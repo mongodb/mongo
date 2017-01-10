@@ -102,7 +102,6 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
  * shardKeyPattern The shard key which corresponds to this sharded namespace.
  * collectionVersion The expected collection version when doing the split.
  * minKey/maxKey Bounds of the chunk to be split.
- * chunkVersion Expected version of the chunk, which is being modified.
  * splitPoints The set of points at which the chunk should be split.
  */
 StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
@@ -113,7 +112,6 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     ChunkVersion collectionVersion,
     const BSONObj& minKey,
     const BSONObj& maxKey,
-    ChunkVersion chunkVersion,
     const std::vector<BSONObj>& splitPoints);
 
 }  // namespace shardutil
