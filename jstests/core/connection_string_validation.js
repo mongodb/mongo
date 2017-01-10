@@ -34,7 +34,7 @@ var badStrings = [
     {s: "/", r: badHost},
     {s: "/test", r: badHost},
     {s: ":/", r: emptyHost},
-    {s: ":/test", r: noReplSet},
+    {s: ":/test", r: emptyHost},
     {s: "mongodb://:" + port + "/", r: emptyHost},
     {s: "mongodb://:" + port + "/test", r: emptyHost},
     {s: "mongodb://localhost:/test", r: noPort},

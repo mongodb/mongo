@@ -19,17 +19,16 @@
             "--nodb",
             "--eval",
             "inner_mode=true;port=" + primary.port + ";",
-            "jstests/noPassthroughWithMongod/host_connection_string_validation.js"
+            "jstests/noPassthroughWithMongod/replset_host_connection_validation.js"
         ];
         const exitCode = _runMongoProgram(...args);
         jsTest.log("Inner mode test finished, exit code was " + exitCode);
 
-        // Stop the server we started
-        jsTest.log("Outer mode test stopping server");
-        MongoRunner.stopMongod(primary.port, 15);
-
         // Pass the inner test's exit code back as the outer test's exit code
-        quit(exitCode);
+        if (exitCode != 0) {
+            doassert("inner test failed with exit code " + exitcode);
+        }
+        return;
     }
 
     const testHost = function(host) {
