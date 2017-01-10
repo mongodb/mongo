@@ -106,6 +106,7 @@ class CleanEveryN(CustomBehavior):
     def __init__(self, logger, fixture, n=DEFAULT_N):
         description = "CleanEveryN (restarts the fixture after running `n` tests)"
         CustomBehavior.__init__(self, logger, fixture, description)
+        self.hook_test_case = testcases.TestCase(logger, "Hook", "CleanEveryN")
 
         # Try to isolate what test triggers the leak by restarting the fixture each time.
         if "detect_leaks=1" in os.getenv("ASAN_OPTIONS", ""):
@@ -118,7 +119,12 @@ class CleanEveryN(CustomBehavior):
 
     def after_test(self, test, test_report):
         self.tests_run += 1
-        if self.tests_run >= self.n:
+        if self.tests_run < self.n:
+            return
+
+        self.hook_test_case.test_name = test.short_name() + ":" + self.logger_name
+        CustomBehavior.start_dynamic_test(self.hook_test_case, test_report)
+        try:
             self.logger.info("%d tests have been run against the fixture, stopping it...",
                              self.tests_run)
             self.tests_run = 0
@@ -129,6 +135,11 @@ class CleanEveryN(CustomBehavior):
             self.logger.info("Starting the fixture back up again...")
             self.fixture.setup()
             self.fixture.await_ready()
+
+            self.hook_test_case.return_code = 0
+            test_report.addSuccess(self.hook_test_case)
+        finally:
+            test_report.stopTest(self.hook_test_case)
 
 
 class JsCustomBehavior(CustomBehavior):
