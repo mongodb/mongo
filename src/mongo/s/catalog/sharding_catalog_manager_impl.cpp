@@ -1177,16 +1177,6 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* txn,
     // move chunks on different collections to proceed in parallel
     Lock::ExclusiveLock lk(txn->lockState(), _kChunkOpLock);
 
-    // Acquire GlobalLock in MODE_X twice to prevent yielding.
-    // GlobalLock and the following lock on config.chunks are only needed to support
-    // mixed-mode operation with mongoses from 3.2
-    // TODO(SERVER-25337): Remove GlobalLock and config.chunks lock after 3.4
-    Lock::GlobalLock firstGlobalLock(txn->lockState(), MODE_X, UINT_MAX);
-    Lock::GlobalLock secondGlobalLock(txn->lockState(), MODE_X, UINT_MAX);
-
-    // Acquire lock on config.chunks in MODE_X
-    AutoGetCollection autoColl(txn, NamespaceString(ChunkType::ConfigNS), MODE_X);
-
     // Get the chunk with highest version for this namespace
     auto findStatus = grid.shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
         txn,
@@ -1376,16 +1366,6 @@ Status ShardingCatalogManagerImpl::commitChunkMerge(OperationContext* txn,
     // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
     // move chunks on different collections to proceed in parallel
     Lock::ExclusiveLock lk(txn->lockState(), _kChunkOpLock);
-
-    // Acquire GlobalLock in MODE_X twice to prevent yielding.
-    // GLobalLock and the following lock on config.chunks are only needed to support
-    // mixed-mode operation with mongoses from 3.2
-    // TODO(SERVER-25337): Remove GlobalLock and config.chunks lock after 3.4
-    Lock::GlobalLock firstGlobalLock(txn->lockState(), MODE_X, UINT_MAX);
-    Lock::GlobalLock secondGlobalLock(txn->lockState(), MODE_X, UINT_MAX);
-
-    // Acquire lock on config.chunks in MODE_X
-    AutoGetCollection autoColl(txn, NamespaceString(ChunkType::ConfigNS), MODE_X);
 
     // Get the chunk with the highest version for this namespace
     auto findStatus = grid.shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
@@ -1647,22 +1627,15 @@ StatusWith<BSONObj> ShardingCatalogManagerImpl::commitChunkMigration(
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
     // migrations.
+    //
+    // ConfigSvrCommitChunkMigration commands must be run serially because the new ChunkVersions
+    // for migrated chunks are generated within the command and must be committed to the database
+    // before another chunk commit generates new ChunkVersions in the same manner.
+    //
     // TODO(SERVER-25359): Replace with a collection-specific lock map to allow splits/merges/
     // move chunks on different collections to proceed in parallel.
     // (Note: This is not needed while we have a global lock, taken here only for consistency.)
     Lock::ExclusiveLock lk(txn->lockState(), _kChunkOpLock);
-
-    // Acquire GlobalLock in MODE_X twice to prevent yielding.
-    // Run operations under a nested lock as a hack to prevent yielding. When query/applyOps
-    // commands are called, they will take a second lock, and the PlanExecutor will be unable to
-    // yield.
-    //
-    // ConfigSvrCommitChunkMigration commands must be run serially because the new ChunkVersions
-    // for migrated chunks are generated within the command. Therefore it cannot be allowed to
-    // yield between generating the ChunkVersion and committing it to the database with
-    // applyOps.
-
-    Lock::GlobalWrite firstGlobalWriteLock(txn->lockState());
 
     // Ensure that the epoch passed in still matches the real state of the database.
 
