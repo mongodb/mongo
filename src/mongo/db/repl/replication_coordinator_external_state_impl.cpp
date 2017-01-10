@@ -529,9 +529,7 @@ StatusWith<LastVote> ReplicationCoordinatorExternalStateImpl::loadLocalLastVoteD
                                                 << "Did not find replica set lastVote document in "
                                                 << lastVoteCollectionName);
             }
-            LastVote lastVote;
-            lastVote.initialize(lastVoteObj);
-            return StatusWith<LastVote>(lastVote);
+            return LastVote::readFromLastVote(lastVoteObj);
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
             txn, "load replica set lastVote", lastVoteCollectionName);
