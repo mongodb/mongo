@@ -51,7 +51,8 @@ def makeEmitCompilationDbEntry(comstr):
             source=[],
             __COMPILATIONDB_UTARGET=target,
             __COMPILATIONDB_USOURCE=source,
-            __COMPILATIONDB_UACTION=user_action)
+            __COMPILATIONDB_UACTION=user_action,
+            __COMPILATIONDB_ENV=env)
 
         # TODO: Technically, these next two lines should not be required: it should be fine to
         # cache the entries. However, they don't seem to update properly. Since they are quick
@@ -70,7 +71,7 @@ def CompilationDbEntryAction(target, source, env, **kw):
     command = env['__COMPILATIONDB_UACTION'].strfunction(
         target=env['__COMPILATIONDB_UTARGET'],
         source=env['__COMPILATIONDB_USOURCE'],
-        env=env)
+        env=env['__COMPILATIONDB_ENV'],)
 
     entry = {
         "directory": env.Dir('#').abspath,
