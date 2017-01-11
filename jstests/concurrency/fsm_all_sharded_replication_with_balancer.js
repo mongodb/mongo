@@ -9,6 +9,7 @@ var blacklist = [
     'distinct.js',             // SERVER-13116 distinct isn't sharding aware
     'distinct_noindex.js',     // SERVER-13116 distinct isn't sharding aware
     'distinct_projection.js',  // SERVER-13116 distinct isn't sharding aware
+    'create_database.js',      // SERVER-17397 Drops of sharded namespaces may not fully succeed
     'drop_database.js',        // SERVER-17397 Drops of sharded namespaces may not fully succeed
     'remove_where.js',  // SERVER-14669 Multi-removes that use $where miscount removed documents
 

@@ -40,16 +40,14 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/auth_index_d.h"
 #include "mongo/db/background.h"
-#include "mongo/db/clientcursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
@@ -57,10 +55,12 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d.h"
 #include "mongo/db/stats/top.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -213,35 +213,6 @@ Database::Database(OperationContext* txn, StringData name, DatabaseCatalogEntry*
         const string ns = *it;
         _collections[ns] = _getOrCreateCollectionInstance(txn, ns);
     }
-}
-
-
-/*static*/
-string Database::duplicateUncasedName(const string& name, set<string>* duplicates) {
-    if (duplicates) {
-        duplicates->clear();
-    }
-
-    set<string> allShortNames;
-    dbHolder().getAllShortNames(allShortNames);
-
-    for (const auto& dbname : allShortNames) {
-        if (strcasecmp(dbname.c_str(), name.c_str()))
-            continue;
-
-        if (strcmp(dbname.c_str(), name.c_str()) == 0)
-            continue;
-
-        if (duplicates) {
-            duplicates->insert(dbname);
-        } else {
-            return dbname;
-        }
-    }
-    if (duplicates) {
-        return duplicates->empty() ? "" : *duplicates->begin();
-    }
-    return "";
 }
 
 void Database::clearTmpCollections(OperationContext* txn) {
@@ -496,7 +467,9 @@ Collection* Database::createCollection(OperationContext* txn,
         // This check only applies for actual collections, not indexes or other types of ns.
         uassert(17381,
                 str::stream() << "fully qualified namespace " << ns << " is too long "
-                              << "(max is " << NamespaceString::MaxNsCollectionLen << " bytes)",
+                              << "(max is "
+                              << NamespaceString::MaxNsCollectionLen
+                              << " bytes)",
                 ns.size() <= NamespaceString::MaxNsCollectionLen);
     }
 
