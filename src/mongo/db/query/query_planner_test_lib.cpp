@@ -193,6 +193,7 @@ static bool childrenMatch(const BSONObj& testSoln, const QuerySolutionNode* true
     // The order of the children array in testSoln might not match
     // the order in trueSoln, so we have to check all combos with
     // these nested loops.
+    stdx::unordered_set<size_t> matchedNodeIndexes;
     BSONObjIterator i(children.Obj());
     while (i.more()) {
         BSONElement child = i.next();
@@ -203,8 +204,13 @@ static bool childrenMatch(const BSONObj& testSoln, const QuerySolutionNode* true
         // try to match against one of the QuerySolutionNode's children
         bool found = false;
         for (size_t j = 0; j < trueSoln->children.size(); ++j) {
+            if (matchedNodeIndexes.find(j) != matchedNodeIndexes.end()) {
+                // Do not match a child of the QuerySolutionNode more than once.
+                continue;
+            }
             if (QueryPlannerTestLib::solutionMatches(child.Obj(), trueSoln->children[j])) {
                 found = true;
+                matchedNodeIndexes.insert(j);
                 break;
             }
         }
@@ -215,7 +221,8 @@ static bool childrenMatch(const BSONObj& testSoln, const QuerySolutionNode* true
         }
     }
 
-    return true;
+    // Ensure we've matched all children of the QuerySolutionNode.
+    return matchedNodeIndexes.size() == trueSoln->children.size();
 }
 
 // static

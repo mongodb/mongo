@@ -108,6 +108,30 @@ bool scansAreEquivalent(const QuerySolutionNode* lhs, const QuerySolutionNode* r
     return *leftIxscan == *rightIxscan;
 }
 
+/**
+ * If all nodes can provide the requested sort, returns a vector expressing which nodes must have
+ * their index scans reversed to provide the sort. Otherwise, returns an empty vector.
+ * 'nodes' must not be empty.
+ */
+std::vector<bool> canProvideSortWithMergeSort(const std::vector<QuerySolutionNode*>& nodes,
+                                              const BSONObj& requestedSort) {
+    invariant(!nodes.empty());
+    std::vector<bool> shouldReverseScan;
+    const auto reverseSort = QueryPlannerCommon::reverseSortObj(requestedSort);
+    for (auto&& node : nodes) {
+        node->computeProperties();
+        auto sorts = node->getSort();
+        if (sorts.find(requestedSort) != sorts.end()) {
+            shouldReverseScan.push_back(false);
+        } else if (sorts.find(reverseSort) != sorts.end()) {
+            shouldReverseScan.push_back(true);
+        } else {
+            return {};
+        }
+    }
+    return shouldReverseScan;
+}
+
 }  // namespace
 
 namespace mongo {
@@ -1081,40 +1105,25 @@ QuerySolutionNode* QueryPlannerAccess::buildIndexedOr(const CanonicalQuery& quer
     if (1 == ixscanNodes.size()) {
         orResult = ixscanNodes[0];
     } else {
-        bool shouldMergeSort = false;
+        std::vector<bool> shouldReverseScan;
 
         if (!query.getQueryRequest().getSort().isEmpty()) {
-            const BSONObj& desiredSort = query.getQueryRequest().getSort();
+            // If all ixscanNodes can provide the sort, shouldReverseScan is populated with which
+            // scans to reverse.
+            shouldReverseScan =
+                canProvideSortWithMergeSort(ixscanNodes, query.getQueryRequest().getSort());
+        }
 
-            // If there exists a sort order that is present in each child, we can merge them and
-            // maintain that sort order / those sort orders.
-            ixscanNodes[0]->computeProperties();
-            BSONObjSet sharedSortOrders = ixscanNodes[0]->getSort();
-
-            if (!sharedSortOrders.empty()) {
-                for (size_t i = 1; i < ixscanNodes.size(); ++i) {
-                    ixscanNodes[i]->computeProperties();
-                    const auto& bsonCmp = SimpleBSONObjComparator::kInstance;
-                    BSONObjSet isect = bsonCmp.makeBSONObjSet();
-                    set_intersection(sharedSortOrders.begin(),
-                                     sharedSortOrders.end(),
-                                     ixscanNodes[i]->getSort().begin(),
-                                     ixscanNodes[i]->getSort().end(),
-                                     std::inserter(isect, isect.end()),
-                                     bsonCmp.makeLessThan());
-                    sharedSortOrders = isect;
-                    if (sharedSortOrders.empty()) {
-                        break;
-                    }
+        if (!shouldReverseScan.empty()) {
+            // Each node can provide either the requested sort, or the reverse of the requested
+            // sort.
+            invariant(ixscanNodes.size() == shouldReverseScan.size());
+            for (size_t i = 0; i < ixscanNodes.size(); ++i) {
+                if (shouldReverseScan[i]) {
+                    QueryPlannerCommon::reverseScans(ixscanNodes[i]);
                 }
             }
 
-            // TODO: If we're looking for the reverse of one of these sort orders we could
-            // possibly reverse the ixscan nodes.
-            shouldMergeSort = (sharedSortOrders.end() != sharedSortOrders.find(desiredSort));
-        }
-
-        if (shouldMergeSort) {
             MergeSortNode* msn = new MergeSortNode();
             msn->sort = query.getQueryRequest().getSort();
             msn->children.swap(ixscanNodes);
