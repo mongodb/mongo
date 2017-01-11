@@ -177,6 +177,7 @@
     addShardRes = st.s.adminCommand({addShard: rst.getURL()});
     assertAddShardSucceeded(addShardRes);
     assert.writeOK(st.s.getDB('test').foo.insert({x: 1}));
+    assert.commandWorked(st.s.getDB('test').runCommand({dropDatabase: 1}));
     removeShardWithName(addShardRes.shardAdded);
 
     rst.stopSet();
