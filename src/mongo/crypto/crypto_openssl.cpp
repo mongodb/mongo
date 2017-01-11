@@ -30,16 +30,36 @@
 
 #include "mongo/config.h"
 #include "mongo/crypto/crypto.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/scopeguard.h"
 
 #ifndef MONGO_CONFIG_SSL
 #error This file should only be included in SSL-enabled builds
 #endif
 
+#include <cstring>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/sha.h>
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+namespace {
+// Copies of OpenSSL after 1.1.0 define new EVP digest routines. We must
+// polyfill used definitions to interact with older OpenSSL versions.
+EVP_MD_CTX* EVP_MD_CTX_new() {
+    void* ret = OPENSSL_malloc(sizeof(EVP_MD_CTX));
+
+    if (ret != NULL) {
+        memset(ret, 0, sizeof(EVP_MD_CTX));
+    }
+    return static_cast<EVP_MD_CTX*>(ret);
+}
+
+void EVP_MD_CTX_free(EVP_MD_CTX* ctx) {
+    EVP_MD_CTX_cleanup(ctx);
+    OPENSSL_free(ctx);
+}
+}  // namespace
+#endif
 
 namespace mongo {
 namespace crypto {
@@ -49,14 +69,13 @@ namespace crypto {
 SHA1Hash sha1(const unsigned char* input, const size_t inputLen) {
     SHA1Hash output;
 
-    EVP_MD_CTX digestCtx;
-    EVP_MD_CTX_init(&digestCtx);
-    ON_BLOCK_EXIT(EVP_MD_CTX_cleanup, &digestCtx);
+    std::unique_ptr<EVP_MD_CTX, decltype(&EVP_MD_CTX_free)> digestCtx(EVP_MD_CTX_new(),
+                                                                      EVP_MD_CTX_free);
 
     fassert(40379,
-            EVP_DigestInit_ex(&digestCtx, EVP_sha1(), NULL) == 1 &&
-                EVP_DigestUpdate(&digestCtx, input, inputLen) == 1 &&
-                EVP_DigestFinal_ex(&digestCtx, output.data(), NULL) == 1);
+            EVP_DigestInit_ex(digestCtx.get(), EVP_sha1(), NULL) == 1 &&
+                EVP_DigestUpdate(digestCtx.get(), input, inputLen) == 1 &&
+                EVP_DigestFinal_ex(digestCtx.get(), output.data(), NULL) == 1);
     return output;
 }
 
