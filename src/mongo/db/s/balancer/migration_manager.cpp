@@ -454,6 +454,29 @@ shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule(
         }
     }
 
+
+    // Sanity checks that the chunk being migrated is actually valid. These will be repeated at the
+    // shard as well, but doing them here saves an extra network call, which might otherwise fail.
+    auto statusWithScopedChunkManager = ScopedChunkManager::refreshAndGet(txn, nss);
+    if (!statusWithScopedChunkManager.isOK()) {
+        return std::make_shared<Notification<RemoteCommandResponse>>(
+            std::move(statusWithScopedChunkManager.getStatus()));
+    }
+
+    ChunkManager* const chunkManager = statusWithScopedChunkManager.getValue().cm();
+
+    auto chunk = chunkManager->findIntersectingChunkWithSimpleCollation(txn, migrateInfo.minKey);
+    invariant(chunk);
+
+    // If the chunk is not found exactly as requested, the caller must have stale data
+    if (SimpleBSONObjComparator::kInstance.evaluate(chunk->getMin() != migrateInfo.minKey) ||
+        SimpleBSONObjComparator::kInstance.evaluate(chunk->getMax() != migrateInfo.maxKey)) {
+        return std::make_shared<Notification<RemoteCommandResponse>>(Status(
+            ErrorCodes::IncompatibleShardingMetadata,
+            stream() << "Chunk " << ChunkRange(migrateInfo.minKey, migrateInfo.maxKey).toString()
+                     << " does not exist."));
+    }
+
     const auto fromShardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, migrateInfo.from);
     if (!fromShardStatus.isOK()) {
         return std::make_shared<Notification<RemoteCommandResponse>>(
@@ -472,11 +495,12 @@ shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule(
     MoveChunkRequest::appendAsCommand(
         &builder,
         nss,
-        migrateInfo.version,
+        chunkManager->getVersion(),
         Grid::get(txn)->shardRegistry()->getConfigServerConnectionString(),
         migrateInfo.from,
         migrateInfo.to,
         ChunkRange(migrateInfo.minKey, migrateInfo.maxKey),
+        chunk->getLastmod(),
         maxChunkSizeBytes,
         secondaryThrottle,
         waitForDelete);

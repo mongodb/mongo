@@ -59,17 +59,17 @@ public:
      * without closing the builder. The builder must be empty, but callers are free to append more
      * fields once the command has been constructed.
      *
-     * The chunkVersion argument is appended as 'chunkVersion', but not parsed by the
-     * createFromCommand method above, because it is needed for backwards compatibility with 3.4.
-     * However, the 'epoch' field created from the chunkVersion argument is parsed.
+     * The collectionVersion argument is appended, but not parsed by the createFromCommand method
+     * above, because it is processed by the mongod generic command parsing code.
      */
     static void appendAsCommand(BSONObjBuilder* builder,
                                 const NamespaceString& nss,
-                                ChunkVersion chunkVersion,
+                                ChunkVersion collectionVersion,
                                 const ConnectionString& configServerConnectionString,
                                 const ShardId& fromShardId,
                                 const ShardId& toShardId,
                                 const ChunkRange& range,
+                                ChunkVersion chunkVersion,
                                 int64_t maxChunkSizeBytes,
                                 const MigrationSecondaryThrottleOptions& secondaryThrottle,
                                 bool waitForDelete);
@@ -98,8 +98,12 @@ public:
         return _range.getMax();
     }
 
-    const OID getVersionEpoch() const {
-        return _versionEpoch;
+    bool hasChunkVersion() const {
+        return _chunkVersion.is_initialized();
+    }
+
+    ChunkVersion getChunkVersion() const {
+        return *_chunkVersion;
     }
 
     int64_t getMaxChunkSizeBytes() const {
@@ -148,8 +152,10 @@ private:
     // Range of the chunk being moved
     ChunkRange _range;
 
-    // Assures the collection has not been dropped and recreated since the moveChunk was sent.
-    OID _versionEpoch;
+    // Version of the chunk being moved. Optional for backwards compatibility with 3.2 mongos
+    // instances.
+    // TODO: Make non-optional after 3.4 is released.
+    boost::optional<ChunkVersion> _chunkVersion;
 
     // This value is used by the migration source to determine the data size threshold above which a
     // chunk would be considered jumbo and migrations will not proceed.

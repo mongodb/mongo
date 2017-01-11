@@ -142,6 +142,7 @@ protected:
             kDonorConnStr.getSetName(),
             kRecipientConnStr.getSetName(),
             chunkRange,
+            ChunkVersion(1, 0, OID::gen()),
             1024 * 1024,
             MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kDefault),
             false);
