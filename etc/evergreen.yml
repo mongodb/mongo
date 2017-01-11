@@ -468,11 +468,16 @@ functions:
         if [ ${run_multiple_jobs|false} = true ]; then
           processor_architecture=$(uname -m)
           num_jobs_available=${num_jobs_available|1}
-          # Reduce the number of available jobs by half when running any sharding* or replicasets*
-          # task on Windows and ARM to avoid overwhelming test hosts.
+          # Reduce the number of available jobs by half when running any sharding*, replicasets*
+          # and select jsCore_small_oplog tasks on Windows and ARM to avoid overwhelming test hosts.
           if [ "Windows_NT" = "$OS" ] || [ "aarch64" = $processor_architecture ]; then
             case "${task_name}" in
-            sharding*|replicasets*)
+            jsCore_small_oplog_rs_initsync          \
+            |jsCore_small_oplog_rs_initsync_static  \
+            |jsCore_small_oplog_rs_resync_static    \
+            |replicasets*                           \
+            |sharding*                              \
+            )
               num_jobs_available=$((${num_jobs_available|2} / 2))
               echo "Reducing jobs from ${num_jobs_available|1} to $num_jobs_available"
               ;;
