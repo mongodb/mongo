@@ -29,6 +29,7 @@
 #pragma once
 
 #include <set>
+#include <string>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
@@ -87,9 +88,15 @@ public:
         }
     }
 
-private:
-    typedef StringMap<Database*> DBs;
+    /**
+     * Returns the set of existing database names that differ only in casing.
+     */
+    std::set<std::string> getNamesWithConflictingCasing(StringData name);
 
+private:
+    std::set<std::string> _getNamesWithConflictingCasing_inlock(StringData name);
+
+    typedef StringMap<Database*> DBs;
     mutable SimpleMutex _m;
     DBs _dbs;
 };
