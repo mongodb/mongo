@@ -125,6 +125,15 @@ IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(ASN1_SEQUENCE_ANY, ASN1_SET_ANY, ASN
 #endif // MONGO_CONFIG_NEEDS_ASN1_ANY_DEFINITIONS
 // clang-format on
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+// Copies of OpenSSL after 1.1.0 define new functions for interaction with
+// X509 structure. We must polyfill used definitions to interact with older
+// OpenSSL versions.
+const STACK_OF(X509_EXTENSION) * X509_get0_extensions(const X509* peerCert) {
+    return peerCert->cert_info->extensions;
+}
+#endif
+
 /**
  * Multithreaded Support for SSL.
  *
@@ -754,7 +763,7 @@ bool SSLManager::_parseAndValidateCertificate(const std::string& keyFile,
                                               const std::string& keyPassword,
                                               std::string* subjectName,
                                               Date_t* serverCertificateExpirationDate) {
-    BIO* inBIO = BIO_new(BIO_s_file_internal());
+    BIO* inBIO = BIO_new(BIO_s_file());
     if (inBIO == NULL) {
         error() << "failed to allocate BIO object: " << getSSLErrorMessage(ERR_get_error());
         return false;
@@ -813,7 +822,7 @@ bool SSLManager::_setupPEM(SSL_CTX* context,
         return false;
     }
 
-    BIO* inBio = BIO_new(BIO_s_file_internal());
+    BIO* inBio = BIO_new(BIO_s_file());
     if (!inBio) {
         error() << "failed to allocate BIO object: " << getSSLErrorMessage(ERR_get_error());
         return false;
@@ -1291,7 +1300,7 @@ SSLPeerInfo SSLManager::parseAndValidatePeerCertificateDeprecated(const SSLConne
 
 StatusWith<stdx::unordered_set<RoleName>> SSLManager::_parsePeerRoles(X509* peerCert) const {
     // exts is owned by the peerCert
-    STACK_OF(X509_EXTENSION)* exts = peerCert->cert_info->extensions;
+    const STACK_OF(X509_EXTENSION)* exts = X509_get0_extensions(peerCert);
 
     int extCount = 0;
     if (exts) {
