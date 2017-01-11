@@ -5513,6 +5513,43 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenConfigVersionDoesNotMatch) {
     ASSERT_FALSE(response.getVoteGranted());
 }
 
+TEST_F(TopoCoordTest, ArbiterDoesNotGrantVoteWhenItCanSeeAHealthyPrimaryOfEqualOrGreaterPriority) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 1 << "members"
+                      << BSON_ARRAY(BSON("_id" << 10 << "host"
+                                               << "hself"
+                                               << "arbiterOnly" << true)
+                                    << BSON("_id" << 20 << "host"
+                                                  << "h2"
+                                                  << "priority" << 5) << BSON("_id" << 30 << "host"
+                                                                                    << "h3"))),
+                 0);
+    heartbeatFromMember(HostAndPort("h2"),
+                        "rs0",
+                        MemberState::RS_PRIMARY,
+                        OpTime(Timestamp(0, 0), 0),
+                        Milliseconds(300));
+    heartbeatFromMember(HostAndPort("h3"),
+                        "rs0",
+                        MemberState::RS_SECONDARY,
+                        OpTime(Timestamp(0, 0), 0),
+                        Milliseconds(300));
+
+    ReplSetRequestVotesArgs args;
+    args.initialize(BSON("replSetRequestVotes" << 1 << "setName"
+                                               << "rs0"
+                                               << "term" << 1LL << "candidateIndex" << 2LL
+                                               << "configVersion" << 1LL << "lastCommittedOp"
+                                               << BSON("ts" << Timestamp(10, 0) << "term" << 0LL)));
+    ReplSetRequestVotesResponse response;
+    OpTime lastAppliedOpTime;
+
+    getTopoCoord().processReplSetRequestVotes(args, &response, lastAppliedOpTime);
+    ASSERT_EQUALS("can see a healthy primary of equal or greater priority", response.getReason());
+    ASSERT_FALSE(response.getVoteGranted());
+}
+
 TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenTermIsStale) {
     updateConfig(BSON("_id"
                       << "rs0"
