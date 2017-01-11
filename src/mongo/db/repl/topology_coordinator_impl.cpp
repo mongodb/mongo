@@ -1413,6 +1413,23 @@ bool TopologyCoordinatorImpl::_aMajoritySeemsToBeUp() const {
     return vUp * 2 > _rsConfig.getTotalVotingMembers();
 }
 
+bool TopologyCoordinatorImpl::_canSeeHealthyPrimaryOfEqualOrGreaterPriority(
+    const int candidateIndex) const {
+    const double candidatePriority = _rsConfig.getMemberAt(candidateIndex).getPriority();
+    for (auto it = _hbdata.begin(); it != _hbdata.end(); ++it) {
+        if (!it->up() || it->getState() != MemberState::RS_PRIMARY) {
+            continue;
+        }
+        const int itIndex = indexOfIterator(_hbdata, it);
+        const double priority = _rsConfig.getMemberAt(itIndex).getPriority();
+        if (itIndex != _selfIndex && itIndex != candidateIndex && priority >= candidatePriority) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool TopologyCoordinatorImpl::_isOpTimeCloseEnoughToLatestToElect(
     const OpTime& otherOpTime, const OpTime& ourLastOpApplied) const {
     const OpTime latestKnownOpTime = _latestKnownOpTime(ourLastOpApplied);
@@ -2561,6 +2578,10 @@ void TopologyCoordinatorImpl::processReplSetRequestVotes(const ReplSetRequestVot
     } else if (!args.isADryRun() && _lastVote.getTerm() == args.getTerm()) {
         response->setVoteGranted(false);
         response->setReason("already voted for another candidate this term");
+    } else if (_selfConfig().isArbiter() &&
+               _canSeeHealthyPrimaryOfEqualOrGreaterPriority(args.getCandidateIndex())) {
+        response->setVoteGranted(false);
+        response->setReason("can see a healthy primary of equal or greater priority");
     } else {
         if (!args.isADryRun()) {
             _lastVote.setTerm(args.getTerm());
