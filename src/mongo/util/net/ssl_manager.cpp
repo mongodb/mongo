@@ -709,7 +709,7 @@ unsigned long long SSLManager::_convertASN1ToMillis(ASN1_TIME* asn1time) {
 bool SSLManager::_parseAndValidateCertificate(const std::string& keyFile,
                                               std::string* subjectName,
                                               Date_t* serverCertificateExpirationDate) {
-    BIO* inBIO = BIO_new(BIO_s_file_internal());
+    BIO* inBIO = BIO_new(BIO_s_file());
     if (inBIO == NULL) {
         error() << "failed to allocate BIO object: " << getSSLErrorMessage(ERR_get_error());
         return false;
