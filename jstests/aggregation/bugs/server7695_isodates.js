@@ -16,7 +16,7 @@
         var pipeline = [{$project: {_id: 0, result: {}}}];
         pipeline[0].$project.result[op] = value;
         var msg = "Exptected {" + op + ": " + value + "} to equal: " + expResult;
-        var res = coll.runCommand('aggregate', {pipeline: pipeline});
+        var res = coll.runCommand('aggregate', {pipeline: pipeline, cursor: {}});
 
         // in the case of $dateToString the date is on property date
         var date = value.date || value;
@@ -33,7 +33,7 @@
             return;
         }
 
-        assert.eq(res.result[0].result, expResult, pipeline);
+        assert.eq(res.cursor.firstBatch[0].result, expResult, pipeline);
     }
 
     // While development, there was a bug which caused an error with $dateToString if the order of

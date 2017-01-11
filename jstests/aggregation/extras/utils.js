@@ -259,16 +259,6 @@ function assertErrorCode(coll, pipe, code, errmsg) {
         pipe = [pipe];
     }
 
-    // Test non-cursor
-    var res = coll.runCommand("aggregate", {pipeline: pipe});
-    if (res.ok || res.code != code)
-        printjson({pipeline: pipe, result: res});
-
-    /* assert failure with proper error code */
-    assert(!res.ok, errmsg || "failed in assertErrorCode");
-    assert.eq(res.code, code);
-
-    // Test with cursors
     var cmd = {pipeline: pipe};
     // cmd.cursor = {};
     cmd.cursor = {batchSize: 0};

@@ -186,15 +186,16 @@
     // Positive test for "aggregate".
     configureMaxTimeAlwaysTimeOut("alwaysOn");
     assert.commandFailedWithCode(
-        coll.runCommand("aggregate", {pipeline: [], maxTimeMS: 60 * 1000}),
+        coll.runCommand("aggregate", {pipeline: [], cursor: {}, maxTimeMS: 60 * 1000}),
         ErrorCodes.ExceededTimeLimit,
         "expected aggregate to fail with code " + ErrorCodes.ExceededTimeLimit +
             " due to maxTimeAlwaysTimeOut fail point, but instead got: " + tojson(res));
 
     // Negative test for "aggregate".
     configureMaxTimeAlwaysTimeOut("off");
-    assert.commandWorked(coll.runCommand("aggregate", {pipeline: [], maxTimeMS: 60 * 1000}),
-                         "expected aggregate to not hit time limit in mongod");
+    assert.commandWorked(
+        coll.runCommand("aggregate", {pipeline: [], cursor: {}, maxTimeMS: 60 * 1000}),
+        "expected aggregate to not hit time limit in mongod");
 
     // Positive test for "moveChunk".
     configureMaxTimeAlwaysTimeOut("alwaysOn");

@@ -82,7 +82,7 @@
         _transferMods: {skip: isAnInternalCommand},
         addShard: {skip: isUnrelated},
         addShardToZone: {skip: isUnrelated},
-        aggregate: {command: {aggregate: "view", pipeline: [{$match: {}}]}},
+        aggregate: {command: {aggregate: "view", pipeline: [{$match: {}}], cursor: {}}},
         appendOplogNote: {skip: isUnrelated},
         applyOps: {
             command: {applyOps: [{op: "i", o: {_id: 1}, ns: "test.view"}]},

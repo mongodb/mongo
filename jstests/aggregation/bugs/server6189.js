@@ -38,7 +38,8 @@ function test(date, testSynthetics) {
                 ,
                 format: {$dateToString: {format: ISOfmt, date: '$date'}}
             }
-        }]
+        }],
+        cursor: {}
     });
 
     if (date.valueOf() < 0 && _isWindows() && res.code == 16422) {
@@ -54,7 +55,7 @@ function test(date, testSynthetics) {
     }
 
     assert.commandWorked(res);
-    assert.eq(res.result[0], {
+    assert.eq(res.cursor.firstBatch[0], {
         year: date.getUTCFullYear(),
         month: date.getUTCMonth() + 1  // jan == 1
         ,

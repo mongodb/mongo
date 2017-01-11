@@ -55,8 +55,9 @@
         const lookup = {
             $lookup: {from: "collection2", localField: "_id", foreignField: "_id", as: "match"}
         };
-        assert.commandWorked(viewsDB.runCommand({aggregate: "collection", pipeline: [lookup]}),
-                             makeErrorMessage("aggregate with $lookup"));
+        assert.commandWorked(
+            viewsDB.runCommand({aggregate: "collection", pipeline: [lookup], cursor: {}}),
+            makeErrorMessage("aggregate with $lookup"));
 
         const graphLookup = {
             $graphLookup: {
@@ -67,8 +68,9 @@
                 as: "match"
             }
         };
-        assert.commandWorked(viewsDB.runCommand({aggregate: "collection", pipeline: [graphLookup]}),
-                             makeErrorMessage("aggregate with $graphLookup"));
+        assert.commandWorked(
+            viewsDB.runCommand({aggregate: "collection", pipeline: [graphLookup], cursor: {}}),
+            makeErrorMessage("aggregate with $graphLookup"));
 
         assert.commandWorked(viewsDB.runCommand({dropIndexes: "collection", index: "x_1"}),
                              makeErrorMessage("dropIndexes"));

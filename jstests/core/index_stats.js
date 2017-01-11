@@ -149,7 +149,7 @@
     //
     // Confirm index stats tick on aggregate w/ match.
     //
-    res = db.runCommand({aggregate: colName, pipeline: [{$match: {b: 1}}]});
+    res = db.runCommand({aggregate: colName, pipeline: [{$match: {b: 1}}], cursor: {}});
     assert.commandWorked(res);
     countB++;
     assert.eq(countB, getUsageCount("b_1_c_1"));

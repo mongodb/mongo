@@ -83,17 +83,12 @@ StatusWith<BSONObj> ResolvedView::asExpandedViewAggregation(
     }
     pipelineBuilder.doneFast();
 
-    // The cursor option is always specified regardless of the presence of batchSize.
-    if (request.getBatchSize()) {
-        BSONObjBuilder batchSizeBuilder(aggregationBuilder.subobjStart("cursor"));
-        batchSizeBuilder.append(AggregationRequest::kBatchSizeName, *request.getBatchSize());
-        batchSizeBuilder.doneFast();
-    } else {
-        aggregationBuilder.append("cursor", BSONObj());
-    }
-
     if (request.isExplain()) {
         aggregationBuilder.append("explain", true);
+    } else {
+        BSONObjBuilder batchSizeBuilder(aggregationBuilder.subobjStart("cursor"));
+        batchSizeBuilder.append(AggregationRequest::kBatchSizeName, request.getBatchSize());
+        batchSizeBuilder.doneFast();
     }
 
     if (request.shouldBypassDocumentValidation()) {

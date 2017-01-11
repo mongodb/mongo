@@ -58,7 +58,7 @@ const StringData AggregationRequest::kAllowDiskUseName = "allowDiskUse"_sd;
 const long long AggregationRequest::kDefaultBatchSize = 101;
 
 AggregationRequest::AggregationRequest(NamespaceString nss, std::vector<BSONObj> pipeline)
-    : _nss(std::move(nss)), _pipeline(std::move(pipeline)) {}
+    : _nss(std::move(nss)), _pipeline(std::move(pipeline)), _batchSize(kDefaultBatchSize) {}
 
 StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(NamespaceString nss,
                                                                  const BSONObj& cmdObj) {
@@ -85,6 +85,8 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(NamespaceString
         kCommandName,
         repl::ReadConcernArgs::kReadConcernFieldName};
 
+    bool hasCursorElem = false;
+
     // Parse optional parameters.
     for (auto&& elem : cmdObj) {
         auto fieldName = elem.fieldNameStringData();
@@ -108,7 +110,7 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(NamespaceString
                 return status;
             }
 
-            request.setCursorCommand(true);
+            hasCursorElem = true;
             request.setBatchSize(batchSize);
         } else if (kCollationName == fieldName) {
             if (elem.type() != BSONType::Object) {
@@ -149,6 +151,14 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(NamespaceString
                     str::stream() << "unrecognized field '" << elem.fieldName() << "'"};
         }
     }
+
+    if (!hasCursorElem && !request.isExplain()) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "The '" << kCursorName << "' option is required, unless '"
+                              << kExplainName
+                              << "' is true"};
+    }
+
     return request;
 }
 
@@ -165,7 +175,8 @@ Document AggregationRequest::serializeToCommandObj() const {
          _bypassDocumentValidation ? Value(true) : Value()},
         // Only serialize a collation if one was specified.
         {kCollationName, _collation.isEmpty() ? Value() : Value(_collation)},
-        {kCursorName, _batchSize ? Value(Document{{kBatchSizeName, _batchSize.get()}}) : Value()}};
+        // Only serialize batchSize when explain is false.
+        {kCursorName, _explain ? Value() : Value(Document{{kBatchSizeName, _batchSize}})}};
 }
 
 }  // namespace mongo

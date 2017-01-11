@@ -13,11 +13,11 @@
 
     // Test aggregation command output format.
     var commandResult = testDB.runCommand(
-        {aggregate: testColl.getName(), pipeline: [{$collStats: {latencyStats: {}}}]});
+        {aggregate: testColl.getName(), pipeline: [{$collStats: {latencyStats: {}}}], cursor: {}});
     assert.commandWorked(commandResult);
-    assert(commandResult.result.length == 1);
+    assert(commandResult.cursor.firstBatch.length == 1);
 
-    var stats = commandResult.result[0];
+    var stats = commandResult.cursor.firstBatch[0];
     var histogramTypes = ["reads", "writes", "commands"];
 
     assert(stats.hasOwnProperty("localTime"));

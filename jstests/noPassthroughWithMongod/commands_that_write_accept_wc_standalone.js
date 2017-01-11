@@ -61,7 +61,7 @@
     });
 
     commands.push({
-        req: {aggregate: collName, pipeline: [{$sort: {type: 1}}, {$out: "foo"}]},
+        req: {aggregate: collName, pipeline: [{$sort: {type: 1}}, {$out: "foo"}], cursor: {}},
         setupFunc: function() {
             coll.insert({_id: 1, type: 'oak'});
             coll.insert({_id: 2, type: 'maple'});

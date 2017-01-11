@@ -139,13 +139,6 @@ public:
      */
     std::vector<Value> serialize() const;
 
-    /**
-      Run the Pipeline on the given source.
-
-      @param result builder to write the result to
-    */
-    void run(BSONObjBuilder& result);
-
     /// The initial source is special since it varies between mongos and mongod.
     void addInitialSource(boost::intrusive_ptr<DocumentSource> source);
 

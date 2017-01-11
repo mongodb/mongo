@@ -20,7 +20,7 @@
     var res;
 
     // aggregate command errors if plan executor is killed.
-    res = db.runCommand({aggregate: collName, pipeline: []});
+    res = db.runCommand({aggregate: collName, pipeline: [], cursor: {}});
     assert.commandFailed(res);
     assert(res.errmsg.indexOf("hit planExecutorAlwaysDead fail point") > -1);
 

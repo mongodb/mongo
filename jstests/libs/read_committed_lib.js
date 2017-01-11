@@ -36,6 +36,7 @@ function testReadCommittedLookup(db, secondary, rst) {
               }
             },
         ],
+        cursor: {},
         readConcern: {
             level: "majority",
         }
@@ -52,6 +53,7 @@ function testReadCommittedLookup(db, secondary, rst) {
                 as: "match"
             }
         }],
+        cursor: {},
         readConcern: {
             level: "majority",
         }
@@ -78,10 +80,10 @@ function testReadCommittedLookup(db, secondary, rst) {
     }];
 
     // Confirm lookup/graphLookup return the matched result.
-    let result = db.runCommand(aggCmdLookupObj).result;
+    let result = db.runCommand(aggCmdLookupObj).cursor.firstBatch;
     assert.eq(result, expectedMatchedResult);
 
-    result = db.runCommand(aggCmdGraphLookupObj).result;
+    result = db.runCommand(aggCmdGraphLookupObj).cursor.firstBatch;
     assert.eq(result, expectedMatchedResult);
 
     // Stop oplog application on the secondary so that it won't acknowledge updates.
@@ -92,10 +94,10 @@ function testReadCommittedLookup(db, secondary, rst) {
 
     // lookup/graphLookup should not see the update, since it has not been acknowledged by the
     // secondary.
-    result = db.runCommand(aggCmdLookupObj).result;
+    result = db.runCommand(aggCmdLookupObj).cursor.firstBatch;
     assert.eq(result, expectedMatchedResult);
 
-    result = db.runCommand(aggCmdGraphLookupObj).result;
+    result = db.runCommand(aggCmdGraphLookupObj).cursor.firstBatch;
     assert.eq(result, expectedMatchedResult);
 
     // Restart oplog application on the secondary and wait for it's snapshot to catch up.
@@ -103,9 +105,9 @@ function testReadCommittedLookup(db, secondary, rst) {
     rst.awaitLastOpCommitted();
 
     // Now lookup/graphLookup should report that the documents don't match.
-    result = db.runCommand(aggCmdLookupObj).result;
+    result = db.runCommand(aggCmdLookupObj).cursor.firstBatch;
     assert.eq(result, expectedUnmatchedResult);
 
-    result = db.runCommand(aggCmdGraphLookupObj).result;
+    result = db.runCommand(aggCmdGraphLookupObj).cursor.firstBatch;
     assert.eq(result, expectedUnmatchedResult);
 }

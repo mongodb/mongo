@@ -44,6 +44,9 @@
 namespace mongo {
 namespace {
 
+const Document kDefaultCursorOptionDocument{
+    {AggregationRequest::kBatchSizeName, AggregationRequest::kDefaultBatchSize}};
+
 //
 // Parsing
 //
@@ -58,8 +61,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     ASSERT_TRUE(request.shouldAllowDiskUse());
     ASSERT_TRUE(request.isFromRouter());
     ASSERT_TRUE(request.shouldBypassDocumentValidation());
-    ASSERT_TRUE(request.isCursorCommand());
-    ASSERT_EQ(request.getBatchSize().get(), 10);
+    ASSERT_EQ(request.getBatchSize(), 10);
     ASSERT_BSONOBJ_EQ(request.getCollation(),
                       BSON("locale"
                            << "en_US"));
@@ -75,7 +77,8 @@ TEST(AggregationRequestTest, ShouldOnlySerializeRequiredFieldsIfNoOptionalFields
 
     auto expectedSerialization =
         Document{{AggregationRequest::kCommandName, nss.coll()},
-                 {AggregationRequest::kPipelineName, Value(std::vector<Value>{})}};
+                 {AggregationRequest::kPipelineName, Value(std::vector<Value>{})},
+                 {AggregationRequest::kCursorName, Value(kDefaultCursorOptionDocument)}};
     ASSERT_DOCUMENT_EQ(request.serializeToCommandObj(), expectedSerialization);
 }
 
@@ -90,7 +93,8 @@ TEST(AggregationRequestTest, ShouldNotSerializeOptionalValuesIfEquivalentToDefau
 
     auto expectedSerialization =
         Document{{AggregationRequest::kCommandName, nss.coll()},
-                 {AggregationRequest::kPipelineName, Value(std::vector<Value>{})}};
+                 {AggregationRequest::kPipelineName, Value(std::vector<Value>{})},
+                 {AggregationRequest::kCursorName, Value(kDefaultCursorOptionDocument)}};
     ASSERT_DOCUMENT_EQ(request.serializeToCommandObj(), expectedSerialization);
 }
 
@@ -101,6 +105,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     request.setAllowDiskUse(true);
     request.setFromRouter(true);
     request.setBypassDocumentValidation(true);
+    request.setBatchSize(10);  // batchSize not serialzed when explain is true.
     const auto collationObj = BSON("locale"
                                    << "en_US");
     request.setCollation(collationObj);
@@ -116,23 +121,25 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     ASSERT_DOCUMENT_EQ(request.serializeToCommandObj(), expectedSerialization);
 }
 
+TEST(AggregationRequestTest, ShouldSerializeBatchSizeIfSetAndExplainFalse) {
+    NamespaceString nss("a.collection");
+    AggregationRequest request(nss, {});
+    request.setBatchSize(10);
+
+    auto expectedSerialization =
+        Document{{AggregationRequest::kCommandName, nss.coll()},
+                 {AggregationRequest::kPipelineName, Value(std::vector<Value>{})},
+                 {AggregationRequest::kCursorName,
+                  Value(Document({{AggregationRequest::kBatchSizeName, 10}}))}};
+    ASSERT_DOCUMENT_EQ(request.serializeToCommandObj(), expectedSerialization);
+}
+
 TEST(AggregationRequestTest, ShouldSetBatchSizeToDefaultOnEmptyCursorObject) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}}");
     auto request = AggregationRequest::parseFromBSON(nss, inputBson);
     ASSERT_OK(request.getStatus());
-    ASSERT_TRUE(request.getValue().isCursorCommand());
-    ASSERT_TRUE(request.getValue().getBatchSize());
-    ASSERT_EQ(request.getValue().getBatchSize().get(), AggregationRequest::kDefaultBatchSize);
-}
-
-TEST(AggregationRequestTest, NoBatchSizeWhenCursorObjectNotSet) {
-    NamespaceString nss("a.collection");
-    const BSONObj inputBson = fromjson("{pipeline: [{$match: {a: 'abc'}}]}");
-    auto request = AggregationRequest::parseFromBSON(nss, inputBson);
-    ASSERT_OK(request.getStatus());
-    ASSERT_FALSE(request.getValue().isCursorCommand());
-    ASSERT_FALSE(request.getValue().getBatchSize());
+    ASSERT_EQ(request.getValue().getBatchSize(), AggregationRequest::kDefaultBatchSize);
 }
 
 //
@@ -141,41 +148,51 @@ TEST(AggregationRequestTest, NoBatchSizeWhenCursorObjectNotSet) {
 
 TEST(AggregationRequestTest, ShouldRejectNonArrayPipeline) {
     NamespaceString nss("a.collection");
-    const BSONObj inputBson = fromjson("{pipeline: {}}");
+    const BSONObj inputBson = fromjson("{pipeline: {}, cursor: {}}");
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectPipelineArrayIfAnElementIsNotAnObject) {
     NamespaceString nss("a.collection");
-    BSONObj inputBson = fromjson("{pipeline: [4]}");
+    BSONObj inputBson = fromjson("{pipeline: [4], cursor: {}}");
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 
-    inputBson = fromjson("{pipeline: [{$match: {a: 'abc'}}, 4]}");
+    inputBson = fromjson("{pipeline: [{$match: {a: 'abc'}}, 4], cursor: {}}");
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectNonObjectCollation) {
     NamespaceString nss("a.collection");
-    const BSONObj inputBson = fromjson("{pipeline: [{$match: {a: 'abc'}}], collation: 1}");
+    const BSONObj inputBson =
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, collation: 1}");
     ASSERT_NOT_OK(
         AggregationRequest::parseFromBSON(NamespaceString("a.collection"), inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectNonBoolExplain) {
     NamespaceString nss("a.collection");
-    const BSONObj inputBson = fromjson("{pipeline: [{$match: {a: 'abc'}}], explain: 1}");
+    const BSONObj inputBson =
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, explain: 1}");
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectNonBoolFromRouter) {
     NamespaceString nss("a.collection");
-    const BSONObj inputBson = fromjson("{pipeline: [{$match: {a: 'abc'}}], fromRouter: 1}");
+    const BSONObj inputBson =
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, fromRouter: 1}");
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldRejectNonBoolAllowDiskUse) {
     NamespaceString nss("a.collection");
-    const BSONObj inputBson = fromjson("{pipeline: [{$match: {a: 'abc'}}], allowDiskUse: 1}");
+    const BSONObj inputBson =
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, allowDiskUse: 1}");
+    ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
+}
+
+TEST(AggregationRequestTest, ShouldRejectNoCursorNoExplain) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson = fromjson("{pipeline: [{$match: {a: 'abc'}}]}");
     ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 
@@ -185,27 +202,29 @@ TEST(AggregationRequestTest, ShouldRejectNonBoolAllowDiskUse) {
 
 TEST(AggregationRequestTest, ShouldIgnoreFieldsPrefixedWithDollar) {
     NamespaceString nss("a.collection");
-    const BSONObj inputBson = fromjson("{pipeline: [{$match: {a: 'abc'}}], $unknown: 1}");
+    const BSONObj inputBson =
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, $unknown: 1}");
     ASSERT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldIgnoreWriteConcernOption) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
-        fromjson("{pipeline: [{$match: {a: 'abc'}}], writeConcern: 'invalid'}");
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, writeConcern: 'invalid'}");
     ASSERT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldIgnoreMaxTimeMsOption) {
     NamespaceString nss("a.collection");
-    const BSONObj inputBson = fromjson("{pipeline: [{$match: {a: 'abc'}}], maxTimeMS: 'invalid'}");
+    const BSONObj inputBson =
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, maxTimeMS: 'invalid'}");
     ASSERT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ShouldIgnoreReadConcernOption) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
-        fromjson("{pipeline: [{$match: {a: 'abc'}}], readConcern: 'invalid'}");
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, readConcern: 'invalid'}");
     ASSERT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 

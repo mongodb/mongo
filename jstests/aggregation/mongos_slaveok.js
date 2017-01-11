@@ -24,7 +24,8 @@
         // wait for mongos to recognize that the slave is up
         awaitRSClientHosts(st.s, secNode, {ok: true});
 
-        var res = testDB.runCommand({aggregate: 'user', pipeline: [{$project: {x: 1}}]});
+        var res =
+            testDB.runCommand({aggregate: 'user', pipeline: [{$project: {x: 1}}], cursor: {}});
         assert(res.ok, 'aggregate command failed: ' + tojson(res));
 
         var profileQuery = {op: 'command', ns: 'test.user', 'command.aggregate': 'user'};

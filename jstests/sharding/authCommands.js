@@ -132,9 +132,10 @@
 
             res = checkCommandSucceeded(testDB, {
                 aggregate: 'foo',
-                pipeline: [{$project: {j: 1}}, {$group: {_id: 'j', sum: {$sum: '$j'}}}]
+                pipeline: [{$project: {j: 1}}, {$group: {_id: 'j', sum: {$sum: '$j'}}}],
+                cursor: {}
             });
-            assert.eq(4500, res.result[0].sum);
+            assert.eq(4500, res.cursor.firstBatch[0].sum);
         } else {
             print("Checking read operations, should fail");
             assert.throws(function() {
@@ -146,7 +147,8 @@
                                {mapreduce: 'foo', map: map, reduce: reduce, out: {inline: 1}});
             checkCommandFailed(testDB, {
                 aggregate: 'foo',
-                pipeline: [{$project: {j: 1}}, {$group: {_id: 'j', sum: {$sum: '$j'}}}]
+                pipeline: [{$project: {j: 1}}, {$group: {_id: 'j', sum: {$sum: '$j'}}}],
+                cursor: {}
             });
         }
     };

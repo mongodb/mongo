@@ -24,17 +24,17 @@
 
     function test(pipeline, outOfMemoryCode) {
         // ensure by default we error out if exceeding memory limit
-        var res = t.runCommand('aggregate', {pipeline: pipeline});
+        var res = t.runCommand('aggregate', {pipeline: pipeline, cursor: {}});
         assert.commandFailed(res);
         assert.eq(res.code, outOfMemoryCode);
 
         // ensure allowDiskUse: false does what it says
-        res = t.runCommand('aggregate', {pipeline: pipeline, allowDiskUse: false});
+        res = t.runCommand('aggregate', {pipeline: pipeline, cursor: {}, allowDiskUse: false});
         assert.commandFailed(res);
         assert.eq(res.code, outOfMemoryCode);
 
         // allowDiskUse only supports bool. In particular, numbers aren't allowed.
-        res = t.runCommand('aggregate', {pipeline: pipeline, allowDiskUse: 1});
+        res = t.runCommand('aggregate', {pipeline: pipeline, cursor: {}, allowDiskUse: 1});
         assert.commandFailed(res);
 
         // ensure we work when allowDiskUse === true

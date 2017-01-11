@@ -160,12 +160,12 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
     }
 
     // Test on sharded
-    cmdTest({aggregate: 'user', pipeline: [{$project: {x: 1}}]},
+    cmdTest({aggregate: 'user', pipeline: [{$project: {x: 1}}], cursor: {}},
             true,
             formatProfileQuery({aggregate: 'user'}));
 
     // Test on non-sharded
-    cmdTest({aggregate: 'mrIn', pipeline: [{$project: {x: 1}}]},
+    cmdTest({aggregate: 'mrIn', pipeline: [{$project: {x: 1}}], cursor: {}},
             true,
             formatProfileQuery({aggregate: 'mrIn'}));
 };

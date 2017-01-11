@@ -310,30 +310,6 @@ void Pipeline::stitch() {
     }
 }
 
-void Pipeline::run(BSONObjBuilder& result) {
-    // We should not get here in the explain case.
-    verify(!pCtx->isExplain);
-
-    // the array in which the aggregation results reside
-    // cant use subArrayStart() due to error handling
-    BSONArrayBuilder resultArray;
-    while (auto next = getNext()) {
-        // Add the document to the result set.
-        BSONObjBuilder documentBuilder(resultArray.subobjStart());
-        next->toBson(&documentBuilder);
-        documentBuilder.doneFast();
-        // Object will be too large, assert. The extra 1KB is for headers.
-        uassert(16389,
-                str::stream() << "aggregation result exceeds maximum document size ("
-                              << BSONObjMaxUserSize / (1024 * 1024)
-                              << "MB)",
-                resultArray.len() < BSONObjMaxUserSize - 1024);
-    }
-
-    resultArray.done();
-    result.appendArray("result", resultArray.arr());
-}
-
 boost::optional<Document> Pipeline::getNext() {
     invariant(!_sources.empty());
     auto nextResult = _sources.back()->getNext();

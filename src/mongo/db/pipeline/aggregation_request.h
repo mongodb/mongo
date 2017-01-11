@@ -81,7 +81,7 @@ public:
     // Getters.
     //
 
-    boost::optional<long long> getBatchSize() const {
+    long long getBatchSize() const {
         return _batchSize;
     }
 
@@ -94,10 +94,6 @@ public:
      */
     const std::vector<BSONObj>& getPipeline() const {
         return _pipeline;
-    }
-
-    bool isCursorCommand() const {
-        return _cursorCommand;
     }
 
     bool isExplain() const {
@@ -128,8 +124,7 @@ public:
     //
 
     /**
-     * Must be either unset or non-negative. Negative batchSize is illegal but batchSize of 0 is
-     * allowed.
+     * Negative batchSize is illegal but batchSize of 0 is allowed.
      */
     void setBatchSize(long long batchSize) {
         uassert(40203, "batchSize must be non-negative", batchSize >= 0);
@@ -138,10 +133,6 @@ public:
 
     void setCollation(BSONObj collation) {
         _collation = collation.getOwned();
-    }
-
-    void setCursorCommand(bool isCursorCommand) {
-        _cursorCommand = isCursorCommand;
     }
 
     void setExplain(bool isExplain) {
@@ -168,9 +159,9 @@ private:
     // An unparsed version of the pipeline.
     const std::vector<BSONObj> _pipeline;
 
-    // Optional fields.
+    long long _batchSize;
 
-    boost::optional<long long> _batchSize;
+    // Optional fields.
 
     // An owned copy of the user-specified collation object, or an empty object if no collation was
     // specified.
@@ -180,6 +171,5 @@ private:
     bool _allowDiskUse = false;
     bool _fromRouter = false;
     bool _bypassDocumentValidation = false;
-    bool _cursorCommand = false;
 };
 }  // namespace mongo

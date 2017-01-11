@@ -1,21 +1,6 @@
 load('jstests/aggregation/extras/utils.js');
 load('jstests/libs/analyze_plan.js');  // For planHasStage.
 
-// Use this for aggregations that only have arrays or results of specified order.
-// It will check that cursors return the same results as non-cursors.
-function aggregateOrdered(coll, pipeline) {
-    var cursor = coll.aggregate(pipeline).toArray();
-    var noCursor = coll.runCommand('aggregate', {pipeline: pipeline}).result;
-    assert.eq(cursor, noCursor);
-    return cursor;
-}
-
-// Use this for aggregations that have arrays or results of unspecified order.
-// It will bypass the check that cursors return the same results as non-cursors.
-function aggregateNoOrder(coll, pipeline) {
-    return coll.aggregate(pipeline).toArray();
-}
-
 jsTestLog("Creating sharded cluster");
 var shardedAggTest = new ShardingTest({
     shards: 2,
@@ -86,11 +71,19 @@ for (var i = 0; i < shards.length; i++) {
 }
 
 jsTestLog('a project and group in shards, result combined in mongos');
-var a1 = aggregateNoOrder(db.ts1, [
-    {$project: {cMod10: {$mod: ["$counter", 10]}, number: 1, counter: 1}},
-    {$group: {_id: "$cMod10", numberSet: {$addToSet: "$number"}, avgCounter: {$avg: "$cMod10"}}},
-    {$sort: {_id: 1}}
-]);
+var a1 = db.ts1
+             .aggregate([
+                 {$project: {cMod10: {$mod: ["$counter", 10]}, number: 1, counter: 1}},
+                 {
+                   $group: {
+                       _id: "$cMod10",
+                       numberSet: {$addToSet: "$number"},
+                       avgCounter: {$avg: "$cMod10"}
+                   }
+                 },
+                 {$sort: {_id: 1}}
+             ])
+             .toArray();
 
 for (i = 0; i < 10; ++i) {
     assert.eq(a1[i].avgCounter, a1[i]._id, 'agg sharded test avgCounter failed');
@@ -98,37 +91,38 @@ for (i = 0; i < 10; ++i) {
 }
 
 jsTestLog('an initial group starts the group in the shards, and combines them in mongos');
-var a2 = aggregateOrdered(db.ts1, [{$group: {_id: "all", total: {$sum: "$counter"}}}]);
+var a2 = db.ts1.aggregate([{$group: {_id: "all", total: {$sum: "$counter"}}}]).toArray();
 
 jsTestLog('sum of an arithmetic progression S(n) = (n/2)(a(1) + a(n));');
 assert.eq(a2[0].total, (nItems / 2) * (1 + nItems), 'agg sharded test counter sum failed');
 
 jsTestLog('A group combining all documents into one, averaging a null field.');
-assert.eq(aggregateOrdered(db.ts1, [{$group: {_id: null, avg: {$avg: "$missing"}}}]),
+assert.eq(db.ts1.aggregate([{$group: {_id: null, avg: {$avg: "$missing"}}}]).toArray(),
           [{_id: null, avg: null}]);
 
 jsTestLog('an initial group starts the group in the shards, and combines them in mongos');
 var a3 =
-    aggregateOrdered(db.ts1, [{$group: {_id: "$number", total: {$sum: 1}}}, {$sort: {_id: 1}}]);
+    db.ts1.aggregate([{$group: {_id: "$number", total: {$sum: 1}}}, {$sort: {_id: 1}}]).toArray();
 
 for (i = 0; i < strings.length; ++i) {
     assert.eq(a3[i].total, nItems / strings.length, 'agg sharded test sum numbers failed');
 }
 
 jsTestLog('a match takes place in the shards; just returning the results from mongos');
-var a4 = aggregateNoOrder(db.ts1, [{
-                              $match: {
-                                  $or: [
-                                      {counter: 55},
-                                      {counter: 1111},
-                                      {counter: 2222},
-                                      {counter: 33333},
-                                      {counter: 99999},
-                                      {counter: 55555}
-                                  ]
-                              }
-                          }]);
-
+var a4 = db.ts1
+             .aggregate([{
+                 $match: {
+                     $or: [
+                         {counter: 55},
+                         {counter: 1111},
+                         {counter: 2222},
+                         {counter: 33333},
+                         {counter: 99999},
+                         {counter: 55555}
+                     ]
+                 }
+             }])
+             .toArray();
 assert.eq(a4.length, 6, tojson(a4));
 for (i = 0; i < 6; ++i) {
     c = a4[i].counter;
@@ -146,7 +140,7 @@ function testSkipLimit(ops, expectedCount) {
 
     ops.push({$group: {_id: 1, count: {$sum: 1}}});
 
-    var out = aggregateOrdered(db.ts1, ops);
+    var out = db.ts1.aggregate(ops).toArray();
     assert.eq(out[0].count, expectedCount);
 }
 
@@ -166,8 +160,11 @@ function testSortLimit(limit, direction) {
     var from_cursor =
         db.ts1.find({}, {random: 1, _id: 0}).sort({random: direction}).limit(limit).toArray();
     shardedAggTest.startBalancer();  // TODO: remove after fixing SERVER-9622
-    var from_agg = aggregateOrdered(
-        db.ts1, [{$project: {random: 1, _id: 0}}, {$sort: {random: direction}}, {$limit: limit}]);
+    var from_agg =
+        db.ts1
+            .aggregate(
+                [{$project: {random: 1, _id: 0}}, {$sort: {random: direction}}, {$limit: limit}])
+            .toArray();
     assert.eq(from_cursor, from_agg);
 }
 testSortLimit(1, 1);
@@ -179,8 +176,8 @@ testSortLimit(100, -1);
 
 function testAvgStdDev() {
     jsTestLog('testing $avg and $stdDevPop in sharded $group');
-    // Note: not using aggregateOrdered since it requires exact results. $stdDevPop can vary
-    // slightly between runs if a migration occurs. This is why we use assert.close below.
+    // $stdDevPop can vary slightly between runs if a migration occurs. This is why we use
+    // assert.close below.
     var res = db.ts1
                   .aggregate([{
                       $group: {
@@ -219,7 +216,7 @@ testSample();
 
 jsTestLog('test $out by copying source collection verbatim to output');
 var outCollection = db.ts1_out;
-var res = aggregateOrdered(db.ts1, [{$out: outCollection.getName()}]);
+var res = db.ts1.aggregate([{$out: outCollection.getName()}]).toArray();
 shardedAggTest.stopBalancer();  // TODO: remove after fixing SERVER-9622
 assert.eq(db.ts1.find().itcount(), outCollection.find().itcount());
 assert.eq(db.ts1.find().sort({_id: 1}).toArray(), outCollection.find().sort({_id: 1}).toArray());
@@ -231,9 +228,13 @@ assert.commandFailed(
 
 assert.writeOK(db.literal.save({dollar: false}));
 
-result = aggregateOrdered(
-    db.literal,
-    [{$project: {_id: 0, cost: {$cond: ['$dollar', {$literal: '$1.00'}, {$literal: '$.99'}]}}}]);
+result =
+    db.literal
+        .aggregate([{
+            $project:
+                {_id: 0, cost: {$cond: ['$dollar', {$literal: '$1.00'}, {$literal: '$.99'}]}}
+        }])
+        .toArray();
 
 assert.eq([{cost: '$.99'}], result);
 
@@ -271,7 +272,7 @@ for (var shardName in res.shards) {
     var pipeline = [{$match: {_id: targetId}}, {$project: {_id: 1}}, {$sort: {_id: 1}}];
     var expectedDocs = [{_id: targetId}];
     // Normal pipeline.
-    assert.eq(aggregateOrdered(db.ts1, pipeline), expectedDocs);
+    assert.eq(db.ts1.aggregate(pipeline).toArray(), expectedDocs);
     // With $out.
     db[outCollection].drop();
     pipeline.push({$out: outCollection});
@@ -291,7 +292,7 @@ for (var shardName in res.shards) {
         expectedDocs.push({_id: i});
     }
     // Normal pipeline.
-    assert.eq(aggregateOrdered(db.ts1, pipeline), expectedDocs);
+    assert.eq(db.ts1.aggregate(pipeline).toArray(), expectedDocs);
     // With $out.
     db[outCollection].drop();
     pipeline.push({$out: outCollection});

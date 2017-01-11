@@ -82,6 +82,7 @@ runReadOnlyTest(function() {
             var allowDiskUseCmd = {
                 aggregate: readableCollection.getName(),
                 pipeline: [],
+                cursor: {},
                 allowDiskUse: true
             };
 

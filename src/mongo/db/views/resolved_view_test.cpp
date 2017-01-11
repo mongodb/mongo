@@ -44,24 +44,29 @@ namespace {
 const NamespaceString viewNss("testdb.testview");
 const NamespaceString backingNss("testdb.testcoll");
 const std::vector<BSONObj> emptyPipeline;
+const BSONObj kDefaultCursorOptionDocument =
+    BSON(AggregationRequest::kBatchSizeName << AggregationRequest::kDefaultBatchSize);
 
 TEST(ResolvedViewTest, ExpandingCmdObjWithEmptyPipelineOnNoOpViewYieldsEmptyPipeline) {
     const ResolvedView resolvedView{backingNss, emptyPipeline};
-    BSONObj cmdObj = BSON("aggregate" << viewNss.coll() << "pipeline" << BSONArray());
+    BSONObj cmdObj =
+        BSON("aggregate" << viewNss.coll() << "pipeline" << BSONArray() << "cursor" << BSONObj());
 
     auto result = resolvedView.asExpandedViewAggregation(cmdObj);
     ASSERT_OK(result.getStatus());
 
-    BSONObj expected = BSON(
-        "aggregate" << backingNss.coll() << "pipeline" << BSONArray() << "cursor" << BSONObj());
+    BSONObj expected =
+        BSON("aggregate" << backingNss.coll() << "pipeline" << BSONArray() << "cursor"
+                         << kDefaultCursorOptionDocument);
     ASSERT_BSONOBJ_EQ(result.getValue(), expected);
 }
 
 TEST(ResolvedViewTest, ExpandingCmdObjWithNonemptyPipelineAppendsToViewPipeline) {
     std::vector<BSONObj> viewPipeline{BSON("skip" << 7)};
     const ResolvedView resolvedView{backingNss, viewPipeline};
-    BSONObj cmdObj =
-        BSON("aggregate" << viewNss.coll() << "pipeline" << BSON_ARRAY(BSON("limit" << 3)));
+    BSONObj cmdObj = BSON(
+        "aggregate" << viewNss.coll() << "pipeline" << BSON_ARRAY(BSON("limit" << 3)) << "cursor"
+                    << BSONObj());
 
     auto result = resolvedView.asExpandedViewAggregation(cmdObj);
     ASSERT_OK(result.getStatus());
@@ -69,7 +74,7 @@ TEST(ResolvedViewTest, ExpandingCmdObjWithNonemptyPipelineAppendsToViewPipeline)
     BSONObj expected = BSON("aggregate" << backingNss.coll() << "pipeline"
                                         << BSON_ARRAY(BSON("skip" << 7) << BSON("limit" << 3))
                                         << "cursor"
-                                        << BSONObj());
+                                        << kDefaultCursorOptionDocument);
     ASSERT_BSONOBJ_EQ(result.getValue(), expected);
 }
 
@@ -86,8 +91,9 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithEmptyPipelineOnNoOpViewYieldsEmpty
     auto result = resolvedView.asExpandedViewAggregation(aggRequest);
     ASSERT_OK(result.getStatus());
 
-    BSONObj expected = BSON(
-        "aggregate" << backingNss.coll() << "pipeline" << BSONArray() << "cursor" << BSONObj());
+    BSONObj expected =
+        BSON("aggregate" << backingNss.coll() << "pipeline" << BSONArray() << "cursor"
+                         << kDefaultCursorOptionDocument);
     ASSERT_BSONOBJ_EQ(result.getValue(), expected);
 }
 
@@ -104,7 +110,7 @@ TEST(ResolvedViewTest, ExpandingAggRequestWithNonemptyPipelineAppendsToViewPipel
     BSONObj expected = BSON("aggregate" << backingNss.coll() << "pipeline"
                                         << BSON_ARRAY(BSON("skip" << 7) << BSON("limit" << 3))
                                         << "cursor"
-                                        << BSONObj());
+                                        << kDefaultCursorOptionDocument);
     ASSERT_BSONOBJ_EQ(result.getValue(), expected);
 }
 
@@ -117,9 +123,22 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesExplain) {
     ASSERT_OK(result.getStatus());
 
     BSONObj expected =
-        BSON("aggregate" << backingNss.coll() << "pipeline" << BSONArray() << "cursor" << BSONObj()
+        BSON("aggregate" << backingNss.coll() << "pipeline" << BSONArray() << "explain" << true);
+    ASSERT_BSONOBJ_EQ(result.getValue(), expected);
+}
+
+TEST(ResolvedViewTest, ExpandingAggRequestWithCursorAndExplainOnlyPreservesExplain) {
+    const ResolvedView resolvedView{backingNss, emptyPipeline};
+    BSONObj cmdObj =
+        BSON("aggregate" << viewNss.coll() << "pipeline" << BSONArray() << "cursor" << BSONObj()
                          << "explain"
                          << true);
+
+    auto result = resolvedView.asExpandedViewAggregation(cmdObj);
+    ASSERT_OK(result.getStatus());
+
+    BSONObj expected =
+        BSON("aggregate" << backingNss.coll() << "pipeline" << BSONArray() << "explain" << true);
     ASSERT_BSONOBJ_EQ(result.getValue(), expected);
 }
 
@@ -132,7 +151,8 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesBypassDocumentValidation) {
     ASSERT_OK(result.getStatus());
 
     BSONObj expected =
-        BSON("aggregate" << backingNss.coll() << "pipeline" << BSONArray() << "cursor" << BSONObj()
+        BSON("aggregate" << backingNss.coll() << "pipeline" << BSONArray() << "cursor"
+                         << kDefaultCursorOptionDocument
                          << "bypassDocumentValidation"
                          << true);
     ASSERT_BSONOBJ_EQ(result.getValue(), expected);
@@ -147,7 +167,8 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesAllowDiskUse) {
     ASSERT_OK(result.getStatus());
 
     BSONObj expected =
-        BSON("aggregate" << backingNss.coll() << "pipeline" << BSONArray() << "cursor" << BSONObj()
+        BSON("aggregate" << backingNss.coll() << "pipeline" << BSONArray() << "cursor"
+                         << kDefaultCursorOptionDocument
                          << "allowDiskUse"
                          << true);
     ASSERT_BSONOBJ_EQ(result.getValue(), expected);

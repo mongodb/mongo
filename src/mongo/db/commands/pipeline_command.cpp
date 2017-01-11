@@ -99,8 +99,7 @@ bool handleCursorCommand(OperationContext* txn,
         invariant(cursor->isAggCursor());
     }
 
-    invariant(request.getBatchSize());
-    long long batchSize = request.getBatchSize().get();
+    long long batchSize = request.getBatchSize();
 
     // can't use result BSONObjBuilder directly since it won't handle exceptions correctly.
     BSONArrayBuilder resultsArray;
@@ -529,33 +528,17 @@ public:
             // Unless set to true, the ClientCursor created above will be deleted on block exit.
             bool keepCursor = false;
 
-            // Use of the aggregate command without specifying to use a cursor is deprecated.
-            // Applications should migrate to using cursors. Cursors are strictly more useful than
-            // outputting the results as a single document, since results that fit inside a single
-            // BSONObj will also fit inside a single batch.
-            //
-            // We occasionally log a deprecation warning.
-            if (!request.isCursorCommand()) {
-                RARELY {
-                    warning()
-                        << "Use of the aggregate command without the 'cursor' "
-                           "option is deprecated. See "
-                           "http://dochub.mongodb.org/core/aggregate-without-cursor-deprecation.";
-                }
-            }
-
             // If both explain and cursor are specified, explain wins.
             if (expCtx->isExplain) {
                 result << "stages" << Value(pipeline->writeExplainOps());
-            } else if (request.isCursorCommand()) {
+            } else {
+                // Cursor must be specified, if explain is not.
                 keepCursor = handleCursorCommand(txn,
                                                  origNss.ns(),
                                                  pin ? pin->getCursor() : nullptr,
                                                  pin ? pin->getCursor()->getExecutor() : exec.get(),
                                                  request,
                                                  result);
-            } else {
-                pipeline->run(result);
             }
 
             if (!expCtx->isExplain) {

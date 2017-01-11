@@ -6,8 +6,8 @@ db[collection].insert({foo: 1});
 res = db.runCommand({
     'aggregate': collection,
     'pipeline': [{'$project': {'_id': false, 'foo': true}}],
-    $readPreference: {'mode': 'primary'}
+    $readPreference: {'mode': 'primary'}, 'cursor': {}
 });
 
 assert.commandWorked(res);
-assert.eq(res.result, [{foo: 1}]);
+assert.eq(res.cursor.firstBatch, [{foo: 1}]);

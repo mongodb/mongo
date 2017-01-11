@@ -379,7 +379,7 @@ assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeNeverTimeOut", 
 //
 
 // "aggregate" command.
-res = t.runCommand("aggregate", {pipeline: [], maxTimeMS: 60 * 1000});
+res = t.runCommand("aggregate", {pipeline: [], cursor: {}, maxTimeMS: 60 * 1000});
 assert(res.ok == 1,
        "expected aggregate with maxtime to succeed, ok=" + res.ok + ", code=" + res.code);
 

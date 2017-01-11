@@ -131,7 +131,8 @@
         pipeline: [{
             $lookup:
                 {from: shardedCollName, localField: "_id", foreignField: "_id", as: "results"}
-        }]
+        }],
+        cursor: {}
     }));
     assert.eq(
         28769, res.code, "Expected aggregation to fail due to $lookup on a sharded collection");
@@ -151,7 +152,8 @@
                     }
                 }]
             }
-        }]
+        }],
+        cursor: {}
     }));
     assert.eq(
         28769, res.code, "Expected aggregation to fail due to $lookup on a sharded collection");

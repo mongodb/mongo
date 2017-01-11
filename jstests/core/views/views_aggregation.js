@@ -90,6 +90,7 @@
         viewsDB.runCommand({
             aggregate: "invalidDocsView",
             pipeline: [{$out: validatedCollName}],
+            cursor: {},
             bypassDocumentValidation: true
         }),
         "Expected $out insertions to succeed since 'bypassDocumentValidation' was specified");
@@ -115,7 +116,7 @@
 
     assert.commandWorked(
         viewsDB.runCommand(
-            {aggregate: "largeView", pipeline: [{$sort: {x: -1}}], allowDiskUse: true}),
+            {aggregate: "largeView", pipeline: [{$sort: {x: -1}}], cursor: {}, allowDiskUse: true}),
         "Expected aggregate to succeed since 'allowDiskUse' was specified");
 
     // The remaining tests involve $lookup and $graphLookup. We cannot lookup into sharded

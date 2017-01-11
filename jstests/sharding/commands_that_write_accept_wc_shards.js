@@ -131,7 +131,7 @@ load('jstests/libs/write_concern_util.js');
 
     // Aggregate with passthrough.
     commands.push({
-        req: {aggregate: collName, pipeline: [{$sort: {type: 1}}, {$out: "foo"}]},
+        req: {aggregate: collName, pipeline: [{$sort: {type: 1}}, {$out: "foo"}], cursor: {}},
         setupFunc: function() {
             coll.insert({_id: 1, x: 3, type: 'oak'});
             coll.insert({_id: 2, x: 13, type: 'maple'});
@@ -148,7 +148,8 @@ load('jstests/libs/write_concern_util.js');
     commands.push({
         req: {
             aggregate: collName,
-            pipeline: [{$match: {x: -3}}, {$match: {type: {$exists: 1}}}, {$out: "foo"}]
+            pipeline: [{$match: {x: -3}}, {$match: {type: {$exists: 1}}}, {$out: "foo"}],
+            cursor: {}
         },
         setupFunc: function() {
             shardCollectionWithChunks(st, coll);
@@ -168,7 +169,8 @@ load('jstests/libs/write_concern_util.js');
     commands.push({
         req: {
             aggregate: collName,
-            pipeline: [{$match: {type: {$exists: 1}}}, {$sort: {type: 1}}, {$out: "foo"}]
+            pipeline: [{$match: {type: {$exists: 1}}}, {$sort: {type: 1}}, {$out: "foo"}],
+            cursor: {}
         },
         setupFunc: function() {
             shardCollectionWithChunks(st, coll);
