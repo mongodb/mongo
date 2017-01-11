@@ -235,6 +235,94 @@ functions:
           exit 1
         fi
 
+  "get curator":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+
+        PLATFORM=rhel70
+
+        if [ "Windows_NT" = "$OS" ]; then
+           PLATFORM=windows-64
+        fi
+
+        if [ "${push_name|}" = "sunos5" ]; then
+           PLATFORM=solaris
+        fi
+
+        # NOTE: there are curator builds for all platforms (non-amd64), but we don't
+        #       use it in any of those contexts at this point.
+
+        if [ "${install_curator|}" = "true" ]; then
+           CURATOR_RELEASE="3f45f5f8e7a233518504e06a04594fb6c0b21b63"
+           curl -L -O http://boxes.10gen.com/build/curator/curator-dist-$PLATFORM-$CURATOR_RELEASE.tar.gz
+           tar -zxvf curator-dist-$PLATFORM-$CURATOR_RELEASE.tar.gz
+        fi
+
+  "setup aws credentials":
+    command: shell.exec
+    params:
+      silent: true
+      script: |
+        set -o errexit
+
+        mkdir -p ~/.aws
+
+        cat <<EOF > ~/.aws/config
+        [default]
+        region = us-east-1
+        EOF
+
+        cat <<EOF > ~/.aws/credentials
+        [default]
+        aws_access_key_id = ${aws_key}
+        aws_secret_access_key = ${aws_secret}
+        EOF
+
+  "pull scons cache":
+    command: shell.exec
+    params:
+      shell: bash
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        # NOTE: in the future curator will be installed in
+        #       /usr/local/bin/ on all systems, so we should just use that
+        #       rather than install it here.
+
+        if [ "${use_scons_cache|}" = "true" ]; then
+           ./curator s3 sync-from --bucket build-scons-cache --local ${scons_cache_path_base} --prefix '${build_system_id}'
+        fi
+
+        if [ -d "${scons_cache_path}" ]; then
+            ${python|python} buildscripts/scons_cache_prune.py --cache-dir '${scons_cache_path}' --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+        fi
+
+  "push scons cache":
+    command: shell.exec
+    params:
+      shell: bash
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        # NOTE: in the future curator will be installed in
+        #       /usr/local/bin/ on all systems, so we should just use that
+        #       rather than install it here.
+
+        if [ -d "${scons_cache_path}" ]; then
+            ${python|python} buildscripts/scons_cache_prune.py --cache-dir '${scons_cache_path}' --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+        fi
+
+        if [ "${use_scons_cache|}" = "true" ]; then
+            ./curator s3 sync-to --delete --bucket build-scons-cache --local ${scons_cache_path_base} --prefix '${build_system_id}'
+        fi
+
   "get buildnumber" : &get_buildnumber
     command: keyval.inc
     params:
@@ -1148,6 +1236,11 @@ tasks:
     # Then we load the generated version data into the agent so we can use it in task definitions
     - *apply_compile_expansions
 
+    - func: "setup aws credentials"
+    - func: "get curator"
+      vars: { install_curator: "${use_scons_cache|}" }
+    - func: "pull scons cache"
+
     - command: shell.exec
       type: test
       params:
@@ -1185,6 +1278,7 @@ tasks:
           # Capture a list of new and modified tests.
           ${python|python} buildscripts/burn_in_tests.py --branch=${branch_name} --buildVariant=${build_variant} --testListOutfile=jstests/new_tests.json --noExec $burn_in_args
 
+    - func: "push scons cache"
     - command: shell.exec
       params:
         working_dir: src
@@ -1274,6 +1368,11 @@ tasks:
     # Then we load the generated version data into the agent so we can use it in task definitions.
     - *apply_compile_expansions
 
+    - func: "setup aws credentials"
+    - func: "get curator"
+      vars: { install_curator: "${use_scons_cache|}" }
+    - func: "pull scons cache"
+
     - command: shell.exec
       type: test
       params:
@@ -1288,6 +1387,8 @@ tasks:
 
     # Run the C++ unittests as part of compile_all. The compiled binaries are automatically
     # installed into the top-level directory by SCons.
+    - func: "push scons cache"
+
     - func: "run tests"
       vars:
         resmoke_args: --suites=unittests
@@ -2842,6 +2943,9 @@ tasks:
 
           echo "${signing_auth_token_34}" > signing_auth_token
 
+    - func: "get curator"
+      vars: { install_curator: "${has_pacakges|}" }
+
     - command: shell.exec
       params:
         working_dir: src
@@ -2867,9 +2971,6 @@ tasks:
           /usr/local/bin/notary-client.py --key-name "server-3.4" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --skip-missing mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} mongodb-win32-${push_arch}-${suffix}.msi mongodb-src-${src_suffix}.${ext|tar.gz}
 
           if [ "${has_packages|}" = "true" ]; then
-             CURATOR_RELEASE="88f34a9f1c79db7ea9597b6e85eb5995d03714ba"
-             curl -L -O http://boxes.10gen.com/build/curator/curator-dist-rhel70-$CURATOR_RELEASE.tar.gz
-             tar -zxvf curator-dist-rhel70-$CURATOR_RELEASE.tar.gz
              ./curator repo --config ./etc/repo_config.yaml --distro ${packager_distro} --edition ${repo_edition} --version ${version} --arch ${packager_arch} --packages repo
           fi
 
