@@ -768,4 +768,66 @@ TEST(QuerySolutionTest, ExclusionProjectionTruncatesSort) {
     ASSERT(proj.getSort().count(BSON("a" << 1)));
 }
 
+TEST(QuerySolutionTest, NonMultikeyIndexWithoutPathLevelInfoCanCoverItsFields) {
+    auto node = stdx::make_unique<IndexScanNode>(IndexEntry(BSON("a" << 1 << "b.c.d" << 1)));
+    node->index.multikey = false;
+    node->index.multikeyPaths = MultikeyPaths{};
+    ASSERT_TRUE(node->hasField("a"));
+    ASSERT_TRUE(node->hasField("b.c.d"));
+    ASSERT_FALSE(node->hasField("b.c"));
+    ASSERT_FALSE(node->hasField("b"));
+    ASSERT_FALSE(node->hasField("e"));
+}
+
+TEST(QuerySolutionTest, NonMultikeyIndexWithPathLevelInfoCanCoverItsFields) {
+    auto node = stdx::make_unique<IndexScanNode>(IndexEntry(BSON("a" << 1 << "b.c.d" << 1)));
+    node->index.multikey = false;
+    node->index.multikeyPaths = MultikeyPaths{{}, {}};
+    ASSERT_TRUE(node->hasField("a"));
+    ASSERT_TRUE(node->hasField("b.c.d"));
+    ASSERT_FALSE(node->hasField("b.c"));
+    ASSERT_FALSE(node->hasField("b"));
+    ASSERT_FALSE(node->hasField("e"));
+}
+
+TEST(QuerySolutionTest, MultikeyIndexWithoutPathLevelInfoCannotCoverAnyFields) {
+    auto node = stdx::make_unique<IndexScanNode>(IndexEntry(BSON("a" << 1 << "b.c.d" << 1)));
+    node->index.multikey = true;
+    node->index.multikeyPaths = MultikeyPaths{};
+    ASSERT_FALSE(node->hasField("a"));
+    ASSERT_FALSE(node->hasField("b.c.d"));
+    ASSERT_FALSE(node->hasField("b.c"));
+    ASSERT_FALSE(node->hasField("b"));
+    ASSERT_FALSE(node->hasField("e"));
+}
+
+TEST(QuerySolutionTest, MultikeyIndexWithPathLevelInfoCanCoverNonMultikeyFields) {
+    auto node =
+        stdx::make_unique<IndexScanNode>(IndexEntry(BSON("a" << 1 << "b" << 1 << "c" << 1)));
+
+    // Add metadata indicating that "b" is multikey.
+    node->index.multikey = true;
+    node->index.multikeyPaths = MultikeyPaths{{}, {0U}, {}};
+
+    ASSERT_TRUE(node->hasField("a"));
+    ASSERT_FALSE(node->hasField("b"));
+    ASSERT_FALSE(node->hasField("b.c"));
+    ASSERT_TRUE(node->hasField("c"));
+}
+
+TEST(QuerySolutionTest, MultikeyIndexCannotCoverFieldWithAnyMultikeyPathComponent) {
+    auto node =
+        stdx::make_unique<IndexScanNode>(IndexEntry(BSON("a" << 1 << "b.c.d" << 1 << "e" << 1)));
+
+    // Add metadata indicating that "b.c" is multikey.
+    node->index.multikey = true;
+    node->index.multikeyPaths = MultikeyPaths{{}, {1U}, {}};
+
+    ASSERT_TRUE(node->hasField("a"));
+    ASSERT_FALSE(node->hasField("b"));
+    ASSERT_FALSE(node->hasField("b.c"));
+    ASSERT_FALSE(node->hasField("b.c.d"));
+    ASSERT_TRUE(node->hasField("e"));
+}
+
 }  // namespace

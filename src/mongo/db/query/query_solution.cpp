@@ -538,9 +538,9 @@ void IndexScanNode::appendToString(mongoutils::str::stream* ss, int indent) cons
 }
 
 bool IndexScanNode::hasField(const string& field) const {
-    // There is no covering in a multikey index because you don't know whether or not the field
-    // in the key was extracted from an array in the original document.
-    if (index.multikey) {
+    // The index is multikey but does not have any path-level multikeyness information. Such indexes
+    // can never provide covering.
+    if (index.multikey && index.multikeyPaths.empty()) {
         return false;
     }
 
@@ -559,11 +559,17 @@ bool IndexScanNode::hasField(const string& field) const {
         }
     }
 
-    BSONObjIterator it(index.keyPattern);
-    while (it.more()) {
-        if (field == it.next().fieldName()) {
+    size_t keyPatternFieldIndex = 0;
+    for (auto&& elt : index.keyPattern) {
+        // The index can provide this field if the requested path appears in the index key pattern,
+        // and that path has no multikey components. We can't cover a field that has multikey
+        // components because the index keys contain individual array elements, and we can't
+        // reconstitute the array from the index keys in the right order.
+        if (field == elt.fieldName() &&
+            (!index.multikey || index.multikeyPaths[keyPatternFieldIndex].empty())) {
             return true;
         }
+        ++keyPatternFieldIndex;
     }
     return false;
 }

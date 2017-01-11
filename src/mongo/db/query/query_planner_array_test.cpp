@@ -1413,4 +1413,44 @@ TEST_F(QueryPlannerTest, CannotCompoundBoundsWhenSharedPrefixInsideElemMatchIsMu
         "bounds: {'a.b.c': [[2, 2, true, true]], 'a.b.d': [['MinKey', 'MaxKey', true, true]]}}}}}");
 }
 
+TEST_F(QueryPlannerTest, CanMakeCoveredPlanForNonArrayLeadingFieldWithPathLevelMultikeyInfo) {
+    MultikeyPaths multikeyPaths{{}, {0U}};
+    addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {a: 1, b: 2}, projection: {_id: 0, a: 1}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, node: {cscan: {dir: 1}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id: 0, a: 1}, node: {ixscan: {pattern: {a: 1, b: 1},"
+        "filter: null, bounds: {a: [[1,1,true,true]], b: [[2,2,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CanMakeCoveredPlanForNonArrayTrailingFieldWithPathLevelMultikeyInfo) {
+    MultikeyPaths multikeyPaths{{1U}, {}, {1U}};
+    addIndex(BSON("a.z" << 1 << "b" << 1 << "c.z" << 1), multikeyPaths);
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', filter: {'a.z': 1, 'c.z': 2, b: 3}, projection: {_id: 0, b: 1}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{proj: {spec: {_id: 0, b: 1}, node: {cscan: {dir: 1}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id:0,b:1}, node: {ixscan: {pattern: {'a.z':1,b:1,'c.z':1}, filter: null,"
+        "bounds: {'a.z':[[1,1,true,true]],b:[[3,3,true,true]],'c.z':[[2,2,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, CannotCoverNonMultikeyDottedField) {
+    MultikeyPaths multikeyPaths{{}, {0U}};
+    addIndex(BSON("a.y" << 1 << "b.z" << 1), multikeyPaths);
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {'a.y': 1, 'b.z': 2}, projection: {_id: 0, 'a.y': 1}}"));
+
+    assertNumSolutions(2U);
+    assertSolutionExists("{proj: {spec: {_id:0,'a.y':1}, node: {cscan: {dir: 1}}}}");
+    assertSolutionExists(
+        "{proj: {spec: {_id:0,'a.y':1}, node: {fetch: {filter: null, node: {ixscan:"
+        "{pattern: {'a.y':1,'b.z':1}, filter: null,"
+        "bounds: {'a.y':[[1,1,true,true]],'b.z':[[2,2,true,true]]}}}}}}}");
+}
+
 }  // namespace
