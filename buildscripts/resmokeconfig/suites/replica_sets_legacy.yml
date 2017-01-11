@@ -23,6 +23,8 @@ selector:
     - jstests/replsets/write_concern_after_stepdown_and_stepup.js
     # PV0 does not persist the last vote
     - jstests/replsets/last_vote.js
+    # This test expects the server to log a PV1-only vote-not-granted reason
+    - jstests/replsets/no_flapping_during_network_partition.js
 
 executor:
   js_test:
