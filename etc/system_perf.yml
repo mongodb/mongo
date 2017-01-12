@@ -208,7 +208,8 @@ functions:
             EXISTING="true"
           fi
 
-          $DSI_PATH/bin/setup-cluster.sh ${cluster} $EXISTING
+          # Disabling fio pre-qualification as of PERF-826
+          $DSI_PATH/bin/setup-cluster.sh ${cluster} $EXISTING --skip-fio
           # handle the case when setup-cluster.sh fail
           if [ $? -eq 0 ]; then
             echo "Resource provisioned/updated."
