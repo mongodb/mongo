@@ -191,6 +191,10 @@ void DatabaseCloner::shutdown() {
         if (!_active) {
             return;
         }
+
+        for (auto&& collectionCloner : _collectionCloners) {
+            collectionCloner.shutdown();
+        }
     }
 
     _listCollectionsFetcher.shutdown();
