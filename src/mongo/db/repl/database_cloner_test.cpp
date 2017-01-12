@@ -568,46 +568,6 @@ TEST_F(DatabaseClonerTest, StartSecondCollectionClonerFailed) {
     ASSERT_EQUALS(errStatus, getStatus());
 }
 
-TEST_F(DatabaseClonerTest, ShutdownCancelsCollectionCloning) {
-    ASSERT_OK(_databaseCloner->startup());
-    auto net = getNet();
-    {
-        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
-
-        assertRemoteCommandNameEquals("listCollections",
-                                      net->scheduleSuccessfulResponse(createListCollectionsResponse(
-                                          0,
-                                          BSON_ARRAY(BSON("name"
-                                                          << "a"
-                                                          << "options"
-                                                          << BSONObj())
-                                                     << BSON("name"
-                                                             << "b"
-                                                             << "options"
-                                                             << BSONObj())))));
-        net->runReadyNetworkOperations();
-
-        // CollectionCloner sends collection count request on startup.
-        // Blackhole count request to leave collection cloner active.
-        auto noi = net->getNextReadyRequest();
-        assertRemoteCommandNameEquals("count", noi->getRequest());
-        ASSERT_EQUALS("a", noi->getRequest().cmdObj.firstElement().String());
-        net->blackHole(noi);
-    }
-
-    _databaseCloner->shutdown();
-
-    // Deliver cancellation event to cloners.
-    executor::NetworkInterfaceMock::InNetworkGuard(net)->runReadyNetworkOperations();
-
-    _databaseCloner->join();
-    ASSERT_FALSE(_databaseCloner->isActive());
-
-    // This is the error code from attempting to start up the last (of 2) collection cloner which
-    // was shut down before it was ever started.
-    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, getStatus());
-}
-
 TEST_F(DatabaseClonerTest, FirstCollectionListIndexesFailed) {
     ASSERT_OK(_databaseCloner->startup());
 
