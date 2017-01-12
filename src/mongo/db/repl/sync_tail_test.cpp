@@ -101,10 +101,10 @@ void SyncTailTest::setUp() {
     _txn.reset(new OperationContextReplMock(&cc(), 0));
     _opsApplied = 0;
     _applyOp =
-        [](OperationContext* txn, Database* db, const BSONObj& op, bool convertUpdateToUpsert) {
+        [](OperationContext* txn, Database* db, const BSONObj& op, bool inSteadyStateReplication) {
             return Status::OK();
         };
-    _applyCmd = [](OperationContext* txn, const BSONObj& op) { return Status::OK(); };
+    _applyCmd = [](OperationContext* txn, const BSONObj& op, bool) { return Status::OK(); };
     _incOps = [this]() { _opsApplied++; };
 }
 
@@ -116,6 +116,11 @@ void SyncTailTest::tearDown() {
     }
     _txn.reset();
     setGlobalReplicationCoordinator(nullptr);
+}
+
+Status failedApplyCommand(OperationContext* txn, const BSONObj& theOperation, bool) {
+    FAIL("applyCommand unexpectedly invoked.");
+    return Status::OK();
 }
 
 TEST_F(SyncTailTest, Peek) {
@@ -159,7 +164,7 @@ TEST_F(SyncTailTest, SyncApplyNoOp) {
     SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* txn,
                                                    Database* db,
                                                    const BSONObj& theOperation,
-                                                   bool convertUpdateToUpsert) {
+                                                   bool inSteadyStateReplication) {
         applyOpCalled = true;
         ASSERT_TRUE(txn);
         ASSERT_TRUE(txn->lockState()->isDbLockedForMode("test", MODE_X));
@@ -167,17 +172,12 @@ TEST_F(SyncTailTest, SyncApplyNoOp) {
         ASSERT_TRUE(documentValidationDisabled(txn));
         ASSERT_TRUE(db);
         ASSERT_EQUALS(op, theOperation);
-        ASSERT_FALSE(convertUpdateToUpsert);
+        ASSERT_FALSE(inSteadyStateReplication);
         return Status::OK();
     };
-    SyncTail::ApplyCommandInLockFn applyCmd =
-        [&](OperationContext* txn, const BSONObj& theOperation) {
-            FAIL("applyCommand unexpectedly invoked.");
-            return Status::OK();
-        };
     ASSERT_TRUE(_txn->writesAreReplicated());
     ASSERT_FALSE(documentValidationDisabled(_txn.get()));
-    ASSERT_OK(SyncTail::syncApply(_txn.get(), op, false, applyOp, applyCmd, _incOps));
+    ASSERT_OK(SyncTail::syncApply(_txn.get(), op, false, applyOp, failedApplyCommand, _incOps));
     ASSERT_TRUE(applyOpCalled);
     ASSERT_EQUALS(1U, _opsApplied);
 }
@@ -191,19 +191,14 @@ TEST_F(SyncTailTest, SyncApplyNoOpApplyOpThrowsException) {
     SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* txn,
                                                    Database* db,
                                                    const BSONObj& theOperation,
-                                                   bool convertUpdateToUpsert) {
+                                                   bool inSteadyStateReplication) {
         applyOpCalled++;
         if (applyOpCalled < 5) {
             throw WriteConflictException();
         }
         return Status::OK();
     };
-    SyncTail::ApplyCommandInLockFn applyCmd =
-        [&](OperationContext* txn, const BSONObj& theOperation) {
-            FAIL("applyCommand unexpectedly invoked.");
-            return Status::OK();
-        };
-    ASSERT_OK(SyncTail::syncApply(_txn.get(), op, false, applyOp, applyCmd, _incOps));
+    ASSERT_OK(SyncTail::syncApply(_txn.get(), op, false, applyOp, failedApplyCommand, _incOps));
     ASSERT_EQUALS(5, applyOpCalled);
     ASSERT_EQUALS(1U, _opsApplied);
 }
@@ -217,7 +212,7 @@ void SyncTailTest::_testSyncApplyInsertDocument(LockMode expectedMode) {
     SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* txn,
                                                    Database* db,
                                                    const BSONObj& theOperation,
-                                                   bool convertUpdateToUpsert) {
+                                                   bool inSteadyStateReplication) {
         applyOpCalled = true;
         ASSERT_TRUE(txn);
         ASSERT_TRUE(txn->lockState()->isDbLockedForMode("test", expectedMode));
@@ -226,17 +221,12 @@ void SyncTailTest::_testSyncApplyInsertDocument(LockMode expectedMode) {
         ASSERT_TRUE(documentValidationDisabled(txn));
         ASSERT_TRUE(db);
         ASSERT_EQUALS(op, theOperation);
-        ASSERT_TRUE(convertUpdateToUpsert);
+        ASSERT_TRUE(inSteadyStateReplication);
         return Status::OK();
     };
-    SyncTail::ApplyCommandInLockFn applyCmd =
-        [&](OperationContext* txn, const BSONObj& theOperation) {
-            FAIL("applyCommand unexpectedly invoked.");
-            return Status::OK();
-        };
     ASSERT_TRUE(_txn->writesAreReplicated());
     ASSERT_FALSE(documentValidationDisabled(_txn.get()));
-    ASSERT_OK(SyncTail::syncApply(_txn.get(), op, true, applyOp, applyCmd, _incOps));
+    ASSERT_OK(SyncTail::syncApply(_txn.get(), op, true, applyOp, failedApplyCommand, _incOps));
     ASSERT_TRUE(applyOpCalled);
     ASSERT_EQUALS(1U, _opsApplied);
 }
@@ -278,7 +268,7 @@ TEST_F(SyncTailTest, SyncApplyIndexBuild) {
     SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* txn,
                                                    Database* db,
                                                    const BSONObj& theOperation,
-                                                   bool convertUpdateToUpsert) {
+                                                   bool inSteadyStateReplication) {
         applyOpCalled = true;
         ASSERT_TRUE(txn);
         ASSERT_TRUE(txn->lockState()->isDbLockedForMode("test", MODE_X));
@@ -286,17 +276,12 @@ TEST_F(SyncTailTest, SyncApplyIndexBuild) {
         ASSERT_TRUE(documentValidationDisabled(txn));
         ASSERT_TRUE(db);
         ASSERT_EQUALS(op, theOperation);
-        ASSERT_FALSE(convertUpdateToUpsert);
+        ASSERT_FALSE(inSteadyStateReplication);
         return Status::OK();
     };
-    SyncTail::ApplyCommandInLockFn applyCmd =
-        [&](OperationContext* txn, const BSONObj& theOperation) {
-            FAIL("applyCommand unexpectedly invoked.");
-            return Status::OK();
-        };
     ASSERT_TRUE(_txn->writesAreReplicated());
     ASSERT_FALSE(documentValidationDisabled(_txn.get()));
-    ASSERT_OK(SyncTail::syncApply(_txn.get(), op, false, applyOp, applyCmd, _incOps));
+    ASSERT_OK(SyncTail::syncApply(_txn.get(), op, false, applyOp, failedApplyCommand, _incOps));
     ASSERT_TRUE(applyOpCalled);
     ASSERT_EQUALS(1U, _opsApplied);
 }
@@ -310,12 +295,12 @@ TEST_F(SyncTailTest, SyncApplyCommand) {
     SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* txn,
                                                    Database* db,
                                                    const BSONObj& theOperation,
-                                                   bool convertUpdateToUpsert) {
+                                                   bool inSteadyStateReplication) {
         FAIL("applyOperation unexpectedly invoked.");
         return Status::OK();
     };
     SyncTail::ApplyCommandInLockFn applyCmd =
-        [&](OperationContext* txn, const BSONObj& theOperation) {
+        [&](OperationContext* txn, const BSONObj& theOperation, bool) {
             applyCmdCalled = true;
             ASSERT_TRUE(txn);
             ASSERT_TRUE(txn->lockState()->isW());
@@ -340,12 +325,12 @@ TEST_F(SyncTailTest, SyncApplyCommandThrowsException) {
     SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* txn,
                                                    Database* db,
                                                    const BSONObj& theOperation,
-                                                   bool convertUpdateToUpsert) {
+                                                   bool inSteadyStateReplication) {
         FAIL("applyOperation unexpectedly invoked.");
         return Status::OK();
     };
     SyncTail::ApplyCommandInLockFn applyCmd =
-        [&](OperationContext* txn, const BSONObj& theOperation) {
+        [&](OperationContext* txn, const BSONObj& theOperation, bool) {
             applyCmdCalled++;
             if (applyCmdCalled < 5) {
                 throw WriteConflictException();
@@ -356,5 +341,26 @@ TEST_F(SyncTailTest, SyncApplyCommandThrowsException) {
     ASSERT_EQUALS(5, applyCmdCalled);
     ASSERT_EQUALS(1U, _opsApplied);
 }
+
+TEST_F(SyncTailTest, MultiInitialSyncApplyFailsOnRenameCollection) {
+    SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc());
+
+    BSONObjBuilder bob;
+    bob.appendElements(OpTime(Timestamp(1, 0), 1LL).toBSON());
+    bob.append("h", 1LL);
+    bob.append("op", "c");
+    bob.append("ns", "test.$cmd");
+    bob.append("o",
+               BSON("renameCollection"
+                    << "test.foo"
+                    << "to"
+                    << "test.bar"
+                    << "stayTemp" << false << "dropTarget" << false));
+    auto op = bob.obj();
+
+    ASSERT_EQUALS(ErrorCodes::OplogOperationUnsupported,
+                  SyncTail::syncApply(_txn.get(), op, false));
+}
+
 
 }  // namespace

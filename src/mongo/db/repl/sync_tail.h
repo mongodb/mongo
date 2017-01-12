@@ -59,7 +59,7 @@ public:
     /**
      * Type of function that takes a non-command op and applies it locally.
      * Used for applying from an oplog.
-     * Last boolean argument 'convertUpdateToUpsert' converts some updates to upserts for
+     * Last boolean argument 'inSteadyStateReplication' converts some updates to upserts for
      * idempotency reasons.
      * Returns failure status if the op was an update that could not be applied.
      */
@@ -71,7 +71,7 @@ public:
      * Used for applying from an oplog.
      * Returns failure status if the op that could not be applied.
      */
-    using ApplyCommandInLockFn = stdx::function<Status(OperationContext*, const BSONObj&)>;
+    using ApplyCommandInLockFn = stdx::function<Status(OperationContext*, const BSONObj&, bool)>;
 
     /**
      * Type of function to increment "repl.apply.ops" server status metric.
@@ -88,12 +88,12 @@ public:
      */
     static Status syncApply(OperationContext* txn,
                             const BSONObj& o,
-                            bool convertUpdateToUpsert,
+                            bool inSteadyStateReplication,
                             ApplyOperationInLockFn applyOperationInLock,
                             ApplyCommandInLockFn applyCommandInLock,
                             IncrementOpsAppliedStatsFn incrementOpsAppliedStats);
 
-    static Status syncApply(OperationContext* txn, const BSONObj& o, bool convertUpdateToUpsert);
+    static Status syncApply(OperationContext* txn, const BSONObj& o, bool inSteadyStateReplication);
 
     void oplogApplication(StorageInterface* storageInterface);
     bool peek(BSONObj* obj);

@@ -132,7 +132,7 @@ Status applyOps(OperationContext* txn,
         try {
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 if (*opType == 'c') {
-                    status = repl::applyCommand_inlock(txn, temp);
+                    status = repl::applyCommand_inlock(txn, temp, true);
                     break;
                 } else {
                     OldClientContext ctx(txn, ns);

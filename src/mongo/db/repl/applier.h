@@ -64,7 +64,7 @@ public:
 
     /**
      * Type of function to to apply a single operation. In production, this function
-     * would have the same outcome as calling SyncTail::syncApply() ('convertUpdatesToUpserts'
+     * would have the same outcome as calling SyncTail::syncApply() ('inSteadyStateReplication'
      * value will be embedded in the function implementation).
      */
     using ApplyOperationFn = stdx::function<Status(OperationContext*, const BSONObj&)>;

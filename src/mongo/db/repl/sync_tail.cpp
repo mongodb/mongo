@@ -255,7 +255,7 @@ bool SyncTail::peek(BSONObj* op) {
 // static
 Status SyncTail::syncApply(OperationContext* txn,
                            const BSONObj& op,
-                           bool convertUpdateToUpsert,
+                           bool inSteadyStateReplication,
                            ApplyOperationInLockFn applyOperationInLock,
                            ApplyCommandInLockFn applyCommandInLock,
                            IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
@@ -291,7 +291,7 @@ Status SyncTail::syncApply(OperationContext* txn,
             Lock::GlobalWrite globalWriteLock(txn->lockState());
 
             // special case apply for commands to avoid implicit database creation
-            Status status = applyCommandInLock(txn, op);
+            Status status = applyCommandInLock(txn, op, inSteadyStateReplication);
             incrementOpsAppliedStats();
             return status;
         }
@@ -304,7 +304,7 @@ Status SyncTail::syncApply(OperationContext* txn,
         txn->setReplicatedWrites(false);
         DisableDocumentValidation validationDisabler(txn);
 
-        Status status = applyOperationInLock(txn, db, op, convertUpdateToUpsert);
+        Status status = applyOperationInLock(txn, db, op, inSteadyStateReplication);
         if (!status.isOK() && status.code() == ErrorCodes::WriteConflict) {
             throw WriteConflictException();
         }
@@ -369,10 +369,12 @@ Status SyncTail::syncApply(OperationContext* txn,
     return Status(ErrorCodes::BadValue, ss);
 }
 
-Status SyncTail::syncApply(OperationContext* txn, const BSONObj& op, bool convertUpdateToUpsert) {
+Status SyncTail::syncApply(OperationContext* txn,
+                           const BSONObj& op,
+                           bool inSteadyStateReplication) {
     return syncApply(txn,
                      op,
-                     convertUpdateToUpsert,
+                     inSteadyStateReplication,
                      applyOperation_inlock,
                      applyCommand_inlock,
                      stdx::bind(&Counter64::increment, &opsAppliedStats, 1ULL));
@@ -989,11 +991,12 @@ void multiSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
     // allow us to get through the magic barrier
     txn.lockState()->setIsBatchWriter(true);
 
-    bool convertUpdatesToUpserts = true;
+    // This function is only called in steady state replication.
+    bool inSteadyStateReplication = true;
 
     for (std::vector<BSONObj>::const_iterator it = ops.begin(); it != ops.end(); ++it) {
         try {
-            const Status s = SyncTail::syncApply(&txn, *it, convertUpdatesToUpserts);
+            const Status s = SyncTail::syncApply(&txn, *it, inSteadyStateReplication);
             if (!s.isOK()) {
                 severe() << "Error applying operation (" << it->toString() << "): " << s;
                 fassertFailedNoTrace(16359);
@@ -1022,14 +1025,23 @@ void multiInitialSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
     // allow us to get through the magic barrier
     txn.lockState()->setIsBatchWriter(true);
 
-    bool convertUpdatesToUpserts = false;
+    // This function is only called in initial sync, as its name suggests.
+    bool inSteadyStateReplication = false;
 
     for (std::vector<BSONObj>::const_iterator it = ops.begin(); it != ops.end(); ++it) {
         try {
-            const Status s = SyncTail::syncApply(&txn, *it, convertUpdatesToUpserts);
+            const Status s = SyncTail::syncApply(&txn, *it, inSteadyStateReplication);
             if (!s.isOK()) {
+                // Don't retry on commands.
+                SyncTail::OplogEntry entry(*it);
+                if (entry.opType[0] == 'c') {
+                    error() << "Error applying command (" << it->toString() << "): " << s;
+                    fassertFailedNoTrace(40353);
+                }
+
+                // We might need to fetch the missing docs from the sync source.
                 if (st->shouldRetry(&txn, *it)) {
-                    const Status s2 = SyncTail::syncApply(&txn, *it, convertUpdatesToUpserts);
+                    const Status s2 = SyncTail::syncApply(&txn, *it, inSteadyStateReplication);
                     if (!s2.isOK()) {
                         severe() << "Error applying operation (" << it->toString() << "): " << s2;
                         fassertFailedNoTrace(15915);
