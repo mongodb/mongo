@@ -65,19 +65,17 @@ protected:
 };
 
 MoveChunkRequest createMoveChunkRequest(const NamespaceString& nss) {
-    const ChunkVersion collectionVersion(2, 3, OID::gen());
     const ChunkVersion chunkVersion(1, 2, OID::gen());
 
     BSONObjBuilder builder;
     MoveChunkRequest::appendAsCommand(
         &builder,
         nss,
-        collectionVersion,
+        chunkVersion,
         assertGet(ConnectionString::parse("TestConfigRS/CS1:12345,CS2:12345,CS3:12345")),
         ShardId("shard0001"),
         ShardId("shard0002"),
         ChunkRange(BSON("Key" << -100), BSON("Key" << 100)),
-        chunkVersion,
         1024,
         MigrationSecondaryThrottleOptions::create(MigrationSecondaryThrottleOptions::kOff),
         true);

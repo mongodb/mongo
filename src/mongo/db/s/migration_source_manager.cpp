@@ -91,15 +91,8 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn,
             "Destination shard cannot be the same as source",
             _args.getFromShardId() != _args.getToShardId());
 
-    const auto& oss = OperationShardingState::get(txn);
-    uassert(ErrorCodes::InvalidOptions, "collection version is missing", oss.hasShardVersion());
-
-    // Even though the moveChunk command transmits a value in the operation's shardVersion field,
-    // this value does not actually contain the shard version, but the global collection version.
-    const ChunkVersion expectedCollectionVersion = oss.getShardVersion(getNss());
-
     log() << "Starting chunk migration " << redact(_args.toString())
-          << " with expected collection version " << expectedCollectionVersion;
+          << " with expected collection version epoch" << _args.getVersionEpoch();
 
     // Now that the collection is locked, snapshot the metadata and fetch the latest versions
     ShardingState* const shardingState = ShardingState::get(txn);
@@ -134,13 +127,13 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn,
     const ChunkVersion collectionVersion = _collectionMetadata->getCollVersion();
 
     uassert(ErrorCodes::StaleEpoch,
-            str::stream() << "cannot move chunk " << _args.toString()
+            str::stream() << "cannot move chunk " << redact(_args.toString())
                           << " because collection may have been dropped. "
                           << "current epoch: "
                           << collectionVersion.epoch()
                           << ", cmd epoch: "
-                          << expectedCollectionVersion.epoch(),
-            expectedCollectionVersion.epoch() == collectionVersion.epoch());
+                          << _args.getVersionEpoch(),
+            _args.getVersionEpoch() == collectionVersion.epoch());
 
     // With nonzero shard version, we must have a coll version >= our shard version
     invariant(collectionVersion >= shardVersion);
@@ -155,9 +148,10 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn,
     Status chunkValidateStatus = _collectionMetadata->checkChunkIsValid(chunkToMove);
     if (!chunkValidateStatus.isOK()) {
         uasserted(chunkValidateStatus.code(),
-                  str::stream() << "Unable to move chunk with arguments '" << _args.toString()
+                  str::stream() << "Unable to move chunk with arguments '"
+                                << redact(_args.toString())
                                 << "' due to error "
-                                << chunkValidateStatus.reason());
+                                << redact(chunkValidateStatus.reason()));
     }
 }
 
