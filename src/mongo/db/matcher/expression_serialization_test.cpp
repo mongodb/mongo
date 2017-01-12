@@ -166,6 +166,28 @@ TEST(SerializeBasic, ExpressionElemMatchValueSerializesCorrectly) {
     ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
 }
 
+TEST(SerializeBasic, ExpressionElemMatchValueWithRegexSerializesCorrectly) {
+    const CollatorInterface* collator = nullptr;
+    const auto match = BSON("x" << BSON("$elemMatch" << BSON("$regex"
+                                                             << "abc"
+                                                             << "$options"
+                                                             << "i")));
+    Matcher original(match, ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), match);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+
+    BSONObj obj = fromjson("{x: ['abc', 'xyz']}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+
+    obj = fromjson("{x: ['ABC', 'XYZ']}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+
+    obj = fromjson("{x: ['def', 'xyz']}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+}
+
 TEST(SerializeBasic, ExpressionElemMatchValueWithEmptyStringSerializesCorrectly) {
     const CollatorInterface* collator = nullptr;
     Matcher original(
@@ -233,7 +255,12 @@ TEST(SerializeBasic, ExpressionAllWithRegex) {
         fromjson("{x: {$all: [/a.b.c/, /.d.e./]}}"), ExtensionsCallbackNoop(), collator);
     Matcher reserialized(
         serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$and: [{x: /a.b.c/}, {x: /.d.e./}]}"));
+
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      BSON("$and" << BSON_ARRAY(BSON("x" << BSON("$regex"
+                                                                 << "a.b.c"))
+                                                << BSON("x" << BSON("$regex"
+                                                                    << ".d.e.")))));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 'abcde'}");
@@ -267,6 +294,26 @@ TEST(SerializeBasic, ExpressionNeSerializesCorrectly) {
     Matcher reserialized(
         serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$nor: [{x: {$eq: {a: 1}}}]}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+
+    BSONObj obj = fromjson("{x: {a: 1}}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+
+    obj = fromjson("{x: {a: [1, 2]}}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+}
+
+TEST(SerializeBasic, ExpressionNeWithRegexObjectSerializesCorrectly) {
+    const CollatorInterface* collator = nullptr;
+    Matcher original(BSON("x" << BSON("$ne" << BSON("$regex"
+                                                    << "abc"))),
+                     ExtensionsCallbackNoop(),
+                     collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      BSON("$nor" << BSON_ARRAY(BSON("x" << BSON("$eq" << BSON("$regex"
+                                                                               << "abc"))))));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: {a: 1}}");
@@ -341,22 +388,9 @@ TEST(SerializeBasic, ExpressionRegexWithObjSerializesCorrectly) {
     Matcher original(fromjson("{x: {$regex: 'a.b'}}"), ExtensionsCallbackNoop(), collator);
     Matcher reserialized(
         serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$regex: 'a.b'}}"));
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
-
-    BSONObj obj = fromjson("{x: 'abc'}");
-    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
-
-    obj = fromjson("{x: 'acb'}");
-    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
-}
-
-TEST(SerializeBasic, ExpressionRegexWithValueSerializesCorrectly) {
-    const CollatorInterface* collator = nullptr;
-    Matcher original(fromjson("{x: /a.b/i}"), ExtensionsCallbackNoop(), collator);
-    Matcher reserialized(
-        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$regex: 'a.b', $options: 'i'}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      BSON("x" << BSON("$regex"
+                                       << "a.b")));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 'abc'}");
@@ -368,10 +402,31 @@ TEST(SerializeBasic, ExpressionRegexWithValueSerializesCorrectly) {
 
 TEST(SerializeBasic, ExpressionRegexWithValueAndOptionsSerializesCorrectly) {
     const CollatorInterface* collator = nullptr;
+    Matcher original(fromjson("{x: /a.b/i}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      BSON("x" << BSON("$regex"
+                                       << "a.b"
+                                       << "$options"
+                                       << "i")));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+
+    BSONObj obj = fromjson("{x: 'abc'}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+
+    obj = fromjson("{x: 'acb'}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+}
+
+TEST(SerializeBasic, ExpressionRegexWithValueSerializesCorrectly) {
+    const CollatorInterface* collator = nullptr;
     Matcher original(fromjson("{x: /a.b/}"), ExtensionsCallbackNoop(), collator);
     Matcher reserialized(
         serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{x: {$regex: 'a.b'}}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      BSON("x" << BSON("$regex"
+                                       << "a.b")));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 'abc'}");
@@ -510,6 +565,25 @@ TEST(SerializeBasic, ExpressionNinSerializesCorrectly) {
     ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
 }
 
+TEST(SerializeBasic, ExpressionNinWithRegexValueSerializesCorrectly) {
+    const CollatorInterface* collator = nullptr;
+    Matcher original(
+        fromjson("{x: {$nin: [/abc/, /def/, /xyz/]}}"), ExtensionsCallbackNoop(), collator);
+    Matcher reserialized(
+        serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      fromjson("{$nor: [{x: {$in: [/abc/, /def/, /xyz/]}}]}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
+
+    BSONObj obj = fromjson("{x: 'abc'}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+
+    obj = fromjson("{x: 'def'}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+    obj = fromjson("{x: [/abc/, /def/]}");
+    ASSERT_EQ(original.matches(obj), reserialized.matches(obj));
+}
+
 TEST(SerializeBasic, ExpressionBitsAllSetSerializesCorrectly) {
     const CollatorInterface* collator = nullptr;
     Matcher original(fromjson("{x: {$bitsAllSet: [1, 3]}}"), ExtensionsCallbackNoop(), collator);
@@ -626,7 +700,9 @@ TEST(SerializeBasic, ExpressionNotWithRegexObjSerializesCorrectly) {
     Matcher original(fromjson("{x: {$not: {$regex: 'a.b'}}}"), ExtensionsCallbackNoop(), collator);
     Matcher reserialized(
         serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$nor: [{x: /a.b/}]}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      BSON("$nor" << BSON_ARRAY(BSON("x" << BSON("$regex"
+                                                                 << "a.b")))));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 'abc'}");
@@ -641,7 +717,9 @@ TEST(SerializeBasic, ExpressionNotWithRegexValueSerializesCorrectly) {
     Matcher original(fromjson("{x: {$not: /a.b/}}"), ExtensionsCallbackNoop(), collator);
     Matcher reserialized(
         serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$nor: [{x: /a.b/}]}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      BSON("$nor" << BSON_ARRAY(BSON("x" << BSON("$regex"
+                                                                 << "a.b")))));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 'abc'}");
@@ -656,7 +734,11 @@ TEST(SerializeBasic, ExpressionNotWithRegexValueAndOptionsSerializesCorrectly) {
     Matcher original(fromjson("{x: {$not: /a.b/i}}"), ExtensionsCallbackNoop(), collator);
     Matcher reserialized(
         serialize(original.getMatchExpression()), ExtensionsCallbackNoop(), collator);
-    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), fromjson("{$nor: [{x: /a.b/i}]}"));
+    ASSERT_BSONOBJ_EQ(*reserialized.getQuery(),
+                      BSON("$nor" << BSON_ARRAY(BSON("x" << BSON("$regex"
+                                                                 << "a.b"
+                                                                 << "$options"
+                                                                 << "i")))));
     ASSERT_BSONOBJ_EQ(*reserialized.getQuery(), serialize(reserialized.getMatchExpression()));
 
     BSONObj obj = fromjson("{x: 'abc'}");

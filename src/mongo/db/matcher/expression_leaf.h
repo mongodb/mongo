@@ -247,6 +247,8 @@ public:
 
     virtual void serialize(BSONObjBuilder* out) const;
 
+    void serializeToBSONTypeRegex(BSONObjBuilder* out) const;
+
     void shortDebugString(StringBuilder& debug) const;
 
     virtual bool equivalent(const MatchExpression* other) const;

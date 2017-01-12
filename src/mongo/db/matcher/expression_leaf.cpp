@@ -319,6 +319,17 @@ void RegexMatchExpression::debugString(StringBuilder& debug, int level) const {
 }
 
 void RegexMatchExpression::serialize(BSONObjBuilder* out) const {
+    BSONObjBuilder regexBuilder(out->subobjStart(path()));
+    regexBuilder.append("$regex", _regex);
+
+    if (!_flags.empty()) {
+        regexBuilder.append("$options", _flags);
+    }
+
+    regexBuilder.doneFast();
+}
+
+void RegexMatchExpression::serializeToBSONTypeRegex(BSONObjBuilder* out) const {
     out->appendRegex(path(), _regex, _flags);
 }
 
@@ -596,7 +607,7 @@ void InMatchExpression::serialize(BSONObjBuilder* out) const {
     }
     for (auto&& _regex : _regexes) {
         BSONObjBuilder regexBob;
-        _regex->serialize(&regexBob);
+        _regex->serializeToBSONTypeRegex(&regexBob);
         arrBob.append(regexBob.obj().firstElement());
     }
     arrBob.doneFast();
