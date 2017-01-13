@@ -149,6 +149,11 @@ private:
     bool _isActive_inlock() const;
 
     /**
+     * Returns whether the CollectionCloner is in shutdown.
+     */
+    bool _isShuttingDown() const;
+
+    /**
      * Cancels all outstanding work.
      * Used by shutdown() and CompletionGuard::setResultAndCancelRemainingWork().
      */
