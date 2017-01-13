@@ -51,9 +51,9 @@ namespace repl {
 
 Seconds OplogFetcher::kDefaultProtocolZeroAwaitDataTimeout(2);
 
-namespace {
-
 MONGO_FP_DECLARE(stopOplogFetcher);
+
+namespace {
 
 /**
  * Calculates await data timeout based on the current replica set configuration.

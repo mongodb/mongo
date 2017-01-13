@@ -43,9 +43,12 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 namespace repl {
+
+MONGO_FP_FORWARD_DECLARE(stopOplogFetcher);
 
 /**
  * Used to keep track of the optime and hash of the last fetched operation.
