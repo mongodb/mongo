@@ -2468,6 +2468,28 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: read_concern_linearizable_passthrough
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=read_concern_linearizable_passthrough --storageEngine=mmapv1
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: read_concern_linearizable_passthrough_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=read_concern_linearizable_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: read_concern_majority_passthrough_WT
   depends_on:
   - name: jsCore_WT
@@ -3371,6 +3393,7 @@ buildvariants:
   - name: concurrency_sharded_WT
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_WT
+  - name: read_concern_linearizable_passthrough_WT
   - name: read_concern_majority_passthrough_WT
   - name: read_only
   - name: read_only_WT
@@ -3516,6 +3539,8 @@ buildvariants:
   - name: concurrency_simultaneous_WT
     distros:
     - rhel62-large
+  - name: read_concern_linearizable_passthrough
+  - name: read_concern_linearizable_passthrough_WT
   - name: read_concern_majority_passthrough_WT
   - name: replicasets
   - name: replicasets_WT
@@ -4342,6 +4367,7 @@ buildvariants:
   - name: noPassthrough_WT
   - name: parallel_WT
   - name: parallel_compatibility_WT
+  - name: read_concern_linearizable_passthrough_WT
   - name: read_concern_majority_passthrough_WT
   - name: replicasets_WT
   - name: replicasets_WT_ese
@@ -4786,6 +4812,8 @@ buildvariants:
   - name: concurrency_sharded_WT
   - name: concurrency_simultaneous
   - name: concurrency_simultaneous_WT
+  - name: read_concern_linearizable_passthrough
+  - name: read_concern_linearizable_passthrough_WT
   - name: read_concern_majority_passthrough_WT
   - name: replicasets
   - name: replicasets_WT
@@ -4921,6 +4949,12 @@ buildvariants:
     distros:
     - windows-64-vs2015-large
   - name: concurrency_simultaneous_WT
+    distros:
+    - windows-64-vs2015-large
+  - name: read_concern_linearizable_passthrough
+    distros:
+    - windows-64-vs2015-large
+  - name: read_concern_linearizable_passthrough_WT
     distros:
     - windows-64-vs2015-large
   - name: read_concern_majority_passthrough_WT
@@ -5064,6 +5098,7 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
+  - name: read_concern_linearizable_passthrough
   - name: replicasets_auth
   - name: sasl
   - name: sharding_auth
@@ -5629,6 +5664,12 @@ buildvariants:
   - name: parallel_WT
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
+  - name: read_concern_linearizable_passthrough
+    distros:
+    - rhel62-large
+  - name: read_concern_linearizable_passthrough_WT
+    distros:
+    - rhel62-large
   - name: read_concern_majority_passthrough_WT
     distros:
     - rhel62-large
@@ -5851,6 +5892,12 @@ buildvariants:
   - name: parallel_WT
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
+  - name: read_concern_linearizable_passthrough
+    distros:
+    - rhel62-large
+  - name: read_concern_linearizable_passthrough_WT
+    distros:
+    - rhel62-large
   - name: read_concern_majority_passthrough_WT
     distros:
     - rhel62-large
@@ -6344,6 +6391,8 @@ buildvariants:
   - name: parallel_WT
   # - name: parallel_compatibility
   - name: parallel_compatibility_WT
+  # - name: read_concern_linearizable_passthrough
+  - name: read_concern_linearizable_passthrough_WT
   - name: read_concern_majority_passthrough_WT
   # - name: replicasets
   - name: replicasets_WT
@@ -6481,6 +6530,8 @@ buildvariants:
   - name: parallel_WT
   # - name: parallel_compatibility
   - name: parallel_compatibility_WT
+  # - name: read_concern_linearizable_passthrough
+  - name: read_concern_linearizable_passthrough_WT
   - name: read_concern_majority_passthrough_WT
   # - name: replicasets
   - name: replicasets_WT
@@ -6865,6 +6916,7 @@ buildvariants:
   - name: noPassthrough_WT
   - name: parallel_WT
   - name: parallel_compatibility_WT
+  - name: read_concern_linearizable_passthrough_WT
   - name: read_concern_majority_passthrough_WT
   - name: replicasets_WT
   - name: replicasets_WT_ese
@@ -7133,6 +7185,7 @@ buildvariants:
   - name: noPassthrough_WT
   - name: parallel_WT
   - name: parallel_compatibility_WT
+  - name: read_concern_linearizable_passthrough_WT
   - name: read_concern_majority_passthrough_WT
   - name: replicasets_WT
   - name: replicasets_WT_ese
@@ -7811,6 +7864,7 @@ buildvariants:
   - name: noPassthroughWithMongod
   - name: parallel
   - name: parallel_compatibility
+  - name: read_concern_linearizable_passthrough
   - name: read_concern_majority_passthrough_WT
   - name: replicasets_WT
   - name: replicasets_auth
@@ -7898,6 +7952,7 @@ buildvariants:
   - name: noPassthroughWithMongod
   - name: parallel
   - name: parallel_compatibility
+  - name: read_concern_linearizable_passthrough
   - name: replicasets_WT
   - name: replicasets_auth
   - name: replicasets_legacy
@@ -7971,6 +8026,7 @@ buildvariants:
   - name: noPassthroughWithMongod
   - name: parallel
   - name: parallel_compatibility
+  - name: read_concern_linearizable_passthrough
   - name: read_concern_majority_passthrough_WT
   - name: replicasets_WT
   - name: replicasets_auth
@@ -8059,6 +8115,7 @@ buildvariants:
   - name: noPassthroughWithMongod
   - name: parallel
   - name: parallel_compatibility
+  - name: read_concern_linearizable_passthrough
   - name: read_concern_majority_passthrough_WT
   - name: replicasets_WT
   - name: replicasets_auth
@@ -8142,6 +8199,7 @@ buildvariants:
     distros:
     - ubuntu1404-build
   - name: concurrency_simultaneous
+  - name: read_concern_linearizable_passthrough
   - name: replicasets
   - name: replicasets_auth
   - name: replication
@@ -8256,6 +8314,8 @@ buildvariants:
   - name: parallel_WT
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
+  - name: read_concern_linearizable_passthrough
+  - name: read_concern_linearizable_passthrough_WT
   - name: read_concern_majority_passthrough_WT
   - name: read_only
   - name: read_only_WT
@@ -8430,6 +8490,8 @@ buildvariants:
   - name: parallel_WT
   - name: parallel_compatibility
   - name: parallel_compatibility_WT
+  - name: read_concern_linearizable_passthrough
+  - name: read_concern_linearizable_passthrough_WT
   - name: read_concern_majority_passthrough_WT
   - name: read_only
   - name: read_only_WT
@@ -8543,6 +8605,12 @@ buildvariants:
   - name: noPassthroughWithMongod
   - name: noPassthroughWithMongod_WT
   - name: noPassthrough_WT
+  - name: read_concern_linearizable_passthrough
+    distros:
+    - rhel62-large
+  - name: read_concern_linearizable_passthrough_WT
+    distros:
+    - rhel62-large
   - name: read_concern_majority_passthrough_WT
     distros:
     - rhel62-large

@@ -1,6 +1,5 @@
 /**
- * Use prototype overrides to set a read concern of "majority" and a write concern of "majority"
- * while running core tests.
+ * Use prototype overrides to set read concern and write concern while running core tests.
  */
 (function() {
     "use strict";
@@ -9,7 +8,12 @@
         // Use a "signature" value that won't typically match a value assigned in normal use.
         wtimeout: 60321
     };
-    var defaultReadConcern = {level: "majority"};
+    if (typeof TestData === "undefined" || !TestData.hasOwnProperty("defaultReadConcernLevel")) {
+        throw new Error(
+            "The default read-concern level must be set as the 'defaultReadConcernLevel' " +
+            "property on TestData");
+    }
+    var defaultReadConcern = {level: TestData.defaultReadConcernLevel};
 
     var originalDBQuery = DBQuery;
 
@@ -31,8 +35,7 @@
     var originalStartParallelShell = startParallelShell;
     startParallelShell = function(jsCode, port, noConnect) {
         var newCode;
-        var overridesFile = "jstests/libs/override_methods/set_majority_read_and_write_concerns.js";
-
+        var overridesFile = "jstests/libs/override_methods/set_read_and_write_concerns.js";
         if (typeof(jsCode) === "function") {
             // Load the override file and immediately invoke the supplied function.
             newCode = `load("${overridesFile}"); (${jsCode})();`;
@@ -109,6 +112,7 @@
             "geoNear",
             "geoSearch",
             "group",
+            "parallelCollectionScan",
         ];
 
         var forceWriteConcern = Array.contains(commandsToForceWriteConcern, cmdName);
