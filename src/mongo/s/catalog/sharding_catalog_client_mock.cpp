@@ -227,8 +227,8 @@ DistLockManager* ShardingCatalogClientMock::getDistLockManager() {
     return _distLockManager.get();
 }
 
-Status ShardingCatalogClientMock::appendInfoForConfigServerDatabases(OperationContext* txn,
-                                                                     BSONArrayBuilder* builder) {
+Status ShardingCatalogClientMock::appendInfoForConfigServerDatabases(
+    OperationContext* txn, const BSONObj& listDatabasesCmd, BSONArrayBuilder* builder) {
     return Status::OK();
 }
 

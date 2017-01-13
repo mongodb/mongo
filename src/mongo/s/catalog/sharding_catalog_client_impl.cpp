@@ -1683,14 +1683,14 @@ void ShardingCatalogClientImpl::_appendReadConcern(BSONObjBuilder* builder) {
     readConcern.appendInfo(builder);
 }
 
-Status ShardingCatalogClientImpl::appendInfoForConfigServerDatabases(OperationContext* txn,
-                                                                     BSONArrayBuilder* builder) {
+Status ShardingCatalogClientImpl::appendInfoForConfigServerDatabases(
+    OperationContext* txn, const BSONObj& listDatabasesCmd, BSONArrayBuilder* builder) {
     auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
     auto resultStatus =
         configShard->runCommandWithFixedRetryAttempts(txn,
                                                       kConfigPrimaryPreferredSelector,
                                                       "admin",
-                                                      BSON("listDatabases" << 1),
+                                                      listDatabasesCmd,
                                                       Shard::RetryPolicy::kIdempotent);
 
     if (!resultStatus.isOK()) {

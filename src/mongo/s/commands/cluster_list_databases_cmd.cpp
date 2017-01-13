@@ -32,6 +32,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/commands.h"
@@ -105,7 +106,7 @@ public:
                 txn,
                 ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
                 "admin",
-                BSON("listDatabases" << 1),
+                cmdObj,
                 Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(response.commandStatus);
             BSONObj x = std::move(response.response);
@@ -117,13 +118,13 @@ public:
                 const string name = dbObj["name"].String();
                 const long long size = dbObj["sizeOnDisk"].numberLong();
 
-                long long& totalSize = sizes[name];
+                long long& sizeSumForDbAcrossShards = sizes[name];
                 if (size == 1) {
-                    if (totalSize <= 1) {
-                        totalSize = 1;
+                    if (sizeSumForDbAcrossShards <= 1) {
+                        sizeSumForDbAcrossShards = 1;
                     }
                 } else {
-                    totalSize += size;
+                    sizeSumForDbAcrossShards += size;
                 }
 
                 unique_ptr<BSONObjBuilder>& bb = dbShardInfo[name];
@@ -134,8 +135,6 @@ public:
                 bb->appendNumber(s->getId().toString(), size);
             }
         }
-
-        long long totalSize = 0;
 
         BSONArrayBuilder dbListBuilder(result.subarrayStart("databases"));
         for (map<string, long long>::iterator i = sizes.begin(); i != sizes.end(); ++i) {
@@ -152,7 +151,6 @@ public:
             }
 
             long long size = i->second;
-            totalSize += size;
 
             BSONObjBuilder temp;
             temp.append("name", name);
@@ -165,12 +163,24 @@ public:
 
         // Get information for config and admin dbs from the config servers.
         auto catalogClient = grid.catalogClient(txn);
-        auto appendStatus = catalogClient->appendInfoForConfigServerDatabases(txn, &dbListBuilder);
+        auto appendStatus =
+            catalogClient->appendInfoForConfigServerDatabases(txn, cmdObj, &dbListBuilder);
         if (!appendStatus.isOK()) {
             return Command::appendCommandStatus(result, appendStatus);
         }
 
         dbListBuilder.done();
+
+        // Compute the combined total size based on the response we've built so far.
+        long long totalSize = 0;
+        for (auto&& dbElt : result.asTempObj()["databases"].Obj()) {
+            long long sizeOnDisk;
+            uassertStatusOK(bsonExtractIntegerField(dbElt.Obj(), "sizeOnDisk"_sd, &sizeOnDisk));
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "Found negative 'sizeOnDisk' in: " << dbElt.Obj(),
+                    sizeOnDisk >= 0);
+            totalSize += sizeOnDisk;
+        }
 
         result.appendNumber("totalSize", totalSize);
         result.appendNumber("totalSizeMb", totalSize / (1024 * 1024));
