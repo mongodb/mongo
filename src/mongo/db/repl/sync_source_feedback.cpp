@@ -38,6 +38,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/reporter.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
@@ -161,12 +162,16 @@ void SyncSourceFeedback::run(executor::TaskExecutor* executor, BackgroundSync* b
             // this class.
             stdx::unique_lock<stdx::mutex> lock(_mtx);
             while (!_positionChanged && !_shutdownSignaled) {
-                if (_cond.wait_for(lock, keepAliveInterval.toSystemDuration()) ==
-                    stdx::cv_status::timeout) {
-                    MemberState state = ReplicationCoordinator::get(opCtx.get())->getMemberState();
-                    if (!(state.primary() || state.startup())) {
-                        break;
+                {
+                    IdleThreadBlock markIdle;
+                    if (_cond.wait_for(lock, keepAliveInterval.toSystemDuration()) !=
+                        stdx::cv_status::timeout) {
+                        continue;
                     }
+                }
+                MemberState state = ReplicationCoordinator::get(opCtx.get())->getMemberState();
+                if (!(state.primary() || state.startup())) {
+                    break;
                 }
             }
 

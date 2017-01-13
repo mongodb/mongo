@@ -124,7 +124,7 @@
 #include "mongo/transport/transport_layer_legacy.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
-#include "mongo/util/concurrency/task.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit.h"
@@ -735,6 +735,8 @@ ExitCode _initAndListen(int listenPort) {
         log() << "starting clean exit via failpoint";
         exitCleanly(EXIT_CLEAN);
     }
+
+    IdleThreadBlock markIdle;
     return waitForShutdown();
 }
 

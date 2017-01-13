@@ -38,6 +38,7 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -309,8 +310,12 @@ void PeriodicTaskRunner::run() {
 
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     while (!_shutdownRequested) {
-        if (stdx::cv_status::timeout == _cond.wait_for(lock, waitTime.toSystemDuration()))
-            _runTasks();
+        {
+            IdleThreadBlock markIdle;
+            if (stdx::cv_status::timeout != _cond.wait_for(lock, waitTime.toSystemDuration()))
+                continue;
+        }
+        _runTasks();
     }
 }
 

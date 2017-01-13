@@ -56,6 +56,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -180,6 +181,7 @@ void WiredTigerRecordStore::OplogStones::awaitHasExcessStonesOrDead() {
     // Wait until kill() is called or there are too many oplog stones.
     stdx::unique_lock<stdx::mutex> lock(_oplogReclaimMutex);
     while (!_isDead && !hasExcessStones()) {
+        IdleThreadBlock markIdle;
         _oplogReclaimCv.wait(lock);
     }
 }
@@ -1708,8 +1710,11 @@ void WiredTigerRecordStore::_oplogJournalThreadLoop(WiredTigerSessionCache* sess
     Client::initThread("WTOplogJournalThread");
     while (true) {
         stdx::unique_lock<stdx::mutex> lk(_uncommittedRecordIdsMutex);
-        _opsWaitingForJournalCV.wait(
-            lk, [&] { return _shuttingDown || !_opsWaitingForJournal.empty(); });
+        {
+            IdleThreadBlock markIdle;
+            _opsWaitingForJournalCV.wait(
+                lk, [&] { return _shuttingDown || !_opsWaitingForJournal.empty(); });
+        }
 
         while (!_shuttingDown && MONGO_FAIL_POINT(WTPausePrimaryOplogDurabilityLoop)) {
             lk.unlock();

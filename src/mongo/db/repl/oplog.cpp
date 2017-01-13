@@ -88,6 +88,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/file.h"
@@ -1213,6 +1214,7 @@ void SnapshotThread::run() {
                     break;
                 }
 
+                IdleThreadBlock markIdle;
                 newTimestampNotifier.wait(lock);
             }
         }

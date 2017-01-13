@@ -39,6 +39,7 @@
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
@@ -213,7 +214,11 @@ void JournalWriter::_journalWriterThread() {
 
     try {
         while (true) {
-            Buffer* const buffer = _journalQueue.blockingPop();
+            Buffer* const buffer = [&] {
+                IdleThreadBlock markIdle;
+                return _journalQueue.blockingPop();
+            }();
+
             BufferGuard bufferGuard(buffer, &_readyQueue);
 
             if (buffer->_isShutdown) {

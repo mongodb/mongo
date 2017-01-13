@@ -46,6 +46,7 @@
 #include "mongo/rpc/metadata/metadata_hook.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/sock.h"
@@ -185,6 +186,7 @@ void NetworkInterfaceASIO::waitForWork() {
     stdx::unique_lock<stdx::mutex> lk(_executorMutex);
     // TODO: This can be restructured with a lambda.
     while (!_isExecutorRunnable) {
+        IdleThreadBlock markIdle;
         _isExecutorRunnableCondition.wait(lk);
     }
     _isExecutorRunnable = false;
@@ -198,6 +200,7 @@ void NetworkInterfaceASIO::waitForWorkUntil(Date_t when) {
         if (waitTime <= Milliseconds(0)) {
             break;
         }
+        IdleThreadBlock markIdle;
         _isExecutorRunnableCondition.wait_for(lk, waitTime.toSystemDuration());
     }
     _isExecutorRunnable = false;

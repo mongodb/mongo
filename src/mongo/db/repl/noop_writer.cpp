@@ -39,6 +39,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -82,6 +83,7 @@ private:
             OperationContext& opCtx = *opCtxPtr;
             {
                 stdx::unique_lock<stdx::mutex> lk(_mutex);
+                IdleThreadBlock markIdle;
                 _cv.wait_for(lk, waitTime.toSystemDuration(), [&] { return _inShutdown; });
 
                 if (_inShutdown)

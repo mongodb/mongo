@@ -56,6 +56,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/util/background.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 
@@ -87,7 +88,10 @@ public:
         AuthorizationSession::get(cc())->grantInternalAuthorization();
 
         while (!globalInShutdownDeprecated()) {
-            sleepsecs(ttlMonitorSleepSecs.load());
+            {
+                IdleThreadBlock markIdle;
+                sleepsecs(ttlMonitorSleepSecs.load());
+            }
 
             LOG(3) << "thread awake";
 

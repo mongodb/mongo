@@ -37,6 +37,7 @@
 
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
@@ -104,6 +105,7 @@ void BackgroundThreadClockSource::_startTimerThread() {
     // Start the background thread that repeatedly sleeps for the specified duration of milliseconds
     // and wakes up to store the current time.
     _timer = stdx::thread([&]() {
+        setThreadName("BackgroundThreadClockSource");
         stdx::unique_lock<stdx::mutex> lock(_mutex);
         _started = true;
         _condition.notify_one();
@@ -114,10 +116,12 @@ void BackgroundThreadClockSource::_startTimerThread() {
             } else {
                 // Stop running if nothing has read the time since we last updated the time.
                 _current.store(0);
+                IdleThreadBlock markIdle;
                 _condition.wait(lock, [this] { return _inShutdown || _current.load() != 0; });
             }
 
             const auto sleepUntil = Date_t::fromMillisSinceEpoch(_current.load()) + _granularity;
+            IdleThreadBlock markIdle;
             _clockSource->waitForConditionUntil(
                 _condition, lock, sleepUntil, [this] { return _inShutdown; });
         }

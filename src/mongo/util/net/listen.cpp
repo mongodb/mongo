@@ -43,6 +43,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/asio_message_port.h"
@@ -294,7 +295,10 @@ void Listener::initAndListen() {
 
         maxSelectTime.tv_sec = 0;
         maxSelectTime.tv_usec = 250000;
-        const int ret = select(maxfd + 1, fds, nullptr, nullptr, &maxSelectTime);
+        const int ret = [&] {
+            IdleThreadBlock markIdle;
+            return select(maxfd + 1, fds, nullptr, nullptr, &maxSelectTime);
+        }();
 
         if (ret == 0) {
             continue;

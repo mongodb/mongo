@@ -38,6 +38,7 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_mongos.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -112,6 +113,7 @@ void ShardingUptimeReporter::startPeriodicThread() {
                 }
             }
 
+            IdleThreadBlock markIdle;
             sleepFor(kUptimeReportInterval);
         }
     });
