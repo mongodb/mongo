@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/base_cloner.h"
+#include "mongo/db/repl/callback_completion_guard.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/executor/task_executor.h"
@@ -63,6 +64,11 @@ class CollectionCloner : public BaseCloner {
     MONGO_DISALLOW_COPYING(CollectionCloner);
 
 public:
+    /**
+     * Callback completion guard for CollectionCloner.
+     */
+    using OnCompletionGuard = CallbackCompletionGuard<Status>;
+
     struct Stats {
         static constexpr StringData kDocumentsToCopyFieldName = "documentsToCopy"_sd;
         static constexpr StringData kDocumentsCopiedFieldName = "documentsCopied"_sd;
@@ -143,6 +149,12 @@ private:
     bool _isActive_inlock() const;
 
     /**
+     * Cancels all outstanding work.
+     * Used by shutdown() and CompletionGuard::setResultAndCancelRemainingWork().
+     */
+    void _cancelRemainingWork_inlock();
+
+    /**
      * Read number of documents in collection from count result.
      */
     void _countCallback(const executor::TaskExecutor::RemoteCommandCallbackArgs& args);
@@ -159,7 +171,8 @@ private:
      */
     void _findCallback(const StatusWith<Fetcher::QueryResponse>& fetchResult,
                        Fetcher::NextAction* nextAction,
-                       BSONObjBuilder* getMoreBob);
+                       BSONObjBuilder* getMoreBob,
+                       std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
      * Request storage interface to create collection.
@@ -180,7 +193,8 @@ private:
      * interface.
      */
     void _insertDocumentsCallback(const executor::TaskExecutor::CallbackArgs& callbackData,
-                                  bool lastBatch);
+                                  bool lastBatch,
+                                  std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
      * Reports completion status.
@@ -211,7 +225,7 @@ private:
     StorageInterface* _storageInterface;  // (R) Not owned by us.
     RemoteCommandRetryScheduler _countScheduler;  // (S)
     Fetcher _listIndexesFetcher;                  // (S)
-    Fetcher _findFetcher;                         // (S)
+    std::unique_ptr<Fetcher> _findFetcher;        // (M)
     std::vector<BSONObj> _indexSpecs;             // (M)
     BSONObj _idIndexSpec;                         // (M)
     std::vector<BSONObj> _documents;              // (M) Documents read from fetcher to insert.
