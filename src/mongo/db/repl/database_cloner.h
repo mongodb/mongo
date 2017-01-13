@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <iosfwd>
 #include <list>
 #include <string>
 #include <vector>
@@ -161,7 +162,23 @@ public:
      */
     void setStartCollectionClonerFn(const StartCollectionClonerFn& startCollectionCloner);
 
+    // State transitions:
+    // PreStart --> Running --> ShuttingDown --> Complete
+    // It is possible to skip intermediate states. For example,
+    // Calling shutdown() when the cloner has not started will transition from PreStart directly
+    // to Complete.
+    // This enum class is made public for testing.
+    enum class State { kPreStart, kRunning, kShuttingDown, kComplete };
+
+    /**
+     * Returns current database cloner state.
+     * For testing only.
+     */
+    State getState_forTest() const;
+
 private:
+    bool _isActive_inlock() const;
+
     /**
      * Read collection names and options from listCollections result.
      */
@@ -209,7 +226,6 @@ private:
     CollectionCallbackFn
         _collectionWork;       // (R) Invoked once for every successfully started collection cloner.
     CallbackFn _onCompletion;  // (R) Invoked once when cloning completes or fails.
-    bool _active = false;      // _active is true when database cloner is started.
     Fetcher _listCollectionsFetcher;  // (R) Fetcher instance for running listCollections command.
     // Collection info objects returned from listCollections.
     // Format of each document:
@@ -227,7 +243,16 @@ private:
         _scheduleDbWorkFn;  // (RT) Function for scheduling database work using the executor.
     StartCollectionClonerFn _startCollectionCloner;  // (RT)
     Stats _stats;                                    // (M) Stats about what this instance did.
+
+    // Current database cloner state. See comments for State enum class for details.
+    State _state = State::kPreStart;  // (M)
 };
+
+/**
+ * Insertion operator for DatabaseCloner::State. Formats database cloner state for output stream.
+ * For testing only.
+ */
+std::ostream& operator<<(std::ostream& os, const DatabaseCloner::State& state);
 
 }  // namespace repl
 }  // namespace mongo
