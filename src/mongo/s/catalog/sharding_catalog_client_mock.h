@@ -159,6 +159,7 @@ public:
     DistLockManager* getDistLockManager() override;
 
     Status appendInfoForConfigServerDatabases(OperationContext* txn,
+                                              const BSONObj& listDatabasesCmd,
                                               BSONArrayBuilder* builder) override;
 
 private:
