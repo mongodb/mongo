@@ -383,6 +383,10 @@ void BackgroundSync::_produce(OperationContext* txn) {
         StorageInterface::get(txn)->setAppliedThrough(txn, _replCoord->getMyLastAppliedOpTime());
     }
 
+    if (MONGO_FAIL_POINT(stopOplogFetcher)) {
+        return;
+    }
+
     // "lastFetched" not used. Already set in _enqueueDocuments.
     Status fetcherReturnStatus = Status::OK();
     DataReplicatorExternalStateBackgroundSync dataReplicatorExternalState(
