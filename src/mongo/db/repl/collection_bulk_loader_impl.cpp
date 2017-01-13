@@ -225,10 +225,14 @@ Status CollectionBulkLoaderImpl::commit() {
 
 void CollectionBulkLoaderImpl::_releaseResources() {
     if (_secondaryIndexesBlock) {
+        // A valid Client is required to drop unfinished indexes.
+        Client::initThreadIfNotAlready();
         _secondaryIndexesBlock.reset();
     }
 
     if (_idIndexBlock) {
+        // A valid Client is required to drop unfinished indexes.
+        Client::initThreadIfNotAlready();
         _idIndexBlock.reset();
     }
 

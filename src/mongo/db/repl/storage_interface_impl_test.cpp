@@ -53,6 +53,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -489,6 +490,80 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, CreateCollectionWithIDIndexCommits
     auto idIdxDesc = collIdxCat->findIdIndex(txn);
     auto count = getIndexKeyCount(txn, collIdxCat, idIdxDesc);
     ASSERT_EQ(count, 2LL);
+}
+
+void _testDestroyUncommitedCollectionBulkLoader(
+    OperationContext* txn,
+    std::vector<BSONObj> secondaryIndexes,
+    stdx::function<void(std::unique_ptr<CollectionBulkLoader> loader)> destroyLoaderFn) {
+    StorageInterfaceImpl storage;
+    storage.startup();
+    NamespaceString nss("foo.bar");
+    CollectionOptions opts;
+    auto loaderStatus =
+        storage.createCollectionForBulkLoading(nss, opts, makeIdIndexSpec(nss), secondaryIndexes);
+    ASSERT_OK(loaderStatus.getStatus());
+    auto loader = std::move(loaderStatus.getValue());
+    std::vector<BSONObj> docs = {BSON("_id" << 1)};
+    ASSERT_OK(loader->insertDocuments(docs.begin(), docs.end()));
+
+    // Destroy bulk loader.
+    // Collection and ID index should not exist after 'loader' is destroyed.
+    destroyLoaderFn(std::move(loader));
+
+    AutoGetCollectionForRead autoColl(txn, nss);
+    auto coll = autoColl.getCollection();
+
+    // Bulk loader is used to create indexes. The collection is not dropped when the bulk loader is
+    // destroyed.
+    ASSERT_TRUE(coll);
+    ASSERT_EQ(1LL, coll->getRecordStore()->numRecords(txn));
+
+    // IndexCatalog::numIndexesTotal() includes unfinished indexes. We need to ensure that
+    // the bulk loader drops the unfinished indexes.
+    auto collIdxCat = coll->getIndexCatalog();
+    ASSERT_EQUALS(0, collIdxCat->numIndexesTotal(txn));
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       DestroyingUncommittedCollectionBulkLoaderDropsIndexes) {
+    auto txn = getOperationContext();
+    NamespaceString nss("foo.bar");
+    std::vector<BSONObj> indexes = {BSON("v" << 1 << "key" << BSON("x" << 1) << "name"
+                                             << "x_1"
+                                             << "ns"
+                                             << nss.ns())};
+    auto destroyLoaderFn = [](std::unique_ptr<CollectionBulkLoader> loader) {
+        // Destroy 'loader' by letting it go out of scope.
+    };
+    _testDestroyUncommitedCollectionBulkLoader(txn, indexes, destroyLoaderFn);
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       DestructorInitializesClientBeforeDestroyingIdIndexBuilder) {
+    auto txn = getOperationContext();
+    NamespaceString nss("foo.bar");
+    std::vector<BSONObj> indexes;
+    auto destroyLoaderFn = [](std::unique_ptr<CollectionBulkLoader> loader) {
+        // Destroy 'loader' in a new thread that does not have a Client.
+        stdx::thread([&loader]() { loader.reset(); }).join();
+    };
+    _testDestroyUncommitedCollectionBulkLoader(txn, indexes, destroyLoaderFn);
+}
+
+TEST_F(StorageInterfaceImplWithReplCoordTest,
+       DestructorInitializesClientBeforeDestroyingSecondaryIndexesBuilder) {
+    auto txn = getOperationContext();
+    NamespaceString nss("foo.bar");
+    std::vector<BSONObj> indexes = {BSON("v" << 1 << "key" << BSON("x" << 1) << "name"
+                                             << "x_1"
+                                             << "ns"
+                                             << nss.ns())};
+    auto destroyLoaderFn = [](std::unique_ptr<CollectionBulkLoader> loader) {
+        // Destroy 'loader' in a new thread that does not have a Client.
+        stdx::thread([&loader]() { loader.reset(); }).join();
+    };
+    _testDestroyUncommitedCollectionBulkLoader(txn, indexes, destroyLoaderFn);
 }
 
 TEST_F(StorageInterfaceImplWithReplCoordTest, CreateCollectionThatAlreadyExistsFails) {
