@@ -581,6 +581,25 @@ var Cluster = function(options) {
 
         return data;
     };
+
+    this.isRunningWiredTigerLSM = function isRunningWiredTigerLSM() {
+        var adminDB = this.getDB('admin');
+
+        if (this.isSharded()) {
+            // Get the storage engine the sharded cluster is configured to use from one of the
+            // shards since mongos won't report it.
+            adminDB = st.shard0.getDB('admin');
+        }
+
+        var res = adminDB.runCommand({getCmdLineOpts: 1});
+        assert.commandWorked(res, 'failed to get command line options');
+
+        var wiredTigerOptions = res.parsed.storage.wiredTiger || {};
+        var wiredTigerCollectionConfig = wiredTigerOptions.collectionConfig || {};
+        var wiredTigerConfigString = wiredTigerCollectionConfig.configString || '';
+
+        return wiredTigerConfigString === 'type=lsm';
+    };
 };
 
 /**
