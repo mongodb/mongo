@@ -1,0 +1,94 @@
+selector:
+  js_test:
+    roots:
+    - jstests/core/**/*.js
+    exclude_files:
+    # Tests that won't work with an injected 'linearizable' readConcern
+    # and/or an injected 'majority' writeConcern. Where a function is
+    # listed the reason is we don't have a reliable solution to override
+    # the write concern for that function.
+    - jstests/core/batch_write_command*.js # these tests use various write concerns
+    - jstests/core/bench_test*.js # benchRun() used for writes
+    - jstests/core/capped_update.js # uses godinsert and can't run under replication.
+    - jstests/core/crud_api.js # has specific w:0 tests
+    - jstests/core/error2.js # db.eval() used
+    - jstests/core/eval0.js # db.eval() used
+    - jstests/core/eval1.js # db.eval() used
+    - jstests/core/eval3.js # db.eval() used
+    - jstests/core/eval4.js # db.eval() used
+    - jstests/core/eval5.js # db.eval() used
+    - jstests/core/eval6.js # db.eval() used
+    - jstests/core/eval7.js # db.eval() used
+    - jstests/core/eval9.js # db.eval() used
+    - jstests/core/evala.js # db.eval() used
+    - jstests/core/evalb.js # db.eval() used
+    - jstests/core/evalc.js # db.eval() used
+    - jstests/core/evald.js # db.eval() used
+    - jstests/core/evale.js # db.eval() used
+    - jstests/core/evalg.js # db.eval() used
+    - jstests/core/eval_mr.js # db.eval() used
+    - jstests/core/eval_nolock.js # db.eval() used
+    - jstests/core/fsync.js # Uses fsyncLock() which prevents a linearizable read from writing
+                            # an entry to the oplog.
+    - jstests/core/geo_s2cursorlimitskip.js # drops system.profile collection and counts ops.
+    - jstests/core/js3.js # db.dbEval() used
+    - jstests/core/js7.js # db.eval() used
+    - jstests/core/js9.js # db.eval() used
+    - jstests/core/max_time_ms.js # SERVER-27665 maxTimeNeverTimeOut failPoint.
+    - jstests/core/mr_merge.js # mr temp tables aren't replicated
+    - jstests/core/mr_merge2.js # mr temp tables aren't replicated
+    - jstests/core/mr_outreduce.js # mr temp tables aren't replicated
+    - jstests/core/mr_outreduce2.js # mr temp tables aren't replicated
+    - jstests/core/opcounters_active.js  # off by n problem with opcounters
+    - jstests/core/opcounters_write_cmd.js # off by n problem with opcounters
+    - jstests/core/profile_agg.js # system.profile not replicated
+    - jstests/core/profile_count.js # system.profile not replicated
+    - jstests/core/profile_delete.js # system.profile not replicated
+    - jstests/core/profile_distinct.js # system.profile not replicated
+    - jstests/core/profile_find.js # system.profile not replicated
+    - jstests/core/profile_findandmodify.js # system.profile not replicated
+    - jstests/core/profile_geonear.js # system.profile not replicated
+    - jstests/core/profile_getmore.js # system.profile not replicated
+    - jstests/core/profile_group.js # system.profile not replicated
+    - jstests/core/profile_insert.js # system.profile not replicated
+    - jstests/core/profile_mapreduce.js # system.profile not replicated
+    - jstests/core/profile_update.js # system.profile not replicated
+    - jstests/core/profile1.js # system.profile not replicated
+    - jstests/core/profile2.js # system.profile not replicated
+    - jstests/core/profile3.js # system.profile not replicated
+    - jstests/core/read_after_optime.js # verifies read after optime fails on standalone
+    - jstests/core/remove8.js # db.eval() used
+    - jstests/core/rename4.js # db.eval() used
+    - jstests/core/shell1.js # tests setSlaveOk() variations on standalone mongod
+    - jstests/core/shellkillop.js # db.eval() used
+    - jstests/core/shell_writeconcern.js # checks write concern shell helpers
+    - jstests/core/storefunc.js # db.eval() used
+    - jstests/core/write_result.js # Tests invalid writeConcern, we shouldn't override.
+    # Tests that need triaging & remediation | blacklist decision
+    # Comments list possible problem point under review.
+    - jstests/core/capped6.js # Uses captrunc test command.
+    - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        global_vars:
+          TestData:
+            defaultReadConcernLevel: linearizable
+        eval: "var testingReplication = true; load('jstests/libs/override_methods/set_read_and_write_concerns.js');"
+        readMode: commands
+    hooks:
+    - class: ValidateCollections
+    - class: CheckReplOplogs
+    - class: CheckReplDBHash
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: ReplicaSetFixture
+      mongod_options:
+        set_parameters:
+          enableTestCommands: 1
+          numInitialSyncAttempts: 1
+      num_nodes: 2
+      write_concern_majority_journal_default: false
