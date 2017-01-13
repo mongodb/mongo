@@ -115,25 +115,6 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
                               numInitialSyncListIndexesAttempts.load(),
                               executor::RemoteCommandRequest::kNoTimeout,
                               RemoteCommandRetryScheduler::kAllRetriableErrors)),
-      _findFetcher(
-          _executor,
-          _source,
-          _sourceNss.db().toString(),
-          // noCursorTimeout true, large batchSize (for older server versions to get larger batch)
-          BSON("find" << _sourceNss.coll() << "noCursorTimeout" << true << "batchSize"
-                      << batchSize),
-          stdx::bind(&CollectionCloner::_findCallback,
-                     this,
-                     stdx::placeholders::_1,
-                     stdx::placeholders::_2,
-                     stdx::placeholders::_3),
-          rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
-          RemoteCommandRequest::kNoTimeout,
-          RemoteCommandRetryScheduler::makeRetryPolicy(
-              numInitialSyncCollectionFindAttempts.load(),
-              executor::RemoteCommandRequest::kNoTimeout,
-              RemoteCommandRetryScheduler::kAllRetriableErrors)),
-
       _indexSpecs(),
       _documents(),
       _dbWorkTaskRunner(_dbWorkThreadPool),
@@ -181,7 +162,7 @@ std::string CollectionCloner::getDiagnosticString() const {
     output << " collection options: " << _options.toBSON();
     output << " active: " << _isActive_inlock();
     output << " listIndexes fetcher: " << _listIndexesFetcher.getDiagnosticString();
-    output << " find fetcher: " << _findFetcher.getDiagnosticString();
+    output << " find fetcher: " << (_findFetcher ? _findFetcher->getDiagnosticString() : "");
     return output;
 }
 
@@ -236,9 +217,15 @@ void CollectionCloner::shutdown() {
             return;
     }
 
+    _cancelRemainingWork_inlock();
+}
+
+void CollectionCloner::_cancelRemainingWork_inlock() {
     _countScheduler.shutdown();
     _listIndexesFetcher.shutdown();
-    _findFetcher.shutdown();
+    if (_findFetcher) {
+        _findFetcher->shutdown();
+    }
     _dbWorkTaskRunner.cancel();
 }
 
@@ -406,7 +393,8 @@ void CollectionCloner::_listIndexesCallback(const Fetcher::QueryResponseStatus& 
 
 void CollectionCloner::_findCallback(const StatusWith<Fetcher::QueryResponse>& fetchResult,
                                      Fetcher::NextAction* nextAction,
-                                     BSONObjBuilder* getMoreBob) {
+                                     BSONObjBuilder* getMoreBob,
+                                     std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
     if (!fetchResult.isOK()) {
         // Wait for active inserts to complete.
         waitForDbWorker();
@@ -430,8 +418,12 @@ void CollectionCloner::_findCallback(const StatusWith<Fetcher::QueryResponse>& f
                   << ", cursorId:" << batchData.cursorId << ", isLastBatch:" << lastBatch;
     }
 
-    auto&& scheduleResult = _scheduleDbWorkFn(stdx::bind(
-        &CollectionCloner::_insertDocumentsCallback, this, stdx::placeholders::_1, lastBatch));
+    auto&& scheduleResult =
+        _scheduleDbWorkFn(stdx::bind(&CollectionCloner::_insertDocumentsCallback,
+                                     this,
+                                     stdx::placeholders::_1,
+                                     lastBatch,
+                                     onCompletionGuard));
     if (!scheduleResult.isOK()) {
         Status newStatus{scheduleResult.getStatus().code(),
                          str::stream() << "While cloning collection '" << _sourceNss.ns()
@@ -478,7 +470,28 @@ void CollectionCloner::_beginCollectionCallback(const executor::TaskExecutor::Ca
 
     _collLoader = std::move(status.getValue());
 
-    Status scheduleStatus = _findFetcher.schedule();
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard;
+
+    _findFetcher = stdx::make_unique<Fetcher>(
+        _executor,
+        _source,
+        _sourceNss.db().toString(),
+        // noCursorTimeout true, large batchSize (for older server versions to get larger batch)
+        BSON("find" << _sourceNss.coll() << "noCursorTimeout" << true << "batchSize" << batchSize),
+        stdx::bind(&CollectionCloner::_findCallback,
+                   this,
+                   stdx::placeholders::_1,
+                   stdx::placeholders::_2,
+                   stdx::placeholders::_3,
+                   onCompletionGuard),
+        rpc::ServerSelectionMetadata(true, boost::none).toBSON(),
+        RemoteCommandRequest::kNoTimeout,
+        RemoteCommandRetryScheduler::makeRetryPolicy(
+            numInitialSyncCollectionFindAttempts.load(),
+            executor::RemoteCommandRequest::kNoTimeout,
+            RemoteCommandRetryScheduler::kAllRetriableErrors));
+
+    Status scheduleStatus = _findFetcher->schedule();
     if (!scheduleStatus.isOK()) {
         lk.unlock();
         _finishCallback(scheduleStatus);
@@ -486,8 +499,10 @@ void CollectionCloner::_beginCollectionCallback(const executor::TaskExecutor::Ca
     }
 }
 
-void CollectionCloner::_insertDocumentsCallback(const executor::TaskExecutor::CallbackArgs& cbd,
-                                                bool lastBatch) {
+void CollectionCloner::_insertDocumentsCallback(
+    const executor::TaskExecutor::CallbackArgs& cbd,
+    bool lastBatch,
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
     if (!cbd.status.isOK()) {
         _finishCallback(cbd.status);
         return;
