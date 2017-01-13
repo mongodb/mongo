@@ -35,6 +35,7 @@
 
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -68,12 +69,17 @@ void BackgroundThreadClockSource::_startTimerThread() {
     // Start the background thread that repeatedly sleeps for the specified duration of milliseconds
     // and wakes up to store the current time.
     _timer = stdx::thread([&]() {
+        setThreadName("BackgroundThreadClockSource");
         stdx::unique_lock<stdx::mutex> lock(_mutex);
         while (!_shutdownTimer) {
-            if (_condition.wait_for(lock, _granularity.toSystemDuration()) ==
-                stdx::cv_status::timeout) {
-                _updateCurrent();
+            {
+                IdleThreadBlock markIdle;
+                if (_condition.wait_for(lock, _granularity.toSystemDuration()) !=
+                    stdx::cv_status::timeout) {
+                    continue;
+                }
             }
+            _updateCurrent();
         }
     });
 }

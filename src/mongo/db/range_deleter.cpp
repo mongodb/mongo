@@ -39,6 +39,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -423,8 +424,11 @@ void RangeDeleter::doWork() {
         {
             stdx::unique_lock<stdx::mutex> sl(_queueMutex);
             while (_taskQueue.empty()) {
-                _taskQueueNotEmptyCV.wait_for(
-                    sl, Milliseconds(kNotEmptyTimeoutMillis).toSystemDuration());
+                {
+                    IdleThreadBlock markIdle;
+                    _taskQueueNotEmptyCV.wait_for(
+                        sl, Milliseconds(kNotEmptyTimeoutMillis).toSystemDuration());
+                }
 
                 if (stopRequested()) {
                     log() << "stopping range deleter worker" << endl;

@@ -50,6 +50,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/background.h"
+#include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
 
 namespace mongo {
@@ -271,6 +272,7 @@ public:
                 cursorStatsTimedOut.increment(
                     CursorManager::timeoutCursorsGlobal(&txn, t.millisReset()));
             }
+            IdleThreadBlock markIdle;
             sleepsecs(clientCursorMonitorFrequencySecs);
         }
     }
