@@ -35,14 +35,15 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/auth_index_d.h"
 #include "mongo/db/background.h"
-#include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/client.h"
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -91,56 +92,81 @@ Database* DatabaseHolder::get(OperationContext* txn, StringData ns) const {
     return NULL;
 }
 
+std::set<std::string> DatabaseHolder::_getNamesWithConflictingCasing_inlock(StringData name) {
+    std::set<std::string> duplicates;
+
+    for (const auto& nameAndPointer : _dbs) {
+        // A name that's equal with case-insensitive match must be identical, or it's a duplicate.
+        if (name.equalCaseInsensitive(nameAndPointer.first) && name != nameAndPointer.first)
+            duplicates.insert(nameAndPointer.first);
+    }
+    return duplicates;
+}
+
+std::set<std::string> DatabaseHolder::getNamesWithConflictingCasing(StringData name) {
+    stdx::lock_guard<SimpleMutex> lk(_m);
+    return _getNamesWithConflictingCasing_inlock(name);
+}
+
 Database* DatabaseHolder::openDb(OperationContext* txn, StringData ns, bool* justCreated) {
     const StringData dbname = _todb(ns);
     invariant(txn->lockState()->isDbLockedForMode(dbname, MODE_X));
 
-    Database* db = get(txn, ns);
-    if (db) {
-        if (justCreated) {
-            *justCreated = false;
-        }
+    if (justCreated)
+        *justCreated = false;  // Until proven otherwise.
 
+    stdx::unique_lock<SimpleMutex> lk(_m);
+
+    // The following will insert a nullptr for dbname, which will treated the same as a non-
+    // existant database by the get method, yet still counts in getNamesWithConflictingCasing.
+    if (auto db = _dbs[dbname])
         return db;
-    }
 
-    // Check casing
-    const string duplicate = Database::duplicateUncasedName(dbname.toString());
-    if (!duplicate.empty()) {
-        stringstream ss;
-        ss << "db already exists with different case already have: [" << duplicate
-           << "] trying to create [" << dbname.toString() << "]";
-        uasserted(ErrorCodes::DatabaseDifferCase, ss.str());
-    }
+    // We've inserted a nullptr entry for dbname: make sure to remove it on unsuccessful exit.
+    auto removeDbGuard = MakeGuard([this, &lk, dbname] {
+        if (!lk.owns_lock())
+            lk.lock();
+        _dbs.erase(dbname);
+    });
 
+    // Check casing in lock to avoid transient duplicates.
+    auto duplicates = _getNamesWithConflictingCasing_inlock(dbname);
+    uassert(ErrorCodes::DatabaseDifferCase,
+            str::stream() << "db already exists with different case already have: ["
+                          << *duplicates.cbegin() << "] trying to create [" << dbname.toString()
+                          << "]",
+            duplicates.empty());
+
+
+    // Do the catalog lookup and database creation outside of the scoped lock, because these may
+    // block. Only one thread can be inside this method for the same DB name, because of the
+    // requirement for X-lock on the database when we enter. So there is no way we can insert two
+    // different databases for the same name.
+    lk.unlock();
     StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-    invariant(storageEngine);
-
     DatabaseCatalogEntry* entry = storageEngine->getDatabaseCatalogEntry(txn, dbname);
-    invariant(entry);
-    const bool exists = entry->exists();
-    if (!exists) {
+
+    if (!entry->exists()) {
         audit::logCreateDatabase(&cc(), dbname);
+        if (justCreated)
+            *justCreated = true;
     }
 
-    if (justCreated) {
-        *justCreated = !exists;
-    }
+    auto newDb = stdx::make_unique<Database>(txn, dbname, entry);
 
-    // Do this outside of the scoped lock, because database creation does transactional
-    // operations which may block. Only one thread can be inside this method for the same DB
-    // name, because of the requirement for X-lock on the database when we enter. So there is
-    // no way we can insert two different databases for the same name.
-    db = new Database(txn, dbname, entry);
+    // Finally replace our nullptr entry with the new Database pointer.
+    removeDbGuard.Dismiss();
+    lk.lock();
+    auto it = _dbs.find(dbname);
+    invariant(it != _dbs.end() && it->second == nullptr);
+    Database* newDbPointer = newDb.release();
+    _dbs[dbname] = newDbPointer;
+    invariant(_getNamesWithConflictingCasing_inlock(dbname.toString()).empty());
 
-    stdx::lock_guard<SimpleMutex> lk(_m);
-    _dbs[dbname] = db;
-
-    return db;
+    return newDbPointer;
 }
 
 void DatabaseHolder::close(OperationContext* txn, StringData ns) {
-    // TODO: This should be fine if only a DB X-lock
     invariant(txn->lockState()->isW());
 
     const StringData dbName = _todb(ns);
