@@ -66,7 +66,7 @@ void ClusterCursorCleanupJob::run() {
     ClusterCursorManager* manager = grid.getCursorManager();
     invariant(manager);
 
-    while (!inShutdown()) {
+    while (!globalInShutdownDeprecated()) {
         manager->killMortalCursorsInactiveSince(Date_t::now() -
                                                 Milliseconds(cursorTimeoutMillis.load()));
         manager->incrementCursorsTimedOut(manager->reapZombieCursors());

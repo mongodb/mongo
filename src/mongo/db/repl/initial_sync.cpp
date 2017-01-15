@@ -72,7 +72,7 @@ void InitialSync::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTim
 
         auto replCoord = repl::ReplicationCoordinator::get(txn);
         while (!tryPopAndWaitForMore(txn, &ops, BatchLimits{})) {
-            if (inShutdown()) {
+            if (globalInShutdownDeprecated()) {
                 return;
             }
 
@@ -113,7 +113,7 @@ void InitialSync::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTim
         replCoord->setMyLastAppliedOpTime(lastOpTime);
         setNewTimestamp(lastOpTime.getTimestamp());
 
-        if (inShutdown()) {
+        if (globalInShutdownDeprecated()) {
             return;
         }
 

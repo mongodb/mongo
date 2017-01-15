@@ -415,7 +415,7 @@ void RangeDeleter::doWork() {
     Client::initThreadIfNotAlready("RangeDeleter");
     Client* client = &cc();
 
-    while (!inShutdown() && !stopRequested()) {
+    while (!globalInShutdownDeprecated() && !stopRequested()) {
         string errMsg;
 
         RangeDeleteEntry* nextTask = NULL;

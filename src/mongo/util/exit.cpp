@@ -77,12 +77,8 @@ void setShutdownFlag() {
 
 }  // namespace
 
-bool inShutdown() {
+bool globalInShutdownDeprecated() {
     return shutdownFlag.loadRelaxed() != 0;
-}
-
-bool inShutdownStrict() {
-    return shutdownFlag.load() != 0;
 }
 
 ExitCode waitForShutdown() {
@@ -94,7 +90,7 @@ ExitCode waitForShutdown() {
 
 void registerShutdownTask(stdx::function<void()> task) {
     stdx::lock_guard<stdx::mutex> lock(shutdownMutex);
-    invariant(!inShutdown());
+    invariant(!globalInShutdownDeprecated());
     shutdownTasks.emplace(std::move(task));
 }
 
@@ -106,7 +102,7 @@ void shutdown(ExitCode code) {
 
         if (shutdownTasksInProgress) {
             // Someone better have called shutdown in some form already.
-            invariant(inShutdown());
+            invariant(globalInShutdownDeprecated());
 
             // Re-entrant calls to shutdown are not allowed.
             invariant(shutdownTasksThreadId != stdx::this_thread::get_id());
@@ -144,7 +140,7 @@ void shutdownNoTerminate() {
     {
         stdx::lock_guard<stdx::mutex> lock(shutdownMutex);
 
-        if (inShutdown())
+        if (globalInShutdownDeprecated())
             return;
 
         setShutdownFlag();

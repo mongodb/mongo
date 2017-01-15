@@ -575,12 +575,13 @@ static void serviceShutdown(const char* controlCodeName) {
     setThreadName("serviceShutdown");
 
     log() << "got " << controlCodeName << " request from Windows Service Control Manager, "
-          << (inShutdown() ? "already in shutdown" : "will terminate after current cmd ends");
+          << (globalInShutdownDeprecated() ? "already in shutdown"
+                                           : "will terminate after current cmd ends");
 
     reportStatus(SERVICE_STOP_PENDING, kStopWaitHintMillis);
 
     // Note: This triggers _serviceCallback, ie  ServiceMain,
-    // to stop by setting inShutdown() == true
+    // to stop by setting globalInShutdownDeprecated() == true
     shutdownNoTerminate();
 
     // Note: we will report exit status in initService

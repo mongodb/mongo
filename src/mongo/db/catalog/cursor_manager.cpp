@@ -297,7 +297,7 @@ int CursorManager::eraseCursorGlobalIfAuthorized(OperationContext* txn, int n, c
     for (int i = 0; i < n; i++) {
         if (eraseCursorGlobalIfAuthorized(txn, ids.readAndAdvance<LittleEndian<int64_t>>()))
             numDeleted++;
-        if (inShutdown())
+        if (globalInShutdownDeprecated())
             break;
     }
     return numDeleted;

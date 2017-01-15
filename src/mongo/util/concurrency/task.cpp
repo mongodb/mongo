@@ -62,7 +62,7 @@ void Task::run() {
         } catch (...) {
         }
         sleepmillis(repeat);
-        if (inShutdown())
+        if (globalInShutdownDeprecated())
             break;
         if (repeat == 0)
             break;

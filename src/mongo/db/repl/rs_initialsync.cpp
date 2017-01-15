@@ -223,7 +223,7 @@ bool _initialSyncApplyOplog(OperationContext* txn,
         LOG(2) << "Applying oplog entries from " << startOpTime << " until " << stopOpTime;
         syncer->oplogApplication(txn, stopOpTime);
 
-        if (inShutdown()) {
+        if (globalInShutdownDeprecated()) {
             return false;
         }
     } catch (const DBException&) {
@@ -289,7 +289,7 @@ Status _initialSync(OperationContext* txn, BackgroundSync* bgsync) {
             sleepsecs(1);
         }
 
-        if (inShutdown()) {
+        if (globalInShutdownDeprecated()) {
             return Status(ErrorCodes::ShutdownInProgress, "shutting down");
         }
     }
@@ -552,12 +552,12 @@ void syncDoInitialSync(OperationContext* txn,
         } catch (const DBException& e) {
             error() << redact(e);
             // Return if in shutdown
-            if (inShutdown()) {
+            if (globalInShutdownDeprecated()) {
                 return;
             }
         }
 
-        if (inShutdown()) {
+        if (globalInShutdownDeprecated()) {
             return;
         }
 

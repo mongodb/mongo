@@ -181,7 +181,7 @@ public:
             if (ss->avail) {
                 // If we're shutting down, don't want to initiate release mechanism as it is
                 // slow, and isn't needed since all connections will be closed anyway.
-                if (inShutdown()) {
+                if (globalInShutdownDeprecated()) {
                     if (versionManager.isVersionableCB(ss->avail)) {
                         versionManager.resetShardVersionCB(ss->avail);
                     }

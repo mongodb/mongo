@@ -233,7 +233,7 @@ Status reloadShardRegistryUntilSuccess(OperationContext* txn) {
         return Status::OK();
     }
 
-    while (!inShutdown()) {
+    while (!globalInShutdownDeprecated()) {
         auto stopStatus = txn->checkForInterruptNoAssert();
         if (!stopStatus.isOK()) {
             return stopStatus;

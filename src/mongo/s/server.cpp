@@ -271,7 +271,7 @@ static ExitCode runMongosServer() {
         Status status = initializeSharding(opCtx.get());
         if (!status.isOK()) {
             if (status == ErrorCodes::CallbackCanceled) {
-                invariant(inShutdown());
+                invariant(globalInShutdownDeprecated());
                 log() << "Shutdown called before mongos finished starting up";
                 return EXIT_CLEAN;
             }

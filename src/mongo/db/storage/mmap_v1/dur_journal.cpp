@@ -725,7 +725,7 @@ void Journal::removeUnneededJournalFiles() {
 }
 
 void Journal::_rotate(unsigned long long lsnOfCurrentJournalEntry) {
-    if (inShutdown() || !_curLogFile)
+    if (globalInShutdownDeprecated() || !_curLogFile)
         return;
 
     j.updateLSNFile(lsnOfCurrentJournalEntry);

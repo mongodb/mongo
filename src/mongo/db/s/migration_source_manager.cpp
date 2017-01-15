@@ -359,7 +359,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* txn
         if ((ErrorCodes::isInterruption(status.code()) ||
              ErrorCodes::isShutdownError(status.code()) ||
              status == ErrorCodes::CallbackCanceled) &&
-            inShutdown()) {
+            globalInShutdownDeprecated()) {
             // Since the server is already doing a clean shutdown, this call will just join the
             // previous shutdown call
             shutdown(waitForShutdown());

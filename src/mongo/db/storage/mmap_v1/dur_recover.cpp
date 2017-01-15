@@ -526,7 +526,9 @@ bool RecoveryJob::processFileBuffer(const void* p, unsigned len) {
             processSection((const JSectHeader*)hdr, data, dataLen, (const JSectFooter*)footer);
 
             // ctrl c check
-            uassert(ErrorCodes::Interrupted, "interrupted during journal recovery", !inShutdown());
+            uassert(ErrorCodes::Interrupted,
+                    "interrupted during journal recovery",
+                    !globalInShutdownDeprecated());
         }
     } catch (const BufReader::eof&) {
         if (mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalDumpJournal)

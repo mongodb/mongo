@@ -522,7 +522,7 @@ DBClientCursor::~DBClientCursor() {
 void DBClientCursor::kill() {
     DESTRUCTOR_GUARD(
 
-        if (cursorId && _ownCursor && !inShutdown()) {
+        if (cursorId && _ownCursor && !globalInShutdownDeprecated()) {
             if (_client) {
                 _client->killCursor(cursorId);
             } else {

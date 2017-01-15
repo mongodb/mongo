@@ -106,7 +106,7 @@ StatusWith<SnapshotDiff> Snapshots::computeDelta() {
 
 void StatsSnapshotThread::run() {
     Client::initThread("statsSnapshot");
-    while (!inShutdown()) {
+    while (!globalInShutdownDeprecated()) {
         try {
             statsSnapshots.takeSnapshot();
         } catch (std::exception& e) {

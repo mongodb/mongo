@@ -266,7 +266,7 @@ public:
     void run() {
         Client::initThread("clientcursormon");
         Timer t;
-        while (!inShutdown()) {
+        while (!globalInShutdownDeprecated()) {
             {
                 const ServiceContext::UniqueOperationContext txnPtr = cc().makeOperationContext();
                 OperationContext& txn = *txnPtr;

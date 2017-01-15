@@ -86,7 +86,7 @@ public:
         Client::initThread(name().c_str());
         AuthorizationSession::get(cc())->grantInternalAuthorization();
 
-        while (!inShutdown()) {
+        while (!globalInShutdownDeprecated()) {
             sleepsecs(ttlMonitorSleepSecs.load());
 
             LOG(3) << "thread awake";

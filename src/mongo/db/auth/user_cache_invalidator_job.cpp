@@ -112,7 +112,7 @@ UserCacheInvalidator::UserCacheInvalidator(AuthorizationManager* authzManager)
     : _authzManager(authzManager) {}
 
 UserCacheInvalidator::~UserCacheInvalidator() {
-    invariant(inShutdown());
+    invariant(globalInShutdownDeprecated());
     // Wait to stop running.
     wait();
 }
@@ -153,7 +153,7 @@ void UserCacheInvalidator::run() {
         lastInvalidationTime = now;
         lock.unlock();
 
-        if (inShutdown()) {
+        if (globalInShutdownDeprecated()) {
             break;
         }
 

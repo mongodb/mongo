@@ -117,7 +117,7 @@ public:
     virtual void run() {
         Client::initThread(_name.c_str());
 
-        while (!inShutdown()) {
+        while (!globalInShutdownDeprecated()) {
             if (!_deleteExcessDocuments()) {
                 sleepmillis(1000);  // Back off in case there were problems deleting.
             }

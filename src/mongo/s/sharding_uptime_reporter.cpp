@@ -97,7 +97,7 @@ void ShardingUptimeReporter::startPeriodicThread() {
         const std::string instanceId(constructInstanceIdString());
         const Timer upTimeTimer;
 
-        while (!inShutdown()) {
+        while (!globalInShutdownDeprecated()) {
             {
                 auto txn = cc().makeOperationContext();
                 reportStatus(txn.get(), instanceId, upTimeTimer);
