@@ -50,7 +50,7 @@ class test_txn13(wttest.WiredTigerTestCase, suite_subprocess):
     ])
 
     # Turn on logging for this test.
-    def conn_config(self, dir):
+    def conn_config(self):
         return 'log=(archive=false,enabled,file_max=%s)' % self.logmax + \
             ',cache_size=8G'
 

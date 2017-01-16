@@ -80,19 +80,9 @@ class test_txn09(wttest.WiredTigerTestCase, suite_subprocess):
         op1s, txn1s, op2s, txn2s, op3s, txn3s, op4s, txn4s,
         prune=20, prunelong=5000)
 
-    # Overrides WiredTigerTestCase
-    def setUpConnectionOpen(self, dir):
-        self.home = dir
-        conn_params = \
-                'create,error_prefix="%s: ",' % self.shortid() + \
-                'log=(archive=false,enabled=%s),' % int(self.log_enabled) + \
-                'transaction_sync=(enabled=false),'
-
-        # print "Opening conn at '%s' with config '%s'" % (dir, conn_params)
-        conn = self.wiredtiger_open(dir, conn_params)
-        self.pr(`conn`)
-        self.session2 = conn.open_session()
-        return conn
+    def conn_config(self):
+        return 'log=(archive=false,enabled=%s),' % int(self.log_enabled) + \
+            'transaction_sync=(enabled=false)'
 
     # Check that a cursor (optionally started in a new transaction), sees the
     # expected values.
@@ -141,6 +131,7 @@ class test_txn09(wttest.WiredTigerTestCase, suite_subprocess):
             # Close and reopen the connection and cursor, toggling the log
             self.log_enabled = not self.log_enabled
             self.reopen_conn()
+            self.session2 = self.conn.open_session()
             c = self.session.open_cursor(self.uri, None, 'overwrite')
 
             self.session.begin_transaction(
