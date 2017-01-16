@@ -139,8 +139,12 @@ class test_txn05(wttest.WiredTigerTestCase, suite_subprocess):
             backup_conn = self.wiredtiger_open(self.backup_dir,
                                                backup_conn_params)
             try:
-                 self.check(backup_conn.open_session(), None, committed)
+                 session = backup_conn.open_session()
             finally:
+                self.check(session, None, committed)
+                # Force a checkpoint because we don't record the recovery
+                # checkpoint as available for archiving.
+                session.checkpoint("force")
                 # Sleep long enough so that the archive thread is guaranteed
                 # to run before we close the connection.
                 time.sleep(1.0)
