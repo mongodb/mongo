@@ -153,46 +153,13 @@ sh.isBalancerRunning = function(configDB) {
         configDB = sh._getConfigDB();
 
     var result = configDB.adminCommand({balancerStatus: 1});
-    if (result.code != ErrorCodes.CommandNotFound) {
-        return assert.commandWorked(result).inBalancerRound;
-    }
-
-    var x = configDB.locks.findOne({_id: "balancer"});
-    if (x == null) {
-        print("config.locks collection empty or missing. be sure you are connected to a mongos");
-        return false;
-    }
-    return x.state > 0;
-};
-
-sh.getBalancerHost = function(configDB) {
-    if (configDB === undefined)
-        configDB = sh._getConfigDB();
-    var x = configDB.locks.findOne({_id: "balancer"});
-    if (x == null) {
-        print(
-            "config.locks collection does not contain balancer lock. be sure you are connected to a mongos");
-        return "";
-    } else if (x.process.match(/ConfigServer/)) {
-        print("getBalancerHost is deprecated starting version 3.4. The balancer is running on " +
-              "the config server primary host.");
-        return "";
-    } else {
-        return x.process.match(/[^:]+:[^:]+/)[0];
-    }
+    return assert.commandWorked(result).inBalancerRound;
 };
 
 sh.stopBalancer = function(timeoutMs, interval) {
     timeoutMs = timeoutMs || 60000;
 
     var result = db.adminCommand({balancerStop: 1, maxTimeMS: timeoutMs});
-    if (result.code === ErrorCodes.CommandNotFound) {
-        // For backwards compatibility, use the legacy balancer stop method
-        result = sh._writeBalancerStateDeprecated(false);
-        sh.waitForBalancer(false, timeoutMs, interval);
-        return result;
-    }
-
     return assert.commandWorked(result);
 };
 
@@ -200,13 +167,6 @@ sh.startBalancer = function(timeoutMs, interval) {
     timeoutMs = timeoutMs || 60000;
 
     var result = db.adminCommand({balancerStart: 1, maxTimeMS: timeoutMs});
-    if (result.code === ErrorCodes.CommandNotFound) {
-        // For backwards compatibility, use the legacy balancer start method
-        result = sh._writeBalancerStateDeprecated(true);
-        sh.waitForBalancer(true, timeoutMs, interval);
-        return result;
-    }
-
     return assert.commandWorked(result);
 };
 
@@ -236,41 +196,6 @@ sh.getShouldAutoSplit = function(configDB) {
         return true;
     }
     return autosplit.enabled;
-};
-
-sh._waitForDLock = function(lockId, onOrNot, timeout, interval) {
-    // Wait for balancer to be on or off
-    // Can also wait for particular balancer state
-    var state = onOrNot;
-    var configDB = sh._getConfigDB();
-
-    var beginTS = undefined;
-    if (state == undefined) {
-        var currLock = configDB.locks.findOne({_id: lockId});
-        if (currLock != null)
-            beginTS = currLock.ts;
-    }
-
-    var lockStateOk = function() {
-        var lock = configDB.locks.findOne({_id: lockId});
-
-        if (state == false)
-            return !lock || lock.state == 0;
-        if (state == true)
-            return lock && lock.state == 2;
-        if (state == undefined)
-            return (beginTS == undefined && lock) ||
-                (beginTS != undefined && (!lock || lock.ts + "" != beginTS + ""));
-        else
-            return lock && lock.state == state;
-    };
-
-    assert.soon(
-        lockStateOk,
-        "Waited too long for lock " + lockId + " to " +
-            (state == true ? "lock" : (state == false ? "unlock" : "change to state " + state)),
-        timeout,
-        interval);
 };
 
 sh.waitForPingChange = function(activePings, timeout, interval) {
@@ -306,50 +231,6 @@ sh.waitForPingChange = function(activePings, timeout, interval) {
     }
 
     return remainingPings;
-};
-
-sh.waitForBalancer = function(onOrNot, timeout, interval) {
-    // If we're waiting for the balancer to turn on or switch state or go to a particular state
-    if (onOrNot) {
-        // Just wait for the balancer lock to change, can't ensure we'll ever see it actually locked
-        sh._waitForDLock("balancer", undefined, timeout, interval);
-    } else {
-        // Otherwise we need to wait until we're sure balancing stops
-        var activePings = [];
-        sh._getConfigDB().mongos.find().forEach(function(ping) {
-            if (!ping.waiting)
-                activePings.push(ping);
-        });
-
-        print("Waiting for active hosts...");
-        activePings = sh.waitForPingChange(activePings, 60 * 1000);
-
-        // After 1min, we assume that all hosts with unchanged pings are either offline (this is
-        // enough time for a full errored balance round, if a network issue, which would reload
-        // settings) or balancing, which we wait for next. Legacy hosts we always have to wait for.
-        print("Waiting for the balancer lock...");
-
-        // Wait for the balancer lock to become inactive. We can guess this is stale after 15 mins,
-        // but need to double-check manually.
-        try {
-            sh._waitForDLock("balancer", false, 15 * 60 * 1000);
-        } catch (e) {
-            print(
-                "Balancer still may be active, you must manually verify this is not the case using the config.changelog collection.");
-            throw Error(e);
-        }
-
-        print("Waiting again for active hosts after balancer is off...");
-
-        // Wait a short time afterwards, to catch the host which was balancing earlier
-        activePings = sh.waitForPingChange(activePings, 5 * 1000);
-
-        // Warn about all the stale host pings remaining
-        activePings.forEach(function(activePing) {
-            print("Warning : host " + activePing._id + " seems to have been offline since " +
-                  activePing.ping);
-        });
-    }
 };
 
 sh.disableBalancing = function(coll) {
@@ -516,19 +397,6 @@ sh.removeRangeFromZone = function(ns, min, max) {
     return sh._getConfigDB().adminCommand({updateZoneKeyRange: ns, min: min, max: max, zone: null});
 };
 
-sh.getBalancerLockDetails = function(configDB) {
-    if (configDB === undefined)
-        configDB = db.getSiblingDB('config');
-    var lock = configDB.locks.findOne({_id: 'balancer'});
-    if (lock == null) {
-        return null;
-    }
-    if (lock.state == 0) {
-        return null;
-    }
-    return lock;
-};
-
 sh.getBalancerWindow = function(configDB) {
     if (configDB === undefined)
         configDB = db.getSiblingDB('config');
@@ -545,7 +413,7 @@ sh.getBalancerWindow = function(configDB) {
 sh.getActiveMigrations = function(configDB) {
     if (configDB === undefined)
         configDB = db.getSiblingDB('config');
-    var activeLocks = configDB.locks.find({_id: {$ne: "balancer"}, state: {$eq: 2}});
+    var activeLocks = configDB.locks.find({state: {$eq: 2}});
     var result = [];
     if (activeLocks != null) {
         activeLocks.forEach(function(lock) {
@@ -715,12 +583,6 @@ function printShardingStatus(configDB, verbose) {
 
     // Is the balancer currently active
     output("\tCurrently running:  " + (sh.isBalancerRunning(configDB) ? "yes" : "no"));
-
-    // Output details of the current balancer round
-    var balLock = sh.getBalancerLockDetails(configDB);
-    if (balLock) {
-        output("\t\tBalancer lock taken at " + balLock.when + " by " + balLock.who);
-    }
 
     // Output the balancer window
     var balSettings = sh.getBalancerWindow(configDB);

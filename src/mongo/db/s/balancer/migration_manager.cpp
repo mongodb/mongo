@@ -239,15 +239,6 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* txn) {
 
     auto distLockManager = Grid::get(txn)->catalogClient(txn)->getDistLockManager();
 
-    // Must claim the balancer lock to prevent any 3.2 mongos clients from acquiring it.
-    auto balancerLockStatus = distLockManager->tryLockWithLocalWriteConcern(
-        txn, "balancer", "CSRS Balancer", _lockSessionID);
-    if (!balancerLockStatus.isOK()) {
-        log() << "Failed to acquire balancer distributed lock. Abandoning balancer recovery."
-              << causedBy(redact(balancerLockStatus.getStatus()));
-        return;
-    }
-
     // Load the active migrations from the config.migrations collection.
     auto statusWithMigrationsQueryResponse =
         Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
@@ -660,15 +651,6 @@ Status MigrationManager::_processRemoteCommandResponse(
     }
 
     return commandStatus;
-}
-
-Status MigrationManager::tryTakeBalancerLock(OperationContext* txn, StringData whyMessage) {
-    return Grid::get(txn)
-        ->catalogClient(txn)
-        ->getDistLockManager()
-        ->lockWithSessionID(
-            txn, "balancer", whyMessage, _lockSessionID, DistLockManager::kSingleLockAttemptTimeout)
-        .getStatus();
 }
 
 MigrationManager::Migration::Migration(NamespaceString inNss, BSONObj inMoveChunkCmdObj)

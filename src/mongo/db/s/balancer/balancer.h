@@ -46,9 +46,7 @@ class Status;
 
 /**
  * The balancer is a background task that tries to keep the number of chunks across all
- * servers of the cluster even. Although every mongos will have one balancer running, only one
- * of them will be active at the any given point in time. The balancer uses a distributed lock
- * for that coordination.
+ * servers of the cluster even.
  *
  * The balancer does act continuously but in "rounds". At a given round, it would decide if
  * there is an imbalance by checking the difference in chunks between the most and least

@@ -313,22 +313,6 @@ void Balancer::_mainThread() {
 
     const Seconds kInitBackoffInterval(10);
 
-    // Take the balancer distributed lock and hold it permanently. Do the attempts with single
-    // attempts in order to not block the thread and be able to check for interrupt more frequently.
-    while (!_stopRequested()) {
-        auto status = _migrationManager.tryTakeBalancerLock(txn.get(), "CSRS Balancer");
-        if (!status.isOK()) {
-            log() << "Balancer distributed lock could not be acquired and will be retried in "
-                  << durationCount<Seconds>(kInitBackoffInterval) << " seconds"
-                  << causedBy(redact(status));
-
-            _sleepFor(txn.get(), kInitBackoffInterval);
-            continue;
-        }
-
-        break;
-    }
-
     auto balancerConfig = shardingContext->getBalancerConfiguration();
     while (!_stopRequested()) {
         Status refreshStatus = balancerConfig->refreshAndCheck(txn.get());

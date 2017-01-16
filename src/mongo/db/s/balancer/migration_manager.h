@@ -137,11 +137,6 @@ public:
      */
     void drainActiveMigrations();
 
-    /**
-     * Tries to take or take over the balancer distributed lock.
-     */
-    Status tryTakeBalancerLock(OperationContext* txn, StringData whyMessage);
-
 private:
     // The current state of the migration manager
     enum class State {  // Allowed transitions:

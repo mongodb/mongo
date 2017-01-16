@@ -45,62 +45,62 @@ TEST(Validity, Empty) {
 
 TEST(Validity, UnlockedWithOptional) {
     OID testLockID = OID::gen();
-    BSONObj obj = BSON(LocksType::name("balancer")
+    BSONObj obj = BSON(LocksType::name("dummy")
                        << LocksType::process("host.local:27017:1352918870:16807")
                        << LocksType::state(LocksType::State::UNLOCKED)
                        << LocksType::lockID(testLockID)
-                       << LocksType::who("host.local:27017:1352918870:16807:Balancer:282475249")
-                       << LocksType::why("doing balance round"));
+                       << LocksType::who("host.local:27017:1352918870:16807:Dummy:282475249")
+                       << LocksType::why("twiddling thumbs"));
     auto locksResult = LocksType::fromBSON(obj);
     ASSERT_OK(locksResult.getStatus());
 
     const LocksType& lock = locksResult.getValue();
 
-    ASSERT_EQUALS(lock.getName(), "balancer");
+    ASSERT_EQUALS(lock.getName(), "dummy");
     ASSERT_EQUALS(lock.getProcess(), "host.local:27017:1352918870:16807");
     ASSERT_EQUALS(lock.getState(), LocksType::State::UNLOCKED);
     ASSERT_EQUALS(lock.getLockID(), testLockID);
-    ASSERT_EQUALS(lock.getWho(), "host.local:27017:1352918870:16807:Balancer:282475249");
-    ASSERT_EQUALS(lock.getWhy(), "doing balance round");
+    ASSERT_EQUALS(lock.getWho(), "host.local:27017:1352918870:16807:Dummy:282475249");
+    ASSERT_EQUALS(lock.getWhy(), "twiddling thumbs");
 }
 
 TEST(Validity, UnlockedWithoutOptional) {
-    BSONObj obj = BSON(LocksType::name("balancer") << LocksType::state(LocksType::State::UNLOCKED));
+    BSONObj obj = BSON(LocksType::name("dummy") << LocksType::state(LocksType::State::UNLOCKED));
     auto locksResult = LocksType::fromBSON(obj);
     ASSERT_OK(locksResult.getStatus());
 
     const LocksType& lock = locksResult.getValue();
 
-    ASSERT_EQUALS(lock.getName(), "balancer");
+    ASSERT_EQUALS(lock.getName(), "dummy");
     ASSERT_EQUALS(lock.getState(), LocksType::State::UNLOCKED);
 }
 
 TEST(Validity, LockedValid) {
     OID testLockID = OID::gen();
-    BSONObj obj = BSON(LocksType::name("balancer")
+    BSONObj obj = BSON(LocksType::name("dummy")
                        << LocksType::process("host.local:27017:1352918870:16807")
                        << LocksType::state(LocksType::State::LOCKED)
                        << LocksType::lockID(testLockID)
-                       << LocksType::who("host.local:27017:1352918870:16807:Balancer:282475249")
+                       << LocksType::who("host.local:27017:1352918870:16807:Dummy:282475249")
                        << LocksType::why("doing balance round"));
     auto locksResult = LocksType::fromBSON(obj);
     ASSERT_OK(locksResult.getStatus());
 
     const LocksType& lock = locksResult.getValue();
 
-    ASSERT_EQUALS(lock.getName(), "balancer");
+    ASSERT_EQUALS(lock.getName(), "dummy");
     ASSERT_EQUALS(lock.getProcess(), "host.local:27017:1352918870:16807");
     ASSERT_EQUALS(lock.getState(), LocksType::State::LOCKED);
     ASSERT_EQUALS(lock.getLockID(), testLockID);
-    ASSERT_EQUALS(lock.getWho(), "host.local:27017:1352918870:16807:Balancer:282475249");
+    ASSERT_EQUALS(lock.getWho(), "host.local:27017:1352918870:16807:Dummy:282475249");
     ASSERT_EQUALS(lock.getWhy(), "doing balance round");
 }
 
 TEST(Validity, LockedMissingProcess) {
-    BSONObj obj = BSON(LocksType::name("balancer")
+    BSONObj obj = BSON(LocksType::name("dummy")
                        << LocksType::state(LocksType::State::LOCKED)
                        << LocksType::lockID(OID::gen())
-                       << LocksType::who("host.local:27017:1352918870:16807:Balancer:282475249")
+                       << LocksType::who("host.local:27017:1352918870:16807:Dummy:282475249")
                        << LocksType::why("doing balance round"));
     auto locksResult = LocksType::fromBSON(obj);
     ASSERT_OK(locksResult.getStatus());
@@ -110,10 +110,10 @@ TEST(Validity, LockedMissingProcess) {
 }
 
 TEST(Validity, LockedMissingLockID) {
-    BSONObj obj = BSON(LocksType::name("balancer")
+    BSONObj obj = BSON(LocksType::name("dummy")
                        << LocksType::process("host.local:27017:1352918870:16807")
                        << LocksType::state(LocksType::State::LOCKED)
-                       << LocksType::who("host.local:27017:1352918870:16807:Balancer:282475249")
+                       << LocksType::who("host.local:27017:1352918870:16807:Dummy:282475249")
                        << LocksType::why("doing balance round"));
     auto locksResult = LocksType::fromBSON(obj);
     ASSERT_OK(locksResult.getStatus());
@@ -124,10 +124,10 @@ TEST(Validity, LockedMissingLockID) {
 
 TEST(Validity, LockedMissingWho) {
     BSONObj obj =
-        BSON(LocksType::name("balancer") << LocksType::process("host.local:27017:1352918870:16807")
-                                         << LocksType::state(LocksType::State::LOCKED)
-                                         << LocksType::lockID(OID::gen())
-                                         << LocksType::why("doing balance round"));
+        BSON(LocksType::name("dummy") << LocksType::process("host.local:27017:1352918870:16807")
+                                      << LocksType::state(LocksType::State::LOCKED)
+                                      << LocksType::lockID(OID::gen())
+                                      << LocksType::why("twiddling thumbs"));
     auto locksResult = LocksType::fromBSON(obj);
     ASSERT_OK(locksResult.getStatus());
 
@@ -136,11 +136,11 @@ TEST(Validity, LockedMissingWho) {
 }
 
 TEST(Validity, LockedMissingWhy) {
-    BSONObj obj = BSON(LocksType::name("balancer")
+    BSONObj obj = BSON(LocksType::name("dummy")
                        << LocksType::process("host.local:27017:1352918870:16807")
                        << LocksType::state(LocksType::State::LOCKED)
                        << LocksType::lockID(OID::gen())
-                       << LocksType::who("host.local:27017:1352918870:16807:Balancer:282475249"));
+                       << LocksType::who("host.local:27017:1352918870:16807:Dummy:282475249"));
     auto locksResult = LocksType::fromBSON(obj);
     ASSERT_OK(locksResult.getStatus());
 
@@ -149,12 +149,12 @@ TEST(Validity, LockedMissingWhy) {
 }
 
 TEST(Validity, ContestedValid) {
-    BSONObj obj = BSON(LocksType::name("balancer")
+    BSONObj obj = BSON(LocksType::name("dummy")
                        << LocksType::process("host.local:27017:1352918870:16807")
                        << LocksType::state(LocksType::State::LOCK_PREP)
                        << LocksType::lockID(OID::gen())
-                       << LocksType::who("host.local:27017:1352918870:16807:Balancer:282475249")
-                       << LocksType::why("doing balance round"));
+                       << LocksType::who("host.local:27017:1352918870:16807:Dummy:282475249")
+                       << LocksType::why("twiddling thumbs"));
     auto locksResult = LocksType::fromBSON(obj);
     ASSERT_OK(locksResult.getStatus());
 
@@ -163,11 +163,11 @@ TEST(Validity, ContestedValid) {
 }
 
 TEST(Validity, ContestedMissingProcess) {
-    BSONObj obj = BSON(LocksType::name("balancer")
+    BSONObj obj = BSON(LocksType::name("dummy")
                        << LocksType::state(LocksType::State::LOCK_PREP)
                        << LocksType::lockID(OID::gen())
-                       << LocksType::who("host.local:27017:1352918870:16807:Balancer:282475249")
-                       << LocksType::why("doing balance round"));
+                       << LocksType::who("host.local:27017:1352918870:16807:Dummy:282475249")
+                       << LocksType::why("twiddling thumbs"));
     auto locksResult = LocksType::fromBSON(obj);
     ASSERT_OK(locksResult.getStatus());
 
@@ -176,11 +176,11 @@ TEST(Validity, ContestedMissingProcess) {
 }
 
 TEST(Validity, ContestedMissingLockID) {
-    BSONObj obj = BSON(LocksType::name("balancer")
+    BSONObj obj = BSON(LocksType::name("dummy")
                        << LocksType::process("host.local:27017:1352918870:16807")
                        << LocksType::state(LocksType::State::LOCK_PREP)
-                       << LocksType::who("host.local:27017:1352918870:16807:Balancer:282475249")
-                       << LocksType::why("doing balance round"));
+                       << LocksType::who("host.local:27017:1352918870:16807:Dummy:282475249")
+                       << LocksType::why("twiddling thumbs"));
     auto locksResult = LocksType::fromBSON(obj);
     ASSERT_OK(locksResult.getStatus());
 
@@ -190,10 +190,10 @@ TEST(Validity, ContestedMissingLockID) {
 
 TEST(Validity, ContestedMissingWho) {
     BSONObj obj =
-        BSON(LocksType::name("balancer") << LocksType::process("host.local:27017:1352918870:16807")
-                                         << LocksType::state(LocksType::State::LOCK_PREP)
-                                         << LocksType::lockID(OID::gen())
-                                         << LocksType::why("doing balance round"));
+        BSON(LocksType::name("dummy") << LocksType::process("host.local:27017:1352918870:16807")
+                                      << LocksType::state(LocksType::State::LOCK_PREP)
+                                      << LocksType::lockID(OID::gen())
+                                      << LocksType::why("doing balance round"));
     auto locksResult = LocksType::fromBSON(obj);
     ASSERT_OK(locksResult.getStatus());
 
@@ -202,11 +202,11 @@ TEST(Validity, ContestedMissingWho) {
 }
 
 TEST(Validity, ContestedMissingWhy) {
-    BSONObj obj = BSON(LocksType::name("balancer")
+    BSONObj obj = BSON(LocksType::name("dummy")
                        << LocksType::process("host.local:27017:1352918870:16807")
                        << LocksType::state(LocksType::State::LOCK_PREP)
                        << LocksType::lockID(OID::gen())
-                       << LocksType::who("host.local:27017:1352918870:16807:Balancer:282475249"));
+                       << LocksType::who("host.local:27017:1352918870:16807:Dummy:282475249"));
     auto locksResult = LocksType::fromBSON(obj);
     ASSERT_OK(locksResult.getStatus());
 
