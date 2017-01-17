@@ -15,3 +15,12 @@ function getProfilerProtocolStringForCommand(conn) {
 
     return "op_command";
 }
+
+// Throws an assertion if the profiler does not contain exactly one entry matching <filter>.
+// Optional arguments <errorMsgFilter> and <errorMsgProj> limit profiler output if this asserts.
+function profilerHasSingleMatchingEntryOrThrow(inputDb, filter, errorMsgFilter, errorMsgProj) {
+    assert.eq(inputDb.system.profile.find(filter).itcount(),
+              1,
+              "Expected exactly one op matching: " + tojson(filter) + " in profiler " +
+                  tojson(inputDb.system.profile.find(errorMsgFilter, errorMsgProj).toArray()));
+}

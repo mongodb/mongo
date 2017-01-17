@@ -9,6 +9,8 @@ selector:
     - jstests/sharding/printShardingStatus.js
     # Behavior change to addShard
     - jstests/sharding/addshard_idempotent.js
+    # SERVER-27438: Preserves $comment in OP_QUERY and tests for this change.
+    - jstests/sharding/mongos_query_comment.js
 
 executor:
   js_test:
