@@ -51,10 +51,12 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/journal_listener',
         '$BUILD_DIR/mongo/db/storage/paths',
         '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
+        # '$BUILD_DIR/mongo/db/index/index_access_methods', # CYCLE
+        # '$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
     ],
     LIBDEPS_TAGS=[
-        # Depends upon parts of catalog which form a cycle.
-        'incomplete',
+        # TODO(ADAM, 2017-01-06): See `CYCLE` tags above
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 

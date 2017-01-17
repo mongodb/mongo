@@ -79,10 +79,14 @@ env.Library(
         "$BUILD_DIR/mongo/db/s/sharding",
         "$BUILD_DIR/mongo/db/storage/oplog_hack",
         "$BUILD_DIR/mongo/util/elapsed_tracker",
+        #"$BUILD_DIR/mongo/db/matcher/expressions_mongod_only", # CYCLE
+        #'$BUILD_DIR/mongo/db/clientcursor',, # CYCLE
+        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
+        #'$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
     ],
     LIBDEPS_TAGS=[
-        # Has direct and indirect circular dependencies with the catalog components.
-        'incomplete',
+        # TODO(ADAM, 2017-01-09): See `CYCLE` tags above.
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
@@ -199,10 +203,11 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/exec/exec',
         '$BUILD_DIR/mongo/db/exec/working_set',
+        #'$BUILD_DIR/mongo/db/query/query', # CYCLE
     ],
     LIBDEPS_TAGS=[
-        # Circular with the 'query' library in this directory
-        'incomplete',
+        # TODO(ADAM, 2017-01-09): See `CYCLE` tags above
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 

@@ -24,11 +24,14 @@ env.Library(
         '$BUILD_DIR/mongo/s/cluster_last_error_info',
         '$BUILD_DIR/mongo/s/is_mongos',
         'shard_interface',
+        '$BUILD_DIR/mongo/db/lasterror',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/auth/authcore',
+        #'$BUILD_DIR/mongo/s/coreshard', # CYCLE
     ],
     LIBDEPS_TAGS=[
-        # Circular with both coreshard and coredb! Also relies on some
-        # symbols that are not uniquely defined.
-        'incomplete',
+        # TODO(ADAM, 2017,01-06): See `CYCLE` tags above
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 

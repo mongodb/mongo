@@ -430,15 +430,15 @@ env.Library(
         "repl/replset_web_handler.cpp",
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/background',
         "$BUILD_DIR/mongo/db/curop",
+        '$BUILD_DIR/mongo/db/clientcursor',
         "$BUILD_DIR/mongo/db/dbdirectclient",
+        '$BUILD_DIR/mongo/db/stats/fill_locker_info',
+        '$BUILD_DIR/mongo/db/stats/serveronly',
         "$BUILD_DIR/mongo/util/net/miniwebserver",
         "mongodandmongos",
         'repl/repl_coordinator_global',
-    ],
-    LIBDEPS_TAGS=[
-        # Depends on symbols from serverOnlyFiles
-        'incomplete',
     ],
 )
 
@@ -592,10 +592,11 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver',
         'curop',
         'lasterror',
+        # 'assemble_response', # CYCLE
     ],
     LIBDEPS_TAGS=[
-        # Circularity with assembleResponse, defined in assemble_response, below.
-        'incomplete',
+        # TODO(ADAM, 2017-01-09): See `CYCLE` tags above
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 

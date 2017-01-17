@@ -84,10 +84,16 @@ env.Library(
         'metadata',
         'migration_types',
         'type_shard_identity',
+        #'$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
+        #'$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager_impl', # CYCLE
+        #'$BUILD_DIR/mongo/db/query/query', # CYCLE
+        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
+        #'$BUILD_DIR/mongo/db/dbhelpers', # CYCLE
+        #'$BUILD_DIR/mongo/db/db_raii', # CYCLE
     ],
     LIBDEPS_TAGS=[
-        # Depends on parts of catalog.
-        'incomplete',
+        # TODO(ADAM, 2017-01-06): See `CYCLE` tags above
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
 
@@ -158,18 +164,17 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
+        '$BUILD_DIR/mongo/db/commands/dcommands',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/dbhelpers',
+        '$BUILD_DIR/mongo/db/index_d',
+        '$BUILD_DIR/mongo/db/range_deleter_d',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         '$BUILD_DIR/mongo/s/serveronly',
         'balancer',
         'metadata',
         'sharding',
-    ],
-    LIBDEPS_TAGS=[
-        # Depends on getDeleter from db/serveronly
-        'incomplete',
     ],
 )
 

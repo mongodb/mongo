@@ -100,10 +100,18 @@ env.Library(
         "$BUILD_DIR/mongo/db/storage/storage_options",
         "$BUILD_DIR/mongo/s/common",
         '$BUILD_DIR/third_party/s2/s2',
+        '$BUILD_DIR/mongo/db/query/query_common',
+        #'$BUILD_DIR/mongo/db/ops/write_ops', # CYCLE
+        #'$BUILD_DIR/mongo/db/index/index_access_methods', # CYCLE
+        #'$BUILD_DIR/mongo/db/matcher/expressions_mongod_only', # CYCLE
+        #'$BUILD_DIR/mongo/db/s/sharding', # CYCLE
+        #'$BUILD_DIR/mongo/db/query/query', # CYCLE
+        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
+        #'$BUILD_DIR/mongo/db/pipeline/serveronly', # CYCLE
     ],
     LIBDEPS_TAGS=[
-        # A great number of undefined symbols in this library
-        'incomplete',
+        # TODO(ADAM, 2017-01-06): See `CYCLE` tags above
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ]
 )
 

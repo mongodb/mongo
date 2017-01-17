@@ -282,9 +282,13 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_impl',
         '$BUILD_DIR/mongo/db/service_context',
         'update_driver',
+        #'$BUILD_DIR/mongo/db/commands/dcommands', # CYCLE
+        '$BUILD_DIR/mongo/db/introspect',
+        '$BUILD_DIR/mongo/db/curop_metrics',
     ],
     LIBDEPS_TAGS=[
-        # Deep circularity with catalog
-        'incomplete'
+        # TODO(ADAM, 2017-01-10): See `CYCLE` tags above.
+        # The only undefined symbol is `mongo::Command::run` from `dcommands`.
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
     ],
 )
