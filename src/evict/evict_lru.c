@@ -912,6 +912,7 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 	struct timespec current_time;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	uint64_t cur_threads, delta_msec, delta_pages, i, target_threads;
 	uint64_t pgs_evicted_cur, pgs_evicted_persec_cur;
 	uint32_t thread_surplus;
@@ -945,7 +946,7 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 	 * Otherwise, we just record the number of evicted pages and return.
 	 */
 	if (conn->evict_tune_pgs_last == 0)
-		goto out;
+		goto err;
 
 	delta_msec = WT_TIMEDIFF_MS(current_time, conn->evict_tune_last_time);
 	delta_pages = pgs_evicted_cur - conn->evict_tune_pgs_last;
@@ -995,8 +996,13 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 			    conn->evict_tune_workers_best;
 
 			for (i = 0; i < thread_surplus; i++) {
-				WT_RET(__wt_thread_group_stop_one(session,
-				   &conn->evict_threads, true));
+				/*
+				 * If we get an error, it should be because we
+				 * were unable to acquire the thread group lock.
+				 * Break out of trying.
+				 */
+				WT_ERR(__wt_thread_group_stop_one(
+				    session, &conn->evict_threads, false));
 				WT_STAT_CONN_INCR(session,
 				  cache_eviction_worker_removed);
 			}
@@ -1029,7 +1035,12 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 		 * Start the new threads.
 		 */
 		for (i = 0; i < (target_threads - cur_threads); ++i) {
-			WT_RET(__wt_thread_group_start_one(session,
+			/*
+			 * If we get an error, it should be because we were
+			 * unable to acquire the thread group lock.  Break out
+			 * of trying.
+			 */
+			WT_ERR(__wt_thread_group_start_one(session,
 			    &conn->evict_threads, false));
 			WT_STAT_CONN_INCR(session,
 			    cache_eviction_worker_created);
@@ -1042,9 +1053,15 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 	WT_STAT_CONN_SET(session, cache_eviction_active_workers,
 	    conn->evict_threads.current_threads);
 
-out:	conn->evict_tune_last_time = current_time;
+err:	conn->evict_tune_last_time = current_time;
 	conn->evict_tune_pgs_last = pgs_evicted_cur;
-	return (0);
+	/*
+	 * If we got an EBUSY trying to acquire the lock just return.
+	 * We can try to tune the workers next time.
+	 */
+	if (ret == EBUSY)
+		ret = 0;
+	return (ret);
 }
 
 /*

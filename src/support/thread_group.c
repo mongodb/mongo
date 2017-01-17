@@ -325,8 +325,8 @@ __wt_thread_group_start_one(
 
 	if (wait)
 		__wt_writelock(session, &group->lock);
-	else if (__wt_try_writelock(session, &group->lock) != 0)
-		return (0);
+	else
+		WT_RET(__wt_try_writelock(session, &group->lock));
 
 	/* Recheck the bounds now that we hold the lock */
 	if (group->current_threads < group->max)
@@ -352,8 +352,8 @@ __wt_thread_group_stop_one(
 
 	if (wait)
 		__wt_writelock(session, &group->lock);
-	else if (__wt_try_writelock(session, &group->lock) != 0)
-		return (0);
+	else
+		WT_RET(__wt_try_writelock(session, &group->lock));
 
 	/* Recheck the bounds now that we hold the lock */
 	if (group->current_threads > group->min)
