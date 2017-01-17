@@ -46,7 +46,7 @@ function runTest(s) {
             bulk.insert({i: idInc++, val: valInc++, y: str});
         }
     }
-    assert.writeOK(bulk.execute());
+    assert.writeOK(bulk.execute({w: 2, wtimeout: 10 * 60 * 1000}));
 
     jsTest.log("Documents inserted, doing double-checks of insert...");
 
@@ -146,7 +146,7 @@ function runTest(s) {
             bulk.insert({i: idInc++, val: valInc++, y: str});
         }
         // wait for replication to catch up
-        assert.writeOK(bulk.execute({w: 2}));
+        assert.writeOK(bulk.execute({w: 2, wtimeout: 10 * 60 * 1000}));
     }
 
     jsTest.log("No errors...");
