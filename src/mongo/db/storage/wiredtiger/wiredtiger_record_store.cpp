@@ -1543,7 +1543,11 @@ Status WiredTigerRecordStore::validate(OperationContext* opCtx,
     if (!_isEphemeral) {
         int err = WiredTigerUtil::verifyTable(opCtx, _uri, &results->errors);
         if (err == EBUSY) {
-            const char* msg = "verify() returned EBUSY. Not treating as invalid.";
+            std::string msg = str::stream()
+                << "Could not complete validation of " << _uri << ". "
+                << "This is a transient issue as the collection was actively "
+                   "in use by other operations.";
+
             warning() << msg;
             results->warnings.push_back(msg);
         } else if (err) {

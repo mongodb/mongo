@@ -392,7 +392,10 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
         // SERVER-16457: verify and salvage are occasionally failing with EBUSY. For now we
         // lie and return OK to avoid breaking tests. This block should go away when that ticket
         // is resolved.
-        error() << "Verify on " << uri << " failed with EBUSY. Assuming no salvage is needed.";
+        error()
+            << "Verify on " << uri << " failed with EBUSY. "
+            << "This means the collection was being accessed. No repair is necessary unless other "
+               "errors are reported.";
         return Status::OK();
     }
 
