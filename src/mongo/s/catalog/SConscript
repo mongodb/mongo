@@ -18,7 +18,6 @@ env.Library(
     target='sharding_catalog_mock',
     source=[
         'sharding_catalog_client_mock.cpp',
-        'sharding_catalog_manager_mock.cpp',
     ],
     LIBDEPS=[
         'dist_lock_manager_mock',
@@ -143,7 +142,10 @@ env.Library(
 env.Library(
     target='sharding_catalog_manager_impl',
     source=[
+        'sharding_catalog_manager_chunk_operations_impl.cpp',
         'sharding_catalog_manager_impl.cpp',
+        'sharding_catalog_manager_shard_operations_impl.cpp',
+        'sharding_catalog_manager_zone_operations_impl.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/db_raii',

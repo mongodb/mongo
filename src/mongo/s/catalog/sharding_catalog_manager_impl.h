@@ -28,36 +28,22 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
-class DatabaseType;
 class RemoteCommandTargeter;
-class ShardingCatalogClient;
-class VersionType;
-class ShardId;
-template <typename T>
-class StatusWith;
-
-namespace executor {
-class TaskExecutor;
-}  // namespace executor
 
 /**
  * Implements the catalog manager for writing to replica set config servers.
  */
 class ShardingCatalogManagerImpl final : public ShardingCatalogManager {
 public:
-    ShardingCatalogManagerImpl(ShardingCatalogClient* catalogClient,
-                               std::unique_ptr<executor::TaskExecutor> addShardExecutor);
+    ShardingCatalogManagerImpl(std::unique_ptr<executor::TaskExecutor> addShardExecutor);
     virtual ~ShardingCatalogManagerImpl();
 
     /**
@@ -68,10 +54,9 @@ public:
 
     void shutDown(OperationContext* txn) override;
 
-    StatusWith<std::string> addShard(OperationContext* txn,
-                                     const std::string* shardProposedName,
-                                     const ConnectionString& shardConnectionString,
-                                     const long long maxSize) override;
+    Status initializeConfigDatabaseIfNeeded(OperationContext* txn) override;
+
+    void discardCachedConfigDatabaseInitializationState() override;
 
     Status addShardToZone(OperationContext* txn,
                           const std::string& shardName,
@@ -113,14 +98,14 @@ public:
 
     void appendConnectionStats(executor::ConnectionPoolStats* stats) override;
 
-    Status initializeConfigDatabaseIfNeeded(OperationContext* txn) override;
-
-    void discardCachedConfigDatabaseInitializationState() override;
+    StatusWith<std::string> addShard(OperationContext* txn,
+                                     const std::string* shardProposedName,
+                                     const ConnectionString& shardConnectionString,
+                                     const long long maxSize) override;
 
     Status initializeShardingAwarenessOnUnawareShards(OperationContext* txn) override;
 
     Status upsertShardIdentityOnShard(OperationContext* txn, ShardType shardType) override;
-
 
     BSONObj createShardIdentityUpsertForAddShard(OperationContext* txn,
                                                  const std::string& shardName) override;
@@ -132,9 +117,15 @@ public:
 
 private:
     /**
-     * Generates a unique name to be given to a newly added shard.
+     * Performs the necessary checks for version compatibility and creates a new config.version
+     * document if the current cluster config is empty.
      */
-    StatusWith<std::string> _generateNewShardName(OperationContext* txn);
+    Status _initConfigVersion(OperationContext* txn);
+
+    /**
+     * Builds all the expected indexes on the config server.
+     */
+    Status _initConfigIndexes(OperationContext* txn);
 
     /**
      * Used during addShard to determine if there is already an existing shard that matches the
@@ -188,17 +179,6 @@ private:
                                                               RemoteCommandTargeter* targeter,
                                                               const std::string& dbName,
                                                               const BSONObj& cmdObj);
-
-    /**
-     * Returns the current cluster schema/protocol version.
-     */
-    StatusWith<VersionType> _getConfigVersion(OperationContext* txn);
-
-    /**
-     * Performs the necessary checks for version compatibility and creates a new config.version
-     * document if the current cluster config is empty.
-     */
-    Status _initConfigVersion(OperationContext* txn);
 
     /**
      * Retrieves all shards that are not marked as sharding aware (state = 1) in this cluster.
@@ -265,11 +245,6 @@ private:
      */
     void _untrackAddShardHandle_inlock(const ShardId& shardId);
 
-    /**
-     * Builds all the expected indexes on the config server.
-     */
-    Status _initConfigIndexes(OperationContext* txn);
-
     //
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
@@ -281,24 +256,19 @@ private:
 
     stdx::mutex _mutex;
 
-    // Pointer to the ShardingCatalogClient that can be used to read config server data.
-    // This pointer is not owned, so it is important that the object it points to continues to be
-    // valid for the lifetime of this ShardingCatalogManager.
-    ShardingCatalogClient* _catalogClient;  // (R)
+    // True if shutDown() has been called. False, otherwise.
+    bool _inShutdown{false};  // (M)
+
+    // True if startup() has been called.
+    bool _started{false};  // (M)
+
+    // True if initializeConfigDatabaseIfNeeded() has been called and returned successfully.
+    bool _configInitialized{false};  // (M)
 
     // Executor specifically used for sending commands to servers that are in the process of being
     // added as shards.  Does not have any connection hook set on it, thus it can be used to talk
     // to servers that are not yet in the ShardRegistry.
     std::unique_ptr<executor::TaskExecutor> _executorForAddShard;  // (R)
-
-    // True if shutDown() has been called. False, otherwise.
-    bool _inShutdown = false;  // (M)
-
-    // True if startup() has been called.
-    bool _started = false;  // (M)
-
-    // True if initializeConfigDatabaseIfNeeded() has been called and returned successfully.
-    bool _configInitialized = false;  // (M)
 
     // For rolling upgrade and backwards compatibility with 3.2 mongos, maintains a mapping of
     // a shardId to an outstanding addShard task scheduled against the _executorForAddShard.
