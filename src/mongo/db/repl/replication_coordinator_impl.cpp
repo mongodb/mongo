@@ -44,7 +44,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
-#include "mongo/db/repl/data_replicator_external_state_impl.h"
+#include "mongo/db/repl/data_replicator_external_state_initial_sync.h"
 #include "mongo/db/repl/elect_cmd_runner.h"
 #include "mongo/db/repl/freshness_checker.h"
 #include "mongo/db/repl/freshness_scanner.h"
@@ -620,7 +620,8 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* txn,
                 stdx::lock_guard<stdx::mutex> lock(_mutex);
                 drCopy = std::make_shared<DataReplicator>(
                     createDataReplicatorOptions(this, _externalState.get()),
-                    stdx::make_unique<DataReplicatorExternalStateImpl>(this, _externalState.get()),
+                    stdx::make_unique<DataReplicatorExternalStateInitialSync>(this,
+                                                                              _externalState.get()),
                     _storage,
                     onCompletion);
                 _dr = drCopy;
