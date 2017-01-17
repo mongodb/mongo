@@ -25,9 +25,11 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/stdx/memory.h"
@@ -39,7 +41,6 @@ class ChunkRange;
 class ConnectionString;
 class NamespaceString;
 class OperationContext;
-class RemoteCommandTargeter;
 class ShardId;
 class ShardType;
 class ChunkType;

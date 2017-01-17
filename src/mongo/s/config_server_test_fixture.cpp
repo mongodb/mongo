@@ -143,7 +143,7 @@ std::unique_ptr<ShardingCatalogManager> ConfigServerTestFixture::makeShardingCat
     _addShardNetworkTestEnv =
         stdx::make_unique<NetworkTestEnv>(specialExec.get(), _mockNetworkForAddShard);
 
-    return stdx::make_unique<ShardingCatalogManagerImpl>(catalogClient, std::move(specialExec));
+    return stdx::make_unique<ShardingCatalogManagerImpl>(std::move(specialExec));
 }
 
 std::unique_ptr<CatalogCache> ConfigServerTestFixture::makeCatalogCache() {
