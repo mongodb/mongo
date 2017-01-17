@@ -6,7 +6,8 @@
 
 (function() {
     "use strict";
-    load("jstests/libs/check_log.js");
+
+    load("jstests/libs/write_concern_util.js");
 
     // The config.version document is written on transition to primary. We need to ensure this
     // config.version document is rolled back for this test.
@@ -57,12 +58,9 @@
     jsTest.log("Waiting for " + nodes[1] + " and " + nodes[2] + " to transition to SECONDARY.");
     configRS.waitForState([nodes[1], nodes[2]], ReplSetTest.State.SECONDARY);
 
-    jsTest.log("Stopping the OplogFetcher on all nodes");
+    jsTest.log("Stopping the replication producer on all nodes");
     // Now that the secondaries have finished initial sync and are electable, stop replication.
-    nodes.forEach(function(node) {
-        assert.commandWorked(node.getDB('admin').runCommand(
-            {configureFailPoint: 'stopOplogFetcher', mode: 'alwaysOn'}));
-    });
+    stopServerReplication([nodes[1], nodes[2]]);
 
     jsTest.log("Allowing the primary to write the config.version doc");
     nodes.forEach(function(node) {
@@ -116,10 +114,7 @@
     assert.neq(origConfigVersionDoc.clusterId, newConfigVersionDoc.clusterId);
 
     jsTest.log("Re-enabling replication on all nodes");
-    nodes.forEach(function(node) {
-        assert.commandWorked(
-            node.getDB('admin').runCommand({configureFailPoint: 'stopOplogFetcher', mode: 'off'}));
-    });
+    restartServerReplication(nodes);
 
     jsTest.log(
         "Waiting for original primary to rollback and replicate new config.version document");

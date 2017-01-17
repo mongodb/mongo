@@ -753,7 +753,7 @@ void DataReplicator::_oplogFetcherCallback(const Status& oplogFetcherFinishStatu
     // It is up to the DatabasesCloner and MultiApplier to determine if they can proceed without any
     // additional data going into the oplog buffer.
     // It is not common for the OplogFetcher to return with an OK status. The only time it returns
-    // an OK status is when the 'stopOplogFetcher' fail point is enabled, which causes the
+    // an OK status is when the 'stopReplProducer' fail point is enabled, which causes the
     // OplogFetcher to ignore the current sync source response and return early.
     if (status.isOK()) {
         log() << "Finished fetching oplog fetching early. Last fetched optime and hash: "

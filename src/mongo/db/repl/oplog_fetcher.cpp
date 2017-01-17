@@ -51,7 +51,7 @@ namespace repl {
 
 Seconds OplogFetcher::kDefaultProtocolZeroAwaitDataTimeout(2);
 
-MONGO_FP_DECLARE(stopOplogFetcher);
+MONGO_FP_DECLARE(stopReplProducer);
 
 namespace {
 
@@ -423,12 +423,10 @@ void OplogFetcher::_callback(const Fetcher::QueryResponseStatus& result,
     }
 
     // Stop fetching and return on fail point.
-    // This fail point is intended to make the oplog fetcher ignore the downloaded batch of
-    // operations and not error out.
-    if (MONGO_FAIL_POINT(stopOplogFetcher)) {
+    // This fail point makes the oplog fetcher ignore the downloaded batch of operations and not
+    // error out.
+    if (MONGO_FAIL_POINT(stopReplProducer)) {
         _finishCallback(Status::OK());
-        // Wait for a while, otherwise, it will keep busy waiting.
-        sleepmillis(100);
         return;
     }
 
