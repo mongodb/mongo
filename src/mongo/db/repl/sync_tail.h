@@ -220,6 +220,9 @@ private:
 // These free functions are used by the thread pool workers to write ops to the db.
 void multiSyncApply(const std::vector<BSONObj>& ops, SyncTail* st);
 void multiInitialSyncApply(const std::vector<BSONObj>& ops, SyncTail* st);
+Status multiInitialSyncApply_noAbort(OperationContext* txn,
+                                     const std::vector<BSONObj>& ops,
+                                     SyncTail* st);
 
 }  // namespace repl
 }  // namespace mongo

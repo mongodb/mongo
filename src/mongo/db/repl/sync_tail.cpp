@@ -1019,32 +1019,39 @@ void multiInitialSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
     initializeWriterThread();
 
     OperationContextImpl txn;
-    txn.setReplicatedWrites(false);
-    DisableDocumentValidation validationDisabler(&txn);
+    Status status = multiInitialSyncApply_noAbort(&txn, ops, st);
+    fassertNoTrace(15915, status);
+}
+
+Status multiInitialSyncApply_noAbort(OperationContext* txn,
+                                     const std::vector<BSONObj>& ops,
+                                     SyncTail* st) {
+    txn->setReplicatedWrites(false);
+    DisableDocumentValidation validationDisabler(txn);
 
     // allow us to get through the magic barrier
-    txn.lockState()->setIsBatchWriter(true);
+    txn->lockState()->setIsBatchWriter(true);
 
     // This function is only called in initial sync, as its name suggests.
     bool inSteadyStateReplication = false;
 
     for (std::vector<BSONObj>::const_iterator it = ops.begin(); it != ops.end(); ++it) {
         try {
-            const Status s = SyncTail::syncApply(&txn, *it, inSteadyStateReplication);
+            const Status s = SyncTail::syncApply(txn, *it, inSteadyStateReplication);
             if (!s.isOK()) {
                 // Don't retry on commands.
                 SyncTail::OplogEntry entry(*it);
                 if (entry.opType[0] == 'c') {
                     error() << "Error applying command (" << it->toString() << "): " << s;
-                    fassertFailedNoTrace(40353);
+                    return s;
                 }
 
                 // We might need to fetch the missing docs from the sync source.
-                if (st->shouldRetry(&txn, *it)) {
-                    const Status s2 = SyncTail::syncApply(&txn, *it, inSteadyStateReplication);
+                if (st->shouldRetry(txn, *it)) {
+                    const Status s2 = SyncTail::syncApply(txn, *it, inSteadyStateReplication);
                     if (!s2.isOK()) {
                         severe() << "Error applying operation (" << it->toString() << "): " << s2;
-                        fassertFailedNoTrace(15915);
+                        return s2;
                     }
                 }
 
@@ -1053,16 +1060,24 @@ void multiInitialSyncApply(const std::vector<BSONObj>& ops, SyncTail* st) {
                 // subsequently got deleted and no longer exists on the Sync Target at all
             }
         } catch (const DBException& e) {
+            // SERVER-24927 If we have a NamespaceNotFound exception, then this document will be
+            // dropped before initial sync ends anyways and we should ignore it.
+            SyncTail::OplogEntry entry(*it);
+            if (e.getCode() == ErrorCodes::NamespaceNotFound &&
+                isCrudOpType(entry.opType.rawData())) {
+                continue;
+            }
+
             severe() << "writer worker caught exception: " << causedBy(e)
                      << " on: " << it->toString();
 
             if (inShutdown()) {
-                return;
+                return Status::OK();
             }
-
-            fassertFailedNoTrace(16361);
+            return e.toStatus();
         }
     }
+    return Status::OK();
 }
 
 }  // namespace repl

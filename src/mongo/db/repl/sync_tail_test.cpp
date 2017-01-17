@@ -45,6 +45,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/operation_context_repl_mock.h"
+#include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/sync_tail.h"
@@ -429,13 +430,9 @@ Status IdempotencyTest::runOp(const BSONObj& op) {
 }
 
 Status IdempotencyTest::runOps(std::initializer_list<BSONObj> ops) {
-    for (auto& op : ops) {
-        Status status = SyncTail::syncApply(_txn.get(), op, false);
-        if (!status.isOK()) {
-            return status;
-        }
-    }
-    return Status::OK();
+    std::vector<BSONObj> opsVector(ops);
+    SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc());
+    return multiInitialSyncApply_noAbort(_txn.get(), opsVector, &syncTail);
 }
 
 BSONObj IdempotencyTest::createCollection() {
@@ -542,6 +539,26 @@ TEST_F(IdempotencyTest, ResyncOnRenameCollection) {
                                        << "stayTemp" << false << "dropTarget" << false);
     auto op = makeCommandOplogEntry(nextOpTime(), nss, cmd);
     ASSERT_EQUALS(runOp(op), ErrorCodes::OplogOperationUnsupported);
+}
+
+TEST_F(IdempotencyTest, MultiInitialSyncApplySkipsDocumentOnNamespaceNotFound) {
+    BSONObj emptyDoc;
+    NamespaceString nss("test", "foo");
+    NamespaceString badNss("test", "bad");
+    auto doc1 = BSON("_id" << 1);
+    auto doc2 = BSON("_id" << 2);
+    auto doc3 = BSON("_id" << 3);
+    auto op0 = makeCreateCollectionOplogEntry(nextOpTime(), nss);
+    auto op1 = makeInsertDocumentOplogEntry(nextOpTime(), nss, doc1);
+    auto op2 = makeInsertDocumentOplogEntry(nextOpTime(), badNss, doc2);
+    auto op3 = makeInsertDocumentOplogEntry(nextOpTime(), nss, doc3);
+    runOps({op0, op1, op2, op3});
+
+    OplogInterfaceLocal collectionReader(_txn.get(), nss.ns());
+    auto iter = collectionReader.makeIterator();
+    ASSERT_EQUALS(doc3, unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(doc1, unittest::assertGet(iter->next()).first);
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, iter->next().getStatus());
 }
 
 }  // namespace
