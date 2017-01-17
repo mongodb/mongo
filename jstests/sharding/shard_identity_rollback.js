@@ -7,6 +7,8 @@
 (function() {
     "use strict";
 
+    load('jstests/libs/write_concern_util.js');
+
     var st = new ShardingTest({shards: 1});
 
     var replTest = new ReplSetTest({nodes: 3});
@@ -23,14 +25,7 @@
     replTest.awaitSecondaryNodes();
     replTest.awaitReplication();
 
-    nodes.forEach(function(node) {
-        // Pause bgsync so it doesn't keep trying to sync from other nodes.
-        assert.commandWorked(
-            node.adminCommand({configureFailPoint: 'pauseRsBgSyncProducer', mode: 'alwaysOn'}));
-        // Stop oplog fetcher so that the ongoing fetcher doesn't return anything new.
-        assert.commandWorked(
-            node.adminCommand({configureFailPoint: 'stopOplogFetcher', mode: 'alwaysOn'}));
-    });
+    stopServerReplication(secondaries);
 
     jsTest.log("inserting shardIdentity document to primary that shouldn't replicate");
 
@@ -70,18 +65,7 @@
 
     // Disable the fail point so that the elected node can exit drain mode and finish becoming
     // primary.
-    secondaries.forEach(function(secondary) {
-        assert.commandWorked(
-            secondary.adminCommand({configureFailPoint: 'stopOplogFetcher', mode: 'off'}));
-        try {
-            assert.commandWorked(
-                secondary.adminCommand({configureFailPoint: 'pauseRsBgSyncProducer', mode: 'off'}));
-        } catch (e) {
-            // Enabling bgsync producer may cause rollback, which will close all connections
-            // including the one sending "configureFailPoint".
-            print("got exception when disabling fail point 'pauseRsBgSyncProducer': " + e);
-        }
-    });
+    restartServerReplication(secondaries);
 
     // Wait for a new healthy primary
     var newPriConn = replTest.getPrimary();

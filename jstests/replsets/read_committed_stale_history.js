@@ -89,6 +89,9 @@
     nodes[0].disconnect(nodes[1]);
     nodes[0].disconnect(nodes[2]);
 
+    // Ensure the soon-to-be primary cannot see the write from the old primary.
+    assert.eq(null, nodes[1].getDB(dbName).getCollection(collName).findOne({a: 2}));
+
     jsTest.log("Wait for a new primary to be elected");
     // Allow the secondaries to replicate again.
     restartServerReplication(secondaries);
@@ -98,6 +101,9 @@
     jsTest.log("Do a write to the new primary");
     assert.writeOK(nodes[1].getDB(dbName).getCollection(collName).insert(
         {a: 3}, {writeConcern: {w: 2, wtimeout: rst.kDefaultTimeoutMS}}));
+
+    // Ensure the new primary still cannot see the write from the old primary.
+    assert.eq(null, nodes[1].getDB(dbName).getCollection(collName).findOne({a: 2}));
 
     jsTest.log("Reconnect the old primary to the rest of the nodes");
     nodes[1].reconnect(nodes[0]);

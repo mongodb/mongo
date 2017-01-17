@@ -108,8 +108,6 @@ size_t getSize(const BSONObj& o) {
 }
 }  // namespace
 
-MONGO_FP_DECLARE(pauseRsBgSyncProducer);
-
 // Failpoint which causes rollback to hang before starting.
 MONGO_FP_DECLARE(rollbackHangBeforeStart);
 
@@ -259,12 +257,19 @@ void BackgroundSync::_runProducer() {
 }
 
 void BackgroundSync::_produce(OperationContext* txn) {
+    if (MONGO_FAIL_POINT(stopReplProducer)) {
+        // This log output is used in js tests so please leave it.
+        log() << "bgsync - stopReplProducer fail point "
+                 "enabled. Blocking until fail point is disabled.";
 
-    while (MONGO_FAIL_POINT(pauseRsBgSyncProducer)) {
-        if (inShutdown()) {
-            return;
-        }
-        sleepmillis(10);
+        // TODO(SERVER-27120): Remove the return statement and uncomment the while loop.
+        // Currently we cannot block here or we prevent primaries from being fully elected since
+        // we'll never call _signalNoNewDataForApplier.
+        //        while (MONGO_FAIL_POINT(stopReplProducer) && !inShutdown()) {
+        //            mongo::sleepsecs(1);
+        //        }
+        mongo::sleepsecs(1);
+        return;
     }
 
     // this oplog reader does not do a handshake because we don't want the server it's syncing
@@ -381,10 +386,6 @@ void BackgroundSync::_produce(OperationContext* txn) {
     // before the OplogWriter gets a chance to append to the oplog.
     if (StorageInterface::get(txn)->getAppliedThrough(txn).isNull()) {
         StorageInterface::get(txn)->setAppliedThrough(txn, _replCoord->getMyLastAppliedOpTime());
-    }
-
-    if (MONGO_FAIL_POINT(stopOplogFetcher)) {
-        return;
     }
 
     // "lastFetched" not used. Already set in _enqueueDocuments.

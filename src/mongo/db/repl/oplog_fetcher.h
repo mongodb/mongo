@@ -48,7 +48,7 @@
 namespace mongo {
 namespace repl {
 
-MONGO_FP_FORWARD_DECLARE(stopOplogFetcher);
+MONGO_FP_FORWARD_DECLARE(stopReplProducer);
 
 /**
  * Used to keep track of the optime and hash of the last fetched operation.

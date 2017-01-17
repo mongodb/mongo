@@ -2,6 +2,8 @@
  * Utilities for testing writeConcern.
  */
 
+load("jstests/libs/check_log.js");
+
 // Shards a collection and creates 2 chunks, one on each s of two shards.
 function shardCollectionWithChunks(st, coll) {
     var _db = coll.getDB();
@@ -25,10 +27,13 @@ function stopServerReplication(conn) {
         });
         return;
     }
-    var errMsg = 'Failed to enable stopOplogFetcher failpoint.';
+    var errMsg = 'Failed to enable stopReplProducer failpoint.';
     assert.commandWorked(
-        conn.getDB('admin').runCommand({configureFailPoint: 'stopOplogFetcher', mode: 'alwaysOn'}),
+        conn.getDB('admin').runCommand({configureFailPoint: 'stopReplProducer', mode: 'alwaysOn'}),
         errMsg);
+
+    // Wait until the fail point is actually hit.
+    checkLog.contains(conn, 'bgsync - stopReplProducer fail point enabled');
 }
 
 // Stops replication at all replicaset secondaries.
@@ -50,9 +55,9 @@ function restartServerReplication(conn) {
         return;
     }
 
-    var errMsg = 'Failed to disable stopOplogFetcher failpoint.';
+    var errMsg = 'Failed to disable stopReplProducer failpoint.';
     assert.commandWorked(
-        conn.getDB('admin').runCommand({configureFailPoint: 'stopOplogFetcher', mode: 'off'}),
+        conn.getDB('admin').runCommand({configureFailPoint: 'stopReplProducer', mode: 'off'}),
         errMsg);
 }
 
