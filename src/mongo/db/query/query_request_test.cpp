@@ -1306,5 +1306,28 @@ TEST(QueryRequestTest, ConvertToAggregationWithCollationSucceeds) {
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSON("f" << 1));
 }
 
+TEST(QueryRequestTest, ParseFromLegacyObjMetaOpComment) {
+    BSONObj queryObj = fromjson(
+        "{$query: {a: 1},"
+        "$comment: {b: 2, c: {d: 'ParseFromLegacyObjMetaOpComment'}}}");
+    const NamespaceString nss("test.testns");
+    unique_ptr<QueryRequest> qr(
+        assertGet(QueryRequest::fromLegacyQueryForTest(nss, queryObj, BSONObj(), 0, 0, 0)));
+
+    // Ensure that legacy comment meta-operator is parsed to a string comment
+    ASSERT_EQ(qr->getComment(), "{ b: 2, c: { d: \"ParseFromLegacyObjMetaOpComment\" } }");
+}
+
+TEST(QueryRequestTest, ParseFromLegacyStringMetaOpComment) {
+    BSONObj queryObj = fromjson(
+        "{$query: {a: 1},"
+        "$comment: 'ParseFromLegacyStringMetaOpComment'}");
+    const NamespaceString nss("test.testns");
+    unique_ptr<QueryRequest> qr(
+        assertGet(QueryRequest::fromLegacyQueryForTest(nss, queryObj, BSONObj(), 0, 0, 0)));
+
+    ASSERT_EQ(qr->getComment(), "ParseFromLegacyStringMetaOpComment");
+}
+
 }  // namespace mongo
 }  // namespace
