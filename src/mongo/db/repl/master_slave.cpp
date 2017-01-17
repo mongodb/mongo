@@ -488,6 +488,11 @@ void ReplSource::resyncDrop(OperationContext* txn, const string& dbName) {
     invariant(txn->lockState()->isW());
 
     Database* const db = dbHolder().get(txn, dbName);
+    if (!db) {
+        log() << "resync: dropping database " << dbName
+              << " - database does not exist. nothing to do.";
+        return;
+    }
     Database::dropDatabase(txn, db);
 }
 
