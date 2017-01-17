@@ -69,6 +69,16 @@
 
     replTest.awaitSecondaryNodes();
 
+    // We cannot reconfig nodes[2] to have priority 0 if it is currently the primary. After the
+    // first reconfig, it will be unelectable so this only needs to be done once.
+    if (replTest.getPrimary() === replTest.nodes[2]) {
+        jsTestLog("Stepping down node 2 before reconfig");
+        assert.throws(function() {
+            replTest.nodes[2].adminCommand({replSetStepDown: 5, force: true});
+        });
+        replTest.waitForState(replTest.nodes[2], ReplSetTest.State.SECONDARY);
+    }
+
     // ** Setup different priorities
     var c = replTest.getReplSetConfigFromNode();
     c.members[0].priority = 99;
