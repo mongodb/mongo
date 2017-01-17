@@ -33,7 +33,11 @@
 
 static char home[512];			/* Program working dir */
 static const char *progname;		/* Program name */
+/*
+ * These two names for the URI and file system must be maintained in tandem.
+ */
 static const char * const uri = "table:main";
+static const char * const fs_main = "main.wt";
 static bool inmem;
 
 #define	MAX_TH	12
@@ -211,6 +215,7 @@ extern char *__wt_optarg;
 int
 main(int argc, char *argv[])
 {
+	struct stat sb;
 	FILE *fp;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
@@ -305,8 +310,15 @@ main(int argc, char *argv[])
 		/* parent */
 		/*
 		 * Sleep for the configured amount of time before killing
-		 * the child.
+		 * the child.  Start the timeout from the time we notice that
+		 * the table has been created.  That allows the test to run
+		 * correctly on really slow machines.  Verify the process ID
+		 * still exists in case the child aborts for some reason we
+		 * don't stay in this loop forever.
 		 */
+		snprintf(fname, sizeof(fname), "%s/%s", home, fs_main);
+		while (stat(fname, &sb) != 0 && kill(pid, 0) == 0)
+			sleep(1);
 		sleep(timeout);
 
 		/*
