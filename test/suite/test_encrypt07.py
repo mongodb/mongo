@@ -45,6 +45,8 @@ class test_encrypt07(test_salvage.test_salvage):
     bigvalue = "abcdefghij" * 1007    # len(bigvalue) = 10070
 
     def conn_extensions(self, extlist):
+        # Load the compression extension, skip the test if missing
+        extlist.skip_if_missing = True
         extlist.extension('encryptors', self.sys_encrypt)
 
     def conn_config(self):

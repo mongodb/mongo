@@ -36,7 +36,9 @@ class test_join04(wttest.WiredTigerTestCase):
     table_name1 = 'test_join04'
     nentries = 100
 
-    conn_extensions = [ 'extractors/csv' ]
+    def conn_extensions(self, extlist):
+        extlist.skip_if_missing = True
+        extlist.extension('extractors', 'csv')
 
     # JIRA WT-2308:
     # Test extractors with equality joins

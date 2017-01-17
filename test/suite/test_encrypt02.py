@@ -39,16 +39,18 @@ from wtscenario import make_scenarios
 class test_encrypt02(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'file:test_encrypt02'
     encrypt_type = [
-        ('noarg', dict( conn_extensions=[ 'encryptors/rotn' ],
-            encrypt_args='name=rotn', secret_arg=None)),
-        ('keyid', dict( conn_extensions=[ 'encryptors/rotn' ],
-            encrypt_args='name=rotn,keyid=11', secret_arg=None)),
-        ('pass', dict( conn_extensions=[ 'encryptors/rotn' ],
-            encrypt_args='name=rotn', secret_arg='ABC')),
-        ('keyid-pass', dict( conn_extensions=[ 'encryptors/rotn' ],
+        ('noarg', dict( encrypt_args='name=rotn', secret_arg=None)),
+        ('keyid', dict( encrypt_args='name=rotn,keyid=11', secret_arg=None)),
+        ('pass', dict( encrypt_args='name=rotn', secret_arg='ABC')),
+        ('keyid-pass', dict(
             encrypt_args='name=rotn,keyid=11', secret_arg='ABC')),
     ]
     scenarios = make_scenarios(encrypt_type)
+
+    def conn_extensions(self, extlist):
+        # Load the compression extension, skip the test if missing
+        extlist.skip_if_missing = True
+        extlist.extension('encryptors', 'rotn')
 
     nrecords = 5000
     bigvalue = "abcdefghij" * 1001    # len(bigvalue) = 10010

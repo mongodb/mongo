@@ -36,7 +36,9 @@ class test_join03(wttest.WiredTigerTestCase):
     table_name1 = 'test_join03'
     nentries = 100
 
-    conn_extensions = [ 'extractors/csv' ]
+    def conn_extensions(self, extlist):
+        extlist.skip_if_missing = True
+        extlist.extension('extractors', 'csv')
 
     def gen_key(self, i):
         return [ i + 1 ]

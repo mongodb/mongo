@@ -200,7 +200,9 @@ class test_join07(wttest.WiredTigerTestCase):
 
     scenarios = make_scenarios(extractscen)
 
-    conn_extensions = [ 'extractors/csv' ]
+    def conn_extensions(self, extlist):
+        extlist.skip_if_missing = True
+        extlist.extension('extractors', 'csv')
 
     def expect(self, token, expected):
         if token == None or token.kind not in expected:

@@ -90,6 +90,7 @@ class test_encrypt06(wttest.WiredTigerTestCase):
     nrecords = 1000
 
     def conn_extensions(self, extlist):
+        extlist.skip_if_missing = True
         extlist.extension('encryptors', self.sys_encrypt)
         extlist.extension('encryptors', self.file0_encrypt)
         extlist.extension('encryptors', self.file1_encrypt)

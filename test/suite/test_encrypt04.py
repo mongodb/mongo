@@ -81,6 +81,7 @@ class test_encrypt04(wttest.WiredTigerTestCase, suite_subprocess):
         extarg = None
         if self.expect_forceerror:
             extarg='(config=\"rotn_force_error=true\")'
+        extlist.skip_if_missing = True
         extlist.extension('encryptors', self.name, extarg)
 
     # Override WiredTigerTestCase, we have extensions.

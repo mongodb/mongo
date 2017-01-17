@@ -51,6 +51,7 @@ class test_encrypt03(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(types, encrypt)
 
     def conn_extensions(self, extlist):
+        extlist.skip_if_missing = True
         extlist.extension('encryptors', self.sys_encrypt)
         extlist.extension('encryptors', self.file_encrypt)
 

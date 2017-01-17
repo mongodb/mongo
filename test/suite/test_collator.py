@@ -48,7 +48,10 @@ class test_collator(wttest.WiredTigerTestCase):
     nentries = 100
     nindices = 4
 
-    conn_extensions = [ 'extractors/csv', 'collators/revint' ]
+    def conn_extensions(self, extlist):
+        extlist.skip_if_missing = True
+        extlist.extension('extractors', 'csv')
+        extlist.extension('collators', 'revint')
 
     def create_indices(self):
         # Create self.nindices index files, each with a column from the CSV

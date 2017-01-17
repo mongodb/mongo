@@ -57,7 +57,9 @@ class test_schema05(wttest.WiredTigerTestCase):
         ('index-after', { 'create_index' : 2 }),
     ])
 
-    conn_extensions = [ 'extractors/csv' ]
+    def conn_extensions(self, extlist):
+        extlist.skip_if_missing = True
+        extlist.extension('extractors', 'csv')
 
     def create_indices(self):
         # Create self.nindices index files, each with a column from the CSV
