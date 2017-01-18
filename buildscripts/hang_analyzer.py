@@ -23,7 +23,6 @@ import signal
 import subprocess
 import sys
 import tempfile
-import threading
 import time
 from distutils import spawn
 from optparse import OptionParser
@@ -463,17 +462,6 @@ def signal_process(pid, signalnum):
         print "Cannot send signal to a process on Windows"
 
 
-def timeout_protector():
-    print "Script timeout has been hit, terminating"
-    if sys.platform == "win32":
-        # Have the process exit with code 9 when it terminates itself to closely match the exit code
-        # of the process when it sends itself a SIGKILL.
-        handle = win32process.GetCurrentProcess()
-        win32process.TerminateProcess(handle, 9)
-    else:
-        os.kill(os.getpid(), signal.SIGKILL)
-
-
 # Basic procedure
 #
 # 1. Get a list of interesting processes
@@ -521,10 +509,6 @@ def main():
         sys.stderr.write("hang_analyzer.py: Unsupported platform: %s\n" % (sys.platform))
         exit(1)
 
-    # Make sure the script does not hang
-    timer = threading.Timer(120, timeout_protector)
-    timer.start()
-
     processes_orig = ps.dump_processes()
 
     # Find all running interesting processes by doing a substring match.
@@ -563,9 +547,6 @@ def main():
             signal_process(process[0], signal.SIGUSR1)
 
             dbg.dump_info(process[0], process[1], sys.stdout, check_dump_quota(max_dump_size_bytes, dbg.get_dump_ext()))
-
-    # Suspend the timer so we can exit cleanly
-    timer.cancel()
 
     sys.stdout.write("Done analyzing processes for hangs\n")
 
