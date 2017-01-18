@@ -109,6 +109,7 @@ dbtest = env.Program(
         'query_stage_update.cpp',
         'querytests.cpp',
         'replica_set_monitor_test.cpp',
+        'replica_set_tests.cpp',
         'repltests.cpp',
         'rollbacktests.cpp',
         'socktests.cpp',
