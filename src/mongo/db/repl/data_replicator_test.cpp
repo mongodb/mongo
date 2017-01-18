@@ -861,6 +861,13 @@ TEST_F(DataReplicatorTest, DataReplicatorResetsOnCompletionCallbackFunctionPoint
     ASSERT_FALSE(sharedCallbackStateDestroyed);
 
     ASSERT_OK(dr->shutdown());
+
+    // Depending on which DataReplicator stage (_chooseSyncSource or _rollbackCheckerResetCallback)
+    // was interrupted by shutdown(), we may have to request the network interface to deliver
+    // cancellation signals to the DataReplicator callbacks in for DataReplicator to run to
+    // completion.
+    executor::NetworkInterfaceMock::InNetworkGuard(getNet())->runReadyNetworkOperations();
+
     dr->join();
 
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, lastApplied);
