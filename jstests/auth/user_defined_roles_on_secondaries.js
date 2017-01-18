@@ -90,7 +90,7 @@
     // This write will have to wait on the initial sync to complete before progressing.
     assert.soonNoExcept(() => {
         assert.writeOK(rstest.getPrimary().getDB("db1")["aCollection"].insert(
-            {_id: "afterSecondNodeAdded"}, {writeConcern: {w: 2, wtimeout: 60 * 1000}}));
+            {a: "afterSecondNodeAdded"}, {writeConcern: {w: 2, wtimeout: 60 * 1000}}));
         return true;
     });
 
