@@ -622,17 +622,9 @@ config_opt_str(WTPERF *wtperf, const char *optstr)
 		return (ret);
 	}
 
-	/*
-	 * Append the current line to our copy of the config. The config is
-	 * stored in the order it is processed, so added options will be after
-	 * any parsed from the original config. We allocate len + 1 to allow for
-	 * a null byte to be added.
-	 */
-	config_line = dcalloc(sizeof(CONFIG_QUEUE_ENTRY), 1);
-	config_line->string = dstrdup(optstr);
-	TAILQ_INSERT_TAIL(&opts->config_head, config_line, q);
-
 	while (ret == 0) {
+		size_t pos;
+
 		if ((ret = scan->next(scan, &k, &v)) != 0) {
 			/* Any parse error has already been reported. */
 			if (ret == WT_NOTFOUND)
@@ -640,6 +632,46 @@ config_opt_str(WTPERF *wtperf, const char *optstr)
 			break;
 		}
 		ret = config_opt(wtperf, &k, &v);
+
+		/*
+		 * Append the key-value pair to our copy of the config.
+		 * The config is stored in the order it is processed, so added
+		 * options will be after any parsed from the original config.
+		 */
+		config_line = dcalloc(sizeof(CONFIG_QUEUE_ENTRY), 1);
+		/*
+		 * If key or value is a string, consider extra space for the
+		 * quotes. Add 2 to the required space for '=' and the ending
+		 * null character in "key=value".
+		 */
+		config_line->string = dcalloc(
+		    k.len + (k.type == WT_CONFIG_ITEM_STRING ? 2 : 0) +
+		    v.len + (v.type == WT_CONFIG_ITEM_STRING ? 2 : 0) + 2, 1);
+		pos = 0;
+		if (k.type == WT_CONFIG_ITEM_STRING) {
+			config_line->string[pos] = '"';
+			pos++;
+		}
+		strncpy(config_line->string + pos, k.str, k.len);
+		pos += k.len;
+		if (k.type == WT_CONFIG_ITEM_STRING) {
+			config_line->string[pos] = '"';
+			pos++;
+		}
+		config_line->string[pos] = '=';
+		pos++;
+		if (v.type == WT_CONFIG_ITEM_STRING) {
+			config_line->string[pos] = '"';
+			pos++;
+		}
+		strncpy(config_line->string + pos, v.str, v.len);
+		pos += v.len;
+		if (v.type == WT_CONFIG_ITEM_STRING) {
+			config_line->string[pos] = '"';
+			pos++;
+		}
+		config_line->string[pos] = '\0';
+		TAILQ_INSERT_TAIL(&opts->config_head, config_line, q);
 	}
 	if ((t_ret = scan->close(scan)) != 0) {
 		lprintf(wtperf, ret, 0, "Error in config_scan_end");
@@ -754,8 +786,11 @@ config_consolidate(CONFIG_OPTS *opts)
 
 	/*
 	 * This loop iterates over the config queue and for each entry checks if
-	 * a later queue entry has the same key. If there's a match, the current
-	 * queue entry is removed and we continue.
+	 * a later queue entry has the same key. If there's a match, and key is
+	 * "conn_config" or "table_config", the later queue entry is replaced
+	 * with a concatenated entry of the two queue entries, the current queue
+	 * entry is removed. For any other key, if there is a match, the current
+	 * queue entry is removed.
 	 */
 	conf_line = TAILQ_FIRST(&opts->config_head);
 	while (conf_line != NULL) {
@@ -771,6 +806,34 @@ config_consolidate(CONFIG_OPTS *opts)
 			if (strncmp(conf_line->string, test_line->string,
 			    (size_t)((string_key - conf_line->string) + 1))
 			    == 0) {
+				if ((strncmp("conn_config=", conf_line->string,
+				    (size_t)((string_key - conf_line->string) +
+				    1)) == 0) ||
+				    (strncmp("table_config=", conf_line->string,
+				    (size_t)((string_key - conf_line->string) +
+				    1)) == 0)) {
+					char *concat_str, *val_pointer;
+
+					/*
+					 * To concatenate the two config
+					 * strings, copy the first string to a
+					 * new one, replace the ending '"' with
+					 * a ',' and then concatenate the second
+					 * string's value after its starting '"'
+					 */
+					val_pointer =
+					    strchr(test_line->string, '=') + 2;
+					concat_str =
+					    dmalloc(strlen(conf_line->string) +
+					    strlen(val_pointer) + 1);
+					strcpy(concat_str, conf_line->string);
+					concat_str[strlen(concat_str) - 1] =
+					    ',';
+					strcat(concat_str, val_pointer);
+					free(test_line->string);
+					test_line->string = concat_str;
+				}
+
 				TAILQ_REMOVE(&opts->config_head, conf_line, q);
 				free(conf_line->string);
 				free(conf_line);
