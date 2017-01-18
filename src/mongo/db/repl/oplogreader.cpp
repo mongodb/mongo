@@ -165,7 +165,8 @@ Status OplogReader::_compareRequiredOpTimeWithQueryResponse(const OpTime& requir
 void OplogReader::connectToSyncSource(OperationContext* txn,
                                       const OpTime& lastOpTimeFetched,
                                       const OpTime& requiredOpTime,
-                                      ReplicationCoordinator* replCoord) {
+                                      ReplicationCoordinator* replCoord,
+                                      int* rbidOut) {
     const Timestamp sentinelTimestamp(duration_cast<Seconds>(Milliseconds(curTimeMillis64())), 0);
     const OpTime sentinel(sentinelTimestamp, std::numeric_limits<long long>::max());
     OpTime oldestOpTimeSeen = sentinel;
@@ -209,6 +210,18 @@ void OplogReader::connectToSyncSource(OperationContext* txn,
             replCoord->blacklistSyncSource(candidate, Date_t::now() + Seconds(10));
             continue;
         }
+
+        if (rbidOut) {
+            BSONObj reply;
+            if (!conn()->runCommand("admin", BSON("replSetGetRBID" << 1), reply)) {
+                log() << "Error getting rbid from " << candidate << ": " << reply;
+                resetConnection();
+                replCoord->blacklistSyncSource(candidate, Date_t::now() + Seconds(10));
+                continue;
+            }
+            *rbidOut = reply["rbid"].Int();
+        }
+
         // Read the first (oldest) op and confirm that it's not newer than our last
         // fetched op. Otherwise, we have fallen off the back of that source's oplog.
         BSONObj remoteOldestOp(findOne(rsOplogName.c_str(), Query()));

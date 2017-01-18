@@ -187,7 +187,8 @@ private:
                           OpTime lastOpTimeFetched,
                           long long lastFetchedHash,
                           Milliseconds fetcherMaxTimeMS,
-                          Status* returnStatus);
+                          Status* returnStatus,
+                          int rbid);
 
     /**
      * Executes a rollback.
@@ -195,6 +196,7 @@ private:
      */
     void _rollback(OperationContext* txn,
                    const HostAndPort& source,
+                   boost::optional<int> requiredRBID,
                    stdx::function<DBClientBase*()> getConnection);
 
     /**
