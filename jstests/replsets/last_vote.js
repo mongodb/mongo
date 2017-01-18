@@ -87,6 +87,7 @@
     conf.version++;
     conf.members[0].priority = 0;
     reconfig(rst, conf);
+    rst.awaitNodesAgreeOnConfigVersion();
 
     jsTestLog("Restarting node 0 as a standalone");
     var node0 = rst.restart(0, {noReplSet: true});  // Restart as a standalone node.

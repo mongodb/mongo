@@ -746,6 +746,28 @@ var ReplSetTest = function(opts) {
     };
 
     /**
+     * Blocks until all nodes in the replica set have the same config version as the primary.
+     **/
+    this.awaitNodesAgreeOnConfigVersion = function(timeout) {
+        timeout = timeout || this.kDefaultTimeoutMS;
+
+        assert.soonNoExcept(function() {
+            var primaryVersion = self.getPrimary().adminCommand({ismaster: 1}).setVersion;
+
+            for (var i = 0; i < self.nodes.length; i++) {
+                var version = self.nodes[i].adminCommand({ismaster: 1}).setVersion;
+                assert.eq(version,
+                          primaryVersion,
+                          "waiting for secondary node " + self.nodes[i].host +
+                              " with config version of " + version +
+                              " to match the version of the primary " + primaryVersion);
+            }
+
+            return true;
+        }, "Awaiting nodes to agree on config version", timeout);
+    };
+
+    /**
      * Waits for the last oplog entry on the primary to be visible in the committed snapshop view
      * of the oplog on *all* secondaries.
      * Returns last oplog entry.
@@ -840,7 +862,7 @@ var ReplSetTest = function(opts) {
                               ", but expected config version #" + masterConfigVersion);
 
                         if (slaveConfigVersion > masterConfigVersion) {
-                            master = this.getPrimary();
+                            master = self.getPrimary();
                             masterConfigVersion =
                                 master.getDB("local")['system.replset'].findOne().version;
                             masterName = master.toString().substr(14);  // strip "connection to "
