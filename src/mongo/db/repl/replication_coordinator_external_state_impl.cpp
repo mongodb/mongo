@@ -545,7 +545,24 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             ScopedTransaction transaction(txn, MODE_IX);
             Lock::DBLock dbWriteLock(txn->lockState(), lastVoteDatabaseName, MODE_X);
-            Helpers::putSingleton(txn, lastVoteCollectionName, lastVoteObj);
+
+            // If there is no last vote document, we want to store one. Otherwise, we only want to
+            // replace it if the new last vote document would have a higher term. We both check
+            // the term of the current last vote document and insert the new document under the
+            // DBLock to synchronize the two operations.
+            BSONObj result;
+            bool exists = Helpers::getSingleton(txn, lastVoteCollectionName, result);
+            if (!exists) {
+                Helpers::putSingleton(txn, lastVoteCollectionName, lastVoteObj);
+            } else {
+                StatusWith<LastVote> oldLastVoteDoc = LastVote::readFromLastVote(result);
+                if (!oldLastVoteDoc.isOK()) {
+                    return oldLastVoteDoc.getStatus();
+                }
+                if (lastVote.getTerm() > oldLastVoteDoc.getValue().getTerm()) {
+                    Helpers::putSingleton(txn, lastVoteCollectionName, lastVoteObj);
+                }
+            }
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
             txn, "save replica set lastVote", lastVoteCollectionName);
