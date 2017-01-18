@@ -37,7 +37,6 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -114,7 +113,7 @@ QueryRequest::QueryRequest(NamespaceString nss) : _nss(std::move(nss)) {}
 StatusWith<unique_ptr<QueryRequest>> QueryRequest::makeFromFindCommand(NamespaceString nss,
                                                                        const BSONObj& cmdObj,
                                                                        bool isExplain) {
-    auto qr = stdx::make_unique<QueryRequest>(nss);
+    unique_ptr<QueryRequest> qr(new QueryRequest(std::move(nss)));
     qr->_explain = isExplain;
 
     // Parse the command BSON by looping through one element at a time.
@@ -703,25 +702,9 @@ bool QueryRequest::isQueryIsolated(const BSONObj& query) {
 
 // static
 StatusWith<unique_ptr<QueryRequest>> QueryRequest::fromLegacyQueryMessage(const QueryMessage& qm) {
-    auto qr = stdx::make_unique<QueryRequest>(NamespaceString(qm.ns));
+    unique_ptr<QueryRequest> qr(new QueryRequest(NamespaceString(qm.ns)));
 
     Status status = qr->init(qm.ntoskip, qm.ntoreturn, qm.queryOptions, qm.query, qm.fields, true);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    return std::move(qr);
-}
-
-StatusWith<unique_ptr<QueryRequest>> QueryRequest::fromLegacyQueryForTest(NamespaceString nss,
-                                                                          const BSONObj& queryObj,
-                                                                          const BSONObj& proj,
-                                                                          int ntoskip,
-                                                                          int ntoreturn,
-                                                                          int queryOptions) {
-    auto qr = stdx::make_unique<QueryRequest>(nss);
-
-    Status status = qr->init(ntoskip, ntoreturn, queryOptions, queryObj, proj, true);
     if (!status.isOK()) {
         return status;
     }
@@ -879,13 +862,6 @@ Status QueryRequest::initFullQuery(const BSONObj& top) {
                     return maxTimeMS.getStatus();
                 }
                 _maxTimeMS = maxTimeMS.getValue();
-            } else if (str::equals("comment", name)) {
-                // Legacy $comment can be any BSON element. Convert to string if it isn't already.
-                if (e.type() == BSONType::String) {
-                    _comment = e.str();
-                } else {
-                    _comment = e.toString(false);
-                }
             }
         }
     }
