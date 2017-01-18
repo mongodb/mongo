@@ -73,6 +73,15 @@
     var term = getLatestOp(rst.getPrimary()).t + 100;
 
     jsTestLog("Test that last vote is loaded on startup");
+    // We cannot reconfig nodes[0] to have priority 0 if it is currently the primary.
+    if (rst.getPrimary() === rst.nodes[0]) {
+        jsTestLog("Stepping down node 0 before reconfig");
+        assert.throws(function() {
+            rst.nodes[0].adminCommand({replSetStepDown: 5, force: true});
+        });
+        rst.waitForState(rst.nodes[0], ReplSetTest.State.SECONDARY);
+    }
+
     jsTestLog("Reconfiguring cluster to make node 0 unelectable so it stays SECONDARY on restart");
     conf = rst.getReplSetConfigFromNode();
     conf.version++;
