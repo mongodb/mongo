@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/callback_completion_guard.h"
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/multiapplier.h"
@@ -155,52 +156,9 @@ public:
     typedef stdx::function<void(const StatusWith<OpTimeWithHash>& lastApplied)> OnCompletionFn;
 
     /**
-     * RAII type that stores the result of a single initial sync attempt.
-     * Only the first result passed to setResultAndCancelRemainingWork_inlock() is saved.
-     * Calls '_onCompletion' on destruction with result.
-     * We use an invariant to ensure that a result has been provided by the caller at destruction.
+     * Callback completion guard for data replicator.
      */
-    class OnCompletionGuard {
-        MONGO_DISALLOW_COPYING(OnCompletionGuard);
-
-    public:
-        // Function to invoke DataReplicator::_cancelRemainingWork_inlock().
-        using CancelRemainingWorkInLockFn = stdx::function<void()>;
-
-        OnCompletionGuard(const CancelRemainingWorkInLockFn& cancelRemainingWorkInLock,
-                          const OnCompletionFn& onCompletion);
-        ~OnCompletionGuard();
-
-        /**
-         * Sets result if called for the first time.
-         * Cancels remaining work in DataReplicator.
-         * Requires either a unique_lock or lock_guard to be passed in to ensure that we call
-         * DataReplicator::_cancelRemainingWork_inlock()) while we have a lock on the data
-         * replicator's mutex.
-         */
-        void setResultAndCancelRemainingWork_inlock(const stdx::lock_guard<stdx::mutex>& lock,
-                                                    const StatusWith<OpTimeWithHash>& lastApplied);
-        void setResultAndCancelRemainingWork_inlock(const stdx::unique_lock<stdx::mutex>& lock,
-                                                    const StatusWith<OpTimeWithHash>& lastApplied);
-
-    private:
-        /**
-         * Once we verified that we have the data replicator lock, this function is called by both
-         * versions of setResultAndCancelRemainingWork_inlock() to set the result and cancel any
-         * remaining work in the data replicator.
-         */
-        void _setResultAndCancelRemainingWork_inlock(const StatusWith<OpTimeWithHash>& lastApplied);
-
-        const CancelRemainingWorkInLockFn _cancelRemainingWorkInLock;
-        const OnCompletionFn _onCompletion;
-
-        // _lastAppliedSet and _lastApplied are guarded by the mutex of the DataReplicator instance
-        // that owns this guard object.
-        bool _lastAppliedSet = false;
-        StatusWith<OpTimeWithHash> _lastApplied =
-            Status(ErrorCodes::InternalError,
-                   "This initial sync attempt finished without an explicit result.");
-    };
+    using OnCompletionGuard = CallbackCompletionGuard<StatusWith<OpTimeWithHash>>;
 
     struct InitialSyncAttemptInfo {
         int durationMillis;
