@@ -66,6 +66,7 @@ selector:
     - jstests/sharding/listDatabases.js
     - jstests/sharding/bulk_insert.js
     - jstests/sharding/printShardingStatus.js
+    - jstests/sharding/cmds_epoch_mismatch.js
     # Balancer writes (direct write to config database with no retries)
     - jstests/sharding/convert_to_and_from_sharded.js
     - jstests/sharding/remove2.js
