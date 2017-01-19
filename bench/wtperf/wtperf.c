@@ -2361,11 +2361,11 @@ main(int argc, char *argv[])
 {
 	CONFIG_OPTS *opts;
 	WTPERF *wtperf, _wtperf;
-	size_t req_len, sreq_len;
+	size_t pos, req_len, sreq_len;
 	bool monitor_set;
 	int ch, ret;
 	const char *cmdflags = "C:h:m:O:o:T:";
-	const char *config_opts;
+	const char *append_comma, *config_opts;
 	char *cc_buf, *path, *sess_cfg, *tc_buf, *user_cconfig, *user_tconfig;
 
 	/* The first WTPERF structure (from which all others are derived). */
@@ -2502,19 +2502,14 @@ main(int argc, char *argv[])
 	__wt_stream_set_line_buffer(stdout);
 
 	/* Concatenate non-default configuration strings. */
-	if ((opts->verbose > 1 && strlen(debug_cconfig)) ||
+	if ((opts->verbose > 1 && strlen(debug_cconfig) != 0) ||
 	     user_cconfig != NULL || opts->session_count_idle > 0 ||
 	     wtperf->compress_ext != NULL || wtperf->async_config != NULL) {
-		bool append_comma;
-		uint32_t pos;
-
-		append_comma = false;
-		pos = 0;
 		req_len = 20;
-		req_len += (wtperf->async_config != NULL ?
-		    strlen(wtperf->async_config) : 0);
-		req_len += (wtperf->compress_ext != NULL ?
-		    strlen(wtperf->compress_ext) : 0);
+		req_len += wtperf->async_config != NULL ?
+		    strlen(wtperf->async_config) : 0;
+		req_len += wtperf->compress_ext != NULL ?
+		    strlen(wtperf->compress_ext) : 0;
 		if (opts->session_count_idle > 0) {
 			sreq_len = strlen("session_max=") + 6;
 			req_len += sreq_len;
@@ -2524,89 +2519,88 @@ main(int argc, char *argv[])
 			    opts->session_count_idle +
 			    wtperf->workers_cnt + opts->populate_threads + 10);
 		}
-		req_len += (user_cconfig != NULL ? strlen(user_cconfig) : 0);
-		req_len += (debug_cconfig != NULL ? strlen(debug_cconfig) : 0);
+		req_len += user_cconfig != NULL ? strlen(user_cconfig) : 0;
+		req_len += debug_cconfig != NULL ? strlen(debug_cconfig) : 0;
 		cc_buf = dmalloc(req_len);
 
+		pos = 0;
+		append_comma = "";
 		if (wtperf->async_config != NULL &&
-		    strlen(wtperf->async_config)) {
-			pos += (uint32_t)snprintf(
+		    strlen(wtperf->async_config) != 0) {
+			pos += (size_t)snprintf(
 			    cc_buf + pos, req_len - pos, "%s%s",
-			    append_comma ? "," : "", wtperf->async_config);
-			append_comma = true;
+			    append_comma, wtperf->async_config);
+			append_comma = ",";
 		}
 		if (wtperf->compress_ext != NULL &&
-		    strlen(wtperf->compress_ext)) {
-			pos += (uint32_t)snprintf(
+		    strlen(wtperf->compress_ext) != 0) {
+			pos += (size_t)snprintf(
 			    cc_buf + pos, req_len - pos, "%s%s",
-			    append_comma ? "," : "", wtperf->compress_ext);
-			append_comma = true;
+			    append_comma, wtperf->compress_ext);
+			append_comma = ",";
 		}
-		if (sess_cfg != NULL && strlen(sess_cfg)) {
-			pos += (uint32_t)snprintf(
+		if (sess_cfg != NULL && strlen(sess_cfg) != 0) {
+			pos += (size_t)snprintf(
 			    cc_buf + pos, req_len - pos, "%s%s",
-			    append_comma ? "," : "", sess_cfg);
-			append_comma = true;
+			    append_comma, sess_cfg);
+			append_comma = ",";
 		}
-		if (user_cconfig != NULL && strlen(user_cconfig)) {
-			pos += (uint32_t)snprintf(
+		if (user_cconfig != NULL && strlen(user_cconfig) != 0) {
+			pos += (size_t)snprintf(
 			    cc_buf + pos, req_len - pos, "%s%s",
-			    append_comma ? "," : "", user_cconfig);
-			append_comma = true;
+			    append_comma, user_cconfig);
+			append_comma = ",";
 		}
-		if (opts->verbose > 1 && strlen(debug_cconfig)) {
-			pos += (uint32_t)snprintf(
+		if (opts->verbose > 1 && strlen(debug_cconfig) != 0) {
+			pos += (size_t)snprintf(
 			    cc_buf + pos, req_len - pos, "%s%s",
-			    append_comma ? "," : "", debug_cconfig);
-			append_comma = true;
+			    append_comma, debug_cconfig);
+			append_comma = ",";
 		}
 
-		if (strlen(cc_buf) && (ret =
+		if (strlen(cc_buf) != 0 && (ret =
 		    config_opt_name_value(wtperf, "conn_config", cc_buf)) != 0)
 			goto err;
 	}
-	if ((opts->verbose > 1 && strlen(debug_tconfig)) || opts->index ||
+	if ((opts->verbose > 1 && strlen(debug_tconfig) != 0) || opts->index ||
 	    user_tconfig != NULL || wtperf->compress_table != NULL) {
-		bool append_comma;
-		uint32_t pos;
-
-		append_comma = false;
-		pos = 0;
 		req_len = 20;
-		req_len += (wtperf->compress_table != NULL ?
-		    strlen(wtperf->compress_table) : 0);
-		req_len += (opts->index ? strlen(INDEX_COL_NAMES) : 0);
-		req_len += (user_tconfig != NULL ? strlen(user_tconfig) : 0);
-		req_len += (debug_tconfig != NULL ? strlen(debug_tconfig) : 0);
+		req_len += wtperf->compress_table != NULL ?
+		    strlen(wtperf->compress_table) : 0;
+		req_len += opts->index ? strlen(INDEX_COL_NAMES) : 0;
+		req_len += user_tconfig != NULL ? strlen(user_tconfig) : 0;
+		req_len += debug_tconfig != NULL ? strlen(debug_tconfig) : 0;
 		tc_buf = dmalloc(req_len);
 
+		pos = 0;
+		append_comma = "";
 		if (wtperf->compress_table != NULL &&
-		    strlen(wtperf->compress_table)) {
-			pos += (uint32_t)snprintf(
+		    strlen(wtperf->compress_table) != 0) {
+			pos += (size_t)snprintf(
 			    tc_buf + pos, req_len - pos, "%s%s",
-			    append_comma ? "," : "", wtperf->compress_table);
-			append_comma = true;
+			    append_comma, wtperf->compress_table);
+			append_comma = ",";
 		}
 		if (opts->index) {
-			pos += (uint32_t)snprintf(
+			pos += (size_t)snprintf(
 			    tc_buf + pos, req_len - pos, "%s%s",
-			    append_comma ? "," : "", INDEX_COL_NAMES);
-			append_comma = true;
+			    append_comma, INDEX_COL_NAMES);
+			append_comma = ",";
 		}
-		if (user_tconfig != NULL && strlen(user_tconfig)) {
-			pos += (uint32_t)snprintf(
+		if (user_tconfig != NULL && strlen(user_tconfig) != 0) {
+			pos += (size_t)snprintf(
 			    tc_buf + pos, req_len - pos, "%s%s",
-			    append_comma ? "," : "", user_tconfig);
-			append_comma = true;
+			    append_comma, user_tconfig);
+			append_comma = ",";
 		}
-		if (opts->verbose > 1 && strlen(debug_tconfig)) {
-			pos += (uint32_t)snprintf(
+		if (opts->verbose > 1 && strlen(debug_tconfig) != 0) {
+			pos += (size_t)snprintf(
 			    tc_buf + pos, req_len - pos, "%s%s",
-			    append_comma ? "," : "", debug_tconfig);
-			append_comma = true;
+			    append_comma, debug_tconfig);
+			append_comma = ",";
 		}
 
-		if (strlen(tc_buf) && (ret =
+		if (strlen(tc_buf) != 0 && (ret =
 		    config_opt_name_value(wtperf, "table_config", tc_buf)) != 0)
 			goto err;
 	}
