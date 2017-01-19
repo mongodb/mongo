@@ -33,7 +33,7 @@ namespace mongo {
 void (*snmpInit)() = nullptr;
 
 namespace {
-std::function<void()> snmpInitializer = [] {
+stdx::function<void()> snmpInitializer = [] {
     if (snmpInit) {
         snmpInit();
     }
