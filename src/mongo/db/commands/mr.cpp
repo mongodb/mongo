@@ -72,9 +72,9 @@
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/sharding_raii.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/mutex.h"
@@ -1771,17 +1771,14 @@ public:
         set<string> servers;
 
         {
-            // parse per shard results
+            // Parse per shard results
             BSONObjIterator i(shardCounts);
             while (i.more()) {
                 BSONElement e = i.next();
                 std::string server = e.fieldName();
                 servers.insert(server);
 
-                auto shardStatus = grid.shardRegistry()->getShard(txn, server);
-                if (!shardStatus.isOK()) {
-                    return appendCommandStatus(result, shardStatus.getStatus());
-                }
+                uassertStatusOK(Grid::get(txn)->shardRegistry()->getShard(txn, server));
             }
         }
 
@@ -1801,20 +1798,21 @@ public:
                 result.append("result", config.outputOptions.collectionName);
         }
 
-        auto status = grid.catalogCache()->getDatabase(txn, dbname);
-        if (!status.isOK()) {
-            return appendCommandStatus(result, status.getStatus());
+        auto scopedDbStatus = ScopedShardDatabase::getExisting(txn, dbname);
+        if (!scopedDbStatus.isOK()) {
+            return appendCommandStatus(result, scopedDbStatus.getStatus());
         }
 
-        shared_ptr<DBConfig> confOut = status.getValue();
+        auto confOut = scopedDbStatus.getValue().db();
 
         vector<shared_ptr<Chunk>> chunks;
+
         if (confOut->isSharded(config.outputOptions.finalNamespace.ns())) {
             shared_ptr<ChunkManager> cm =
                 confOut->getChunkManager(txn, config.outputOptions.finalNamespace.ns());
 
-            // Fetch result from other shards 1 chunk at a time. It would be better to do
-            // just one big $or query, but then the sorting would not be efficient.
+            // Fetch result from other shards 1 chunk at a time. It would be better to do just one
+            // big $or query, but then the sorting would not be efficient.
             const string shardName = ShardingState::get(txn)->getShardName();
             const ChunkMap& chunkMap = cm->getChunkMap();
 

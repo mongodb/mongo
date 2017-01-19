@@ -69,7 +69,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/client/sharding_connection_hook_for_mongos.h"
-#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/mongos_options.h"
@@ -370,6 +369,8 @@ static int _main() {
 
     getGlobalServiceContext()->setFastClockSource(FastClockSourceFactory::create(Milliseconds{10}));
 
+    auto shardingContext = Grid::get(getGlobalServiceContext());
+
     // we either have a setting where all processes are in localhost or none are
     std::vector<HostAndPort> configServers = mongosGlobalParams.configdbs.getServers();
     for (std::vector<HostAndPort>::const_iterator it = configServers.begin();
@@ -378,10 +379,10 @@ static int _main() {
         const HostAndPort& configAddr = *it;
 
         if (it == configServers.begin()) {
-            grid.setAllowLocalHost(configAddr.isLocalHost());
+            shardingContext->setAllowLocalHost(configAddr.isLocalHost());
         }
 
-        if (configAddr.isLocalHost() != grid.allowLocalHost()) {
+        if (configAddr.isLocalHost() != shardingContext->allowLocalHost()) {
             mongo::log(LogComponent::kDefault)
                 << "cannot mix localhost and ip addresses in configdbs";
             return 10;

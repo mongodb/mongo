@@ -32,13 +32,14 @@
 
 #include "mongo/s/config.h"
 
+#include <vector>
+
 #include "mongo/db/lasterror.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
-#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
@@ -48,33 +49,13 @@
 
 namespace mongo {
 
-using std::set;
-using std::string;
-using std::vector;
+struct CollectionInfo {
+    // The config server opTime at which the chunk manager below was loaded
+    const repl::OpTime configOpTime;
 
-CollectionInfo::CollectionInfo(OperationContext* txn,
-                               const CollectionType& coll,
-                               repl::OpTime opTime)
-    : _configOpTime(std::move(opTime)) {
-    // Do this *first* so we're invisible to everyone else
-    std::unique_ptr<ChunkManager> manager(stdx::make_unique<ChunkManager>(txn, coll));
-    manager->loadExistingRanges(txn, nullptr);
-
-    // Collections with no chunks are unsharded, no matter what the collections entry says. This
-    // helps prevent errors when dropping in a different process.
-    if (manager->numChunks()) {
-        _cm = std::move(manager);
-    }
-}
-
-CollectionInfo::~CollectionInfo() = default;
-
-void CollectionInfo::resetCM(ChunkManager* cm) {
-    invariant(cm);
-    invariant(_cm);
-
-    _cm.reset(cm);
-}
+    // The chunk manager
+    const std::shared_ptr<ChunkManager> cm;
+};
 
 DBConfig::DBConfig(const DatabaseType& dbt, repl::OpTime configOpTime)
     : _name(dbt.getName()),
@@ -84,15 +65,10 @@ DBConfig::DBConfig(const DatabaseType& dbt, repl::OpTime configOpTime)
 
 DBConfig::~DBConfig() = default;
 
-bool DBConfig::isSharded(const string& ns) {
+bool DBConfig::isSharded(const std::string& ns) {
     stdx::lock_guard<stdx::mutex> lk(_lock);
 
-    CollectionInfoMap::iterator i = _collections.find(ns);
-    if (i == _collections.end()) {
-        return false;
-    }
-
-    return i->second.isSharded();
+    return _collections.count(ns) > 0;
 }
 
 void DBConfig::markNSNotSharded(const std::string& ns) {
@@ -104,55 +80,38 @@ void DBConfig::markNSNotSharded(const std::string& ns) {
     }
 }
 
-// Handles weird logic related to getting *either* a chunk manager *or* the collection primary
-// shard
 void DBConfig::getChunkManagerOrPrimary(OperationContext* txn,
-                                        const string& ns,
+                                        const std::string& ns,
                                         std::shared_ptr<ChunkManager>& manager,
                                         std::shared_ptr<Shard>& primary) {
-    // The logic here is basically that at any time, our collection can become sharded or
-    // unsharded
-    // via a command.  If we're not sharded, we want to send data to the primary, if sharded, we
-    // want to send data to the correct chunks, and we can't check both w/o the lock.
-
     manager.reset();
     primary.reset();
 
     const auto shardRegistry = Grid::get(txn)->shardRegistry();
 
-    {
-        stdx::lock_guard<stdx::mutex> lk(_lock);
+    stdx::lock_guard<stdx::mutex> lk(_lock);
 
-        CollectionInfoMap::iterator i = _collections.find(ns);
+    auto it = _collections.find(ns);
 
-        // No namespace
-        if (i == _collections.end()) {
-            // If we don't know about this namespace, it's unsharded by default
-            auto primaryStatus = shardRegistry->getShard(txn, _primaryId);
-            if (primaryStatus.isOK()) {
-                primary = primaryStatus.getValue();
-            }
-        } else {
-            CollectionInfo& cInfo = i->second;
-
-            if (cInfo.isSharded()) {
-                manager = cInfo.getCM();
-            } else {
-                auto primaryStatus = shardRegistry->getShard(txn, _primaryId);
-                if (primaryStatus.isOK()) {
-                    primary = primaryStatus.getValue();
-                }
-            }
+    if (it == _collections.end()) {
+        // If we don't know about this namespace, it's unsharded by default
+        auto shardStatus = shardRegistry->getShard(txn, _primaryId);
+        if (!shardStatus.isOK()) {
+            uasserted(40371,
+                      str::stream() << "The primary shard for collection " << ns
+                                    << " could not be loaded due to error "
+                                    << shardStatus.getStatus().toString());
         }
-    }
 
-    invariant(manager || primary);
-    invariant(!manager || !primary);
+        primary = std::move(shardStatus.getValue());
+    } else {
+        const auto& ci = it->second;
+        manager = ci.cm;
+    }
 }
 
-
 std::shared_ptr<ChunkManager> DBConfig::getChunkManagerIfExists(OperationContext* txn,
-                                                                const string& ns,
+                                                                const std::string& ns,
                                                                 bool shouldReload,
                                                                 bool forceReload) {
     // Don't report exceptions here as errors in GetLastError
@@ -167,7 +126,7 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManagerIfExists(OperationContext
 }
 
 std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
-                                                        const string& ns,
+                                                        const std::string& ns,
                                                         bool shouldReload,
                                                         bool forceReload) {
     ChunkVersion oldVersion;
@@ -176,34 +135,39 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
     {
         stdx::lock_guard<stdx::mutex> lk(_lock);
 
-        bool earlyReload = !_collections[ns].isSharded() && (shouldReload || forceReload);
+        auto it = _collections.find(ns);
+
+        const bool earlyReload = (it == _collections.end()) && (shouldReload || forceReload);
         if (earlyReload) {
             // This is to catch cases where there this is a new sharded collection.
             // Note: read the _reloadCount inside the _lock mutex, so _loadIfNeeded will always
             // be forced to perform a reload.
             const auto currentReloadIteration = _reloadCount.load();
             _loadIfNeeded(txn, currentReloadIteration);
+
+            it = _collections.find(ns);
         }
 
-        const CollectionInfo& ci = _collections[ns];
         uassert(ErrorCodes::NamespaceNotSharded,
                 str::stream() << "Collection is not sharded: " << ns,
-                ci.isSharded());
+                it != _collections.end());
+
+        const auto& ci = it->second;
 
         if (!(shouldReload || forceReload) || earlyReload) {
-            return ci.getCM();
+            return ci.cm;
         }
 
-        if (ci.getCM()) {
-            oldManager = ci.getCM();
-            oldVersion = ci.getCM()->getVersion();
+        if (ci.cm) {
+            oldManager = ci.cm;
+            oldVersion = ci.cm->getVersion();
         }
     }
 
     // TODO: We need to keep this first one-chunk check in until we have a more efficient way of
     // creating/reusing a chunk manager, as doing so requires copying the full set of chunks
     // currently
-    vector<ChunkType> newestChunk;
+    std::vector<ChunkType> newestChunk;
     if (oldVersion.isSet() && !forceReload) {
         uassertStatusOK(Grid::get(txn)->catalogClient(txn)->getChunks(
             txn,
@@ -219,14 +183,16 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
             ChunkVersion v = newestChunk[0].getVersion();
             if (v.equals(oldVersion)) {
                 stdx::lock_guard<stdx::mutex> lk(_lock);
-                const CollectionInfo& ci = _collections[ns];
+
+                auto it = _collections.find(ns);
                 uassert(15885,
                         str::stream() << "not sharded after reloading from chunks : " << ns,
-                        ci.isSharded());
-                return ci.getCM();
+                        it != _collections.end());
+
+                const auto& ci = it->second;
+                return ci.cm;
             }
         }
-
     } else if (!oldVersion.isSet()) {
         warning() << "version 0 found when " << (forceReload ? "reloading" : "checking")
                   << " chunk manager; collection '" << ns << "' initially detected as sharded";
@@ -241,15 +207,17 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
             // If we have a target we're going for see if we've hit already
             stdx::lock_guard<stdx::mutex> lk(_lock);
 
-            CollectionInfo& ci = _collections[ns];
+            auto it = _collections.find(ns);
 
-            if (ci.isSharded() && ci.getCM()) {
+            if (it != _collections.end()) {
+                const auto& ci = it->second;
+
                 ChunkVersion currentVersion = newestChunk[0].getVersion();
 
                 // Only reload if the version we found is newer than our own in the same epoch
-                if (currentVersion <= ci.getCM()->getVersion() &&
-                    ci.getCM()->getVersion().hasEqualEpoch(currentVersion)) {
-                    return ci.getCM();
+                if (currentVersion <= ci.cm->getVersion() &&
+                    ci.cm->getVersion().hasEqualEpoch(currentVersion)) {
+                    return ci.cm;
                 }
             }
         }
@@ -273,11 +241,15 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
 
     stdx::lock_guard<stdx::mutex> lk(_lock);
 
-    CollectionInfo& ci = _collections[ns];
-    uassert(14822, (string) "state changed in the middle: " + ns, ci.isSharded());
+    auto it = _collections.find(ns);
+    uassert(14822,
+            str::stream() << "Collection " << ns << " became unsharded in the middle.",
+            it != _collections.end());
+
+    const auto& ci = it->second;
 
     // Reset if our versions aren't the same
-    bool shouldReset = !tempChunkManager->getVersion().equals(ci.getCM()->getVersion());
+    bool shouldReset = !tempChunkManager->getVersion().equals(ci.cm->getVersion());
 
     // Also reset if we're forced to do so
     if (!shouldReset && forceReload) {
@@ -296,12 +268,12 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
     // TODO: Assert in next version, to allow smooth upgrades
     //
 
-    if (shouldReset && tempChunkManager->getVersion() < ci.getCM()->getVersion()) {
+    if (shouldReset && tempChunkManager->getVersion() < ci.cm->getVersion()) {
         shouldReset = false;
 
         warning() << "not resetting chunk manager for collection '" << ns << "', config version is "
                   << tempChunkManager->getVersion() << " and "
-                  << "old version is " << ci.getCM()->getVersion();
+                  << "old version is " << ci.cm->getVersion();
     }
 
     // end legacy behavior
@@ -309,19 +281,18 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManager(OperationContext* txn,
     if (shouldReset) {
         const auto cmOpTime = tempChunkManager->getConfigOpTime();
 
-        // The existing ChunkManager could have been updated since we last checked, so
-        // replace the existing chunk manager only if it is strictly newer.
-        // The condition should be (>) than instead of (>=), but use (>=) since legacy non-repl
-        // config servers will always have an opTime of zero.
-        if (cmOpTime >= ci.getCM()->getConfigOpTime()) {
-            ci.resetCM(tempChunkManager.release());
+        // The existing ChunkManager could have been updated since we last checked, so replace the
+        // existing chunk manager only if it is strictly newer.
+        if (cmOpTime > ci.cm->getConfigOpTime()) {
+            _collections.erase(ns);
+            auto emplacedEntryIt =
+                _collections.emplace(ns, CollectionInfo{cmOpTime, std::move(tempChunkManager)})
+                    .first;
+            return emplacedEntryIt->second.cm;
         }
     }
 
-    uassert(
-        15883, str::stream() << "not sharded after chunk manager reset : " << ns, ci.isSharded());
-
-    return ci.getCM();
+    return ci.cm;
 }
 
 bool DBConfig::load(OperationContext* txn) {
@@ -354,34 +325,34 @@ bool DBConfig::_loadIfNeeded(OperationContext* txn, Counter reloadIteration) {
     _configOpTime = dbOpTimePair.opTime;
 
     // Load all collections
-    vector<CollectionType> collections;
+    std::vector<CollectionType> collections;
     repl::OpTime configOpTimeWhenLoadingColl;
     uassertStatusOK(
         catalogClient->getCollections(txn, &_name, &collections, &configOpTimeWhenLoadingColl));
-
-    int numCollsErased = 0;
-    int numCollsSharded = 0;
 
     invariant(configOpTimeWhenLoadingColl >= _configOpTime);
 
     for (const auto& coll : collections) {
         auto collIter = _collections.find(coll.getNs().ns());
         if (collIter != _collections.end()) {
-            invariant(configOpTimeWhenLoadingColl >= collIter->second.getConfigOpTime());
+            invariant(configOpTimeWhenLoadingColl >= collIter->second.configOpTime);
         }
 
-        if (coll.getDropped()) {
-            _collections.erase(coll.getNs().ns());
-            numCollsErased++;
-        } else {
-            _collections[coll.getNs().ns()] =
-                CollectionInfo(txn, coll, configOpTimeWhenLoadingColl);
-            numCollsSharded++;
+        _collections.erase(coll.getNs().ns());
+
+        if (!coll.getDropped()) {
+            // Do the blocking collection load
+            std::unique_ptr<ChunkManager> manager(stdx::make_unique<ChunkManager>(txn, coll));
+            manager->loadExistingRanges(txn, nullptr);
+
+            // Collections with no chunks are unsharded, no matter what the collections entry says
+            if (manager->numChunks()) {
+                _collections.emplace(
+                    coll.getNs().ns(),
+                    CollectionInfo{configOpTimeWhenLoadingColl, std::move(manager)});
+            }
         }
     }
-
-    LOG(2) << "found " << numCollsSharded << " collections left and " << numCollsErased
-           << " collections dropped for database " << _name;
 
     _reloadCount.fetchAndAdd(1);
 
@@ -406,17 +377,13 @@ bool DBConfig::reload(OperationContext* txn) {
     return successful;
 }
 
-void DBConfig::getAllShardIds(set<ShardId>* shardIds) {
-    dassert(shardIds);
-
+void DBConfig::getAllShardIds(std::set<ShardId>* shardIds) {
     stdx::lock_guard<stdx::mutex> lk(_lock);
     shardIds->insert(_primaryId);
-    for (CollectionInfoMap::const_iterator it(_collections.begin()), end(_collections.end());
-         it != end;
-         ++it) {
-        if (it->second.isSharded()) {
-            it->second.getCM()->getAllShardIds(shardIds);
-        }  // TODO: handle collections on non-primary shard
+
+    for (const auto& ciEntry : _collections) {
+        const auto& ci = ciEntry.second;
+        ci.cm->getAllShardIds(shardIds);
     }
 }
 

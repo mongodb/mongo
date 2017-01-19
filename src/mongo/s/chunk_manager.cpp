@@ -365,19 +365,6 @@ bool ChunkManager::_load(OperationContext* txn,
     }
 }
 
-shared_ptr<ChunkManager> ChunkManager::reload(OperationContext* txn, bool force) const {
-    const NamespaceString nss(_ns);
-    auto config = uassertStatusOK(grid.catalogCache()->getDatabase(txn, nss.db().toString()));
-
-    return config->getChunkManagerIfExists(txn, getns(), force);
-}
-
-void ChunkManager::_printChunks() const {
-    for (ChunkMap::const_iterator it = _chunkMap.begin(), end = _chunkMap.end(); it != end; ++it) {
-        log() << redact((*it->second).toString());
-    }
-}
-
 void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
                                            const ShardId& primaryShardId,
                                            const vector<BSONObj>* initPoints,
@@ -488,49 +475,55 @@ Status ChunkManager::createFirstChunks(OperationContext* txn,
 StatusWith<shared_ptr<Chunk>> ChunkManager::findIntersectingChunk(OperationContext* txn,
                                                                   const BSONObj& shardKey,
                                                                   const BSONObj& collation) const {
-    {
-        const bool hasSimpleCollation = (collation.isEmpty() && !_defaultCollator) ||
-            SimpleBSONObjComparator::kInstance.evaluate(collation == CollationSpec::kSimpleSpec);
-        if (!hasSimpleCollation) {
-            for (BSONElement elt : shardKey) {
-                if (CollationIndexKey::isCollatableType(elt.type())) {
-                    return Status(ErrorCodes::ShardKeyNotFound,
-                                  "cannot target single shard due to collation");
-                }
+    const bool hasSimpleCollation = (collation.isEmpty() && !_defaultCollator) ||
+        SimpleBSONObjComparator::kInstance.evaluate(collation == CollationSpec::kSimpleSpec);
+    if (!hasSimpleCollation) {
+        for (BSONElement elt : shardKey) {
+            if (CollationIndexKey::isCollatableType(elt.type())) {
+                return Status(ErrorCodes::ShardKeyNotFound,
+                              "cannot target single shard due to collation");
             }
-        }
-
-        BSONObj chunkMin;
-        shared_ptr<Chunk> chunk;
-        {
-            ChunkMap::const_iterator it = _chunkMap.upper_bound(shardKey);
-            if (it != _chunkMap.end()) {
-                chunkMin = it->first;
-                chunk = it->second;
-            }
-        }
-
-        if (chunk) {
-            if (chunk->containsKey(shardKey)) {
-                return chunk;
-            }
-
-            log() << redact(chunkMin.toString());
-            log() << redact((*chunk).toString());
-            log() << redact(shardKey);
-
-            reload(txn);
-            msgasserted(13141, "Chunk map pointed to incorrect chunk");
         }
     }
 
-    msgasserted(8070,
-                str::stream() << "couldn't find a chunk intersecting: " << shardKey << " for ns: "
-                              << _ns
-                              << " at version: "
-                              << _version.toString()
-                              << ", number of chunks: "
-                              << _chunkMap.size());
+    BSONObj chunkMin;
+    shared_ptr<Chunk> chunk;
+    {
+        ChunkMap::const_iterator it = _chunkMap.upper_bound(shardKey);
+        if (it != _chunkMap.end()) {
+            chunkMin = it->first;
+            chunk = it->second;
+        }
+    }
+
+    if (!chunk) {
+        // TODO: This should be an invariant
+        msgasserted(8070,
+                    str::stream() << "couldn't find a chunk intersecting: " << shardKey
+                                  << " for ns: "
+                                  << _ns
+                                  << " at version: "
+                                  << _version.toString()
+                                  << ", number of chunks: "
+                                  << _chunkMap.size());
+    }
+
+    if (chunk->containsKey(shardKey)) {
+        return chunk;
+    }
+
+    // TODO: This should be an invariant
+    log() << redact(chunkMin.toString());
+    log() << redact((*chunk).toString());
+    log() << redact(shardKey);
+
+    // Proactively force a reload on the chunk manager in case it somehow got inconsistent
+    const NamespaceString nss(_ns);
+    auto config =
+        uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, nss.db().toString()));
+    config->getChunkManagerIfExists(txn, nss.ns(), true);
+
+    msgasserted(13141, "Chunk map pointed to incorrect chunk");
 }
 
 shared_ptr<Chunk> ChunkManager::findIntersectingChunkWithSimpleCollation(

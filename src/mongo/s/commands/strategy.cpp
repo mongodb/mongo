@@ -59,7 +59,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/version_manager.h"
 #include "mongo/s/commands/cluster_explain.h"
-#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/cluster_find.h"

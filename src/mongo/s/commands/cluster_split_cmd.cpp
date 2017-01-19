@@ -43,7 +43,6 @@
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_connection.h"
-#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/s/sharding_raii.h"
@@ -239,7 +238,7 @@ public:
 
         // Proactively refresh the chunk manager. Not strictly necessary, but this way it's
         // immediately up-to-date the next time it's used.
-        cm->reload(txn);
+        scopedCM.db()->getChunkManagerIfExists(txn, nss.ns(), true);
 
         return true;
     }

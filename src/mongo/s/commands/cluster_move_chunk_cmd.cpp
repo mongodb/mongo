@@ -42,7 +42,6 @@
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/config.h"
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
@@ -201,7 +200,7 @@ public:
 
         // Proactively refresh the chunk manager. Not strictly necessary, but this way it's
         // immediately up-to-date the next time it's used.
-        cm->reload(txn);
+        scopedCM.db()->getChunkManagerIfExists(txn, nss.ns(), true);
 
         result.append("millis", t.millis());
         return true;

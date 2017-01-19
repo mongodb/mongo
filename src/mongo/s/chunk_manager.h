@@ -192,12 +192,7 @@ public:
     ChunkVersion getVersion(const ShardId& shardName) const;
     ChunkVersion getVersion() const;
 
-    void _printChunks() const;
-
     uint64_t getCurrentDesiredChunkSize() const;
-
-    std::shared_ptr<ChunkManager> reload(OperationContext* txn,
-                                         bool force = true) const;  // doesn't modify self!
 
     /**
      * Returns the opTime of config server the last time chunks were loaded.
