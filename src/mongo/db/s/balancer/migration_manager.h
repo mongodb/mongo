@@ -172,23 +172,7 @@ private:
     // O(1) removal time.
     using MigrationsList = std::list<Migration>;
 
-    /**
-     * Contains the runtime state for a single collection. This class does not have concurrency
-     * control of its own and relies on the migration manager's mutex.
-     */
-    struct CollectionMigrationsState {
-        CollectionMigrationsState(DistLockHandle distLockHandle);
-        ~CollectionMigrationsState();
-
-        // Dist lock handle, which must be released at destruction time.
-        const DistLockHandle distLockHandle;
-
-        // Contains a set of migrations which are currently active for this namespace.
-        MigrationsList migrations;
-    };
-
-    using CollectionMigrationsStateMap =
-        stdx::unordered_map<NamespaceString, CollectionMigrationsState>;
+    using CollectionMigrationsStateMap = stdx::unordered_map<NamespaceString, MigrationsList>;
 
     /**
      * Optionally takes the collection distributed lock and schedules a chunk migration with the
@@ -281,8 +265,7 @@ private:
     // signaled when the state change is complete.
     stdx::condition_variable _condVar;
 
-    // Holds information about each collection's distributed lock and active migrations via a
-    // CollectionMigrationState object.
+    // Maps collection namespaces to that collection's active migrations.
     CollectionMigrationsStateMap _activeMigrations;
 };
 
