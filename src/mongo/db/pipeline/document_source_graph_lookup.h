@@ -121,7 +121,7 @@ private:
      * Returns boost::none if no query is necessary, i.e., all values were retrieved from the cache.
      * Otherwise, returns a query object.
      */
-    boost::optional<BSONObj> makeMatchStageFromFrontier(BSONObjSet* cached);
+    boost::optional<BSONObj> makeMatchStageFromFrontier(DocumentUnorderedSet* cached);
 
     /**
      * If we have internalized a $unwind, getNext() dispatches to this function.
@@ -145,7 +145,7 @@ private:
      * Updates '_cache' with 'result' appropriately, given that 'result' was retrieved when querying
      * for 'queried'.
      */
-    void addToCache(const BSONObj& result, const ValueUnorderedSet& queried);
+    void addToCache(Document result, const ValueUnorderedSet& queried);
 
     /**
      * Assert that '_visited' and '_frontier' have not exceeded the maximum meory usage, and then
@@ -159,7 +159,7 @@ private:
      *
      * Returns whether '_visited' was updated, and thus, whether the search should recurse.
      */
-    bool addToVisitedAndFrontier(BSONObj result, long long depth);
+    bool addToVisitedAndFrontier(Document result, long long depth);
 
     // $graphLookup options.
     NamespaceString _from;
@@ -190,7 +190,7 @@ private:
     // Tracks nodes that have been discovered for a given input. Keys are the '_id' value of the
     // document from the foreign collection, value is the document itself.  The keys are compared
     // using the simple collation.
-    ValueUnorderedMap<BSONObj> _visited;
+    ValueUnorderedMap<Document> _visited;
 
     // Caches query results to avoid repeating any work. This structure is maintained across calls
     // to getNext().
