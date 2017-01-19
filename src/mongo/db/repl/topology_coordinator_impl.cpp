@@ -49,6 +49,7 @@
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -64,6 +65,11 @@ const Seconds TopologyCoordinatorImpl::VoteLease::leaseTime = Seconds(30);
 // Controls how caught up in replication a secondary with higher priority than the current primary
 // must be before it will call for a priority takeover election.
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(priorityTakeoverFreshnessWindowSeconds, int, 2);
+
+// If this fail point is enabled, TopologyCoordinatorImpl::shouldChangeSyncSource() will ignore
+// the option TopologyCoordinatorImpl::Options::maxSyncSourceLagSecs. The sync source will not be
+// re-evaluated if it lags behind another node by more than 'maxSyncSourceLagSecs' seconds.
+MONGO_FP_DECLARE(disableMaxSyncSourceLagSecs);
 
 namespace {
 
@@ -2472,26 +2478,36 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
         return true;
     }
 
-    unsigned int currentSecs = currentSourceOpTime.getSecs();
-    unsigned int goalSecs = currentSecs + durationCount<Seconds>(_options.maxSyncSourceLagSecs);
+    if (MONGO_FAIL_POINT(disableMaxSyncSourceLagSecs)) {
+        log() << "disableMaxSyncSourceLagSecs fail point enabled - not checking the most recent "
+                 "OpTime, "
+              << currentSourceOpTime.toString() << ", of our current sync source, " << currentSource
+              << ", against the OpTimes of the other nodes in this replica set.";
+    } else {
+        unsigned int currentSecs = currentSourceOpTime.getSecs();
+        unsigned int goalSecs = currentSecs + durationCount<Seconds>(_options.maxSyncSourceLagSecs);
 
-    for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin(); it != _hbdata.end();
-         ++it) {
-        const int itIndex = indexOfIterator(_hbdata, it);
-        const MemberConfig& candidateConfig = _rsConfig.getMemberAt(itIndex);
-        if (it->up() && (candidateConfig.isVoter() || !_selfConfig().isVoter()) &&
-            (candidateConfig.shouldBuildIndexes() || !_selfConfig().shouldBuildIndexes()) &&
-            it->getState().readable() && !_memberIsBlacklisted(candidateConfig, now) &&
-            goalSecs < it->getAppliedOpTime().getSecs()) {
-            log() << "Choosing new sync source because the most recent OpTime of our sync source, "
-                  << currentSource << ", is " << currentSourceOpTime.toString()
-                  << " which is more than " << _options.maxSyncSourceLagSecs << " behind member "
-                  << candidateConfig.getHostAndPort().toString() << " whose most recent OpTime is "
-                  << it->getAppliedOpTime().toString();
-            invariant(itIndex != _selfIndex);
-            return true;
+        for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin();
+             it != _hbdata.end();
+             ++it) {
+            const int itIndex = indexOfIterator(_hbdata, it);
+            const MemberConfig& candidateConfig = _rsConfig.getMemberAt(itIndex);
+            if (it->up() && (candidateConfig.isVoter() || !_selfConfig().isVoter()) &&
+                (candidateConfig.shouldBuildIndexes() || !_selfConfig().shouldBuildIndexes()) &&
+                it->getState().readable() && !_memberIsBlacklisted(candidateConfig, now) &&
+                goalSecs < it->getAppliedOpTime().getSecs()) {
+                log() << "Choosing new sync source because the most recent OpTime of our sync "
+                         "source, "
+                      << currentSource << ", is " << currentSourceOpTime.toString()
+                      << " which is more than " << _options.maxSyncSourceLagSecs
+                      << " behind member " << candidateConfig.getHostAndPort().toString()
+                      << " whose most recent OpTime is " << it->getAppliedOpTime().toString();
+                invariant(itIndex != _selfIndex);
+                return true;
+            }
         }
     }
+
     return false;
 }
 
