@@ -61,6 +61,14 @@ env.Library(
     ]
 )
 
+env.Library(
+    target='initialize_snmp',
+	source= [
+		'initialize_snmp.cpp',
+	],
+	LIBDEPS=[],
+)
+
 env.CppUnitTest(
     target= 'field_ref_test',
     source= 'field_ref_test.cpp',

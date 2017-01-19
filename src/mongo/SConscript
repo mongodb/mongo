@@ -280,6 +280,7 @@ mongodLibDeps = [
     'db/dbdirectclient',
     'db/ftdc/ftdc_mongod',
     'db/index_d',
+    'db/initialize_snmp',
     'db/mongod_options',
     'db/mongodandmongos',
     'db/op_observer_d',
