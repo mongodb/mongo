@@ -273,24 +273,41 @@ Status ShardingState::onStaleShardVersion(OperationContext* txn,
         }
     }
 
-    auto refreshStatusAndVersion =
-        _refreshMetadata(txn, nss, (currentMetadata ? currentMetadata.getMetadata() : nullptr));
-    return refreshStatusAndVersion.getStatus();
+    // At the first attempt try to use the currently loaded metadata and on subsequent attempts use
+    // the complete metadata
+    int numRefreshAttempts = 0;
+
+    while (true) {
+        numRefreshAttempts++;
+
+        auto refreshStatusAndVersion =
+            _refreshMetadata(txn, nss, (currentMetadata ? currentMetadata.getMetadata() : nullptr));
+        if (refreshStatusAndVersion.isOK()) {
+            LOG(1) << "Successfully refreshed metadata for " << nss.ns() << " to "
+                   << refreshStatusAndVersion.getValue();
+            return Status::OK();
+        }
+
+        if (refreshStatusAndVersion == ErrorCodes::RemoteChangeDetected &&
+            numRefreshAttempts < kMaxNumMetadataRefreshAttempts) {
+            currentMetadata = ScopedCollectionMetadata();
+
+            log() << "Refresh failed and will be retried as full reload "
+                  << refreshStatusAndVersion.getStatus();
+            continue;
+        }
+
+        return refreshStatusAndVersion.getStatus();
+    }
+
+
+    MONGO_UNREACHABLE;
 }
 
 Status ShardingState::refreshMetadataNow(OperationContext* txn,
                                          const NamespaceString& nss,
                                          ChunkVersion* latestShardVersion) {
-    ScopedCollectionMetadata currentMetadata;
-
-    {
-        AutoGetCollection autoColl(txn, nss, MODE_IS);
-
-        currentMetadata = CollectionShardingState::get(txn, nss)->getMetadata();
-    }
-
-    auto refreshLatestShardVersionStatus =
-        _refreshMetadata(txn, nss, currentMetadata.getMetadata());
+    auto refreshLatestShardVersionStatus = _refreshMetadata(txn, nss, nullptr);
     if (!refreshLatestShardVersionStatus.isOK()) {
         return refreshLatestShardVersionStatus.getStatus();
     }
@@ -651,34 +668,24 @@ StatusWith<ChunkVersion> ShardingState::_refreshMetadata(
         }
     }
 
-    Status status = {ErrorCodes::InternalError, "metadata refresh not performed"};
+    // The _configServerTickets serializes this process such that only a small number of threads can
+    // try to refresh at the same time in order to avoid overloading the config server
+    _configServerTickets.waitForTicket();
+    TicketHolderReleaser needTicketFrom(&_configServerTickets);
+
     Timer t;
-    int numAttempts = 0;
-    std::unique_ptr<CollectionMetadata> remoteMetadata;
 
-    do {
-        // The _configServerTickets serializes this process such that only a small number of threads
-        // can try to refresh at the same time in order to avoid overloading the config server.
-        _configServerTickets.waitForTicket();
-        TicketHolderReleaser needTicketFrom(&_configServerTickets);
+    log() << "MetadataLoader loading chunks for " << nss.ns() << " based on: "
+          << (metadataForDiff ? metadataForDiff->getCollVersion().toString() : "(empty)");
 
-        if (status == ErrorCodes::RemoteChangeDetected) {
-            metadataForDiff = nullptr;
-            log() << "Refresh failed and will be retried as full reload " << status;
-        }
+    std::unique_ptr<CollectionMetadata> remoteMetadata(stdx::make_unique<CollectionMetadata>());
 
-        log() << "MetadataLoader loading chunks for " << nss.ns() << " based on: "
-              << (metadataForDiff ? metadataForDiff->getCollVersion().toString() : "(empty)");
-
-        remoteMetadata = stdx::make_unique<CollectionMetadata>();
-        status = MetadataLoader::makeCollectionMetadata(txn,
-                                                        grid.catalogClient(txn),
-                                                        nss.ns(),
-                                                        getShardName(),
-                                                        metadataForDiff,
-                                                        remoteMetadata.get());
-    } while (status == ErrorCodes::RemoteChangeDetected &&
-             ++numAttempts < kMaxNumMetadataRefreshAttempts);
+    Status status = MetadataLoader::makeCollectionMetadata(txn,
+                                                           grid.catalogClient(txn),
+                                                           nss.ns(),
+                                                           getShardName(),
+                                                           metadataForDiff,
+                                                           remoteMetadata.get());
 
     if (!status.isOK() && status != ErrorCodes::NamespaceNotFound) {
         warning() << "MetadataLoader failed after " << t.millis() << " ms"
@@ -693,23 +700,24 @@ StatusWith<ChunkVersion> ShardingState::_refreshMetadata(
 
     auto css = CollectionShardingState::get(txn, nss);
 
-    if (!status.isOK()) {
-        invariant(status == ErrorCodes::NamespaceNotFound);
-        css->refreshMetadata(txn, nullptr);
+    if (status.isOK()) {
+        css->refreshMetadata(txn, std::move(remoteMetadata));
 
-        log() << "MetadataLoader took " << t.millis() << " ms and did not find the namespace";
+        auto metadata = css->getMetadata();
 
-        return ChunkVersion::UNSHARDED();
+        log() << "MetadataLoader took " << t.millis() << " ms and found version "
+              << metadata->getCollVersion();
+
+        return metadata->getShardVersion();
     }
 
-    css->refreshMetadata(txn, std::move(remoteMetadata));
+    invariant(status == ErrorCodes::NamespaceNotFound);
 
-    auto metadata = css->getMetadata();
+    css->refreshMetadata(txn, nullptr);
 
-    log() << "MetadataLoader took " << t.millis() << " ms and found version "
-          << metadata->getCollVersion();
+    log() << "MetadataLoader took " << t.millis() << " ms and did not find the namespace";
 
-    return metadata->getShardVersion();
+    return ChunkVersion::UNSHARDED();
 }
 
 StatusWith<ScopedRegisterDonateChunk> ShardingState::registerDonateChunk(
