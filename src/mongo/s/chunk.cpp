@@ -34,13 +34,11 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/connpool.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
@@ -73,6 +71,12 @@ const int splitTestFactor = 5;
 int mkDataWritten() {
     PseudoRandom r(static_cast<int64_t>(time(0)));
     return r.nextInt32(grid.getBalancerConfiguration()->getMaxChunkSizeBytes() / splitTestFactor);
+}
+
+void reloadChunkManager(OperationContext* txn, const std::string ns) {
+    const NamespaceString nss(ns);
+    auto config = uassertStatusOK(ScopedShardDatabase::getExisting(txn, nss.db()));
+    config.db()->getChunkManagerIfExists(txn, nss.ns(), true);
 }
 
 }  // namespace
@@ -301,7 +305,7 @@ StatusWith<boost::optional<ChunkRange>> Chunk::split(OperationContext* txn,
         return splitStatus.getStatus();
     }
 
-    _manager->reload(txn);
+    reloadChunkManager(txn, _manager->getns());
 
     *resultingSplits = splitPoints.size();
     return splitStatus.getValue();
@@ -422,7 +426,7 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
                 msgassertedNoTraceWithStatus(10412, rebalanceStatus);
             }
 
-            _manager->reload(txn);
+            reloadChunkManager(txn, _manager->getns());
         }
 
         return true;

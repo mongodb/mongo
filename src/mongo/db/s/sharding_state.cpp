@@ -61,7 +61,6 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/sharding_network_connection_hook.h"
-#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/util/log.h"

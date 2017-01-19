@@ -29,8 +29,8 @@
 #pragma once
 
 #include <set>
+#include <string>
 
-#include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/client/shard.h"
@@ -39,33 +39,9 @@
 namespace mongo {
 
 class ChunkManager;
-class CollectionType;
+struct CollectionInfo;
 class DatabaseType;
 class OperationContext;
-
-struct CollectionInfo {
-    CollectionInfo() = default;
-    CollectionInfo(OperationContext* txn, const CollectionType& coll, repl::OpTime opTime);
-    ~CollectionInfo();
-
-    bool isSharded() const {
-        return _cm.get();
-    }
-
-    std::shared_ptr<ChunkManager> getCM() const {
-        return _cm;
-    }
-
-    void resetCM(ChunkManager* cm);
-
-    repl::OpTime getConfigOpTime() const {
-        return _configOpTime;
-    }
-
-private:
-    repl::OpTime _configOpTime;
-    std::shared_ptr<ChunkManager> _cm;
-};
 
 /**
  * Represents the cache entry for a database.
