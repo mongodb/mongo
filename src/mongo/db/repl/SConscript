@@ -250,6 +250,7 @@ env.Library('topology_coordinator_impl',
                 'repl_settings',
                 'rslog',
                 'topology_coordinator',
+                '$BUILD_DIR/mongo/util/fail_point',
             ])
 
 env.CppUnitTest('repl_set_heartbeat_response_test',

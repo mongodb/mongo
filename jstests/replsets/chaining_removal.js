@@ -26,6 +26,16 @@
     var primary = replTest.getPrimary();
     replTest.awaitReplication();
 
+    // When setting up chaining on slow machines, we do not want slow writes or delayed heartbeats
+    // to cause our nodes to invalidate the sync source provided in the 'replSetSyncFrom' command.
+    // To achieve this, we disable the server parameter 'maxSyncSourceLagSecs' (see
+    // repl_settings_init.cpp and TopologyCoordinatorImpl::Options) in
+    // TopologyCoordinatorImpl::shouldChangeSyncSource().
+    assert.commandWorked(nodes[1].getDB('admin').runCommand(
+        {configureFailPoint: 'disableMaxSyncSourceLagSecs', mode: 'alwaysOn'}));
+    assert.commandWorked(nodes[4].getDB('admin').runCommand(
+        {configureFailPoint: 'disableMaxSyncSourceLagSecs', mode: 'alwaysOn'}));
+
     // Force node 1 to sync directly from node 0.
     syncFrom(nodes[1], nodes[0], replTest);
 
@@ -38,6 +48,12 @@
         writeConcern: {w: numNodes, wtimeout: timeout}
     };
     assert.writeOK(primary.getDB(name).foo.insert({x: 1}, options));
+
+    // Re-enable 'maxSyncSourceLagSecs' checking on sync source.
+    assert.commandWorked(nodes[1].getDB('admin').runCommand(
+        {configureFailPoint: 'disableMaxSyncSourceLagSecs', mode: 'off'}));
+    assert.commandWorked(nodes[4].getDB('admin').runCommand(
+        {configureFailPoint: 'disableMaxSyncSourceLagSecs', mode: 'off'}));
 
     var config = primary.getDB("local").system.replset.findOne();
     config.members.pop();
