@@ -818,6 +818,16 @@ env.Library(
 )
 
 env.Library(
+    target='callback_completion_guard',
+    source=[
+        'callback_completion_guard.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
     target='collection_cloner',
     source=[
         'collection_cloner.cpp',
@@ -1049,6 +1059,7 @@ env.Library(
         'data_replicator.cpp',
     ],
     LIBDEPS=[
+        'callback_completion_guard',
         'collection_cloner',
         'database_cloner',
         'databases_cloner',
