@@ -238,6 +238,15 @@ void InclusionNode::addPreservedPaths(std::set<std::string>* preservedPaths) con
     }
 }
 
+void InclusionNode::addComputedPaths(std::set<std::string>* computedPaths) const {
+    for (auto&& computedPair : _expressions) {
+        computedPaths->insert(FieldPath::getFullyQualifiedPath(_pathToNode, computedPair.first));
+    }
+    for (auto&& childPair : _children) {
+        childPair.second->addComputedPaths(computedPaths);
+    }
+}
+
 //
 // ParsedInclusionProjection
 //

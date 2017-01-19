@@ -137,6 +137,66 @@ class MoveMultipleSkipsAndLimitsBeforeProject : public Base {
     }
 };
 
+class MoveMatchBeforeAddFieldsIfInvolvedFieldsNotRelated : public Base {
+    string inputPipeJson() override {
+        return "[{$addFields : {a : 1}}, {$match : {b : 1}}]";
+    }
+
+    string outputPipeJson() override {
+        return "[{$match : {b : 1}}, {$addFields : {a : {$const : 1}}}]";
+    }
+};
+
+class MatchDoesNotMoveBeforeAddFieldsIfInvolvedFieldsAreRelated : public Base {
+    string inputPipeJson() override {
+        return "[{$addFields : {a : 1}}, {$match : {a : 1}}]";
+    }
+
+    string outputPipeJson() override {
+        return "[{$addFields : {a : {$const : 1}}}, {$match : {a : 1}}]";
+    }
+};
+
+class MatchOnTopLevelFieldDoesNotMoveBeforeAddFieldsOfNestedPath : public Base {
+    string inputPipeJson() override {
+        return "[{$addFields : {'a.b' : 1}}, {$match : {a : 1}}]";
+    }
+
+    string outputPipeJson() override {
+        return "[{$addFields : {a : {b : {$const : 1}}}}, {$match : {a : 1}}]";
+    }
+};
+
+class MatchOnNestedFieldDoesNotMoveBeforeAddFieldsOfPrefixOfPath : public Base {
+    string inputPipeJson() override {
+        return "[{$addFields : {a : 1}}, {$match : {'a.b' : 1}}]";
+    }
+
+    string outputPipeJson() override {
+        return "[{$addFields : {a : {$const : 1}}}, {$match : {'a.b' : 1}}]";
+    }
+};
+
+class MoveMatchOnNestedFieldBeforeAddFieldsOfDifferentNestedField : public Base {
+    string inputPipeJson() override {
+        return "[{$addFields : {'a.b' : 1}}, {$match : {'a.c' : 1}}]";
+    }
+
+    string outputPipeJson() override {
+        return "[{$match : {'a.c' : 1}}, {$addFields : {a : {b : {$const : 1}}}}]";
+    }
+};
+
+class MoveMatchBeforeAddFieldsWhenMatchedFieldIsPrefixOfAddedFieldName : public Base {
+    string inputPipeJson() override {
+        return "[{$addFields : {abcd : 1}}, {$match : {abc : 1}}]";
+    }
+
+    string outputPipeJson() override {
+        return "[{$match : {abc : 1}}, {$addFields : {abcd: {$const: 1}}}]";
+    }
+};
+
 class SkipSkipLimitBecomesLimitSkip : public Base {
     string inputPipeJson() override {
         return "[{$skip : 3}"
@@ -1439,6 +1499,14 @@ public:
         add<Optimizations::Local::MoveLimitBeforeProject>();
         add<Optimizations::Local::MoveSkipBeforeProject>();
         add<Optimizations::Local::MoveMultipleSkipsAndLimitsBeforeProject>();
+        add<Optimizations::Local::MatchDoesNotMoveBeforeAddFieldsIfInvolvedFieldsAreRelated>();
+        add<Optimizations::Local::MatchOnNestedFieldDoesNotMoveBeforeAddFieldsOfPrefixOfPath>();
+        add<Optimizations::Local::MatchOnTopLevelFieldDoesNotMoveBeforeAddFieldsOfNestedPath>();
+        add<Optimizations::Local::MoveMatchBeforeAddFieldsIfInvolvedFieldsNotRelated>();
+        add<Optimizations::Local::
+                MoveMatchBeforeAddFieldsWhenMatchedFieldIsPrefixOfAddedFieldName>();
+        add<Optimizations::Local::MoveMatchOnNestedFieldBeforeAddFieldsOfDifferentNestedField>();
+        add<Optimizations::Local::MatchDoesNotMoveBeforeAddFieldsIfInvolvedFieldsAreRelated>();
         add<Optimizations::Local::SkipSkipLimitBecomesLimitSkip>();
         add<Optimizations::Local::SortMatchProjSkipLimBecomesMatchTopKSortSkipProj>();
         add<Optimizations::Local::DoNotRemoveSkipOne>();

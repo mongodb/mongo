@@ -124,6 +124,11 @@ public:
      */
     void addPreservedPaths(std::set<std::string>* preservedPaths) const;
 
+    /**
+     * Recursively adds all paths that are purely computed in this inclusion projection.
+     */
+    void addComputedPaths(std::set<std::string>* computedPaths) const;
+
 private:
     // Helpers for the Document versions above. These will apply the transformation recursively to
     // each element of any arrays, and ensure non-documents are handled appropriately.
