@@ -1497,6 +1497,46 @@ Status DataReplicator::_enqueueDocuments(Fetcher::Documents::const_iterator begi
     return Status::OK();
 }
 
+DataReplicator::OnCompletionGuard::OnCompletionGuard(
+    const CancelRemainingWorkInLockFn& cancelRemainingWorkInLock,
+    const OnCompletionFn& onCompletion)
+    : _cancelRemainingWorkInLock(cancelRemainingWorkInLock), _onCompletion(onCompletion) {}
+
+DataReplicator::OnCompletionGuard::~OnCompletionGuard() {
+    MONGO_DESTRUCTOR_GUARD({
+        if (!_lastAppliedSet) {
+            severe() << "It is a programming error to destroy this initial sync attempt completion "
+                        "guard without the caller providing a result for '_lastApplied'";
+        }
+        invariant(_lastAppliedSet);
+        // _onCompletion() must be called outside the DataReplicator's lock to avoid a deadlock.
+        _onCompletion(_lastApplied);
+    });
+}
+
+void DataReplicator::OnCompletionGuard::setResultAndCancelRemainingWork_inlock(
+    const stdx::lock_guard<stdx::mutex>&, const StatusWith<OpTimeWithHash>& lastApplied) {
+    _setResultAndCancelRemainingWork_inlock(lastApplied);
+}
+
+void DataReplicator::OnCompletionGuard::setResultAndCancelRemainingWork_inlock(
+    const stdx::unique_lock<stdx::mutex>& lock, const StatusWith<OpTimeWithHash>& lastApplied) {
+    invariant(lock.owns_lock());
+    _setResultAndCancelRemainingWork_inlock(lastApplied);
+}
+
+void DataReplicator::OnCompletionGuard::_setResultAndCancelRemainingWork_inlock(
+    const StatusWith<OpTimeWithHash>& lastApplied) {
+    if (_lastAppliedSet) {
+        return;
+    }
+    _lastApplied = lastApplied;
+    _lastAppliedSet = true;
+
+    // It is fine to call this multiple times.
+    _cancelRemainingWorkInLock();
+}
+
 std::string DataReplicator::Stats::toString() const {
     return toBSON().toString();
 }
