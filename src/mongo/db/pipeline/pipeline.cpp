@@ -331,44 +331,67 @@ Status Pipeline::checkAuthForCommand(ClientBasic* client,
 
     std::vector<Privilege> privileges;
 
-    if (cmdObj.getFieldDotted("pipeline.0.$indexStats")) {
-        Privilege::addPrivilegeToPrivilegeVector(&privileges,
-                                                 Privilege(inputResource, ActionType::indexStats));
-    } else {
-        // If no source requiring an alternative permission scheme is specified then default to
-        // requiring find() privileges on the given namespace.
-        Privilege::addPrivilegeToPrivilegeVector(&privileges,
-                                                 Privilege(inputResource, ActionType::find));
+    BSONElement pipelineElem = cmdObj["pipeline"];
+    if (pipelineElem.type() != BSONType::Array) {
+        return Status(ErrorCodes::TypeMismatch, "'pipeline' must be specified as an array");
     }
 
-    BSONObj pipeline = cmdObj.getObjectField("pipeline");
-    BSONForEach(stageElem, pipeline) {
-        BSONObj stage = stageElem.embeddedObjectUserCheck();
-        StringData stageName = stage.firstElementFieldName();
-        if (stageName == "$out" && stage.firstElementType() == String) {
-            NamespaceString outputNs(db, stage.firstElement().str());
-            uassert(17139,
-                    mongoutils::str::stream() << "Invalid $out target namespace, " << outputNs.ns(),
-                    outputNs.isValid());
+    BSONObj pipeline = pipelineElem.embeddedObject();
+    if (pipeline.isEmpty()) {
+        // The pipeline is empty, so we require only the find action.
+        Privilege::addPrivilegeToPrivilegeVector(&privileges,
+                                                 Privilege(inputResource, ActionType::find));
+    } else {
+        if (pipeline.firstElementType() != BSONType::Object) {
+            // The pipeline contains something that's not an object.
+            return Status(ErrorCodes::TypeMismatch,
+                          "'pipeline' cannot contain non-object elements");
+        }
 
-            ActionSet actions;
-            actions.addAction(ActionType::remove);
-            actions.addAction(ActionType::insert);
-            if (shouldBypassDocumentValidationForCommand(cmdObj)) {
-                actions.addAction(ActionType::bypassDocumentValidation);
+        // We treat the first stage in the pipeline specially, as $indexStats changes the authz
+        // requirements when appearing in this position.
+        BSONObj firstPipelineStage = pipeline.firstElement().embeddedObject();
+        if (str::equals("$indexStats", firstPipelineStage.firstElementFieldName())) {
+            Privilege::addPrivilegeToPrivilegeVector(
+                &privileges, Privilege(inputResource, ActionType::indexStats));
+        } else {
+            // If no source requiring an alternative permission scheme is specified then default to
+            // requiring find() privileges on the given namespace.
+            Privilege::addPrivilegeToPrivilegeVector(&privileges,
+                                                     Privilege(inputResource, ActionType::find));
+        }
+
+        BSONObj pipelineStages = cmdObj.getObjectField("pipeline");
+        BSONForEach(stageElem, pipelineStages) {
+            BSONObj stage = stageElem.embeddedObjectUserCheck();
+            StringData stageName = stage.firstElementFieldName();
+            if (stageName == "$out" && stage.firstElementType() == String) {
+                NamespaceString outputNs(db, stage.firstElement().str());
+                uassert(17139,
+                        mongoutils::str::stream() << "Invalid $out target namespace, "
+                                                  << outputNs.ns(),
+                        outputNs.isValid());
+
+                ActionSet actions;
+                actions.addAction(ActionType::remove);
+                actions.addAction(ActionType::insert);
+                if (shouldBypassDocumentValidationForCommand(cmdObj)) {
+                    actions.addAction(ActionType::bypassDocumentValidation);
+                }
+                Privilege::addPrivilegeToPrivilegeVector(
+                    &privileges, Privilege(ResourcePattern::forExactNamespace(outputNs), actions));
+            } else if (stageName == "$lookup" && stage.firstElementType() == Object) {
+                NamespaceString fromNs(db, stage.firstElement()["from"].str());
+                Privilege::addPrivilegeToPrivilegeVector(
+                    &privileges,
+                    Privilege(ResourcePattern::forExactNamespace(fromNs), ActionType::find));
             }
-            Privilege::addPrivilegeToPrivilegeVector(
-                &privileges, Privilege(ResourcePattern::forExactNamespace(outputNs), actions));
-        } else if (stageName == "$lookup" && stage.firstElementType() == Object) {
-            NamespaceString fromNs(db, stage.firstElement()["from"].str());
-            Privilege::addPrivilegeToPrivilegeVector(
-                &privileges,
-                Privilege(ResourcePattern::forExactNamespace(fromNs), ActionType::find));
         }
     }
 
-    if (AuthorizationSession::get(client)->isAuthorizedForPrivileges(privileges))
+    if (AuthorizationSession::get(client)->isAuthorizedForPrivileges(privileges)) {
         return Status::OK();
+    }
     return Status(ErrorCodes::Unauthorized, "unauthorized");
 }
 

@@ -44,6 +44,7 @@ namespace mongo {
 class ActionSet {
 public:
     ActionSet() : _actions(0) {}
+    ActionSet(std::initializer_list<ActionType> actions);
 
     void addAction(const ActionType& action);
     void addAllActionsFromSet(const ActionSet& actionSet);

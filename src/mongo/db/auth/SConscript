@@ -178,3 +178,13 @@ env.CppUnitTest('authorization_manager_test', 'authorization_manager_test.cpp',
                 LIBDEPS=['authcore', 'authmocks', 'saslauth'])
 env.CppUnitTest('authorization_session_test', 'authorization_session_test.cpp',
                 LIBDEPS=['authcore', 'authmocks', 'saslauth'])
+
+env.Library(
+    target='authorization_session_for_test',
+    source=[
+        'authorization_session_for_test.cpp',
+    ],
+    LIBDEPS=[
+        'authcore',
+    ]
+)

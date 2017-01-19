@@ -41,6 +41,12 @@
 
 namespace mongo {
 
+ActionSet::ActionSet(std::initializer_list<ActionType> actions) {
+    for (auto& action : actions) {
+        addAction(action);
+    }
+}
+
 void ActionSet::addAction(const ActionType& action) {
     if (action == ActionType::anyAction) {
         addAllActions();
