@@ -354,10 +354,9 @@ static Value getNestedFieldHelper(const Document& doc,
     return getNestedFieldHelper(val.getDocument(), fieldNames, positions, level + 1);
 }
 
-const Value Document::getNestedField(const FieldPath& fieldNames,
-                                     vector<Position>* positions) const {
-    fassert(16489, fieldNames.getPathLength());
-    return getNestedFieldHelper(*this, fieldNames, positions, 0);
+const Value Document::getNestedField(const FieldPath& path, vector<Position>* positions) const {
+    fassert(16489, path.getPathLength());
+    return getNestedFieldHelper(*this, path, positions, 0);
 }
 
 size_t Document::getApproximateSize() const {

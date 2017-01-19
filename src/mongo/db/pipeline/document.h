@@ -123,14 +123,13 @@ public:
         return storage().getField(pos).val;
     }
 
-    /** Similar to extractAllElementsAlongPath(), but using FieldPath rather than a dotted string.
-     *  If you pass a non-NULL positions vector, you get back a path suitable
-     *  to pass to MutableDocument::setNestedField.
-     *
-     *  TODO a version that doesn't use FieldPath
+    /**
+     * Returns the Value stored at the location given by 'path', or Value() if no such path exists.
+     * If 'positions' is non-null, it will be filled with a path suitable to pass to
+     * MutableDocument::setNestedField().
      */
-    const Value getNestedField(const FieldPath& fieldNames,
-                               std::vector<Position>* positions = NULL) const;
+    const Value getNestedField(const FieldPath& path,
+                               std::vector<Position>* positions = nullptr) const;
 
     /// Number of fields in this document. O(n)
     size_t size() const {
