@@ -301,7 +301,6 @@ struct __wt_connection_impl {
 	uint32_t	 evict_threads_max;/* Max eviction threads */
 	uint32_t	 evict_threads_min;/* Min eviction threads */
 
-#define	EVICT_GROUP_INCR 4    /* Evict group size increased in batches */
 	uint32_t         evict_tune_datapts_needed;/* Data needed to tune */
 	struct timespec  evict_tune_last_action_time;/* Time of last action */
 	struct timespec  evict_tune_last_time;	/* Time of last check */
