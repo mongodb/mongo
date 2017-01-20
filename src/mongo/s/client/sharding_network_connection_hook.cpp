@@ -90,31 +90,11 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
 
 StatusWith<boost::optional<executor::RemoteCommandRequest>>
 ShardingNetworkConnectionHook::makeRequest(const HostAndPort& remoteHost) {
-    auto shard = grid.shardRegistry()->getShardForHostNoReload(remoteHost);
-    if (!shard) {
-        return {ErrorCodes::ShardNotFound,
-                str::stream() << "No shard found for host: " << remoteHost.toString()};
-    }
-    if (shard->isConfig()) {
-        // No need to initialize sharding metadata if talking to a config server
-        return {boost::none};
-    }
-
-    SetShardVersionRequest ssv = SetShardVersionRequest::makeForInitNoPersist(
-        grid.shardRegistry()->getConfigServerConnectionString(),
-        shard->getId(),
-        shard->getConnString());
-    executor::RemoteCommandRequest request;
-    request.dbname = "admin";
-    request.target = remoteHost;
-    request.timeout = Seconds{30};
-    request.cmdObj = ssv.toBSON();
-
-    return {request};
+    return {boost::none};
 }
 
 Status ShardingNetworkConnectionHook::handleReply(const HostAndPort& remoteHost,
                                                   executor::RemoteCommandResponse&& response) {
-    return getStatusFromCommandResult(response.data);
+    MONGO_UNREACHABLE;
 }
 }  // namespace mongo

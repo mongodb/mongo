@@ -91,26 +91,11 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        ShardingState* const shardingState = ShardingState::get(txn);
+        auto shardingState = ShardingState::get(txn);
+        uassertStatusOK(shardingState->canAcceptShardedCommands());
 
         const ShardId toShard(cmdObj["toShardName"].String());
         const ShardId fromShard(cmdObj["fromShardName"].String());
-
-        if (!shardingState->enabled()) {
-            if (!cmdObj["configServer"].eoo()) {
-                dassert(cmdObj["configServer"].type() == String);
-                shardingState->initializeFromConfigConnString(
-                    txn, cmdObj["configServer"].String(), toShard.toString());
-            } else {
-                errmsg = str::stream()
-                    << "cannot start recv'ing chunk, "
-                    << "sharding is not enabled and no config server was provided";
-
-                warning() << errmsg;
-                return false;
-            }
-        }
-
 
         const NamespaceString nss(cmdObj.firstElement().String());
 

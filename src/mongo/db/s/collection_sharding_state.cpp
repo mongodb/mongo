@@ -81,51 +81,6 @@ private:
     const ShardIdentityType _shardIdentity;
 };
 
-/**
- * Used by the config server for backwards compatibility with 3.2 mongos to upsert a shardIdentity
- * document (and thereby perform shard aware initialization) on a newly added shard.
- *
- * Warning: Only a config server primary should perform this upsert. Callers should ensure that
- * they are primary before registering this RecoveryUnit.
- */
-class LegacyAddShardLogOpHandler final : public RecoveryUnit::Change {
-public:
-    LegacyAddShardLogOpHandler(OperationContext* txn, ShardType shardType)
-        : _txn(txn), _shardType(std::move(shardType)) {}
-
-    void commit() override {
-        uassertStatusOK(
-            Grid::get(_txn)->catalogManager()->upsertShardIdentityOnShard(_txn, _shardType));
-    }
-
-    void rollback() override {}
-
-private:
-    OperationContext* _txn;
-    const ShardType _shardType;
-};
-
-/**
- * Used by the config server for backwards compatibility. Cancels a pending addShard task (if there
- * is one) for the shard with id shardId that was initiated by catching the insert to config.shards
- * from a 3.2 mongos doing addShard.
- */
-class RemoveShardLogOpHandler final : public RecoveryUnit::Change {
-public:
-    RemoveShardLogOpHandler(OperationContext* txn, ShardId shardId)
-        : _txn(txn), _shardId(std::move(shardId)) {}
-
-    void commit() override {
-        Grid::get(_txn)->catalogManager()->cancelAddShardTaskIfNeeded(_shardId);
-    }
-
-    void rollback() override {}
-
-private:
-    OperationContext* _txn;
-    const ShardId _shardId;
-};
-
 }  // unnamed namespace
 
 CollectionShardingState::CollectionShardingState(ServiceContext* sc, NamespaceString nss)
@@ -243,22 +198,6 @@ void CollectionShardingState::onInsertOp(OperationContext* txn, const BSONObj& i
         }
     }
 
-    // For backwards compatibility with 3.2 mongos, perform share aware initialization on a newly
-    // added shard on inserts to config.shards missing the "state" field. (On addShard, a 3.2
-    // mongos performs the insert into config.shards without a "state" field.)
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
-        _nss == ShardType::ConfigNS) {
-        // Only the primary should complete the addShard process by upserting the shardIdentity on
-        // the new shard. This guards against inserts on non-primaries due to oplog application in
-        // steady state, rollback, or recovering.
-        if (repl::getGlobalReplicationCoordinator()->getMemberState().primary() &&
-            insertedDoc[ShardType::state.name()].eoo()) {
-            const auto shardType = uassertStatusOK(ShardType::fromBSON(insertedDoc));
-            txn->recoveryUnit()->registerChange(
-                new LegacyAddShardLogOpHandler(txn, std::move(shardType)));
-        }
-    }
-
     checkShardVersionOrThrow(txn);
 
     if (_sourceMgr) {
@@ -299,19 +238,7 @@ void CollectionShardingState::onDeleteOp(OperationContext* txn,
     }
 
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        if (_nss == ShardType::ConfigNS) {
-            // For backwards compatibility, cancel a pending asynchronous addShard task created on
-            // the primary config as a result of a 3.2 mongos doing addShard for the shard with id
-            // deletedDocId.
-            BSONElement idElement = deleteState.idDoc["_id"];
-            invariant(!idElement.eoo());
-            auto shardIdStr = idElement.valuestrsafe();
-            // Though the asynchronous addShard task should only be started on a primary, we
-            // should cancel a pending addShard task (if one exists for this shardId) even while
-            // non-primary, since it guarantees we cleanup any pending tasks on stepdown.
-            txn->recoveryUnit()->registerChange(
-                new RemoveShardLogOpHandler(txn, ShardId(std::move(shardIdStr))));
-        } else if (_nss == VersionType::ConfigNS) {
+        if (_nss == VersionType::ConfigNS) {
             if (!repl::ReplicationCoordinator::get(txn)->getMemberState().rollback()) {
                 uasserted(40302, "cannot delete config.version document while in --configsvr mode");
             } else {

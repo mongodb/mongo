@@ -51,7 +51,6 @@
 #include "mongo/s/commands/sharded_command_processing.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/set_shard_version_request.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -179,19 +178,6 @@ public:
             ShardingCatalogClient::kMajorityWriteConcern);
 
         ScopedDbConnection toconn(toShard->getConnString());
-
-        {
-            // Make sure the target node is sharding aware.
-            auto ssvRequest = SetShardVersionRequest::makeForInitNoPersist(
-                shardRegistry->getConfigServerConnectionString(),
-                toShard->getId(),
-                toShard->getConnString());
-            BSONObj res;
-            bool ok = toconn->runCommand("admin", ssvRequest.toBSON(), res);
-            if (!ok) {
-                return appendCommandStatus(result, getStatusFromCommandResult(res));
-            }
-        }
 
         // TODO ERH - we need a clone command which replays operations from clone start to now
         //            can just use local.oplog.$main

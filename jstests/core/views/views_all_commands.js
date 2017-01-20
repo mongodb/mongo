@@ -451,7 +451,7 @@
             },
             skipSharded: true,
             expectFailure: true,
-            expectedErrorCode: null,
+            expectedErrorCode: 193,
             isAdminCommand: true,
         },
         splitVector: {

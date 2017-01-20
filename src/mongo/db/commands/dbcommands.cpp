@@ -1532,7 +1532,6 @@ void mongo::execCommandDatabase(OperationContext* txn,
             }
         }
 
-
         if (command->adminOnly()) {
             LOG(2) << "command: " << request.getCommandName();
         }
@@ -1564,39 +1563,17 @@ void mongo::execCommandDatabase(OperationContext* txn,
         // Operations are only versioned against the primary. We also make sure not to redo shard
         // version handling if this command was issued via the direct client.
         if (iAmPrimary && !txn->getClient()->isInDirectClient()) {
-            // Handle shard version and config optime information that may have been sent along with
-            // the command.
-            auto& oss = OperationShardingState::get(txn);
-
+            // Handle a shard version that may have been sent along with the command.
             auto commandNS = NamespaceString(command->parseNs(dbname, request.getCommandArgs()));
+            auto& oss = OperationShardingState::get(txn);
             oss.initializeShardVersion(commandNS, extractedFields[kShardVersionFieldIdx]);
-
             auto shardingState = ShardingState::get(txn);
-
             if (oss.hasShardVersion()) {
-                if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
-                    uassertStatusOK(
-                        {ErrorCodes::NoShardingEnabled,
-                         "Cannot accept sharding commands if not started with --shardsvr"});
-                } else if (!shardingState->enabled()) {
-                    // TODO(esha): Once 3.4 ships, we no longer need to support initializing
-                    // sharding awareness through commands, so just reject all sharding commands.
-                    if (!shardingState->commandInitializesShardingAwareness(
-                            request.getCommandName().toString())) {
-                        uassertStatusOK({ErrorCodes::NoShardingEnabled,
-                                         str::stream()
-                                             << "Received a command with sharding chunk version "
-                                                "information but this node is not sharding aware: "
-                                             << request.getCommandArgs().jsonString()});
-                    }
-                }
+                uassertStatusOK(shardingState->canAcceptShardedCommands());
             }
 
-            if (shardingState->enabled()) {
-                // TODO(spencer): Do this unconditionally once all nodes are sharding aware
-                // by default.
-                uassertStatusOK(shardingState->updateConfigServerOpTimeFromMetadata(txn));
-            }
+            // Handle config optime information that may have been sent along with the command.
+            uassertStatusOK(shardingState->updateConfigServerOpTimeFromMetadata(txn));
         }
 
         // Can throw

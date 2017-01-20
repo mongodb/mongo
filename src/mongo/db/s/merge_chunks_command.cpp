@@ -325,8 +325,7 @@ public:
     void help(stringstream& h) const override {
         h << "Merge Chunks command\n"
           << "usage: { mergeChunks : <ns>, bounds : [ <min key>, <max key> ],"
-          << " (opt) epoch : <epoch>, (opt) config : <configdb string>,"
-          << " (opt) shardName : <shard name> }";
+          << " (opt) epoch : <epoch> }";
     }
 
     Status checkAuthForCommand(Client* client,
@@ -357,11 +356,9 @@ public:
     // Required
     static BSONField<string> nsField;
     static BSONField<vector<BSONObj>> boundsField;
+
     // Optional, if the merge is only valid for a particular epoch
     static BSONField<OID> epochField;
-    // Optional, if our sharding state has not previously been initializeed
-    static BSONField<string> shardNameField;
-    static BSONField<string> configField;
 
     bool run(OperationContext* txn,
              const string& dbname,
@@ -369,6 +366,8 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) override {
+        uassertStatusOK(ShardingState::get(txn)->canAcceptShardedCommands());
+
         string ns = parseNs(dbname, cmdObj);
 
         if (ns.size() == 0) {
@@ -404,38 +403,7 @@ public:
             return false;
         }
 
-        //
-        // This might be the first call from mongos, so we may need to pass the config and shard
-        // information to initialize the sharding state.
-        //
-
-        ShardingState* gss = ShardingState::get(txn);
-        if (!gss->enabled()) {
-            string configConnString;
-            FieldParser::FieldState extracted =
-                FieldParser::extract(cmdObj, configField, &configConnString, &errmsg);
-            if (!extracted || extracted == FieldParser::FIELD_NONE) {
-                errmsg =
-                    "sharding state must be enabled or "
-                    "config server specified to merge chunks";
-                return false;
-            }
-
-            string shardName;
-            extracted = FieldParser::extract(cmdObj, shardNameField, &shardName, &errmsg);
-            if (!extracted) {
-                errmsg =
-                    "shard name must be specified to merge chunks if sharding state not enabled";
-                return false;
-            }
-
-            gss->initializeFromConfigConnString(txn, configConnString, shardName);
-        }
-
-        //
         // Epoch is optional, and if not set indicates we should use the latest epoch
-        //
-
         OID epoch;
         if (!FieldParser::extract(cmdObj, epochField, &epoch, &errmsg)) {
             return false;
@@ -448,9 +416,6 @@ public:
 
 BSONField<string> MergeChunksCommand::nsField("mergeChunks");
 BSONField<vector<BSONObj>> MergeChunksCommand::boundsField("bounds");
-
-BSONField<string> MergeChunksCommand::configField("config");
-BSONField<string> MergeChunksCommand::shardNameField("shardName");
 BSONField<OID> MergeChunksCommand::epochField("epoch");
 
 }  // namespace

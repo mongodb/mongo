@@ -173,6 +173,9 @@ public:
              int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
+        auto shardingState = ShardingState::get(txn);
+        uassertStatusOK(shardingState->canAcceptShardedCommands());
+
         //
         // Check whether parameters passed to splitChunk are sound
         //
@@ -220,24 +223,6 @@ public:
         auto parseShardNameStatus = bsonExtractStringField(cmdObj, "from", &shardName);
         if (!parseShardNameStatus.isOK())
             return appendCommandStatus(result, parseShardNameStatus);
-
-        //
-        // Get sharding state up-to-date
-        //
-        ShardingState* const shardingState = ShardingState::get(txn);
-
-        // This could be the first call that enables sharding - make sure we initialize the
-        // sharding state for this shard.
-        if (!shardingState->enabled()) {
-            if (cmdObj["configdb"].type() != String) {
-                errmsg = "sharding not enabled";
-                warning() << errmsg;
-                return false;
-            }
-
-            const string configdb = cmdObj["configdb"].String();
-            shardingState->initializeFromConfigConnString(txn, configdb, shardName);
-        }
 
         log() << "received splitChunk request: " << redact(cmdObj);
 

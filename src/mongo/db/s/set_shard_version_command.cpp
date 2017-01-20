@@ -94,23 +94,42 @@ public:
              int options,
              string& errmsg,
              BSONObjBuilder& result) {
-
-        if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
-            uassertStatusOK({ErrorCodes::NoShardingEnabled,
-                             "Cannot accept sharding commands if not started with --shardsvr"});
-        }
+        auto shardingState = ShardingState::get(txn);
+        uassertStatusOK(shardingState->canAcceptShardedCommands());
 
         // Steps
-        // 1. check basic config
-        // 2. extract params from command
-        // 3. fast check
-        // 4. slow check (LOCKS)
+        // 1. As long as the command does not have noConnectionVersioning set, register a
+        //    ShardedConnectionInfo for this client connection (this is for clients using
+        //    ShardConnection). Registering the ShardedConnectionInfo guarantees that we will check
+        //    the shardVersion on all requests from this client connection. The connection's version
+        //    will be updated on each subsequent setShardVersion sent on this connection.
+        //
+        // 2. If we have received the init form of setShardVersion, vacuously return true.
+        //    The init form of setShardVersion was used to initialize sharding awareness on a shard,
+        //    but was made obsolete in v3.4 by making nodes sharding-aware when they are added to a
+        //    cluster. The init form was kept in v3.4 shards for compatibility with mixed-version
+        //    3.2/3.4 clusters, but was deprecated and made to vacuously return true in v3.6.
+        //
+        // 3. Validate all command parameters against the info in our ShardingState, and return an
+        //    error if they do not match.
+        //
+        // 4. If the sent shardVersion is compatible with our shardVersion, update the shardVersion
+        //    in this client's ShardedConnectionInfo if needed.
+        //
+        // 5. If the sent shardVersion indicates a drop, jump to step 7.
+        //
+        // 6. If the sent shardVersion is staler than ours, return a stale config error.
+        //
+        // 7. If the sent shardVersion is newer than ours (or indicates a drop), reload our metadata
+        //    and compare the sent shardVersion with what we reloaded. If the versions are now
+        //    compatible, update the shardVersion in this client's ShardedConnectionInfo, as in
+        //    step 4. If the sent shardVersion is staler than what we reloaded, return a stale
+        //    config error, as in step 6.
 
         // Step 1
+
         Client* client = txn->getClient();
         LastError::get(client).disable();
-
-        ShardingState* shardingState = ShardingState::get(txn);
 
         const bool authoritative = cmdObj.getBoolField("authoritative");
         const bool noConnectionVersioning = cmdObj.getBoolField("noConnectionVersioning");
@@ -123,50 +142,73 @@ public:
             info = ShardedConnectionInfo::get(client, true);
         }
 
-        const auto configDBStr = cmdObj["configdb"].str();
-        string shardName = cmdObj["shard"].str();
+        // Step 2
+
+        // The init form of setShardVersion was deprecated in v3.6. For backwards compatibility with
+        // pre-v3.6 mongos, return true.
         const auto isInit = cmdObj["init"].trueValue();
-
-        const string ns = cmdObj["setShardVersion"].valuestrsafe();
-        if (shardName.empty()) {
-            if (isInit && ns.empty()) {
-                // Note: v3.0 mongos ConfigCoordinator doesn't set the shard field when sending
-                // setShardVersion to config.
-                shardName = "config";
-            } else {
-                errmsg = "shard name cannot be empty if not init";
-                return false;
-            }
-        }
-
-        if (!_checkConfigOrInit(txn, configDBStr, shardName, authoritative, errmsg, result)) {
-            return false;
-        }
-
-        // Handle initial shard connection
-        if (cmdObj["version"].eoo() && isInit) {
+        if (isInit) {
             result.append("initialized", true);
-
-            // TODO: SERVER-21397 remove post v3.3.
-            // Send back wire version to let mongos know what protocol we can speak
-            result.append("minWireVersion", WireSpec::instance().incoming.minWireVersion);
-            result.append("maxWireVersion", WireSpec::instance().incoming.maxWireVersion);
-
             return true;
         }
 
+        // Step 3
+
+        // Validate shardName parameter.
+        string shardName = cmdObj["shard"].str();
+        auto storedShardName = ShardingState::get(txn)->getShardName();
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "received shardName " << shardName
+                              << " which differs from stored shardName "
+                              << storedShardName,
+                storedShardName == shardName);
+
+        // Validate config connection string parameter.
+
+        const auto configdb = cmdObj["configdb"].str();
+        if (configdb.size() == 0) {
+            errmsg = "no configdb";
+            return false;
+        }
+
+        auto givenConnStrStatus = ConnectionString::parse(configdb);
+        uassertStatusOK(givenConnStrStatus);
+
+        const auto& givenConnStr = givenConnStrStatus.getValue();
+        if (givenConnStr.type() != ConnectionString::SET) {
+            errmsg = str::stream() << "given config server string is not of type SET";
+            return false;
+        }
+
+        ConnectionString storedConnStr = ShardingState::get(txn)->getConfigServer(txn);
+        if (givenConnStr.getSetName() != storedConnStr.getSetName()) {
+            errmsg = str::stream()
+                << "given config server set name: " << givenConnStr.getSetName()
+                << " differs from known set name: " << storedConnStr.getSetName();
+
+            return false;
+        }
+
+        // Validate namespace parameter.
+
+        const string ns = cmdObj["setShardVersion"].valuestrsafe();
         if (ns.size() == 0) {
             errmsg = "need to specify namespace";
             return false;
         }
 
-        const NamespaceString nss(ns);
-
         // Backwards compatibility for SERVER-23119
+        const NamespaceString nss(ns);
         if (!nss.isValid()) {
             warning() << "Invalid namespace used for setShardVersion: " << ns;
             return true;
         }
+
+        // Validate chunk version parameter.
+        const ChunkVersion requestedVersion =
+            uassertStatusOK(ChunkVersion::parseFromBSONForSetShardVersion(cmdObj));
+
+        // Step 4
 
         // we can run on a slave up to here
         if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nss.db())) {
@@ -175,11 +217,6 @@ public:
             return false;
         }
 
-        // step 2
-        const ChunkVersion requestedVersion =
-            uassertStatusOK(ChunkVersion::parseFromBSONForSetShardVersion(cmdObj));
-
-        // step 3 - Actual version checking
         const ChunkVersion connectionVersion = info->getVersion(ns);
         connectionVersion.addToBSON(result, "oldVersion");
 
@@ -203,12 +240,18 @@ public:
 
             if (requestedVersion.isWriteCompatibleWith(collectionShardVersion)) {
                 // mongos and mongod agree!
+                // Now we should update the connection's version if it's not compatible with the
+                // request's version. This could happen if the shard's metadata has changed, but
+                // the remote client has already refreshed its view of the metadata since the last
+                // time it sent anything over this connection.
                 if (!connectionVersion.isWriteCompatibleWith(requestedVersion)) {
+                    // A migration occurred.
                     if (connectionVersion < collectionShardVersion &&
                         connectionVersion.epoch() == collectionShardVersion.epoch()) {
                         info->setVersion(ns, requestedVersion);
-                    } else if (authoritative) {
-                        // this means there was a drop and our version is reset
+                    }
+                    // The collection was dropped and recreated.
+                    else if (authoritative) {
                         info->setVersion(ns, requestedVersion);
                     } else {
                         result.append("ns", ns);
@@ -221,8 +264,8 @@ public:
                 return true;
             }
 
-            // step 4
-            // Cases below all either return OR fall-through to remote metadata reload.
+            // Step 5
+
             const bool isDropRequested =
                 !requestedVersion.isSet() && collectionShardVersion.isSet();
 
@@ -238,6 +281,8 @@ public:
                 // Fall through to metadata reload below
             } else {
                 // Not Dropping
+
+                // Step 6
 
                 // TODO: Refactor all of this
                 if (requestedVersion < connectionVersion &&
@@ -297,6 +342,8 @@ public:
                 // Fall through to metadata reload below
             }
         }
+
+        // Step 7
 
         Status status = shardingState->onStaleShardVersion(txn, nss, requestedVersion);
 
@@ -361,90 +408,6 @@ public:
         info->setVersion(ns, requestedVersion);
         return true;
     }
-
-private:
-    /**
-     * Checks if this server has already been initialized. If yes, then checks that the configdb
-     * settings matches the initialized settings. Otherwise, initializes the server with the given
-     * settings.
-     */
-    bool _checkConfigOrInit(OperationContext* txn,
-                            const string& configdb,
-                            const string& shardName,
-                            bool authoritative,
-                            string& errmsg,
-                            BSONObjBuilder& result) {
-        if (configdb.size() == 0) {
-            errmsg = "no configdb";
-            return false;
-        }
-
-        auto givenConnStrStatus = ConnectionString::parse(configdb);
-        if (!givenConnStrStatus.isOK()) {
-            errmsg = str::stream() << "error parsing given config string: " << configdb
-                                   << causedBy(givenConnStrStatus.getStatus());
-            return false;
-        }
-
-        const auto& givenConnStr = givenConnStrStatus.getValue();
-        ConnectionString storedConnStr;
-
-        if (shardName == "config") {
-            stdx::lock_guard<stdx::mutex> lk(_mutex);
-            if (!_configStr.isValid()) {
-                _configStr = givenConnStr;
-                return true;
-            } else {
-                storedConnStr = _configStr;
-            }
-        } else if (ShardingState::get(txn)->enabled()) {
-            invariant(!_configStr.isValid());
-            storedConnStr = ShardingState::get(txn)->getConfigServer(txn);
-        }
-
-        if (storedConnStr.isValid()) {
-            if (givenConnStr.type() == ConnectionString::SET &&
-                storedConnStr.type() == ConnectionString::SET) {
-                if (givenConnStr.getSetName() != storedConnStr.getSetName()) {
-                    errmsg = str::stream()
-                        << "given config server set name: " << givenConnStr.getSetName()
-                        << " differs from known set name: " << storedConnStr.getSetName();
-
-                    return false;
-                }
-
-                return true;
-            }
-
-            const auto& storedRawConfigString = storedConnStr.toString();
-            if (storedRawConfigString == configdb) {
-                return true;
-            }
-
-            result.append("configdb",
-                          BSON("stored" << storedRawConfigString << "given" << configdb));
-
-            errmsg = str::stream() << "mongos specified a different config database string : "
-                                   << "stored : " << storedRawConfigString
-                                   << " vs given : " << configdb;
-            return false;
-        }
-
-        invariant(shardName != "config");
-
-        if (!authoritative) {
-            result.appendBool("need_authoritative", true);
-            errmsg = "first setShardVersion";
-            return false;
-        }
-
-        ShardingState::get(txn)->initializeFromConfigConnString(txn, configdb, shardName);
-        return true;
-    }
-
-    // Only for servers that are running as a config server.
-    stdx::mutex _mutex;
-    ConnectionString _configStr;
 
 } setShardVersionCmd;
 

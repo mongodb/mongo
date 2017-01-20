@@ -270,17 +270,8 @@ Status ShardingStateRecovery::recover(OperationContext* txn) {
 
     log() << "Sharding state recovery process found document " << redact(recoveryDoc.toBSON());
 
-    // Make sure the sharding state is initialized
     ShardingState* const shardingState = ShardingState::get(txn);
-
-    // For backwards compatibility. Shards added by v3.4 cluster should have been initialized by
-    // the shard identity document.
-    // TODO(SERER-25276): Remove this after 3.4 since 3.4 shards should always have ShardingState
-    // initialized by this point.
-    if (!shardingState->enabled()) {
-        shardingState->initializeFromConfigConnString(
-            txn, recoveryDoc.getConfigsvr().toString(), recoveryDoc.getShardName());
-    }
+    invariant(shardingState->enabled());
 
     if (!recoveryDoc.getMinOpTimeUpdaters()) {
         // Treat the minOpTime as up-to-date

@@ -25,12 +25,12 @@
     // The cluster now has the shard information. Then kill the replica set so when mongos restarts
     // and tries to create a ReplSetMonitor for that shard, it will not be able to connect to any of
     // the seed servers.
-    replTest.stopSet();
+    // Don't clear the data directory so that the shardIdentity is not deleted.
+    replTest.stopSet(undefined /* send default signal */, true /* don't clear data directory */);
 
     st.restartMongos(0);
 
-    replTest.startSet({restart: true});
-    replTest.initiate();
+    replTest.startSet({restart: true, noCleanData: true});
     replTest.awaitSecondaryNodes();
 
     // Verify that the replSetMonitor can reach the restarted set

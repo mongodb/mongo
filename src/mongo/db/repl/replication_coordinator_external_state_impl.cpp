@@ -773,16 +773,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             fassertStatusOK(40217, status);
         }
 
-        // For upgrade from 3.2 to 3.4, check if any shards in config.shards are not yet marked as
-        // shard aware, and attempt to initialize sharding awareness on them.
-        auto shardAwareInitializationStatus =
-            Grid::get(txn)->catalogManager()->initializeShardingAwarenessOnUnawareShards(txn);
-        if (!shardAwareInitializationStatus.isOK()) {
-            warning() << "Error while attempting to initialize sharding awareness on sharding "
-                         "unaware shards "
-                      << causedBy(shardAwareInitializationStatus);
-        }
-
         // Free any leftover locks from previous instantiations.
         auto distLockManager = Grid::get(txn)->catalogClient(txn)->getDistLockManager();
         distLockManager->unlockAll(txn, distLockManager->getProcessID());

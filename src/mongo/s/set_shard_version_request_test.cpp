@@ -284,36 +284,6 @@ TEST(SetShardVersionRequest, ToSSVCommandInit) {
                            << 30000));
 }
 
-TEST(SetShardVersionRequest, ToSSVCommandInitNoConnectionVersioning) {
-    SetShardVersionRequest ssv =
-        SetShardVersionRequest::makeForInitNoPersist(configCS, ShardId("TestShard"), shardCS);
-
-    ASSERT(ssv.isInit());
-    ASSERT(ssv.isAuthoritative());
-    ASSERT(ssv.getNoConnectionVersioning());
-    ASSERT_EQ(ssv.getConfigServer().toString(), configCS.toString());
-    ASSERT_EQ(ssv.getShardName(), "TestShard");
-    ASSERT_EQ(ssv.getShardConnectionString().toString(), shardCS.toString());
-
-    ASSERT_BSONOBJ_EQ(ssv.toBSON(),
-                      BSON("setShardVersion"
-                           << ""
-                           << "init"
-                           << true
-                           << "authoritative"
-                           << true
-                           << "configdb"
-                           << configCS.toString()
-                           << "shard"
-                           << "TestShard"
-                           << "shardHost"
-                           << shardCS.toString()
-                           << "maxTimeMS"
-                           << 30000
-                           << "noConnectionVersioning"
-                           << true));
-}
-
 TEST(SetShardVersionRequest, ToSSVCommandFull) {
     const ChunkVersion chunkVersion(1, 2, OID::gen());
 

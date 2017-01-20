@@ -11,7 +11,6 @@
     testDB.adminCommand({enableSharding: 'test'});
     testDB.adminCommand({shardCollection: 'test.user', key: {x: 1}});
 
-    // Initialize version on shard.
     testDB.user.insert({x: 1});
 
     var directConn = new Mongo(st.d0.host);
@@ -22,6 +21,7 @@
 
     var shardDoc = st.s.getDB('config').shards.findOne();
 
+    jsTest.log("Verify that the obsolete init form of setShardVersion succeeds on shards.");
     assert.commandWorked(adminDB.runCommand({
         setShardVersion: '',
         init: true,
@@ -31,14 +31,18 @@
         shardHost: shardDoc.host
     }));
 
-    assert.commandFailed(adminDB.runCommand({
+    var configAdmin = st.c0.getDB('admin');
+
+    jsTest.log("Verify that setShardVersion fails on the config server");
+    // Even if shardName sent is 'config' and connstring sent is config server's actual connstring.
+    assert.commandFailedWithCode(configAdmin.runCommand({
         setShardVersion: '',
         init: true,
         authoritative: true,
-        configdb: 'bad-rs/local:12,local:34',
-        shard: shardDoc._id,
-        shardHost: shardDoc.host
-    }));
+        configdb: configStr,
+        shard: 'config'
+    }),
+                                 ErrorCodes.NoShardingEnabled);
 
     st.stop();
 })();
