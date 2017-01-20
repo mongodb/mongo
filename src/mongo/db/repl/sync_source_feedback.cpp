@@ -113,17 +113,14 @@ Status SyncSourceFeedback::updateUpstream(OperationContext* txn, bool oldStyle) 
         return Status::OK();
     }
     BSONObjBuilder cmd;
-    {
-        stdx::unique_lock<stdx::mutex> lock(_mtx);
-        // The command could not be created, likely because this node was removed from the set.
-        if (!oldStyle) {
-            if (!replCoord->prepareReplSetUpdatePositionCommand(&cmd)) {
-                return Status::OK();
-            }
-        } else {
-            if (!replCoord->prepareOldReplSetUpdatePositionCommand(&cmd)) {
-                return Status::OK();
-            }
+    // The command could not be created, likely because this node was removed from the set.
+    if (!oldStyle) {
+        if (!replCoord->prepareReplSetUpdatePositionCommand(&cmd)) {
+            return Status::OK();
+        }
+    } else {
+        if (!replCoord->prepareOldReplSetUpdatePositionCommand(&cmd)) {
+            return Status::OK();
         }
     }
     BSONObj res;
