@@ -139,7 +139,6 @@ if (typeof _threadInject != "undefined") {
             "killop.js",
             "run_program1.js",
             "notablescan.js",
-            "drop2.js",
             "dropdb_race.js",
             "fsync2.js",  // May be placed in serialTestsArr once SERVER-4243 is fixed.
             "bench_test1.js",
@@ -170,6 +169,7 @@ if (typeof _threadInject != "undefined") {
             // These tests use fsyncLock.
             parallelFilesDir + "/fsync.js",
             parallelFilesDir + "/currentop.js",
+            parallelFilesDir + "/killop_drop_collection.js",
 
             // These tests expect the profiler to be on or off at specific points
             // during the test run.
