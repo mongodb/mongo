@@ -114,7 +114,7 @@
     assert.neq(origConfigVersionDoc.clusterId, newConfigVersionDoc.clusterId);
 
     jsTest.log("Re-enabling replication on all nodes");
-    restartServerReplication(nodes);
+    restartServerReplication([nodes[1], nodes[2]]);
 
     jsTest.log(
         "Waiting for original primary to rollback and replicate new config.version document");
