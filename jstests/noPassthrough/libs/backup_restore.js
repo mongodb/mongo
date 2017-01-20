@@ -1,5 +1,5 @@
 /**
- * Test the backup/restore process:
+ * Sets up a test for the backup/restore process:
  * - 3 node replica set
  * - Mongo CRUD client
  * - Mongo FSM client
@@ -9,19 +9,41 @@
  * - Start mongod as hidden secondary
  * - Wait until new hidden node becomes secondary
  *
- * Some methods for backup used in this test checkpoint the files in the dbpath. This technique will
- * not work for ephemeral storage engines, as they do not store any data in the dbpath.
- * @tags: [requires_persistence]
+ * @param {Object} options An object with the following fields:
+ *   {
+ *     name {string}: name of this backup/restore test. Required.
+ *     storageEngine {string}: name of storage engine. Required.
+ *     backup {string}: backup method. Must be one of: fsyncLock, rolling, stopStart. Required.
+ *     nodes {number}: number of nodes in replica set initially (excluding hidden secondary node to
+ *                     be added during test). Default: 3.
+ *     clientTime {number}: Time (in milliseconds) for clients to run before getting the new
+ *                          secondary its data. Default: 10,000.
+ *   }
  */
 
-(function() {
+var BackupRestoreTest = function(options) {
     "use strict";
 
-    function runCmd(cmd) {
+    if (!(this instanceof BackupRestoreTest)) {
+        return new BackupRestoreTest(options);
+    }
+
+    // Capture the 'this' reference
+    var self = this;
+
+    self.options = options;
+
+    /**
+     * Runs a command in the bash shell.
+     */
+    function _runCmd(cmd) {
         runProgram('bash', '-c', cmd);
     }
 
-    function crudClient(host, dbName, coll) {
+    /**
+     * Starts a client that will run a CRUD workload.
+     */
+    function _crudClient(host, dbName, coll) {
         // Launch CRUD client
         var crudClientCmds = "var bulkNum = 1000;" + "var baseNum = 100000;" +
             "var coll = db.getSiblingDB('" + dbName + "')." + coll + ";" +
@@ -56,7 +78,10 @@
         return startMongoProgramNoConnect("mongo", "--eval", crudClientCmds, host);
     }
 
-    function fsmClient(host, blackListDb, numNodes) {
+    /**
+     * Starts a client that will run a FSM workload.
+     */
+    function _fsmClient(host, blackListDb, numNodes) {
         // Launch FSM client
         // SERVER-19488 The FSM framework assumes that there is an implicit 'db' connection when
         // started without any cluster options. Since the shell running this test was started with
@@ -93,7 +118,12 @@
         return startMongoProgramNoConnect("mongo", "--eval", fsmClientCmds, host);
     }
 
-    function runTest(options) {
+    /**
+     * Runs the test.
+     */
+    this.run = function() {
+        var options = this.options;
+
         jsTestLog("Backup restore " + tojson(options));
 
         // Test options
@@ -141,10 +171,10 @@
         // Launch CRUD client
         var crudDb = "crud";
         var crudColl = "backuprestore";
-        var crudPid = crudClient(primary.host, crudDb, crudColl);
+        var crudPid = _crudClient(primary.host, crudDb, crudColl);
 
         // Launch FSM client
-        var fsmPid = fsmClient(primary.host, crudDb, numNodes);
+        var fsmPid = _fsmClient(primary.host, crudDb, numNodes);
 
         // Let clients run for specified time before backing up secondary
         sleep(clientTime);
@@ -201,13 +231,13 @@
             var rsyncCmd = "rsync -aKkz --del " + sourcePath + " " + destPath;
             // Simulate a rolling rsync, do it 3 times before stopping process
             for (var i = 0; i < 3; i++) {
-                runCmd(rsyncCmd);
+                _runCmd(rsyncCmd);
                 sleep(10000);
             }
             // Stop the mongod process
             rst.stop(secondary.nodeId);
             // One final rsync
-            runCmd(rsyncCmd);
+            _runCmd(rsyncCmd);
             removeFile(hiddenDbpath + '/mongod.lock');
             print("Source directory:", tojson(ls(dbpathSecondary)));
             copiedFiles = ls(hiddenDbpath);
@@ -284,48 +314,5 @@
         // This is not done properly for replSetTest if dbpath is provided
         resetDbpath(dbpathPrefix);
         resetDbpath(hiddenDbpath);
-    }
-
-    // Main
-
-    // Add storage engines which are to be skipped entirely to this array
-    var noBackupTests = ['inMemoryExperiment'];
-
-    // Grab the storage engine, default is wiredTiger
-    var storageEngine = jsTest.options().storageEngine || "wiredTiger";
-
-    if (noBackupTests.indexOf(storageEngine) != -1) {
-        jsTestLog("Skipping test for " + storageEngine);
-        return;
-    }
-
-    if (storageEngine === "wiredTiger") {
-        // if rsync is not available on the host, then this test is skipped
-        if (!runProgram('bash', '-c', 'which rsync')) {
-            runTest({
-                name: storageEngine + ' rolling',
-                storageEngine: storageEngine,
-                backup: 'rolling',
-                clientTime: 30000
-            });
-        } else {
-            jsTestLog("Skipping test for " + storageEngine + ' rolling');
-        }
-    }
-
-    // Run the fsyncLock test. Will return before testing for any engine that doesn't
-    // support fsyncLock
-    runTest({
-        name: storageEngine + ' fsyncLock/fsyncUnlock',
-        storageEngine: storageEngine,
-        backup: 'fsyncLock'
-    });
-
-    runTest({
-        name: storageEngine + ' stop/start',
-        storageEngine: storageEngine,
-        backup: 'stopStart',
-        clientTime: 30000
-    });
-
-}());
+    };
+};
