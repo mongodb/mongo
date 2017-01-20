@@ -51,13 +51,13 @@ func getOpstream(cfg OpStreamSettings) (*packetHandlerContext, error) {
 		}
 	} else if len(cfg.NetworkInterface) > 0 {
 		inactive, err := pcap.NewInactiveHandle(cfg.NetworkInterface)
-		// This is safe; calling `Activate()` steals the underlying ptr.
-		defer inactive.CleanUp()
 		if err != nil {
 			return nil, fmt.Errorf("error creating a pcap handle: %v", err)
 		}
+		// This is safe; calling `Activate()` steals the underlying ptr.
+		defer inactive.CleanUp()
 
-		err = inactive.SetSnapLen(32*1024*1024)
+		err = inactive.SetSnapLen(64 * 1024)
 		if err != nil {
 			return nil, fmt.Errorf("error setting snaplen on pcap handle: %v", err)
 		}
@@ -140,7 +140,7 @@ func (record *RecordCommand) ValidateParams(args []string) error {
 	}
 	if record.OpStreamSettings.CaptureBufSize == 0 {
 		// default capture buffer size to 2 MiB (same as libpcap)
-		record.OpStreamSettings.CaptureBufSize = 2*1024
+		record.OpStreamSettings.CaptureBufSize = 2 * 1024
 	}
 	return nil
 }
@@ -169,10 +169,10 @@ func (record *RecordCommand) Execute(args []string) error {
 		ctx.packetHandler.Close()
 	}()
 	playbackWriter, err := NewPlaybackWriter(record.PlaybackFile, record.Gzip)
-	defer playbackWriter.Close()
 	if err != nil {
 		return err
 	}
+	defer playbackWriter.Close()
 
 	return Record(ctx, playbackWriter, record.FullReplies)
 
@@ -186,23 +186,35 @@ func Record(ctx *packetHandlerContext,
 	ch := make(chan error)
 	go func() {
 		defer close(ch)
+		var fail error
 		for op := range ctx.mongoOpStream.Ops {
+			// since we don't currently have a way to shutdown packetHandler.Handle()
+			// continue to read from ctx.mongoOpStream.Ops even after a faltal error
+			if fail != nil {
+				toolDebugLogger.Logvf(DebugHigh, "not recording op because of record error %v", fail)
+				continue
+			}
 			if (op.Header.OpCode == OpCodeReply || op.Header.OpCode == OpCodeCommandReply) &&
 				!noShortenReply {
-				op.ShortenReply()
+				err := op.ShortenReply()
+				if err != nil {
+					userInfoLogger.Logvf(DebugLow, "stream %v problem shortening reply: %v", op.SeenConnectionNum, err)
+					continue
+				}
 			}
 			bsonBytes, err := bson.Marshal(op)
 			if err != nil {
-				ch <- fmt.Errorf("error marshaling message: %v", err)
-				return
+				userInfoLogger.Logvf(DebugLow, "stream %v error marshaling message: %v", op.SeenConnectionNum, err)
+				continue
 			}
 			_, err = playbackWriter.Write(bsonBytes)
 			if err != nil {
-				ch <- fmt.Errorf("error writing message: %v", err)
-				return
+				fail = fmt.Errorf("error writing message: %v", err)
+				userInfoLogger.Logvf(Always, "%v", err)
+				continue
 			}
 		}
-		ch <- nil
+		ch <- fail
 	}()
 
 	if err := ctx.packetHandler.Handle(ctx.mongoOpStream, -1); err != nil {

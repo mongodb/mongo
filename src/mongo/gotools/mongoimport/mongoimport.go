@@ -288,7 +288,7 @@ type fileSizeProgressor struct {
 }
 
 func (fsp *fileSizeProgressor) Progress() (int64, int64) {
-	return fsp.max, fsp.sizeTracker.Size()
+	return fsp.sizeTracker.Size(), fsp.max
 }
 
 // ImportDocuments is used to write input data to the database. It returns the

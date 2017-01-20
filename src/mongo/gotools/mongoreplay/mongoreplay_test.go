@@ -559,6 +559,16 @@ func TestShortenLegacyReply(t *testing.T) {
 	}
 }
 
+type cursorDoc struct {
+	Batch []interface{} `bson:"firstBatch"`
+	Id    int64         `bson:"id"`
+	Ns    string        `bson:"ns"`
+}
+type findReply struct {
+	Cursor cursorDoc `bson:"cursor"`
+	Ok     int       `bson:"ok"`
+}
+
 func TestShortenCommandReply(t *testing.T) {
 	generator := newRecordedOpGenerator()
 
@@ -566,11 +576,6 @@ func TestShortenCommandReply(t *testing.T) {
 	op.Metadata = &testDoc{
 		Name:           "Metadata",
 		DocumentNumber: 100000,
-		Success:        true,
-	}
-	op.CommandReply = &testDoc{
-		Name:           "Command Reply",
-		DocumentNumber: 200000,
 		Success:        true,
 	}
 
@@ -584,14 +589,21 @@ func TestShortenCommandReply(t *testing.T) {
 		DocumentNumber: 2,
 		Success:        true,
 	}
-	op.OutputDocs = []interface{}{doc1, doc2}
+
+	batch := []interface{}{doc1, doc2}
+
+	cursorDocIn := cursorDoc{
+		batch, 12345678, "test"}
+
+	op.CommandReply = findReply{cursorDocIn, 1}
+	op.OutputDocs = []interface{}{}
 
 	result, err := generator.fetchRecordedOpsFromConn(&op.CommandReplyOp)
 
 	// reply should be functional and parseable
 	parsed, err := result.RawOp.Parse()
 	if err != nil {
-		t.Errorf("error parsing op: %v", err)
+		t.Errorf("error parsing op: %#v", err)
 	}
 
 	t.Logf("parsed Op: %v", parsed)
@@ -600,8 +612,23 @@ func TestShortenCommandReply(t *testing.T) {
 	if !ok {
 		t.Errorf("parsed op was wrong type")
 	}
-	if !(len(fullReply.OutputDocs) == 2) {
-		t.Errorf("parsed reply has wrong number of docs: %d", len(fullReply.OutputDocs))
+
+	commandReplyCheckRaw, ok := fullReply.CommandReply.(*bson.Raw)
+	if !ok {
+		t.Errorf("comamndReply not bson.Raw")
+	}
+
+	commandReplyCheck := &findReply{
+		Cursor: cursorDoc{},
+	}
+	err = bson.Unmarshal(commandReplyCheckRaw.Data, commandReplyCheck)
+	if err != nil {
+		t.Errorf("error unmarshaling commandReply %v", err)
+	}
+
+	// ensure that the reply now has 2 document
+	if !(len(commandReplyCheck.Cursor.Batch) == 2) {
+		t.Errorf("parsed reply has wrong number of docs: %d", len(commandReplyCheck.Cursor.Batch))
 	}
 
 	// shorten the reply
@@ -617,9 +644,22 @@ func TestShortenCommandReply(t *testing.T) {
 		t.Errorf("parsed op was wrong type")
 	}
 
-	// ensure that the reply now has only 1 document
-	if !(len(fullReply.OutputDocs) == 1) {
-		t.Errorf("parsed reply has wrong number of docs: %d", len(fullReply.OutputDocs))
+	commandReplyRaw, ok := fullReply.CommandReply.(*bson.Raw)
+	if !ok {
+		t.Errorf("comamndReply not bson.Raw")
+	}
+
+	commandReplyOut := &findReply{
+		Cursor: cursorDoc{},
+	}
+	err = bson.Unmarshal(commandReplyRaw.Data, commandReplyOut)
+	if err != nil {
+		t.Errorf("error unmarshaling commandReply %v", err)
+	}
+
+	// ensure that the reply now has 0 documents
+	if !(len(commandReplyOut.Cursor.Batch) == 0) {
+		t.Errorf("parsed reply has wrong number of docs: %d", len(commandReplyOut.Cursor.Batch))
 	}
 }
 

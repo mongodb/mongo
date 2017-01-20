@@ -21,8 +21,11 @@ mongo_tools_variables:
       - name: legacy26
       - name: legacy24
       - name: qa-tests
-      - name: qa-dump-restore-archiving
+      - name: qa-tests-3.2
       - name: qa-dump-restore-gzip
+      - name: qa-dump-restore-gzip-3.2
+      - name: qa-dump-restore-archiving
+      - name: qa-dump-restore-archiving-3.2
       - name: unit
 # disabled until BUILD-2273 is done
 #      - name: replay-dist
@@ -54,9 +57,12 @@ mongo_tools_variables:
       - name: lint-go
       - name: lint-js
       - name: qa-tests
+      - name: qa-tests-3.2
       - name: qa-tests-unstable
-      - name: qa-dump-restore-archiving
       - name: qa-dump-restore-gzip
+      - name: qa-dump-restore-gzip-3.2
+      - name: qa-dump-restore-archiving
+      - name: qa-dump-restore-archiving-3.2
       - name: qa-tests-wt
       - name: unit
       - name: vet
@@ -146,12 +152,22 @@ mongo_tools_variables:
       - name: qa-tests
         distros:
         - windows-64-vs2013-test
+      - name: qa-tests-3.2
+        distros:
+        - windows-64-vs2013-test
       - name: qa-dump-restore-archiving
+        distros:
+        - windows-64-vs2013-test
+      - name: qa-dump-restore-archiving-3.2
         distros:
         - windows-64-vs2013-test
       - name: qa-dump-restore-gzip
         distros:
         - windows-64-vs2013-test
+      - name: qa-dump-restore-gzip-3.2
+        distros:
+        - windows-64-vs2013-test
+      - name: qa-tests-unstable
       - name: unit
     windows_64_ssl_task_list: &windows_64_ssl_tasks
       - name: dist
@@ -841,7 +857,7 @@ tasks:
             value: "${args} -test.types=db"
     - func: "download mongod"
       vars:
-        mongo_version: "3.2"
+        mongo_version: "3.4"
     - func: "start mongod"
     - func: "wait for mongod to be ready"
     - func: "setup integration test"
@@ -925,7 +941,7 @@ tasks:
             value: "${args} -test.types=${integration_test_args}"
     - func: "download mongod"
       vars:
-        mongo_version: "3.2"
+        mongo_version: "3.4"
     - func: "start mongod"
     - func: "wait for mongod to be ready"
     - func: "run tool integration tests"
@@ -949,7 +965,7 @@ tasks:
             value: "db.createUser({ user: '${auth_username}', pwd: '${auth_password}', roles: [{ role: '__system', db: 'admin' }] });"
     - func: "download mongod"
       vars:
-        mongo_version: "3.2"
+        mongo_version: "3.4"
     - func: "start mongod"
     - func: "wait for mongod to be ready"
     - func: "run tool integration tests"
@@ -1193,7 +1209,7 @@ tasks:
     - func: "setup credentials"
     - func: "download mongod"
       vars:
-        mongo_version: "3.2"
+        mongo_version: "3.4"
     - func: "fetch tool"
       vars:
         tool: mongoimport
@@ -1225,6 +1241,48 @@ tasks:
       vars:
         resmoke_suite: "core${resmoke_use_ssl}"
         excludes: "requires_unstable,${excludes}"
+
+- name: qa-tests-3.2
+  depends_on:
+  - name: dist
+  commands:
+    - func: "fetch source"
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+      vars:
+        mongo_version: "3.2"
+    - func: "fetch tool"
+      vars:
+        tool: mongoimport
+    - func: "fetch tool"
+      vars:
+        tool: mongoexport
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongorestore
+    - func: "fetch tool"
+      vars:
+        tool: mongostat
+    - func: "fetch tool"
+      vars:
+        tool: mongotop
+    - func: "fetch tool"
+      vars:
+        tool: mongooplog
+    - func: "fetch tool"
+      vars:
+        tool: mongofiles
+    - func: "fetch tool"
+      vars:
+        tool: bsondump
+    - func: "run qa-tests"
+      vars:
+        resmoke_suite: "core${resmoke_use_ssl}"
+        excludes: "requires_unstable,requires_mongo_34,${excludes}"
 
 - name: native-cert-ssl
   depends_on:
@@ -1288,7 +1346,7 @@ tasks:
     - func: "setup credentials"
     - func: "download mongod"
       vars:
-        mongo_version: "3.2"
+        mongo_version: "3.4"
     - func: "fetch tool"
       vars:
         tool: mongodump
@@ -1300,7 +1358,49 @@ tasks:
         resmoke_suite: "restore_archive"
         excludes: "requires_unstable,${excludes}"
 
+- name: qa-dump-restore-archiving-3.2
+  depends_on:
+  - name: dist
+  commands:
+    - func: "fetch source"
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+      vars:
+        mongo_version: "3.2"
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongorestore
+    - func: "run qa-tests"
+      vars:
+        resmoke_suite: "restore_archive"
+        excludes: "requires_unstable,requires_mongo_34,${excludes}"
+
 - name: qa-dump-restore-gzip
+  depends_on:
+  - name: dist
+  commands:
+    - func: "fetch source"
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+      vars:
+        mongo_version: "3.4"
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongorestore
+    - func: "run qa-tests"
+      vars:
+        resmoke_suite: "restore_gzip"
+        excludes: "requires_unstable,${excludes}"
+
+- name: qa-dump-restore-gzip-3.2
   depends_on:
   - name: dist
   commands:
@@ -1319,7 +1419,7 @@ tasks:
     - func: "run qa-tests"
       vars:
         resmoke_suite: "restore_gzip"
-        excludes: "requires_unstable,${excludes}"
+        excludes: "requires_unstable,requires_mongo_34,${excludes}"
 
 - name: qa-tests-wt
   depends_on:
@@ -1330,7 +1430,7 @@ tasks:
     - func: "setup credentials"
     - func: "download mongod"
       vars:
-        mongo_version: "3.2"
+        mongo_version: "3.4"
     - func: "fetch tool"
       vars:
         tool: mongoimport
@@ -1452,7 +1552,7 @@ tasks:
       tool: mongoreplay
   - func: "download mongod"
     vars:
-      mongo_version: "3.2"
+      mongo_version: "3.4"
   - func: "start mongod"
   - func: "wait for mongod to be ready"
   - command: shell.exec
@@ -1482,7 +1582,7 @@ tasks:
       pcapFname: getmore_single_channel.pcap
   - func: "download mongod"
     vars:
-      mongo_version: "3.2"
+      mongo_version: "3.4"
   - func: "start mongod"
   - func: "wait for mongod to be ready"
   - func: "run go_test"
@@ -1507,7 +1607,7 @@ tasks:
       pcapFname: getmore_single_channel.pcap
   - func: "download mongod"
     vars:
-      mongo_version: "3.2"
+      mongo_version: "3.4"
   - func: "create sharded_cluster"
   - func: "run go_test"
     vars:
@@ -1531,7 +1631,7 @@ tasks:
       pcapFname: getmore_single_channel.pcap
   - func: "download mongod"
     vars:
-      mongo_version: "3.2"
+      mongo_version: "3.4"
   - func: "start mongod"
     vars:
         additional_args: --auth
@@ -1561,7 +1661,7 @@ tasks:
       pcapFname: getmore_single_channel.pcap
   - func: "download mongod"
     vars:
-      mongo_version: "3.2"
+      mongo_version: "3.4"
   - func: "create repl_set"
     vars:
         mongod_port: ${mongod_port}
@@ -1581,7 +1681,7 @@ tasks:
       tool: mongoreplay
   - func: "download mongod"
     vars:
-      mongo_version: "3.2"
+      mongo_version: "3.4"
   - func: "fetch ftdc"
   - command: shell.exec
     params:
@@ -1788,21 +1888,6 @@ buildvariants:
 #######################################
 #        Windows Buildvariants        #
 #######################################
-- name: windows-32
-  display_name: Windows 32-bit
-  run_on:
-  - windows-32
-  expansions:
-    <<: *mongod_win32_startup_args
-    <<: *mongo_default_startup_args
-    mongo_target: "windows_i686"
-    mongo_arch: "i386"
-    extension: .exe
-    preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
-    excludes: requires_large_ram
-    integration_test_args: "integration"
-  tasks: *windows_32_tasks
-
 - name: windows-64
   display_name: Windows 64-bit
   run_on:
@@ -1812,6 +1897,7 @@ buildvariants:
     <<: *mongo_default_startup_args
     mongo_os: "windows-64"
     mongo_target: "windows_x86_64-2008plus"
+    resmoke_args: --jobs $(grep -c ^processor /proc/cpuinfo)
     excludes: requires_large_ram
     extension: .exe
     arch: "win32/x86_64"
@@ -1832,6 +1918,7 @@ buildvariants:
     edition: ssl
     smoke_use_ssl: --use-ssl
     resmoke_use_ssl: _ssl
+    resmoke_args: --jobs $(grep -c ^processor /proc/cpuinfo)
     excludes: requires_large_ram,requires_mongo_24
     multiversion_override: "2.6"
     extension: .exe
@@ -1853,6 +1940,7 @@ buildvariants:
     mongo_target: "windows"
     build_tags: "sasl ssl"
     smoke_use_ssl: --use-ssl
+    resmoke_args: --jobs $(grep -c ^processor /proc/cpuinfo)
     resmoke_use_ssl: _ssl
     excludes: requires_large_ram,requires_mongo_24
     multiversion_override: "2.6"

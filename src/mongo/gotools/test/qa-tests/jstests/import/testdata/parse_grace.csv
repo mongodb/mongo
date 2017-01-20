@@ -1,4 +1,0 @@
-a.string(),b.int32(),"c.xyz.date_oracle(Month dd, yyyy HH24:mi:ss)",c.noop.boolean(),d.hij.lkm.binary(hex)
-foo,12,"June 02, 1997 15:24:00",true,7bc3049f36681723260fb5921dd36b149c8493c3
-bar,24,"06/08/2016 09:26:00",true,746573740a
-baz,36,"June 08, 2016 09:26:00",false,746573740a

@@ -467,7 +467,7 @@ func (restore *MongoRestore) CreateStdinIntentForCollection(db string, collectio
 		C:        collection,
 		Location: "-",
 	}
-	intent.BSONFile = &stdinFile{Reader: restore.stdin}
+	intent.BSONFile = &stdinFile{Reader: restore.InputReader}
 	restore.manager.Put(intent)
 	return nil
 }

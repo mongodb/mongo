@@ -50,11 +50,11 @@ func main() {
 
 	// create a session provider to connect to the db
 	sessionProvider, err := db.NewSessionProvider(*opts)
-	defer sessionProvider.Close()
 	if err != nil {
 		log.Logvf(log.Always, "error connecting to host: %v", err)
 		os.Exit(util.ExitError)
 	}
+	defer sessionProvider.Close()
 	sessionProvider.SetBypassDocumentValidation(ingestOpts.BypassDocumentValidation)
 
 	m := mongoimport.MongoImport{

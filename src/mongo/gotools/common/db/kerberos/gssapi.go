@@ -15,8 +15,7 @@ func AddKerberosOpts(opts options.ToolOptions, dialInfo *mgo.DialInfo) {
 	if dialInfo == nil {
 		return
 	}
-	if opts.Kerberos == nil || opts.Kerberos.Service == "" ||
-		opts.Kerberos.ServiceHost == "" {
+	if opts.Kerberos == nil {
 		return
 	}
 	if opts.Auth == nil || (opts.Auth.Mechanism != authMechanism &&

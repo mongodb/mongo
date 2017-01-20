@@ -36,6 +36,9 @@ type MongoRestore struct {
 
 	TargetDirectory string
 
+	// Skip restoring users and roles, regardless of namespace, when true.
+	SkipUsersAndRoles bool
+
 	// other internal state
 	manager *intents.Manager
 	safety  *mgo.Safe
@@ -62,8 +65,9 @@ type MongoRestore struct {
 	// channel on which to notify if/when a termination signal is received
 	termChan chan struct{}
 
-	// for testing. If set, this value will be used instead of os.Stdin
-	stdin io.Reader
+	// Reader to take care of BSON input if not reading from the local filesystem.
+	// This is initialized to os.Stdin if unset.
+	InputReader io.Reader
 }
 
 type collectionIndexes map[string][]IndexDocument
@@ -225,8 +229,8 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 			return fmt.Errorf("cannot restore from stdin without a specified collection")
 		}
 	}
-	if restore.stdin == nil {
-		restore.stdin = os.Stdin
+	if restore.InputReader == nil {
+		restore.InputReader = os.Stdin
 	}
 
 	return nil
@@ -488,7 +492,7 @@ func (restore *MongoRestore) Restore() error {
 
 func (restore *MongoRestore) getArchiveReader() (rc io.ReadCloser, err error) {
 	if restore.InputOptions.Archive == "-" {
-		rc = ioutil.NopCloser(restore.stdin)
+		rc = ioutil.NopCloser(restore.InputReader)
 	} else {
 		targetStat, err := os.Stat(restore.InputOptions.Archive)
 		if err != nil {

@@ -14,6 +14,7 @@ type MonitorCommand struct {
 	GlobalOpts *Options `no-flag:"true"`
 	StatOptions
 	OpStreamSettings
+	Collect      string `long:"collect" description:"Stat collection format; 'format' option uses the --format string" choice:"json" choice:"format" choice:"none" default:"format"`
 	PairedMode   bool   `long:"paired" description:"Output only one line for a request/reply pair"`
 	Gzip         bool   `long:"gzip" description:"decompress gzipped input"`
 	PlaybackFile string `short:"p" description:"path to playback file to read from" long:"playback-file"`
@@ -125,7 +126,7 @@ func (monitor *MonitorCommand) Execute(args []string) error {
 			ctx.packetHandler.Close()
 		}()
 	}
-	statColl, err := newStatCollector(monitor.StatOptions, monitor.PairedMode, false)
+	statColl, err := newStatCollector(monitor.StatOptions, monitor.Collect, monitor.PairedMode, false)
 	if err != nil {
 		return err
 	}

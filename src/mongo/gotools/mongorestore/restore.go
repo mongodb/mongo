@@ -141,6 +141,30 @@ func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 			return fmt.Errorf("error parsing metadata from %v: %v", intent.MetadataLocation, err)
 		}
 
+		// The only way to specify options on the idIndex is at collection creation time.
+		// This loop pulls out the idIndex from `indexes` and sets it in `options`.
+		for i, index := range indexes {
+			// The index with the name "_id_" will always be the idIndex.
+			if index.Options["name"].(string) == "_id_" {
+				// Remove the index version (to use the default) unless otherwise specified.
+				if !restore.OutputOptions.KeepIndexVersion {
+					delete(index.Options, "v")
+				}
+				index.Options["ns"] = intent.Namespace()
+
+				// If the collection has an idIndex, then we are about to create it, so
+				// ignore the value of autoIndexId.
+				for j, opt := range options {
+					if opt.Name == "autoIndexId" {
+						options = append(options[:j], options[j+1:]...)
+					}
+				}
+				options = append(options, bson.DocElem{"idIndex", index})
+				indexes = append(indexes[:i], indexes[i+1:]...)
+				break
+			}
+		}
+
 		if restore.OutputOptions.NoOptionsRestore {
 			log.Logv(log.Info, "not restoring collection options")
 			logMessageSuffix = "with no collection options"

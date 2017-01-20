@@ -175,7 +175,8 @@ func newPreprocessCursorManager(opChan <-chan *RecordedOp) (*preprocessCursorMan
 		if op.RawOp.Header.OpCode == OpCodeCommand {
 			commandName, err := getCommandName(&op.RawOp)
 			if err != nil {
-				return nil, err
+				userInfoLogger.Logvf(DebugLow, "preprocessing op no command name: %v", err)
+				continue
 			}
 			if commandName != "getMore" && commandName != "getmore" {
 				continue
@@ -184,7 +185,8 @@ func newPreprocessCursorManager(opChan <-chan *RecordedOp) (*preprocessCursorMan
 
 		parsedOp, err := op.RawOp.Parse()
 		if err != nil {
-			return nil, err
+			userInfoLogger.Logvf(DebugLow, "preprocessing op parse error: %v", err)
+			continue
 		}
 
 		switch castOp := parsedOp.(type) {
@@ -194,7 +196,8 @@ func newPreprocessCursorManager(opChan <-chan *RecordedOp) (*preprocessCursorMan
 			// cursor
 			cursorIDs, err := castOp.getCursorIDs()
 			if err != nil {
-				return nil, err
+				userInfoLogger.Logvf(DebugLow, "preprocessing op no cursorId: %v", err)
+				continue
 			}
 			for _, cursorID := range cursorIDs {
 				if cursorID == 0 {
@@ -209,7 +212,8 @@ func newPreprocessCursorManager(opChan <-chan *RecordedOp) (*preprocessCursorMan
 			// cursor id.
 			cursorID, err := castOp.getCursorID()
 			if err != nil {
-				return nil, err
+				userInfoLogger.Logvf(DebugLow, "preprocessing op no cursorId: %v", err)
+				continue
 			}
 			if cursorID == 0 {
 				continue

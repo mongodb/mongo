@@ -29,7 +29,6 @@ var (
 	authTestServerMode  bool
 	isMongosTestServer  bool
 	testCollectorOpts   = StatOptions{
-		Collect:  "format",
 		Buffered: true,
 	}
 )
@@ -181,7 +180,7 @@ func TestOpInsertLiveDB(t *testing.T) {
 		}
 	}()
 
-	statCollector, _ := newStatCollector(testCollectorOpts, true, true)
+	statCollector, _ := newStatCollector(testCollectorOpts, "format", true, true)
 	statRec := statCollector.StatRecorder.(*BufferedStatRecorder)
 	context := NewExecutionContext(statCollector)
 
@@ -297,7 +296,7 @@ func TestUpdateOpLiveDB(t *testing.T) {
 		}
 	}()
 
-	statCollector, _ := newStatCollector(testCollectorOpts, true, true)
+	statCollector, _ := newStatCollector(testCollectorOpts, "format", true, true)
 	statRec := statCollector.StatRecorder.(*BufferedStatRecorder)
 	context := NewExecutionContext(statCollector)
 
@@ -400,7 +399,7 @@ func TestQueryOpLiveDB(t *testing.T) {
 		}
 	}()
 
-	statCollector, _ := newStatCollector(testCollectorOpts, true, true)
+	statCollector, _ := newStatCollector(testCollectorOpts, "format", true, true)
 	statRec := statCollector.StatRecorder.(*BufferedStatRecorder)
 	context := NewExecutionContext(statCollector)
 
@@ -488,7 +487,7 @@ func TestOpGetMoreLiveDB(t *testing.T) {
 			}
 		}
 	}()
-	statCollector, _ := newStatCollector(testCollectorOpts, true, true)
+	statCollector, _ := newStatCollector(testCollectorOpts, "format", true, true)
 	statRec := statCollector.StatRecorder.(*BufferedStatRecorder)
 	context := NewExecutionContext(statCollector)
 
@@ -589,7 +588,7 @@ func TestOpGetMoreMultiCursorLiveDB(t *testing.T) {
 			}
 		}
 	}()
-	statCollector, _ := newStatCollector(testCollectorOpts, true, true)
+	statCollector, _ := newStatCollector(testCollectorOpts, "format", true, true)
 	statRec := statCollector.StatRecorder.(*BufferedStatRecorder)
 	context := NewExecutionContext(statCollector)
 
@@ -710,7 +709,7 @@ func TestOpKillCursorsLiveDB(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	statCollector, _ := newStatCollector(testCollectorOpts, true, true)
+	statCollector, _ := newStatCollector(testCollectorOpts, "format", true, true)
 	statRec := statCollector.StatRecorder.(*BufferedStatRecorder)
 	context := NewExecutionContext(statCollector)
 
@@ -776,7 +775,7 @@ func TestCommandOpInsertLiveDB(t *testing.T) {
 		}
 	}()
 
-	statCollector, _ := newStatCollector(testCollectorOpts, true, true)
+	statCollector, _ := newStatCollector(testCollectorOpts, "format", true, true)
 	statRec := statCollector.StatRecorder.(*BufferedStatRecorder)
 	context := NewExecutionContext(statCollector)
 
@@ -876,7 +875,7 @@ func TestCommandOpFindLiveDB(t *testing.T) {
 		}
 	}()
 
-	statCollector, _ := newStatCollector(testCollectorOpts, true, true)
+	statCollector, _ := newStatCollector(testCollectorOpts, "format", true, true)
 	statRec := statCollector.StatRecorder.(*BufferedStatRecorder)
 	context := NewExecutionContext(statCollector)
 
@@ -968,7 +967,7 @@ func TestCommandOpGetMoreLiveDB(t *testing.T) {
 			}
 		}
 	}()
-	statCollector, _ := newStatCollector(testCollectorOpts, true, true)
+	statCollector, _ := newStatCollector(testCollectorOpts, "format", true, true)
 	statRec := statCollector.StatRecorder.(*BufferedStatRecorder)
 	context := NewExecutionContext(statCollector)
 
@@ -1118,9 +1117,9 @@ func (generator *recordedOpGenerator) generateCommandFind(filter interface{}, li
 func (generator *recordedOpGenerator) generateCommandGetMore(cursorID int64, limit int32) error {
 	var getmoreArgs bson.D
 	if limit > 0 {
-		getmoreArgs = bson.D{{"collection", testCollection}, {"getMore", cursorID}, {"batchSize", limit}}
+		getmoreArgs = bson.D{{"getMore", cursorID}, {"collection", testCollection}, {"batchSize", limit}}
 	} else {
-		getmoreArgs = bson.D{{"collection", testCollection}, {"getMore", cursorID}}
+		getmoreArgs = bson.D{{"getMore", cursorID}, {"collection", testCollection}}
 	}
 
 	return generator.generateCommandOp("getMore", getmoreArgs, 0)

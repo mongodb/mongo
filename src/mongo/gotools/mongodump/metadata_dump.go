@@ -52,7 +52,7 @@ func (dump *MongoDump) dumpMetadata(intent *intents.Intent, buffer resettableOut
 	// that list as the "indexes" field of the metadata document.
 	log.Logvf(log.DebugHigh, "\treading indexes for `%v`", intent.Namespace())
 
-	session, err := dump.sessionProvider.GetSession()
+	session, err := dump.SessionProvider.GetSession()
 	if err != nil {
 		return err
 	}

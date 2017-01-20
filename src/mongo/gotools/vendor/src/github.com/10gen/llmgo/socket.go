@@ -446,9 +446,11 @@ func (socket *MongoSocket) SimpleQuery(op *QueryOp) (data []byte, replyOp *Reply
 		if !replyDone {
 			replyDone = true
 			replyErr = err
-			replyOp = rfl.op
-			if err == nil {
-				replyData = rfl.docData
+			if rfl != nil {
+				replyOp = rfl.op
+				if err == nil {
+					replyData = rfl.docData
+				}
 			}
 		}
 		change.Unlock()

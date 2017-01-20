@@ -76,7 +76,7 @@ func TestMongorestore(t *testing.T) {
 			restore.NSOptions.Collection = "c1"
 			restore.NSOptions.DB = "db1"
 			So(err, ShouldBeNil)
-			restore.stdin = bsonFile
+			restore.InputReader = bsonFile
 			restore.TargetDirectory = "-"
 			err = restore.Restore()
 			So(err, ShouldBeNil)

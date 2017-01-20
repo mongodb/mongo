@@ -499,6 +499,9 @@ func (restore *MongoRestore) ValidateAuthVersions() error {
 // ShouldRestoreUsersAndRoles returns true if mongorestore should go through
 // through the process of restoring collections pertaining to authentication.
 func (restore *MongoRestore) ShouldRestoreUsersAndRoles() bool {
+	if restore.SkipUsersAndRoles {
+		return false
+	}
 	// If the user has done anything that would indicate the restoration
 	// of users and roles (i.e. used --restoreDbUsersAndRoles, -d admin, or
 	// is doing a full restore), then we check if users or roles BSON files

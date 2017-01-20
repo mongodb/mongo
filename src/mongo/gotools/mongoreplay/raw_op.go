@@ -6,7 +6,10 @@ import (
 	"io"
 
 	mgo "github.com/10gen/llmgo"
+	"github.com/10gen/llmgo/bson"
 )
+
+const maxBSONSize = 16 * 1024 * 1024 // 16MB - maximum BSON document size
 
 // RawOp may be exactly the same as OpUnknown.
 type RawOp struct {
@@ -49,6 +52,16 @@ func (op *RawOp) FromReader(r io.Reader) error {
 	return err
 }
 
+type CommandReplyStruct struct {
+	Cursor struct {
+		Id         int64    `bson:"id"`
+		Ns         string   `bson:"ns"`
+		FirstBatch bson.Raw `bson:"firstBatch,omitempty"`
+		NextBatch  bson.Raw `bson:"nextBatch,omitempty"`
+	} `bson:"cursor"`
+	Ok int `bson:"ok"`
+}
+
 // ShortReplyFromReader reads an op from the given reader. It only holds on
 // to header-related information and the first document.
 func (op *RawOp) ShortenReply() error {
@@ -66,18 +79,51 @@ func (op *RawOp) ShortenReply() error {
 			return nil
 		}
 		firstDocSize := getInt32(op.Body, 20+MsgHeaderLen)
+		if 20+MsgHeaderLen+int(firstDocSize) > len(op.Body) || firstDocSize > maxBSONSize {
+			return fmt.Errorf("the size of the first document is greater then the size of the message")
+		}
 		op.Body = op.Body[0:(20 + MsgHeaderLen + firstDocSize)]
 
 	case OpCodeCommandReply:
-		commandReplyDocSize := getInt32(op.Body, MsgHeaderLen)
-		metadataDocSize := getInt32(op.Body, int(commandReplyDocSize)+MsgHeaderLen)
-		if op.Header.MessageLength <= commandReplyDocSize+metadataDocSize+MsgHeaderLen {
-			//there are no reply docs
+		// unmarshal the needed fields for replacing into the buffer
+		commandReply := &CommandReplyStruct{}
+
+		err := bson.Unmarshal(op.Body[MsgHeaderLen:], commandReply)
+		if err != nil {
+			return fmt.Errorf("unmarshaling op to shorten: %v", err)
+		}
+		switch {
+		case commandReply.Cursor.FirstBatch.Data != nil:
+			commandReply.Cursor.FirstBatch.Data, _ = bson.Marshal([0]byte{})
+
+		case commandReply.Cursor.NextBatch.Data != nil:
+			commandReply.Cursor.NextBatch.Data, _ = bson.Marshal([0]byte{})
+
+		default:
+			// it's not a findReply so we don't care about it
 			return nil
 		}
-		firstOutputDocSize := getInt32(op.Body, int(commandReplyDocSize+metadataDocSize)+MsgHeaderLen)
-		shortReplySize := commandReplyDocSize + metadataDocSize + firstOutputDocSize + MsgHeaderLen
-		op.Body = op.Body[0:shortReplySize]
+
+		out, err := bson.Marshal(commandReply)
+		if err != nil {
+			return err
+		}
+
+		// calculate the new sizes for offsets into the new buffer
+		commandReplySize := getInt32(op.Body, MsgHeaderLen)
+		newCommandReplySize := getInt32(out, 0)
+		sizeDiff := commandReplySize - newCommandReplySize
+		newSize := op.Header.MessageLength - sizeDiff
+		newBody := make([]byte, newSize)
+
+		// copy the new data into a buffer that will replace the old buffer
+		copy(newBody, op.Body[:MsgHeaderLen])
+		copy(newBody[MsgHeaderLen:], out)
+		copy(newBody[MsgHeaderLen+newCommandReplySize:], op.Body[MsgHeaderLen+commandReplySize:])
+		// update the size of this message in the headers
+		SetInt32(newBody, 0, newSize)
+		op.Header.MessageLength = newSize
+		op.Body = newBody
 
 	default:
 		return fmt.Errorf("unexpected op type : %v", op.Header.OpCode)

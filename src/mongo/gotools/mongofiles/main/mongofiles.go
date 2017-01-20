@@ -50,11 +50,11 @@ func main() {
 
 	// create a session provider to connect to the db
 	provider, err := db.NewSessionProvider(*opts)
-	defer provider.Close()
 	if err != nil {
 		log.Logvf(log.Always, "error connecting to host: %v", err)
 		os.Exit(util.ExitError)
 	}
+	defer provider.Close()
 	mf := mongofiles.MongoFiles{
 		ToolOptions:     opts,
 		StorageOptions:  storageOpts,

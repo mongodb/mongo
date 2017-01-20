@@ -165,7 +165,7 @@ func pcapTestHelper(t *testing.T, pcapFname string, preprocess bool, verifier ve
 		t.Errorf("error opening playback file to write: %v\n", err)
 	}
 
-	statCollector, _ := newStatCollector(testCollectorOpts, true, true)
+	statCollector, _ := newStatCollector(testCollectorOpts, "format", true, true)
 	statRec := statCollector.StatRecorder.(*BufferedStatRecorder)
 	context := NewExecutionContext(statCollector)
 
