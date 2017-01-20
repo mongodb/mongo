@@ -2,7 +2,7 @@
 (function() {
     "use strict";
 
-    let viewsDB = db.getSiblingDB(jsTest.name());
+    let viewsDB = db.getSiblingDB("views_coll_stats");
     const matchStage = {$match: {}};
     const collStatsStage = {$collStats: {latencyStats: {}}};
 
