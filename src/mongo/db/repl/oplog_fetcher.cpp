@@ -37,6 +37,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/stats/timer_stats.h"
+#include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
@@ -114,6 +115,8 @@ BSONObj makeGetMoreCommandObject(DataReplicatorExternalState* dataReplicatorExte
 StatusWith<BSONObj> makeMetadataObject(bool isV1ElectionProtocol) {
     return isV1ElectionProtocol
         ? BSON(rpc::kReplSetMetadataFieldName
+               << 1
+               << rpc::kOplogQueryMetadataFieldName
                << 1
                << rpc::ServerSelectionMetadata::fieldName()
                << BSON(rpc::ServerSelectionMetadata::kSecondaryOkFieldName << true))

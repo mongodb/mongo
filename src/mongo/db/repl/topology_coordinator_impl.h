@@ -223,9 +223,11 @@ public:
                           const OpTime& lastOpCommitted);
     virtual bool stepDownIfPending();
     virtual Date_t getStepDownTime() const;
-    virtual void prepareReplMetadata(rpc::ReplSetMetadata* metadata,
-                                     const OpTime& lastVisibleOpTime,
-                                     const OpTime& lastCommitttedOpTime) const;
+    virtual rpc::ReplSetMetadata prepareReplSetMetadata(const OpTime& lastVisibleOpTime,
+                                                        const OpTime& lastCommitttedOpTime) const;
+    virtual rpc::OplogQueryMetadata prepareOplogQueryMetadata(const OpTime& lastCommittedOpTime,
+                                                              const OpTime& lastAppliedOpTime,
+                                                              int rbid) const;
     virtual void processReplSetRequestVotes(const ReplSetRequestVotesArgs& args,
                                             ReplSetRequestVotesResponse* response,
                                             const OpTime& lastAppliedOpTime);

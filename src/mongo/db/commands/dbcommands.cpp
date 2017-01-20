@@ -95,6 +95,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
+#include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
@@ -1285,9 +1286,7 @@ void appendOpTimeMetadata(OperationContext* txn,
         // Attach our own last opTime.
         repl::OpTime lastOpTimeFromClient =
             repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
-        if (request.getMetadata().hasField(rpc::kReplSetMetadataFieldName)) {
-            replCoord->prepareReplMetadata(lastOpTimeFromClient, metadataBob);
-        }
+        replCoord->prepareReplMetadata(request.getMetadata(), lastOpTimeFromClient, metadataBob);
         // For commands from mongos, append some info to help getLastError(w) work.
         // TODO: refactor out of here as part of SERVER-18236
         if (isShardingAware || isConfig) {

@@ -59,6 +59,7 @@
 #include "mongo/db/service_context_noop.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/future.h"
@@ -4069,6 +4070,80 @@ TEST_F(ReplCoordTest,
     ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
     ASSERT_EQUALS(3, getReplCoord()->getTerm());
     ASSERT_EQUALS(-1, getTopoCoord().getCurrentPrimaryIndex());
+}
+
+TEST_F(ReplCoordTest, PrepareOplogQueryMetadata) {
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 2
+                            << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id"
+                                               << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id"
+                                                  << 1)
+                                          << BSON("host"
+                                                  << "node3:12345"
+                                                  << "_id"
+                                                  << 2))
+                            << "protocolVersion"
+                            << 1),
+                       HostAndPort("node1", 12345));
+    getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
+
+    // Update committed optime with ReplSetMetadata.
+    OpTime optime1{Timestamp(10, 0), 3};
+    OpTime optime2{Timestamp(11, 2), 5};
+
+    StatusWith<rpc::ReplSetMetadata> metadataToProcess = rpc::ReplSetMetadata::readFromMetadata(
+        BSON(rpc::kReplSetMetadataFieldName
+             << BSON("lastOpCommitted" << optime1.toBSON() << "lastOpVisible" << optime1.toBSON()
+                                       << "configVersion"
+                                       << 2
+                                       << "primaryIndex"
+                                       << 2
+                                       << "term"
+                                       << 3
+                                       << "syncSourceIndex"
+                                       << 1)));
+    getReplCoord()->processReplSetMetadata(metadataToProcess.getValue(), true);
+
+    getReplCoord()->setMyLastAppliedOpTime(optime2);
+
+    // Get current rbid to check against.
+    BSONObjBuilder result;
+    getReplCoord()->processReplSetGetRBID(&result);
+    int initialValue = result.obj()["rbid"].Int();
+
+    BSONObjBuilder metadataBob;
+    getReplCoord()->prepareReplMetadata(
+        BSON(rpc::kOplogQueryMetadataFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
+        OpTime(),
+        &metadataBob);
+
+    BSONObj metadata = metadataBob.done();
+    log() << metadata;
+
+    auto oqMetadata = rpc::OplogQueryMetadata::readFromMetadata(metadata);
+    ASSERT_OK(oqMetadata.getStatus());
+    ASSERT_EQ(oqMetadata.getValue().getLastOpCommitted(), optime1);
+    ASSERT_EQ(oqMetadata.getValue().getLastOpApplied(), optime2);
+    ASSERT_EQ(oqMetadata.getValue().getRBID(), initialValue);
+    ASSERT_EQ(oqMetadata.getValue().getSyncSourceIndex(), -1);
+    ASSERT_EQ(oqMetadata.getValue().getPrimaryIndex(), -1);
+
+    auto replMetadata = rpc::ReplSetMetadata::readFromMetadata(metadata);
+    ASSERT_OK(replMetadata.getStatus());
+    ASSERT_EQ(replMetadata.getValue().getLastOpCommitted(), optime1);
+    ASSERT_EQ(replMetadata.getValue().getLastOpVisible(), OpTime());
+    ASSERT_EQ(replMetadata.getValue().getConfigVersion(), 2);
+    ASSERT_EQ(replMetadata.getValue().getTerm(), 3);
+    ASSERT_EQ(replMetadata.getValue().getSyncSourceIndex(), -1);
+    ASSERT_EQ(replMetadata.getValue().getPrimaryIndex(), -1);
 }
 
 TEST_F(ReplCoordTest, TermAndLastCommittedOpTimeUpdatedFromHeartbeatWhenArbiter) {

@@ -435,11 +435,19 @@ public:
     virtual void setMyHeartbeatMessage(const Date_t now, const std::string& s) = 0;
 
     /**
-     * Prepares a BSONObj describing the current term, primary, and lastOp information.
+     * Prepares a ReplSetMetadata object describing the current term, primary, and lastOp
+     * information.
      */
-    virtual void prepareReplMetadata(rpc::ReplSetMetadata* metadata,
-                                     const OpTime& lastVisibleOpTime,
-                                     const OpTime& lastCommittedOpTime) const = 0;
+    virtual rpc::ReplSetMetadata prepareReplSetMetadata(
+        const OpTime& lastVisibleOpTime, const OpTime& lastCommittedOpTime) const = 0;
+
+    /**
+     * Prepares an OplogQueryMetadata object describing the current sync source, rbid, primary,
+     * lastOpApplied, and lastOpCommitted.
+     */
+    virtual rpc::OplogQueryMetadata prepareOplogQueryMetadata(const OpTime& lastCommittedOpTime,
+                                                              const OpTime& lastAppliedOpTime,
+                                                              int rbid) const = 0;
 
     /**
      * Writes into 'output' all the information needed to generate a summary of the current

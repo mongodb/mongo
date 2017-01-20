@@ -221,7 +221,8 @@ public:
                                               const ReplSetRequestVotesArgs& args,
                                               ReplSetRequestVotesResponse* response);
 
-    void prepareReplMetadata(const OpTime& lastOpTimeFromClient,
+    void prepareReplMetadata(const BSONObj& metadataRequestObj,
+                             const OpTime& lastOpTimeFromClient,
                              BSONObjBuilder* builder) const override;
 
     virtual Status processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,

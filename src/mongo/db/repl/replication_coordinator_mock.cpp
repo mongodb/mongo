@@ -397,7 +397,8 @@ Status ReplicationCoordinatorMock::processReplSetRequestVotes(
     return Status::OK();
 }
 
-void ReplicationCoordinatorMock::prepareReplMetadata(const OpTime& lastOpTimeFromClient,
+void ReplicationCoordinatorMock::prepareReplMetadata(const BSONObj& metadataRequestObj,
+                                                     const OpTime& lastOpTimeFromClient,
                                                      BSONObjBuilder* builder) const {}
 
 Status ReplicationCoordinatorMock::processHeartbeatV1(const ReplSetHeartbeatArgsV1& args,

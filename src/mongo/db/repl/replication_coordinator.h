@@ -57,9 +57,9 @@ struct ConnectionPoolStats;
 
 namespace rpc {
 
+class OplogQueryMetadata;
 class ReplSetMetadata;
 class RequestInterface;
-class ReplSetMetadata;
 
 }  // namespace rpc
 
@@ -689,9 +689,11 @@ public:
                                               ReplSetRequestVotesResponse* response) = 0;
 
     /**
-     * Prepares a metadata object describing the current term, primary, and lastOp information.
+     * Prepares a metadata object with the ReplSetMetadata and the OplogQueryMetadata depending
+     * on what has been requested.
      */
-    virtual void prepareReplMetadata(const OpTime& lastOpTimeFromClient,
+    virtual void prepareReplMetadata(const BSONObj& metadataRequestObj,
+                                     const OpTime& lastOpTimeFromClient,
                                      BSONObjBuilder* builder) const = 0;
 
     /**

@@ -35,6 +35,7 @@
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/metadata.h"
+#include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/stdx/memory.h"
@@ -399,8 +400,9 @@ TEST_F(OplogFetcherTest, MetadataObjectContainsReplSetMetadataFieldUnderProtocol
                                     enqueueDocumentsFn,
                                     [](Status, OpTimeWithHash) {})
                            .getMetadataObject_forTest();
-    ASSERT_EQUALS(2, metadataObj.nFields());
+    ASSERT_EQUALS(3, metadataObj.nFields());
     ASSERT_EQUALS(1, metadataObj[rpc::kReplSetMetadataFieldName].numberInt());
+    ASSERT_EQUALS(1, metadataObj[rpc::kOplogQueryMetadataFieldName].numberInt());
 }
 
 TEST_F(OplogFetcherTest, MetadataObjectIsEmptyUnderProtocolVersion0) {

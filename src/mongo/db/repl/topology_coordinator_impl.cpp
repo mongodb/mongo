@@ -48,6 +48,7 @@
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/hex.h"
@@ -2511,17 +2512,24 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
     return false;
 }
 
-void TopologyCoordinatorImpl::prepareReplMetadata(rpc::ReplSetMetadata* metadata,
-                                                  const OpTime& lastVisibleOpTime,
-                                                  const OpTime& lastCommittedOpTime) const {
-    *metadata =
-        rpc::ReplSetMetadata(_term,
-                             lastCommittedOpTime,
-                             lastVisibleOpTime,
-                             _rsConfig.getConfigVersion(),
-                             _rsConfig.getReplicaSetId(),
-                             _currentPrimaryIndex,
-                             _rsConfig.findMemberIndexByHostAndPort(getSyncSourceAddress()));
+rpc::ReplSetMetadata TopologyCoordinatorImpl::prepareReplSetMetadata(
+    const OpTime& lastVisibleOpTime, const OpTime& lastCommittedOpTime) const {
+    return rpc::ReplSetMetadata(_term,
+                                lastCommittedOpTime,
+                                lastVisibleOpTime,
+                                _rsConfig.getConfigVersion(),
+                                _rsConfig.getReplicaSetId(),
+                                _currentPrimaryIndex,
+                                _rsConfig.findMemberIndexByHostAndPort(getSyncSourceAddress()));
+}
+
+rpc::OplogQueryMetadata TopologyCoordinatorImpl::prepareOplogQueryMetadata(
+    const OpTime& lastCommittedOpTime, const OpTime& lastAppliedOpTime, int rbid) const {
+    return rpc::OplogQueryMetadata(lastCommittedOpTime,
+                                   lastAppliedOpTime,
+                                   rbid,
+                                   _currentPrimaryIndex,
+                                   _rsConfig.findMemberIndexByHostAndPort(getSyncSourceAddress()));
 }
 
 void TopologyCoordinatorImpl::summarizeAsHtml(ReplSetHtmlSummary* output) {
