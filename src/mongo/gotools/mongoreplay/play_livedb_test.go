@@ -1117,9 +1117,9 @@ func (generator *recordedOpGenerator) generateCommandFind(filter interface{}, li
 func (generator *recordedOpGenerator) generateCommandGetMore(cursorID int64, limit int32) error {
 	var getmoreArgs bson.D
 	if limit > 0 {
-		getmoreArgs = bson.D{{"collection", testCollection}, {"getMore", cursorID}, {"batchSize", limit}}
+		getmoreArgs = bson.D{{"getMore", cursorID}, {"collection", testCollection}, {"batchSize", limit}}
 	} else {
-		getmoreArgs = bson.D{{"collection", testCollection}, {"getMore", cursorID}}
+		getmoreArgs = bson.D{{"getMore", cursorID}, {"collection", testCollection}}
 	}
 
 	return generator.generateCommandOp("getMore", getmoreArgs, 0)

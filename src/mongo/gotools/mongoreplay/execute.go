@@ -150,10 +150,10 @@ func (context *ExecutionContext) newExecutionSession(url string, start time.Time
 		var connected bool
 		time.Sleep(start.Add(-5 * time.Second).Sub(now)) // Sleep until five seconds before the start time
 		session, err := mgo.Dial(url)
-		defer session.Close()
 		if err == nil {
 			userInfoLogger.Logvf(Info, "(Connection %v) New connection CREATED.", connectionNum)
 			connected = true
+			defer session.Close()
 		} else {
 			userInfoLogger.Logvf(Info, "(Connection %v) New Connection FAILED: %v", connectionNum, err)
 		}
