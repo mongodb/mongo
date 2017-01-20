@@ -17,7 +17,7 @@ function setupTest() {
     var config = s.getDB("config");
 
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
-    s.ensurePrimaryShard('test', 'test-rs0');
+    s.ensurePrimaryShard('test', s.shard0.shardName);
     assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {"_id": 1}}));
     return s;
 }

@@ -68,7 +68,7 @@ var coll = conn.getCollection("test.remove2");
 coll.drop();
 
 st.admin.runCommand({enableSharding: coll.getDB().getName()});
-st.ensurePrimaryShard(coll.getDB().getName(), 'test-rs0');
+st.ensurePrimaryShard(coll.getDB().getName(), st.shard0.shardName);
 st.admin.runCommand({shardCollection: coll.getFullName(), key: {i: 1}});
 
 // Setup initial data

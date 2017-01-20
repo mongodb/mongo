@@ -1015,7 +1015,7 @@ var ShardingTest = function(params) {
 
     assert(isObject(params), 'ShardingTest configuration must be a JSON object');
 
-    var testName = params.name || "test";
+    var testName = params.name || jsTest.name();
     var otherParams = Object.merge(params, params.other || {});
 
     var numShards = otherParams.hasOwnProperty('shards') ? otherParams.shards : 2;

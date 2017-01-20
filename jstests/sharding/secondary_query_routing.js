@@ -9,7 +9,7 @@
 
     st.s0.adminCommand({enableSharding: 'test'});
 
-    st.ensurePrimaryShard('test', 'test-rs0');
+    st.ensurePrimaryShard('test', st.shard0.shardName);
     st.s0.adminCommand({shardCollection: 'test.user', key: {x: 1}});
     st.s0.adminCommand({split: 'test.user', middle: {x: 0}});
 
@@ -21,7 +21,7 @@
     // Mongos #0 bumps up the version without Mongos #1 knowledge.
     // Note: moveChunk has implicit { w: 2 } write concern.
     st.s0.adminCommand(
-        {moveChunk: 'test.user', find: {x: 0}, to: 'test-rs1', _waitForDelete: true});
+        {moveChunk: 'test.user', find: {x: 0}, to: st.shard1.shardName, _waitForDelete: true});
 
     // Clear all the connections to make sure that Mongos #1 will attempt to establish
     // the shard version.

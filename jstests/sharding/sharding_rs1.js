@@ -5,7 +5,7 @@
     var s = new ShardingTest({shards: 3, other: {rs: true, chunkSize: 1, enableBalancer: true}});
 
     s.adminCommand({enablesharding: "test"});
-    s.ensurePrimaryShard('test', 'test-rs0');
+    s.ensurePrimaryShard('test', s.shard0.shardName);
     s.config.settings.update({_id: "balancer"}, {$set: {_waitForDelete: true}}, true);
 
     var db = s.getDB("test");

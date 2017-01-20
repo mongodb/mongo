@@ -8,7 +8,7 @@
     var st = new ShardingTest({shards: 2, rs: {nodes: 2}});
     var testDB = st.s.getDB("test");
     assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName()}));
-    st.ensurePrimaryShard(testDB.getName(), "test-rs0");
+    st.ensurePrimaryShard(testDB.getName(), st.shard0.shardName);
 
     // Create a collection with a v:1 _id index.
     var coll = testDB.getCollection("migration_id_index");
@@ -28,8 +28,8 @@
     // Move a chunk to the non-primary shard.
     assert.commandWorked(testDB.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
     assert.commandWorked(testDB.adminCommand({split: coll.getFullName(), middle: {a: 5}}));
-    assert.commandWorked(
-        testDB.adminCommand({moveChunk: coll.getFullName(), find: {a: 6}, to: "test-rs1"}));
+    assert.commandWorked(testDB.adminCommand(
+        {moveChunk: coll.getFullName(), find: {a: 6}, to: st.shard1.shardName}));
 
     // Check that the collection was created with a v:1 _id index on the non-primary shard.
     spec = GetIndexHelpers.findByName(

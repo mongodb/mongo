@@ -1698,7 +1698,7 @@ var ReplSetTest = function(opts) {
      * Constructor, which initializes the ReplSetTest object by starting new instances.
      */
     function _constructStartNewInstances(opts) {
-        self.name = opts.name || "testReplSet";
+        self.name = opts.name || jsTest.name();
         print('Starting new replica set ' + self.name);
 
         self.useHostName = opts.useHostName == undefined ? true : opts.useHostName;
