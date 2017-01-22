@@ -2551,12 +2551,10 @@ main(int argc, char *argv[])
 			    append_comma, user_cconfig);
 			append_comma = ",";
 		}
-		if (opts->verbose > 1 && strlen(debug_cconfig) != 0) {
+		if (opts->verbose > 1 && strlen(debug_cconfig) != 0)
 			pos += (size_t)snprintf(
 			    cc_buf + pos, req_len - pos, "%s%s",
 			    append_comma, debug_cconfig);
-			append_comma = ",";
-		}
 
 		if (strlen(cc_buf) != 0 && (ret =
 		    config_opt_name_value(wtperf, "conn_config", cc_buf)) != 0)
@@ -2593,12 +2591,10 @@ main(int argc, char *argv[])
 			    append_comma, user_tconfig);
 			append_comma = ",";
 		}
-		if (opts->verbose > 1 && strlen(debug_tconfig) != 0) {
+		if (opts->verbose > 1 && strlen(debug_tconfig) != 0)
 			pos += (size_t)snprintf(
 			    tc_buf + pos, req_len - pos, "%s%s",
 			    append_comma, debug_tconfig);
-			append_comma = ",";
-		}
 
 		if (strlen(tc_buf) != 0 && (ret =
 		    config_opt_name_value(wtperf, "table_config", tc_buf)) != 0)
