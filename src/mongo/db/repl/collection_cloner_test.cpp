@@ -1105,7 +1105,7 @@ TEST_F(CollectionClonerTest, CollectionClonerCannotBeRestartedAfterPreviousFailu
                                "failed to read remaining documents from source collection");
     }
 
-    collectionCloner->waitForDbWorker();
+    collectionCloner->join();
     ASSERT_EQUALS(1, collectionStats.insertCount);
 
     ASSERT_EQUALS(ErrorCodes::OperationFailed, getStatus());
