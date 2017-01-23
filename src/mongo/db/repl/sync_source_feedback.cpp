@@ -85,7 +85,6 @@ Reporter::PrepareReplSetUpdatePositionCommandFn makePrepareReplSetUpdatePosition
             }
         }
 
-        stdx::lock_guard<stdx::mutex> lock(mtx);
         auto replCoord = repl::ReplicationCoordinator::get(txn);
         if (replCoord->getMemberState().primary()) {
             // Primary has no one to send updates to.
