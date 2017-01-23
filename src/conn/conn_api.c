@@ -1987,6 +1987,16 @@ __conn_set_file_system(
 	CONNECTION_API_CALL(conn, session, set_file_system, config, cfg);
 	WT_UNUSED(cfg);
 
+	/*
+	 * You can only configure a file system once, and attempting to do it
+	 * again probably means the extension argument didn't have early-load
+	 * set and we've already configured the default file system.
+	 */
+	if (conn->file_system != NULL)
+		WT_ERR_MSG(session, EPERM,
+		    "filesystem already configured; custom filesystems should "
+		    "enable \"early_load\" configuration");
+
 	conn->file_system = file_system;
 
 err:	API_END_RET(session, ret);

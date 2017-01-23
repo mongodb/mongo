@@ -36,6 +36,8 @@
  * than that.
  */
 
+#define	WT_FAIL_FS_LIB	"../../ext/test/fail_fs/.libs/libwiredtiger_fail_fs.so"
+
 int
 main(int argc, char *argv[])
 {
@@ -43,7 +45,7 @@ main(int argc, char *argv[])
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	char *kstr, *vstr;
-	char buf[100];
+	char buf[1024];
 
 	opts = &_opts;
 	memset(opts, 0, sizeof(*opts));
@@ -51,8 +53,7 @@ main(int argc, char *argv[])
 	testutil_make_work_dir(opts->home);
 
 	snprintf(buf, sizeof(buf),
-	    "create,extensions="
-	    "[\"../../ext/test/fail_fs/.libs/libwiredtiger_fail_fs.so\"]");
+	    "create,extensions=(" WT_FAIL_FS_LIB "=(early_load=true))");
 	testutil_check(wiredtiger_open(opts->home, NULL, buf, &opts->conn));
 	testutil_check(
 	    opts->conn->open_session(opts->conn, NULL, NULL, &session));

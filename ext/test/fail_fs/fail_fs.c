@@ -224,10 +224,11 @@ fail_file_read(WT_FILE_HANDLE *file_handle,
 		chunk = (len < FAIL_FS_GIGABYTE) ? len : FAIL_FS_GIGABYTE;
 		if ((nr = pread(fail_fh->fd, addr, chunk, offset)) <= 0) {
 			(void)wtext->err_printf(wtext, session,
-			    "%s: handle-read: failed to read %" PRIu64
-			    " bytes at offset %" PRIu64 ": %s",
-			    fail_fh->iface.name, (uint64_t)len,
-			    (uint64_t)offset, wtext->strerror(wtext, NULL, nr));
+			    "%s: handle-read: failed to read %" PRIuMAX
+			    " bytes at offset %" PRIuMAX ": %s",
+			    fail_fh->iface.name,
+			    (uintmax_t)len, (uintmax_t)offset,
+			    wtext->strerror(wtext, NULL, errno));
 			ret = (nr == 0 ? WT_ERROR : errno);
 			break;
 		}
@@ -327,10 +328,11 @@ fail_file_write(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
 		chunk = (len < FAIL_FS_GIGABYTE) ? len : FAIL_FS_GIGABYTE;
 		if ((nr = pwrite(fail_fh->fd, addr, chunk, offset)) <= 0) {
 			(void)wtext->err_printf(wtext, session,
-			    "%s: handle-write: failed to write %" PRIu64
-			    " bytes at offset %" PRIu64 ": %s",
-			    fail_fh->iface.name, (uint64_t)len,
-			    (uint64_t)offset, wtext->strerror(wtext, NULL, nr));
+			    "%s: handle-write: failed to write %" PRIuMAX
+			    " bytes at offset %" PRIuMAX ": %s",
+			    fail_fh->iface.name,
+			    (uintmax_t)len, (uintmax_t)offset,
+			    wtext->strerror(wtext, NULL, errno));
 			ret = (nr == 0 ? WT_ERROR : errno);
 			break;
 		}
@@ -376,6 +378,7 @@ fail_fs_directory_list(WT_FILE_SYSTEM *file_system,
 	uint32_t allocated, count;
 	int ret;
 	char *name, **entries;
+	void *p;
 
 	(void)session;						/* Unused */
 
@@ -401,14 +404,15 @@ fail_fs_directory_list(WT_FILE_SYSTEM *file_system,
 		 * matter if the list is a bit longer than necessary.
 		 */
 		if (count >= allocated) {
-			entries = realloc(
-			    entries, (allocated + 10) * sizeof(char *));
-			if (entries == NULL) {
+			p = realloc(
+			    entries, (allocated + 10) * sizeof(*entries));
+			if (p == NULL) {
 				ret = ENOMEM;
 				goto err;
 			}
-			memset(entries + allocated * sizeof(char *),
-			    0, 10 * sizeof(char *));
+			entries = p;
+			memset(entries + allocated * sizeof(*entries),
+			    0, 10 * sizeof(*entries));
 			allocated += 10;
 		}
 		entries[count++] = strdup(name);
@@ -476,16 +480,17 @@ fail_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 	FAIL_FILE_HANDLE *fail_fh;
 	FAIL_FILE_SYSTEM *fail_fs;
 	WT_FILE_HANDLE *file_handle;
-	int open_flags;
-	int ret;
+	int fd, open_flags, ret;
 
 	(void)file_type;					/* Unused */
 	(void)session;						/* Unused */
 
 	*file_handlep = NULL;
-	ret = 0;
-	fail_fs = (FAIL_FILE_SYSTEM *)file_system;
+
 	fail_fh = NULL;
+	fail_fs = (FAIL_FILE_SYSTEM *)file_system;
+	fd = -1;
+	ret = 0;
 
 	fail_fs_lock(&fail_fs->lock);
 
@@ -499,8 +504,10 @@ fail_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 	else
 		open_flags |= O_RDWR;
 
-	if ((ret = open(name, open_flags, 0666)) < 0)
+	if ((fd = open(name, open_flags, 0666)) < 0) {
+		ret = errno;
 		goto err;
+	}
 
 	/* We create a handle structure for each open. */
 	if ((fail_fh = calloc(1, sizeof(FAIL_FILE_HANDLE))) == NULL) {
@@ -510,8 +517,7 @@ fail_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 
 	/* Initialize private information. */
 	fail_fh->fail_fs = fail_fs;
-	fail_fh->fd = ret;
-	ret = 0;
+	fail_fh->fd = fd;
 
 	/* Initialize public information. */
 	file_handle = (WT_FILE_HANDLE *)fail_fh;
@@ -542,7 +548,9 @@ fail_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 	*file_handlep = file_handle;
 
 	if (0) {
-err:		free(fail_fh);
+err:		if (fd != -1)
+			(void)close(fd);
+		free(fail_fh);
 	}
 
 	fail_fs_unlock(&fail_fs->lock);
