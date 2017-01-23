@@ -652,7 +652,7 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
 	page = ref->page;
 	mod = page->modify;
 
-	WT_RET(ds->f(ds, "%p", (void *)page));
+	WT_RET(ds->f(ds, "%p", (void *)ref));
 
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
