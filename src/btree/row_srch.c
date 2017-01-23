@@ -792,9 +792,11 @@ __wt_row_random_descent(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *current, *descent;
+	uint32_t i, entries, retry;
 
 	btree = S2BT(session);
 	current = NULL;
+	retry = 100;
 
 	if (0) {
 restart:	/*
@@ -812,8 +814,32 @@ restart:	/*
 			break;
 
 		WT_INTL_INDEX_GET(session, page, pindex);
-		descent = pindex->index[
-		    __wt_random(&session->rnd) % pindex->entries];
+		entries = pindex->entries;
+
+		/*
+		 * There may be empty pages in the tree, and they're useless to
+		 * us. If we don't find a non-empty page in "entries" random
+		 * guesses, take the first non-empty page in the tree. If the
+		 * search page contains nothing other than empty pages, restart
+		 * from the root some number of times before giving up.
+		 */
+		for (i = 0; i < entries; ++i) {
+			descent =
+			    pindex->index[__wt_random(&session->rnd) % entries];
+			if (descent->state != WT_REF_DELETED)
+				break;
+		}
+		if (i == entries)
+			for (i = 0; i < entries; ++i) {
+				descent = pindex->index[i];
+				if (descent->state != WT_REF_DELETED)
+					break;
+			}
+		if (i == entries) {
+			if (--retry > 0)
+				goto restart;
+			return (WT_NOTFOUND);
+		}
 
 		/*
 		 * Swap the current page for the child page. If the page splits
