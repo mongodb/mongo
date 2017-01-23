@@ -47,7 +47,7 @@ if (m.writeMode() == 'commands') {
 
     s = rt.start(false);
     setup();
-    assert(worked(2, 30000), "E");
+    assert(worked(2, 5 * 60 * 1000), "E");
 }
 
 rt.stop();
