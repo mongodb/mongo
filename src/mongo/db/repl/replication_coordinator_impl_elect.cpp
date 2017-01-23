@@ -202,7 +202,11 @@ void ReplicationCoordinatorImpl::_onFreshnessCheckComplete() {
             return;
     }
 
-    log() << "running for election";
+    log() << "running for election"
+          << (abortReason == FreshnessChecker::FreshnessTie
+                  ? "; slept last election, so running regardless of possible tie"
+                  : "");
+
     // Secure our vote for ourself first
     if (!_topCoord->voteForMyself(now)) {
         return;
