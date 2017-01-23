@@ -823,6 +823,7 @@ restart:	/*
 		 * search page contains nothing other than empty pages, restart
 		 * from the root some number of times before giving up.
 		 */
+		descent = NULL;
 		for (i = 0; i < entries; ++i) {
 			descent =
 			    pindex->index[__wt_random(&session->rnd) % entries];
@@ -835,7 +836,7 @@ restart:	/*
 				if (descent->state != WT_REF_DELETED)
 					break;
 			}
-		if (i == entries) {
+		if (i == entries || descent == NULL) {
 			if (--retry > 0)
 				goto restart;
 			return (WT_NOTFOUND);
