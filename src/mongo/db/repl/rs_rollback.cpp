@@ -63,6 +63,7 @@
 #include "mongo/db/repl/rollback_source.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -121,6 +122,7 @@ namespace repl {
 
 // Failpoint which causes rollback to hang before finishing.
 MONGO_FP_DECLARE(rollbackHangBeforeFinish);
+MONGO_FP_DECLARE(rollbackHangThenFailAfterWritingMinValid);
 
 using namespace rollback_internal;
 
@@ -357,6 +359,18 @@ void checkRbidAndUpdateMinValid(OperationContext* txn,
     log() << "Setting minvalid to " << minValid;
     StorageInterface::get(txn)->setAppliedThrough(txn, {});  // Use top of oplog.
     StorageInterface::get(txn)->setMinValid(txn, minValid);
+
+    if (MONGO_FAIL_POINT(rollbackHangThenFailAfterWritingMinValid)) {
+        // This log output is used in js tests so please leave it.
+        log() << "rollback - rollbackHangThenFailAfterWritingMinValid fail point "
+                 "enabled. Blocking until fail point is disabled.";
+        while (MONGO_FAIL_POINT(rollbackHangThenFailAfterWritingMinValid)) {
+            invariant(!globalInShutdownDeprecated());  // It is an error to shutdown while enabled.
+            mongo::sleepsecs(1);
+        }
+        uasserted(40378,
+                  "failing rollback due to rollbackHangThenFailAfterWritingMinValid fail point");
+    }
 }
 
 void syncFixUp(OperationContext* txn,
@@ -829,6 +843,7 @@ Status _syncRollback(OperationContext* txn,
         log() << "rollback - rollbackHangBeforeFinish fail point "
                  "enabled. Blocking until fail point is disabled.";
         while (MONGO_FAIL_POINT(rollbackHangBeforeFinish)) {
+            invariant(!globalInShutdownDeprecated());  // It is an error to shutdown while enabled.
             mongo::sleepsecs(1);
         }
     }
