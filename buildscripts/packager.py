@@ -31,7 +31,6 @@ import errno
 from glob import glob
 import os
 import re
-import requests
 import shutil
 import subprocess
 import sys
@@ -287,7 +286,7 @@ def get_args(distros, arch_choices):
     parser.add_argument("-d", "--distros", help="Distros to build for", choices=distro_choices, required=False, default=[], action='append')
     parser.add_argument("-p", "--prefix", help="Directory to build into", required=False)
     parser.add_argument("-a", "--arches", help="Architecture to build", choices=arch_choices, default=[], required=False, action='append')
-    parser.add_argument("-t", "--tarball", help="Local tarball to package instead of downloading (only valid with one distro/arch combination)", required=False, type=lambda x: is_valid_file(parser, x))
+    parser.add_argument("-t", "--tarball", help="Local tarball to package", required=True, type=lambda x: is_valid_file(parser, x))
 
     args = parser.parse_args()
 
@@ -316,9 +315,6 @@ def main(argv):
 
     os.chdir(prefix)
     try:
-      # Download the binaries.
-      urlfmt="http://downloads.mongodb.org/linux/mongodb-linux-%s-%s-%s.tgz"
-
       # Build a package for each distro/spec/arch tuple, and
       # accumulate the repository-layout directories.
       for (distro, arch) in crossproduct(distros, args.arches):
@@ -326,12 +322,9 @@ def main(argv):
           for build_os in distro.build_os(arch):
             if build_os in args.distros or not args.distros:
 
-              if args.tarball:
-                filename = tarfile(build_os, arch, spec)
-                ensure_dir(filename)
-                shutil.copyfile(args.tarball,filename)
-              else:
-                httpget(urlfmt % (arch, build_os, spec.version()), ensure_dir(tarfile(build_os, arch, spec)))
+              filename = tarfile(build_os, arch, spec)
+              ensure_dir(filename)
+              shutil.copyfile(args.tarball, filename)
 
               repo = make_package(distro, build_os, arch, spec, srcdir)
               make_repo(repo, distro, build_os, spec)
@@ -382,20 +375,6 @@ def setupdir(distro, build_os, arch, spec):
     # would be dst/x86_64/debian-sysvinit/wheezy/mongodb-org-unstable/
     # or dst/x86_64/redhat/rhel55/mongodb-org-unstable/
     return "dst/%s/%s/%s/%s%s-%s/" % (arch, distro.name(), build_os, distro.pkgbase(), spec.suffix(), spec.pversion(distro))
-
-def httpget(url, filename):
-    """Download the contents of url to filename, return filename."""
-    print "Fetching %s to %s." % (url, filename)
-
-    r = requests.get(url, stream=True)
-    if r.status_code == 200:
-        with open(filename, 'wb') as f:
-            for chunk in r.iter_content(chunk_size=16384):
-                f.write(chunk)
-    else:
-        raise Exception("HTTP error %d" % r.status_code)
-
-    return filename
 
 def unpack_binaries_into(build_os, arch, spec, where):
     """Unpack the tarfile for (build_os, arch, spec) into directory where."""

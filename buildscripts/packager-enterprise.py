@@ -157,10 +157,7 @@ def main(argv):
 
     os.chdir(prefix)
     try:
-      # Download the binaries.
-      urlfmt="http://downloads.mongodb.com/linux/mongodb-linux-%s-enterprise-%s-%s.tgz"
       made_pkg = False
-
       # Build a package for each distro/spec/arch tuple, and
       # accumulate the repository-layout directories.
       for (distro, arch) in packager.crossproduct(distros, args.arches):
@@ -168,12 +165,9 @@ def main(argv):
           for build_os in distro.build_os(arch):
             if build_os in args.distros or not args.distros:
 
-              if args.tarball:
-                filename = tarfile(build_os, arch, spec)
-                packager.ensure_dir(filename)
-                shutil.copyfile(args.tarball,filename)
-              else:
-                packager.httpget(urlfmt % (arch, build_os, spec.version()), packager.ensure_dir(tarfile(build_os, arch, spec)))
+              filename = tarfile(build_os, arch, spec)
+              packager.ensure_dir(filename)
+              shutil.copyfile(args.tarball, filename)
 
               repo = make_package(distro, build_os, arch, spec, srcdir)
               make_repo(repo, distro, build_os, spec)
