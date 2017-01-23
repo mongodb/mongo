@@ -93,11 +93,10 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
     checklog_calls = 100 if wttest.islongtest() else 2
     checklog_mod = (len(scenarios) / checklog_calls + 1)
 
-    def setUpConnectionOpen(self, dir):
-        self.home = dir
+    def conn_config(self):
         # Cycle through the different transaction_sync values in a
         # deterministic manner.
-        self.txn_sync = self.sync_list[
+        txn_sync = self.sync_list[
             self.scenario_number % len(self.sync_list)]
         #
         # We don't want to run zero fill with only the same settings, such
@@ -107,17 +106,9 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
         zerofill = 'false'
         if self.scenario_number % freq == 0:
             zerofill = 'true'
-        self.backup_dir = os.path.join(self.home, "WT_BACKUP")
-        conn_params = \
-                'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
-                'log=(zero_fill=%s),' % zerofill + \
-                'create,error_prefix="%s: ",' % self.shortid() + \
-                'transaction_sync="%s",' % self.txn_sync
-        # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
-        conn = self.wiredtiger_open(dir, conn_params)
-        self.pr(`conn`)
-        self.session2 = conn.open_session()
-        return conn
+        return 'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
+            'log=(zero_fill=%s),' % zerofill + \
+            'transaction_sync="%s",' % txn_sync
 
     # Check that a cursor (optionally started in a new transaction), sees the
     # expected values.
@@ -176,8 +167,10 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
             backup_conn = self.wiredtiger_open(self.backup_dir,
                                                backup_conn_params)
             try:
-                self.check(backup_conn.open_session(), None, committed)
+                session = backup_conn.open_session()
             finally:
+                session.checkpoint("force")
+                self.check(backup_conn.open_session(), None, committed)
                 # Sleep long enough so that the archive thread is guaranteed
                 # to run before we close the connection.
                 time.sleep(1.0)
@@ -204,6 +197,8 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(cur_logs, pr_logs)
 
     def test_ops(self):
+        self.backup_dir = os.path.join(self.home, "WT_BACKUP")
+        self.session2 = self.conn.open_session()
         # print "Creating %s with config '%s'" % (self.uri, self.create_params)
         self.session.create(self.uri, self.create_params)
         # Set up the table with entries for 1, 2, 10 and 11.
@@ -226,6 +221,7 @@ class test_txn02(wttest.WiredTigerTestCase, suite_subprocess):
             # Close and reopen the connection and cursor.
             if reopen == 'reopen':
                 self.reopen_conn()
+                self.session2 = self.conn.open_session()
                 c = self.session.open_cursor(self.uri, None, 'overwrite')
 
             self.session.begin_transaction(

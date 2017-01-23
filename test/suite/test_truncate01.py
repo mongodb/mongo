@@ -183,11 +183,11 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
     # those tests to file objects.
     types = [
         ('file', dict(type='file:', valuefmt='S',
-            config='allocation_size=512,leaf_page_max=512')),
+            config='allocation_size=512,leaf_page_max=512', P=0.25)),
         ('file8t', dict(type='file:', valuefmt='8t',
-            config='allocation_size=512,leaf_page_max=512')),
+            config='allocation_size=512,leaf_page_max=512', P=0.25)),
         ('table', dict(type='table:', valuefmt='S',
-            config='allocation_size=512,leaf_page_max=512')),
+            config='allocation_size=512,leaf_page_max=512', P=0.5)),
     ]
     keyfmt = [
         ('integer', dict(keyfmt='i')),
@@ -203,7 +203,8 @@ class test_truncate_cursor(wttest.WiredTigerTestCase):
         ('big', dict(nentries=1000,skip=37)),
     ]
 
-    scenarios = make_scenarios(types, keyfmt, size, reopen)
+    scenarios = make_scenarios(types, keyfmt, size, reopen,
+        prune=10, prunelong=1000)
 
     # Set a cursor key.
     def cursorKey(self, ds, uri, key):

@@ -21,6 +21,7 @@ Alakuijala
 Alexandrescu's
 Alloc
 Async
+AsyncOp
 Athanassoulis
 Athlon
 BBBBB
@@ -276,6 +277,7 @@ PRNG
 PTHREAD
 PTR
 PackInputStream
+PackOutputStream
 Pandis
 Phong
 PlatformSDK
@@ -339,6 +341,7 @@ Split's
 Stoica
 StoreLoad
 StoreStore
+Syscall
 TAILQ
 TCMalloc
 TESTUTIL

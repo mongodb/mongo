@@ -895,12 +895,12 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 	 */
 	create_log = true;
 	if (conn->log_prealloc > 0 && !conn->hot_backup) {
-		__wt_readlock(session, conn->hot_backup_lock);
+		__wt_readlock(session, &conn->hot_backup_lock);
 		if (conn->hot_backup)
-			__wt_readunlock(session, conn->hot_backup_lock);
+			__wt_readunlock(session, &conn->hot_backup_lock);
 		else {
 			ret = __log_alloc_prealloc(session, log->fileid);
-			__wt_readunlock(session, conn->hot_backup_lock);
+			__wt_readunlock(session, &conn->hot_backup_lock);
 
 			/*
 			 * If ret is 0 it means we found a pre-allocated file.
@@ -1029,12 +1029,12 @@ __log_truncate_file(WT_SESSION_IMPL *session, WT_FH *log_fh, wt_off_t offset)
 	log = conn->log;
 
 	if (!F_ISSET(log, WT_LOG_TRUNCATE_NOTSUP) && !conn->hot_backup) {
-		__wt_readlock(session, conn->hot_backup_lock);
+		__wt_readlock(session, &conn->hot_backup_lock);
 		if (conn->hot_backup)
-			__wt_readunlock(session, conn->hot_backup_lock);
+			__wt_readunlock(session, &conn->hot_backup_lock);
 		else {
 			ret = __wt_ftruncate(session, log_fh, offset);
-			__wt_readunlock(session, conn->hot_backup_lock);
+			__wt_readunlock(session, &conn->hot_backup_lock);
 			if (ret != ENOTSUP)
 				return (ret);
 			F_SET(log, WT_LOG_TRUNCATE_NOTSUP);
@@ -1655,10 +1655,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		WT_RET(__log_get_files(session,
 		    WT_LOG_FILENAME, &logfiles, &logcount));
 		if (logcount == 0)
-			/*
-			 * Return it is not supported if none don't exist.
-			 */
-			return (ENOTSUP);
+			WT_RET_MSG(session, ENOTSUP, "no log files found");
 		for (i = 0; i < logcount; i++) {
 			WT_ERR(__wt_log_extract_lognum(session, logfiles[i],
 			    &lognum));
@@ -1674,6 +1671,10 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	    &log_fh, WT_LOG_FILENAME, start_lsn.l.file, WT_LOG_OPEN_VERIFY));
 	WT_ERR(__wt_filesize(session, log_fh, &log_size));
 	rd_lsn = start_lsn;
+	if (LF_ISSET(WT_LOGSCAN_RECOVER))
+		__wt_verbose(session, WT_VERB_RECOVERY_PROGRESS,
+		    "Recovering log %" PRIu32 " through %" PRIu32,
+		    rd_lsn.l.file, end_lsn.l.file);
 
 	WT_ERR(__wt_scr_alloc(session, WT_LOG_ALIGN, &buf));
 	WT_ERR(__wt_scr_alloc(session, 0, &decryptitem));
@@ -1722,6 +1723,11 @@ advance:
 			WT_ERR(__log_openfile(session,
 			    &log_fh, WT_LOG_FILENAME,
 			    rd_lsn.l.file, WT_LOG_OPEN_VERIFY));
+			if (LF_ISSET(WT_LOGSCAN_RECOVER))
+				__wt_verbose(session, WT_VERB_RECOVERY_PROGRESS,
+				    "Recovering log %" PRIu32
+				    " through %" PRIu32,
+				    rd_lsn.l.file, end_lsn.l.file);
 			WT_ERR(__wt_filesize(session, log_fh, &log_size));
 			eol = false;
 			continue;

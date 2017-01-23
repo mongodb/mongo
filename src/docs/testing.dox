@@ -27,7 +27,7 @@ The WiredTiger unit test suite includes tests that cover:
 
 The WiredTiger Python test suite is built using the WiredTiger Python
 API and the Python unittest functionality (the test suite requires at
-least Python version 2.7).
+least Python version 2.6).
 
 The WiredTiger test suite automatically runs as part of every commit
 into the WiredTiger GitHub source tree.

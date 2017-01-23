@@ -1,4 +1,4 @@
-conn_config="cache_size=1G,eviction=(threads_max=4),session_max=2000"
+conn_config="cache_size=1G,eviction=(threads_max=8),session_max=2000"
 table_config="type=file"
 table_count=100
 close_conn=false

@@ -235,7 +235,7 @@ struct __wt_log {
 	WT_SPINLOCK      log_sync_lock; /* Locked: Single-thread fsync */
 	WT_SPINLOCK      log_writelsn_lock; /* Locked: write LSN */
 
-	WT_RWLOCK	 *log_archive_lock;	/* Archive and log cursors */
+	WT_RWLOCK	 log_archive_lock;/* Archive and log cursors */
 
 	/* Notify any waiting threads when sync_lsn is updated. */
 	WT_CONDVAR	*log_sync_cond;

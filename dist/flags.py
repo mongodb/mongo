@@ -76,6 +76,7 @@ flags = {
         'VERB_REBALANCE',
         'VERB_RECONCILE',
         'VERB_RECOVERY',
+        'VERB_RECOVERY_PROGRESS',
         'VERB_SALVAGE',
         'VERB_SHARED_CACHE',
         'VERB_SPLIT',

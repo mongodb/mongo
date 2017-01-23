@@ -66,41 +66,20 @@ class test_encrypt01(wttest.WiredTigerTestCase):
     nrecords = 5000
     bigvalue = "abcdefghij" * 1001    # len(bigvalue) = 10010
 
-    # Override WiredTigerTestCase, we have extensions.
-    def setUpConnectionOpen(self, dir):
+    def conn_extensions(self, extlist):
+        extlist.skip_if_missing = True
+        extlist.extension('encryptors', self.sys_encrypt)
+        extlist.extension('encryptors', self.file_encrypt)
+        extlist.extension('compressors', self.block_compress)
+        extlist.extension('compressors', self.log_compress)
+
+    def conn_config(self):
         encarg = 'encryption=(name={0}{1}),'.format(
             self.sys_encrypt, self.sys_encrypt_args)
         comparg = ''
         if self.log_compress != None:
             comparg='log=(compressor={0}),'.format(self.log_compress)
-        extarg = self.extensionArg([('encryptors', self.sys_encrypt),
-            ('encryptors', self.file_encrypt),
-            ('compressors', self.block_compress),
-            ('compressors', self.log_compress)])
-        conn = self.wiredtiger_open(dir,
-            'create,error_prefix="{0}: ",{1}{2}{3}'.format(
-                self.shortid(), encarg, comparg, extarg))
-        self.pr(`conn`)
-        return conn
-
-    # Return the wiredtiger_open extension argument for a shared library.
-    def extensionArg(self, exts):
-        extfiles = []
-        for ext in exts:
-            (dirname, name) = ext
-            if name != None and name != 'none':
-                testdir = os.path.dirname(__file__)
-                extdir = os.path.join(run.wt_builddir, 'ext', dirname)
-                extfile = os.path.join(
-                    extdir, name, '.libs', 'libwiredtiger_' + name + '.so')
-                if not os.path.exists(extfile):
-                    self.skipTest('extension "' + extfile + '" not built')
-                if not extfile in extfiles:
-                    extfiles.append(extfile)
-        if len(extfiles) == 0:
-            return ''
-        else:
-            return ',extensions=["' + '","'.join(extfiles) + '"]'
+        return encarg + comparg
 
     # Create a table, add keys with both big and small values, then verify them.
     def test_encrypt(self):

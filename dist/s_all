@@ -57,7 +57,7 @@ errchk()
 	# Some tests shouldn't return an error, we exclude them here.
 	case "$1" in
 	*s_export|*s_tags)
-		break;;
+		;;
 	*)
 		errfound=1;;
 	esac
@@ -97,10 +97,10 @@ COMMANDS="
 2>&1 ./s_string > ${t_pfx}s_string
 2>&1 ./s_tags > ${t_pfx}tags
 2>&1 ./s_typedef -c > ${t_pfx}s_typedef_c
-2>&1 ./s_void > ${t_pfx}s_void"
+2>&1 ./s_void > ${t_pfx}s_void
 2>&1 ./s_whitespace > ${t_pfx}s_whitespace
 2>&1 ./s_win > ${t_pfx}s_win
-2>&1 python style.py > ${t_pfx}py_style
+2>&1 python style.py > ${t_pfx}py_style"
 
 # Parallelize if possible.
 xp=""
@@ -111,14 +111,13 @@ fi
 echo "$COMMANDS" | xargs $xp -I{} /bin/sh -c {}
 
 for f in `find . -name ${t_pfx}\*`; do
-	if ! `test -s $f`; then
-		continue
+	if `test -s $f`; then
+		LOCAL_NAME=`basename $f`
+		# Find original command and trim redirect garbage
+		FAILED_CMD=`echo "$COMMANDS" | grep $LOCAL_NAME | \
+		    sed -e 's/ >.*//' -e 's/.* //'`
+		errchk "$FAILED_CMD" $f
 	fi
-	LOCAL_NAME=`basename $f`
-	# Find original command and trim redirect garbage
-	FAILED_CMD=`echo "$COMMANDS" | grep $LOCAL_NAME | \
-	    sed -e 's/ >.*//' -e 's/.* //'`
-	errchk "$FAILED_CMD" $f
 done
 
 echo 'dist/s_all run finished'

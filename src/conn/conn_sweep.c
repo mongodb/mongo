@@ -81,7 +81,7 @@ __sweep_expire_one(WT_SESSION_IMPL *session)
 	 * handle list lock so that connection-level handle searches
 	 * never need to retry.
 	 */
-	WT_RET(__wt_try_writelock(session, dhandle->rwlock));
+	WT_RET(__wt_try_writelock(session, &dhandle->rwlock));
 
 	/* Only sweep clean trees where all updates are visible. */
 	if (btree->modified ||
@@ -95,7 +95,7 @@ __sweep_expire_one(WT_SESSION_IMPL *session)
 	 */
 	ret = __wt_conn_btree_sync_and_close(session, false, true);
 
-err:	__wt_writeunlock(session, dhandle->rwlock);
+err:	__wt_writeunlock(session, &dhandle->rwlock);
 
 	return (ret);
 }
@@ -188,7 +188,7 @@ __sweep_remove_one(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
 	WT_DECL_RET;
 
 	/* Try to get exclusive access. */
-	WT_RET(__wt_try_writelock(session, dhandle->rwlock));
+	WT_RET(__wt_try_writelock(session, &dhandle->rwlock));
 
 	/*
 	 * If there are no longer any references to the handle in any
@@ -205,7 +205,7 @@ __sweep_remove_one(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
 	 * don't retry the discard until it times out again.
 	 */
 	if (ret != 0) {
-err:		__wt_writeunlock(session, dhandle->rwlock);
+err:		__wt_writeunlock(session, &dhandle->rwlock);
 	}
 
 	return (ret);

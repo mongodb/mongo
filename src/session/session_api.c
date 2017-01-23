@@ -1686,7 +1686,7 @@ __session_snapshot(WT_SESSION *wt_session, const char *config)
 	WT_ERR(__wt_txn_named_snapshot_config(
 	    session, cfg, &has_create, &has_drop));
 
-	__wt_writelock(session, txn_global->nsnap_rwlock);
+	__wt_writelock(session, &txn_global->nsnap_rwlock);
 
 	/* Drop any snapshots to be removed first. */
 	if (has_drop)
@@ -1696,7 +1696,7 @@ __session_snapshot(WT_SESSION *wt_session, const char *config)
 	if (has_create)
 		WT_ERR(__wt_txn_named_snapshot_begin(session, cfg));
 
-err:	__wt_writeunlock(session, txn_global->nsnap_rwlock);
+err:	__wt_writeunlock(session, &txn_global->nsnap_rwlock);
 
 	API_END_RET_NOTFOUND_MAP(session, ret);
 }

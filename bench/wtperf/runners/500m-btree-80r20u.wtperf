@@ -5,7 +5,7 @@
 #
 # Set cache to half of memory of AWS perf instance.  Enable logging and
 # checkpoints.  Collect wiredtiger stats for ftdc.
-conn_config="cache_size=16G,checkpoint=(wait=60,log_size=2GB),session_max=20000,log=(enabled),statistics=(fast),statistics_log=(wait=30,json),eviction=(threads_max=4)"
+conn_config="cache_size=16G,checkpoint=(wait=60,log_size=2GB),session_max=20000,log=(enabled),statistics=(fast),statistics_log=(wait=30,json),eviction=(threads_max=8)"
 create=false
 compression="snappy"
 # close_conn as false allows this test to close/finish faster, but if running

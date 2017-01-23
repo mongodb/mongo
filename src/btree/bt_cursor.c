@@ -163,7 +163,7 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		 * column-store pages don't have slots, but map one-to-one to
 		 * keys, check for retrieval past the end of the page.
 		 */
-		if (cbt->recno >= cbt->ref->ref_recno + page->pg_fix_entries)
+		if (cbt->recno >= cbt->ref->ref_recno + page->entries)
 			return (false);
 
 		/*
@@ -173,9 +173,9 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		break;
 	case BTREE_COL_VAR:
 		/* The search function doesn't check for empty pages. */
-		if (page->pg_var_entries == 0)
+		if (page->entries == 0)
 			return (false);
-		WT_ASSERT(session, cbt->slot < page->pg_var_entries);
+		WT_ASSERT(session, cbt->slot < page->entries);
 
 		/*
 		 * Column-store updates are stored as "insert" objects. If
@@ -191,16 +191,16 @@ __cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		 * backing store; check the cell for a record already deleted
 		 * when read.
 		 */
-		cip = &page->pg_var_d[cbt->slot];
+		cip = &page->pg_var[cbt->slot];
 		if ((cell = WT_COL_PTR(page, cip)) == NULL ||
 		    __wt_cell_type(cell) == WT_CELL_DEL)
 			return (false);
 		break;
 	case BTREE_ROW:
 		/* The search function doesn't check for empty pages. */
-		if (page->pg_row_entries == 0)
+		if (page->entries == 0)
 			return (false);
-		WT_ASSERT(session, cbt->slot < page->pg_row_entries);
+		WT_ASSERT(session, cbt->slot < page->entries);
 
 		/*
 		 * See above: for row-store, no insert object can have the same
@@ -418,8 +418,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 		 * might be legitimately positioned after the last page slot).
 		 * Ignore those cases, it makes things too complicated.
 		 */
-		if (cbt->slot != 0 &&
-		    cbt->slot != cbt->ref->page->pg_row_entries - 1)
+		if (cbt->slot != 0 && cbt->slot != cbt->ref->page->entries - 1)
 			valid = __cursor_valid(cbt, &upd);
 	}
 	if (!valid) {

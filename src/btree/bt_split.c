@@ -1770,9 +1770,9 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 
 	/* Find the last item on the page. */
 	if (type == WT_PAGE_ROW_LEAF)
-		ins_head = page->pg_row_entries == 0 ?
+		ins_head = page->entries == 0 ?
 		    WT_ROW_INSERT_SMALLEST(page) :
-		    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1);
+		    WT_ROW_INSERT_SLOT(page, page->entries - 1);
 	else
 		ins_head = WT_COL_APPEND(page);
 	moved_ins = WT_SKIP_LAST(ins_head);
@@ -1822,7 +1822,7 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
 			key->size = WT_INSERT_KEY_SIZE(ins);
 		} else
 			WT_ERR(__wt_row_leaf_key(
-			    session, page, &page->pg_row_d[0], key, true));
+			    session, page, &page->pg_row[0], key, true));
 		WT_ERR(__wt_row_ikey(session, 0, key->data, key->size, child));
 		parent_incr += sizeof(WT_IKEY) + key->size;
 		__wt_scr_free(session, &key);

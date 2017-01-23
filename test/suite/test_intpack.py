@@ -126,8 +126,8 @@ class PackTester:
 class test_intpack(wttest.WiredTigerTestCase):
     name = 'test_intpack'
 
-    # We have to be a bit verbose here with naming, as there can be problems with
-    # case insensitive test names:w
+    # We have to be a bit verbose here with naming, scenario names are
+    # case insensitive and must be unique.
 
     scenarios = make_scenarios([
         ('int8_t_b', dict(formatcode='b', low=-128, high=127, nbits=8)),

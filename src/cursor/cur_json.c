@@ -369,11 +369,11 @@ __wt_json_unpack_char(u_char ch, u_char *buf, size_t bufsz, bool force_unicode)
  *	of column names.
  */
 void
-__wt_json_column_init(WT_CURSOR *cursor, const char *keyformat,
+__wt_json_column_init(WT_CURSOR *cursor, const char *uri, const char *keyformat,
     const WT_CONFIG_ITEM *idxconf, const WT_CONFIG_ITEM *colconf)
 {
 	WT_CURSOR_JSON *json;
-	const char *p, *end, *beginkey;
+	const char *beginkey, *end, *lparen, *p;
 	uint32_t keycnt, nkeys;
 
 	json = (WT_CURSOR_JSON *)cursor->json_private;
@@ -400,8 +400,16 @@ __wt_json_column_init(WT_CURSOR *cursor, const char *keyformat,
 			keycnt++;
 		p++;
 	}
-	json->value_names.str = p;
-	json->value_names.len = WT_PTRDIFF(end, p);
+	if ((lparen = strchr(uri, '(')) != NULL) {
+		/* This cursor is a projection. */
+		json->value_names.str = lparen;
+		json->value_names.len = strlen(lparen) - 1;
+		WT_ASSERT((WT_SESSION_IMPL *)cursor->session,
+		    json->value_names.str[json->value_names.len] == ')');
+	} else {
+		json->value_names.str = p;
+		json->value_names.len = WT_PTRDIFF(end, p);
+	}
 	if (idxconf == NULL) {
 		if (p > beginkey)
 			p--;

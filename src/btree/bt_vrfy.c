@@ -386,7 +386,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 	}
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-		vs->record_total += page->pg_fix_entries;
+		vs->record_total += page->entries;
 		break;
 	case WT_PAGE_COL_VAR:
 		recno = 0;
@@ -614,7 +614,7 @@ __verify_row_leaf_key_order(
 	 * If a tree is empty (just created), it won't have keys; if there
 	 * are no keys, we're done.
 	 */
-	if (page->pg_row_entries == 0)
+	if (page->entries == 0)
 		return (0);
 
 	/*
@@ -624,7 +624,7 @@ __verify_row_leaf_key_order(
 	 */
 	if (vs->max_addr->size != 0) {
 		WT_RET(__wt_row_leaf_key_copy(
-		    session, page, page->pg_row_d, vs->tmp1));
+		    session, page, page->pg_row, vs->tmp1));
 
 		/*
 		 * Compare the key against the largest key we've seen so far.
@@ -653,7 +653,7 @@ __verify_row_leaf_key_order(
 
 	/* Update the largest key we've seen to the last key on this page. */
 	WT_RET(__wt_row_leaf_key_copy(session, page,
-	    page->pg_row_d + (page->pg_row_entries - 1), vs->max_key));
+	    page->pg_row + (page->entries - 1), vs->max_key));
 	(void)__wt_page_addr_string(session, ref, vs->max_addr);
 
 	return (0);

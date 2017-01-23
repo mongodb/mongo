@@ -59,7 +59,7 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(uri, data_config, cursor_config)
 
     # Turn on statistics for this test.
-    def conn_config(self, dir):
+    def conn_config(self):
         return 'statistics=(%s)' % self.data_config
 
     # For each database/cursor configuration, confirm the right combinations

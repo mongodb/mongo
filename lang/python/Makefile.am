@@ -17,7 +17,8 @@ install-exec-local:
 	(cd $(PYSRC) && \
 	    $(PYTHON) setup.py build_py -d $(abs_builddir)/build && \
 	    $(PYTHON) setup.py build_ext -f -b $(abs_builddir)/build $(PYDIRS) && \
-	    $(PYTHON) setup.py install_lib -b $(abs_builddir)/build --skip-build $(PYTHON_INSTALL_ARG))
+	    $(PYTHON) setup.py install_lib -b $(abs_builddir)/build --skip-build $(PYTHON_INSTALL_ARG) && \
+	    rm -rf $(abs_builddir)/build)
 
 # We build in different places for an install vs running from the tree:
 # clean up both.  Don't rely on "setup.py clean" -- everything that should
