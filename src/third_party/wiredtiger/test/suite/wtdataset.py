@@ -41,6 +41,7 @@ class BaseDataSet(object):
         self.key_format = kwargs.get('key_format', 'S')
         self.value_format = kwargs.get('value_format', 'S')
         self.config = kwargs.get('config', '')
+        self.projection = kwargs.get('projection', '')
 
     def create(self):
         self.testcase.session.create(self.uri, 'key_format=' + self.key_format
@@ -103,7 +104,8 @@ class BaseDataSet(object):
 
     def check(self):
         self.testcase.pr('check: ' + self.uri)
-        cursor = self.testcase.session.open_cursor(self.uri, None)
+        cursor = self.testcase.session.open_cursor(
+            self.uri + self.projection, None, None)
         self.check_cursor(cursor)
         cursor.close()
 
@@ -288,6 +290,94 @@ class ComplexLSMDataSet(ComplexDataSet):
     @classmethod
     def is_lsm(cls):
         return True
+
+class ProjectionDataSet(SimpleDataSet):
+    """
+    ProjectionDataSet creates a table with predefined data identical to
+    SimpleDataSet (single key and value), but when checking it, uses
+    a cursor with a projection.
+    """
+    def __init__(self, testcase, uri, rows, **kwargs):
+        kwargs['config'] = kwargs.get('config', '') + ',columns=(k,v0)'
+        kwargs['projection'] = '(v0,v0,v0)'
+        super(ProjectionDataSet, self).__init__(testcase, uri, rows, **kwargs)
+
+    # A value suitable for checking the value returned by a cursor.
+    def comparable_value(self, i):
+        v0 = self.value(i)
+        return [v0, v0, v0]
+
+    def check_cursor(self, cursor):
+        i = 0
+        for key, got0, got1, got2 in cursor:
+            i += 1
+            self.testcase.assertEqual(key, self.key(i))
+            if cursor.value_format == '8t' and got0 == 0:    # deleted
+                continue
+            self.testcase.assertEqual([got0, got1, got2],
+                self.comparable_value(i))
+        self.testcase.assertEqual(i, self.rows)
+
+class ProjectionIndexDataSet(BaseDataSet):
+    """
+    ProjectionIndexDataSet creates a table with three values and
+    an index.  Checks are made against a projection of the main table
+    and a projection of the index.
+    """
+    def __init__(self, testcase, uri, rows, **kwargs):
+        self.origconfig = kwargs.get('config', '')
+        self.indexname = 'index:' + uri.split(":")[1] +  ':index0'
+        kwargs['config'] = self.origconfig + ',columns=(k,v0,v1,v2)'
+        kwargs['value_format'] = kwargs.get('value_format', 'SiS')
+        kwargs['projection'] = '(v1,v2,v0)'
+        super(ProjectionIndexDataSet, self).__init__(
+            testcase, uri, rows, **kwargs)
+
+    def value(self, i):
+        return ('v0:' + str(i), i*i, 'v2:' + str(i))
+
+    # Suitable for checking the value returned by a cursor using a projection.
+    def comparable_value(self, i):
+        return [i*i, 'v2:' + str(i), 'v0:' + str(i)]
+
+    def create(self):
+        super(ProjectionIndexDataSet, self).create()
+        self.testcase.session.create(self.indexname, 'columns=(v2,v1),' +
+            self.origconfig)
+
+    def check_cursor(self, cursor):
+        i = 0
+        for key, got0, got1, got2 in cursor:
+            i += 1
+            self.testcase.assertEqual(key, self.key(i))
+            if cursor.value_format == '8t' and got0 == 0:    # deleted
+                continue
+            self.testcase.assertEqual([got0, got1, got2],
+                self.comparable_value(i))
+        self.testcase.assertEqual(i, self.rows)
+
+    def check_index_cursor(self, cursor):
+        for i in xrange(1, self.rows + 1):
+            k = self.key(i)
+            v = self.value(i)
+            ik = (v[2], v[1])  # The index key is (v2,v2)
+            expect = [v[1],k,v[2],v[0]]
+            self.testcase.assertEqual(expect, cursor[ik])
+
+    def check(self):
+        BaseDataSet.check(self)
+
+        # Check values in the index.
+        idxcursor = self.testcase.session.open_cursor(
+            self.indexname + '(v1,k,v2,v0)')
+        self.check_index_cursor(idxcursor)
+        idxcursor.close()
+
+    def index_count(self):
+        return 1
+
+    def index_name(self, i):
+        return self.indexname
 
 # create a key based on a cursor as a shortcut to creating a SimpleDataSet
 def simple_key(cursor, i):

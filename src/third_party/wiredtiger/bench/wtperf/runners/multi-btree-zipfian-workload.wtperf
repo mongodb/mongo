@@ -1,5 +1,5 @@
 # Read from a set of tables with uneven distribution of data
-conn_config="cache_size=1G,eviction=(threads_max=4),file_manager=(close_idle_time=100000),checkpoint=(wait=60,log_size=2GB),statistics=(fast),statistics_log=(wait=5,json),session_max=1000"
+conn_config="cache_size=1G,eviction=(threads_max=8),file_manager=(close_idle_time=100000),checkpoint=(wait=60,log_size=2GB),statistics=(fast),statistics_log=(wait=5,json),session_max=1000"
 table_config="type=file"
 table_count=100
 icount=0

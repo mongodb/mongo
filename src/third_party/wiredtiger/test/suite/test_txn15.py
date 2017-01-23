@@ -41,7 +41,7 @@ class test_txn15(wttest.WiredTigerTestCase, suite_subprocess):
     create_params = 'key_format=i,value_format=i'
     entries = 100
     # Turn on logging for this test.
-    def conn_config(self, dir):
+    def conn_config(self):
         return 'statistics=(fast),' + \
             'log=(archive=false,enabled,file_max=100K),' + \
             'use_environment=false,' + \

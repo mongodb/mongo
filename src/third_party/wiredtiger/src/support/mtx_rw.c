@@ -115,23 +115,27 @@
 #include "wt_internal.h"
 
 /*
- * __wt_rwlock_alloc --
- *	Allocate and initialize a read/write lock.
+ * __wt_rwlock_init --
+ *	Initialize a read/write lock.
  */
-int
-__wt_rwlock_alloc(
-    WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp, const char *name)
+void
+__wt_rwlock_init(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 {
-	WT_RWLOCK *rwlock;
+	WT_UNUSED(session);
 
-	__wt_verbose(session, WT_VERB_MUTEX, "rwlock: alloc %s", name);
+	l->u = 0;
+}
 
-	WT_RET(__wt_calloc_one(session, &rwlock));
+/*
+ * __wt_rwlock_destroy --
+ *	Destroy a read/write lock.
+ */
+void
+__wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK *l)
+{
+	WT_UNUSED(session);
 
-	rwlock->name = name;
-
-	*rwlockp = rwlock;
-	return (0);
+	l->u = 0;
 }
 
 /*
@@ -139,13 +143,12 @@ __wt_rwlock_alloc(
  *	Try to get a shared lock, fail immediately if unavailable.
  */
 int
-__wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+__wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 {
-	wt_rwlock_t *l, new, old;
+	WT_RWLOCK new, old;
 
 	WT_STAT_CONN_INCR(session, rwlock_read);
 
-	l = &rwlock->rwlock;
 	new = old = *l;
 
 	/*
@@ -172,19 +175,15 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
  *	exclusive.
  */
 void
-__wt_readlock_spin(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+__wt_readlock_spin(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 {
-	wt_rwlock_t *l;
-
-	l = &rwlock->rwlock;
-
 	/*
 	 * Try to get the lock in a single operation if it is available to
 	 * readers.  This avoids the situation where multiple readers arrive
 	 * concurrently and have to line up in order to enter the lock.  For
 	 * read-heavy workloads it can make a significant difference.
 	 */
-	while (__wt_try_readlock(session, rwlock) != 0) {
+	while (__wt_try_readlock(session, l) != 0) {
 		if (l->s.writers_active > 0)
 			__wt_yield();
 		else
@@ -197,17 +196,14 @@ __wt_readlock_spin(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
  *	Get a shared lock.
  */
 void
-__wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+__wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 {
-	wt_rwlock_t *l;
 	uint16_t ticket;
 	int pause_cnt;
 
 	WT_STAT_CONN_INCR(session, rwlock_read);
 
 	WT_DIAGNOSTIC_YIELD;
-
-	l = &rwlock->rwlock;
 
 	/*
 	 * Possibly wrap: if we have more than 64K lockers waiting, the ticket
@@ -246,13 +242,9 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
  *	Release a shared lock.
  */
 void
-__wt_readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+__wt_readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 {
-	wt_rwlock_t *l;
-
 	WT_UNUSED(session);
-
-	l = &rwlock->rwlock;
 
 	/*
 	 * Increment the writers value (other readers are doing the same, make
@@ -266,13 +258,12 @@ __wt_readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
  *	Try to get an exclusive lock, fail immediately if unavailable.
  */
 int
-__wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+__wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 {
-	wt_rwlock_t *l, new, old;
+	WT_RWLOCK new, old;
 
 	WT_STAT_CONN_INCR(session, rwlock_write);
 
-	l = &rwlock->rwlock;
 	old = new = *l;
 
 	/*
@@ -296,15 +287,12 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
  *	Wait to get an exclusive lock.
  */
 void
-__wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+__wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 {
-	wt_rwlock_t *l;
 	uint16_t ticket;
 	int pause_cnt;
 
 	WT_STAT_CONN_INCR(session, rwlock_write);
-
-	l = &rwlock->rwlock;
 
 	/*
 	 * Possibly wrap: if we have more than 64K lockers waiting, the ticket
@@ -338,13 +326,12 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
  *	Release an exclusive lock.
  */
 void
-__wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+__wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 {
-	wt_rwlock_t *l, new;
+	WT_RWLOCK new;
 
 	WT_UNUSED(session);
 
-	l = &rwlock->rwlock;
 	(void)__wt_atomic_sub16(&l->s.writers_active, 1);
 
 	/*
@@ -368,39 +355,15 @@ __wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	WT_DIAGNOSTIC_YIELD;
 }
 
-/*
- * __wt_rwlock_destroy --
- *	Destroy a read/write lock.
- */
-void
-__wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp)
-{
-	WT_RWLOCK *rwlock;
-
-	rwlock = *rwlockp;		/* Clear our caller's reference. */
-	if (rwlock == NULL)
-		return;
-	*rwlockp = NULL;
-
-	__wt_verbose(
-	    session, WT_VERB_MUTEX, "rwlock: destroy %s", rwlock->name);
-
-	__wt_free(session, rwlock);
-}
-
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_rwlock_islocked --
  *	Return if a read/write lock is currently locked for reading or writing.
  */
 bool
-__wt_rwlock_islocked(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+__wt_rwlock_islocked(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 {
-	wt_rwlock_t *l;
-
 	WT_UNUSED(session);
-
-	l = &rwlock->rwlock;
 
 	return (l->s.writers != l->s.next || l->s.readers != l->s.next);
 }

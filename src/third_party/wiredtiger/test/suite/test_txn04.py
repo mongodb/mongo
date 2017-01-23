@@ -63,24 +63,15 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
     txn1s = [('t1c', dict(txn1='commit')), ('t1r', dict(txn1='rollback'))]
 
     scenarios = make_scenarios(types, op1s, txn1s)
-    # Overrides WiredTigerTestCase
-    def setUpConnectionOpen(self, dir):
-        self.home = dir
+
+    def conn_config(self):
         # Cycle through the different transaction_sync values in a
         # deterministic manner.
-        self.txn_sync = self.sync_list[
+        txn_sync = self.sync_list[
             self.scenario_number % len(self.sync_list)]
-        self.backup_dir = os.path.join(self.home, "WT_BACKUP")
         # Set archive false on the home directory.
-        conn_params = \
-                'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
-                'create,error_prefix="%s: ",' % self.shortid() + \
-                'transaction_sync="%s",' % self.txn_sync
-        # print "Creating conn at '%s' with config '%s'" % (dir, conn_params)
-        conn = self.wiredtiger_open(dir, conn_params)
-        self.pr(`conn`)
-        self.session2 = conn.open_session()
-        return conn
+        return 'log=(archive=false,enabled,file_max=%s),' % self.logmax + \
+            'transaction_sync="%s",' % txn_sync
 
     # Check that a cursor (optionally started in a new transaction), sees the
     # expected values.
@@ -146,6 +137,7 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
             # The runWt command closes our connection and sessions so
             # we need to reopen them here.
             self.hot_backup(None, committed)
+            self.session2 = self.conn.open_session()
             c = self.session.open_cursor(self.uri, None, 'overwrite')
             c.set_value(1)
             # Then do the given modification.
@@ -193,6 +185,8 @@ class test_txn04(wttest.WiredTigerTestCase, suite_subprocess):
         self.hot_backup(self.uri, committed)
 
     def test_ops(self):
+        self.backup_dir = os.path.join(self.home, "WT_BACKUP")
+        self.session2 = self.conn.open_session()
         with self.expectedStdoutPattern('recreating metadata'):
             self.ops()
 

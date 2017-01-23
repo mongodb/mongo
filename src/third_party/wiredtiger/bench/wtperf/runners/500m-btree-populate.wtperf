@@ -9,7 +9,7 @@
 #
 # This generates about 80 Gb of uncompressed data.  But it should compress
 # well and be small on disk.
-conn_config="cache_size=16G,checkpoint=(wait=60,log_size=2GB),session_max=20000,log=(enabled),statistics=(fast),statistics_log=(wait=30,json),eviction=(threads_max=4)"
+conn_config="cache_size=16G,checkpoint=(wait=60,log_size=2GB),session_max=20000,log=(enabled),statistics=(fast),statistics_log=(wait=30,json),eviction=(threads_max=8)"
 compact=true
 compression="snappy"
 sess_config="isolation=snapshot"

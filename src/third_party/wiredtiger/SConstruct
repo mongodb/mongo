@@ -313,6 +313,7 @@ wtbin = env.Program("wt", [
     "src/utilities/util_rename.c",
     "src/utilities/util_salvage.c",
     "src/utilities/util_stat.c",
+    "src/utilities/util_truncate.c",
     "src/utilities/util_upgrade.c",
     "src/utilities/util_verbose.c",
     "src/utilities/util_verify.c",

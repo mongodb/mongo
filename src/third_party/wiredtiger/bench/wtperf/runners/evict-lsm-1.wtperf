@@ -1,5 +1,5 @@
 # wtperf options file: evict lsm configuration
-conn_config="cache_size=50M,lsm_manager=(worker_thread_max=6)"
+conn_config="cache_size=50M,eviction=(threads_max=1),lsm_manager=(worker_thread_max=6)"
 table_config="type=lsm,lsm=(chunk_size=2M),os_cache_dirty_max=16MB"
 compact=true
 icount=10000000

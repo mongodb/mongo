@@ -368,14 +368,16 @@ __wt_txn_checkpoint_log(
 
 		/*
 		 * If this full checkpoint completed successfully and there is
-		 * no hot backup in progress, tell the logging subsystem the
-		 * checkpoint LSN so that it can archive.  Do not update the
-		 * logging checkpoint LSN if this is during a clean connection
-		 * close, only during a full checkpoint.  A clean close may not
-		 * update any metadata LSN and we do not want to archive in
-		 * that case.
+		 * no hot backup in progress and this is not recovery, tell
+		 * the logging subsystem the checkpoint LSN so that it can
+		 * archive.  Do not update the logging checkpoint LSN if this
+		 * is during a clean connection close, only during a full
+		 * checkpoint.  A clean close may not update any metadata LSN
+		 * and we do not want to archive in that case.
 		 */
-		if (!S2C(session)->hot_backup && txn->full_ckpt)
+		if (!S2C(session)->hot_backup &&
+		    !F_ISSET(S2C(session), WT_CONN_RECOVERING) &&
+		    txn->full_ckpt)
 			__wt_log_ckpt(session, ckpt_lsn);
 
 		/* FALLTHROUGH */

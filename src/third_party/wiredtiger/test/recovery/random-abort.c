@@ -31,9 +31,13 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-static char home[512];			/* Program working dir */
+static char home[1024];			/* Program working dir */
 static const char *progname;		/* Program name */
+/*
+ * These two names for the URI and file system must be maintained in tandem.
+ */
 static const char * const uri = "table:main";
+static const char * const fs_main = "main.wt";
 static bool inmem;
 
 #define	MAX_TH	12
@@ -211,6 +215,7 @@ extern char *__wt_optarg;
 int
 main(int argc, char *argv[])
 {
+	struct stat sb;
 	FILE *fp;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
@@ -222,7 +227,7 @@ main(int argc, char *argv[])
 	pid_t pid;
 	bool fatal, rand_th, rand_time, verify_only;
 	const char *working_dir;
-	char fname[64], kname[64];
+	char fname[64], kname[64], statname[1024];
 
 	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
 		progname = argv[0];
@@ -263,7 +268,7 @@ main(int argc, char *argv[])
 	if (argc != 0)
 		usage();
 
-	testutil_work_dir_from_path(home, 512, working_dir);
+	testutil_work_dir_from_path(home, sizeof(home), working_dir);
 	/*
 	 * If the user wants to verify they need to tell us how many threads
 	 * there were so we can find the old record files.
@@ -305,8 +310,15 @@ main(int argc, char *argv[])
 		/* parent */
 		/*
 		 * Sleep for the configured amount of time before killing
-		 * the child.
+		 * the child.  Start the timeout from the time we notice that
+		 * the table has been created.  That allows the test to run
+		 * correctly on really slow machines.  Verify the process ID
+		 * still exists in case the child aborts for some reason we
+		 * don't stay in this loop forever.
 		 */
+		snprintf(statname, sizeof(statname), "%s/%s", home, fs_main);
+		while (stat(statname, &sb) != 0 && kill(pid, 0) == 0)
+			sleep(1);
 		sleep(timeout);
 
 		/*
@@ -340,11 +352,8 @@ main(int argc, char *argv[])
 	for (i = 0; i < nth; ++i) {
 		middle = 0;
 		snprintf(fname, sizeof(fname), RECORDS_FILE, i);
-		if ((fp = fopen(fname, "r")) == NULL) {
-			fprintf(stderr,
-			    "Failed to open %s. i %" PRIu32 "\n", fname, i);
-			testutil_die(errno, "fopen");
-		}
+		if ((fp = fopen(fname, "r")) == NULL)
+			testutil_die(errno, "fopen: %s", fname);
 
 		/*
 		 * For every key in the saved file, verify that the key exists

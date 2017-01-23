@@ -64,8 +64,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_spin_init(session, &conn->turtle_lock, "turtle file"));
 
 	/* Read-write locks */
-	WT_RET(__wt_rwlock_alloc(
-	    session, &conn->hot_backup_lock, "hot backup"));
+	__wt_rwlock_init(session, &conn->hot_backup_lock);
 
 	WT_RET(__wt_calloc_def(session, WT_PAGE_LOCKS, &conn->page_lock));
 	for (i = 0; i < WT_PAGE_LOCKS; ++i)

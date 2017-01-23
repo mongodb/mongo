@@ -42,7 +42,7 @@
  *	A handle for a generic named data source.
  */
 struct __wt_data_handle {
-	WT_RWLOCK *rwlock;		/* Lock for shared/exclusive ops */
+	WT_RWLOCK rwlock;		/* Lock for shared/exclusive ops */
 	TAILQ_ENTRY(__wt_data_handle) q;
 	TAILQ_ENTRY(__wt_data_handle) hashq;
 

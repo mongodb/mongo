@@ -300,3 +300,22 @@ __wt_spin_lock_track(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 	} else
 		__wt_spin_lock(session, t);
 }
+
+/*
+ * __wt_spin_trylock_track --
+ *      Try to lock a spinlock or fail immediately if it is busy.
+ *      Track if successful.
+ */
+static inline int
+__wt_spin_trylock_track(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
+{
+	int64_t **stats;
+
+	if (t->stat_count_off != -1 && WT_STAT_ENABLED(session)) {
+		WT_RET(__wt_spin_trylock(session, t));
+		stats = (int64_t **)S2C(session)->stats;
+		stats[session->stat_bucket][t->stat_count_off]++;
+		return (0);
+	} else
+		return (__wt_spin_trylock(session, t));
+}

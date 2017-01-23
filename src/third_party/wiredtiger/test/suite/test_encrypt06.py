@@ -89,38 +89,15 @@ class test_encrypt06(wttest.WiredTigerTestCase):
     scenarios = make_scenarios(encrypt, storagetype)
     nrecords = 1000
 
-    # Override WiredTigerTestCase, we have extensions.
-    def setUpConnectionOpen(self, dir):
-        encarg = 'encryption=(name={0}{1}),'.format(
-            self.sys_encrypt, self.sys_encrypt_args)
-        comparg = ''
-        extarg = self.extensionArg([('encryptors', self.sys_encrypt),
-            ('encryptors', self.file0_encrypt),
-            ('encryptors', self.file1_encrypt)])
-        self.open_params = 'create,error_prefix="{0}: ",{1}{2}{3}'.format(
-                self.shortid(), encarg, comparg, extarg)
-        conn = self.wiredtiger_open(dir, self.open_params)
-        self.pr(`conn`)
-        return conn
+    def conn_extensions(self, extlist):
+        extlist.skip_if_missing = True
+        extlist.extension('encryptors', self.sys_encrypt)
+        extlist.extension('encryptors', self.file0_encrypt)
+        extlist.extension('encryptors', self.file1_encrypt)
 
-    # Return the wiredtiger_open extension argument for a shared library.
-    def extensionArg(self, exts):
-        extfiles = []
-        for ext in exts:
-            (dirname, name) = ext
-            if name != None and name != 'none':
-                testdir = os.path.dirname(__file__)
-                extdir = os.path.join(run.wt_builddir, 'ext', dirname)
-                extfile = os.path.join(
-                    extdir, name, '.libs', 'libwiredtiger_' + name + '.so')
-                if not os.path.exists(extfile):
-                    self.skipTest('extension "' + extfile + '" not built')
-                if not extfile in extfiles:
-                    extfiles.append(extfile)
-        if len(extfiles) == 0:
-            return ''
-        else:
-            return ',extensions=["' + '","'.join(extfiles) + '"]'
+    def conn_config(self):
+        return 'encryption=(name={0}{1}),'.format(
+            self.sys_encrypt, self.sys_encrypt_args)
 
     def encrypt_file_params(self, name, args):
         if name == None:
