@@ -80,13 +80,13 @@ main(int argc, char *argv[])
 	testutil_check(session->open_cursor(session, opts->uri, NULL, NULL,
 	    &cursor));
 	testutil_check(cursor->next(cursor));
-	cursor->get_key(cursor, &kstr);
-	cursor->get_value(cursor, &vstr);
+	testutil_check(cursor->get_key(cursor, &kstr));
+	testutil_check(cursor->get_value(cursor, &vstr));
 	testutil_assert(strcmp(kstr, "a") == 0);
 	testutil_assert(strcmp(vstr, "0") == 0);
 	testutil_check(cursor->next(cursor));
-	cursor->get_key(cursor, &kstr);
-	cursor->get_value(cursor, &vstr);
+	testutil_check(cursor->get_key(cursor, &kstr));
+	testutil_check(cursor->get_value(cursor, &vstr));
 	testutil_assert(strcmp(kstr, "b") == 0);
 	testutil_assert(strcmp(vstr, "1") == 0);
 	testutil_assert(cursor->next(cursor) == WT_NOTFOUND);
