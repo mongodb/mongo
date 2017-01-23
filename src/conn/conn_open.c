@@ -159,15 +159,6 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	/* Discard transaction state. */
 	__wt_txn_global_destroy(session);
 
-	/* Close extensions, first calling any unload entry point. */
-	while ((dlh = TAILQ_FIRST(&conn->dlhqh)) != NULL) {
-		TAILQ_REMOVE(&conn->dlhqh, dlh, q);
-
-		if (dlh->terminate != NULL)
-			WT_TRET(dlh->terminate(wt_conn));
-		WT_TRET(__wt_dlclose(session, dlh));
-	}
-
 	/* Close the lock file, opening up the database to other connections. */
 	if (conn->lock_fh != NULL)
 		WT_TRET(__wt_close(session, &conn->lock_fh));
@@ -199,8 +190,22 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 				__wt_free(session, s->hazard);
 			}
 
+	/* Destroy the file-system configuration. */
+	if (conn->file_system != NULL && conn->file_system->terminate != NULL)
+		WT_TRET(conn->file_system->terminate(
+		    conn->file_system, (WT_SESSION *)session));
+
+	/* Close extensions, first calling any unload entry point. */
+	while ((dlh = TAILQ_FIRST(&conn->dlhqh)) != NULL) {
+		TAILQ_REMOVE(&conn->dlhqh, dlh, q);
+
+		if (dlh->terminate != NULL)
+			WT_TRET(dlh->terminate(wt_conn));
+		WT_TRET(__wt_dlclose(session, dlh));
+	}
+
 	/* Destroy the handle. */
-	WT_TRET(__wt_connection_destroy(conn));
+	__wt_connection_destroy(conn);
 
 	return (ret);
 }
