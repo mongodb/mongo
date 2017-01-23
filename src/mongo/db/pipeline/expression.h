@@ -585,6 +585,15 @@ public:
 };
 
 
+class ExpressionArrayToObject final : public ExpressionFixedArity<ExpressionArrayToObject, 1> {
+public:
+    explicit ExpressionArrayToObject(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : ExpressionFixedArity<ExpressionArrayToObject, 1>(expCtx) {}
+
+    Value evaluateInternal(Variables* vars) const final;
+    const char* getOpName() const final;
+};
+
 class ExpressionCeil final : public ExpressionSingleNumericArg<ExpressionCeil> {
 public:
     explicit ExpressionCeil(const boost::intrusive_ptr<ExpressionContext>& expCtx)
