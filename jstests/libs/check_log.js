@@ -11,6 +11,19 @@ var checkLog;
     }
 
     checkLog = (function() {
+        var getGlobalLog = function(conn) {
+            var cmdRes;
+            try {
+                cmdRes = conn.adminCommand({getLog: 'global'});
+            } catch (e) {
+                // Retry with network errors.
+                print("checkLog ignoring failure: " + e);
+                return null;
+            }
+
+            return assert.commandWorked(cmdRes).log;
+        };
+
         /*
          * Calls the 'getLog' function at regular intervals on the provided connection 'conn' until
          * the provided 'msg' is found in the logs, or 5 minutes have elapsed. Throws an exception
@@ -19,8 +32,10 @@ var checkLog;
         var contains = function(conn, msg) {
             assert.soon(
                 function() {
-                    var logMessages =
-                        assert.commandWorked(conn.adminCommand({getLog: 'global'})).log;
+                    var logMessages = getGlobalLog(conn);
+                    if (logMessages === null) {
+                        return false;
+                    }
                     for (var i = 0; i < logMessages.length; i++) {
                         if (logMessages[i].indexOf(msg) != -1) {
                             return true;
@@ -43,8 +58,10 @@ var checkLog;
             var count = 0;
             assert.soon(
                 function() {
-                    var logMessages =
-                        assert.commandWorked(conn.adminCommand({getLog: 'global'})).log;
+                    var logMessages = getGlobalLog(conn);
+                    if (logMessages === null) {
+                        return false;
+                    }
                     for (var i = 0; i < logMessages.length; i++) {
                         if (logMessages[i].indexOf(msg) != -1) {
                             count++;
