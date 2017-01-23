@@ -9,7 +9,7 @@ var master = replTest.getPrimary();
 var mdb = master.getDB("test");
 
 // synchronize replication
-assert.writeOK(mdb.foo.insert({_id: "1"}, {writeConcern: {w: 3, wtimeout: 30000}}));
+assert.writeOK(mdb.foo.insert({_id: "1"}, {writeConcern: {w: 3, wtimeout: 5 * 60 * 1000}}));
 
 var gle = master.getDB("test").runCommand({getLastError: 1, j: true});
 print('Trying j=true');
@@ -51,7 +51,7 @@ replTest.stop(2);
 master = replTest.getPrimary();
 mdb = master.getDB("test");
 // do w:2 write so secondary is caught up before calling {gle w:3}.
-assert.writeOK(mdb.foo.insert({_id: "3"}, {writeConcern: {w: 2, wtimeout: 30000}}));
+assert.writeOK(mdb.foo.insert({_id: "3"}, {writeConcern: {w: 2, wtimeout: 5 * 60 * 1000}}));
 gle = mdb.getLastErrorObj(3, 1000);
 print('Trying w=3 with 2 nodes up, 1000ms timeout.');
 printjson(gle);
