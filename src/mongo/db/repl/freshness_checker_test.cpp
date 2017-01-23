@@ -277,7 +277,8 @@ TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshest) {
 
     stopCapturingLogMessages();
     ASSERT_EQUALS(shouldAbortElection(), FreshnessChecker::FresherNodeFound);
-    ASSERT_EQUALS(1, countLogLinesContaining("not electing self, we are not freshest"));
+    ASSERT_EQUALS(
+        1, countLogLinesContaining("not electing self, h1:27017 knows a node is fresher than us"));
 }
 
 TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshestOpTime) {
@@ -503,7 +504,8 @@ TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshestManyNodes) {
     waitOnChecker();
     stopCapturingLogMessages();
     ASSERT_EQUALS(shouldAbortElection(), FreshnessChecker::FresherNodeFound);
-    ASSERT_EQUALS(1, countLogLinesContaining("not electing self, we are not freshest"));
+    ASSERT_EQUALS(
+        1, countLogLinesContaining("not electing self, h1:27017 knows a node is fresher than us"));
 }
 
 TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshestOpTimeManyNodes) {

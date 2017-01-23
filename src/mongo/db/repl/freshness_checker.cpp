@@ -149,7 +149,8 @@ void FreshnessChecker::Algorithm::processResponse(const RemoteCommandRequest& re
     LOG(2) << "FreshnessChecker: Got response from " << request.target << " of " << res;
 
     if (res["fresher"].trueValue()) {
-        log() << "not electing self, we are not freshest";
+        log() << "not electing self, " << request.target.toString()
+              << " knows a node is fresher than us";
         _abortReason = FresherNodeFound;
         return;
     }
@@ -162,10 +163,15 @@ void FreshnessChecker::Algorithm::processResponse(const RemoteCommandRequest& re
     }
     Timestamp remoteTime(res["opTime"].date());
     if (remoteTime == _lastOpTimeApplied) {
+        log() << "not electing self, " << request.target.toString()
+              << " has same OpTime as us: " << remoteTime.toBSON();
         _abortReason = FreshnessTie;
     }
     if (remoteTime > _lastOpTimeApplied) {
         // something really wrong (rogue command?)
+        log() << "not electing self, " << request.target.toString()
+              << " has newer OpTime than us. Our OpTime: " << _lastOpTimeApplied.toBSON()
+              << ", their OpTime: " << remoteTime.toBSON();
         _abortReason = FresherNodeFound;
         return;
     }
