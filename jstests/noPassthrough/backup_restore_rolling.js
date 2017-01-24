@@ -22,6 +22,12 @@ load("jstests/noPassthrough/libs/backup_restore.js");
     // Grab the storage engine, default is wiredTiger
     var storageEngine = jsTest.options().storageEngine || "wiredTiger";
 
+    // Skip this test if not running with the "wiredTiger" storage engine.
+    if (storageEngine !== 'wiredTiger') {
+        jsTest.log('Skipping test because storageEngine is not "wiredTiger"');
+        return;
+    }
+
     // if rsync is not available on the host, then this test is skipped
     if (!runProgram('bash', '-c', 'which rsync')) {
         new BackupRestoreTest({
