@@ -19,7 +19,7 @@ __log_slot_dump(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
-	int32_t earliest, i;
+	int earliest, i;
 
 	conn = S2C(session);
 	log = conn->log;
@@ -39,9 +39,9 @@ __log_slot_dump(WT_SESSION_IMPL *session)
 		__wt_errx(session, "    Release LSN: %" PRIu32 "/%" PRIu32,
 		    slot->slot_release_lsn.l.file,
 		    slot->slot_release_lsn.l.offset);
-		__wt_errx(session, "    Offset: start: %" PRIu32
-		    " last:%" PRIu32, (uint32_t)slot->slot_start_offset,
-		    (uint32_t)slot->slot_last_offset);
+		__wt_errx(session, "    Offset: start: %" PRIuMAX
+		    " last:%" PRIuMAX, (uintmax_t)slot->slot_start_offset,
+		    (uintmax_t)slot->slot_last_offset);
 		__wt_errx(session, "    Unbuffered: %" PRId64
 		    " error: %" PRId32, slot->slot_unbuffered,
 		    slot->slot_error);
