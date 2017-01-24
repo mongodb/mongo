@@ -254,6 +254,7 @@ struct __wt_log {
 #define	WT_SLOT_POOL	128
 	WT_LOGSLOT	*active_slot;			/* Active slot */
 	WT_LOGSLOT	 slot_pool[WT_SLOT_POOL];	/* Pool of all slots */
+	int32_t		 pool_index;		/* Index into slot pool */
 	size_t		 slot_buf_size;		/* Buffer size for slots */
 #ifdef HAVE_DIAGNOSTIC
 	uint64_t	 write_calls;		/* Calls to log_write */
