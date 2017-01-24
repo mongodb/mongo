@@ -1483,6 +1483,19 @@ tasks:
       <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz --storageEngine=wiredTiger
 
+## jstestfuzz concurrent mmapv1 ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_concurrent
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 75
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz --storageEngine=mmapv1 --numClientsPerFixture=10
+
 ## jstestfuzz concurrent WT ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_WT
@@ -1496,6 +1509,19 @@ tasks:
       <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz --storageEngine=wiredTiger --numClientsPerFixture=10
 
+## jstestfuzz concurrent replica set mmapv1 ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_concurrent_replication
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 75
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz_replication --storageEngine=mmapv1 --numClientsPerFixture=10
+
 ## jstestfuzz concurrent replica set WT ##
 - <<: *jstestfuzz_template
   name: jstestfuzz_concurrent_replication_WT
@@ -1508,6 +1534,19 @@ tasks:
     vars:
       <<: *jstestfuzz_config_vars
       resmoke_args: --suites=jstestfuzz_replication --storageEngine=wiredTiger --numClientsPerFixture=10
+
+## jstestfuzz concurrent sharded cluster mmapv1 ##
+- <<: *jstestfuzz_template
+  name: jstestfuzz_concurrent_sharded
+  commands:
+  - func: "do setup"
+  - func: "run jstestfuzz"
+    vars:
+      jstestfuzz_vars: --numGeneratedFiles 75
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      resmoke_args: --suites=jstestfuzz_sharded --storageEngine=mmapv1 --numClientsPerFixture=10
 
 ## jstestfuzz concurrent sharded cluster WT ##
 - <<: *jstestfuzz_template
@@ -3464,8 +3503,11 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -3705,8 +3747,11 @@ buildvariants:
   - name: jsCore_small_oplog_rs
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -3858,8 +3903,11 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -3987,8 +4035,11 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -4107,8 +4158,11 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -4548,8 +4602,11 @@ buildvariants:
   - name: jsCore_decimal_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -4654,8 +4711,11 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -4773,8 +4833,11 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -4883,8 +4946,11 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -5127,8 +5193,11 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -5194,8 +5263,11 @@ buildvariants:
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
   - name: jstestfuzz
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
@@ -5256,8 +5328,11 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -5388,8 +5463,11 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -5487,8 +5565,11 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -5602,8 +5683,11 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -5743,8 +5827,11 @@ buildvariants:
     - rhel62-large
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -6114,8 +6201,11 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -6203,8 +6293,11 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -6324,8 +6417,11 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -6716,8 +6812,11 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -6785,8 +6884,11 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -6845,8 +6947,11 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -6929,8 +7034,11 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -7112,8 +7220,11 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -7205,8 +7316,11 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -7380,8 +7494,11 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -7488,8 +7605,11 @@ buildvariants:
   - name: jsCore_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -7569,8 +7689,11 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -7629,8 +7752,11 @@ buildvariants:
   - name: jsCore_auth
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -7715,8 +7841,11 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -7838,8 +7967,11 @@ buildvariants:
   - name: jsCore_small_oplog_rs_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
@@ -8479,8 +8611,11 @@ buildvariants:
   - name: compile_all
   - name: jstestfuzz
   - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication
   - name: jstestfuzz_replication_WT
