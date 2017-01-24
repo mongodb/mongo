@@ -49,7 +49,7 @@ var bulk = masterDB.getCollection(collection).initializeUnorderedBulkOp();
 for (i = 0; i < size; ++i) {
     bulk.insert({i: Random.rand()});
 }
-assert.writeOK(bulk.execute());
+assert.writeOK(bulk.execute({w: 2, wtimeout: replTest.kDefaultTimeoutMS}));
 
 jsTest.log("Starting background indexing for test of: " + tojson(dc));
 // Add another index to be sure the drop command works.
