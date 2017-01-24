@@ -83,7 +83,7 @@ BSONElement extractElementAtPathOrArrayAlongPath(const BSONObj& obj, const char*
  * and array elements.
  *
  * This function fills 'arrayComponents' with the positions (starting at 0) of 'path' corresponding
- * to array values with multiple elements.
+ * to array values.
  *
  * Some examples:
  *

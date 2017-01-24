@@ -428,7 +428,23 @@ void BtreeKeyGeneratorV1::getKeysImplWithArray(
         }
         keys->insert(b.obj());
     } else if (arrElt.embeddedObject().firstElement().eoo()) {
-        // Empty array, so set matching fields to undefined.
+        // We've encountered an empty array.
+        if (multikeyPaths && mayExpandArrayUnembedded) {
+            // Any indexed path which traverses through the empty array must be recorded as an array
+            // component.
+            for (auto i : arrIdxs) {
+                // We need to determine which component of the indexed field causes the index to be
+                // multikey as a result of the empty array. Indexed empty arrays are considered
+                // multikey and may occur mid-path. For instance, the indexed path "a.b.c" has
+                // multikey components {0, 1} given the document {a: [{b: []}, {b: 1}]}.
+                size_t fullPathLength = _pathLengths[i];
+                size_t suffixPathLength = FieldRef{fieldNames[i]}.numParts();
+                invariant(suffixPathLength < fullPathLength);
+                arrComponents[i] = fullPathLength - suffixPathLength - 1;
+            }
+        }
+
+        // For an empty array, set matching fields to undefined.
         _getKeysArrEltFixed(&fieldNames,
                             &fixed,
                             undefinedElt,
@@ -510,7 +526,6 @@ void BtreeKeyGeneratorV1::getKeysImplWithArray(
         }
 
         // Generate a key for each element of the indexed array.
-        size_t nArrObjFields = 0;
         for (const auto arrObjElem : arrObj) {
             _getKeysArrEltFixed(&fieldNames,
                                 &fixed,
@@ -522,16 +537,14 @@ void BtreeKeyGeneratorV1::getKeysImplWithArray(
                                 mayExpandArrayUnembedded,
                                 subPositionalInfo,
                                 multikeyPaths);
-            ++nArrObjFields;
         }
+    }
 
-        if (multikeyPaths && nArrObjFields > 1) {
-            // The 'arrElt' array value contains multiple elements, so we say that it causes the
-            // index to be multikey.
-            for (size_t i = 0; i < arrComponents.size(); ++i) {
-                if (auto arrComponent = arrComponents[i]) {
-                    (*multikeyPaths)[i].insert(*arrComponent);
-                }
+    // Record multikey path components.
+    if (multikeyPaths) {
+        for (size_t i = 0; i < arrComponents.size(); ++i) {
+            if (auto arrComponent = arrComponents[i]) {
+                (*multikeyPaths)[i].insert(*arrComponent);
             }
         }
     }

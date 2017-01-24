@@ -86,7 +86,6 @@ void _extractAllElementsAlongPath(const BSONObj& obj,
                                                  depth + 1,
                                                  arrayComponents);
                 } else {
-                    size_t nArrElems = 0;
                     BSONObjIterator i(e.embeddedObject());
                     while (i.more()) {
                         BSONElement e2 = i.next();
@@ -97,9 +96,8 @@ void _extractAllElementsAlongPath(const BSONObj& obj,
                                                          expandArrayOnTrailingField,
                                                          depth + 1,
                                                          arrayComponents);
-                        ++nArrElems;
                     }
-                    if (arrayComponents && nArrElems > 1) {
+                    if (arrayComponents) {
                         arrayComponents->insert(depth);
                     }
                 }
@@ -109,13 +107,11 @@ void _extractAllElementsAlongPath(const BSONObj& obj,
         }
     } else {
         if (e.type() == Array && expandArrayOnTrailingField) {
-            size_t nArrElems = 0;
             BSONObjIterator i(e.embeddedObject());
             while (i.more()) {
                 elements.insert(i.next());
-                ++nArrElems;
             }
-            if (arrayComponents && nArrElems > 1) {
+            if (arrayComponents) {
                 arrayComponents->insert(depth);
             }
         } else {

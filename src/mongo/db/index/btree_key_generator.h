@@ -143,18 +143,17 @@ private:
         // The array to which 'positionallyIndexedElt' belongs.
         BSONObj arrayObj;
 
-        // If we find a positionally indexed element, we traverse the remainder of the path
-        // until we find either another array element or the end of the path. The result of
-        // this traversal (implemented using extractAllElementsAlongPath()), is stored here and used
-        // during the recursive call for each array element.
+        // If we find a positionally indexed element, we traverse the remainder of the path until we
+        // find either another array element or the end of the path. The result of this traversal is
+        // stored here and used during the recursive call for each array element.
         //
         // Example:
         //   Suppose we have key pattern {"a.1.b.0.c": 1}. The document for which we are
         //   generating keys is {a: [0, {b: [{c: 99}]}]}. We will find that {b: [{c: 99}]}
         //   is a positionally indexed element and store it as 'positionallyIndexedElt'.
         //
-        //   We then call extractAllElementsAlongPath() to traverse the remainder of the path,
-        //   "b.1.c". The result is the array [{c: 99}] which is stored here as 'dottedElt'.
+        //   We then traverse the remainder of the path, "b.0.c", until encountering an array. The
+        //   result is the array [{c: 99}] which is stored here as 'dottedElt'.
         BSONElement dottedElt;
 
         // The remaining path that must be traversed in 'dottedElt' to find the indexed
@@ -197,8 +196,9 @@ private:
                               const std::vector<PositionalPathInfo>& positionalInfo,
                               MultikeyPaths* multikeyPaths) const;
     /**
-     * A call to getKeysImplWithArray() begins by calling this for each field in the key
-     * pattern. It uses extractAllElementsAlongPath() to traverse the path '*field' in 'obj'.
+     * A call to getKeysImplWithArray() begins by calling this for each field in the key pattern. It
+     * traverses the path '*field' in 'obj' until either reaching the end of the path or an array
+     * element.
      *
      * The 'positionalInfo' arg is used for handling a field path where 'obj' has an
      * array indexed by position. See the comments for PositionalPathInfo for more detail.

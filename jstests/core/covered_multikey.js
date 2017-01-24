@@ -1,5 +1,5 @@
 /**
- * Test queries over a multikey index that can be covered.
+ * Test covering behavior for queries over a multikey index.
  */
 (function() {
     "use strict";
@@ -45,4 +45,72 @@
     } else {
         assert(!planHasStage(explainRes.queryPlanner.winningPlan, "FETCH"));
     }
+
+    // Verify that a query cannot be covered over a path which is multikey due to an empty array.
+    coll.drop();
+    assert.writeOK(coll.insert({a: []}));
+    assert.commandWorked(coll.createIndex({a: 1}));
+    assert.eq({a: []}, coll.findOne({a: []}, {_id: 0, a: 1}));
+    explainRes = coll.explain("queryPlanner").find({a: []}, {_id: 0, a: 1}).finish();
+    assert(planHasStage(explainRes.queryPlanner.winningPlan, "IXSCAN"));
+    assert(planHasStage(explainRes.queryPlanner.winningPlan, "FETCH"));
+    let ixscanStage = getPlanStage(explainRes.queryPlanner.winningPlan, "IXSCAN");
+    assert.eq(true, ixscanStage.isMultiKey);
+
+    // Verify that a query cannot be covered over a path which is multikey due to a single-element
+    // array.
+    coll.drop();
+    assert.writeOK(coll.insert({a: [2]}));
+    assert.commandWorked(coll.createIndex({a: 1}));
+    assert.eq({a: [2]}, coll.findOne({a: 2}, {_id: 0, a: 1}));
+    explainRes = coll.explain("queryPlanner").find({a: 2}, {_id: 0, a: 1}).finish();
+    assert(planHasStage(explainRes.queryPlanner.winningPlan, "IXSCAN"));
+    assert(planHasStage(explainRes.queryPlanner.winningPlan, "FETCH"));
+    ixscanStage = getPlanStage(explainRes.queryPlanner.winningPlan, "IXSCAN");
+    assert.eq(true, ixscanStage.isMultiKey);
+
+    // Verify that a query cannot be covered over a path which is multikey due to a single-element
+    // array, where the path is made multikey by an update rather than an insert.
+    coll.drop();
+    assert.writeOK(coll.insert({a: 2}));
+    assert.commandWorked(coll.createIndex({a: 1}));
+    assert.writeOK(coll.update({}, {$set: {a: [2]}}));
+    assert.eq({a: [2]}, coll.findOne({a: 2}, {_id: 0, a: 1}));
+    explainRes = coll.explain("queryPlanner").find({a: 2}, {_id: 0, a: 1}).finish();
+    assert(planHasStage(explainRes.queryPlanner.winningPlan, "IXSCAN"));
+    assert(planHasStage(explainRes.queryPlanner.winningPlan, "FETCH"));
+    ixscanStage = getPlanStage(explainRes.queryPlanner.winningPlan, "IXSCAN");
+    assert.eq(true, ixscanStage.isMultiKey);
+
+    // Verify that a trailing empty array makes a 2dsphere index multikey.
+    coll.drop();
+    assert.commandWorked(coll.createIndex({"a.b": 1, c: "2dsphere"}));
+    assert.writeOK(coll.insert({a: {b: 1}, c: {type: "Point", coordinates: [0, 0]}}));
+    explainRes = coll.explain().find().hint({"a.b": 1, c: "2dsphere"}).finish();
+    ixscanStage = getPlanStage(explainRes.queryPlanner.winningPlan, "IXSCAN");
+    assert.neq(null, ixscanStage);
+    assert.eq(false, ixscanStage.isMultiKey);
+    assert.writeOK(coll.insert({a: {b: []}, c: {type: "Point", coordinates: [0, 0]}}));
+    explainRes = coll.explain().find().hint({"a.b": 1, c: "2dsphere"}).finish();
+    ixscanStage = getPlanStage(explainRes.queryPlanner.winningPlan, "IXSCAN");
+    assert.neq(null, ixscanStage);
+    assert.eq(true, ixscanStage.isMultiKey);
+
+    // Verify that a mid-path empty array makes a 2dsphere index multikey.
+    coll.drop();
+    assert.commandWorked(coll.createIndex({"a.b": 1, c: "2dsphere"}));
+    assert.writeOK(coll.insert({a: [], c: {type: "Point", coordinates: [0, 0]}}));
+    explainRes = coll.explain().find().hint({"a.b": 1, c: "2dsphere"}).finish();
+    ixscanStage = getPlanStage(explainRes.queryPlanner.winningPlan, "IXSCAN");
+    assert.neq(null, ixscanStage);
+    assert.eq(true, ixscanStage.isMultiKey);
+
+    // Verify that a single-element array makes a 2dsphere index multikey.
+    coll.drop();
+    assert.commandWorked(coll.createIndex({"a.b": 1, c: "2dsphere"}));
+    assert.writeOK(coll.insert({a: {b: [3]}, c: {type: "Point", coordinates: [0, 0]}}));
+    explainRes = coll.explain().find().hint({"a.b": 1, c: "2dsphere"}).finish();
+    ixscanStage = getPlanStage(explainRes.queryPlanner.winningPlan, "IXSCAN");
+    assert.neq(null, ixscanStage);
+    assert.eq(true, ixscanStage.isMultiKey);
 }());
