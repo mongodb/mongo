@@ -2395,6 +2395,24 @@ TEST_F(QueryPlannerTest, HintInvalid) {
     runInvalidQueryHint(BSONObj(), fromjson("{b: 1}"));
 }
 
+TEST_F(QueryPlannerTest, HintedBlockingSortIndexFilteredOut) {
+    params.options = QueryPlannerParams::NO_BLOCKING_SORT;
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1));
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {a: 1, b: 1}, sort: {b: 1}, hint: {a: 1}}"));
+    assertNumSolutions(0U);
+}
+
+TEST_F(QueryPlannerTest, HintedNotCoveredProjectionIndexFilteredOut) {
+    params.options = QueryPlannerParams::NO_UNCOVERED_PROJECTIONS;
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("a" << 1 << "b" << 1));
+    runQueryAsCommand(fromjson(
+        "{find: 'testns', filter: {a: 1}, projection: {a: 1, b: 1, _id: 0}, hint: {a: 1}}"));
+    assertNumSolutions(0U);
+}
+
 //
 // Sparse indices, SERVER-8067
 // Each index in this block of tests is sparse.

@@ -482,7 +482,7 @@ public:
 
             // This does mongod-specific stuff like creating the input PlanExecutor and adding
             // it to the front of the pipeline if needed.
-            PipelineD::prepareCursorSource(collection, pipeline);
+            PipelineD::prepareCursorSource(collection, &request, pipeline);
 
             // Create the PlanExecutor which returns results from the pipeline. The WorkingSet
             // ('ws') and the PipelineProxyStage ('proxy') will be owned by the created

@@ -1123,6 +1123,17 @@ TEST(QueryRequestTest, ConvertToAggregationWithExplainSucceeds) {
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
 }
 
+TEST(QueryRequestTest, ConvertToAggregationWithHintSucceeds) {
+    QueryRequest qr(testns);
+    qr.setHint(fromjson("{a_1: -1}"));
+    const auto aggCmd = qr.asAggregationCommand();
+    ASSERT_OK(aggCmd);
+
+    auto ar = AggregationRequest::parseFromBSON(testns, aggCmd.getValue());
+    ASSERT_OK(ar.getStatus());
+    ASSERT_BSONOBJ_EQ(qr.getHint(), ar.getValue().getHint());
+}
+
 TEST(QueryRequestTest, ConvertToAggregationWithMinFails) {
     QueryRequest qr(testns);
     qr.setMin(fromjson("{a: 1}"));
@@ -1164,12 +1175,6 @@ TEST(QueryRequestTest, ConvertToAggregationWithMaxScanFails) {
 TEST(QueryRequestTest, ConvertToAggregationWithReturnKeyFails) {
     QueryRequest qr(testns);
     qr.setReturnKey(true);
-    ASSERT_NOT_OK(qr.asAggregationCommand());
-}
-
-TEST(QueryRequestTest, ConvertToAggregationWithHintFails) {
-    QueryRequest qr(testns);
-    qr.setHint(fromjson("{a_1: -1}"));
     ASSERT_NOT_OK(qr.asAggregationCommand());
 }
 

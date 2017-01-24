@@ -54,6 +54,7 @@ const StringData AggregationRequest::kPipelineName = "pipeline"_sd;
 const StringData AggregationRequest::kCollationName = "collation"_sd;
 const StringData AggregationRequest::kExplainName = "explain"_sd;
 const StringData AggregationRequest::kAllowDiskUseName = "allowDiskUse"_sd;
+const StringData AggregationRequest::kHintName = "hint"_sd;
 
 const long long AggregationRequest::kDefaultBatchSize = 101;
 
@@ -119,6 +120,18 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(NamespaceString
                                       << typeName(elem.type())};
             }
             request.setCollation(elem.embeddedObject().getOwned());
+        } else if (kHintName == fieldName) {
+            if (BSONType::Object == elem.type()) {
+                request.setHint(elem.embeddedObject());
+            } else if (BSONType::String == elem.type()) {
+                request.setHint(BSON("$hint" << elem.valueStringData()));
+            } else {
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream()
+                                  << kHintName
+                                  << " must be specified as a string representing an index"
+                                  << " name, or an object representing an index's key pattern");
+            }
         } else if (kExplainName == fieldName) {
             if (elem.type() != BSONType::Bool) {
                 return {ErrorCodes::TypeMismatch,
@@ -176,7 +189,9 @@ Document AggregationRequest::serializeToCommandObj() const {
         // Only serialize a collation if one was specified.
         {kCollationName, _collation.isEmpty() ? Value() : Value(_collation)},
         // Only serialize batchSize when explain is false.
-        {kCursorName, _explain ? Value() : Value(Document{{kBatchSizeName, _batchSize}})}};
+        {kCursorName, _explain ? Value() : Value(Document{{kBatchSizeName, _batchSize}})},
+        // Only serialize a hint if one was specified.
+        {kHintName, _hint.isEmpty() ? Value() : Value(_hint)}};
 }
 
 }  // namespace mongo

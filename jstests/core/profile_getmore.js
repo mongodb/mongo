@@ -100,7 +100,7 @@
     }
     assert.commandWorked(coll.createIndex({a: 1}));
 
-    var cursor = coll.aggregate([{$match: {a: {$gte: 0}}}], {cursor: {batchSize: 0}});
+    var cursor = coll.aggregate([{$match: {a: {$gte: 0}}}], {cursor: {batchSize: 0}, hint: {a: 1}});
     var cursorId = getLatestProfilerEntry(testDB).cursorid;
     assert.neq(0, cursorId);
 
@@ -122,4 +122,7 @@
     assert.eq(profileObj.keysExamined, 20, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 20, tojson(profileObj));
     assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+    if (!isLegacyReadMode) {
+        assert.eq(profileObj.originatingCommand.hint, {a: 1}, tojson(profileObj));
+    }
 })();

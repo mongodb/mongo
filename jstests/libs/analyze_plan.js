@@ -56,6 +56,56 @@ function getPlanStage(root, stage) {
 }
 
 /**
+ * Given the root stage of agg explain's JSON representation of a query plan ('root'), returns all
+ * subdocuments whose stage is 'stage'. Returns an empty array if the plan does not have the
+ * requested stage. Asserts that agg explain structure matches expected format.
+ */
+function getAggPlanStages(root, stage) {
+    let results = [];
+
+    if (root.hasOwnProperty("stages")) {
+        assert(root.stages.constructor === Array);
+        assert(root.stages[0].hasOwnProperty("$cursor"));
+        assert(root.stages[0].$cursor.hasOwnProperty("queryPlanner"));
+        assert(root.stages[0].$cursor.queryPlanner.hasOwnProperty("winningPlan"));
+        results =
+            results.concat(getPlanStages(root.stages[0].$cursor.queryPlanner.winningPlan, stage));
+    }
+
+    if (root.hasOwnProperty("shards")) {
+        for (let elem in root.shards) {
+            assert(root.shards[elem].stages.constructor === Array);
+            assert(root.shards[elem].stages[0].hasOwnProperty("$cursor"));
+            assert(root.shards[elem].stages[0].$cursor.hasOwnProperty("queryPlanner"));
+            assert(root.shards[elem].stages[0].$cursor.queryPlanner.hasOwnProperty("winningPlan"));
+            results = results.concat(
+                getPlanStages(root.shards[elem].stages[0].$cursor.queryPlanner.winningPlan, stage));
+        }
+    }
+
+    return results;
+}
+
+/**
+ * Given the root stage of agg explain's JSON representation of a query plan ('root'), returns the
+ * subdocument with its stage as 'stage'. Returns null if the plan does not have such a stage.
+ * Asserts that no more than one stage is a match.
+ */
+function getAggPlanStage(root, stage) {
+    let planStageList = getAggPlanStages(root, stage);
+
+    if (planStageList.length === 0) {
+        return null;
+    } else {
+        assert.eq(1,
+                  planStageList.length,
+                  "getAggPlanStage expects to find 0 or 1 matching stages. planStageList: " +
+                      tojson(planStageList));
+        return planStageList[0];
+    }
+}
+
+/**
  * Given the root stage of explain's BSON representation of a query plan ('root'),
  * returns true if the plan has a stage called 'stage'.
  */

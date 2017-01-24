@@ -91,6 +91,10 @@ StatusWith<BSONObj> ResolvedView::asExpandedViewAggregation(
         batchSizeBuilder.doneFast();
     }
 
+    if (!request.getHint().isEmpty()) {
+        aggregationBuilder.append(AggregationRequest::kHintName, request.getHint());
+    }
+
     if (request.shouldBypassDocumentValidation()) {
         aggregationBuilder.append("bypassDocumentValidation", true);
     }

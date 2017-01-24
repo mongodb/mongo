@@ -55,13 +55,15 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson(
         "{pipeline: [{$match: {a: 'abc'}}], explain: true, allowDiskUse: true, fromRouter: true, "
-        "bypassDocumentValidation: true, collation: {locale: 'en_US'}, cursor: {batchSize: 10}}");
+        "bypassDocumentValidation: true, collation: {locale: 'en_US'}, cursor: {batchSize: 10}, "
+        "hint: {a: 1}}");
     auto request = unittest::assertGet(AggregationRequest::parseFromBSON(nss, inputBson));
     ASSERT_TRUE(request.isExplain());
     ASSERT_TRUE(request.shouldAllowDiskUse());
     ASSERT_TRUE(request.isFromRouter());
     ASSERT_TRUE(request.shouldBypassDocumentValidation());
     ASSERT_EQ(request.getBatchSize(), 10);
+    ASSERT_BSONOBJ_EQ(request.getHint(), BSON("a" << 1));
     ASSERT_BSONOBJ_EQ(request.getCollation(),
                       BSON("locale"
                            << "en_US"));
@@ -90,6 +92,7 @@ TEST(AggregationRequestTest, ShouldNotSerializeOptionalValuesIfEquivalentToDefau
     request.setFromRouter(false);
     request.setBypassDocumentValidation(false);
     request.setCollation(BSONObj());
+    request.setHint(BSONObj());
 
     auto expectedSerialization =
         Document{{AggregationRequest::kCommandName, nss.coll()},
@@ -106,6 +109,8 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     request.setFromRouter(true);
     request.setBypassDocumentValidation(true);
     request.setBatchSize(10);  // batchSize not serialzed when explain is true.
+    const auto hintObj = BSON("a" << 1);
+    request.setHint(hintObj);
     const auto collationObj = BSON("locale"
                                    << "en_US");
     request.setCollation(collationObj);
@@ -117,7 +122,8 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
                  {AggregationRequest::kAllowDiskUseName, true},
                  {AggregationRequest::kFromRouterName, true},
                  {bypassDocumentValidationCommandOption(), true},
-                 {AggregationRequest::kCollationName, collationObj}};
+                 {AggregationRequest::kCollationName, collationObj},
+                 {AggregationRequest::kHintName, hintObj}};
     ASSERT_DOCUMENT_EQ(request.serializeToCommandObj(), expectedSerialization);
 }
 
@@ -140,6 +146,17 @@ TEST(AggregationRequestTest, ShouldSetBatchSizeToDefaultOnEmptyCursorObject) {
     auto request = AggregationRequest::parseFromBSON(nss, inputBson);
     ASSERT_OK(request.getStatus());
     ASSERT_EQ(request.getValue().getBatchSize(), AggregationRequest::kDefaultBatchSize);
+}
+
+TEST(AggregationRequestTest, ShouldAcceptHintAsString) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson =
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], hint: 'a_1', cursor: {}}");
+    auto request = AggregationRequest::parseFromBSON(nss, inputBson);
+    ASSERT_OK(request.getStatus());
+    ASSERT_BSONOBJ_EQ(request.getValue().getHint(),
+                      BSON("$hint"
+                           << "a_1"));
 }
 
 //
@@ -165,6 +182,21 @@ TEST(AggregationRequestTest, ShouldRejectNonObjectCollation) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
         fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, collation: 1}");
+    ASSERT_NOT_OK(
+        AggregationRequest::parseFromBSON(NamespaceString("a.collection"), inputBson).getStatus());
+}
+
+TEST(AggregationRequestTest, ShouldRejectNonStringNonObjectHint) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson = fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, hint: 1}");
+    ASSERT_NOT_OK(
+        AggregationRequest::parseFromBSON(NamespaceString("a.collection"), inputBson).getStatus());
+}
+
+TEST(AggregationRequestTest, ShouldRejectHintAsArray) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson =
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, hint: []}]}");
     ASSERT_NOT_OK(
         AggregationRequest::parseFromBSON(NamespaceString("a.collection"), inputBson).getStatus());
 }

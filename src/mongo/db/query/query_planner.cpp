@@ -841,10 +841,13 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     // desired behavior when an index is hinted that is not relevant to the query.
     if (!hintIndex.isEmpty()) {
         if (0 == out->size()) {
-            QuerySolution* soln = buildWholeIXSoln(params.indices[*hintIndexNumber], query, params);
-            verify(NULL != soln);
-            LOG(5) << "Planner: outputting soln that uses hinted index as scan.";
-            out->push_back(soln);
+            // Push hinted index solution to output list if found. It is possible to end up without
+            // a solution in the case where a filtering QueryPlannerParams argument, such as
+            // NO_BLOCKING_SORT, leads to its exclusion.
+            if (auto soln = buildWholeIXSoln(params.indices[*hintIndexNumber], query, params)) {
+                LOG(5) << "Planner: outputting soln that uses hinted index as scan.";
+                out->push_back(soln);
+            }
         }
         return Status::OK();
     }

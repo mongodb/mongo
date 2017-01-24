@@ -69,4 +69,17 @@
     profileObj = getLatestProfilerEntry(testDB);
 
     assert.eq(profileObj.fromMultiPlanner, true, tojson(profileObj));
+
+    //
+    // Confirm that the "hint" modifier is in the profiler document.
+    //
+    coll.drop();
+    assert.commandWorked(coll.createIndex({a: 1}));
+    for (i = 0; i < 5; ++i) {
+        assert.writeOK(coll.insert({a: i, b: i}));
+    }
+
+    assert.eq(1, coll.aggregate([{$match: {a: 3, b: 3}}], {hint: {_id: 1}}).itcount());
+    profileObj = getLatestProfilerEntry(testDB);
+    assert.eq(profileObj.command.hint, {_id: 1}, tojson(profileObj));
 })();

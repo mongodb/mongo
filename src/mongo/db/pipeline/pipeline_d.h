@@ -33,6 +33,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/aggregation_request.h"
 
 namespace mongo {
 class Collection;
@@ -71,8 +72,11 @@ public:
      * The cursor is added to the front of the pipeline's sources.
      *
      * Callers must take care to ensure that 'collection' is locked in at least IS-mode.
+     *
+     * When not null, 'aggRequest' provides access to pipeline command options such as hint.
      */
     static void prepareCursorSource(Collection* collection,
+                                    const AggregationRequest* aggRequest,
                                     const boost::intrusive_ptr<Pipeline>& pipeline);
 
     static std::string getPlanSummaryStr(const boost::intrusive_ptr<Pipeline>& pPipeline);
@@ -101,6 +105,7 @@ private:
         const boost::intrusive_ptr<DocumentSourceSort>& sortStage,
         const DepsTracker& deps,
         const BSONObj& queryObj,
+        const AggregationRequest* aggRequest,
         BSONObj* sortObj,
         BSONObj* projectionObj);
 

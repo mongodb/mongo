@@ -143,12 +143,6 @@ StatusWith<CountRequest> CountRequest::parseFromBSON(const std::string& dbname,
 }
 
 StatusWith<BSONObj> CountRequest::asAggregationCommand() const {
-    // The 'hint' option is not supported in aggregation.
-    if (_hint) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << kHintField << " not supported in aggregation."};
-    }
-
     BSONObjBuilder aggregationBuilder;
     aggregationBuilder.append("aggregate", _nss.coll());
 
@@ -183,6 +177,10 @@ StatusWith<BSONObj> CountRequest::asAggregationCommand() const {
 
     if (_collation) {
         aggregationBuilder.append(kCollationField, *_collation);
+    }
+
+    if (_hint) {
+        aggregationBuilder.append(kHintField, *_hint);
     }
 
     // The 'cursor' option is always specified so that aggregation uses the cursor interface.

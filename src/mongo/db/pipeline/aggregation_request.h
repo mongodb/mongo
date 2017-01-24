@@ -54,6 +54,7 @@ public:
     static const StringData kCollationName;
     static const StringData kExplainName;
     static const StringData kAllowDiskUseName;
+    static const StringData kHintName;
 
     static const long long kDefaultBatchSize;
 
@@ -119,6 +120,10 @@ public:
         return _collation;
     }
 
+    BSONObj getHint() const {
+        return _hint;
+    }
+
     //
     // Setters for optional fields.
     //
@@ -133,6 +138,10 @@ public:
 
     void setCollation(BSONObj collation) {
         _collation = collation.getOwned();
+    }
+
+    void setHint(BSONObj hint) {
+        _hint = hint.getOwned();
     }
 
     void setExplain(bool isExplain) {
@@ -166,6 +175,11 @@ private:
     // An owned copy of the user-specified collation object, or an empty object if no collation was
     // specified.
     BSONObj _collation;
+
+    // The hint provided, if any.  If the hint was by index key pattern, the value of '_hint' is
+    // the key pattern hinted.  If the hint was by index name, the value of '_hint' is
+    // {$hint: <String>}, where <String> is the index name hinted.
+    BSONObj _hint;
 
     bool _explain = false;
     bool _allowDiskUse = false;

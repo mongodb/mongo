@@ -209,10 +209,23 @@ TEST(CountRequest, ToBSON) {
     ASSERT_BSONOBJ_EQ(actualObj, expectedObj);
 }
 
-TEST(CountRequest, ConvertToAggregationWithHintFails) {
+TEST(CountRequest, ConvertToAggregationWithHint) {
     CountRequest countRequest(testns, BSONObj());
     countRequest.setHint(BSON("x" << 1));
-    ASSERT_NOT_OK(countRequest.asAggregationCommand());
+    auto agg = countRequest.asAggregationCommand();
+    ASSERT_OK(agg);
+
+    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    ASSERT_OK(ar.getStatus());
+    ASSERT_BSONOBJ_EQ(ar.getValue().getHint(), BSON("x" << 1));
+
+    std::vector<BSONObj> expectedPipeline{BSON("$count"
+                                               << "count")};
+    ASSERT(std::equal(expectedPipeline.begin(),
+                      expectedPipeline.end(),
+                      ar.getValue().getPipeline().begin(),
+                      ar.getValue().getPipeline().end(),
+                      SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 
 TEST(CountRequest, ConvertToAggregationSucceeds) {

@@ -205,7 +205,7 @@ public:
         auto css = CollectionShardingState::get(_ctx->opCtx, expCtx->ns);
         uassert(4567, "from collection cannot be sharded", !bool(css->getMetadata()));
 
-        PipelineD::prepareCursorSource(autoColl.getCollection(), pipeline.getValue());
+        PipelineD::prepareCursorSource(autoColl.getCollection(), nullptr, pipeline.getValue());
 
         return pipeline;
     }
@@ -296,11 +296,15 @@ StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
     BSONObj queryObj,
     BSONObj projectionObj,
     BSONObj sortObj,
+    const AggregationRequest* aggRequest,
     const size_t plannerOpts) {
     auto qr = stdx::make_unique<QueryRequest>(pExpCtx->ns);
     qr->setFilter(queryObj);
     qr->setProj(projectionObj);
     qr->setSort(sortObj);
+    if (aggRequest) {
+        qr->setHint(aggRequest->getHint());
+    }
 
     // If the pipeline has a non-null collator, set the collation option to the result of
     // serializing the collator's spec back into BSON. We do this in order to fill in all options
@@ -331,6 +335,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> attemptToGetExecutor(
 }  // namespace
 
 void PipelineD::prepareCursorSource(Collection* collection,
+                                    const AggregationRequest* aggRequest,
                                     const intrusive_ptr<Pipeline>& pipeline) {
     auto expCtx = pipeline->getContext();
     dassert(expCtx->opCtx->lockState()->isCollectionLockedForMode(expCtx->ns.ns(), MODE_IS));
@@ -432,6 +437,7 @@ void PipelineD::prepareCursorSource(Collection* collection,
                                                 sortStage,
                                                 deps,
                                                 queryObj,
+                                                aggRequest,
                                                 &sortObj,
                                                 &projForQuery));
 
@@ -448,6 +454,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> PipelineD::prepareExecutor(
     const intrusive_ptr<DocumentSourceSort>& sortStage,
     const DepsTracker& deps,
     const BSONObj& queryObj,
+    const AggregationRequest* aggRequest,
     BSONObj* sortObj,
     BSONObj* projectionObj) {
     // The query system has the potential to use an index to provide a non-blocking sort and/or to
@@ -493,12 +500,18 @@ StatusWith<std::unique_ptr<PlanExecutor>> PipelineD::prepareExecutor(
     if (sortStage) {
         // See if the query system can provide a non-blocking sort.
         auto swExecutorSort = attemptToGetExecutor(
-            txn, collection, expCtx, queryObj, emptyProjection, *sortObj, plannerOpts);
+            txn, collection, expCtx, queryObj, emptyProjection, *sortObj, aggRequest, plannerOpts);
 
         if (swExecutorSort.isOK()) {
             // Success! Now see if the query system can also cover the projection.
-            auto swExecutorSortAndProj = attemptToGetExecutor(
-                txn, collection, expCtx, queryObj, *projectionObj, *sortObj, plannerOpts);
+            auto swExecutorSortAndProj = attemptToGetExecutor(txn,
+                                                              collection,
+                                                              expCtx,
+                                                              queryObj,
+                                                              *projectionObj,
+                                                              *sortObj,
+                                                              aggRequest,
+                                                              plannerOpts);
 
             std::unique_ptr<PlanExecutor> exec;
             if (swExecutorSortAndProj.isOK()) {
@@ -540,7 +553,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> PipelineD::prepareExecutor(
 
     // See if the query system can cover the projection.
     auto swExecutorProj = attemptToGetExecutor(
-        txn, collection, expCtx, queryObj, *projectionObj, *sortObj, plannerOpts);
+        txn, collection, expCtx, queryObj, *projectionObj, *sortObj, aggRequest, plannerOpts);
     if (swExecutorProj.isOK()) {
         // Success! We have a covered projection.
         return std::move(swExecutorProj.getValue());
@@ -555,7 +568,7 @@ StatusWith<std::unique_ptr<PlanExecutor>> PipelineD::prepareExecutor(
     *projectionObj = BSONObj();
     // If this doesn't work, nothing will.
     return attemptToGetExecutor(
-        txn, collection, expCtx, queryObj, *projectionObj, *sortObj, plannerOpts);
+        txn, collection, expCtx, queryObj, *projectionObj, *sortObj, aggRequest, plannerOpts);
 }
 
 void PipelineD::addCursorSource(Collection* collection,

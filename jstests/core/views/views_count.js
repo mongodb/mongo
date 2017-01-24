@@ -53,11 +53,10 @@
     assert.commandWorked(explainPlan);
     assert.eq(explainPlan["stages"][0]["$cursor"]["queryPlanner"]["namespace"], "views_count.coll");
 
+    // Count with hint works on a view.
+    assert.commandWorked(viewsDB.runCommand({count: "identityView", hint: "_id_"}));
+
     assert.commandFailedWithCode(
         viewsDB.runCommand({count: "identityView", collation: {locale: "en_US"}}),
         ErrorCodes.OptionNotSupportedOnView);
-
-    // Hint cannot be used when counting on a view.
-    assert.commandFailedWithCode(viewsDB.runCommand({count: "identityView", hint: "_id_"}),
-                                 ErrorCodes.InvalidPipelineOperator);
 }());
