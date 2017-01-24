@@ -9,8 +9,13 @@
  * it rolled back, which could then lead to a double-rollback when node 2 was reconnected
  * to node 1 and tried to apply its oplog despite not being in a consistent state.
  */
+
 (function() {
     'use strict';
+    load("jstests/libs/check_log.js");
+
+    load("jstests/libs/check_log.js");
+    load("jstests/replsets/rslib.js");
 
     var name = "double_rollback";
     var dbName = "test";
@@ -100,18 +105,7 @@
 
     jsTestLog("Wait for failpoint on node 2 to pause rollback before it finishes");
     // Wait for fail point message to be logged.
-    var checkLog = function(node, msg) {
-        assert.soon(function() {
-            var logMessages = assert.commandWorked(node.adminCommand({getLog: 'global'})).log;
-            for (var i = 0; i < logMessages.length; i++) {
-                if (logMessages[i].indexOf(msg) != -1) {
-                    return true;
-                }
-            }
-            return false;
-        }, 'Did not see a log entry containing the following message: ' + msg, timeout);
-    };
-    checkLog(nodes[2], 'rollback - rollbackHangBeforeFinish fail point enabled');
+    checkLog.contains(nodes[2], 'rollback - rollbackHangBeforeFinish fail point enabled');
 
     jsTestLog("Repartition to: [1,3,4] and [0,2].");
     nodes[2].disconnect(nodes[1]);
@@ -128,8 +122,8 @@
     // for a sync source it can use to reach minvalid and get back into SECONDARY state.  Node 0
     // is the only node it can reach, but since node 0 doesn't contain node 2's minvalid oplog entry
     // node 2 will refuse to use it as a sync source.
-    checkLog(nodes[2],
-             "remote oplog does not contain entry with optime matching our required optime");
+    checkLog.contains(
+        nodes[2], "remote oplog does not contain entry with optime matching our required optime");
 
     var node0RBID = nodes[0].adminCommand('replSetGetRBID').rbid;
     var node1RBID = nodes[1].adminCommand('replSetGetRBID').rbid;

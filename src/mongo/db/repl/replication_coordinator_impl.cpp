@@ -1445,10 +1445,38 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
         return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
     }
 
-    if (replMode == modeReplSet && !_memberState.primary()) {
-        return StatusAndDuration(
-            Status(ErrorCodes::NotMaster, "Not master while waiting for replication"),
-            Milliseconds(timer->millis()));
+    auto checkForStepDown = [&]() -> Status {
+        if (replMode == modeReplSet && !_memberState.primary()) {
+            return {ErrorCodes::NotMaster, "Primary stepped down while waiting for replication"};
+        }
+
+        // Relax term checking under 3.2 because some commands (eg. createIndexes) might not return
+        // a term in the response metadata to mongos which may pass the no-term OpTime back to
+        // mongod eventually.
+        if (opTime.getTerm() != OpTime::kUninitializedTerm &&
+            _cachedTerm != OpTime::kUninitializedTerm && opTime.getTerm() != _cachedTerm) {
+            return {
+                ErrorCodes::NotMaster,
+                str::stream() << "Term changed from " << opTime.getTerm() << " to " << _cachedTerm
+                              << " while waiting for replication, indicating that this node must "
+                                 "have stepped down."};
+        }
+
+        if (_stepDownPending) {
+            return {ErrorCodes::NotMaster,
+                    "Received stepdown request while waiting for replication"};
+        }
+        return Status::OK();
+    };
+
+    Status stepdownStatus = checkForStepDown();
+    if (!stepdownStatus.isOK()) {
+        return StatusAndDuration(stepdownStatus, Milliseconds(timer->millis()));
+    }
+
+    auto interruptStatus = txn->checkForInterruptNoAssert();
+    if (!interruptStatus.isOK()) {
+        return StatusAndDuration(interruptStatus, Milliseconds(timer->millis()));
     }
 
     if (writeConcern.wMode.empty()) {
@@ -1469,6 +1497,7 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
         if (!interruptedStatus.isOK()) {
             return StatusAndDuration(interruptedStatus, elapsed);
         }
+
 
         if (!waitInfo.master) {
             return StatusAndDuration(Status(ErrorCodes::NotMaster,
@@ -1505,6 +1534,11 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitRepl
             condVar.wait(*lock);
         } else {
             condVar.wait_for(*lock, waitTime);
+        }
+
+        stepdownStatus = checkForStepDown();
+        if (!stepdownStatus.isOK()) {
+            return StatusAndDuration(stepdownStatus, elapsed);
         }
     }
 
@@ -2001,10 +2035,11 @@ void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result)
     result->append("config", _rsConfig.toBSON());
 }
 
-void ReplicationCoordinatorImpl::processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) {
+void ReplicationCoordinatorImpl::processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata,
+                                                        bool advanceCommitPoint) {
     EventHandle evh;
-    _scheduleWorkAndWaitForCompletion([this, &evh, &replMetadata](const CallbackArgs& args) {
-        evh = _processReplSetMetadata_incallback(replMetadata);
+    _scheduleWorkAndWaitForCompletion([&](const CallbackArgs& args) {
+        evh = _processReplSetMetadata_incallback(replMetadata, advanceCommitPoint);
     });
     if (evh.isValid()) {
         _replExecutor.waitForEvent(evh);
@@ -2017,11 +2052,13 @@ void ReplicationCoordinatorImpl::cancelAndRescheduleElectionTimeout() {
 }
 
 EventHandle ReplicationCoordinatorImpl::_processReplSetMetadata_incallback(
-    const rpc::ReplSetMetadata& replMetadata) {
+    const rpc::ReplSetMetadata& replMetadata, bool advanceCommitPoint) {
     if (replMetadata.getConfigVersion() != _rsConfig.getConfigVersion()) {
         return EventHandle();
     }
-    _setLastCommittedOpTime(replMetadata.getLastOpCommitted());
+    if (advanceCommitPoint) {
+        _setLastCommittedOpTime(replMetadata.getLastOpCommitted());
+    }
     return _updateTerm_incallback(replMetadata.getTerm());
 }
 
@@ -2527,6 +2564,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock() {
             info->condVar->notify_all();
         }
         _canAcceptNonLocalWrites = false;
+        _stepDownPending = false;
         result = kActionCloseAllConnections;
     } else {
         result = kActionFollowerModeStateChange;
@@ -3103,7 +3141,7 @@ bool ReplicationCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& curre
 }
 
 void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
-    if (!_getMemberState_inlock().primary()) {
+    if (!_getMemberState_inlock().primary() || _stepDownPending) {
         return;
     }
 
@@ -3509,7 +3547,7 @@ EventHandle ReplicationCoordinatorImpl::_updateTerm_incallback(
     if (localUpdateTermResult == TopologyCoordinator::UpdateTermResult::kTriggerStepDown) {
         log() << "stepping down from primary, because a new term has begun: " << term;
         _topCoord->prepareForStepDown();
-        return _stepDownStart();
+        return _stepDownStart(false);
     }
     return EventHandle();
 }

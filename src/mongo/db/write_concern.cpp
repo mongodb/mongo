@@ -45,6 +45,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/protocol.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -71,6 +72,8 @@ void setupSynchronousCommit(OperationContext* txn) {
 namespace {
 const std::string kLocalDB = "local";
 }  // namespace
+
+MONGO_FP_DECLARE(hangBeforeWaitingForWriteConcern);
 
 StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* txn,
                                                     const BSONObj& cmdObj,
@@ -233,6 +236,8 @@ Status waitForWriteConcern(OperationContext* txn,
     //
     // This check does not hold for writes done through dbeval because it runs with a global X lock.
     dassert(!txn->lockState()->isLocked() || txn->getClient()->isInDirectClient());
+
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeWaitingForWriteConcern);
 
     // Next handle blocking on disk
 

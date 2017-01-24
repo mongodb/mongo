@@ -100,8 +100,8 @@ assert(syncingTo !== getHostName() + ":" + replSet.ports[1], "node 3 is syncing 
 
 jsTest.log("Pause 3's bgsync thread");
 var rsBgSyncProduceResult3 =
-    member3.runCommand({configureFailPoint: 'rsBgSyncProduce', mode: 'alwaysOn'});
-assert.eq(1, rsBgSyncProduceResult3.ok, "member 3 rsBgSyncProduce admin command failed");
+    member3.runCommand({configureFailPoint: 'stopReplProducer', mode: 'alwaysOn'});
+assert.eq(1, rsBgSyncProduceResult3.ok, "member 3 stopReplProducer admin command failed");
 
 // count documents in member 3
 assert.eq(26,
@@ -123,7 +123,7 @@ assert.soon(function() {
 }, "Replication member 3 did not apply ops 25-75");
 
 jsTest.log("Start 3's bgsync thread");
-member3.runCommand({configureFailPoint: 'rsBgSyncProduce', mode: 'off'});
+member3.runCommand({configureFailPoint: 'stopReplProducer', mode: 'off'});
 
 jsTest.log("Node 3 shouldn't hit rollback");
 var end = (new Date()).getTime() + 10000;

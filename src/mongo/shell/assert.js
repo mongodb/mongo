@@ -452,16 +452,33 @@ assert.writeOK = function(res, msg) {
 };
 
 assert.writeError = function(res, msg) {
+    return assert.writeErrorWithCode(res, null, msg);
+};
+
+assert.writeErrorWithCode = function(res, expectedCode, msg) {
 
     var errMsg = null;
+    var foundCode = null;
 
     if (res instanceof WriteResult) {
-        if (!res.hasWriteError() && !res.hasWriteConcernError()) {
+        if (res.hasWriteError()) {
+            foundCode = res.getWriteError().code;
+        } else if (res.hasWriteConcernError()) {
+            foundCode = res.getWriteConcernError().code;
+        } else {
             errMsg = "no write error: " + tojson(res);
         }
     } else if (res instanceof BulkWriteResult) {
         // Can only happen with bulk inserts
-        if (!res.hasWriteErrors() && !res.hasWriteConcernError()) {
+        if (res.hasWriteErrors()) {
+            if (res.getWriteErrorCount() > 1 && expectedCode != null) {
+                errMsg = "can't check for specific code when there was more than one write error";
+            } else {
+                foundCode = res.getWriteErrorAt(0).code;
+            }
+        } else if (res.hasWriteConcernError()) {
+            foundCode = res.getWriteConcernError().code;
+        } else {
             errMsg = "no write errors: " + tojson(res);
         }
     } else if (res instanceof WriteCommandError) {
@@ -470,6 +487,12 @@ assert.writeError = function(res, msg) {
     } else {
         if (!res || res.ok) {
             errMsg = "unknown type of write result, cannot check error: " + tojson(res);
+        }
+    }
+
+    if (!errMsg && expectedCode) {
+        if (foundCode != expectedCode) {
+            errMsg = "found code " + foundCode + " does not match expected code " + expectedCode;
         }
     }
 

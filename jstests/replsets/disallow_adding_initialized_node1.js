@@ -3,8 +3,10 @@
 // Initialize two replica sets A and B with the same name: A_0; B_0
 // Add B_0 to the replica set A. This operation should fail on replica set A should fail on
 // detecting an inconsistent replica set ID in the heartbeat response metadata from B_0.
+
 (function() {
     'use strict';
+    load("jstests/libs/check_log.js");
 
     var name = 'disallow_adding_initialized_node1';
     var replSetA = new ReplSetTest({name: name, nodes: [{rsConfig: {_id: 10}}, ]});
@@ -45,20 +47,9 @@
     assert.eq(primaryB, newPrimaryB);
 
     // Mismatch replica set IDs in heartbeat responses should be logged.
-    var checkLog = function(node, msg) {
-        assert.soon(function() {
-            var logMessages = assert.commandWorked(node.adminCommand({getLog: 'global'})).log;
-            for (var i = 0; i < logMessages.length; i++) {
-                if (logMessages[i].indexOf(msg) != -1) {
-                    return true;
-                }
-            }
-            return false;
-        }, 'Did not see a log entry containing the following message: ' + msg, 10000, 1000);
-    };
     var msgB = "replica set IDs do not match, ours: " + configB.settings.replicaSetId +
         "; remote node's: " + configA.settings.replicaSetId;
-    checkLog(primaryB, msgB);
+    checkLog.contains(primaryB, msgB);
 
     var statusA = assert.commandWorked(primaryA.adminCommand({replSetGetStatus: 1}));
     var statusB = assert.commandWorked(primaryB.adminCommand({replSetGetStatus: 1}));
