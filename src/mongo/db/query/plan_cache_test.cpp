@@ -1277,6 +1277,21 @@ TEST_F(CachePlanSelectionTest, MatchingCollation) {
                                     "{fetch: {node: {ixscan: {pattern: {x: 1}}}}}");
 }
 
+TEST_F(CachePlanSelectionTest, ContainedOr) {
+    addIndex(BSON("b" << 1 << "a" << 1), "b_1_a_1");
+    addIndex(BSON("c" << 1 << "a" << 1), "c_1_a_1");
+    BSONObj query = fromjson("{$and: [{a: 5}, {$or: [{b: 6}, {c: 7}]}]}");
+    runQuery(query);
+    assertPlanCacheRecoversSolution(
+        query,
+        "{fetch: {filter: null, node: {or: {nodes: ["
+        "{ixscan: {pattern: {b: 1, a: 1}, bounds: {b: [[6, 6, true, true]], a: [[5, 5, true, "
+        "true]]}}},"
+        "{ixscan: {pattern: {c: 1, a: 1}, bounds: {c: [[7, 7, true, true]], a: [[5, 5, true, "
+        "true]]}}}"
+        "]}}}}");
+}
+
 /**
  * Test functions for computeKey.  Cache keys are intentionally obfuscated and are
  * meaningful only within the current lifetime of the server process. Users should treat plan

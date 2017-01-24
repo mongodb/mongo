@@ -107,6 +107,17 @@ TEST_F(QueryPlannerTest, HaveBadPrefixOnTextIndex) {
     runInvalidQuery(fromjson("{$or: [{a:1}, {$text: {$search: 'blah'}}]}"));
 }
 
+// Outside predicates are not yet pushed into contained ORs for text indexes.
+TEST_F(QueryPlannerTest, PrefixOnTextIndexIsOutsidePred) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    addIndex(BSON("a" << 1 << "_fts"
+                      << "text"
+                      << "_ftsx"
+                      << 1));
+    addIndex(BSON("b" << 1));
+    runInvalidQuery(fromjson("{$and: [{a: 5}, {$or: [{$text: {$search: 'blah'}}, {b: 6}]}]}"));
+}
+
 // There can be more than one prefix, but they all require points.
 TEST_F(QueryPlannerTest, ManyPrefixTextIndex) {
     params.options = QueryPlannerParams::NO_TABLE_SCAN;

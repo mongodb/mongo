@@ -272,7 +272,8 @@ Status QueryPlanner::cacheDataFromTaggedTree(const MatchExpression* const tagged
 
     unique_ptr<PlanCacheIndexTree> indexTree(new PlanCacheIndexTree());
 
-    if (NULL != taggedTree->getTag()) {
+    if (taggedTree->getTag() &&
+        taggedTree->getTag()->getType() == MatchExpression::TagData::Type::IndexTag) {
         IndexTag* itag = static_cast<IndexTag*>(taggedTree->getTag());
         if (itag->index >= relevantIndices.size()) {
             mongoutils::str::stream ss;
@@ -295,6 +296,18 @@ Status QueryPlanner::cacheDataFromTaggedTree(const MatchExpression* const tagged
         indexTree->entry.reset(ientry);
         indexTree->index_pos = itag->pos;
         indexTree->canCombineBounds = itag->canCombineBounds;
+    } else if (taggedTree->getTag() &&
+               taggedTree->getTag()->getType() == MatchExpression::TagData::Type::OrPushdownTag) {
+        OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(taggedTree->getTag());
+        for (const auto& dest : orPushdownTag->getDestinations()) {
+            PlanCacheIndexTree::OrPushdown orPushdown;
+            orPushdown.route = dest.route;
+            IndexTag* indexTag = static_cast<IndexTag*>(dest.tagData.get());
+            orPushdown.indexName = relevantIndices[indexTag->index].name;
+            orPushdown.position = indexTag->pos;
+            orPushdown.canCombineBounds = indexTag->canCombineBounds;
+            indexTree->orPushdowns.push_back(std::move(orPushdown));
+        }
     }
 
     for (size_t i = 0; i < taggedTree->numChildren(); ++i) {
@@ -351,6 +364,22 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
         }
         filter->setTag(
             new IndexTag(got->second, indexTree->index_pos, indexTree->canCombineBounds));
+    } else if (!indexTree->orPushdowns.empty()) {
+        filter->setTag(new OrPushdownTag());
+        OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(filter->getTag());
+        for (const auto& orPushdown : indexTree->orPushdowns) {
+            auto index = indexMap.find(orPushdown.indexName);
+            if (index == indexMap.end()) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "Did not find index with name: "
+                                            << orPushdown.indexName);
+            }
+            OrPushdownTag::Destination dest;
+            dest.route = orPushdown.route;
+            dest.tagData = stdx::make_unique<IndexTag>(
+                index->second, orPushdown.position, orPushdown.canCombineBounds);
+            orPushdownTag->addDestination(std::move(dest));
+        }
     }
 
     return Status::OK();
@@ -420,8 +449,8 @@ Status QueryPlanner::planFromCache(const CanonicalQuery& query,
         return s;
     }
 
-    // The planner requires a defined sort order.
-    sortUsingTags(clone.get());
+    // The MatchExpression tree is in canonical order. We must order the nodes for access planning.
+    prepareForAccessPlanning(clone.get());
 
     LOG(5) << "Tagged tree:" << endl << redact(clone->toString());
 
@@ -783,9 +812,9 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
             LOG(5) << "About to build solntree from tagged tree:" << endl
                    << redact(rawTree->toString());
 
-            // Store the plan cache index tree before sorting using index tags, so that the
-            // PlanCacheIndexTree has the same sort as the MatchExpression used to generate the plan
-            // cache key.
+            // Store the plan cache index tree before calling prepareForAccessingPlanning(), so that
+            // the PlanCacheIndexTree has the same sort as the MatchExpression used to generate the
+            // plan cache key.
             std::unique_ptr<MatchExpression> clone(rawTree->shallowClone());
             PlanCacheIndexTree* cacheData;
             Status indexTreeStatus =
@@ -795,7 +824,9 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
             }
             unique_ptr<PlanCacheIndexTree> autoData(cacheData);
 
-            sortUsingTags(rawTree);
+            // We have already cached the tree in canonical order, so now we can order the nodes for
+            // access planning.
+            prepareForAccessPlanning(rawTree);
 
             // This can fail if enumeration makes a mistake.
             QuerySolutionNode* solnRoot = QueryPlannerAccess::buildIndexedDataAccess(

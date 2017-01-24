@@ -213,9 +213,11 @@ public:
 
     class TagData {
     public:
+        enum class Type { IndexTag, RelevantTag, OrPushdownTag };
         virtual ~TagData() {}
         virtual void debugString(StringBuilder* builder) const = 0;
         virtual TagData* clone() const = 0;
+        virtual Type getType() const = 0;
     };
 
     /**

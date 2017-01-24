@@ -388,7 +388,7 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
     }
 
     // Must do this before using the planner functionality.
-    sortUsingTags(_orExpression.get());
+    prepareForAccessPlanning(_orExpression.get());
 
     // Use the cached index assignments to build solnRoot. Takes ownership of '_orExpression'.
     QuerySolutionNode* solnRoot = QueryPlannerAccess::buildIndexedDataAccess(

@@ -411,6 +411,7 @@ PlanCacheIndexTree* PlanCacheIndexTree::clone() const {
         root->setIndexEntry(*entry.get());
         root->canCombineBounds = canCombineBounds;
     }
+    root->orPushdowns = orPushdowns;
 
     for (std::vector<PlanCacheIndexTree*>::const_iterator it = children.begin();
          it != children.end();
@@ -435,8 +436,21 @@ std::string PlanCacheIndexTree::toString(int indents) const {
     } else {
         result << std::string(3 * indents, '-') << "Leaf ";
         if (NULL != entry.get()) {
-            result << entry->keyPattern.toString() << ", pos: " << index_pos << ", can combine? "
+            result << entry->name << ", pos: " << index_pos << ", can combine? "
                    << canCombineBounds;
+        }
+        for (const auto& orPushdown : orPushdowns) {
+            result << "Move to ";
+            bool firstPosition = true;
+            for (auto position : orPushdown.route) {
+                if (!firstPosition) {
+                    result << ",";
+                }
+                firstPosition = false;
+                result << position;
+            }
+            result << ": " << orPushdown.indexName << ", pos: " << orPushdown.position
+                   << ", can combine? " << orPushdown.canCombineBounds << ". ";
         }
         result << '\n';
     }

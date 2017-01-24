@@ -86,6 +86,19 @@ typedef std::string PlanID;
  *   This is done by QueryPlanner::tagAccordingToCache.
  */
 struct PlanCacheIndexTree {
+
+    /**
+     * An OrPushdown is the cached version of an OrPushdownTag::Destination. It indicates that this
+     * node is a predicate that can be used inside of a sibling indexed OR, to tighten index bounds
+     * or satisfy the first field in the index.
+     */
+    struct OrPushdown {
+        std::string indexName;
+        size_t position;
+        bool canCombineBounds;
+        std::deque<size_t> route;
+    };
+
     PlanCacheIndexTree() : entry(nullptr), index_pos(0), canCombineBounds(true) {}
 
     ~PlanCacheIndexTree() {
@@ -123,6 +136,8 @@ struct PlanCacheIndexTree {
     // and is used to ensure that bounds are correctly intersected and/or compounded when a query is
     // planned from the plan cache.
     bool canCombineBounds;
+
+    std::vector<OrPushdown> orPushdowns;
 };
 
 /**

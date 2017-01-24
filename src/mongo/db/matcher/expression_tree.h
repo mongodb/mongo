@@ -65,9 +65,21 @@ public:
         return _expressions[i];
     }
 
+    /*
+     * Replaces the ith child with nullptr, and releases ownership of the child.
+     */
     virtual std::unique_ptr<MatchExpression> releaseChild(size_t i) {
         auto child = std::unique_ptr<MatchExpression>(_expressions[i]);
         _expressions[i] = nullptr;
+        return child;
+    }
+
+    /*
+     * Removes the ith child, and releases ownership of the child.
+     */
+    virtual std::unique_ptr<MatchExpression> removeChild(size_t i) {
+        auto child = std::unique_ptr<MatchExpression>(_expressions[i]);
+        _expressions.erase(_expressions.begin() + i);
         return child;
     }
 

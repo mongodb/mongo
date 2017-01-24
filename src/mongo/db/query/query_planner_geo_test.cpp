@@ -239,6 +239,66 @@ TEST_F(QueryPlannerTest, Multikey2DSphereGeoNearReverseCompound) {
         "bounds: {x: [[1, 1, true, true]], a: [['MinKey', 'MaxKey', true, true]]}}}");
 }
 
+TEST_F(QueryPlannerTest, 2DNonNearContainedOr) {
+    addIndex(BSON("x" << 1 << "a"
+                      << "2d"));
+    addIndex(BSON("y" << 1));
+    runQuery(
+        fromjson("{$and: [{x: 1}, {$or: [{a: {$within: {$polygon: [[0, 0], [0, 1], [1, 0], [0, "
+                 "0]]}}}, {y: 1}]}]}"));
+
+    assertNumSolutions(3U);
+    assertSolutionExists(
+        "{fetch: {filter: {x: 1}, node: {or: {nodes: ["
+        "{ixscan: {pattern: {x: 1, a: '2d'}, bounds: {x: [[1, 1, true, true]]}}},"
+        "{ixscan: {pattern: {y: 1}, bounds: {y: [[1, 1, true, true]]}}}"
+        "]}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {$or: [{a: {$within: {$polygon: [[0, 0], [0, 1], [1, 0], [0, 0]]}}}, {y: "
+        "1}]}, node: "
+        "{ixscan: {pattern: {x: 1, a: '2d'}, bounds: {x: [[1, 1, true, true]], a: [['MinKey', "
+        "'MaxKey', true, true]]}}}}}");
+    assertSolutionExists("{cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, 2DSphereV1NonNearContainedOr) {
+    addIndex(BSON("x" << 1 << "a"
+                      << "2dsphere"),
+             BSON("2dsphereIndexVersion" << 1));
+    addIndex(BSON("y" << 1));
+    runQuery(
+        fromjson("{$and: [{x: 1}, {$or: [{a: {$geoWithin: {$geometry: {type: 'Polygon', "
+                 "coordinates: [[[0, 0], [0, 1], [1, 0], [0, 0]]]}}}}, {y: 1}]}]}"));
+
+    assertNumSolutions(3U);
+    assertSolutionExists(
+        "{fetch: {filter: {x: 1}, node: {or: {nodes: ["
+        "{fetch: {filter: {a: {$geoWithin: {$geometry: {type: 'Polygon', coordinates: [[[0, 0], "
+        "[0, 1], [1, 0], [0, 0]]]}}}}, node: {ixscan: {pattern: {x: 1, a: '2dsphere'}, bounds: {x: "
+        "[[1, 1, true, true]]}}}}},"
+        "{ixscan: {pattern: {y: 1}, bounds: {y: [[1, 1, true, true]]}}}"
+        "]}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {$or: [{a: {$geoWithin: {$geometry: {type: 'Polygon', coordinates: [[[0, "
+        "0], [0, 1], [1, 0], [0, 0]]]}}}}, {y: 1}]}, node: "
+        "{ixscan: {pattern: {x: 1, a: '2dsphere'}, bounds: {x: [[1, 1, true, true]], a: "
+        "[['MinKey', 'MaxKey', true, true]]}}}}}");
+    assertSolutionExists("{cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, 2DSphereV2NonNearContainedOr) {
+    addIndex(BSON("x" << 1 << "a"
+                      << "2dsphere"),
+             BSON("2dsphereIndexVersion" << 2));
+    addIndex(BSON("y" << 1));
+    runQuery(
+        fromjson("{$and: [{x: 1}, {$or: [{a: {$geoWithin: {$geometry: {type: 'Polygon', "
+                 "coordinates: [[[0, 0], [0, 1], [1, 0], [0, 0]]]}}}}, {y: 1}]}]}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1}}}}");
+}
+
 TEST_F(QueryPlannerTest, NearNoIndex) {
     addIndex(BSON("x" << 1));
     runInvalidQuery(fromjson("{x:1, a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));

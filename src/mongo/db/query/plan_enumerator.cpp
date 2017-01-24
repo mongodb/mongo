@@ -214,6 +214,40 @@ bool canAssignPredToIndex(const RelevantTag* rt,
     return true;
 }
 
+/**
+ * Tags each node of the tree with the lowest numbered index that the sub-tree rooted at that
+ * node uses.
+ *
+ * Nodes that satisfy Indexability::nodeCanUseIndexOnOwnField are already tagged if there
+ * exists an index that that node can use.
+ */
+void tagForSort(MatchExpression* tree) {
+    if (!Indexability::nodeCanUseIndexOnOwnField(tree)) {
+        size_t myTagValue = IndexTag::kNoIndex;
+        for (size_t i = 0; i < tree->numChildren(); ++i) {
+            MatchExpression* child = tree->getChild(i);
+            tagForSort(child);
+            if (child->getTag() &&
+                child->getTag()->getType() == MatchExpression::TagData::Type::IndexTag) {
+                IndexTag* childTag = static_cast<IndexTag*>(child->getTag());
+                myTagValue = std::min(myTagValue, childTag->index);
+            } else if (child->getTag() &&
+                       child->getTag()->getType() ==
+                           MatchExpression::TagData::Type::OrPushdownTag) {
+                OrPushdownTag* childTag = static_cast<OrPushdownTag*>(child->getTag());
+                if (childTag->getIndexTag()) {
+                    const IndexTag* indexTag =
+                        static_cast<const IndexTag*>(childTag->getIndexTag());
+                    myTagValue = std::min(myTagValue, indexTag->index);
+                }
+            }
+        }
+        if (myTagValue != IndexTag::kNoIndex) {
+            tree->setTag(new IndexTag(myTagValue));
+        }
+    }
+}
+
 }  // namespace
 
 
@@ -258,9 +292,9 @@ string PlanEnumerator::NodeAssignment::toString() const {
         mongoutils::str::stream ss;
         ss << "predicate\n";
         ss << "\tfirst indices: [";
-        for (size_t i = 0; i < pred->first.size(); ++i) {
-            ss << pred->first[i];
-            if (i < pred->first.size() - 1)
+        for (size_t i = 0; i < pred->indexes.size(); ++i) {
+            ss << pred->indexes[i];
+            if (i < pred->indexes.size() - 1)
                 ss << ", ";
         }
         ss << "]\n";
@@ -360,6 +394,8 @@ void PlanEnumerator::allocateAssignment(MatchExpression* expr,
 bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
     PrepMemoContext childContext;
     childContext.elemMatchExpr = context.elemMatchExpr;
+    childContext.outsidePreds = context.outsidePreds;
+
     if (Indexability::nodeCanUseIndexOnOwnField(node)) {
         // We only get here if our parent is an OR, an array operator, or we're the root.
 
@@ -369,23 +405,42 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
         }
 
         RelevantTag* rt = static_cast<RelevantTag*>(node->getTag());
-        // In order to definitely use an index it must be prefixed with our field.
-        // We don't consider notFirst indices here because we must be AND-related to a node
-        // that uses the first spot in that index, and we currently do not know that
-        // unless we're in an AND node.
-        if (0 == rt->first.size()) {
-            return false;
-        }
 
-        // We know we can use an index, so grab a memo spot.
         size_t myMemoID;
         NodeAssignment* assign;
         allocateAssignment(node, &assign, &myMemoID);
 
         assign->pred.reset(new PredicateAssignment());
         assign->pred->expr = node;
-        assign->pred->first.swap(rt->first);
-        return true;
+
+        // 'expr' can use any index in 'first'.
+        if (!rt->first.empty()) {
+            assign->pred->indexes.swap(rt->first);
+
+            for (auto index : assign->pred->indexes) {
+                assign->pred->positions.push_back(0);
+                assign->pred->orPushdowns.push_back(
+                    getOrPushdowns(index, childContext.outsidePreds));
+            }
+        }
+
+        // 'expr' can use an index in 'notFirst' if an outside predicate can be combined with this
+        // node and use the first position in the index.
+        for (auto index : rt->notFirst) {
+            auto orPushdowns = getOrPushdowns(index, childContext.outsidePreds);
+            for (const auto& orPushdown : orPushdowns) {
+                IndexTag* indexTag = static_cast<IndexTag*>(orPushdown.second.tagData.get());
+                if (indexTag->pos == 0) {
+                    const auto indexEntry = (*_indices)[index];
+                    assign->pred->indexes.push_back(index);
+                    assign->pred->positions.push_back(getPosition(indexEntry, rt->path));
+                    assign->pred->orPushdowns.push_back(std::move(orPushdowns));
+                    break;
+                }
+            }
+        }
+
+        return !assign->pred->indexes.empty();
     } else if (Indexability::isBoundsGeneratingNot(node)) {
         bool childIndexable = prepMemo(node->getChild(0), childContext);
         // If the child isn't indexable then bail out now.
@@ -406,7 +461,14 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
     } else if (MatchExpression::OR == node->matchType()) {
         // For an OR to be indexed, all its children must be indexed.
         for (size_t i = 0; i < node->numChildren(); ++i) {
-            if (!prepMemo(node->getChild(i), childContext)) {
+
+            // Extend the path through the indexed ORs of each outside predicate.
+            auto childContextCopy = childContext;
+            for (auto& pred : childContextCopy.outsidePreds) {
+                pred.second.push_back(i);
+            }
+
+            if (!prepMemo(node->getChild(i), childContextCopy)) {
                 return false;
             }
         }
@@ -478,7 +540,13 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
         // mandatory preds to 'indexedPreds'. Adding the mandatory preds directly to
         // 'indexedPreds' would lead to problems such as pulling a predicate beneath an OR
         // into a set joined by an AND.
-        if (!partitionPreds(node, childContext, &indexedPreds, &subnodes, &mandatorySubnodes)) {
+        getIndexedPreds(node, childContext, &indexedPreds);
+        // Pass in the indexed predicates as outside predicates when prepping the subnodes.
+        auto childContextCopy = childContext;
+        for (auto pred : indexedPreds) {
+            childContextCopy.outsidePreds[pred] = std::deque<size_t>();
+        }
+        if (!prepSubNodes(node, childContextCopy, &subnodes, &mandatorySubnodes)) {
             return false;
         }
 
@@ -537,11 +605,11 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
         }
 
         // If none of our children can use indices, bail out.
-        if (idxToFirst.empty() && (subnodes.size() == 0) && (mandatorySubnodes.size() == 0)) {
+        if (idxToFirst.empty() && idxToNotFirst.empty() && (subnodes.size() == 0) &&
+            (mandatorySubnodes.size() == 0)) {
             return false;
         }
 
-        // At least one child can use an index, so we can create a memo entry.
         AndAssignment* andAssignment = new AndAssignment();
 
         size_t myMemoID;
@@ -555,7 +623,7 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
         if (1 == mandatorySubnodes.size()) {
             AndEnumerableState aes;
             aes.subnodesToIndex.push_back(mandatorySubnodes[0]);
-            andAssignment->choices.push_back(aes);
+            andAssignment->choices.push_back(std::move(aes));
             return true;
         }
 
@@ -566,13 +634,14 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
                 idxToFirst, idxToNotFirst, mandatoryPred, mandatoryIndices, andAssignment);
         }
 
-        enumerateOneIndex(idxToFirst, idxToNotFirst, subnodes, andAssignment);
+        enumerateOneIndex(
+            idxToFirst, idxToNotFirst, subnodes, childContext.outsidePreds, andAssignment);
 
         if (_ixisect) {
             enumerateAndIntersect(idxToFirst, idxToNotFirst, subnodes, andAssignment);
         }
 
-        return true;
+        return !andAssignment->choices.empty();
     }
 
     // Don't know what the node is at this point.
@@ -744,16 +813,48 @@ bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
         // Output the assignments for this index.
         AndEnumerableState state;
         state.assignments.push_back(indexAssign);
-        andAssignment->choices.push_back(state);
+        andAssignment->choices.push_back(std::move(state));
     }
 
     return andAssignment->choices.size() > 0;
 }
 
-void PlanEnumerator::enumerateOneIndex(const IndexToPredMap& idxToFirst,
-                                       const IndexToPredMap& idxToNotFirst,
-                                       const vector<MemoID>& subnodes,
-                                       AndAssignment* andAssignment) {
+std::vector<std::pair<MatchExpression*, OrPushdownTag::Destination>> PlanEnumerator::getOrPushdowns(
+    IndexID index, const unordered_map<MatchExpression*, std::deque<size_t>>& outsidePreds) {
+    std::vector<std::pair<MatchExpression*, OrPushdownTag::Destination>> orPushdowns;
+    const auto indexEntry = (*_indices)[index];
+
+    // TODO SERVER-27904: Determine whether we can combine bounds.
+    if (indexEntry.multikey) {
+        return orPushdowns;
+    }
+
+    for (const auto& pred : outsidePreds) {
+        RelevantTag* relevantTag = static_cast<RelevantTag*>(pred.first->getTag());
+        const auto& first = relevantTag->first;
+        const auto& notFirst = relevantTag->notFirst;
+        if ((std::find(first.begin(), first.end(), index) != first.end()) ||
+            (std::find(notFirst.begin(), notFirst.end(), index) != notFirst.end())) {
+            OrPushdownTag::Destination dest;
+            dest.route = pred.second;
+
+            // The index is not multikey, so we can combine bounds.
+            const bool canCombineBounds = true;
+
+            dest.tagData = stdx::make_unique<IndexTag>(
+                index, getPosition(indexEntry, relevantTag->path), canCombineBounds);
+            orPushdowns.emplace_back(pred.first, std::move(dest));
+        }
+    }
+    return orPushdowns;
+}
+
+void PlanEnumerator::enumerateOneIndex(
+    const IndexToPredMap& idxToFirst,
+    const IndexToPredMap& idxToNotFirst,
+    const vector<MemoID>& subnodes,
+    const unordered_map<MatchExpression*, std::deque<size_t>> outsidePreds,
+    AndAssignment* andAssignment) {
     // In the simplest case, an AndAssignment picks indices like a PredicateAssignment.  To
     // be indexed we must only pick one index
     //
@@ -785,7 +886,7 @@ void PlanEnumerator::enumerateOneIndex(const IndexToPredMap& idxToFirst,
     for (size_t i = 0; i < subnodes.size(); ++i) {
         AndEnumerableState aes;
         aes.subnodesToIndex.push_back(subnodes[i]);
-        andAssignment->choices.push_back(aes);
+        andAssignment->choices.push_back(std::move(aes));
     }
 
     // For each FIRST, we assign nodes to it.
@@ -820,7 +921,8 @@ void PlanEnumerator::enumerateOneIndex(const IndexToPredMap& idxToFirst,
 
                 AndEnumerableState state;
                 state.assignments.push_back(indexAssign);
-                andAssignment->choices.push_back(state);
+                // TODO SERVER-27904: Use outsidePreds to get orPushdowns.
+                andAssignment->choices.push_back(std::move(state));
             }
         } else if (thisIndex.multikey) {
             // We don't have path-level information about what causes 'thisIndex' to be multikey.
@@ -853,7 +955,8 @@ void PlanEnumerator::enumerateOneIndex(const IndexToPredMap& idxToFirst,
                 // Output the assignment.
                 AndEnumerableState state;
                 state.assignments.push_back(indexAssign);
-                andAssignment->choices.push_back(state);
+                // TODO SERVER-27904: Use outsidePreds to get orPushdowns.
+                andAssignment->choices.push_back(std::move(state));
             }
         } else {
             // The assignment we're filling out.
@@ -880,7 +983,30 @@ void PlanEnumerator::enumerateOneIndex(const IndexToPredMap& idxToFirst,
             // Output the assignment.
             AndEnumerableState state;
             state.assignments.push_back(indexAssign);
-            andAssignment->choices.push_back(state);
+            state.orPushdowns = getOrPushdowns(indexAssign.index, outsidePreds);
+            andAssignment->choices.push_back(std::move(state));
+        }
+    }
+
+    // If an outside predicate can fulfill the first position in the index, we can use it.
+    for (const auto& index : idxToNotFirst) {
+        if (idxToFirst.find(index.first) != idxToFirst.end()) {
+            continue;
+        }
+        auto orPushdowns = getOrPushdowns(index.first, outsidePreds);
+        for (const auto& orPushdown : orPushdowns) {
+            IndexTag* indexTag = static_cast<IndexTag*>(orPushdown.second.tagData.get());
+            if (indexTag->pos == 0) {
+                OneIndexAssignment indexAssign;
+                indexAssign.index = index.first;
+                const IndexEntry& indexEntry = (*_indices)[index.first];
+                compound(index.second, indexEntry, &indexAssign);
+                AndEnumerableState state;
+                state.assignments.push_back(indexAssign);
+                state.orPushdowns = std::move(orPushdowns);
+                andAssignment->choices.push_back(std::move(state));
+                break;
+            }
         }
     }
 }
@@ -952,7 +1078,7 @@ void PlanEnumerator::enumerateAndIntersect(const IndexToPredMap& idxToFirst,
             }
             AndEnumerableState state;
             state.assignments.push_back(oneAssign);
-            andAssignment->choices.push_back(state);
+            andAssignment->choices.push_back(std::move(state));
             continue;
         }
 
@@ -961,7 +1087,7 @@ void PlanEnumerator::enumerateAndIntersect(const IndexToPredMap& idxToFirst,
             AndEnumerableState indexAndSubnode;
             indexAndSubnode.assignments.push_back(oneAssign);
             indexAndSubnode.subnodesToIndex.push_back(subnodes[i]);
-            andAssignment->choices.push_back(indexAndSubnode);
+            andAssignment->choices.push_back(std::move(indexAndSubnode));
             // Limit n^2.
             if (andAssignment->choices.size() - sizeBefore > _intersectLimit) {
                 return;
@@ -1128,7 +1254,7 @@ void PlanEnumerator::enumerateAndIntersect(const IndexToPredMap& idxToFirst,
             AndEnumerableState state;
             state.assignments.push_back(firstAssign);
             state.assignments.push_back(secondAssign);
-            andAssignment->choices.push_back(state);
+            andAssignment->choices.push_back(std::move(state));
         }
     }
 
@@ -1144,21 +1270,19 @@ void PlanEnumerator::enumerateAndIntersect(const IndexToPredMap& idxToFirst,
             AndEnumerableState state;
             state.subnodesToIndex.push_back(subnodes[i]);
             state.subnodesToIndex.push_back(subnodes[j]);
-            andAssignment->choices.push_back(state);
+            andAssignment->choices.push_back(std::move(state));
         }
     }
 }
 
-bool PlanEnumerator::partitionPreds(MatchExpression* node,
-                                    PrepMemoContext context,
-                                    vector<MatchExpression*>* indexOut,
-                                    vector<MemoID>* subnodesOut,
-                                    vector<MemoID>* mandatorySubnodes) {
+void PlanEnumerator::getIndexedPreds(MatchExpression* node,
+                                     PrepMemoContext context,
+                                     vector<MatchExpression*>* indexedPreds) {
     for (size_t i = 0; i < node->numChildren(); ++i) {
         MatchExpression* child = node->getChild(i);
         if (Indexability::nodeCanUseIndexOnOwnField(child)) {
             RelevantTag* rt = static_cast<RelevantTag*>(child->getTag());
-            if (NULL != context.elemMatchExpr) {
+            if (context.elemMatchExpr) {
                 // If we're in an $elemMatch context, store the
                 // innermost parent $elemMatch, as well as the
                 // inner path prefix.
@@ -1171,20 +1295,27 @@ bool PlanEnumerator::partitionPreds(MatchExpression* node,
             }
 
             // Output this as a pred that can use the index.
-            indexOut->push_back(child);
+            indexedPreds->push_back(child);
         } else if (Indexability::isBoundsGeneratingNot(child)) {
-            partitionPreds(child, context, indexOut, subnodesOut, mandatorySubnodes);
+            getIndexedPreds(child, context, indexedPreds);
         } else if (MatchExpression::ELEM_MATCH_OBJECT == child->matchType()) {
             PrepMemoContext childContext;
             childContext.elemMatchExpr = child;
-            partitionPreds(child, childContext, indexOut, subnodesOut, mandatorySubnodes);
+            getIndexedPreds(child, childContext, indexedPreds);
         } else if (MatchExpression::AND == child->matchType()) {
-            partitionPreds(child, context, indexOut, subnodesOut, mandatorySubnodes);
-        } else {
-            bool mandatory = expressionRequiresIndex(child);
+            getIndexedPreds(child, context, indexedPreds);
+        }
+    }
+}
 
-            // Recursively prepMemo for the subnode. We fall through
-            // to this case for logical nodes other than AND (e.g. OR).
+bool PlanEnumerator::prepSubNodes(MatchExpression* node,
+                                  PrepMemoContext context,
+                                  vector<MemoID>* subnodesOut,
+                                  vector<MemoID>* mandatorySubnodes) {
+    for (size_t i = 0; i < node->numChildren(); ++i) {
+        MatchExpression* child = node->getChild(i);
+        if (MatchExpression::OR == child->matchType()) {
+            bool mandatory = expressionRequiresIndex(child);
             if (prepMemo(child, context)) {
                 size_t childID = memoIDForNode(child);
 
@@ -1199,6 +1330,13 @@ bool PlanEnumerator::partitionPreds(MatchExpression* node,
                 // that the entire AND cannot be indexed either.
                 return false;
             }
+        } else if (MatchExpression::ELEM_MATCH_OBJECT == child->matchType()) {
+            PrepMemoContext childContext;
+            childContext.elemMatchExpr = child;
+            childContext.outsidePreds = context.outsidePreds;
+            prepSubNodes(child, childContext, subnodesOut, mandatorySubnodes);
+        } else if (MatchExpression::AND == child->matchType()) {
+            prepSubNodes(child, context, subnodesOut, mandatorySubnodes);
         }
     }
 
@@ -1398,6 +1536,17 @@ bool PlanEnumerator::alreadyCompounded(const set<MatchExpression*>& ixisectAssig
     return false;
 }
 
+size_t PlanEnumerator::getPosition(const IndexEntry& indexEntry, const std::string& path) {
+    size_t position = 0;
+    for (auto&& element : indexEntry.keyPattern) {
+        if (element.fieldName() == path) {
+            return position;
+        }
+        ++position;
+    }
+    MONGO_UNREACHABLE;
+}
+
 void PlanEnumerator::compound(const vector<MatchExpression*>& tryCompound,
                               const IndexEntry& thisIndex,
                               OneIndexAssignment* assign) {
@@ -1448,8 +1597,21 @@ void PlanEnumerator::tagMemo(size_t id) {
     if (NULL != assign->pred) {
         PredicateAssignment* pa = assign->pred.get();
         verify(NULL == pa->expr->getTag());
-        verify(pa->indexToAssign < pa->first.size());
-        pa->expr->setTag(new IndexTag(pa->first[pa->indexToAssign]));
+        verify(pa->indexToAssign < pa->indexes.size());
+        auto index = pa->indexes[pa->indexToAssign];
+        auto position = pa->positions[pa->indexToAssign];
+        const bool canCombineBounds = true;
+        pa->expr->setTag(new IndexTag(index, position, canCombineBounds));
+
+        // Add all OrPushdownTags for this index assignment.
+        for (const auto& orPushdown : pa->orPushdowns[pa->indexToAssign]) {
+            auto expr = orPushdown.first;
+            if (!expr->getTag()) {
+                expr->setTag(new OrPushdownTag());
+            }
+            OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(expr->getTag());
+            orPushdownTag->addDestination(orPushdown.second.clone());
+        }
     } else if (NULL != assign->orAssignment) {
         OrAssignment* oa = assign->orAssignment.get();
         for (size_t i = 0; i < oa->subnodes.size(); ++i) {
@@ -1473,10 +1635,25 @@ void PlanEnumerator::tagMemo(size_t id) {
 
             for (size_t j = 0; j < assign.preds.size(); ++j) {
                 MatchExpression* pred = assign.preds[j];
-                verify(NULL == pred->getTag());
-                pred->setTag(
-                    new IndexTag(assign.index, assign.positions[j], assign.canCombineBounds));
+                if (pred->getTag()) {
+                    OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(pred->getTag());
+                    orPushdownTag->setIndexTag(
+                        new IndexTag(assign.index, assign.positions[j], assign.canCombineBounds));
+                } else {
+                    pred->setTag(
+                        new IndexTag(assign.index, assign.positions[j], assign.canCombineBounds));
+                }
             }
+        }
+
+        // Add all OrPushdownTags for this index assignment.
+        for (const auto& orPushdown : aes.orPushdowns) {
+            auto expr = orPushdown.first;
+            if (!expr->getTag()) {
+                expr->setTag(new OrPushdownTag());
+            }
+            OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(expr->getTag());
+            orPushdownTag->addDestination(orPushdown.second.clone());
         }
     } else {
         verify(0);
@@ -1490,7 +1667,7 @@ bool PlanEnumerator::nextMemo(size_t id) {
     if (NULL != assign->pred) {
         PredicateAssignment* pa = assign->pred.get();
         pa->indexToAssign++;
-        if (pa->indexToAssign >= pa->first.size()) {
+        if (pa->indexToAssign >= pa->indexes.size()) {
             pa->indexToAssign = 0;
             return true;
         }

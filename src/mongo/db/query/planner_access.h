@@ -294,9 +294,6 @@ public:
      * facilitate grouping of index scans.  As such, the processing for AND and OR is
      * almost identical.
      *
-     * See tagForSort and sortUsingTags in index_tag.h for details on ordering the children
-     * of OR and AND.
-     *
      * Does not take ownership of 'root' but may remove children from it.
      */
     static bool processIndexScans(const CanonicalQuery& query,
