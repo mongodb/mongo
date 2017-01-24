@@ -43,7 +43,7 @@ function retryOnNetworkError(func) {
     const stepdownDelaySeconds = 10;
     const verbositySetting =
         "{ verbosity: 0, command: {verbosity: 1}, network: {verbosity: 1, asio: {verbosity: 2}}, \
-tracking: {verbosity: 1} }";
+tracking: {verbosity: 0} }";
 
     /**
      * Overrides the ReplSetTest constructor to start the continuous config server stepdown

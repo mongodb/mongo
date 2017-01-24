@@ -1000,7 +1000,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                                     val.indexOf("logComponentVerbosity") === 0;
                             })
                             .length === 0) {
-                        argArray.push(...['--setParameter', "logComponentVerbosity={tracking:1}"]);
+                        argArray.push(...['--setParameter', "logComponentVerbosity={tracking:0}"]);
                     }
                 }
             }
