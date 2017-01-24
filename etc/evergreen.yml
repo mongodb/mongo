@@ -2944,7 +2944,7 @@ tasks:
           echo "${signing_auth_token_34}" > signing_auth_token
 
     - func: "get curator"
-      vars: { install_curator: "${has_pacakges|}" }
+      vars: { install_curator: "${has_packages|}" }
 
     - command: shell.exec
       params:
