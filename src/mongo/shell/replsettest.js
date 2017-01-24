@@ -744,7 +744,20 @@ var ReplSetTest = function(opts) {
             print("Reconfiguring replica set to add in other nodes");
             printjson(cmd);
 
-            assert.commandWorked(master.runCommand(cmd), tojson(cmd));
+            // replSetInitiate and replSetReconfig commands can fail with a NodeNotFound error
+            // if a heartbeat times out during the quorum check. We retry three times to reduce
+            // the chance of failing this way.
+            assert.retry(() => {
+                const res = master.runCommand(cmd);
+                if (res.ok === 1) {
+                    return true;
+                }
+
+                assert.commandFailedWithCode(
+                    res, ErrorCodes.NodeNotFound, "replSetReconfig during initiate failed");
+                return false;
+            }, "replSetReconfig during initiate failed", 3, 5 * 1000);
+
             this.awaitSecondaryNodes(timeout);
         }
 
