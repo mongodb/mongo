@@ -7,20 +7,16 @@
     var name = "maxSyncSourceLagSecs";
     var replTest = new ReplSetTest({
         name: name,
-        nodes: 3,
+        nodes: [
+            {rsConfig: {priority: 3}},
+            {rsConfig: {priority: 0}},
+            {rsConfig: {priority: 0}, setParameter: 'maxSyncSourceLagSecs=3'},
+        ],
         oplogSize: 5,
-        nodeOptions: {setParameter: "maxSyncSourceLagSecs=3"}
     });
     var nodes = replTest.nodeList();
     replTest.startSet();
-    replTest.initiate({
-        "_id": name,
-        "members": [
-            {"_id": 0, "host": nodes[0], priority: 3},
-            {"_id": 1, "host": nodes[1], priority: 0},
-            {"_id": 2, "host": nodes[2], priority: 0}
-        ],
-    });
+    replTest.initiate();
     replTest.awaitNodesAgreeOnPrimary();
 
     var master = replTest.getPrimary();
