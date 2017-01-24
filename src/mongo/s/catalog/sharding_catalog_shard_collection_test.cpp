@@ -180,7 +180,7 @@ public:
             std::transform(chunks.begin(),
                            chunks.end(),
                            std::back_inserter(chunksToReturn),
-                           [](const ChunkType& chunk) { return chunk.toBSON(); });
+                           [](const ChunkType& chunk) { return chunk.toConfigBSON(); });
             return chunksToReturn;
         });
     }

@@ -148,11 +148,11 @@ void CommitChunkMigrationRequest::appendAsCommand(BSONObjBuilder* builder,
     builder->append(kConfigSvrCommitChunkMigration, nss.ns());
     builder->append(kFromShard, fromShard.toString());
     builder->append(kToShard, toShard.toString());
-    builder->append(kMigratedChunk, migratedChunk.toBSON());
+    builder->append(kMigratedChunk, migratedChunk.toConfigBSON());
     fromShardCollectionVersion.appendWithFieldForCommands(builder, kFromShardCollectionVersion);
 
     if (controlChunk) {
-        builder->append(kControlChunk, controlChunk->toBSON());
+        builder->append(kControlChunk, controlChunk->toConfigBSON());
     }
 }
 

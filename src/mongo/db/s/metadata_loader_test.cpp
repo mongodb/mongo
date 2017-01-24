@@ -110,7 +110,7 @@ protected:
             }
 
             ASSERT(chunk.validate().isOK());
-            chunksToSend.push_back(chunk.toBSON());
+            chunksToSend.push_back(chunk.toConfigBSON());
         }
 
         auto future = launchAsync([this, ns, shardName, metadata] {
@@ -226,7 +226,7 @@ TEST_F(MetadataLoaderFixture, BadChunk) {
     });
 
     expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{collType.toBSON()});
-    expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{chunkInfo.toBSON()});
+    expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{chunkInfo.toConfigBSON()});
     future.timed_get(kFutureTimeout);
 }
 
@@ -295,7 +295,7 @@ TEST_F(MetadataLoaderFixture, CheckNumChunk) {
     });
 
     expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{collType.toBSON()});
-    expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{chunkType.toBSON()});
+    expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{chunkType.toConfigBSON()});
 
     future.timed_get(kFutureTimeout);
 }

@@ -95,7 +95,7 @@ public:
 void convertBSONArrayToChunkTypes(const vector<BSONObj>& chunksArray,
                                   std::vector<ChunkType>* chunksVector) {
     for (const BSONObj& obj : chunksArray) {
-        auto chunkTypeRes = ChunkType::fromBSON(obj);
+        auto chunkTypeRes = ChunkType::fromConfigBSON(obj);
         ASSERT(chunkTypeRes.isOK());
         chunksVector->push_back(chunkTypeRes.getValue());
     }

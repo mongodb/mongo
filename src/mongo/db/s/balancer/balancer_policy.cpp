@@ -185,7 +185,7 @@ void DistributionStatus::report(BSONObjBuilder* builder) const {
 
         BSONArrayBuilder chunkArr(shardEntry.subarrayStart("chunks"));
         for (const auto& chunk : shardChunk.second) {
-            chunkArr.append(chunk.toBSON());
+            chunkArr.append(chunk.toConfigBSON());
         }
         chunkArr.doneFast();
 

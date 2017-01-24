@@ -541,7 +541,7 @@ TEST_F(ShardingStateTest, MetadataRefreshShouldUseDiffQuery) {
         chunk.setMax(BSON("x" << 10));
         chunk.setShard(ShardId(shardName()));
         chunk.setVersion(ChunkVersion(2, 0, initEpoch));
-        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toBSON()});
+        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toConfigBSON()});
     }
 
     const ChunkVersion newVersion(3, 0, initEpoch);
@@ -573,7 +573,7 @@ TEST_F(ShardingStateTest, MetadataRefreshShouldUseDiffQuery) {
         chunk.setMax(BSON("x" << 20));
         chunk.setShard(ShardId(shardName()));
         chunk.setVersion(ChunkVersion(3, 10, initEpoch));
-        return std::vector<BSONObj>{chunk.toBSON()};
+        return std::vector<BSONObj>{chunk.toConfigBSON()};
     });
 
     future.timed_get(kFutureTimeout);
@@ -601,7 +601,7 @@ TEST_F(ShardingStateTest, MetadataRefreshShouldUseFullQueryOnEpochMismatch) {
         chunk.setMax(BSON("x" << 10));
         chunk.setShard(ShardId(shardName()));
         chunk.setVersion(ChunkVersion(2, 0, initEpoch));
-        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toBSON()});
+        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toConfigBSON()});
     }
 
 
@@ -636,7 +636,7 @@ TEST_F(ShardingStateTest, MetadataRefreshShouldUseFullQueryOnEpochMismatch) {
         chunk.setMax(BSON("x" << 20));
         chunk.setShard(ShardId(shardName()));
         chunk.setVersion(ChunkVersion(3, 10, newVersion.epoch()));
-        return std::vector<BSONObj>{chunk.toBSON()};
+        return std::vector<BSONObj>{chunk.toConfigBSON()};
     });
 
     // Retry the refresh again. Now doing a full reload.
@@ -664,7 +664,7 @@ TEST_F(ShardingStateTest, MetadataRefreshShouldUseFullQueryOnEpochMismatch) {
         chunk.setMax(BSON("x" << 20));
         chunk.setShard(ShardId(shardName()));
         chunk.setVersion(ChunkVersion(3, 10, newVersion.epoch()));
-        return std::vector<BSONObj>{chunk.toBSON()};
+        return std::vector<BSONObj>{chunk.toConfigBSON()};
     });
 
     future.timed_get(kFutureTimeout);
@@ -689,7 +689,7 @@ TEST_F(ShardingStateTest, FullMetadataOnEpochMismatchShouldStopAfterMaxRetries) 
         chunk.setMax(BSON("x" << 10));
         chunk.setShard(ShardId(shardName()));
         chunk.setVersion(ChunkVersion(2, 0, initEpoch));
-        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toBSON()});
+        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toConfigBSON()});
     }
 
 
@@ -728,7 +728,7 @@ TEST_F(ShardingStateTest, FullMetadataOnEpochMismatchShouldStopAfterMaxRetries) 
             chunk.setMax(BSON("x" << 20));
             chunk.setShard(ShardId(shardName()));
             chunk.setVersion(ChunkVersion(3, 10, nextEpoch));
-            return std::vector<BSONObj>{chunk.toBSON()};
+            return std::vector<BSONObj>{chunk.toConfigBSON()};
         });
 
         lastEpoch = nextEpoch;
@@ -757,7 +757,7 @@ TEST_F(ShardingStateTest, MetadataRefreshShouldBeOkWhenCollectionWasDropped) {
         chunk.setMax(BSON("x" << 10));
         chunk.setShard(ShardId(shardName()));
         chunk.setVersion(ChunkVersion(2, 0, initEpoch));
-        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toBSON()});
+        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toConfigBSON()});
     }
 
     const ChunkVersion newVersion(3, 0, initEpoch);
@@ -798,7 +798,7 @@ TEST_F(ShardingStateTest, MetadataRefreshShouldNotRetryOtherTypesOfError) {
         chunk.setMax(BSON("x" << 10));
         chunk.setShard(ShardId(shardName()));
         chunk.setVersion(ChunkVersion(2, 0, initEpoch));
-        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toBSON()});
+        setupCollectionMetadata(nss, initEpoch, std::vector<BSONObj>{chunk.toConfigBSON()});
     }
 
     auto configTargeter =

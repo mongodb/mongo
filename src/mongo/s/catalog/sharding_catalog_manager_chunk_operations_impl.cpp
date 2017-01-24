@@ -88,7 +88,7 @@ BSONArray buildMergeChunksApplyOpsUpdates(const std::vector<ChunkType>& chunksTo
         mergedChunk.setVersion(mergeVersion);
 
         // add the new chunk information as the update object
-        op.append("o", mergedChunk.toBSON());
+        op.append("o", mergedChunk.toConfigBSON());
 
         // query object
         op.append("o2", BSON(ChunkType::name(mergedChunk.getName())));
@@ -174,7 +174,7 @@ Status checkCollectionVersionEpoch(OperationContext* txn,
                 << ").");
     }
 
-    auto chunkWith = ChunkType::fromBSON(findResponseWith.getValue().docs.front());
+    auto chunkWith = ChunkType::fromConfigBSON(findResponseWith.getValue().docs.front());
     if (!chunkWith.isOK()) {
         return chunkWith.getStatus();
     } else if (chunkWith.getValue().getVersion().epoch() != collectionEpoch) {
@@ -571,7 +571,7 @@ Status ShardingCatalogManagerImpl::commitChunkMerge(OperationContext* txn,
     {
         BSONArrayBuilder b(logDetail.subarrayStart("merged"));
         for (auto chunkToMerge : chunksToMerge) {
-            b.append(chunkToMerge.toBSON());
+            b.append(chunkToMerge.toConfigBSON());
         }
     }
     collVersion.addToBSON(logDetail, "prevShardVersion");

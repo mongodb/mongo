@@ -101,7 +101,7 @@ MigrateInfo makeMigrateInfo() {
     kChunkVersion.appendForChunk(&chunkBuilder);
     chunkBuilder.append(ChunkType::shard(), kFromShard.toString());
 
-    ChunkType chunkType = assertGet(ChunkType::fromBSON(chunkBuilder.obj()));
+    ChunkType chunkType = assertGet(ChunkType::fromConfigBSON(chunkBuilder.obj()));
     ASSERT_OK(chunkType.validate());
 
     return MigrateInfo(kToShard, chunkType);

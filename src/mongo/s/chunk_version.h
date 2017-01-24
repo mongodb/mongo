@@ -99,6 +99,13 @@ public:
     static StatusWith<ChunkVersion> parseFromBSONForChunk(const BSONObj& obj);
 
     /**
+     * Interprets the lastmod (combined major/minor) from a BSONObj without an epoch
+     *  { ..., lastmod: [ <combined major/minor> ], ... }
+     * and then sets the returned ChunkVersion's epoch field to 'epoch'.
+     */
+    static StatusWith<ChunkVersion> parseFromBSONAndSetEpoch(const BSONObj& obj, const OID& epoch);
+
+    /**
      * Indicates a dropped collection. All components are zeroes (OID is zero time, zero
      * machineId/inc).
      */

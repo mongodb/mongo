@@ -251,7 +251,8 @@ StatusWith<ShardType> ConfigServerTestFixture::getShardDoc(OperationContext* txn
 Status ConfigServerTestFixture::setupChunks(const std::vector<ChunkType>& chunks) {
     const NamespaceString chunkNS(ChunkType::ConfigNS);
     for (const auto& chunk : chunks) {
-        auto insertStatus = insertToConfigCollection(operationContext(), chunkNS, chunk.toBSON());
+        auto insertStatus =
+            insertToConfigCollection(operationContext(), chunkNS, chunk.toConfigBSON());
         if (!insertStatus.isOK())
             return insertStatus;
     }
@@ -266,7 +267,7 @@ StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* txn
     if (!doc.isOK())
         return doc.getStatus();
 
-    return ChunkType::fromBSON(doc.getValue());
+    return ChunkType::fromConfigBSON(doc.getValue());
 }
 
 StatusWith<std::vector<BSONObj>> ConfigServerTestFixture::getIndexes(OperationContext* txn,

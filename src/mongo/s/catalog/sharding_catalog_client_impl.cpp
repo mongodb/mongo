@@ -1095,7 +1095,7 @@ Status ShardingCatalogClientImpl::getChunks(OperationContext* txn,
 
     const auto& chunkDocsOpTimePair = findStatus.getValue();
     for (const BSONObj& obj : chunkDocsOpTimePair.value) {
-        auto chunkRes = ChunkType::fromBSON(obj);
+        auto chunkRes = ChunkType::fromConfigBSON(obj);
         if (!chunkRes.isOK()) {
             chunks->clear();
             return {chunkRes.getStatus().code(),

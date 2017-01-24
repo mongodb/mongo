@@ -210,7 +210,7 @@ ChunkType MigrationManagerTest::setUpChunk(const std::string& collName,
     chunk.setShard(shardId);
     chunk.setVersion(version);
     ASSERT_OK(catalogClient()->insertConfigDocument(
-        operationContext(), ChunkType::ConfigNS, chunk.toBSON(), kMajorityWriteConcern));
+        operationContext(), ChunkType::ConfigNS, chunk.toConfigBSON(), kMajorityWriteConcern));
     return chunk;
 }
 

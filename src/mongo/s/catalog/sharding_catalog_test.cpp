@@ -495,33 +495,34 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
         return chunks;
     });
 
-    onFindWithMetadataCommand([this, &chunksQuery, chunkA, chunkB, newOpTime](
-        const RemoteCommandRequest& request) {
-        ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata,
-                          rpc::TrackingMetadata::removeTrackingData(request.metadata));
+    onFindWithMetadataCommand(
+        [this, &chunksQuery, chunkA, chunkB, newOpTime](const RemoteCommandRequest& request) {
+            ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata,
+                              rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss.ns(), ChunkType::ConfigNS);
+            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
+            ASSERT_EQ(nss.ns(), ChunkType::ConfigNS);
 
-        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
+            auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
-        ASSERT_EQ(query->ns(), ChunkType::ConfigNS);
-        ASSERT_BSONOBJ_EQ(query->getFilter(), chunksQuery);
-        ASSERT_BSONOBJ_EQ(query->getSort(), BSON(ChunkType::DEPRECATED_lastmod() << -1));
-        ASSERT_EQ(query->getLimit().get(), 1);
+            ASSERT_EQ(query->ns(), ChunkType::ConfigNS);
+            ASSERT_BSONOBJ_EQ(query->getFilter(), chunksQuery);
+            ASSERT_BSONOBJ_EQ(query->getSort(), BSON(ChunkType::DEPRECATED_lastmod() << -1));
+            ASSERT_EQ(query->getLimit().get(), 1);
 
-        checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
+            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
-        ReplSetMetadata metadata(10, newOpTime, newOpTime, 100, OID(), 30, -1);
-        BSONObjBuilder builder;
-        metadata.writeToMetadata(&builder);
+            ReplSetMetadata metadata(10, newOpTime, newOpTime, 100, OID(), 30, -1);
+            BSONObjBuilder builder;
+            metadata.writeToMetadata(&builder);
 
-        return std::make_tuple(vector<BSONObj>{chunkA.toBSON(), chunkB.toBSON()}, builder.obj());
-    });
+            return std::make_tuple(vector<BSONObj>{chunkA.toConfigBSON(), chunkB.toConfigBSON()},
+                                   builder.obj());
+        });
 
     const auto& chunks = future.timed_get(kFutureTimeout);
-    ASSERT_BSONOBJ_EQ(chunkA.toBSON(), chunks[0].toBSON());
-    ASSERT_BSONOBJ_EQ(chunkB.toBSON(), chunks[1].toBSON());
+    ASSERT_BSONOBJ_EQ(chunkA.toConfigBSON(), chunks[0].toConfigBSON());
+    ASSERT_BSONOBJ_EQ(chunkB.toConfigBSON(), chunks[1].toConfigBSON());
 }
 
 TEST_F(ShardingCatalogClientTest, GetChunksForNSNoSortNoLimit) {
@@ -610,7 +611,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSInvalidChunk) {
         chunkB.setVersion({3, 4, OID::gen()});
         // Missing shard id
 
-        return vector<BSONObj>{chunkA.toBSON(), chunkB.toBSON()};
+        return vector<BSONObj>{chunkA.toConfigBSON(), chunkB.toConfigBSON()};
     });
 
     future.timed_get(kFutureTimeout);
@@ -1364,7 +1365,7 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessfulWithCheck) {
         chunk.setMax(BSON("a" << 100));
         chunk.setVersion({1, 2, oid});
         chunk.setShard(ShardId("shard0000"));
-        return vector<BSONObj>{chunk.toBSON()};
+        return vector<BSONObj>{chunk.toConfigBSON()};
     });
 
     // Now wait for the applyChunkOpsDeprecated call to return

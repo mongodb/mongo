@@ -55,7 +55,7 @@ BalanceChunkRequest::BalanceChunkRequest(ChunkType chunk,
     : _chunk(std::move(chunk)), _secondaryThrottle(std::move(secondaryThrottle)) {}
 
 StatusWith<BalanceChunkRequest> BalanceChunkRequest::parseFromConfigCommand(const BSONObj& obj) {
-    auto chunkStatus = ChunkType::fromBSON(obj);
+    auto chunkStatus = ChunkType::fromConfigBSON(obj);
     if (!chunkStatus.isOK()) {
         return chunkStatus.getStatus();
     }
@@ -132,7 +132,7 @@ BSONObj BalanceChunkRequest::serializeToMoveCommandForConfig(
 
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append(kConfigSvrMoveChunk, 1);
-    cmdBuilder.appendElements(chunk.toBSON());
+    cmdBuilder.appendElements(chunk.toConfigBSON());
     cmdBuilder.append(kToShardId, newShardId.toString());
     cmdBuilder.append(kMaxChunkSizeBytes, static_cast<long long>(maxChunkSizeBytes));
     {
@@ -152,7 +152,7 @@ BSONObj BalanceChunkRequest::serializeToRebalanceCommandForConfig(const ChunkTyp
 
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append(kConfigSvrMoveChunk, 1);
-    cmdBuilder.appendElements(chunk.toBSON());
+    cmdBuilder.appendElements(chunk.toConfigBSON());
     cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
                       kMajorityWriteConcernNoTimeout.toBSON());
 

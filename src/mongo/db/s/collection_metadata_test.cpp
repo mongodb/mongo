@@ -72,7 +72,7 @@ protected:
         chunkType.setMax(BSON("a" << MAXKEY));
         chunkType.setVersion(ChunkVersion(1, 0, epoch));
         ASSERT_OK(chunkType.validate());
-        std::vector<BSONObj> chunksToSend{chunkType.toBSON()};
+        std::vector<BSONObj> chunksToSend{chunkType.toConfigBSON()};
 
         auto future = launchAsync([this] {
             auto status = MetadataLoader::makeCollectionMetadata(operationContext(),

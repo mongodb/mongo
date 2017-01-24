@@ -455,7 +455,10 @@ Status ChunkManager::createFirstChunks(OperationContext* txn,
         chunk.setVersion(version);
 
         Status status = grid.catalogClient(txn)->insertConfigDocument(
-            txn, ChunkType::ConfigNS, chunk.toBSON(), ShardingCatalogClient::kMajorityWriteConcern);
+            txn,
+            ChunkType::ConfigNS,
+            chunk.toConfigBSON(),
+            ShardingCatalogClient::kMajorityWriteConcern);
         if (!status.isOK()) {
             const string errMsg = str::stream() << "Creating first chunks failed: "
                                                 << redact(status.reason());
