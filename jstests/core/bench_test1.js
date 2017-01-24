@@ -31,7 +31,6 @@ assert.lte(seconds * res.update, t.findOne({_id: 1}).x * 1.5, "A1");
 assert.eq(1, t.getIndexes().length, "B1");
 benchArgs['ops'] = [{op: "createIndex", ns: t.getFullName(), key: {x: 1}}];
 benchArgs['parallel'] = 1;
-benchArgs['seconds'] = 1;
 benchRun(benchArgs);
 assert.eq(2, t.getIndexes().length, "B2");
 benchArgs['ops'] = [{op: "dropIndex", ns: t.getFullName(), key: {x: 1}}];
