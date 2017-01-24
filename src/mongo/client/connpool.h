@@ -48,8 +48,22 @@ struct ConnectionPoolStats;
 }  // namespace executor
 
 /**
- * not thread safe
- * thread safety is handled by DBConnectionPool
+ * The PoolForHost is responsible for storing a maximum of _maxPoolSize connections to a particular
+ * host. It is not responsible for creating new connections; instead, when DBConnectionPool is asked
+ * for a connection to a particular host, DBConnectionPool will check if any connections are
+ * available in the PoolForHost for that host. If so, DBConnectionPool will check out a connection
+ * from PoolForHost, and if not, DBConnectionPool will create a new connection itself.
+ *
+ * Once the connection is released back to DBConnectionPool, DBConnectionPool will attempt to
+ * release the connection to PoolForHost. This is how connections enter PoolForHost for the first
+ * time. If PoolForHost is below the _maxPoolSize limit, PoolForHost will take ownership of the
+ * connection, otherwise PoolForHost will clean up and destroy the connection.
+ *
+ * Additionally, PoolForHost knows how to purge itself of stale connections (since a connection can
+ * go stale while it is just sitting in the pool), but does not decide when to do so. Instead,
+ * DBConnectionPool tells PoolForHost to purge stale connections periodically.
+ *
+ * PoolForHost is not thread-safe; thread safety is handled by DBConnectionPool.
  */
 class PoolForHost {
     MONGO_DISALLOW_COPYING(PoolForHost);
