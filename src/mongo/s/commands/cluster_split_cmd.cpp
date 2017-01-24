@@ -42,19 +42,49 @@
 #include "mongo/db/field_parser.h"
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
-#include "mongo/s/client/shard_connection.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/s/sharding_raii.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-using std::shared_ptr;
-using std::string;
-using std::vector;
-
 namespace {
+
+/**
+ * Asks the mongod holding this chunk to find a key that approximately divides the specified chunk
+ * in two. Throws on error or if the chunk is empty.
+ */
+BSONObj selectMedianKey(OperationContext* txn,
+                        const ShardId& shardId,
+                        const NamespaceString& nss,
+                        const ShardKeyPattern& shardKeyPattern,
+                        const ChunkRange& chunkRange) {
+    BSONObjBuilder cmd;
+    cmd.append("splitVector", nss.ns());
+    cmd.append("keyPattern", shardKeyPattern.toBSON());
+    chunkRange.append(&cmd);
+    cmd.appendBool("force", true);
+
+    auto shard = uassertStatusOK(Grid::get(txn)->shardRegistry()->getShard(txn, shardId));
+
+    auto cmdResponse = uassertStatusOK(
+        shard->runCommandWithFixedRetryAttempts(txn,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                "admin",
+                                                cmd.obj(),
+                                                Shard::RetryPolicy::kIdempotent));
+
+    uassertStatusOK(cmdResponse.commandStatus);
+
+    BSONObjIterator it(cmdResponse.response.getObjectField("splitKeys"));
+    if (it.more()) {
+        return it.next().Obj().getOwned();
+    }
+
+    uasserted(ErrorCodes::CannotSplit,
+              "Unable to find median in chunk, possibly because chunk is empty.");
+}
 
 class SplitCollectionCmd : public Command {
 public:
@@ -139,6 +169,7 @@ public:
         }
 
         BSONObj middle;
+
         if (FieldParser::extract(cmdObj, middleField, &middle, &errmsg) ==
             FieldParser::FIELD_INVALID) {
             return false;
@@ -161,7 +192,7 @@ public:
 
         auto const cm = scopedCM.cm();
 
-        shared_ptr<Chunk> chunk;
+        std::shared_ptr<Chunk> chunk;
 
         if (!find.isEmpty()) {
             // find
@@ -218,23 +249,31 @@ public:
             }
         }
 
+        // Once the chunk to be split has been determined, if the split point was explicitly
+        // specified in the split command through the "middle" parameter, choose "middle" as the
+        // splitPoint. Otherwise use the splitVector command with 'force' to ask the shard for the
+        // middle of the chunk.
+        const BSONObj splitPoint = !middle.isEmpty()
+            ? middle
+            : selectMedianKey(txn,
+                              chunk->getShardId(),
+                              nss,
+                              cm->getShardKeyPattern(),
+                              ChunkRange(chunk->getMin(), chunk->getMax()));
+
         log() << "Splitting chunk "
               << redact(ChunkRange(chunk->getMin(), chunk->getMax()).toString())
-              << " in collection " << nss.ns() << " on shard " << chunk->getShardId();
+              << " in collection " << nss.ns() << " on shard " << chunk->getShardId() << " at key "
+              << redact(splitPoint);
 
-        BSONObj res;
-        if (middle.isEmpty()) {
-            uassertStatusOK(chunk->split(txn, Chunk::atMedian, nullptr));
-        } else {
-            uassertStatusOK(shardutil::splitChunkAtMultiplePoints(txn,
-                                                                  chunk->getShardId(),
-                                                                  nss,
-                                                                  cm->getShardKeyPattern(),
-                                                                  cm->getVersion(),
-                                                                  chunk->getMin(),
-                                                                  chunk->getMax(),
-                                                                  {middle}));
-        }
+        uassertStatusOK(
+            shardutil::splitChunkAtMultiplePoints(txn,
+                                                  chunk->getShardId(),
+                                                  nss,
+                                                  cm->getShardKeyPattern(),
+                                                  cm->getVersion(),
+                                                  ChunkRange(chunk->getMin(), chunk->getMax()),
+                                                  {splitPoint}));
 
         // Proactively refresh the chunk manager. Not strictly necessary, but this way it's
         // immediately up-to-date the next time it's used.

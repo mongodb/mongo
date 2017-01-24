@@ -541,14 +541,14 @@ Status Balancer::_enforceTagRanges(OperationContext* txn) {
         auto scopedCM = std::move(scopedCMStatus.getValue());
         ChunkManager* const cm = scopedCM.cm();
 
-        auto splitStatus = shardutil::splitChunkAtMultiplePoints(txn,
-                                                                 splitInfo.shardId,
-                                                                 splitInfo.nss,
-                                                                 cm->getShardKeyPattern(),
-                                                                 splitInfo.collectionVersion,
-                                                                 splitInfo.minKey,
-                                                                 splitInfo.maxKey,
-                                                                 splitInfo.splitKeys);
+        auto splitStatus =
+            shardutil::splitChunkAtMultiplePoints(txn,
+                                                  splitInfo.shardId,
+                                                  splitInfo.nss,
+                                                  cm->getShardKeyPattern(),
+                                                  splitInfo.collectionVersion,
+                                                  ChunkRange(splitInfo.minKey, splitInfo.maxKey),
+                                                  splitInfo.splitKeys);
         if (!splitStatus.isOK()) {
             warning() << "Failed to enforce tag range for chunk " << redact(splitInfo.toString())
                       << causedBy(redact(splitStatus.getStatus()));

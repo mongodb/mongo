@@ -56,10 +56,6 @@ public:
         // the current chunk size setting. Gives empty result if chunk is not big enough.
         normal,
 
-        // Will get a split which approximately splits the chunk into 2 halves,
-        // regardless of the size of the chunk.
-        atMedian,
-
         // Behaves like normal, with additional special heuristics for "top chunks"
         // (the 1 or 2 chunks in the extreme ends of the chunk key space).
         autoSplitInternal
@@ -217,7 +213,7 @@ private:
      * @param atMedian perform a single split at the middle of this chunk.
      * @param splitPoints out parameter containing the chosen split points. Can be empty.
      */
-    std::vector<BSONObj> _determineSplitPoints(OperationContext* txn, bool atMedian) const;
+    std::vector<BSONObj> _determineSplitPoints(OperationContext* txn) const;
 };
 
 }  // namespace mongo

@@ -46,7 +46,7 @@ template <typename T>
 class StatusWith;
 
 /**
- * Set of methods used to introspect the state of individual shards.
+ * Set of functions used to introspect and manipulate the state of individual shards.
  */
 namespace shardutil {
 
@@ -61,23 +61,12 @@ namespace shardutil {
 StatusWith<long long> retrieveTotalShardSize(OperationContext* txn, const ShardId& shardId);
 
 /**
- * Asks the mongod holding this chunk to find a key that approximately divides the specified chunk
- * in two.
- */
-StatusWith<BSONObj> selectMedianKey(OperationContext* txn,
-                                    const ShardId& shardId,
-                                    const NamespaceString& nss,
-                                    const ShardKeyPattern& shardKeyPattern,
-                                    const BSONObj& minKey,
-                                    const BSONObj& maxKey);
-
-/**
  * Ask the specified shard to figure out the split points for a given chunk.
  *
  * shardId The shard id to query.
  * nss Namespace, which owns the chunk.
  * shardKeyPattern The shard key which corresponds to this sharded namespace.
- * minKey/maxKey Bounds of the chunk.
+ * chunkRange Bounds of the chunk to be split.
  * chunkSize Chunk size to target in bytes.
  * maxPoints Limits the number of split points that are needed. Zero means max.
  * maxObjs Limits the number of objects in each chunk. Zero means max.
@@ -86,8 +75,7 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
                                                         const ShardId& shardId,
                                                         const NamespaceString& nss,
                                                         const ShardKeyPattern& shardKeyPattern,
-                                                        const BSONObj& minKey,
-                                                        const BSONObj& maxKey,
+                                                        const ChunkRange& chunkRange,
                                                         long long chunkSizeBytes,
                                                         int maxPoints,
                                                         int maxObjs);
@@ -101,7 +89,7 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
  * nss Namespace, which owns the chunk.
  * shardKeyPattern The shard key which corresponds to this sharded namespace.
  * collectionVersion The expected collection version when doing the split.
- * minKey/maxKey Bounds of the chunk to be split.
+ * chunkRange Bounds of the chunk to be split.
  * splitPoints The set of points at which the chunk should be split.
  */
 StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
@@ -110,8 +98,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     const NamespaceString& nss,
     const ShardKeyPattern& shardKeyPattern,
     ChunkVersion collectionVersion,
-    const BSONObj& minKey,
-    const BSONObj& maxKey,
+    const ChunkRange& chunkRange,
     const std::vector<BSONObj>& splitPoints);
 
 }  // namespace shardutil

@@ -192,8 +192,6 @@ public:
     ChunkVersion getVersion(const ShardId& shardName) const;
     ChunkVersion getVersion() const;
 
-    uint64_t getCurrentDesiredChunkSize() const;
-
     /**
      * Returns the opTime of config server the last time chunks were loaded.
      */

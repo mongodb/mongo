@@ -80,61 +80,18 @@ StatusWith<long long> retrieveTotalShardSize(OperationContext* txn, const ShardI
     return totalSizeElem.numberLong();
 }
 
-StatusWith<BSONObj> selectMedianKey(OperationContext* txn,
-                                    const ShardId& shardId,
-                                    const NamespaceString& nss,
-                                    const ShardKeyPattern& shardKeyPattern,
-                                    const BSONObj& minKey,
-                                    const BSONObj& maxKey) {
-    BSONObjBuilder cmd;
-    cmd.append("splitVector", nss.ns());
-    cmd.append("keyPattern", shardKeyPattern.toBSON());
-    cmd.append(kMinKey, minKey);
-    cmd.append(kMaxKey, maxKey);
-    cmd.appendBool("force", true);
-
-    auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
-    if (!shardStatus.isOK()) {
-        return shardStatus.getStatus();
-    }
-
-    auto cmdStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
-        txn,
-        ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-        "admin",
-        cmd.obj(),
-        Shard::RetryPolicy::kIdempotent);
-    if (!cmdStatus.isOK()) {
-        return std::move(cmdStatus.getStatus());
-    }
-    if (!cmdStatus.getValue().commandStatus.isOK()) {
-        return std::move(cmdStatus.getValue().commandStatus);
-    }
-
-    const auto response = std::move(cmdStatus.getValue().response);
-
-    BSONObjIterator it(response.getObjectField("splitKeys"));
-    if (it.more()) {
-        return it.next().Obj().getOwned();
-    }
-
-    return BSONObj();
-}
-
 StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
                                                         const ShardId& shardId,
                                                         const NamespaceString& nss,
                                                         const ShardKeyPattern& shardKeyPattern,
-                                                        const BSONObj& minKey,
-                                                        const BSONObj& maxKey,
+                                                        const ChunkRange& chunkRange,
                                                         long long chunkSizeBytes,
                                                         int maxPoints,
                                                         int maxObjs) {
     BSONObjBuilder cmd;
     cmd.append("splitVector", nss.ns());
     cmd.append("keyPattern", shardKeyPattern.toBSON());
-    cmd.append(kMinKey, minKey);
-    cmd.append(kMaxKey, maxKey);
+    chunkRange.append(&cmd);
     cmd.append("maxChunkSizeBytes", chunkSizeBytes);
     cmd.append("maxSplitPoints", maxPoints);
     cmd.append("maxChunkObjects", maxObjs);
@@ -175,11 +132,9 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     const NamespaceString& nss,
     const ShardKeyPattern& shardKeyPattern,
     ChunkVersion collectionVersion,
-    const BSONObj& minKey,
-    const BSONObj& maxKey,
+    const ChunkRange& chunkRange,
     const std::vector<BSONObj>& splitPoints) {
     invariant(!splitPoints.empty());
-    invariant(minKey.woCompare(maxKey) < 0);
 
     const size_t kMaxSplitPoints = 8192;
 
@@ -189,6 +144,25 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
                               << " parts at a time."};
     }
 
+    // Sanity check that we are not attempting to split at the boundaries of the chunk. This check
+    // is already performed at chunk split commit time, but we are performing it here for parity
+    // with old auto-split code, which might rely on it.
+    if (SimpleBSONObjComparator::kInstance.evaluate(chunkRange.getMin() == splitPoints.front())) {
+        const std::string msg(str::stream() << "not splitting chunk " << chunkRange.toString()
+                                            << ", split point "
+                                            << splitPoints.front()
+                                            << " is exactly on chunk bounds");
+        return {ErrorCodes::CannotSplit, msg};
+    }
+
+    if (SimpleBSONObjComparator::kInstance.evaluate(chunkRange.getMax() == splitPoints.back())) {
+        const std::string msg(str::stream() << "not splitting chunk " << chunkRange.toString()
+                                            << ", split point "
+                                            << splitPoints.back()
+                                            << " is exactly on chunk bounds");
+        return {ErrorCodes::CannotSplit, msg};
+    }
+
     BSONObjBuilder cmd;
     cmd.append("splitChunk", nss.ns());
     cmd.append("configdb",
@@ -196,8 +170,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     cmd.append("from", shardId.toString());
     cmd.append("keyPattern", shardKeyPattern.toBSON());
     collectionVersion.appendForCommands(&cmd);
-    cmd.append(kMinKey, minKey);
-    cmd.append(kMaxKey, maxKey);
+    chunkRange.append(&cmd);
     cmd.append("splitKeys", splitPoints);
 
     BSONObj cmdObj = cmd.obj();

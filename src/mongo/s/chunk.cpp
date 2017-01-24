@@ -79,6 +79,23 @@ void reloadChunkManager(OperationContext* txn, const std::string ns) {
     config.db()->getChunkManagerIfExists(txn, nss.ns(), true);
 }
 
+uint64_t calculateDesiredChunkSize(uint64_t maxChunkSizeBytes, uint64_t numChunks) {
+    // Splitting faster in early chunks helps spread out an initial load better
+    const uint64_t minChunkSize = 1 << 20;  // 1 MBytes
+
+    if (numChunks <= 1) {
+        return 1024;
+    } else if (numChunks < 3) {
+        return minChunkSize / 2;
+    } else if (numChunks < 10) {
+        return std::max(maxChunkSizeBytes / 4, minChunkSize);
+    } else if (numChunks < 20) {
+        return std::max(maxChunkSizeBytes / 2, minChunkSize);
+    } else {
+        return maxChunkSizeBytes;
+    }
+}
+
 }  // namespace
 
 Chunk::Chunk(OperationContext* txn, ChunkManager* manager, const ChunkType& from)
@@ -179,54 +196,39 @@ BSONObj Chunk::_getExtremeKey(OperationContext* txn, bool doSplitAtLower) const 
     return _manager->getShardKeyPattern().extractShardKeyFromDoc(end);
 }
 
-std::vector<BSONObj> Chunk::_determineSplitPoints(OperationContext* txn, bool atMedian) const {
+std::vector<BSONObj> Chunk::_determineSplitPoints(OperationContext* txn) const {
     // If splitting is not obligatory we may return early if there are not enough data we cap the
     // number of objects that would fall in the first half (before the split point) the rationale is
     // we'll find a split point without traversing all the data.
-    vector<BSONObj> splitPoints;
 
-    if (atMedian) {
-        BSONObj medianKey =
-            uassertStatusOK(shardutil::selectMedianKey(txn,
-                                                       _shardId,
-                                                       NamespaceString(_manager->getns()),
-                                                       _manager->getShardKeyPattern(),
-                                                       _min,
-                                                       _max));
-        if (!medianKey.isEmpty()) {
-            splitPoints.push_back(medianKey);
-        }
-    } else {
-        uint64_t chunkSize = _manager->getCurrentDesiredChunkSize();
+    uint64_t chunkSize = calculateDesiredChunkSize(
+        Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes(), _manager->numChunks());
 
-        // Note: One split point for every 1/2 chunk size.
-        const uint64_t chunkBytesWritten = getBytesWritten();
-        const uint64_t estNumSplitPoints = chunkBytesWritten / chunkSize * 2;
+    // Note: One split point for every 1/2 chunk size.
+    const uint64_t chunkBytesWritten = getBytesWritten();
+    const uint64_t estNumSplitPoints = chunkBytesWritten / chunkSize * 2;
 
-        if (estNumSplitPoints >= kTooManySplitPoints) {
-            // The current desired chunk size will split the chunk into lots of small chunk and at
-            // the worst case this can result into thousands of chunks. So check and see if a bigger
-            // value can be used.
-            chunkSize =
-                std::min(chunkBytesWritten,
-                         Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes());
-        }
+    if (estNumSplitPoints >= kTooManySplitPoints) {
+        // The current desired chunk size will split the chunk into lots of small chunk and at
+        // the worst case this can result into thousands of chunks. So check and see if a bigger
+        // value can be used.
+        chunkSize = std::min(chunkBytesWritten,
+                             Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes());
+    }
 
-        splitPoints =
-            uassertStatusOK(shardutil::selectChunkSplitPoints(txn,
-                                                              _shardId,
-                                                              NamespaceString(_manager->getns()),
-                                                              _manager->getShardKeyPattern(),
-                                                              _min,
-                                                              _max,
-                                                              chunkSize,
-                                                              0,
-                                                              MaxObjectPerChunk));
-        if (splitPoints.size() <= 1) {
-            // No split points means there isn't enough data to split on 1 split point means we have
-            // between half the chunk size to full chunk size so we shouldn't split.
-            splitPoints.clear();
-        }
+    vector<BSONObj> splitPoints =
+        uassertStatusOK(shardutil::selectChunkSplitPoints(txn,
+                                                          _shardId,
+                                                          NamespaceString(_manager->getns()),
+                                                          _manager->getShardKeyPattern(),
+                                                          ChunkRange(_min, _max),
+                                                          chunkSize,
+                                                          0,
+                                                          MaxObjectPerChunk));
+    if (splitPoints.size() <= 1) {
+        // No split points means there isn't enough data to split on 1 split point means we have
+        // between half the chunk size to full chunk size so we shouldn't split.
+        splitPoints.clear();
     }
 
     return splitPoints;
@@ -240,18 +242,9 @@ StatusWith<boost::optional<ChunkRange>> Chunk::split(OperationContext* txn,
         resultingSplits = &dummy;
     }
 
-    bool atMedian = mode == Chunk::atMedian;
-    vector<BSONObj> splitPoints = _determineSplitPoints(txn, atMedian);
+    vector<BSONObj> splitPoints = _determineSplitPoints(txn);
     if (splitPoints.empty()) {
-        string msg;
-        if (atMedian) {
-            msg = "cannot find median in chunk, possibly empty";
-        } else {
-            msg = "chunk not full enough to trigger auto-split";
-        }
-
-        LOG(1) << msg;
-        return Status(ErrorCodes::CannotSplit, msg);
+        return {ErrorCodes::CannotSplit, "chunk not full enough to trigger auto-split"};
     }
 
     // We assume that if the chunk being split is the first (or last) one on the collection,
@@ -264,33 +257,14 @@ StatusWith<boost::optional<ChunkRange>> Chunk::split(OperationContext* txn,
         if (_minIsInf()) {
             BSONObj key = _getExtremeKey(txn, true);
             if (!key.isEmpty()) {
-                splitPoints[0] = key.getOwned();
+                splitPoints.front() = key.getOwned();
             }
         } else if (_maxIsInf()) {
             BSONObj key = _getExtremeKey(txn, false);
             if (!key.isEmpty()) {
-                splitPoints.pop_back();
-                splitPoints.push_back(key);
+                splitPoints.back() = key.getOwned();
             }
         }
-    }
-
-    // Normally, we'd have a sound split point here if the chunk is not empty.
-    // It's also a good place to sanity check.
-    if (SimpleBSONObjComparator::kInstance.evaluate(_min == splitPoints.front())) {
-        string msg(str::stream() << "not splitting chunk " << toString() << ", split point "
-                                 << splitPoints.front()
-                                 << " is exactly on chunk bounds");
-        log() << msg;
-        return Status(ErrorCodes::CannotSplit, msg);
-    }
-
-    if (SimpleBSONObjComparator::kInstance.evaluate(_max == splitPoints.back())) {
-        string msg(str::stream() << "not splitting chunk " << toString() << ", split point "
-                                 << splitPoints.back()
-                                 << " is exactly on chunk bounds");
-        log() << msg;
-        return Status(ErrorCodes::CannotSplit, msg);
     }
 
     auto splitStatus = shardutil::splitChunkAtMultiplePoints(txn,
@@ -298,8 +272,7 @@ StatusWith<boost::optional<ChunkRange>> Chunk::split(OperationContext* txn,
                                                              NamespaceString(_manager->getns()),
                                                              _manager->getShardKeyPattern(),
                                                              _manager->getVersion(),
-                                                             _min,
-                                                             _max,
+                                                             ChunkRange(_min, _max),
                                                              splitPoints);
     if (!splitStatus.isOK()) {
         return splitStatus.getStatus();
@@ -331,7 +304,9 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
     const uint64_t chunkBytesWritten = getBytesWritten();
 
     try {
-        uint64_t splitThreshold = _manager->getCurrentDesiredChunkSize();
+        uint64_t splitThreshold = calculateDesiredChunkSize(
+            Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
+            _manager->numChunks());
 
         if (_minIsInf() || _maxIsInf()) {
             splitThreshold = static_cast<uint64_t>((double)splitThreshold * 0.9);
