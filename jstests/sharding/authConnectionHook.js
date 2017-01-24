@@ -1,5 +1,13 @@
-// Test for SERVER-8786 - if the first operation on an authenticated shard is moveChunk, it breaks
-// the cluster.
+/**
+ * Test for SERVER-8786 - if the first operation on an authenticated shard is moveChunk, it breaks
+ * the cluster.
+ *
+ * Any tests that restart a shard mongod and send sharding requests to it after restart cannot make
+ * the shard use an in-memory storage engine, since the shardIdentity document will be lost after
+ * restart.
+ *
+ * @tags: [requires_persistence]
+ */
 (function() {
     'use strict';
 
