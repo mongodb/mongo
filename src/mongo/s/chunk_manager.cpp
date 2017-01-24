@@ -66,7 +66,6 @@ namespace mongo {
 
 using std::make_pair;
 using std::map;
-using std::max;
 using std::pair;
 using std::set;
 using std::shared_ptr;
@@ -395,8 +394,8 @@ void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
                 primaryShardId,
                 NamespaceString(_ns),
                 _keyPattern,
-                _keyPattern.getKeyPattern().globalMin(),
-                _keyPattern.getKeyPattern().globalMax(),
+                ChunkRange(_keyPattern.getKeyPattern().globalMin(),
+                           _keyPattern.getKeyPattern().globalMax()),
                 Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
                 0,
                 0));
@@ -810,27 +809,6 @@ ChunkManager::ChunkRangeMap ChunkManager::_constructRanges(const ChunkMap& chunk
     invariant(allOfType(MaxKey, chunkRangeMap.rbegin()->first));
 
     return chunkRangeMap;
-}
-
-uint64_t ChunkManager::getCurrentDesiredChunkSize() const {
-    // split faster in early chunks helps spread out an initial load better
-    const uint64_t minChunkSize = 1 << 20;  // 1 MBytes
-
-    uint64_t splitThreshold = grid.getBalancerConfiguration()->getMaxChunkSizeBytes();
-
-    int nc = numChunks();
-
-    if (nc <= 1) {
-        return 1024;
-    } else if (nc < 3) {
-        return minChunkSize / 2;
-    } else if (nc < 10) {
-        splitThreshold = max(splitThreshold / 4, minChunkSize);
-    } else if (nc < 20) {
-        splitThreshold = max(splitThreshold / 2, minChunkSize);
-    }
-
-    return splitThreshold;
 }
 
 repl::OpTime ChunkManager::getConfigOpTime() const {
