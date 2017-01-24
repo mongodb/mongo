@@ -21,6 +21,9 @@ class ReplicaSetFixture(interface.ReplFixture):
     Fixture which provides JSTests with a replica set to run against.
     """
 
+    # Error response codes copied from mongo/base/error_codes.err.
+    _NODE_NOT_FOUND = 74
+
     def __init__(self,
                  logger,
                  job_num,
@@ -125,7 +128,26 @@ class ReplicaSetFixture(interface.ReplFixture):
             initiate_cmd_obj["replSetInitiate"]["settings"] = replset_settings
 
         self.logger.info("Issuing replSetInitiate command...%s", initiate_cmd_obj)
-        client.admin.command(initiate_cmd_obj)
+
+        # replSetInitiate and replSetReconfig commands can fail with a NodeNotFound error
+        # if a heartbeat times out during the quorum check. We retry three times to reduce
+        # the chance of failing this way.
+        num_initiate_attempts = 3
+        for attempt in range(1, num_initiate_attempts + 1):
+            try:
+                client.admin.command(initiate_cmd_obj)
+                break
+            except pymongo.errors.OperationFailure as err:
+                # Retry on NodeNotFound errors from the "replSetInitiate" command.
+                if err.code != ReplicaSetFixture._NODE_NOT_FOUND:
+                    raise
+
+                msg = "replSetInitiate failed attempt {0} of {1} with error: {2}".format(
+                    attempt, num_initiate_attempts, err)
+                self.logger.error(msg)
+                if attempt == num_initiate_attempts:
+                    raise
+                time.sleep(5)  # Wait a little bit before trying again.
 
     def await_ready(self):
         # Wait for the primary to be elected.
