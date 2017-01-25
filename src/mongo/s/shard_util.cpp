@@ -86,15 +86,15 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
                                                         const ShardKeyPattern& shardKeyPattern,
                                                         const ChunkRange& chunkRange,
                                                         long long chunkSizeBytes,
-                                                        int maxPoints,
-                                                        int maxObjs) {
+                                                        boost::optional<int> maxObjs) {
     BSONObjBuilder cmd;
     cmd.append("splitVector", nss.ns());
     cmd.append("keyPattern", shardKeyPattern.toBSON());
     chunkRange.append(&cmd);
     cmd.append("maxChunkSizeBytes", chunkSizeBytes);
-    cmd.append("maxSplitPoints", maxPoints);
-    cmd.append("maxChunkObjects", maxObjs);
+    if (maxObjs) {
+        cmd.append("maxChunkObjects", *maxObjs);
+    }
 
     auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
     if (!shardStatus.isOK()) {

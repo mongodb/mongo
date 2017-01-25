@@ -68,8 +68,8 @@ StatusWith<long long> retrieveTotalShardSize(OperationContext* txn, const ShardI
  * shardKeyPattern The shard key which corresponds to this sharded namespace.
  * chunkRange Bounds of the chunk to be split.
  * chunkSize Chunk size to target in bytes.
- * maxPoints Limits the number of split points that are needed. Zero means max.
- * maxObjs Limits the number of objects in each chunk. Zero means max.
+ * maxObjs Limits the number of objects in each chunk. Zero means max, unspecified means use the
+ *         server default.
  */
 StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
                                                         const ShardId& shardId,
@@ -77,8 +77,7 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* txn,
                                                         const ShardKeyPattern& shardKeyPattern,
                                                         const ChunkRange& chunkRange,
                                                         long long chunkSizeBytes,
-                                                        int maxPoints,
-                                                        int maxObjs);
+                                                        boost::optional<int> maxObjs);
 
 /**
  * Asks the specified shard to split the chunk described by min/maxKey into the respective split

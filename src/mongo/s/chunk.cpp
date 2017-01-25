@@ -99,22 +99,14 @@ uint64_t calculateDesiredChunkSize(uint64_t maxChunkSizeBytes, uint64_t numChunk
 }  // namespace
 
 Chunk::Chunk(OperationContext* txn, ChunkManager* manager, const ChunkType& from)
-    : _manager(manager), _lastmod(from.getVersion()), _dataWritten(mkDataWritten()) {
-    string ns = from.getNS();
-    _shardId = from.getShard();
-
-    verify(_lastmod.isSet());
-
-    _min = from.getMin().getOwned();
-    _max = from.getMax().getOwned();
-
-    _jumbo = from.getJumbo();
-
-    uassert(10170, "Chunk needs a ns", !ns.empty());
-    uassert(13327, "Chunk ns must match server ns", ns == _manager->getns());
-    uassert(10172, "Chunk needs a min", !_min.isEmpty());
-    uassert(10173, "Chunk needs a max", !_max.isEmpty());
-    uassert(10171, "Chunk needs a server", grid.shardRegistry()->getShard(txn, _shardId).isOK());
+    : _manager(manager),
+      _min(from.getMin().getOwned()),
+      _max(from.getMax().getOwned()),
+      _shardId(from.getShard()),
+      _lastmod(from.getVersion()),
+      _jumbo(from.getJumbo()),
+      _dataWritten(mkDataWritten()) {
+    invariantOK(from.validate());
 }
 
 Chunk::Chunk(ChunkManager* info,
@@ -223,8 +215,7 @@ std::vector<BSONObj> Chunk::_determineSplitPoints(OperationContext* txn) const {
                                                           _manager->getShardKeyPattern(),
                                                           ChunkRange(_min, _max),
                                                           chunkSize,
-                                                          0,
-                                                          MaxObjectPerChunk));
+                                                          boost::none));
     if (splitPoints.size() <= 1) {
         // No split points means there isn't enough data to split on 1 split point means we have
         // between half the chunk size to full chunk size so we shouldn't split.
@@ -235,7 +226,6 @@ std::vector<BSONObj> Chunk::_determineSplitPoints(OperationContext* txn) const {
 }
 
 StatusWith<boost::optional<ChunkRange>> Chunk::split(OperationContext* txn,
-                                                     SplitPointMode mode,
                                                      size_t* resultingSplits) const {
     size_t dummy;
     if (resultingSplits == NULL) {
@@ -252,8 +242,7 @@ StatusWith<boost::optional<ChunkRange>> Chunk::split(OperationContext* txn,
     // the very first (or last) key as a split point.
     // This heuristic is skipped for "special" shard key patterns that are not likely to
     // produce monotonically increasing or decreasing values (e.g. hashed shard keys).
-    if (mode == Chunk::autoSplitInternal &&
-        KeyPattern::isOrderedKeyPattern(_manager->getShardKeyPattern().toBSON())) {
+    if (KeyPattern::isOrderedKeyPattern(_manager->getShardKeyPattern().toBSON())) {
         if (_minIsInf()) {
             BSONObj key = _getExtremeKey(txn, true);
             if (!key.isEmpty()) {
@@ -340,7 +329,7 @@ bool Chunk::splitIfShould(OperationContext* txn, long dataWritten) {
                << " splitThreshold: " << splitThreshold;
 
         size_t splitCount = 0;
-        auto splitStatus = split(txn, Chunk::autoSplitInternal, &splitCount);
+        auto splitStatus = split(txn, &splitCount);
         if (!splitStatus.isOK()) {
             // Split would have issued a message if we got here. This means there wasn't enough data
             // to split, so don't want to try again until we have considerably more data.
@@ -441,6 +430,8 @@ string Chunk::toString() const {
 }
 
 void Chunk::markAsJumbo(OperationContext* txn) const {
+    log() << "Marking chunk " << toString() << " as jumbo.";
+
     // set this first
     // even if we can't set it in the db
     // at least this mongos won't try and keep moving
