@@ -676,6 +676,25 @@ tasks:
     - func: "make test log artifact"
     - func: "analyze"
 
+- name: initialsync-logkeeper_WT
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  exec_timeout_secs: 216000 # 2.5 days
+  commands:
+    - func: "prepare environment"
+    - func: "infrastructure provisioning"
+    - func: "configure mongodb cluster"
+      vars:
+        storageEngine: "wiredTiger"
+    - func: "run test"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "initialsync-logkeeper"
+        testList: "initialsync-logkeeper"
+    - func: "make test log artifact"
+    - func: "analyze"
+
 
 #######################################
 #               Modules               #
@@ -806,6 +825,22 @@ buildvariants:
     - name: initialsync_MMAPv1
     - name: initialsync_WT_dr
     - name: initialsync_MMAPv1_dr
+
+- name: linux-replSet-initialsync-logkeeper
+  display_name: Linux ReplSet Initial Sync LogKeeper
+  batchtime: 10080 # 7 days
+  modules: *modules
+  expansions:
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    setup: initialsync-logkeeper
+    cluster: initialsync-logkeeper
+    platform: linux
+    use_scons_cache: true
+    project: *project
+  run_on:
+      - "rhel70-perf-initialsync-logkeeper"
+  tasks:
+    - name: initialsync-logkeeper_WT
 
 - name: linux-oplog-compare
   display_name: Linux Oplog Compare
