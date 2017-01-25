@@ -300,6 +300,7 @@ var BackupRestoreTest = function(options) {
         rst.waitForState(hiddenNode, ReplSetTest.State.SECONDARY);
 
         // Wait for secondaries to finish catching up before shutting down.
+        rst.awaitNodesAgreeOnPrimary();
         primary = rst.getPrimary();
         assert.writeOK(primary.getDB("test").foo.insert(
             {}, {writeConcern: {w: rst.nodes.length, wtimeout: 10 * 60 * 1000}}));
