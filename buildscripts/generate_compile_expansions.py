@@ -69,15 +69,11 @@ else:
     system_id_path = "/etc/mongodb-build-system-id"
     default_cache_path_base = "/data/scons-cache"
 
-print 'scons_cache_path_base: {0}'.format(default_cache_path_base)
-
 if os.path.isfile(system_id_path):
     with open(system_id_path, "r") as f:
-        build_system_id = f.readline().strip()
-        default_cache_path = os.path.join(default_cache_path_base, build_system_id)
+        default_cache_path = os.path.join(default_cache_path_base, f.readline().strip())
 
         print "scons_cache_path: {0}".format(default_cache_path)
-        print "build_system_id: {0}".format(build_system_id)
 
         scons_cache_mode = os.getenv("SCONS_CACHE_MODE")
 
