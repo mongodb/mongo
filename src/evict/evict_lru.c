@@ -285,7 +285,7 @@ __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 	conn = S2C(session);
 	cache = conn->cache;
 
-#ifdef HAVE_DIAGNOSTIC
+#if defined(HAVE_DIAGNOSTIC) || defined(HAVE_VERBOSE)
 	/*
 	 * Ensure the cache stuck timer is initialized when starting eviction.
 	 */
@@ -353,12 +353,12 @@ err:		WT_PANIC_MSG(session, ret, "cache eviction thread error");
 static int
 __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 {
+#if defined(HAVE_DIAGNOSTIC) || defined(HAVE_VERBOSE)
+	struct timespec now;
+#endif
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-#ifdef HAVE_DIAGNOSTIC
-	struct timespec now;
-#endif
 	uint64_t orig_pages_evicted;
 
 	conn = S2C(session);
@@ -395,11 +395,15 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 		cache->pages_evicted = 0;
 	} else if (cache->pages_evicted != cache->pages_evict) {
 		cache->pages_evicted = cache->pages_evict;
-#ifdef HAVE_DIAGNOSTIC
+#if defined(HAVE_DIAGNOSTIC) || defined(HAVE_VERBOSE)
 		__wt_epoch(session, &cache->stuck_ts);
 	} else if (!F_ISSET(conn, WT_CONN_IN_MEMORY)) {
 		/*
-		 * After being stuck for 5 minutes, give up.
+		 * If we're stuck for 5 minutes in diagnostic mode, or the
+		 * verbose evict_stuck flag is configured, log the cache
+		 * and transaction state.
+		 *
+		 * If we're stuck for 5 minutes in diagnostic mode, give up.
 		 *
 		 * We don't do this check for in-memory workloads because
 		 * application threads are not blocked by the cache being full.
@@ -408,11 +412,22 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 		 */
 		__wt_epoch(session, &now);
 		if (WT_TIMEDIFF_SEC(now, cache->stuck_ts) > 300) {
-			ret = ETIMEDOUT;
-			__wt_err(session, ret,
+#if defined(HAVE_DIAGNOSTIC)
+			__wt_err(session, ETIMEDOUT,
 			    "Cache stuck for too long, giving up");
-			WT_TRET(__wt_dump_stuck_info(session, NULL));
+			ret = ETIMEDOUT;
+			WT_TRET(__wt_verbose_dump_txn(session));
+			WT_TRET(__wt_verbose_dump_cache(session));
 			return (ret);
+#elif defined(HAVE_VERBOSE)
+			if (WT_VERBOSE_ISSET(session, WT_VERB_EVICT_STUCK)) {
+				WT_RET(__wt_verbose_dump_txn(session));
+				WT_RET(__wt_verbose_dump_cache(session));
+
+				/* Reset the timer. */
+				__wt_epoch(session, &cache->stuck_ts);
+			}
+#endif
 		}
 #endif
 	}
@@ -2184,226 +2199,138 @@ __wt_evict_priority_clear(WT_SESSION_IMPL *session)
 	S2BT(session)->evict_priority = 0;
 }
 
-#ifdef HAVE_DIAGNOSTIC
+#if defined(HAVE_DIAGNOSTIC) || defined(HAVE_VERBOSE)
 /*
- * __dump_txn_state --
- *	Output debugging information about the global transaction state.
+ * __verbose_dump_cache_single --
+ *	Output diagnostic information about a single file in the cache.
  */
 static int
-__dump_txn_state(WT_SESSION_IMPL *session, FILE *fp)
+__verbose_dump_cache_single(WT_SESSION_IMPL *session,
+    uint64_t *total_bytesp, uint64_t *total_dirty_bytesp)
 {
-	WT_CONNECTION_IMPL *conn;
-	WT_TXN_GLOBAL *txn_global;
-	WT_TXN *txn;
-	WT_TXN_STATE *s;
-	const char *iso_tag;
-	uint64_t id;
-	uint32_t i, session_cnt;
+	WT_DATA_HANDLE *dhandle;
+	WT_PAGE *page;
+	WT_REF *next_walk;
+	size_t size;
+	uint64_t intl_bytes, intl_bytes_max, intl_dirty_bytes;
+	uint64_t intl_dirty_bytes_max, intl_dirty_pages, intl_pages;
+	uint64_t leaf_bytes, leaf_bytes_max, leaf_dirty_bytes;
+	uint64_t leaf_dirty_bytes_max, leaf_dirty_pages, leaf_pages;
 
-	conn = S2C(session);
-	txn_global = &conn->txn_global;
-	WT_ORDERED_READ(session_cnt, conn->session_cnt);
+	intl_bytes = intl_bytes_max = intl_dirty_bytes = 0;
+	intl_dirty_bytes_max = intl_dirty_pages = intl_pages = 0;
+	leaf_bytes = leaf_bytes_max = leaf_dirty_bytes = 0;
+	leaf_dirty_bytes_max = leaf_dirty_pages = leaf_pages = 0;
 
-	/* Note: odd string concatenation avoids spelling errors. */
-	if (fprintf(fp, "==========\n" "transaction state dump\n") < 0)
-		return (EIO);
+	next_walk = NULL;
+	while (__wt_tree_walk(session, &next_walk,
+	    WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_WAIT) == 0 &&
+	    next_walk != NULL) {
+		page = next_walk->page;
+		size = page->memory_footprint;
 
-	if (fprintf(fp,
-	    "current ID: %" PRIu64 "\n"
-	    "last running ID: %" PRIu64 "\n"
-	    "oldest ID: %" PRIu64 "\n"
-	    "oldest named snapshot ID: %" PRIu64 "\n",
-	    txn_global->current, txn_global->last_running,
-	    txn_global->oldest_id, txn_global->nsnap_oldest_id) < 0)
-		return (EIO);
-
-	if (fprintf(fp,
-	    "checkpoint running? %s\n"
-	    "checkpoint generation: %" PRIu64 "\n"
-	    "checkpoint pinned ID: %" PRIu64 "\n"
-	    "checkpoint txn ID: %" PRIu64 "\n"
-	    "session count: %" PRIu32 "\n",
-	    txn_global->checkpoint_running ? "yes" : "no",
-	    txn_global->checkpoint_gen,
-	    txn_global->checkpoint_pinned,
-	    txn_global->checkpoint_txnid,
-	    session_cnt) < 0)
-		return (EIO);
-
-	if (fprintf(fp, "Dumping transaction state of active sessions\n") < 0)
-		return (EIO);
-
-	/*
-	 * Walk each session transaction state and dump information. Accessing
-	 * the content of session handles is not thread safe, so some
-	 * information may change while traversing if other threads are active
-	 * at the same time, which is OK since this is diagnostic code.
-	 */
-	for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
-		/* Skip sessions with no active transaction */
-		if ((id = s->id) == WT_TXN_NONE && s->pinned_id == WT_TXN_NONE)
-			continue;
-
-		txn = &conn->sessions[i].txn;
-		iso_tag = "INVALID";
-		switch (txn->isolation) {
-		case WT_ISO_READ_COMMITTED:
-			iso_tag = "WT_ISO_READ_COMMITTED";
-			break;
-		case WT_ISO_READ_UNCOMMITTED:
-			iso_tag = "WT_ISO_READ_UNCOMMITTED";
-			break;
-		case WT_ISO_SNAPSHOT:
-			iso_tag = "WT_ISO_SNAPSHOT";
-			break;
+		if (WT_PAGE_IS_INTERNAL(page)) {
+			++intl_pages;
+			intl_bytes += size;
+			intl_bytes_max = WT_MAX(intl_bytes_max, size);
+			if (__wt_page_is_modified(page)) {
+				++intl_dirty_pages;
+				intl_dirty_bytes += size;
+				intl_dirty_bytes_max =
+				    WT_MAX(intl_dirty_bytes_max, size);
+			}
+		} else {
+			++leaf_pages;
+			leaf_bytes += size;
+			leaf_bytes_max = WT_MAX(leaf_bytes_max, size);
+			if (__wt_page_is_modified(page)) {
+				++leaf_dirty_pages;
+				leaf_dirty_bytes += size;
+				leaf_dirty_bytes_max =
+				    WT_MAX(leaf_dirty_bytes_max, size);
+			}
 		}
-
-		if (fprintf(fp,
-		    "ID: %6" PRIu64
-		    ", mod count: %u"
-		    ", pinned ID: %" PRIu64
-		    ", snap min: %" PRIu64
-		    ", snap max: %" PRIu64
-		    ", metadata pinned ID: %" PRIu64
-		    ", flags: 0x%08" PRIx32
-		    ", name: %s"
-		    ", isolation: %s" "\n",
-		    id,
-		    txn->mod_count,
-		    s->pinned_id,
-		    txn->snap_min,
-		    txn->snap_max,
-		    s->metadata_pinned,
-		    txn->flags,
-		    conn->sessions[i].name == NULL ?
-		    "EMPTY" : conn->sessions[i].name,
-		    iso_tag) < 0)
-			return (EIO);
 	}
+
+	dhandle = session->dhandle;
+	if (dhandle->checkpoint == NULL)
+		WT_RET(__wt_msg(session, "%s(<live>):", dhandle->name));
+	else
+		WT_RET(__wt_msg(session, "%s(checkpoint=%s):",
+		    dhandle->name, dhandle->checkpoint));
+	if (intl_pages != 0)
+		WT_RET(__wt_msg(session,
+		    "internal: "
+		    "%" PRIu64 " pages, "
+		    "%" PRIu64 "MB, "
+		    "%" PRIu64 "/%" PRIu64 " clean/dirty pages, "
+		    "%" PRIu64 "/%" PRIu64 " clean/dirty MB, "
+		    "%" PRIu64 "MB max page, "
+		    "%" PRIu64 "MB max dirty page",
+		    intl_pages,
+		    intl_bytes / WT_MEGABYTE,
+		    intl_pages - intl_dirty_pages,
+		    intl_dirty_pages,
+		    (intl_bytes - intl_dirty_bytes) / WT_MEGABYTE,
+		    intl_dirty_bytes / WT_MEGABYTE,
+		    intl_bytes_max / WT_MEGABYTE,
+		    intl_dirty_bytes_max / WT_MEGABYTE));
+	if (leaf_pages != 0)
+		WT_RET(__wt_msg(session,
+		    "leaf: "
+		    "%" PRIu64 " pages, "
+		    "%" PRIu64 "MB, "
+		    "%" PRIu64 "/%" PRIu64 " clean/dirty pages, "
+		    "%" PRIu64 "/%" PRIu64 " clean/dirty MB, "
+		    "%" PRIu64 "MB max page, "
+		    "%" PRIu64 "MB max dirty page",
+		    leaf_pages,
+		    leaf_bytes / WT_MEGABYTE,
+		    leaf_pages - leaf_dirty_pages,
+		    leaf_dirty_pages,
+		    (leaf_bytes - leaf_dirty_bytes) / WT_MEGABYTE,
+		    leaf_dirty_bytes / WT_MEGABYTE,
+		    leaf_bytes_max / WT_MEGABYTE,
+		    leaf_dirty_bytes_max / WT_MEGABYTE));
+
+	*total_bytesp += intl_bytes + leaf_bytes;
+	*total_dirty_bytesp += intl_dirty_bytes + leaf_dirty_bytes;
 
 	return (0);
 }
 
 /*
- * __dump_cache --
- *	Output debugging information about the size of the files in cache.
+ * __wt_verbose_dump_cache --
+ *	Output diagnostic information about the cache.
  */
-static int
-__dump_cache(WT_SESSION_IMPL *session, FILE *fp)
+int
+__wt_verbose_dump_cache(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DATA_HANDLE *dhandle, *saved_dhandle;
-	WT_PAGE *page;
-	WT_REF *next_walk;
-	uint64_t intl_bytes, intl_bytes_max, intl_dirty_bytes;
-	uint64_t intl_dirty_bytes_max, intl_dirty_pages, intl_pages;
-	uint64_t leaf_bytes, leaf_bytes_max, leaf_dirty_bytes;
-	uint64_t leaf_dirty_bytes_max, leaf_dirty_pages, leaf_pages;
+	WT_DATA_HANDLE *dhandle;
+	WT_DECL_RET;
 	uint64_t total_bytes, total_dirty_bytes;
-	size_t size;
 
 	conn = S2C(session);
 	total_bytes = total_dirty_bytes = 0;
 
-	/* Note: odd string concatenation avoids spelling errors. */
-	if (fprintf(fp, "==========\n" "cache dump\n") < 0)
-		return (EIO);
+	WT_RET(__wt_msg(session, "%s", WT_DIVIDER));
+	WT_RET(__wt_msg(session, "cache dump"));
 
-	saved_dhandle = session->dhandle;
+	__wt_spin_lock(session, &conn->dhandle_lock);
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			continue;
 
-		intl_bytes = intl_bytes_max = intl_dirty_bytes = 0;
-		intl_dirty_bytes_max = intl_dirty_pages = intl_pages = 0;
-		leaf_bytes = leaf_bytes_max = leaf_dirty_bytes = 0;
-		leaf_dirty_bytes_max = leaf_dirty_pages = leaf_pages = 0;
-
-		next_walk = NULL;
-		session->dhandle = dhandle;
-		while (__wt_tree_walk(session, &next_walk,
-		    WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_WAIT) == 0 &&
-		    next_walk != NULL) {
-			page = next_walk->page;
-			size = page->memory_footprint;
-
-			if (WT_PAGE_IS_INTERNAL(page)) {
-				++intl_pages;
-				intl_bytes += size;
-				intl_bytes_max = WT_MAX(intl_bytes_max, size);
-				if (__wt_page_is_modified(page)) {
-					++intl_dirty_pages;
-					intl_dirty_bytes += size;
-					intl_dirty_bytes_max =
-					    WT_MAX(intl_dirty_bytes_max, size);
-				}
-			} else {
-				++leaf_pages;
-				leaf_bytes += size;
-				leaf_bytes_max = WT_MAX(leaf_bytes_max, size);
-				if (__wt_page_is_modified(page)) {
-					++leaf_dirty_pages;
-					leaf_dirty_bytes += size;
-					leaf_dirty_bytes_max =
-					    WT_MAX(leaf_dirty_bytes_max, size);
-				}
-			}
-		}
-		session->dhandle = NULL;
-
-		if (dhandle->checkpoint == NULL) {
-			if (fprintf(fp,
-			    "%s(<live>): \n", dhandle->name) < 0)
-				return (EIO);
-		} else {
-			if (fprintf(fp, "%s(checkpoint=%s): \n",
-			    dhandle->name, dhandle->checkpoint) < 0)
-				return (EIO);
-		}
-		if (intl_pages != 0) {
-			if (fprintf(fp,
-			    "\t" "internal: "
-			    "%" PRIu64 " pages, "
-			    "%" PRIu64 "MB, "
-			    "%" PRIu64 "/%" PRIu64 " clean/dirty pages, "
-			    "%" PRIu64 "/%" PRIu64 " clean/dirty MB, "
-			    "%" PRIu64 "MB max page, "
-			    "%" PRIu64 "MB max dirty page\n",
-			    intl_pages,
-			    intl_bytes >> 20,
-			    intl_pages - intl_dirty_pages,
-			    intl_dirty_pages,
-			    (intl_bytes - intl_dirty_bytes) >> 20,
-			    intl_dirty_bytes >> 20,
-			    intl_bytes_max >> 20,
-			    intl_dirty_bytes_max >> 20) < 0)
-				return (EIO);
-		}
-		if (leaf_pages != 0) {
-			if (fprintf(fp,
-			    "\t" "leaf: "
-			    "%" PRIu64 " pages, "
-			    "%" PRIu64 "MB, "
-			    "%" PRIu64 "/%" PRIu64 " clean/dirty pages, "
-			    "%" PRIu64 "/%" PRIu64 " clean/dirty MB, "
-			    "%" PRIu64 "MB max page, "
-			    "%" PRIu64 "MB max dirty page\n",
-			    leaf_pages,
-			    leaf_bytes >> 20,
-			    leaf_pages - leaf_dirty_pages,
-			    leaf_dirty_pages,
-			    (leaf_bytes - leaf_dirty_bytes) >> 20,
-			    leaf_dirty_bytes >> 20,
-			    leaf_bytes_max >> 20,
-			    leaf_dirty_bytes_max >> 20) < 0)
-				return (EIO);
-		}
-
-		total_bytes += intl_bytes + leaf_bytes;
-		total_dirty_bytes += intl_dirty_bytes + leaf_dirty_bytes;
+		WT_WITH_DHANDLE(session, dhandle,
+		    ret = __verbose_dump_cache_single(
+		    session, &total_bytes, &total_dirty_bytes));
+		if (ret != 0)
+			break;
 	}
-	session->dhandle = saved_dhandle;
+	__wt_spin_unlock(session, &conn->dhandle_lock);
+	WT_RET(ret);
 
 	/*
 	 * Apply the overhead percentage so our total bytes are comparable with
@@ -2411,39 +2338,16 @@ __dump_cache(WT_SESSION_IMPL *session, FILE *fp)
 	 */
 	total_bytes = __wt_cache_bytes_plus_overhead(conn->cache, total_bytes);
 
-	if (fprintf(fp,
+	WT_RET(__wt_msg(session,
 	    "cache dump: "
-	    "total found: %" PRIu64 "MB vs tracked inuse %" PRIu64 "MB\n"
-	    "total dirty bytes: %" PRIu64 "MB\n",
-	    total_bytes >> 20, __wt_cache_bytes_inuse(conn->cache) >> 20,
-	    total_dirty_bytes >> 20) < 0)
-		return (EIO);
-	if (fprintf(fp, "==========\n") < 0)
-		return (EIO);
+	    "total found: %" PRIu64 "MB vs tracked inuse %" PRIu64 "MB",
+	    total_bytes / WT_MEGABYTE,
+	    __wt_cache_bytes_inuse(conn->cache) / WT_MEGABYTE));
+	WT_RET(__wt_msg(session,
+	    "total dirty bytes: %" PRIu64 "MB",
+	    total_dirty_bytes / WT_MEGABYTE));
+	WT_RET(__wt_msg(session, "%s", WT_DIVIDER));
 
 	return (0);
-}
-
-/*
- * __wt_dump_stuck_info --
- *	Dump debugging information to a file (default stderr) about the state
- *	of WiredTiger when we have determined that the cache is stuck full.
- */
-int
-__wt_dump_stuck_info(WT_SESSION_IMPL *session, const char *ofile)
-{
-	FILE *fp;
-	WT_DECL_RET;
-
-	if (ofile == NULL)
-		fp = stderr;
-	else if ((fp = fopen(ofile, "w")) == NULL)
-		return (EIO);
-
-	WT_ERR(__dump_txn_state(session, fp));
-	WT_ERR(__dump_cache(session, fp));
-err:	if (ofile != NULL && fclose(fp) != 0)
-		return (EIO);
-	return (ret);
 }
 #endif

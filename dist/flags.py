@@ -64,6 +64,7 @@ flags = {
         'VERB_COMPACT',
         'VERB_EVICT',
         'VERB_EVICTSERVER',
+        'VERB_EVICT_STUCK',
         'VERB_FILEOPS',
         'VERB_HANDLEOPS',
         'VERB_LOG',
