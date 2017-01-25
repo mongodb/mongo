@@ -241,6 +241,9 @@ void ReplicationCoordinatorExternalStateMock::dropAllSnapshots() {}
 void ReplicationCoordinatorExternalStateMock::updateCommittedSnapshot(SnapshotName newCommitPoint) {
 }
 
+void ReplicationCoordinatorExternalStateMock::createSnapshot(OperationContext* txn,
+                                                             SnapshotName name) {}
+
 void ReplicationCoordinatorExternalStateMock::forceSnapshotCreation() {}
 
 bool ReplicationCoordinatorExternalStateMock::snapshotsEnabled() const {
