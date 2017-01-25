@@ -102,10 +102,9 @@ public:
 
     /**
      * Idempotent method, which causes the current ongoing migration to abort only if it has the
-     * specified session id, otherwise returns false. If the migration is already aborted, does
-     * nothing.
+     * specified session id. If the migration is already aborted, does nothing.
      */
-    bool abort(const MigrationSessionId& sessionId);
+    Status abort(const MigrationSessionId& sessionId);
 
     /**
      * Same as 'abort' above, but unconditionally aborts the current migration without checking the
@@ -113,7 +112,7 @@ public:
      */
     void abortWithoutSessionIdCheck();
 
-    bool startCommit(const MigrationSessionId& sessionId);
+    Status startCommit(const MigrationSessionId& sessionId);
 
 private:
     /**
