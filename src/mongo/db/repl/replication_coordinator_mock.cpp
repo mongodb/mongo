@@ -429,7 +429,9 @@ SnapshotName ReplicationCoordinatorMock::reserveSnapshotName(OperationContext* t
 
 void ReplicationCoordinatorMock::forceSnapshotCreation() {}
 
-void ReplicationCoordinatorMock::onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) {}
+void ReplicationCoordinatorMock::createSnapshot(OperationContext* txn,
+                                                OpTime timeOfSnapshot,
+                                                SnapshotName name){};
 
 void ReplicationCoordinatorMock::dropAllSnapshots() {}
 

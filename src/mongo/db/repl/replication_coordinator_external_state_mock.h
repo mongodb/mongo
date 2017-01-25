@@ -90,6 +90,7 @@ public:
     virtual void signalApplierToCancelFetcher();
     virtual void dropAllSnapshots();
     virtual void updateCommittedSnapshot(SnapshotName newCommitPoint);
+    virtual void createSnapshot(OperationContext* txn, SnapshotName name);
     virtual void forceSnapshotCreation();
     virtual bool snapshotsEnabled() const;
     virtual void notifyOplogMetadataWaiters();

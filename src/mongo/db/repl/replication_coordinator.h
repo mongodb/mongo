@@ -750,9 +750,12 @@ public:
     virtual void forceSnapshotCreation() = 0;
 
     /**
-     * Called when a new snapshot is created.
+     * Creates a new snapshot in the storage engine and registers it for use in the replication
+     * coordinator.
      */
-    virtual void onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) = 0;
+    virtual void createSnapshot(OperationContext* txn,
+                                OpTime timeOfSnapshot,
+                                SnapshotName name) = 0;
 
     /**
      * Blocks until either the current committed snapshot is at least as high as 'untilSnapshot',

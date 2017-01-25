@@ -3479,9 +3479,11 @@ size_t ReplicationCoordinatorImpl::getNumUncommittedSnapshots() {
     return _uncommittedSnapshotsSize.load();
 }
 
-void ReplicationCoordinatorImpl::onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) {
+void ReplicationCoordinatorImpl::createSnapshot(OperationContext* txn,
+                                                OpTime timeOfSnapshot,
+                                                SnapshotName name) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-
+    _externalState->createSnapshot(txn, name);
     auto snapshotInfo = SnapshotInfo{timeOfSnapshot, name};
 
     if (timeOfSnapshot <= _lastCommittedOpTime) {

@@ -301,7 +301,9 @@ public:
 
     virtual void forceSnapshotCreation() override;
 
-    virtual void onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name) override;
+    virtual void createSnapshot(OperationContext* txn,
+                                OpTime timeOfSnapshot,
+                                SnapshotName name) override;
 
     virtual OpTime getCurrentCommittedSnapshotOpTime() const override;
 

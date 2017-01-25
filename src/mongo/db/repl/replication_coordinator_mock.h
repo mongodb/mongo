@@ -241,7 +241,9 @@ public:
 
     virtual void forceSnapshotCreation() override;
 
-    virtual void onSnapshotCreate(OpTime timeOfSnapshot, SnapshotName name);
+    virtual void createSnapshot(OperationContext* txn,
+                                OpTime timeOfSnapshot,
+                                SnapshotName name) override;
 
     virtual void dropAllSnapshots() override;
 
