@@ -11,8 +11,6 @@
  *
  * @param {Object} options An object with the following fields:
  *   {
- *     name {string}: name of this backup/restore test. Required.
- *     storageEngine {string}: name of storage engine. Required.
  *     backup {string}: backup method. Must be one of: fsyncLock, rolling, stopStart. Required.
  *     nodes {number}: number of nodes in replica set initially (excluding hidden secondary node to
  *                     be added during test). Default: 3.
@@ -128,11 +126,7 @@ var BackupRestoreTest = function(options) {
 
         // Test options
         // Test name
-        assert(options.name, 'Test name option not supplied');
-        var testName = options.name;
-
-        // Storage engine being tested
-        var storageEngine = options.storageEngine;
+        var testName = jsTest.name();
 
         // Backup type (must be specified)
         var allowedBackupKeys = ['fsyncLock', 'stopStart', 'rolling'];
@@ -154,17 +148,17 @@ var BackupRestoreTest = function(options) {
         var dbpathFormat = dbpathPrefix + '/mongod-$port';
 
         // Start numNodes node replSet
-        var replSetName = 'backupRestore';
         var rst = new ReplSetTest({
-            name: replSetName,
             nodes: numNodes,
-            nodeOptions: {oplogSize: 1024, storageEngine: storageEngine, dbpath: dbpathFormat}
+            nodeOptions: {dbpath: dbpathFormat},
+            oplogSize: 1024,
         });
         var nodes = rst.startSet();
 
-        // Wait up to 5 minutes for the replica set to initiate. We allow extra time because
-        // allocating 1GB oplogs on test hosts can be slow with mmapv1.
-        rst.initiate(null, null, 5 * 60 * 1000);
+        // Initialize replica set using default timeout. This should give us sufficient time to
+        // allocate 1GB oplogs on slow test hosts with mmapv1.
+        rst.initiate();
+        rst.awaitNodesAgreeOnPrimary();
         var primary = rst.getPrimary();
         var secondary = rst.getSecondary();
 
@@ -185,8 +179,7 @@ var BackupRestoreTest = function(options) {
 
         if (!ret.ok) {
             assert.commandFailedWithCode(ret, ErrorCodes.CommandNotSupported);
-            jsTestLog("Skipping test of " + options.backup + " for " + storageEngine +
-                      ' as it does not support fsync');
+            jsTestLog('Skipping test of ' + options.backup + ' as it does not support fsync.');
             return;
         }
 
@@ -213,8 +206,7 @@ var BackupRestoreTest = function(options) {
             var ret = secondary.getDB("admin").fsyncLock();
             if (!ret.ok) {
                 assert.commandFailedWithCode(ret, ErrorCodes.CommandNotSupported);
-                jsTestLog("Skipping test of " + options.backup + " for " + storageEngine +
-                          ' as it does not support fsync');
+                jsTestLog('Skipping test of ' + options.backup + ' as it does not support fsync.');
                 return;
             }
 
@@ -262,9 +254,10 @@ var BackupRestoreTest = function(options) {
         // Add new hidden node to replSetTest
         jsTestLog('Starting new hidden node (but do not add to replica set) with dbpath ' +
                   hiddenDbpath + '.');
-        var hiddenCfg =
-            {noCleanData: true, oplogSize: 1024, dbpath: hiddenDbpath, replSet: replSetName};
         var nodesBeforeAddingHiddenMember = rst.nodes.slice();
+        // ReplSetTest.add() will use default values for --oplogSize and --replSet consistent with
+        // existing nodes.
+        var hiddenCfg = {noCleanData: true, dbpath: hiddenDbpath};
         var hiddenNode = rst.add(hiddenCfg);
         var hiddenHost = hiddenNode.host;
 

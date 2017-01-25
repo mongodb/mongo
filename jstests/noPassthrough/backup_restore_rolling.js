@@ -30,12 +30,7 @@ load("jstests/noPassthrough/libs/backup_restore.js");
 
     // if rsync is not available on the host, then this test is skipped
     if (!runProgram('bash', '-c', 'which rsync')) {
-        new BackupRestoreTest({
-            name: storageEngine + ' rolling',
-            storageEngine: storageEngine,
-            backup: 'rolling',
-            clientTime: 30000
-        }).run();
+        new BackupRestoreTest({backup: 'rolling', clientTime: 30000}).run();
     } else {
         jsTestLog("Skipping test for " + storageEngine + ' rolling');
     }
