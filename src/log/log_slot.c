@@ -349,7 +349,7 @@ __wt_log_slot_new(WT_SESSION_IMPL *session)
 		/*
 		 * If we didn't find any free slots signal the worker thread.
 		 */
-		__wt_cond_auto_signal(session, conn->log_wrlsn_cond);
+		__wt_cond_signal(session, conn->log_wrlsn_cond);
 		__wt_yield();
 #ifdef	HAVE_DIAGNOSTIC
 		++count;

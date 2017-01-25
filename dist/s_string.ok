@@ -1217,6 +1217,7 @@ upg
 uri
 uri's
 uris
+usec
 usecs
 usedp
 userbad
@@ -1247,6 +1248,9 @@ vunpack
 vw
 vxr
 waitpid
+waker
+wakeup
+wakeups
 walk's
 warmup
 wb

@@ -1,29 +1,9 @@
 /*-
- * Public Domain 2014-2016 MongoDB, Inc.
- * Public Domain 2008-2014 WiredTiger, Inc.
+ * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
+ *	All rights reserved.
  *
- * This is free and unencumbered software released into the public domain.
- *
- * Anyone is free to copy, modify, publish, use, compile, sell, or
- * distribute this software, either in source code form or as a compiled
- * binary, for any purpose, commercial or non-commercial, and by any
- * means.
- *
- * In jurisdictions that recognize copyright laws, the author or authors
- * of this software dedicate any and all copyright interest in the
- * software to the public domain. We make this dedication for the benefit
- * of the public at large and to the detriment of our heirs and
- * successors. We intend this dedication to be an overt act of
- * relinquishment in perpetuity of all present and future rights to this
- * software under copyright law.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
- * IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
- * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
- * OTHER DEALINGS IN THE SOFTWARE.
+ * See the file LICENSE for redistribution information.
  */
 
 #include "wt_internal.h"
@@ -38,13 +18,12 @@
  *	Allocate and initialize an automatically adjusting condition variable.
  */
 int
-__wt_cond_auto_alloc(
-    WT_SESSION_IMPL *session, const char *name,
-    bool is_signalled, uint64_t min, uint64_t max, WT_CONDVAR **condp)
+__wt_cond_auto_alloc(WT_SESSION_IMPL *session,
+    const char *name, uint64_t min, uint64_t max, WT_CONDVAR **condp)
 {
 	WT_CONDVAR *cond;
 
-	WT_RET(__wt_cond_alloc(session, name, is_signalled, condp));
+	WT_RET(__wt_cond_alloc(session, name, condp));
 	cond = *condp;
 
 	cond->min_wait = min;
@@ -55,33 +34,19 @@ __wt_cond_auto_alloc(
 }
 
 /*
- * __wt_cond_auto_signal --
- *	Signal a condition variable.
- */
-void
-__wt_cond_auto_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
-{
-
-	WT_ASSERT(session, cond->min_wait != 0);
-	__wt_cond_signal(session, cond);
-}
-
-/*
  * __wt_cond_auto_wait_signal --
  *	Wait on a mutex, optionally timing out.  If we get it before the time
  *	out period expires, let the caller know.
- *	TODO: Can this version of the API be removed, now that we have the
- *	auto adjusting condition variables?
  */
 void
-__wt_cond_auto_wait_signal(
-    WT_SESSION_IMPL *session, WT_CONDVAR *cond, bool progress, bool *signalled)
+__wt_cond_auto_wait_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond,
+    bool progress, bool (*run_func)(WT_SESSION_IMPL *), bool *signalled)
 {
 	uint64_t delta;
 
 	/*
 	 * Catch cases where this function is called with a condition variable
-	 * that was initialized non-auto.
+	 * that wasn't initialized to do automatic adjustments.
 	 */
 	WT_ASSERT(session, cond->min_wait != 0);
 
@@ -94,7 +59,8 @@ __wt_cond_auto_wait_signal(
 		    cond->max_wait, cond->prev_wait + delta);
 	}
 
-	__wt_cond_wait_signal(session, cond, cond->prev_wait, signalled);
+	__wt_cond_wait_signal(
+	    session, cond, cond->prev_wait, run_func, signalled);
 
 	if (progress || *signalled)
 		WT_STAT_CONN_INCR(session, cond_auto_wait_reset);
@@ -108,24 +74,10 @@ __wt_cond_auto_wait_signal(
  *	out period expires, let the caller know.
  */
 void
-__wt_cond_auto_wait(
-    WT_SESSION_IMPL *session, WT_CONDVAR *cond, bool progress)
+__wt_cond_auto_wait(WT_SESSION_IMPL *session,
+    WT_CONDVAR *cond, bool progress, bool (*run_func)(WT_SESSION_IMPL *))
 {
-	bool signalled;
+	bool notused;
 
-	/*
-	 * Call the signal version so the wait period is reset if the
-	 * condition is woken explicitly.
-	 */
-	__wt_cond_auto_wait_signal(session, cond, progress, &signalled);
-}
-
-/*
- * __wt_cond_auto_destroy --
- *	Destroy a condition variable.
- */
-int
-__wt_cond_auto_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp)
-{
-	return (__wt_cond_destroy(session, condp));
+	__wt_cond_auto_wait_signal(session, cond, progress, run_func, &notused);
 }

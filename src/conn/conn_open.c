@@ -25,7 +25,7 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 * Tell internal server threads to run: this must be set before opening
 	 * any sessions.
 	 */
-	F_SET(conn, WT_CONN_SERVER_RUN | WT_CONN_LOG_SERVER_RUN);
+	F_SET(conn, WT_CONN_SERVER_RUN);
 
 	/* WT_SESSION_IMPL array. */
 	WT_RET(__wt_calloc(session,
@@ -100,8 +100,12 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 		__wt_yield();
 	}
 
-	/* Clear any pending async ops. */
+	/*
+	 * Clear any pending async operations and shut down the async worker
+	 * threads and system before closing LSM.
+	 */
 	WT_TRET(__wt_async_flush(session));
+	WT_TRET(__wt_async_destroy(session));
 
 	/*
 	 * Shut down server threads other than the eviction server, which is
@@ -110,14 +114,14 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * exit before files are closed.
 	 */
 	F_CLR(conn, WT_CONN_SERVER_RUN);
-	WT_TRET(__wt_async_destroy(session));
 	WT_TRET(__wt_lsm_manager_destroy(session));
-	WT_TRET(__wt_sweep_destroy(session));
 
 	F_SET(conn, WT_CONN_CLOSING);
-
 	WT_TRET(__wt_checkpoint_server_destroy(session));
 	WT_TRET(__wt_statlog_destroy(session, true));
+	WT_TRET(__wt_sweep_destroy(session));
+
+	/* The eviction server is shut down last. */
 	WT_TRET(__wt_evict_destroy(session));
 
 	/* Shut down the lookaside table, after all eviction is complete. */
@@ -126,7 +130,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	/* Close open data handles. */
 	WT_TRET(__wt_conn_dhandle_discard(session));
 
-	/* Shut down metadata tracking, required before creating tables. */
+	/* Shut down metadata tracking. */
 	WT_TRET(__wt_meta_track_destroy(session));
 
 	/*
@@ -140,7 +144,6 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_RECOVER_DONE))
 		WT_TRET(__wt_txn_checkpoint_log(
 		    session, true, WT_TXN_LOG_CKPT_STOP, NULL));
-	F_CLR(conn, WT_CONN_LOG_SERVER_RUN);
 	WT_TRET(__wt_logmgr_destroy(session));
 
 	/* Free memory for collators, compressors, data sources. */

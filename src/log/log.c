@@ -43,11 +43,11 @@ __log_wait_for_earlier_slot(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		 */
 		if (F_ISSET(session, WT_SESSION_LOCKED_SLOT))
 			__wt_spin_unlock(session, &log->log_slot_lock);
-		__wt_cond_auto_signal(session, conn->log_wrlsn_cond);
+		__wt_cond_signal(session, conn->log_wrlsn_cond);
 		if (++yield_count < WT_THOUSAND)
 			__wt_yield();
 		else
-			__wt_cond_wait(session, log->log_write_cond, 200);
+			__wt_cond_wait(session, log->log_write_cond, 200, NULL);
 		if (F_ISSET(session, WT_SESSION_LOCKED_SLOT))
 			__wt_spin_lock(session, &log->log_slot_lock);
 	}
@@ -89,7 +89,7 @@ __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
 	log = conn->log;
 	log->ckpt_lsn = *ckp_lsn;
 	if (conn->log_cond != NULL)
-		__wt_cond_auto_signal(session, conn->log_cond);
+		__wt_cond_signal(session, conn->log_cond);
 }
 
 /*
@@ -170,7 +170,7 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 	 */
 	while (log->sync_lsn.l.file < min_lsn->l.file) {
 		__wt_cond_signal(session, S2C(session)->log_file_cond);
-		__wt_cond_wait(session, log->log_sync_cond, 10000);
+		__wt_cond_wait(session, log->log_sync_cond, 10000, NULL);
 	}
 	__wt_spin_lock(session, &log->log_sync_lock);
 	WT_ASSERT(session, log->log_dir_fh != NULL);
@@ -915,7 +915,7 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 			else {
 				WT_STAT_CONN_INCR(session, log_prealloc_missed);
 				if (conn->log_cond != NULL)
-					__wt_cond_auto_signal(
+					__wt_cond_signal(
 					    session, conn->log_cond);
 			}
 		}
@@ -1490,7 +1490,8 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 		 */
 		if (log->sync_lsn.l.file < slot->slot_end_lsn.l.file ||
 		    __wt_spin_trylock(session, &log->log_sync_lock) != 0) {
-			__wt_cond_wait(session, log->log_sync_cond, 10000);
+			__wt_cond_wait(
+			    session, log->log_sync_cond, 10000, NULL);
 			continue;
 		}
 		locked = true;
@@ -2160,7 +2161,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		 * XXX I've seen times when conditions are NULL.
 		 */
 		if (conn->log_cond != NULL) {
-			__wt_cond_auto_signal(session, conn->log_cond);
+			__wt_cond_signal(session, conn->log_cond);
 			__wt_yield();
 		} else
 			WT_ERR(__wt_log_force_write(session, 1, NULL));
@@ -2169,12 +2170,14 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		/* Wait for our writes to reach the OS */
 		while (__wt_log_cmp(&log->write_lsn, &lsn) <= 0 &&
 		    myslot.slot->slot_error == 0)
-			__wt_cond_wait(session, log->log_write_cond, 10000);
+			__wt_cond_wait(
+			    session, log->log_write_cond, 10000, NULL);
 	} else if (LF_ISSET(WT_LOG_FSYNC)) {
 		/* Wait for our writes to reach disk */
 		while (__wt_log_cmp(&log->sync_lsn, &lsn) <= 0 &&
 		    myslot.slot->slot_error == 0)
-			__wt_cond_wait(session, log->log_sync_cond, 10000);
+			__wt_cond_wait(
+			    session, log->log_sync_cond, 10000, NULL);
 	}
 
 	/*

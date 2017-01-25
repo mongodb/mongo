@@ -1489,6 +1489,20 @@ err:	API_END_RET(session, ret);
 }
 
 /*
+ * __transaction_sync_run_chk --
+ *	Check to decide if the transaction sync call should continue running.
+ */
+static bool
+__transaction_sync_run_chk(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+
+	conn = S2C(session);
+
+	return (FLD_ISSET(conn->flags, WT_CONN_LOG_SERVER_RUN));
+}
+
+/*
  * __session_transaction_sync --
  *	WT_SESSION->transaction_sync method.
  */
@@ -1502,7 +1516,7 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	WT_SESSION_IMPL *session;
 	WT_TXN *txn;
 	struct timespec now, start;
-	uint64_t timeout_ms, waited_ms;
+	uint64_t remaining_usec, timeout_ms, waited_ms;
 	bool forever;
 
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -1555,22 +1569,20 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	__wt_epoch(session, &start);
 	/*
 	 * Keep checking the LSNs until we find it is stable or we reach
-	 * our timeout.
+	 * our timeout, or there's some other reason to quit.
 	 */
 	while (__wt_log_cmp(&session->bg_sync_lsn, &log->sync_lsn) > 0) {
+		if (!__transaction_sync_run_chk(session))
+			WT_ERR(ETIMEDOUT);
+
 		__wt_cond_signal(session, conn->log_file_cond);
 		__wt_epoch(session, &now);
 		waited_ms = WT_TIMEDIFF_MS(now, start);
-		if (forever || waited_ms < timeout_ms)
-			/*
-			 * Note, we will wait an increasing amount of time
-			 * each iteration, likely doubling.  Also note that
-			 * the function timeout value is in usecs (we are
-			 * computing the wait time in msecs and passing that
-			 * in, unchanged, as the usecs to wait).
-			 */
-			__wt_cond_wait(session, log->log_sync_cond, waited_ms);
-		else
+		if (forever || waited_ms < timeout_ms) {
+			remaining_usec = (timeout_ms - waited_ms) * WT_THOUSAND;
+			__wt_cond_wait(session, log->log_sync_cond,
+			    remaining_usec, __transaction_sync_run_chk);
+		} else
 			WT_ERR(ETIMEDOUT);
 	}
 
@@ -1825,7 +1837,7 @@ __open_session(WT_CONNECTION_IMPL *conn,
 	session_ret->name = NULL;
 	session_ret->id = i;
 
-	WT_ERR(__wt_cond_alloc(session, "session", false, &session_ret->cond));
+	WT_ERR(__wt_cond_alloc(session, "session", &session_ret->cond));
 
 	if (WT_SESSION_FIRST_USE(session_ret))
 		__wt_random_init(&session_ret->rnd);

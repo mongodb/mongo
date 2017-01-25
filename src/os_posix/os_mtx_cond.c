@@ -13,8 +13,7 @@
  *	Allocate and initialize a condition variable.
  */
 int
-__wt_cond_alloc(WT_SESSION_IMPL *session,
-    const char *name, bool is_signalled, WT_CONDVAR **condp)
+__wt_cond_alloc(WT_SESSION_IMPL *session, const char *name, WT_CONDVAR **condp)
 {
 	WT_CONDVAR *cond;
 	WT_DECL_RET;
@@ -27,7 +26,7 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
 	WT_ERR(pthread_cond_init(&cond->cond, NULL));
 
 	cond->name = name;
-	cond->waiters = is_signalled ? -1 : 0;
+	cond->waiters = 0;
 
 	*condp = cond;
 	return (0);
@@ -42,8 +41,8 @@ err:	__wt_free(session, cond);
  * out period expires, let the caller know.
  */
 void
-__wt_cond_wait_signal(
-    WT_SESSION_IMPL *session, WT_CONDVAR *cond, uint64_t usecs, bool *signalled)
+__wt_cond_wait_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond,
+    uint64_t usecs, bool (*run_func)(WT_SESSION_IMPL *), bool *signalled)
 {
 	struct timespec ts;
 	WT_DECL_RET;
@@ -61,6 +60,23 @@ __wt_cond_wait_signal(
 
 	WT_ERR(pthread_mutex_lock(&cond->mtx));
 	locked = true;
+
+	/*
+	 * It's possible to race with threads waking us up. That's not a problem
+	 * if there are multiple wakeups because the next wakeup will get us, or
+	 * if we're only pausing for a short period. It's a problem if there's
+	 * only a single wakeup, our waker is likely waiting for us to exit.
+	 * After acquiring the mutex (so we're guaranteed to be awakened by any
+	 * future wakeup call), optionally check if we're OK to keep running.
+	 * This won't ensure our caller won't just loop and call us again, but
+	 * at least it's not our fault.
+	 *
+	 * Assert we're not waiting longer than a second if not checking the
+	 * run status.
+	 */
+	WT_ASSERT(session, run_func != NULL || usecs <= WT_MILLION);
+	if (run_func != NULL && !run_func(session))
+		goto skipping;
 
 	if (usecs > 0) {
 		__wt_epoch(session, &ts);
@@ -81,7 +97,7 @@ __wt_cond_wait_signal(
 	    ret == ETIME ||
 #endif
 	    ret == ETIMEDOUT) {
-		*signalled = false;
+skipping:	*signalled = false;
 		ret = 0;
 	}
 
