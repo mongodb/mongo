@@ -618,9 +618,27 @@ void Balancer::_splitOrMarkJumbo(OperationContext* txn,
 
     auto chunk = chunkManager->findIntersectingChunkWithSimpleCollation(txn, minKey);
 
-    auto splitStatus = chunk->split(txn, Chunk::normal, nullptr);
-    if (!splitStatus.isOK()) {
-        log() << "Marking chunk " << chunk->toString() << " as jumbo.";
+    try {
+        const auto splitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(
+            txn,
+            chunk->getShardId(),
+            nss,
+            chunkManager->getShardKeyPattern(),
+            ChunkRange(chunk->getMin(), chunk->getMax()),
+            Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
+            boost::none));
+
+        uassert(ErrorCodes::CannotSplit, "No split points found", !splitPoints.empty());
+
+        uassertStatusOK(
+            shardutil::splitChunkAtMultiplePoints(txn,
+                                                  chunk->getShardId(),
+                                                  nss,
+                                                  chunkManager->getShardKeyPattern(),
+                                                  chunkManager->getVersion(),
+                                                  ChunkRange(chunk->getMin(), chunk->getMax()),
+                                                  splitPoints));
+    } catch (const DBException& ex) {
         chunk->markAsJumbo(txn);
     }
 }

@@ -397,7 +397,6 @@ void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
                 ChunkRange(_keyPattern.getKeyPattern().globalMin(),
                            _keyPattern.getKeyPattern().globalMax()),
                 Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
-                0,
                 0));
         }
 

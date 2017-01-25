@@ -64,6 +64,8 @@ const char kRecvChunkStatus[] = "_recvChunkStatus";
 const char kRecvChunkCommit[] = "_recvChunkCommit";
 const char kRecvChunkAbort[] = "_recvChunkAbort";
 
+const int kMaxObjectPerChunk{250000};
+
 bool isInRange(const BSONObj& obj,
                const BSONObj& min,
                const BSONObj& max,
@@ -575,11 +577,11 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* txn
     if (totalRecs > 0) {
         avgRecSize = collection->dataSize(txn) / totalRecs;
         maxRecsWhenFull = _args.getMaxChunkSizeBytes() / avgRecSize;
-        maxRecsWhenFull = std::min((unsigned long long)(Chunk::MaxObjectPerChunk + 1),
+        maxRecsWhenFull = std::min((unsigned long long)(kMaxObjectPerChunk + 1),
                                    130 * maxRecsWhenFull / 100 /* slack */);
     } else {
         avgRecSize = 0;
-        maxRecsWhenFull = Chunk::MaxObjectPerChunk + 1;
+        maxRecsWhenFull = kMaxObjectPerChunk + 1;
     }
 
     // Do a full traversal of the chunk and don't stop even if we think it is a large chunk we want

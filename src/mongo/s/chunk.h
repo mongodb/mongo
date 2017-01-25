@@ -51,16 +51,6 @@ class Chunk {
     MONGO_DISALLOW_COPYING(Chunk);
 
 public:
-    enum SplitPointMode {
-        // Determines the split points that will make the current chunk smaller than
-        // the current chunk size setting. Gives empty result if chunk is not big enough.
-        normal,
-
-        // Behaves like normal, with additional special heuristics for "top chunks"
-        // (the 1 or 2 chunks in the extreme ends of the chunk key space).
-        autoSplitInternal
-    };
-
     Chunk(OperationContext* txn, ChunkManager* manager, const ChunkType& from);
 
     Chunk(ChunkManager* manager,
@@ -128,7 +118,6 @@ public:
      * @throws UserException
      */
     StatusWith<boost::optional<ChunkRange>> split(OperationContext* txn,
-                                                  SplitPointMode mode,
                                                   size_t* resultingSplits) const;
 
     /**
@@ -140,12 +129,6 @@ public:
     bool isJumbo() const {
         return _jumbo;
     }
-
-    //
-    // public constants
-    //
-
-    static const int MaxObjectPerChunk{250000};
 
     //
     // accessors and helpers
@@ -166,9 +149,6 @@ public:
     ShardId getShardId() const {
         return _shardId;
     }
-    const ChunkManager* getManager() const {
-        return _manager;
-    }
 
 private:
     /**
@@ -183,16 +163,20 @@ private:
     // The chunk manager, which owns this chunk. Not owned by the chunk.
     const ChunkManager* _manager;
 
-    BSONObj _min;
-    BSONObj _max;
-    ShardId _shardId;
+    const BSONObj _min;
+
+    const BSONObj _max;
+
+    const ShardId _shardId;
+
     const ChunkVersion _lastmod;
+
+    // Indicates whether this chunk should be treated as jumbo and not attempted to be moved or
+    // split
     mutable bool _jumbo;
 
-    // Statistics for the approximate data written by this chunk
-    uint64_t _dataWritten;
-
-    // methods, etc..
+    // Statistics for the approximate data written to this chunk
+    mutable uint64_t _dataWritten;
 
     /**
      * Returns the split point that will result in one of the chunk having exactly one
