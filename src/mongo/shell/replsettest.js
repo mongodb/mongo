@@ -539,15 +539,15 @@ var ReplSetTest = function(opts) {
     /**
      * Blocks until all nodes agree on who the primary is.
      */
-    this.awaitNodesAgreeOnPrimary = function(timeout) {
+    this.awaitNodesAgreeOnPrimary = function(timeout, nodes) {
         timeout = timeout || self.kDefaultTimeoutMS;
+        nodes = nodes || self.nodes;
 
         assert.soonNoExcept(function() {
             var primary = -1;
 
-            for (var i = 0; i < self.nodes.length; i++) {
-                var replSetGetStatus =
-                    self.nodes[i].getDB("admin").runCommand({replSetGetStatus: 1});
+            for (var i = 0; i < nodes.length; i++) {
+                var replSetGetStatus = nodes[i].getDB("admin").runCommand({replSetGetStatus: 1});
                 var nodesPrimary = -1;
                 for (var j = 0; j < replSetGetStatus.members.length; j++) {
                     if (replSetGetStatus.members[j].state === ReplSetTest.State.PRIMARY) {

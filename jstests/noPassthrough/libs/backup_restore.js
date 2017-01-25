@@ -260,10 +260,13 @@ var BackupRestoreTest = function(options) {
         rst.waitForState(rst.getSecondaries(), ReplSetTest.State.SECONDARY);
 
         // Add new hidden node to replSetTest
+        jsTestLog('Starting new hidden node (but do not add to replica set) with dbpath ' +
+                  hiddenDbpath + '.');
         var hiddenCfg =
             {noCleanData: true, oplogSize: 1024, dbpath: hiddenDbpath, replSet: replSetName};
-        rst.add(hiddenCfg);
-        var hiddenHost = rst.nodes[numNodes].host;
+        var nodesBeforeAddingHiddenMember = rst.nodes.slice();
+        var hiddenNode = rst.add(hiddenCfg);
+        var hiddenHost = hiddenNode.host;
 
         // Verify if dbHash is the same on hidden secondary for crudDb
         // Note the dbhash can only run when the DB is inactive to get a result
@@ -273,8 +276,7 @@ var BackupRestoreTest = function(options) {
                 try {
                     // Need to hammer this since the node can disconnect connections as it is
                     // starting up into REMOVED replication state.
-                    return (dbHash ===
-                            rst.nodes[numNodes].getDB(crudDb).runCommand({dbhash: 1}).md5);
+                    return (dbHash === hiddenNode.getDB(crudDb).runCommand({dbhash: 1}).md5);
                 } catch (e) {
                     return false;
                 }
@@ -282,6 +284,9 @@ var BackupRestoreTest = function(options) {
         }
 
         // Add new hidden secondary to replica set
+        jsTestLog('Adding new hidden node ' + hiddenHost + ' to replica set.');
+        rst.awaitNodesAgreeOnPrimary(ReplSetTest.kDefaultTimeoutMS, nodesBeforeAddingHiddenMember);
+        primary = rst.getPrimary();
         var rsConfig = primary.getDB("local").system.replset.findOne();
         rsConfig.version += 1;
         var hiddenMember = {_id: numNodes, host: hiddenHost, priority: 0, hidden: true};
@@ -290,8 +295,7 @@ var BackupRestoreTest = function(options) {
                              testName + ' failed to reconfigure replSet ' + tojson(rsConfig));
 
         // Wait up to 5 minutes until the new hidden node is in state RECOVERING.
-        rst.waitForState(rst.nodes[numNodes],
-                         [ReplSetTest.State.RECOVERING, ReplSetTest.State.SECONDARY]);
+        rst.waitForState(hiddenNode, [ReplSetTest.State.RECOVERING, ReplSetTest.State.SECONDARY]);
 
         // Stop CRUD client and FSM client.
         assert(checkProgram(crudPid), testName + ' CRUD client was not running at end of test');
@@ -300,7 +304,7 @@ var BackupRestoreTest = function(options) {
         stopMongoProgramByPid(fsmPid);
 
         // Wait up to 5 minutes until the new hidden node is in state SECONDARY.
-        rst.waitForState(rst.nodes[numNodes], ReplSetTest.State.SECONDARY);
+        rst.waitForState(hiddenNode, ReplSetTest.State.SECONDARY);
 
         // Wait for secondaries to finish catching up before shutting down.
         primary = rst.getPrimary();
