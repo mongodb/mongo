@@ -19,13 +19,5 @@ load("jstests/noPassthrough/libs/backup_restore.js");
 (function() {
     "use strict";
 
-    // Grab the storage engine, default is wiredTiger
-    var storageEngine = jsTest.options().storageEngine || "wiredTiger";
-
-    new BackupRestoreTest({
-        name: storageEngine + ' stop/start',
-        storageEngine: storageEngine,
-        backup: 'stopStart',
-        clientTime: 30000
-    }).run();
+    new BackupRestoreTest({backup: 'stopStart', clientTime: 30000}).run();
 }());

@@ -19,14 +19,7 @@ load("jstests/noPassthrough/libs/backup_restore.js");
 (function() {
     "use strict";
 
-    // Grab the storage engine, default is wiredTiger
-    var storageEngine = jsTest.options().storageEngine || "wiredTiger";
-
     // Run the fsyncLock test. Will return before testing for any engine that doesn't
     // support fsyncLock
-    new BackupRestoreTest({
-        name: storageEngine + ' fsyncLock/fsyncUnlock',
-        storageEngine: storageEngine,
-        backup: 'fsyncLock'
-    }).run();
+    new BackupRestoreTest({backup: 'fsyncLock'}).run();
 }());
