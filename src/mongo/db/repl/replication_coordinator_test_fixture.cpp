@@ -121,11 +121,18 @@ void ReplCoordTest::init() {
     const int64_t seed = 0;
 
     TopologyCoordinatorImpl::Options settings;
-    _topo = new TopologyCoordinatorImpl(settings);
-    _net = new NetworkInterfaceMock;
-    _externalState = new ReplicationCoordinatorExternalStateMock;
-    _repl.reset(new ReplicationCoordinatorImpl(
-        _settings, _externalState, _net, _topo, storageInterface, seed));
+    auto topo = stdx::make_unique<TopologyCoordinatorImpl>(settings);
+    _topo = topo.get();
+    auto net = stdx::make_unique<NetworkInterfaceMock>();
+    _net = net.get();
+    auto externalState = stdx::make_unique<ReplicationCoordinatorExternalStateMock>();
+    _externalState = externalState.get();
+    _repl = stdx::make_unique<ReplicationCoordinatorImpl>(_settings,
+                                                          std::move(externalState),
+                                                          std::move(net),
+                                                          std::move(topo),
+                                                          storageInterface,
+                                                          seed);
     auto service = getGlobalServiceContext();
     service->setFastClockSource(stdx::make_unique<executor::NetworkInterfaceMockClockSource>(_net));
     service->setPreciseClockSource(

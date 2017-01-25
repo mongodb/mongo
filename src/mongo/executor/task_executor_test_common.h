@@ -51,7 +51,7 @@ class TaskExecutor;
  */
 void addTestsForExecutor(const std::string& suiteName,
                          stdx::function<std::unique_ptr<TaskExecutor>(
-                             std::unique_ptr<NetworkInterfaceMock>*)> makeExecutor);
+                             std::unique_ptr<NetworkInterfaceMock>)> makeExecutor);
 
 }  // namespace executor
 }  // namespace mongo

@@ -48,8 +48,8 @@ namespace executor {
 namespace {
 
 MONGO_INITIALIZER(ThreadPoolExecutorCommonTests)(InitializerContext*) {
-    addTestsForExecutor("ThreadPoolExecutorCommon", [](std::unique_ptr<NetworkInterfaceMock>* net) {
-        return makeThreadPoolTestExecutor(std::move(*net));
+    addTestsForExecutor("ThreadPoolExecutorCommon", [](std::unique_ptr<NetworkInterfaceMock> net) {
+        return makeThreadPoolTestExecutor(std::move(net));
     });
     return Status::OK();
 }

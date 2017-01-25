@@ -53,7 +53,7 @@ void ReplicationExecutorTest::postExecutorThreadLaunch() {
 
 std::unique_ptr<executor::TaskExecutor> ReplicationExecutorTest::makeTaskExecutor(
     std::unique_ptr<executor::NetworkInterfaceMock> net) {
-    return stdx::make_unique<ReplicationExecutor>(net.release(), prngSeed);
+    return stdx::make_unique<ReplicationExecutor>(std::move(net), prngSeed);
 }
 
 }  // namespace repl

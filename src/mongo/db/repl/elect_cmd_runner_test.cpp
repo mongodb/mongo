@@ -79,8 +79,9 @@ private:
 };
 
 void ElectCmdRunnerTest::setUp() {
-    _net = new NetworkInterfaceMock;
-    _executor = stdx::make_unique<ReplicationExecutor>(_net, 1 /* prng seed */);
+    auto net = stdx::make_unique<NetworkInterfaceMock>();
+    _net = net.get();
+    _executor = stdx::make_unique<ReplicationExecutor>(std::move(net), 1 /* prng seed */);
     _executorThread.reset(new stdx::thread(stdx::bind(&ReplicationExecutor::run, _executor.get())));
 }
 

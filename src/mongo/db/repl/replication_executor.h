@@ -98,7 +98,7 @@ public:
      *
      * Takes ownership of the passed NetworkInterface object.
      */
-    ReplicationExecutor(executor::NetworkInterface* netInterface, int64_t pnrgSeed);
+    ReplicationExecutor(std::unique_ptr<executor::NetworkInterface> netInterface, int64_t pnrgSeed);
 
     /**
      * Destroys an executor.

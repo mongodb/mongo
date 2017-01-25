@@ -56,9 +56,10 @@ using executor::NetworkInterface;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
-ReplicationExecutor::ReplicationExecutor(NetworkInterface* netInterface, int64_t prngSeed)
+ReplicationExecutor::ReplicationExecutor(std::unique_ptr<NetworkInterface> netInterface,
+                                         int64_t prngSeed)
     : _random(prngSeed),
-      _networkInterface(netInterface),
+      _networkInterface(std::move(netInterface)),
       _inShutdown(false),
       _dblockWorkers(OldThreadPool::DoNotStartThreadsTag(), 3, "replExecDBWorker-"),
       _dblockTaskRunner(&_dblockWorkers),
