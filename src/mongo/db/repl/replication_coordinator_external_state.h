@@ -234,6 +234,11 @@ public:
     virtual void updateCommittedSnapshot(SnapshotName newCommitPoint) = 0;
 
     /**
+     * Creates a new snapshot.
+     */
+    virtual void createSnapshot(OperationContext* txn, SnapshotName name) = 0;
+
+    /**
      * Signals the SnapshotThread, if running, to take a forced snapshot even if the global
      * timestamp hasn't changed.
      *

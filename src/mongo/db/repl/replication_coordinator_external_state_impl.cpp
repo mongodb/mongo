@@ -548,6 +548,13 @@ void ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(SnapshotNa
     manager->setCommittedSnapshot(newCommitPoint);
 }
 
+void ReplicationCoordinatorExternalStateImpl::createSnapshot(OperationContext* txn,
+                                                             SnapshotName name) {
+    auto manager = getGlobalServiceContext()->getGlobalStorageEngine()->getSnapshotManager();
+    invariant(manager);  // This should never be called if there is no SnapshotManager.
+    manager->createSnapshot(txn, name);
+}
+
 void ReplicationCoordinatorExternalStateImpl::forceSnapshotCreation() {
     if (_snapshotThread)
         _snapshotThread->forceSnapshot();

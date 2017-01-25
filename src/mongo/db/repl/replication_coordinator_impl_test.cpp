@@ -1030,7 +1030,7 @@ TEST_F(
     getReplCoord()->setLastDurableOptime_forTest(2, 1, time1);
     getReplCoord()->setLastAppliedOptime_forTest(2, 2, time1);
     getReplCoord()->setLastDurableOptime_forTest(2, 2, time1);
-    getReplCoord()->onSnapshotCreate(time1, SnapshotName(1));
+    getReplCoord()->createSnapshot(&txn, time1, SnapshotName(1));
 
     statusAndDur = getReplCoord()->awaitReplication(&txn, time1, majorityWriteConcern);
     ASSERT_OK(statusAndDur.status);
@@ -1067,7 +1067,7 @@ TEST_F(
     ASSERT_OK(statusAndDur.status);
 
     // All modes satisfied
-    getReplCoord()->onSnapshotCreate(time1, getReplCoord()->reserveSnapshotName(nullptr));
+    getReplCoord()->createSnapshot(&txn, time1, getReplCoord()->reserveSnapshotName(nullptr));
 
     statusAndDur = getReplCoord()->awaitReplicationOfLastOpForClient(&txn, majorityWriteConcern);
     ASSERT_OK(statusAndDur.status);
@@ -3066,7 +3066,7 @@ TEST_F(ReplCoordTest,
 
     getReplCoord()->setMyLastAppliedOpTime(time);
     getReplCoord()->setMyLastDurableOpTime(time);
-    getReplCoord()->onSnapshotCreate(time, SnapshotName(1));
+    getReplCoord()->createSnapshot(&txn, time, SnapshotName(1));
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 1, time));
 
 
@@ -3157,7 +3157,7 @@ TEST_F(ReplCoordTest,
     ASSERT_EQUALS(ErrorCodes::WriteConcernFailed,
                   getReplCoord()->awaitReplication(&txn, time, majorityWriteConcern).status);
 
-    getReplCoord()->onSnapshotCreate(time, SnapshotName(1));
+    getReplCoord()->createSnapshot(&txn, time, SnapshotName(1));
     ASSERT_OK(getReplCoord()->awaitReplication(&txn, time, majorityWriteConcern).status);
 }
 
@@ -3397,7 +3397,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedGreaterOpTime) {
 
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 0), 1));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 0), 1));
-    getReplCoord()->onSnapshotCreate(OpTime(Timestamp(100, 0), 1), SnapshotName(1));
+    getReplCoord()->createSnapshot(&txn, OpTime(Timestamp(100, 0), 1), SnapshotName(1));
     auto result = getReplCoord()->waitUntilOpTime(
         &txn, ReadConcernArgs(OpTime(Timestamp(50, 0), 1), ReadConcernLevel::kMajorityReadConcern));
 
@@ -3417,7 +3417,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedEqualOpTime) {
     OpTime time(Timestamp(100, 0), 1);
     getReplCoord()->setMyLastAppliedOpTime(time);
     getReplCoord()->setMyLastDurableOpTime(time);
-    getReplCoord()->onSnapshotCreate(time, SnapshotName(1));
+    getReplCoord()->createSnapshot(&txn, time, SnapshotName(1));
     auto result = getReplCoord()->waitUntilOpTime(
         &txn, ReadConcernArgs(time, ReadConcernLevel::kMajorityReadConcern));
 
@@ -3443,7 +3443,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredGreaterOpTime) {
                         // Not guaranteed to be scheduled after waitUntil blocks...
                         getReplCoord()->setMyLastAppliedOpTime(committedOpTime);
                         getReplCoord()->setMyLastDurableOpTime(committedOpTime);
-                        getReplCoord()->onSnapshotCreate(committedOpTime, SnapshotName(1));
+                        getReplCoord()->createSnapshot(nullptr, committedOpTime, SnapshotName(1));
                     });
 
     auto result = getReplCoord()->waitUntilOpTime(
@@ -3475,7 +3475,7 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredEqualOpTime) {
                         // Not guaranteed to be scheduled after waitUntil blocks...
                         getReplCoord()->setMyLastAppliedOpTime(opTimeToWait);
                         getReplCoord()->setMyLastDurableOpTime(opTimeToWait);
-                        getReplCoord()->onSnapshotCreate(opTimeToWait, SnapshotName(1));
+                        getReplCoord()->createSnapshot(nullptr, opTimeToWait, SnapshotName(1));
                     });
 
     auto result = getReplCoord()->waitUntilOpTime(
@@ -3545,7 +3545,7 @@ TEST_F(ReplCoordTest, UpdateLastCommittedOpTimeWhenTheLastCommittedOpTimeFromMet
     ASSERT_EQUALS(1, getReplCoord()->getTerm());
 
     OpTime time(Timestamp(10, 0), 1);
-    getReplCoord()->onSnapshotCreate(time, SnapshotName(1));
+    getReplCoord()->createSnapshot(&txn, time, SnapshotName(1));
 
     // higher OpTime, should change
     StatusWith<rpc::ReplSetMetadata> metadata = rpc::ReplSetMetadata::readFromMetadata(BSON(
@@ -4052,9 +4052,9 @@ TEST_F(ReplCoordTest, AdvanceCommittedSnapshotToMostRecentSnapshotPriorToOpTimeW
     OpTime time5(Timestamp(100, 5), 1);
     OpTime time6(Timestamp(100, 6), 1);
 
-    getReplCoord()->onSnapshotCreate(time1, SnapshotName(1));
-    getReplCoord()->onSnapshotCreate(time2, SnapshotName(2));
-    getReplCoord()->onSnapshotCreate(time5, SnapshotName(3));
+    getReplCoord()->createSnapshot(&txn, time1, SnapshotName(1));
+    getReplCoord()->createSnapshot(&txn, time2, SnapshotName(2));
+    getReplCoord()->createSnapshot(&txn, time5, SnapshotName(3));
 
     // ensure current snapshot follows price is right rules (closest but not greater than)
     getReplCoord()->setMyLastAppliedOpTime(time3);
@@ -4084,9 +4084,9 @@ TEST_F(ReplCoordTest, DoNotAdvanceCommittedSnapshotWhenAnOpTimeIsNewerThanOurLat
     OpTime time5(Timestamp(100, 5), 1);
     OpTime time6(Timestamp(100, 6), 1);
 
-    getReplCoord()->onSnapshotCreate(time1, SnapshotName(1));
-    getReplCoord()->onSnapshotCreate(time2, SnapshotName(2));
-    getReplCoord()->onSnapshotCreate(time5, SnapshotName(3));
+    getReplCoord()->createSnapshot(&txn, time1, SnapshotName(1));
+    getReplCoord()->createSnapshot(&txn, time2, SnapshotName(2));
+    getReplCoord()->createSnapshot(&txn, time5, SnapshotName(3));
 
     // ensure current snapshot will not advance beyond existing snapshots
     getReplCoord()->setMyLastAppliedOpTime(time6);
@@ -4114,16 +4114,16 @@ TEST_F(ReplCoordTest,
     OpTime time5(Timestamp(100, 5), 1);
     OpTime time6(Timestamp(100, 6), 1);
 
-    getReplCoord()->onSnapshotCreate(time1, SnapshotName(1));
-    getReplCoord()->onSnapshotCreate(time2, SnapshotName(2));
-    getReplCoord()->onSnapshotCreate(time5, SnapshotName(3));
+    getReplCoord()->createSnapshot(&txn, time1, SnapshotName(1));
+    getReplCoord()->createSnapshot(&txn, time2, SnapshotName(2));
+    getReplCoord()->createSnapshot(&txn, time5, SnapshotName(3));
 
     getReplCoord()->setMyLastAppliedOpTime(time6);
     getReplCoord()->setMyLastDurableOpTime(time6);
     ASSERT_EQUALS(time5, getReplCoord()->getCurrentCommittedSnapshotOpTime());
 
     // ensure current snapshot updates on new snapshot if we are that far
-    getReplCoord()->onSnapshotCreate(time6, SnapshotName(4));
+    getReplCoord()->createSnapshot(&txn, time6, SnapshotName(4));
     ASSERT_EQUALS(time6, getReplCoord()->getCurrentCommittedSnapshotOpTime());
 }
 
@@ -4146,9 +4146,9 @@ TEST_F(ReplCoordTest, ZeroCommittedSnapshotWhenAllSnapshotsAreDropped) {
     OpTime time5(Timestamp(100, 5), 1);
     OpTime time6(Timestamp(100, 6), 1);
 
-    getReplCoord()->onSnapshotCreate(time1, SnapshotName(1));
-    getReplCoord()->onSnapshotCreate(time2, SnapshotName(2));
-    getReplCoord()->onSnapshotCreate(time5, SnapshotName(3));
+    getReplCoord()->createSnapshot(&txn, time1, SnapshotName(1));
+    getReplCoord()->createSnapshot(&txn, time2, SnapshotName(2));
+    getReplCoord()->createSnapshot(&txn, time5, SnapshotName(3));
 
     // ensure dropping all snapshots should reset the current committed snapshot
     getReplCoord()->dropAllSnapshots();
@@ -4170,7 +4170,7 @@ TEST_F(ReplCoordTest, DoNotAdvanceCommittedSnapshotWhenAppliedOpTimeChanges) {
     OpTime time1(Timestamp(100, 1), 1);
     OpTime time2(Timestamp(100, 2), 1);
 
-    getReplCoord()->onSnapshotCreate(time1, SnapshotName(1));
+    getReplCoord()->createSnapshot(&txn, time1, SnapshotName(1));
 
     getReplCoord()->setMyLastAppliedOpTime(time1);
     ASSERT_EQUALS(OpTime(), getReplCoord()->getCurrentCommittedSnapshotOpTime());
@@ -4347,9 +4347,10 @@ TEST_F(ReplCoordTest, NewStyleUpdatePositionCmdHasMetadata) {
     getReplCoord()->setMyLastDurableOpTime(optime);
 
     // Set last committed optime via metadata.
+    OperationContextReplMock txn;
     rpc::ReplSetMetadata syncSourceMetadata(optime.getTerm(), optime, optime, 1, OID(), -1, 1);
     getReplCoord()->processReplSetMetadata(syncSourceMetadata, true);
-    getReplCoord()->onSnapshotCreate(optime, SnapshotName(1));
+    getReplCoord()->createSnapshot(&txn, optime, SnapshotName(1));
 
     BSONObjBuilder cmdBuilder;
     ASSERT_TRUE(getReplCoord()->prepareReplSetUpdatePositionCommand(&cmdBuilder));
