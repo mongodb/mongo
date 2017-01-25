@@ -33,6 +33,7 @@
 #include "mongo/util/signal_handlers.h"
 
 #include <signal.h>
+#include <time.h>
 
 #if !defined(_WIN32)
 #include <unistd.h>
@@ -163,6 +164,9 @@ sigset_t asyncSignals;
 void signalProcessingThread(LogFileStatus rotate) {
     setThreadName("signalProcessingThread");
 
+    time_t signalTimeSeconds = -1;
+    time_t lastSignalTimeSeconds = -1;
+
     while (true) {
         int actualSignal = 0;
         int status = sigwait(&asyncSignals, &actualSignal);
@@ -170,6 +174,13 @@ void signalProcessingThread(LogFileStatus rotate) {
         switch (actualSignal) {
             case SIGUSR1:
                 // log rotate signal
+                signalTimeSeconds = time(0);
+                if (signalTimeSeconds <= lastSignalTimeSeconds) {
+                    // ignore multiple signals in the same or earlier second.
+                    break;
+                }
+
+                lastSignalTimeSeconds = signalTimeSeconds;
                 fassert(16782, rotateLogs(serverGlobalParams.logRenameOnRotate));
                 if (rotate == LogFileStatus::kNeedToRotateLogFile) {
                     logProcessDetailsForLogRotate();
