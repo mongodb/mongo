@@ -159,8 +159,8 @@ public:
         remoteCmdObjB.append(
             ClusterMergeChunksCommand::configField(),
             Grid::get(txn)->shardRegistry()->getConfigServerConnectionString().toString());
-        remoteCmdObjB.append(ClusterMergeChunksCommand::shardNameField(), firstChunk->getShardId());
-
+        remoteCmdObjB.append(ClusterMergeChunksCommand::shardNameField(),
+                             firstChunk->getShardId().toString());
 
         BSONObj remoteResult;
 

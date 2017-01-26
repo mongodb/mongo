@@ -28,12 +28,15 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/s/write_ops/batch_write_exec.h"
 
 namespace mongo {
 
-class BatchedCommandRequest;
-class BatchedCommandResponse;
+class BSONObj;
+class Chunk;
+class ChunkManager;
 class OperationContext;
 
 class ClusterWriter {
@@ -54,9 +57,13 @@ private:
 };
 
 /**
- * Used only for writes to the config server, config and admin databases.
+ * Adds the specified amount of data written to the chunk's stats and if the total amount nears the
+ * max size of a shard attempt to split the chunk. This call is opportunistic and swallows any
+ * errors.
  */
-Status clusterCreateIndex(
-    OperationContext* txn, const std::string& ns, BSONObj keys, BSONObj collation, bool unique);
+void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* txn,
+                                           ChunkManager* manager,
+                                           Chunk* chunk,
+                                           long dataWritten);
 
 }  // namespace mongo

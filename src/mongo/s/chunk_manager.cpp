@@ -53,7 +53,6 @@
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/chunk.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
@@ -64,7 +63,6 @@
 
 namespace mongo {
 
-using std::make_pair;
 using std::map;
 using std::pair;
 using std::set;
@@ -74,6 +72,9 @@ using std::unique_ptr;
 using std::vector;
 
 namespace {
+
+// Used to generate sequence numbers to assign to each newly created ChunkManager
+AtomicUInt32 nextCMSequenceNumber(0);
 
 /**
  * This is an adapter so we can use config diffs - mongos and mongod do them slightly differently.
@@ -101,12 +102,11 @@ public:
 
     pair<BSONObj, shared_ptr<Chunk>> rangeFor(OperationContext* txn,
                                               const ChunkType& chunk) const final {
-        shared_ptr<Chunk> c(new Chunk(txn, _manager, chunk));
-        return make_pair(chunk.getMax(), c);
+        return std::make_pair(chunk.getMax(), std::make_shared<Chunk>(_manager, chunk));
     }
 
     ShardId shardFor(OperationContext* txn, const ShardId& shardId) const final {
-        const auto shard = uassertStatusOK(grid.shardRegistry()->getShard(txn, shardId));
+        const auto shard = uassertStatusOK(Grid::get(txn)->shardRegistry()->getShard(txn, shardId));
         return shard->getId();
     }
 
@@ -166,8 +166,6 @@ bool isChunkMapValid(const ChunkMap& chunkMap) {
 
 }  // namespace
 
-AtomicUInt32 ChunkManager::NextSequenceNumber(1U);
-
 ChunkManager::ChunkManager(const string& ns,
                            const ShardKeyPattern& pattern,
                            std::unique_ptr<CollatorInterface> defaultCollator,
@@ -176,7 +174,7 @@ ChunkManager::ChunkManager(const string& ns,
       _keyPattern(pattern.getKeyPattern()),
       _defaultCollator(std::move(defaultCollator)),
       _unique(unique),
-      _sequenceNumber(NextSequenceNumber.addAndFetch(1)),
+      _sequenceNumber(nextCMSequenceNumber.addAndFetch(1)),
       _chunkMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<std::shared_ptr<Chunk>>()),
       _chunkRangeMap(
           SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<ShardAndChunkRange>()) {}
@@ -185,7 +183,7 @@ ChunkManager::ChunkManager(OperationContext* txn, const CollectionType& coll)
     : _ns(coll.getNs().ns()),
       _keyPattern(coll.getKeyPattern()),
       _unique(coll.getUnique()),
-      _sequenceNumber(NextSequenceNumber.addAndFetch(1)),
+      _sequenceNumber(nextCMSequenceNumber.addAndFetch(1)),
       _chunkMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<std::shared_ptr<Chunk>>()),
       _chunkRangeMap(
           SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<ShardAndChunkRange>()) {
@@ -278,7 +276,7 @@ bool ChunkManager::_load(OperationContext* txn,
                                              oldC->getLastmod(),
                                              oldC->getBytesWritten()));
 
-            chunkMap.insert(make_pair(oldC->getMax(), newC));
+            chunkMap.insert(std::make_pair(oldC->getMax(), newC));
         }
 
         LOG(2) << "loading chunk manager for collection " << _ns

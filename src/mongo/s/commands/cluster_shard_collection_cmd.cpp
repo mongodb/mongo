@@ -46,6 +46,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/hasher.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/write_concern_options.h"
@@ -64,14 +65,79 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-using std::shared_ptr;
-using std::list;
-using std::set;
-using std::string;
-using std::vector;
-
 namespace {
+
+/**
+ * Constructs the BSON specification document for the given namespace, index key and options.
+ */
+BSONObj createIndexDoc(const std::string& ns,
+                       const BSONObj& keys,
+                       const BSONObj& collation,
+                       bool unique) {
+    BSONObjBuilder indexDoc;
+    indexDoc.append("ns", ns);
+    indexDoc.append("key", keys);
+
+    StringBuilder indexName;
+
+    bool isFirstKey = true;
+    for (BSONObjIterator keyIter(keys); keyIter.more();) {
+        BSONElement currentKey = keyIter.next();
+
+        if (isFirstKey) {
+            isFirstKey = false;
+        } else {
+            indexName << "_";
+        }
+
+        indexName << currentKey.fieldName() << "_";
+        if (currentKey.isNumber()) {
+            indexName << currentKey.numberInt();
+        } else {
+            indexName << currentKey.str();  // this should match up with shell command
+        }
+    }
+
+    indexDoc.append("name", indexName.str());
+
+    if (!collation.isEmpty()) {
+        // Creating an index with the "collation" option requires a v=2 index.
+        indexDoc.append("v", static_cast<int>(IndexDescriptor::IndexVersion::kV2));
+        indexDoc.append("collation", collation);
+    }
+
+    if (unique && !IndexDescriptor::isIdIndexPattern(keys)) {
+        indexDoc.appendBool("unique", unique);
+    }
+
+    return indexDoc.obj();
+}
+
+/**
+ * Used only for writes to the config server, config and admin databases.
+ */
+Status clusterCreateIndex(OperationContext* txn,
+                          const std::string& ns,
+                          const BSONObj& keys,
+                          const BSONObj& collation,
+                          bool unique) {
+    const NamespaceString nss(ns);
+
+    // Go through the shard insert path
+    std::unique_ptr<BatchedInsertRequest> insert(new BatchedInsertRequest());
+    insert->addToDocuments(createIndexDoc(ns, keys, collation, unique));
+
+    BatchedCommandRequest request(insert.release());
+    request.setNS(NamespaceString(nss.getSystemIndexesCollection()));
+    request.setWriteConcern(WriteConcernOptions::Acknowledged);
+
+    BatchedCommandResponse response;
+
+    ClusterWriter writer(false, 0);
+    writer.write(txn, request, &response);
+
+    return response.toStatus();
+}
 
 class ShardCollectionCmd : public Command {
 public:
@@ -194,8 +260,9 @@ public:
             }
         }
 
-        vector<ShardId> shardIds;
+        std::vector<ShardId> shardIds;
         shardRegistry->getAllShardIds(&shardIds);
+
         const int numShards = shardIds.size();
 
         // Cannot have more than 8192 initial chunks per shard. Setting a maximum of 1,000,000
@@ -224,7 +291,7 @@ public:
         // collection.
         BSONObj res;
         {
-            list<BSONObj> all =
+            std::list<BSONObj> all =
                 conn->getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
             if (!all.empty()) {
                 res = all.front().getOwned();
@@ -328,12 +395,12 @@ public:
         // 5. If the collection is empty, and it's still possible to create an index
         //    on the proposed key, we go ahead and do so.
 
-        list<BSONObj> indexes = conn->getIndexSpecs(nss.ns());
+        std::list<BSONObj> indexes = conn->getIndexSpecs(nss.ns());
 
         // 1.  Verify consistency with existing unique indexes
         ShardKeyPattern proposedShardKey(proposedKey);
-        for (list<BSONObj>::iterator it = indexes.begin(); it != indexes.end(); ++it) {
-            BSONObj idx = *it;
+
+        for (const auto& idx : indexes) {
             BSONObj currentKey = idx["key"].embeddedObject();
             bool isUnique = idx["unique"].trueValue();
 
@@ -351,8 +418,7 @@ public:
         // 2. Check for a useful index
         bool hasUsefulIndexForKey = false;
 
-        for (list<BSONObj>::iterator it = indexes.begin(); it != indexes.end(); ++it) {
-            BSONObj idx = *it;
+        for (const auto& idx : indexes) {
             BSONObj currentKey = idx["key"].embeddedObject();
             // Check 2.i. and 2.ii.
             if (!idx["sparse"].trueValue() && idx["filter"].eoo() && idx["collation"].eoo() &&
@@ -377,12 +443,12 @@ public:
 
         // 3. If proposed key is required to be unique, additionally check for exact match.
         bool careAboutUnique = cmdObj["unique"].trueValue();
+
         if (hasUsefulIndexForKey && careAboutUnique) {
             BSONObj eqQuery = BSON("ns" << nss.ns() << "key" << proposedKey);
             BSONObj eqQueryResult;
 
-            for (list<BSONObj>::iterator it = indexes.begin(); it != indexes.end(); ++it) {
-                BSONObj idx = *it;
+            for (const auto& idx : indexes) {
                 if (SimpleBSONObjComparator::kInstance.evaluate(idx["key"].embeddedObject() ==
                                                                 proposedKey)) {
                     eqQueryResult = idx;
@@ -459,8 +525,8 @@ public:
         // 2. move them one at a time
         // 3. split the big chunks to achieve the desired total number of initial chunks
 
-        vector<BSONObj> initSplits;  // there will be at most numShards-1 of these
-        vector<BSONObj> allSplits;   // all of the initial desired split points
+        std::vector<BSONObj> initSplits;  // there will be at most numShards-1 of these
+        std::vector<BSONObj> allSplits;   // all of the initial desired split points
 
         // only pre-split when using a hashed shard key and collection is still empty
         if (isHashedShardKey && isEmpty) {
@@ -516,16 +582,13 @@ public:
 
         audit::logShardCollection(Client::getCurrent(), nss.ns(), proposedKey, careAboutUnique);
 
-        Status status = catalogClient->shardCollection(txn,
+        uassertStatusOK(catalogClient->shardCollection(txn,
                                                        nss.ns(),
                                                        proposedShardKey,
                                                        defaultCollation,
                                                        careAboutUnique,
                                                        initSplits,
-                                                       std::set<ShardId>{});
-        if (!status.isOK()) {
-            return appendCommandStatus(result, status);
-        }
+                                                       std::set<ShardId>{}));
 
         // Make sure the cached metadata for the collection knows that we are now sharded
         config->getChunkManager(txn, nss.ns(), true /* reload */);
@@ -536,7 +599,7 @@ public:
         if (isHashedShardKey && isEmpty) {
             // Reload the new config info.  If we created more than one initial chunk, then
             // we need to move them around to balance.
-            shared_ptr<ChunkManager> chunkManager = config->getChunkManager(txn, nss.ns(), true);
+            auto chunkManager = config->getChunkManager(txn, nss.ns(), true);
             ChunkMap chunkMap = chunkManager->getChunkMap();
 
             // 2. Move and commit each "big chunk" to a different shard.
@@ -549,7 +612,7 @@ public:
                 }
                 const auto to = toStatus.getValue();
 
-                shared_ptr<Chunk> chunk = c->second;
+                auto chunk = c->second;
 
                 // Can't move chunk to shard it's already on
                 if (to->getId() == chunk->getShardId()) {
@@ -587,10 +650,10 @@ public:
 
             // 3. Subdivide the big chunks by splitting at each of the points in "allSplits"
             //    that we haven't already split by.
-            shared_ptr<Chunk> currentChunk =
+            auto currentChunk =
                 chunkManager->findIntersectingChunkWithSimpleCollation(txn, allSplits[0]);
 
-            vector<BSONObj> subSplits;
+            std::vector<BSONObj> subSplits;
             for (unsigned i = 0; i <= allSplits.size(); i++) {
                 if (i == allSplits.size() || !currentChunk->containsKey(allSplits[i])) {
                     if (!subSplits.empty()) {
