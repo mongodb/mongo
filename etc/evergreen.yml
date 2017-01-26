@@ -845,40 +845,25 @@ functions:
         export KITCHEN_SSH_KEY_ID="${kitchen_ssh_key_id}"
         export KITCHEN_SUBNET="${kitchen_subnet}"
 
-        kitchen_variant=${packager_distro}
-
-        # `kitchen test` will test all variants if $kitchen_variant is empty, so exit early if $kitchen_variant is empty
-        if [ -z "$kitchen_variant" ]; then
-          echo "could not find a variant name, exiting"
-          exit 1
-        fi
-
-        kitchen create $kitchen_variant
-
-        # retry converge in case the instance isn't fully ready
-        converged="false"
         for i in {1..3}
         do
-          kitchen converge "$kitchen_variant"
-          if [ $? -eq 0 ]; then
-            converged="true"
-            break
+          if ! kitchen converge "${packager_distro}"; then
+            converged="false"
+            kitchen destroy "${packager_distro}" || true
+            sleep 30
           else
-            sleep 10
+            break
           fi
         done
 
-        if [ "$converged" = "true" ]; then
-          kitchen verify "$kitchen_variant"
-          ret=$?
-          kitchen destroy "$kitchen_variant"
-          exit $ret
-        else
-          echo "converge failed, running kitchen destroy and then exiting"
-          kitchen destroy "$kitchen_variant"
-          exit 1
+        test "$converged" != "false"
+
+        if ! kitchen verify "${packager_distro}"; then
+          verified="false"
         fi
 
+        kitchen destroy "${packager_distro}" || true
+        test "$verified" != "false"
 
 pre:
   - func: "kill processes"
