@@ -1100,7 +1100,9 @@ void WiredTigerRecordStore::Iterator::_getNext() {
         invariantWTOK(ret);
         _loc = _curr();
         RS_ITERATOR_TRACE("_getNext " << ret << " " << _eof << " " << _loc);
-        if (_rs._isCapped) {
+        // Enforce special visibility rules for the end of capped collections.
+        // This is only applicable to forward scanning cursors.
+        if (_forward && _rs._isCapped) {
             RecordId loc = _curr();
             if (_readUntilForOplog.isNull()) {
                 // this is the normal capped case

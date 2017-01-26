@@ -34,15 +34,15 @@
 #include <sstream>
 #include <string>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/base/checked_cast.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/record_store_test_harness.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -755,6 +755,8 @@ TEST(WiredTigerRecordStoreTest, OplogOrder) {
     }
 
     RecordId loc1;
+    RecordId loc2;
+    RecordId loc3;
 
     {  // first insert a document
         scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
@@ -775,17 +777,17 @@ TEST(WiredTigerRecordStoreTest, OplogOrder) {
 
     {
         // now we insert 2 docs, but commit the 2nd one fiirst
-        // we make sure we can't find the 2nd until the first is commited
+        // we make sure we can't find the 2nd until the first is committed
         scoped_ptr<OperationContext> t1(harnessHelper->newOperationContext());
         scoped_ptr<WriteUnitOfWork> w1(new WriteUnitOfWork(t1.get()));
-        _oplogOrderInsertOplog(t1.get(), rs, 2);
+        loc2 = _oplogOrderInsertOplog(t1.get(), rs, 2);
         // do not commit yet
 
         {  // create 2nd doc
             scoped_ptr<OperationContext> t2(harnessHelper->newOperationContext());
             {
                 WriteUnitOfWork w2(t2.get());
-                _oplogOrderInsertOplog(t2.get(), rs, 3);
+                loc3 = _oplogOrderInsertOplog(t2.get(), rs, 3);
                 w2.commit();
             }
         }
@@ -793,6 +795,18 @@ TEST(WiredTigerRecordStoreTest, OplogOrder) {
         {  // state should be the same
             scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
             scoped_ptr<RecordIterator> it(rs->getIterator(opCtx.get(), loc1));
+            ASSERT(!it->isEOF());
+            ASSERT_EQ(loc1, it->getNext());
+            ASSERT(it->isEOF());
+        }
+
+        {  // however, reverse iterators should still see all docs except loc2 which is still
+            // uncommitted.
+            scoped_ptr<OperationContext> opCtx(harnessHelper->newOperationContext());
+            scoped_ptr<RecordIterator> it(
+                rs->getIterator(opCtx.get(), RecordId(), CollectionScanParams::BACKWARD));
+            ASSERT(!it->isEOF());
+            ASSERT_EQ(loc3, it->getNext());
             ASSERT(!it->isEOF());
             ASSERT_EQ(loc1, it->getNext());
             ASSERT(it->isEOF());
@@ -807,9 +821,9 @@ TEST(WiredTigerRecordStoreTest, OplogOrder) {
         ASSERT(!it->isEOF());
         ASSERT_EQ(loc1, it->getNext());
         ASSERT(!it->isEOF());
-        it->getNext();
+        ASSERT_EQ(loc2, it->getNext());
         ASSERT(!it->isEOF());
-        it->getNext();
+        ASSERT_EQ(loc3, it->getNext());
         ASSERT(it->isEOF());
     }
 }
