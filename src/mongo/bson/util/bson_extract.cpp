@@ -185,6 +185,18 @@ Status bsonExtractDoubleField(const BSONObj& object, StringData fieldName, doubl
     return Status::OK();
 }
 
+Status bsonExtractDoubleFieldWithDefault(const BSONObj& object,
+                                         StringData fieldName,
+                                         double defaultValue,
+                                         double* out) {
+    Status status = bsonExtractDoubleField(object, fieldName, out);
+    if (status == ErrorCodes::NoSuchKey) {
+        *out = defaultValue;
+        status = Status::OK();
+    }
+    return status;
+}
+
 Status bsonExtractIntegerFieldWithDefault(const BSONObj& object,
                                           StringData fieldName,
                                           long long defaultValue,

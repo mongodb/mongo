@@ -548,20 +548,33 @@ var DB;
     /**
      * <p> Set profiling level for your db.  Profiling gathers stats on query performance. </p>
      *
-     * <p>Default is off, and resets to off on a database restart -- so if you want it on,
-     *    turn it on periodically. </p>
+     * <p>Default is off, and resets to off on a database restart
+     *    unless you specify the --profile command line argument </p>
+     *
+     * <p>Options:</p>
+     *
+     * <ul>
+     *
+     * <li>slowms: threshold in milliseconds for slow operations. If
+     *     the profiling level is set to 1, only operations that take
+     *     longer than this value are logged.</li>
+     *
+     * <li>sampleRate: ratio of operations to sample. Must be between
+     *     0.0 and 1.0 (inclusive). If specified, a random sample is
+     *     taken of operations that would otherwise be profiled.</li>
+     *
+     * </ul>
      *
      *  <p>Levels :</p>
      *   <ul>
      *    <li>0=off</li>
-     *    <li>1=log very slow operations; optional argument slowms specifies slowness threshold</li>
+     *    <li>1=log very slow operations; specifying the option slowms sets the threshold</li>
      *    <li>2=log all</li>
      *  @param {String} level Desired level of profiling
-     *  @param {String} slowms For slow logging, query duration that counts as slow (default 100ms)
+     *  @param {Object} options Object with options. Options are listed above
      *  @return SOMETHING_FIXME or null on error
      */
-    DB.prototype.setProfilingLevel = function(level, slowms) {
-
+    DB.prototype.setProfilingLevel = function(level, options) {
         if (level < 0 || level > 2) {
             var errorText = "input level " + level + " is out of range [0..2]";
             var errorObject = new Error(errorText);
@@ -570,8 +583,11 @@ var DB;
         }
 
         var cmd = {profile: level};
-        if (isNumber(slowms))
-            cmd["slowms"] = slowms;
+        if (isNumber(options)) {
+            cmd.slowms = options;
+        } else {
+            cmd = Object.extend(cmd, options);
+        }
         return assert.commandWorked(this._dbCommand(cmd));
     };
 
