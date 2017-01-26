@@ -38,5 +38,14 @@ var $config = extendWorkload($config, function($config, $super) {
         /* no-op to prevent index from being created */
     };
 
+    $config.skip = function skip(cluster) {
+        // When the balancer is enabled, the nRemoved result may be inaccurate as
+        // a chunk migration may be active, causing the count function to assert.
+        if (cluster.isBalancerEnabled()) {
+            return {skip: true, msg: 'does not run when balancer is enabled.'};
+        }
+        return {skip: false};
+    };
+
     return $config;
 });
