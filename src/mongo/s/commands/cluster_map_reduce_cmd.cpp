@@ -49,6 +49,7 @@
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_common.h"
+#include "mongo/s/commands/cluster_write.h"
 #include "mongo/s/commands/sharded_command_processing.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/config.h"
@@ -614,7 +615,7 @@ public:
                     warning() << "Mongod reported " << size << " bytes inserted for key " << key
                               << " but can't find chunk";
                 } else {
-                    c->splitIfShould(txn, size);
+                    updateChunkWriteStatsAndSplitIfNeeded(txn, cm.get(), c.get(), size);
                 }
             }
         }

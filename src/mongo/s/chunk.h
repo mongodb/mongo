@@ -28,11 +28,9 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-
-#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/base/disallow_copying.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/client/shard.h"
+#include "mongo/s/shard_id.h"
 
 namespace mongo {
 
@@ -41,17 +39,13 @@ class ChunkType;
 class OperationContext;
 
 /**
-   config.chunks
-   { ns : "alleyinsider.fs.chunks" , min : {} , max : {} , server : "localhost:30001" }
-
-   x is in a shard iff
-   min <= x < max
+ * Represents a cache entry for a single Chunk. Owned by a ChunkManager.
  */
 class Chunk {
     MONGO_DISALLOW_COPYING(Chunk);
 
 public:
-    Chunk(OperationContext* txn, ChunkManager* manager, const ChunkType& from);
+    Chunk(ChunkManager* manager, const ChunkType& from);
 
     Chunk(ChunkManager* manager,
           const BSONObj& min,
@@ -59,10 +53,6 @@ public:
           const ShardId& shardId,
           ChunkVersion lastmod,
           uint64_t initialDataWritten);
-
-    //
-    // chunk boundary support
-    //
 
     const BSONObj& getMin() const {
         return _min;
@@ -72,53 +62,36 @@ public:
         return _max;
     }
 
-    // Returns true if this chunk contains the given shard key, and false otherwise
-    //
-    // Note: this function takes an extracted *key*, not an original document
-    // (the point may be computed by, say, hashing a given field or projecting
-    //  to a subset of fields).
-    bool containsKey(const BSONObj& shardKey) const;
-
-    //
-    // chunk version support
-    //
-
-    void appendShortVersion(const char* name, BSONObjBuilder& b) const;
+    const ShardId& getShardId() const {
+        return _shardId;
+    }
 
     ChunkVersion getLastmod() const {
         return _lastmod;
     }
 
+    bool isJumbo() const {
+        return _jumbo;
+    }
+
+    /**
+     * Returns a string represenation of the chunk for logging.
+     */
+    std::string toString() const;
+
+    // Returns true if this chunk contains the given shard key, and false otherwise
     //
-    // split support
-    //
+    // Note: this function takes an extracted *key*, not an original document (the point may be
+    // computed by, say, hashing a given field or projecting to a subset of fields).
+    bool containsKey(const BSONObj& shardKey) const;
 
     /**
      * Get/increment/set the estimation of how much data was written for this chunk.
      */
     uint64_t getBytesWritten() const;
-    void addBytesWritten(uint64_t bytesWrittenIncrement);
-    void setBytesWritten(uint64_t newBytesWritten);
-
-    /**
-     * if the amount of data written nears the max size of a shard
-     * then we check the real size, and if its too big, we split
-     * @return if something was split
-     */
-    bool splitIfShould(OperationContext* txn, long dataWritten);
-
-    /**
-     * Splits this chunk at a non-specificed split key to be chosen by the
-     * mongod holding this chunk.
-     *
-     * @param mode
-     * @param res the object containing details about the split execution
-     * @param resultingSplits the number of resulting split points. Set to NULL to ignore.
-     *
-     * @throws UserException
-     */
-    StatusWith<boost::optional<ChunkRange>> split(OperationContext* txn,
-                                                  size_t* resultingSplits) const;
+    uint64_t addBytesWritten(uint64_t bytesWrittenIncrement);
+    void clearBytesWritten();
+    void randomizeBytesWritten();
 
     /**
      * marks this chunk as a jumbo chunk
@@ -126,40 +99,7 @@ public:
      */
     void markAsJumbo(OperationContext* txn) const;
 
-    bool isJumbo() const {
-        return _jumbo;
-    }
-
-    //
-    // accessors and helpers
-    //
-
-    std::string toString() const;
-
-    friend std::ostream& operator<<(std::ostream& out, const Chunk& c) {
-        return (out << c.toString());
-    }
-
-    // chunk equality is determined by comparing the min and max bounds of the chunk
-    bool operator==(const Chunk& s) const;
-    bool operator!=(const Chunk& s) const {
-        return !(*this == s);
-    }
-
-    ShardId getShardId() const {
-        return _shardId;
-    }
-
 private:
-    /**
-     * Returns the connection string for the shard on which this chunk resides.
-     */
-    ConnectionString _getShardConnectionString(OperationContext* txn) const;
-
-    // if min/max key is pos/neg infinity
-    bool _minIsInf() const;
-    bool _maxIsInf() const;
-
     // The chunk manager, which owns this chunk. Not owned by the chunk.
     const ChunkManager* _manager;
 
@@ -177,27 +117,6 @@ private:
 
     // Statistics for the approximate data written to this chunk
     mutable uint64_t _dataWritten;
-
-    /**
-     * Returns the split point that will result in one of the chunk having exactly one
-     * document. Also returns an empty document if the split point cannot be determined.
-     *
-     * @param doSplitAtLower determines which side of the split will have exactly one document.
-     *        True means that the split point chosen will be closer to the lower bound.
-     *
-     * Warning: this assumes that the shard key is not "special"- that is, the shardKeyPattern
-     *          is simply an ordered list of ascending/descending field names. Examples:
-     *          {a : 1, b : -1} is not special. {a : "hashed"} is.
-     */
-    BSONObj _getExtremeKey(OperationContext* txn, bool doSplitAtLower) const;
-
-    /**
-     * Determines the appropriate split points for this chunk.
-     *
-     * @param atMedian perform a single split at the middle of this chunk.
-     * @param splitPoints out parameter containing the chosen split points. Can be empty.
-     */
-    std::vector<BSONObj> _determineSplitPoints(OperationContext* txn) const;
 };
 
 }  // namespace mongo

@@ -33,6 +33,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/disallow_copying.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -45,7 +46,6 @@
 namespace mongo {
 
 class CanonicalQuery;
-class Chunk;
 class CollectionType;
 struct QuerySolutionNode;
 class OperationContext;
@@ -54,6 +54,8 @@ class OperationContext;
 typedef BSONObjIndexedMap<std::shared_ptr<Chunk>> ChunkMap;
 
 class ChunkManager {
+    MONGO_DISALLOW_COPYING(ChunkManager);
+
 public:
     typedef std::map<ShardId, ChunkVersion> ShardVersionMap;
 
@@ -270,27 +272,23 @@ private:
     // OpTime of config server the last time chunks were loaded.
     repl::OpTime _configOpTime;
 
-    //
-    // Split Heuristic info
-    //
-    class SplitHeuristics {
+    // Auto-split throttling state
+    struct AutoSplitThrottle {
     public:
-        SplitHeuristics() : _splitTickets(maxParallelSplits) {}
+        AutoSplitThrottle() : _splitTickets(maxParallelSplits) {}
 
         TicketHolder _splitTickets;
 
         // Maximum number of parallel threads requesting a split
         static const int maxParallelSplits = 5;
-    };
 
-    mutable SplitHeuristics _splitHeuristics;
+    } _autoSplitThrottle;
 
-    //
-    // End split heuristics
-    //
-
-    friend class Chunk;
-    static AtomicUInt32 NextSequenceNumber;
+    // This function needs to be able to access the auto-split throttle
+    friend void updateChunkWriteStatsAndSplitIfNeeded(OperationContext*,
+                                                      ChunkManager*,
+                                                      Chunk*,
+                                                      long);
 
     friend class TestableChunkManager;
 };

@@ -44,6 +44,7 @@
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_explain.h"
+#include "mongo/s/commands/cluster_write.h"
 #include "mongo/s/commands/sharded_command_processing.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
@@ -207,19 +208,19 @@ public:
         }
 
         BSONObj shardKey = status.getValue();
-        auto chunk = chunkMgr->findIntersectingChunk(txn, shardKey, collation);
-
-        if (!chunk.isOK()) {
+        auto chunkStatus = chunkMgr->findIntersectingChunk(txn, shardKey, collation);
+        if (!chunkStatus.isOK()) {
             uasserted(ErrorCodes::ShardKeyNotFound,
                       "findAndModify must target a single shard, but was not able to due to "
                       "non-simple collation");
         }
 
-        bool ok =
-            _runCommand(txn, conf, chunkMgr, chunk.getValue()->getShardId(), nss, cmdObj, result);
+        const auto& chunk = chunkStatus.getValue();
+
+        const bool ok = _runCommand(txn, conf, chunkMgr, chunk->getShardId(), nss, cmdObj, result);
         if (ok) {
-            // check whether split is necessary (using update object for size heuristic)
-            chunk.getValue()->splitIfShould(txn, cmdObj.getObjectField("update").objsize());
+            updateChunkWriteStatsAndSplitIfNeeded(
+                txn, chunkMgr.get(), chunk.get(), cmdObj.getObjectField("update").objsize());
         }
 
         return ok;
