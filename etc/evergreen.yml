@@ -255,7 +255,7 @@ functions:
             typeperf -qx PhysicalDisk | grep Disk | grep -v _Total > disk_counters.txt
             typeperf -cf disk_counters.txt -si 5 -o mongo-diskstats
         # Solaris: iostat -T d option for timestamp.
-        elif iostat -T d > /dev/null 2>&1; then
+        elif iostat -T d -Mx > /dev/null 2>&1; then
             iostat -T d -Mx 5 > mongo-diskstats
         # Linux: iostat -t option for timestamp.
         elif iostat -tdmx > /dev/null 2>&1; then
@@ -266,7 +266,7 @@ functions:
             do
                 date +'%m/%d/%Y %I:%M:%S %p' >> mongo-diskstats
                 iostat -d >> mongo-diskstats
-                printf "/n" >> mongo-diskstats
+                printf "\n" >> mongo-diskstats
                 sleep 5
             done
         # Check if vmstat -t is available.
