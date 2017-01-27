@@ -35,7 +35,8 @@ load("jstests/replsets/rslib.js");
 
     // Do a write, this will set up sync sources on secondaries.
     print("do a write");
-    assert.writeOK(primaryColl.bar.insert({x: 1}, {writeConcern: {w: 3}}));
+    assert.writeOK(
+        primaryColl.bar.insert({x: 1}, {writeConcern: {w: 3, wtimeout: rst.kDefaultTimeoutMS}}));
     // Check optime format in protocol version 0, which is a Timestamp.
     var res = primary.adminCommand({replSetGetStatus: 1});
     assert.commandWorked(res);
@@ -56,7 +57,8 @@ load("jstests/replsets/rslib.js");
     // This write may block until all nodes finish upgrade, because replSetUpdatePosition may be
     // rejected by the primary for mismatched config version before secondaries get reconfig.
     // This will make secondaries wait for 0.5 seconds and retry.
-    assert.writeOK(primaryColl.bar.insert({x: 2}, {writeConcern: {w: 3}}));
+    assert.writeOK(
+        primaryColl.bar.insert({x: 2}, {writeConcern: {w: 3, wtimeout: rst.kDefaultTimeoutMS}}));
 
     // Check optime format in protocol version 1, which is an object including the term.
     res = primary.adminCommand({replSetGetStatus: 1});
@@ -79,7 +81,8 @@ load("jstests/replsets/rslib.js");
     conf.protocolVersion = 0;
     conf.version++;
     reconfig(rst, conf);
-    assert.writeOK(primaryColl.bar.insert({x: 3}, {writeConcern: {w: 3}}));
+    assert.writeOK(
+        primaryColl.bar.insert({x: 3}, {writeConcern: {w: 3, wtimeout: rst.kDefaultTimeoutMS}}));
 
     // Check optime format in protocol version 0, which is a Timestamp.
     res = primary.adminCommand({replSetGetStatus: 1});
