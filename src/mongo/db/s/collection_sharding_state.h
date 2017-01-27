@@ -92,7 +92,7 @@ public:
     /**
      * Updates the metadata based on changes received from the config server and also resolves the
      * pending receives map in case some of these pending receives have completed or have been
-     * abandoned.
+     * abandoned.  If newMetadata is null, unshard the collection.
      *
      * Must always be called with an exclusive collection lock.
      */
@@ -167,9 +167,12 @@ public:
 
     void onDropCollection(OperationContext* txn, const NamespaceString& collectionName);
 
-private:
-    friend class CollectionRangeDeleter;
+    MetadataManager* getMetadataManagerForTest() {
+        return &_metadataManager;
+    }
 
+
+private:
     /**
      * Checks whether the shard version of the operation matches that of the collection.
      *
@@ -200,6 +203,8 @@ private:
     //
     // NOTE: The value is not owned by this class.
     MigrationSourceManager* _sourceMgr{nullptr};
+
+    friend class CollectionRangeDeleter;
 };
 
 }  // namespace mongo

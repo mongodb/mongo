@@ -50,22 +50,25 @@ public:
 
     /**
      * Acquires the collection IX lock and checks whether there are new entries for the collection's
-     * rangesToClean structure.  If there are, deletes some small amount of entries and yields using
+     * rangesToClean structure.  If there are, deletes up to maxToDelete entries and yields using
      * the standard query yielding logic.
      *
      * Returns true if there are more entries in rangesToClean, false if there is no more progress
      * to be made.
      */
-    bool cleanupNextRange(OperationContext* txn);
+    bool cleanupNextRange(OperationContext* txn, int maxToDelete);
 
 private:
     /**
-     * Performs the deletion of a small amount of entries within the range in progress.
+     * Performs the deletion of up to maxToDelete entries within the range in progress.
      * This function will invariant if called while _rangeInProgress is not set.
      *
      * Returns the number of documents deleted (0 if deletion is finished), or -1 for error.
      */
-    int _doDeletion(OperationContext* txn, Collection* collection, const BSONObj& keyPattern);
+    int _doDeletion(OperationContext* txn,
+                    Collection* collection,
+                    const BSONObj& keyPattern,
+                    int maxToDelete);
 
     NamespaceString _nss;
 

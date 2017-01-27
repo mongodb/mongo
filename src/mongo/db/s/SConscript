@@ -238,9 +238,11 @@ env.CppUnitTest(
     target='collection_sharding_state_test',
     source=[
         'collection_sharding_state_test.cpp',
+        'collection_range_deleter_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/serveronly',
         '$BUILD_DIR/mongo/executor/network_test_env',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
@@ -248,6 +250,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         '$BUILD_DIR/mongo/util/net/message_port_mock',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
     ],
 )
 
