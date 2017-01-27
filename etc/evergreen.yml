@@ -1176,11 +1176,6 @@ tasks:
             burn_in_args="--checkEvergreen"
           fi
 
-          # Create a branch in the git repository that tracks the remote branch configured for this
-          # Evergreen project so that the `git merge-base <branchname>@{upstream} HEAD` command run
-          # by the burn_in_tests.py script works.
-          git branch --force ${branch_name} origin/${branch_name}
-
           # Capture a list of new and modified tests.
           ${python|python} buildscripts/burn_in_tests.py --branch=${branch_name} --buildVariant=${build_variant} --testListOutfile=jstests/new_tests.json --noExec $burn_in_args
 
