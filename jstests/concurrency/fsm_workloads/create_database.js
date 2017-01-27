@@ -119,6 +119,13 @@ var $config = (function() {
         listDatabases: {init: 0.75, listDatabases: 0.25},
     };
 
+    var skip = function skip(cluster) {
+        if (isEphemeral(cluster.getDB("test"))) {
+            return {skip: true, msg: 'does not run with ephemeral storage.'};
+        }
+        return {skip: false};
+    };
+
     return {
         data,
         // We only run a few iterations to reduce the amount of data cumulatively
@@ -129,5 +136,6 @@ var $config = (function() {
         // test hosts.
         threadCount: 10,
         iterations: 180, states, transitions,
+        skip: skip,
     };
 })();

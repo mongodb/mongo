@@ -8021,13 +8021,12 @@ buildvariants:
   - name: aggregation_WT
   - name: aggregation_auth
   - name: auth
-  # Disabled due to SERVER-21965
-  # - name: concurrency
-  #   distros:
-  #   - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
-  # - name: concurrency_replication
-  # - name: concurrency_sharded
-  # - name: concurrency_simultaneous
+  - name: concurrency
+    distros:
+    - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
+  - name: concurrency_replication
+  - name: concurrency_sharded
+  - name: concurrency_simultaneous
   - name: dbtest
   - name: failpoints
   - name: failpoints_auth
@@ -8047,13 +8046,12 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_small_oplog
   - name: jsCore_small_oplog_rs
-  # Disabled due to SERVER-21965
-  # - name: jstestfuzz_WT
-  # - name: jstestfuzz_concurrent_WT
-  # - name: jstestfuzz_concurrent_replication_WT
-  # - name: jstestfuzz_concurrent_sharded_WT
-  # - name: jstestfuzz_replication_WT
-  # - name: jstestfuzz_sharded_WT
+  - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded_WT
+  - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded_WT
   - name: mongosTest
   - name: noPassthrough
   - name: noPassthroughWithMongod
