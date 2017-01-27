@@ -163,6 +163,7 @@ extern int diagLogging;
 namespace {
 
 const NamespaceString startupLogCollectionName("local.startup_log");
+const NamespaceString kSystemReplSetCollection("local.system.replset");
 
 #ifdef _WIN32
 ntservice::NtServiceDefaultStrings defaultServiceStrings = {
@@ -252,12 +253,9 @@ void checkForIdIndexes(OperationContext* txn, Database* db) {
  *          --replset.
  */
 unsigned long long checkIfReplMissingFromCommandLine(OperationContext* txn) {
-    // This is helpful for the query below to work as you can't open files when readlocked
-    ScopedTransaction transaction(txn, MODE_X);
-    Lock::GlobalWrite lk(txn->lockState());
     if (!repl::getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
         DBDirectClient c(txn);
-        return c.count("local.system.replset");
+        return c.count(kSystemReplSetCollection.ns());
     }
     return 0;
 }
@@ -300,6 +298,17 @@ void repairDatabasesAndCheckVersion(OperationContext* txn) {
     }
 
     const repl::ReplSettings& replSettings = repl::getGlobalReplicationCoordinator()->getSettings();
+
+    if (!storageGlobalParams.readOnly) {
+        // We open the "local" database before calling checkIfReplMissingFromCommandLine() to ensure
+        // the in-memory catalog entries for the 'kSystemReplSetCollection' collection have been
+        // populated if the collection exists. If the "local" database didn't exist at this point
+        // yet, then it will be created. If the mongod is running in a read-only mode, then it is
+        // fine to not open the "local" database and populate the catalog entries because we won't
+        // attempt to drop the temporary collections anyway.
+        Lock::DBLock dbLock(txn->lockState(), kSystemReplSetCollection.db(), MODE_X);
+        dbHolder().openDb(txn, kSystemReplSetCollection.db());
+    }
 
     // On replica set members we only clear temp collections on DBs other than "local" during
     // promotion to primary. On pure slaves, they are only cleared when the oplog tells them
