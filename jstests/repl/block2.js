@@ -19,8 +19,8 @@ function check(msg) {
 
 check("A");
 
-assert.writeOK(tm.insert({x: 1}, {writeConcern: {w: 2}}));
-assert.writeOK(tm.insert({x: 2}, {writeConcern: {w: 2, wtimeout: 3000}}));
+assert.writeOK(tm.insert({x: 1}, {writeConcern: {w: 2, wtimeout: ReplTest.kDefaultTimeoutMS}}));
+assert.writeOK(tm.insert({x: 2}, {writeConcern: {w: 2, wtimeout: ReplTest.kDefaultTimeoutMS}}));
 
 rt.stop(false);
 assert.writeError(tm.insert({x: 3}, {writeConcern: {w: 2, wtimeout: 3000}}));

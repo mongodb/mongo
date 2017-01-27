@@ -72,6 +72,7 @@ ToolTest.prototype.runTool = function() {
 ReplTest = function(name, ports) {
     this.name = name;
     this.ports = ports || allocatePorts(2);
+    this.kDefaultTimeoutMS = 10 * 60 * 1000;
 };
 
 ReplTest.prototype.getPort = function(master) {
