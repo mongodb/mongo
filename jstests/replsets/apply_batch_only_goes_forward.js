@@ -38,9 +38,11 @@
     var stepDownCmd = {replSetStepDown: stepDownSecs, force: true};
 
     // Write op
-    assert.writeOK(mTest.foo.save({}, {writeConcern: {w: 3}}));
-    replTest.waitForState(slave, ReplSetTest.State.SECONDARY, 30000);
-    assert.writeOK(mTest.foo.save({}, {writeConcern: {w: 3}}));
+    assert.writeOK(
+        mTest.foo.save({}, {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+    replTest.waitForState(slave, ReplSetTest.State.SECONDARY);
+    assert.writeOK(
+        mTest.foo.save({}, {writeConcern: {w: 3, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
     // Set minvalid to something far in the future for the current primary, to simulate recovery.
     // Note: This is so far in the future (5 days) that it will never become secondary.
@@ -56,22 +58,22 @@
     // We do an update in case there is a minvalid document on the primary already.
     // If the doc doesn't exist then upsert:true will create it, and the writeConcern ensures
     // that update returns details of the write, like whether an update or insert was performed.
-    printjson(
-        assert.writeOK(mMinvalid.update({},
-                                        {ts: farFutureTS, t: NumberLong(-1), begin: primaryOpTime},
-                                        {upsert: true, writeConcern: {w: 1}})));
+    printjson(assert.writeOK(mMinvalid.update(
+        {},
+        {ts: farFutureTS, t: NumberLong(-1), begin: primaryOpTime},
+        {upsert: true, writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}})));
 
     jsTest.log("restart primary");
     clearRawMongoProgramOutput();
     replTest.restart(master);
     printjson(sLocal.adminCommand("isMaster"));
-    replTest.waitForState(master, ReplSetTest.State.RECOVERING, 90000);
+    replTest.waitForState(master, ReplSetTest.State.RECOVERING);
 
     // Slave is now master... Do a write to advance the optime on the primary so that it will be
     // considered as a sync source -  this is more relevant to PV0 because we do not write a new
     // entry to the oplog on becoming primary.
-    assert.writeOK(
-        replTest.getPrimary().getDB("test").foo.save({}, {writeConcern: {w: 2, wtimeout: 90000}}));
+    assert.writeOK(replTest.getPrimary().getDB("test").foo.save(
+        {}, {writeConcern: {w: 2, wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
     // Sync source selection will log this message if it does not detect min valid in the sync
     // source candidate's oplog.
