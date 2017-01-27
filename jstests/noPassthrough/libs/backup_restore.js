@@ -41,39 +41,59 @@ var BackupRestoreTest = function(options) {
     /**
      * Starts a client that will run a CRUD workload.
      */
-    function _crudClient(host, dbName, coll) {
+    function _crudClient(host, dbName, collectionName) {
         // Launch CRUD client
-        var crudClientCmds = "var bulkNum = 1000;" + "var baseNum = 100000;" +
-            "var coll = db.getSiblingDB('" + dbName + "')." + coll + ";" +
-            "coll.ensureIndex({x: 1});" + "var largeValue = new Array(1024).join('L');" +
-            "Random.setRandomSeed();" +
-            // run indefinitely
-            "while (true) {" + "   try {" + "       var op = Random.rand();" +
-            "       var match = Math.floor(Random.rand() * baseNum);" + "       if (op < 0.2) {" +
-            // 20% of the operations: bulk insert bulkNum docs
-            "           var bulk = coll.initializeUnorderedBulkOp();" +
-            "           for (var i = 0; i < bulkNum; i++) {" +
-            "               bulk.insert({x: (match * i) % baseNum," +
-            "                   doc: largeValue.substring(0, match % largeValue.length)});" +
-            "           }" + "           assert.writeOK(bulk.execute());" +
-            "       } else if (op < 0.4) {" +
-            // 20% of the operations: update docs;
-            "           var updateOpts = {upsert: true, multi: true};" +
-            "           assert.writeOK(coll.update(" + "               {x: {$gte: match}}," +
-            "               {$inc: {x: baseNum}, $set: {n: 'hello'}}," +
-            "               updateOpts));" + "       } else if (op < 0.9) {" +
-            // 50% of the operations: find matchings docs
-            // itcount() consumes the cursor
-            "           coll.find({x: {$gte: match}}).itcount();" + "       } else {" +
-            // 10% of the operations: remove matching docs
-            "           assert.writeOK(coll.remove({x: {$gte: match}}));" + "       }" +
-            "   } catch(e) {" +
-            "       if (e instanceof ReferenceError || e instanceof TypeError) {" +
-            "           throw e;" + "       }" + "   }" + "}";
+        var crudClientCmds = function(dbName, collectionName) {
+            var bulkNum = 1000;
+            var baseNum = 100000;
+            var coll = db.getSiblingDB(dbName).getCollection(collectionName);
+            coll.ensureIndex({x: 1});
+            var largeValue = new Array(1024).join('L');
+            Random.setRandomSeed();
+            // Run indefinitely.
+            while (true) {
+                try {
+                    var op = Random.rand();
+                    var match = Math.floor(Random.rand() * baseNum);
+                    if (op < 0.2) {
+                        // 20% of the operations: bulk insert bulkNum docs.
+                        var bulk = coll.initializeUnorderedBulkOp();
+                        for (var i = 0; i < bulkNum; i++) {
+                            bulk.insert({
+                                x: (match * i) % baseNum,
+                                doc: largeValue.substring(0, match % largeValue.length),
+                            });
+                        }
+                        assert.writeOK(bulk.execute());
+                    } else if (op < 0.4) {
+                        // 20% of the operations: update docs.
+                        var updateOpts = {upsert: true, multi: true};
+                        assert.writeOK(coll.update({x: {$gte: match}},
+                                                   {$inc: {x: baseNum}, $set: {n: 'hello'}},
+                                                   updateOpts));
+                    } else if (op < 0.9) {
+                        // 50% of the operations: find matchings docs.
+                        // itcount() consumes the cursor
+                        coll.find({x: {$gte: match}}).itcount();
+                    } else {
+                        // 10% of the operations: remove matching docs.
+                        assert.writeOK(coll.remove({x: {$gte: match}}));
+                    }
+                } catch (e) {
+                    if (e instanceof ReferenceError || e instanceof TypeError) {
+                        throw e;
+                    }
+                }
+            }
+        };
 
         // Returns the pid of the started mongo shell so the CRUD test client can be terminated
         // without waiting for its execution to finish.
-        return startMongoProgramNoConnect("mongo", "--eval", crudClientCmds, host);
+        return startMongoProgramNoConnect(
+            'mongo',
+            '--eval',
+            '(' + crudClientCmds + ')("' + dbName + '", "' + collectionName + '")',
+            host);
     }
 
     /**
@@ -85,35 +105,61 @@ var BackupRestoreTest = function(options) {
         // started without any cluster options. Since the shell running this test was started with
         // --nodb, another mongo shell is used to allow implicit connections to be made to the
         // primary of the replica set.
-        var fsmClientCmds = "'use strict';" + "load('jstests/concurrency/fsm_libs/runner.js');" +
-            "var dir = 'jstests/concurrency/fsm_workloads';" + "var blacklist = [" +
-            "    'agg_group_external.js'," + "    'agg_sort_external.js'," +
-            "    'auth_create_role.js'," + "    'auth_create_user.js'," +
-            "    'auth_drop_role.js'," + "    'auth_drop_user.js'," +
-            "    'reindex_background.js'," + "    'yield_sort.js'," +
-            "    'create_index_background.js'," +
-            "].map(function(file) { return dir + '/' + file; });" + "Random.setRandomSeed();" +
-            // run indefinitely
-            "while (true) {" + "   try {" +
-            "       var workloads = Array.shuffle(ls(dir).filter(function(file) {" +
-            "           return !Array.contains(blacklist, file);" + "       }));" +
-            // Run workloads one at a time, so we ensure replication completes
-            "       workloads.forEach(function(workload) {" +
-            "           runWorkloadsSerially([workload]," +
-            "               {}, {}, {dropDatabaseBlacklist: ['" + blackListDb + "']});" +
-            // Wait for replication to complete between workloads
-            "           var wc = {writeConcern: {w: " + numNodes + ", wtimeout: 300000}};" +
-            "           var result = db.getSiblingDB('test').fsm_teardown.insert({ a: 1 }, wc);" +
-            "           assert.writeOK(result, 'teardown insert failed: ' + tojson(result));" +
-            "           result = db.getSiblingDB('test').fsm_teardown.drop();" +
-            "           assert(result, 'teardown drop failed');" + "       });" +
-            "   } catch(e) {" +
-            "       if (e instanceof ReferenceError || e instanceof TypeError) {" +
-            "           throw e;" + "       }" + "   }" + "}";
+        var fsmClientCmds = function(blackListDb, numNodes) {
+            'use strict';
+            load('jstests/concurrency/fsm_libs/runner.js');
+            var dir = 'jstests/concurrency/fsm_workloads';
+            var blacklist = [
+                // Disabled due to MongoDB restrictions and/or workload restrictions
+                'agg_group_external.js',  // uses >100MB of data, which can overwhelm test hosts
+                'agg_sort_external.js',   // uses >100MB of data, which can overwhelm test hosts
+                'auth_create_role.js',
+                'auth_create_user.js',
+                'auth_drop_role.js',
+                'auth_drop_user.js',
+                'create_index_background.js',
+                'reindex_background.js',
+                'update_rename.js',
+                'update_rename_noindex.js',
+                'yield_sort.js',
+            ].map(function(file) {
+                return dir + '/' + file;
+            });
+            Random.setRandomSeed();
+            // Run indefinitely.
+            while (true) {
+                try {
+                    var workloads = Array.shuffle(ls(dir).filter(function(file) {
+                        return !Array.contains(blacklist, file);
+                    }));
+                    // Run workloads one at a time, so we ensure replication completes.
+                    workloads.forEach(function(workload) {
+                        runWorkloadsSerially(
+                            [workload], {}, {}, {dropDatabaseBlacklist: [blackListDb]});
+                        // Wait for replication to complete between workloads.
+                        var wc = {
+                            writeConcern: {w: numNodes, wtimeout: ReplSetTest.kDefaultTimeoutMS}
+                        };
+                        var result = db.getSiblingDB('test').fsm_teardown.insert({a: 1}, wc);
+                        assert.writeOK(result, 'teardown insert failed: ' + tojson(result));
+                        result = db.getSiblingDB('test').fsm_teardown.drop();
+                        assert(result, 'teardown drop failed');
+                    });
+                } catch (e) {
+                    if (e instanceof ReferenceError || e instanceof TypeError) {
+                        throw e;
+                    }
+                }
+            }
+        };
 
         // Returns the pid of the started mongo shell so the FSM test client can be terminated
         // without waiting for its execution to finish.
-        return startMongoProgramNoConnect("mongo", "--eval", fsmClientCmds, host);
+        return startMongoProgramNoConnect(
+            'mongo',
+            '--eval',
+            '(' + fsmClientCmds + ')("' + blackListDb + '", ' + numNodes + ');',
+            host);
     }
 
     /**
