@@ -4108,7 +4108,8 @@ buildvariants:
     push_name: linux
     push_arch: arm64-enterprise-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --release CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo) --excludeWithAnyTags=requires_mmapv1
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: arm64
@@ -4185,7 +4186,8 @@ buildvariants:
     push_name: linux
     push_arch: arm64-ubuntu1604
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release CCFLAGS="-march=armv8-a+crc -mtune=generic" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
-    num_jobs_available: $(grep -c ^processor /proc/cpuinfo) --excludeWithAnyTags=requires_mmapv1
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager.py
     packager_arch: arm64
@@ -6518,7 +6520,7 @@ buildvariants:
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)" -tags 'sasl ssl'
     compile_flags: --ssl MONGO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
     num_jobs_available: 2
-    test_flags: -excludeWithAnyTags=requires_mmapv1
+    test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
     packager_script: packager-enterprise.py
     packager_arch: s390x
