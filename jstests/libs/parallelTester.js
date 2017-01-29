@@ -302,26 +302,32 @@ if (typeof _threadInject != "undefined") {
     // newScopes: if true, each thread starts in a fresh scope
     assert.parallelTests = function(params, msg, newScopes) {
         newScopes = newScopes || false;
-        var wrapper = function(fun, argv) {
-            eval("var z = function() {" + "TestData = " + tojson(TestData) + ";" +
-                 "var __parallelTests__fun = " + fun.toString() + ";" +
-                 "var __parallelTests__argv = " + tojson(argv) + ";" +
-                 "var __parallelTests__passed = false;" + "try {" +
-                 "__parallelTests__fun.apply( 0, __parallelTests__argv );" +
-                 "__parallelTests__passed = true;" + "} catch ( e ) {" + "print('');" +
-                 "print( '********** Parallel Test FAILED: ' + tojson(e) );" + "print('');" + "}" +
-                 "return __parallelTests__passed;" + "}");
-            return z;
-        };
+        function wrapper(fun, argv, globals) {
+            if (globals.hasOwnProperty("TestData")) {
+                TestData = globals.TestData;
+            }
+
+            try {
+                fun.apply(0, argv);
+                return {passed: true};
+            } catch (e) {
+                print("\n********** Parallel Test FAILED: " + tojson(e) + "\n");
+                return {
+                    passed: false,
+                    testName: tojson(e).match(/Error: error loading js file: (.*\.js)/)[1]
+                };
+            }
+        }
+
         var runners = new Array();
         for (var i in params) {
             var param = params[i];
             var test = param.shift();
             var t;
             if (newScopes)
-                t = new ScopedThread(wrapper(test, param));
+                t = new ScopedThread(wrapper, test, param, {TestData: TestData});
             else
-                t = new Thread(wrapper(test, param));
+                t = new Thread(wrapper, test, param, {TestData: TestData});
             runners.push(t);
         }
 
@@ -329,13 +335,16 @@ if (typeof _threadInject != "undefined") {
             x.start();
         });
         var nFailed = 0;
+        var failedTests = [];
         // SpiderMonkey doesn't like it if we exit before all threads are joined
         // (see SERVER-19615 for a similar issue).
         runners.forEach(function(x) {
-            if (!x.returnData()) {
+            if (!x.returnData().passed) {
                 ++nFailed;
+                failedTests.push(x.returnData().testName);
             }
         });
+        msg += ": " + tojsononeline(failedTests);
         assert.eq(0, nFailed, msg);
     };
 }
