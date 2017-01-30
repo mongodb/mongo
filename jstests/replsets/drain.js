@@ -27,7 +27,6 @@
 
     var primary = replSet.getPrimary();
     var secondary = replSet.getSecondary();
-    var isPV0 = replSet.getReplSetConfigFromNode().protocolVersion != 1;
 
     // Do an initial insert to prevent the secondary from going into recovery
     var numDocuments = 20;
@@ -54,13 +53,12 @@
         jsTestLog('Number of operations buffered on secondary since stopping applier: ' +
                   bufferCountChange);
         return bufferCountChange >= numDocuments - 1;
-    }, 'secondary did not buffer operations for new inserts on primary', 30000, 1000);
+    }, 'secondary did not buffer operations for new inserts on primary', 300000, 1000);
 
     // Kill primary; secondary will enter drain mode to catch up
     primary.getDB("admin").shutdownServer({force: true});
 
-    var electionTimeout = (isPV0 ? 60 : 20) * 1000;  // Timeout in milliseconds
-    replSet.waitForState(secondary, ReplSetTest.State.PRIMARY, electionTimeout);
+    replSet.waitForState(secondary, ReplSetTest.State.PRIMARY);
 
     // Ensure new primary is not yet writable
     jsTestLog('New primary should not be writable yet');
@@ -97,7 +95,7 @@
     assert.commandWorked(
         secondary.adminCommand({
             replSetTest: 1,
-            waitForDrainFinish: 5000,
+            waitForDrainFinish: 30000,
         }),
         'replSetTest waitForDrainFinish should work when draining is allowed to complete');
 
