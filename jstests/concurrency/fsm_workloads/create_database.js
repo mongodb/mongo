@@ -9,6 +9,9 @@
  * Each thread uses its own database, though sometimes threads may try to create databases with
  * names that only differ in case, expecting the appriopriate error code.
  */
+
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isEphemeralForTest
+
 var $config = (function() {
 
     let data = {
@@ -119,9 +122,11 @@ var $config = (function() {
         listDatabases: {init: 0.75, listDatabases: 0.25},
     };
 
+    // TODO SERVER-27831: Remove this skip function after the deadlock when listing the collections
+    // of the "local" database is fixed.
     var skip = function skip(cluster) {
-        if (isEphemeral(cluster.getDB("test"))) {
-            return {skip: true, msg: 'does not run with ephemeral storage.'};
+        if (isEphemeralForTest(cluster.getDB("test"))) {
+            return {skip: true, msg: 'does not run with ephemeralForTest storage.'};
         }
         return {skip: false};
     };

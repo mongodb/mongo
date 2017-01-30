@@ -73,6 +73,13 @@ function isWiredTiger(db) {
 }
 
 /**
+ * Returns true if the current storage engine is ephemeralForTest, and false otherwise.
+ */
+function isEphemeralForTest(db) {
+    return getStorageEngineName(db) === 'ephemeralForTest';
+}
+
+/**
  * Returns true if the current storage engine is ephemeral, and false otherwise.
  */
 function isEphemeral(db) {
