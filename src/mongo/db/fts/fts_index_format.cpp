@@ -101,6 +101,30 @@ int guessTermSize(const std::string& term, TextIndexVersion textIndexVersion) {
         return termKeyLengthV3;
     }
 }
+
+/**
+ * Given an object being indexed, 'obj', and a path through 'obj', returns the corresponding BSON
+ * element, according to the indexing rules for the non-text fields of an FTS index key pattern.
+ *
+ * Specifically, throws a user assertion if an array is encountered while traversing the 'path'. It
+ * is not legal for there to be an array along the path of the non-text prefix or suffix fields of a
+ * text index, unless a particular array index is specified, as in "a.3".
+ */
+BSONElement extractNonFTSKeyElement(const BSONObj& obj, StringData path) {
+    BSONElementSet indexedElements;
+    const bool expandArrayOnTrailingField = true;
+    std::set<size_t> arrayComponents;
+    dps::extractAllElementsAlongPath(
+        obj, path, indexedElements, expandArrayOnTrailingField, &arrayComponents);
+    uassert(ErrorCodes::CannotBuildIndexKeys,
+            str::stream() << "Field '" << path << "' of text index contains an array in document: "
+                          << obj,
+            arrayComponents.empty());
+
+    // Since there aren't any arrays, there cannot be more than one extracted element on 'path'.
+    invariant(indexedElements.size() <= 1U);
+    return indexedElements.empty() ? nullElt : *indexedElements.begin();
+}
 }  // namespace
 
 MONGO_INITIALIZER(FTSIndexFormat)(InitializerContext* context) {
@@ -116,23 +140,19 @@ void FTSIndexFormat::getKeys(const FTSSpec& spec, const BSONObj& obj, BSONObjSet
     vector<BSONElement> extrasBefore;
     vector<BSONElement> extrasAfter;
 
-    // compute the non FTS key elements
+    // Compute the non FTS key elements for the prefix.
     for (unsigned i = 0; i < spec.numExtraBefore(); i++) {
-        BSONElement e = dps::extractElementAtPath(obj, spec.extraBefore(i));
-        if (e.eoo())
-            e = nullElt;
-        uassert(16675, "cannot have a multi-key as a prefix to a text index", e.type() != Array);
-        extrasBefore.push_back(e);
-        extraSize += e.size();
-    }
-    for (unsigned i = 0; i < spec.numExtraAfter(); i++) {
-        BSONElement e = dps::extractElementAtPath(obj, spec.extraAfter(i));
-        if (e.eoo())
-            e = nullElt;
-        extrasAfter.push_back(e);
-        extraSize += e.size();
+        auto indexedElement = extractNonFTSKeyElement(obj, spec.extraBefore(i));
+        extrasBefore.push_back(indexedElement);
+        extraSize += indexedElement.size();
     }
 
+    // Compute the non FTS key elements for the suffix.
+    for (unsigned i = 0; i < spec.numExtraAfter(); i++) {
+        auto indexedElement = extractNonFTSKeyElement(obj, spec.extraAfter(i));
+        extrasAfter.push_back(indexedElement);
+        extraSize += indexedElement.size();
+    }
 
     TermFrequencyMap term_freqs;
     spec.scoreDocument(obj, &term_freqs);
