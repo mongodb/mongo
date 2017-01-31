@@ -37,15 +37,12 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk.h"
-#include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/client/dbclient_multi_command.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/config.h"
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
@@ -176,34 +173,30 @@ BSONObj findExtremeKeyForShard(OperationContext* txn,
  * Splits the chunks touched based from the targeter stats if needed.
  */
 void splitIfNeeded(OperationContext* txn, const NamespaceString& nss, const TargeterStats& stats) {
-    auto status = Grid::get(txn)->catalogCache()->getDatabase(txn, nss.db().toString());
-    if (!status.isOK()) {
-        warning() << "failed to get database config for " << nss
-                  << " while checking for auto-split: " << status.getStatus();
+    auto scopedCMStatus = ScopedChunkManager::get(txn, nss);
+    if (!scopedCMStatus.isOK()) {
+        warning() << "failed to get collection information for " << nss
+                  << " while checking for auto-split" << causedBy(scopedCMStatus.getStatus());
         return;
     }
 
-    auto config = status.getValue();
+    const auto& scopedCM = scopedCMStatus.getValue();
 
-    std::shared_ptr<ChunkManager> chunkManager;
-    std::shared_ptr<Shard> dummyShard;
-    config->getChunkManagerOrPrimary(txn, nss.ns(), chunkManager, dummyShard);
-
-    if (!chunkManager) {
+    if (!scopedCM.cm()) {
         return;
     }
 
     for (auto it = stats.chunkSizeDelta.cbegin(); it != stats.chunkSizeDelta.cend(); ++it) {
         std::shared_ptr<Chunk> chunk;
         try {
-            chunk = chunkManager->findIntersectingChunkWithSimpleCollation(txn, it->first);
+            chunk = scopedCM.cm()->findIntersectingChunkWithSimpleCollation(txn, it->first);
         } catch (const AssertionException& ex) {
             warning() << "could not find chunk while checking for auto-split: "
                       << causedBy(redact(ex));
             return;
         }
 
-        updateChunkWriteStatsAndSplitIfNeeded(txn, chunkManager.get(), chunk.get(), it->second);
+        updateChunkWriteStatsAndSplitIfNeeded(txn, scopedCM.cm().get(), chunk.get(), it->second);
     }
 }
 

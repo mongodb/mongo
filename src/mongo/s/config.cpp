@@ -42,7 +42,6 @@
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -77,36 +76,6 @@ void DBConfig::markNSNotSharded(const std::string& ns) {
     CollectionInfoMap::iterator it = _collections.find(ns);
     if (it != _collections.end()) {
         _collections.erase(it);
-    }
-}
-
-void DBConfig::getChunkManagerOrPrimary(OperationContext* txn,
-                                        const std::string& ns,
-                                        std::shared_ptr<ChunkManager>& manager,
-                                        std::shared_ptr<Shard>& primary) {
-    manager.reset();
-    primary.reset();
-
-    const auto shardRegistry = Grid::get(txn)->shardRegistry();
-
-    stdx::lock_guard<stdx::mutex> lk(_lock);
-
-    auto it = _collections.find(ns);
-
-    if (it == _collections.end()) {
-        // If we don't know about this namespace, it's unsharded by default
-        auto shardStatus = shardRegistry->getShard(txn, _primaryId);
-        if (!shardStatus.isOK()) {
-            uasserted(40371,
-                      str::stream() << "The primary shard for collection " << ns
-                                    << " could not be loaded due to error "
-                                    << shardStatus.getStatus().toString());
-        }
-
-        primary = std::move(shardStatus.getValue());
-    } else {
-        const auto& ci = it->second;
-        manager = ci.cm;
     }
 }
 

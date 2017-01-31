@@ -320,23 +320,19 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
     // Re-target and re-send the initial find command to the shards until we have established the
     // shard version.
     for (size_t retries = 1; retries <= kMaxStaleConfigRetries; ++retries) {
-        auto dbConfigStatus = ScopedShardDatabase::getExisting(txn, query.nss().db());
-        if (dbConfigStatus == ErrorCodes::NamespaceNotFound) {
+        auto scopedCMStatus = ScopedChunkManager::get(txn, query.nss());
+        if (scopedCMStatus == ErrorCodes::NamespaceNotFound) {
             // If the database doesn't exist, we successfully return an empty result set without
             // creating a cursor.
             return CursorId(0);
-        } else if (!dbConfigStatus.isOK()) {
-            return dbConfigStatus.getStatus();
+        } else if (!scopedCMStatus.isOK()) {
+            return scopedCMStatus.getStatus();
         }
 
-        const auto& dbConfig = dbConfigStatus.getValue();
-
-        std::shared_ptr<ChunkManager> chunkManager;
-        std::shared_ptr<Shard> primary;
-        dbConfig.db()->getChunkManagerOrPrimary(txn, query.nss().ns(), chunkManager, primary);
+        const auto& scopedCM = scopedCMStatus.getValue();
 
         auto cursorId = runQueryWithoutRetrying(
-            txn, query, readPref, chunkManager.get(), std::move(primary), results, viewDefinition);
+            txn, query, readPref, scopedCM.cm().get(), scopedCM.primary(), results, viewDefinition);
         if (cursorId.isOK()) {
             return cursorId;
         }
@@ -357,7 +353,7 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
         if (status == ErrorCodes::StaleEpoch) {
             Grid::get(txn)->catalogCache()->invalidate(query.nss().db().toString());
         } else {
-            dbConfig.db()->getChunkManagerIfExists(txn, query.nss().ns(), true);
+            scopedCM.db()->getChunkManagerIfExists(txn, query.nss().ns(), true);
         }
     }
 
