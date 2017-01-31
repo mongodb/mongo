@@ -5,24 +5,23 @@
 
     var st = new ShardingTest({shards: 3, mongos: 3});
 
-    // Use separate mongoses for admin, inserting data, and validating results, so no
-    // single-mongos tricks will work
-    var insertMongos = st.s2;
+    var config = st.s0.getDB("config");
+    var admin = st.s0.getDB("admin");
+    var coll = st.s0.getCollection("foo.bar");
+
+    // Use separate mongoses for admin, inserting data, and validating results, so no single-mongos
+    // tricks will work
     var staleMongos = st.s1;
+    var insertMongos = st.s2;
 
-    var config = st.s.getDB("config");
-    var admin = st.s.getDB("admin");
-    var coll = st.s.getCollection("foo.bar");
-
-    var shards = {};
+    var shards = [];
     config.shards.find().forEach(function(doc) {
-        shards[doc._id] = new Mongo(doc.host);
+        shards.push(doc._id);
     });
 
     //
     // Test that inserts and queries go to the correct shard even when the collection has been
-    // sharded
-    // in the background
+    // sharded in the background
     //
 
     jsTest.log("Enabling sharding for the first time...");
@@ -74,8 +73,8 @@
 
     var getOtherShard = function(shard) {
         for (var id in shards) {
-            if (id != shard)
-                return id;
+            if (shards[id] != shard)
+                return shards[id];
         }
     };
 
@@ -86,8 +85,9 @@
     jsTest.log("moved primary...");
 
     bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
-    for (var i = 0; i < 100; i++)
+    for (var i = 0; i < 100; i++) {
         bulk.insert({test: "c"});
+    }
     assert.writeOK(bulk.execute());
 
     assert.eq(100, staleMongos.getCollection(coll + "").find({test: "c"}).itcount());
@@ -110,8 +110,9 @@
     assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
     bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
-    for (var i = 0; i < 100; i++)
+    for (var i = 0; i < 100; i++) {
         bulk.insert({test: "d"});
+    }
     assert.writeOK(bulk.execute());
 
     assert.eq(100, staleMongos.getCollection(coll + "").find({test: "d"}).itcount());

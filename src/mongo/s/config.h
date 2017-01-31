@@ -33,7 +33,7 @@
 
 #include "mongo/db/repl/optime.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/s/client/shard.h"
+#include "mongo/s/shard_id.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -80,13 +80,6 @@ public:
      * @return whether or not the 'ns' collection is partitioned
      */
     bool isSharded(const std::string& ns);
-
-    // Atomically returns *either* the chunk manager *or* the primary shard for the collection,
-    // neither if the collection doesn't exist.
-    void getChunkManagerOrPrimary(OperationContext* txn,
-                                  const std::string& ns,
-                                  std::shared_ptr<ChunkManager>& manager,
-                                  std::shared_ptr<Shard>& primary);
 
     std::shared_ptr<ChunkManager> getChunkManager(OperationContext* txn,
                                                   const std::string& ns,

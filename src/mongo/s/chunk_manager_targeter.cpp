@@ -289,13 +289,14 @@ ChunkManagerTargeter::ChunkManagerTargeter(const NamespaceString& nss, TargeterS
 
 
 Status ChunkManagerTargeter::init(OperationContext* txn) {
-    auto dbStatus = ScopedShardDatabase::getOrCreate(txn, _nss.db());
-    if (!dbStatus.isOK()) {
-        return dbStatus.getStatus();
+    auto scopedCMStatus = ScopedChunkManager::getOrCreate(txn, _nss);
+    if (!scopedCMStatus.isOK()) {
+        return scopedCMStatus.getStatus();
     }
 
-    auto scopedDb = std::move(dbStatus.getValue());
-    scopedDb.db()->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
+    const auto& scopedCM = scopedCMStatus.getValue();
+    _manager = scopedCM.cm();
+    _primary = scopedCM.primary();
 
     return Status::OK();
 }
@@ -702,13 +703,14 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* txn, bool* wasCha
     shared_ptr<ChunkManager> lastManager = _manager;
     shared_ptr<Shard> lastPrimary = _primary;
 
-    auto dbStatus = ScopedShardDatabase::getOrCreate(txn, _nss.db());
-    if (!dbStatus.isOK()) {
-        return dbStatus.getStatus();
+    auto scopedCMStatus = ScopedChunkManager::getOrCreate(txn, _nss);
+    if (!scopedCMStatus.isOK()) {
+        return scopedCMStatus.getStatus();
     }
 
-    auto scopedDb = std::move(dbStatus.getValue());
-    scopedDb.db()->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
+    const auto& scopedCM = scopedCMStatus.getValue();
+    _manager = scopedCM.cm();
+    _primary = scopedCM.primary();
 
     // We now have the latest metadata from the cache.
 
@@ -770,25 +772,17 @@ Status ChunkManagerTargeter::refreshNow(OperationContext* txn, RefreshType refre
     // Try not to spam the configs
     refreshBackoff();
 
-    auto dbStatus = ScopedShardDatabase::getOrCreate(txn, _nss.db());
-    if (!dbStatus.isOK()) {
-        return dbStatus.getStatus();
+    ScopedChunkManager::refreshAndGet(txn, _nss);
+
+    auto scopedCMStatus = ScopedChunkManager::get(txn, _nss);
+    if (!scopedCMStatus.isOK()) {
+        return scopedCMStatus.getStatus();
     }
 
-    const auto& scopedDb = dbStatus.getValue();
+    const auto& scopedCM = scopedCMStatus.getValue();
 
-    // TODO: Improve synchronization and make more explicit
-    if (refreshType == RefreshType_RefreshChunkManager) {
-        try {
-            // Forces a remote check of the collection info, synchronization between threads happens
-            // internally
-            scopedDb.db()->getChunkManagerIfExists(txn, _nss.ns(), true);
-        } catch (const DBException& ex) {
-            return Status(ErrorCodes::UnknownError, ex.toString());
-        }
-    }
-
-    scopedDb.db()->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
+    _manager = scopedCM.cm();
+    _primary = scopedCM.primary();
 
     return Status::OK();
 }
