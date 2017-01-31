@@ -126,7 +126,7 @@ def __get_syslibdeps(node):
     cached_var_name = syslibdeps_env_var + '_cached'
     if not hasattr(node.attributes, cached_var_name):
         syslibdeps = node.get_env().Flatten(node.get_env().get(syslibdeps_env_var, []))
-        for lib in __get_libdeps(node):
+        for lib in sorted_by_str(__get_libdeps(node)):
             for syslib in node.get_env().Flatten(lib.get_env().get(syslibdeps_env_var, [])):
                 if syslib:
                     if type(syslib) in (str, unicode) and syslib.startswith(missing_syslibdep):
