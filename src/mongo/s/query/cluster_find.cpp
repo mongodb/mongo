@@ -47,13 +47,12 @@
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog/catalog_cache.h"
-#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/store_possible_cursor.h"
+#include "mongo/s/sharding_raii.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/fail_point_service.h"
@@ -318,22 +317,24 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
                               << query.getQueryRequest().getProj()};
     }
 
-    auto dbConfig = Grid::get(txn)->catalogCache()->getDatabase(txn, query.nss().db().toString());
-    if (dbConfig.getStatus() == ErrorCodes::NamespaceNotFound) {
-        // If the database doesn't exist, we successfully return an empty result set without
-        // creating a cursor.
-        return CursorId(0);
-    } else if (!dbConfig.isOK()) {
-        return dbConfig.getStatus();
-    }
-
-    std::shared_ptr<ChunkManager> chunkManager;
-    std::shared_ptr<Shard> primary;
-    dbConfig.getValue()->getChunkManagerOrPrimary(txn, query.nss().ns(), chunkManager, primary);
-
     // Re-target and re-send the initial find command to the shards until we have established the
     // shard version.
     for (size_t retries = 1; retries <= kMaxStaleConfigRetries; ++retries) {
+        auto dbConfigStatus = ScopedShardDatabase::getExisting(txn, query.nss().db());
+        if (dbConfigStatus == ErrorCodes::NamespaceNotFound) {
+            // If the database doesn't exist, we successfully return an empty result set without
+            // creating a cursor.
+            return CursorId(0);
+        } else if (!dbConfigStatus.isOK()) {
+            return dbConfigStatus.getStatus();
+        }
+
+        const auto& dbConfig = dbConfigStatus.getValue();
+
+        std::shared_ptr<ChunkManager> chunkManager;
+        std::shared_ptr<Shard> primary;
+        dbConfig.db()->getChunkManagerOrPrimary(txn, query.nss().ns(), chunkManager, primary);
+
         auto cursorId = runQueryWithoutRetrying(
             txn, query, readPref, chunkManager.get(), std::move(primary), results, viewDefinition);
         if (cursorId.isOK()) {
@@ -353,19 +354,10 @@ StatusWith<CursorId> ClusterFind::runQuery(OperationContext* txn,
                << " on attempt " << retries << " of " << kMaxStaleConfigRetries << ": "
                << redact(status);
 
-        const bool staleEpoch = (status == ErrorCodes::StaleEpoch);
-        if (staleEpoch) {
-            if (!dbConfig.getValue()->reload(txn)) {
-                // If the reload failed that means the database wasn't found, so successfully return
-                // an empty result set without creating a cursor.
-                return CursorId(0);
-            }
-        }
-        chunkManager =
-            dbConfig.getValue()->getChunkManagerIfExists(txn, query.nss().ns(), true, staleEpoch);
-        if (!chunkManager) {
-            dbConfig.getValue()->getChunkManagerOrPrimary(
-                txn, query.nss().ns(), chunkManager, primary);
+        if (status == ErrorCodes::StaleEpoch) {
+            Grid::get(txn)->catalogCache()->invalidate(query.nss().db().toString());
+        } else {
+            dbConfig.db()->getChunkManagerIfExists(txn, query.nss().ns(), true);
         }
     }
 
