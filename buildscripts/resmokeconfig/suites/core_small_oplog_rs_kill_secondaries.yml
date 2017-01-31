@@ -1,0 +1,32 @@
+selector:
+  js_test:
+    roots:
+    - jstests/core/*.js
+    exclude_files:
+    # These tests are not expected to pass with replica-sets:
+    - jstests/core/dbadmin.js
+    - jstests/core/opcounters_write_cmd.js
+    - jstests/core/read_after_optime.js
+    - jstests/core/capped_update.js
+    # The following tests perform a write with a writeConcern of w=2 when 'testingReplication' is
+    # true. This causes the test to hang because the secondary is running with the "rsSyncStopApply"
+    # failpoint enabled.
+    - jstests/core/geo_update_btree.js
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        eval: "testingReplication = true;"
+        readMode: commands
+    hooks:
+    - class: PeriodicKillSecondaries
+    fixture:
+      class: ReplicaSetFixture
+      mongod_options:
+        oplogSize: 511
+        set_parameters:
+          enableTestCommands: 1
+          numInitialSyncAttempts: 1
+      num_nodes: 2
+      voting_secondaries: false

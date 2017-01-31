@@ -2168,6 +2168,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: jsCore_small_oplog_rs_kill_secondaries_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core_small_oplog_rs_kill_secondaries --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: mongosTest
   commands:
   - func: "do setup"
@@ -4957,6 +4968,9 @@ buildvariants:
   - name: jsCore_small_oplog_rs_resync_static_WT
     distros:
     - windows-64-vs2015-large
+  - name: jsCore_small_oplog_rs_kill_secondaries_WT
+    distros:
+    - windows-64-vs2015-large
   - name: mmap
   - name: mongosTest
   - name: noPassthrough
@@ -5439,6 +5453,7 @@ buildvariants:
   - name: jsCore_small_oplog_WT
   - name: jsCore_small_oplog_rs
   - name: jsCore_small_oplog_rs_WT
+  - name: jsCore_small_oplog_rs_kill_secondaries_WT
   - name: jstestfuzz
   - name: jstestfuzz_WT
   - name: jstestfuzz_concurrent
@@ -5701,6 +5716,9 @@ buildvariants:
   - name: jsCore_small_oplog_rs_resync_static_WT
     distros:
     - rhel62-large
+  - name: jsCore_small_oplog_rs_kill_secondaries_WT
+    distros:
+    - rhel62-large
   - name: jstestfuzz
   - name: jstestfuzz_WT
   - name: jstestfuzz_concurrent
@@ -5941,6 +5959,9 @@ buildvariants:
     distros:
     - rhel62-large
   - name: jsCore_small_oplog_rs_resync_static_WT
+    distros:
+    - rhel62-large
+  - name: jsCore_small_oplog_rs_kill_secondaries_WT
     distros:
     - rhel62-large
   - name: mmap
@@ -8404,6 +8425,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs_initsync_static_WT
   - name: jsCore_small_oplog_rs_resync_static
   - name: jsCore_small_oplog_rs_resync_static_WT
+  - name: jsCore_small_oplog_rs_kill_secondaries_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
@@ -8583,6 +8605,7 @@ buildvariants:
   - name: jsCore_small_oplog_rs_initsync_static_WT
   - name: jsCore_small_oplog_rs_resync_static
   - name: jsCore_small_oplog_rs_resync_static_WT
+  - name: jsCore_small_oplog_rs_kill_secondaries_WT
   - name: mmap
   - name: mongosTest
   - name: multiversion
