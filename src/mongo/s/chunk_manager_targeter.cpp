@@ -38,9 +38,9 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/sharding_raii.h"
@@ -763,15 +763,19 @@ Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* txn, bool* wasCha
 }
 
 Status ChunkManagerTargeter::refreshNow(OperationContext* txn, RefreshType refreshType) {
+    if (refreshType == RefreshType_ReloadDatabase) {
+        Grid::get(txn)->catalogCache()->invalidate(_nss.db().toString());
+    }
+
+    // Try not to spam the configs
+    refreshBackoff();
+
     auto dbStatus = ScopedShardDatabase::getOrCreate(txn, _nss.db());
     if (!dbStatus.isOK()) {
         return dbStatus.getStatus();
     }
 
-    auto scopedDb = std::move(dbStatus.getValue());
-
-    // Try not to spam the configs
-    refreshBackoff();
+    const auto& scopedDb = dbStatus.getValue();
 
     // TODO: Improve synchronization and make more explicit
     if (refreshType == RefreshType_RefreshChunkManager) {
@@ -782,18 +786,9 @@ Status ChunkManagerTargeter::refreshNow(OperationContext* txn, RefreshType refre
         } catch (const DBException& ex) {
             return Status(ErrorCodes::UnknownError, ex.toString());
         }
-
-        scopedDb.db()->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
-    } else if (refreshType == RefreshType_ReloadDatabase) {
-        try {
-            // Dumps the db info, reloads it all, synchronization between threads happens internally
-            scopedDb.db()->reload(txn);
-        } catch (const DBException& ex) {
-            return Status(ErrorCodes::UnknownError, ex.toString());
-        }
-
-        scopedDb.db()->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
     }
+
+    scopedDb.db()->getChunkManagerOrPrimary(txn, _nss.ns(), _manager, _primary);
 
     return Status::OK();
 }
