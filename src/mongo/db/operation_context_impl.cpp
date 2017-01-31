@@ -47,36 +47,15 @@ std::unique_ptr<Locker> newLocker() {
         return stdx::make_unique<MMAPV1LockerImpl>();
     return stdx::make_unique<DefaultLockerImpl>();
 }
-
-class ClientOperationInfo {
-public:
-    std::unique_ptr<Locker>& locker() {
-        if (!_locker) {
-            _locker = newLocker();
-        }
-        return _locker;
-    }
-
-private:
-    std::unique_ptr<Locker> _locker;
-};
-
-const auto clientOperationInfoDecoration = Client::declareDecoration<ClientOperationInfo>();
-
 }  // namespace
 
 using std::string;
 
 OperationContextImpl::OperationContextImpl(Client* client, unsigned opId)
     : OperationContext(client, opId) {
-    setLockState(std::move(clientOperationInfoDecoration(client).locker()));
+    setLockState(newLocker());
     StorageEngine* storageEngine = getServiceContext()->getGlobalStorageEngine();
     setRecoveryUnit(storageEngine->newRecoveryUnit(), kNotInUnitOfWork);
-}
-
-OperationContextImpl::~OperationContextImpl() {
-    lockState()->assertEmptyAndReset();
-    clientOperationInfoDecoration(getClient()).locker() = releaseLockState();
 }
 
 ProgressMeter* OperationContextImpl::setMessage_inlock(const char* msg,
