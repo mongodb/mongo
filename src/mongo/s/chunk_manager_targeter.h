@@ -108,8 +108,6 @@ public:
 private:
     // Different ways we can refresh metadata
     enum RefreshType {
-        // No refresh is needed
-        RefreshType_None,
         // The version has gone up, but the collection hasn't been dropped
         RefreshType_RefreshChunkManager,
         // The collection may have been dropped, so we need to reload the db
