@@ -55,17 +55,6 @@
 namespace mongo {
 namespace repl {
 
-namespace {
-
-using CallbackArgs = executor::TaskExecutor::CallbackArgs;
-using Event = executor::TaskExecutor::EventHandle;
-using Handle = executor::TaskExecutor::CallbackHandle;
-using Operations = MultiApplier::Operations;
-using QueryResponseStatus = StatusWith<Fetcher::QueryResponse>;
-using UniqueLock = stdx::unique_lock<stdx::mutex>;
-
-}  // namespace
-
 // TODO: Remove forward declares once we remove rs_initialsync.cpp and other dependents.
 // Failpoint which fails initial sync and leaves an oplog entry in the buffer.
 MONGO_FP_FORWARD_DECLARE(failInitSyncWithBufferedEntriesLeft);
@@ -478,7 +467,7 @@ private:
 
     BSONObj _getInitialSyncProgress_inlock() const;
 
-    StatusWith<Operations> _getNextApplierBatch_inlock();
+    StatusWith<MultiApplier::Operations> _getNextApplierBatch_inlock();
 
     /**
      * Schedules a fetcher to get the last oplog entry from the sync source.

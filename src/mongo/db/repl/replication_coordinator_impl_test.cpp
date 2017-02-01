@@ -1490,7 +1490,7 @@ TEST_F(ReplCoordTest, NodeChangesTermAndStepsDownWhenAndOnlyWhenUpdateTermSuppli
     ASSERT_TRUE(getReplCoord()->getMemberState().primary());
 
     // higher term, step down and change term
-    Handle cbHandle;
+    executor::TaskExecutor::CallbackHandle cbHandle;
     ASSERT_EQUALS(ErrorCodes::StaleTerm, getReplCoord()->updateTerm(txn.get(), 2).code());
     // Term hasn't been incremented yet, as we need another try to update it after stepdown.
     ASSERT_EQUALS(1, getReplCoord()->getTerm());
