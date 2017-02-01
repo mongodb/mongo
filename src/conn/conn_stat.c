@@ -409,7 +409,6 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 	struct timespec ts;
 	struct tm *tm, _tm;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 	WT_FSTREAM *log_stream;
 
 	conn = S2C(session);
@@ -446,12 +445,9 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 	 * Lock the schema and walk the list of open handles, dumping
 	 * any that match the list of object sources.
 	 */
-	if (conn->stat_sources != NULL) {
-		WT_WITH_HANDLE_LIST_LOCK(session,
-		    ret = __wt_conn_btree_apply(
+	if (conn->stat_sources != NULL)
+		WT_RET(__wt_conn_btree_apply(
 		    session, NULL, __statlog_apply, NULL, NULL));
-		WT_RET(ret);
-	}
 
 	/*
 	 * Walk the list of open LSM trees, dumping any that match the

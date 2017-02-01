@@ -640,9 +640,8 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ASSERT(session, session->ckpt_handle_next == 0);
 	WT_WITH_SCHEMA_LOCK(session,
 	    WT_WITH_TABLE_LOCK(session,
-		WT_WITH_HANDLE_LIST_LOCK(session,
-		    ret = __checkpoint_apply_all(
-		    session, cfg, __wt_checkpoint_get_handles, NULL))));
+		ret = __checkpoint_apply_all(
+		    session, cfg, __wt_checkpoint_get_handles, NULL)));
 	WT_ERR(ret);
 
 	/*

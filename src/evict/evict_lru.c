@@ -24,40 +24,40 @@ static int  __evict_walk_file(
 	(S2C(s)->evict_threads.current_threads > 1)
 
 /*
- * __evict_lock_dhandle --
- *	Try to get the dhandle lock, with yield and sleep back off.
+ * __evict_lock_handle_list --
+ *	Try to get the handle list lock, with yield and sleep back off.
  *	Keep timing statistics overall.
  */
 static int
-__evict_lock_dhandle(WT_SESSION_IMPL *session)
+__evict_lock_handle_list(WT_SESSION_IMPL *session)
 {
 	struct timespec enter, leave;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_SPINLOCK *dh_lock;
-	int64_t **stats;
+	WT_RWLOCK *dh_lock;
 	u_int spins;
 	bool dh_stats;
 
 	conn = S2C(session);
 	cache = conn->cache;
 	dh_lock = &conn->dhandle_lock;
-	stats = (int64_t **)conn->stats;
-	dh_stats = WT_STAT_ENABLED(session) && dh_lock->stat_count_off != -1;
 
 	/*
-	 * Maintain lock acquisition timing statistics as if this were a
-	 * regular lock acquisition.
+	 * Setup tracking of handle lock acquisition wait time if statistics
+	 * are enabled.
 	 */
+	dh_stats = WT_STAT_ENABLED(session);
+
 	if (dh_stats)
 		__wt_epoch(session, &enter);
+
 	/*
 	 * Use a custom lock acquisition back off loop so the eviction server
 	 * notices any interrupt quickly.
 	 */
 	for (spins = 0;
-	    (ret = __wt_spin_trylock_track(session, dh_lock)) == EBUSY &&
+	    (ret = __wt_try_readlock(session, dh_lock)) == EBUSY &&
 	    cache->pass_intr == 0; spins++) {
 		if (spins < WT_THOUSAND)
 			__wt_yield();
@@ -70,8 +70,9 @@ __evict_lock_dhandle(WT_SESSION_IMPL *session)
 	WT_RET(ret);
 	if (dh_stats) {
 		__wt_epoch(session, &leave);
-		stats[session->stat_bucket][dh_lock->stat_int_usecs_off] +=
-		    (int64_t)WT_TIMEDIFF_US(leave, enter);
+		WT_STAT_CONN_INCRV(
+		    session, lock_handle_list_wait_eviction,
+		    (int64_t)WT_TIMEDIFF_US(leave, enter));
 	}
 	return (0);
 }
@@ -379,18 +380,17 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 	 * otherwise we can block applications evicting large pages.
 	 */
 	if (!__wt_cache_stuck(session)) {
-
 		/*
-		 * If we gave up acquiring the lock, that indicates a
-		 * session is waiting for us to clear walks.  Do that
-		 * as part of a normal pass (without the handle list
+		 * Try to get the handle list lock: if we give up, that
+		 * indicates a session is waiting for us to clear walks.  Do
+		 * that as part of a normal pass (without the handle list
 		 * lock) to avoid deadlock.
 		 */
-		if ((ret = __evict_lock_dhandle(session)) == EBUSY)
+		if ((ret = __evict_lock_handle_list(session)) == EBUSY)
 			return (0);
 		WT_RET(ret);
 		ret = __evict_clear_all_walks(session);
-		__wt_spin_unlock(session, &conn->dhandle_lock);
+		__wt_readunlock(session, &conn->dhandle_lock);
 		WT_RET(ret);
 
 		cache->pages_evicted = 0;
@@ -1321,7 +1321,7 @@ retry:	while (slot < max_entries) {
 		 * reference count to keep it alive while we sweep.
 		 */
 		if (!dhandle_locked) {
-			WT_ERR(__evict_lock_dhandle(session));
+			WT_ERR(__evict_lock_handle_list(session));
 			dhandle_locked = true;
 		}
 
@@ -1400,7 +1400,7 @@ retry:	while (slot < max_entries) {
 
 		(void)__wt_atomic_addi32(&dhandle->session_inuse, 1);
 		incr = true;
-		__wt_spin_unlock(session, &conn->dhandle_lock);
+		__wt_readunlock(session, &conn->dhandle_lock);
 		dhandle_locked = false;
 
 		/*
@@ -1447,7 +1447,7 @@ retry:	while (slot < max_entries) {
 	}
 
 err:	if (dhandle_locked) {
-		__wt_spin_unlock(session, &conn->dhandle_lock);
+		__wt_readunlock(session, &conn->dhandle_lock);
 		dhandle_locked = false;
 	}
 
@@ -2319,8 +2319,11 @@ __wt_verbose_dump_cache(WT_SESSION_IMPL *session)
 	WT_RET(__wt_msg(session, "%s", WT_DIVIDER));
 	WT_RET(__wt_msg(session, "cache dump"));
 
-	__wt_spin_lock(session, &conn->dhandle_lock);
-	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
+	for (dhandle = NULL;;) {
+		WT_WITH_HANDLE_LIST_READ_LOCK(session,
+		    WT_DHANDLE_NEXT(session, dhandle, &conn->dhqh, q));
+		if (dhandle == NULL)
+			break;
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			continue;
@@ -2331,7 +2334,6 @@ __wt_verbose_dump_cache(WT_SESSION_IMPL *session)
 		if (ret != 0)
 			break;
 	}
-	__wt_spin_unlock(session, &conn->dhandle_lock);
 	WT_RET(ret);
 
 	/*
