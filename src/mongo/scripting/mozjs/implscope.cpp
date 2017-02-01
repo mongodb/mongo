@@ -321,16 +321,16 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine) {
             //
             // TODO: What if we are running on a platform with very
             // large pages, like 4MB?
-            const int available_stack_space = available.get();
+            const auto available_stack_space = available.get();
 
 #if defined(__powerpc64__) && defined(MONGO_CONFIG_DEBUG_BUILD)
             // From experimentation, we need a larger reservation of 96k since debug ppc64le code
             // needs more stack space to process stack overflow. In debug builds, more variables are
             // stored on the stack which increases the stack pressure. It does not affects non-debug
             // builds.
-            const int reserve_stack_space = 96 * 1024;
+            const decltype(available_stack_space) reserve_stack_space = 96 * 1024;
 #else
-            const int reserve_stack_space = 64 * 1024;
+            const decltype(available_stack_space) reserve_stack_space = 64 * 1024;
 #endif
 
             JS_SetNativeStackQuota(_runtime.get(), available_stack_space - reserve_stack_space);
