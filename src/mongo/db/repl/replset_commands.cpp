@@ -872,7 +872,13 @@ public:
         if (!status.isOK())
             return appendCommandStatus(result, status);
 
+        log() << "Received replSetStepUp request";
+
         status = getGlobalReplicationCoordinator()->stepUpIfEligible();
+
+        if (!status.isOK()) {
+            log() << "replSetStepUp request failed " << causedBy(status);
+        }
 
         return appendCommandStatus(result, status);
     }
