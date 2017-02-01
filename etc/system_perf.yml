@@ -38,7 +38,7 @@ post:
         working_dir: work
         script: |
           source ./dsienv.sh
-          if [ -e $HOME/infrastructure_provisioning/terraform/provisioned.${cluster} ]; then
+          if [ -e /data/infrastructure_provisioning/terraform/provisioned.${cluster} ]; then
             $DSI_PATH/bin/mark_idle.sh
           fi
 
@@ -157,40 +157,46 @@ functions:
           set -v
           ./terraform get --update
     - command: shell.exec
-      # set up $HOME/infrastructure_provisioning to keep track of resources,
+      # set up /data/infrastructure_provisioning to keep track of resources,
       # and allow Evergreen to release resources from there
       params:
         script: |
           set -o verbose
 
           # To force re-creation of existing instances, e.g. for a patch build, you can uncomment this:
-          #if [ -d "$HOME/infrastructure_provisioning" ]; then
-          #  $HOME/infrastructure_provisioning/terraform/infrastructure_teardown.sh \
-          #  && rm -rf $HOME/infrastructure_provisioning
+          #if [ -d "/data/infrastructure_provisioning" ]; then
+          #  /data/infrastructure_provisioning/terraform/infrastructure_teardown.sh \
+          #  && rm -rf /data/infrastructure_provisioning
           #fi
 
-          if [ ! -d "$HOME/infrastructure_provisioning" ]; then
-            echo "copying terraform to Evergreen host"
-            mkdir $HOME/infrastructure_provisioning
-            cp -r terraform $HOME/infrastructure_provisioning/.
-            cp -r modules $HOME/infrastructure_provisioning/.
-            echo "copying infrastructure_teardown.sh to Evergreen host"
-            cp src/dsi/dsi/bin/destroy_cluster.sh $HOME/infrastructure_provisioning/terraform/infrastructure_teardown.sh
+          # IF there's anything still in $HOME it's old or a mistake. Clean it up.
+          if [ -d "$HOME/infrastructure_provisioning" ]; then
+           $HOME/infrastructure_provisioning/terraform/infrastructure_teardown.sh \
+           && rm -rf $HOME/infrastructure_provisioning
           fi
-          ls -l $HOME/infrastructure_provisioning
+
+          if [ ! -d "/data/infrastructure_provisioning" ]; then
+            echo "copying terraform to Evergreen host"
+            mkdir /data/infrastructure_provisioning
+            cp -r terraform /data/infrastructure_provisioning/.
+            cp -r modules /data/infrastructure_provisioning/.
+            echo "copying infrastructure_teardown.sh to Evergreen host"
+            cp src/dsi/dsi/bin/destroy_cluster.sh /data/infrastructure_provisioning/terraform/infrastructure_teardown.sh
+          fi
+          ls -l /data/infrastructure_provisioning
 
   "infrastructure provisioning":
     - command: shell.exec
-      # if $HOME/infrastructure_provisioning exists, get info about provisioned resources
+      # if /data/infrastructure_provisioning exists, get info about provisioned resources
       # from there otherwise provision resources from the cloud
       params:
         working_dir: work
         script: |
           set -e
           set -o verbose
-          if [ -e "$HOME/infrastructure_provisioning/terraform/terraform.tfstate" ]; then
+          if [ -e "/data/infrastructure_provisioning/terraform/terraform.tfstate" ]; then
             echo "Restrieving info for existing resources"
-            cp $HOME/infrastructure_provisioning/terraform/terraform.tfstate .
+            cp /data/infrastructure_provisioning/terraform/terraform.tfstate .
           else
             echo "No existing resources found"
           fi
@@ -202,7 +208,7 @@ functions:
           # don't run this with "set -e" so we can set up properly for the teardown.sh
           set -o verbose
           source ./dsienv.sh
-          if [ ! -e $HOME/infrastructure_provisioning/terraform/provisioned.${cluster} ]; then
+          if [ ! -e /data/infrastructure_provisioning/terraform/provisioned.${cluster} ]; then
             EXISTING="false"
           else
             EXISTING="true"
@@ -214,9 +220,9 @@ functions:
           if [ $? -eq 0 ]; then
             echo "Resource provisioned/updated."
             # copy terraform information needed for teardown
-            cp {terraform.tfstate,cluster.tf,terraform.tfvars,security.tf} $HOME/infrastructure_provisioning/terraform/.
-            rsync -vr ../modules $HOME/infrastructure_provisioning/modules
-            cd $HOME/infrastructure_provisioning/terraform
+            cp {terraform.tfstate,cluster.tf,terraform.tfvars,security.tf} /data/infrastructure_provisioning/terraform/.
+            rsync -vr ../modules /data/infrastructure_provisioning/modules
+            cd /data/infrastructure_provisioning/terraform
             ./terraform get
             # use provisioned.${shard} to indicate the type of clusters held by EVG host
             # remove previous information and keep the latest cluster type
@@ -228,7 +234,7 @@ functions:
             yes yes | ./terraform destroy
             if [ $? != 0 ]; then yes yes | ./terraform destroy; fi
             echo "Resource released."
-            rm -r $HOME/infrastructure_provisioning
+            rm -r /data/infrastructure_provisioning
             echo "Cleaned up provisioning state on Evergreen host. Exiting test."
             exit 1
           fi
