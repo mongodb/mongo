@@ -93,7 +93,6 @@ namespace repl {
 
 MONGO_FP_DECLARE(transitionToPrimaryHangBeforeTakingGlobalExclusiveLock);
 
-using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 using CallbackFn = executor::TaskExecutor::CallbackFn;
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
 using CBHandle = ReplicationExecutor::CallbackHandle;
@@ -1963,7 +1962,7 @@ Status ReplicationCoordinatorImpl::resyncData(OperationContext* txn, bool waitUn
     if (waitUntilCompleted)
         f = [&finishedEvent, this]() { _replExecutor.signalEvent(finishedEvent); };
 
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    UniqueLock lk(_mutex);
     _resetMyLastOpTimes_inlock();
     lk.unlock();  // unlock before calling into replCoordExtState.
     _startDataReplication(txn, f);
