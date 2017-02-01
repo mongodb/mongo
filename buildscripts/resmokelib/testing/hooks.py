@@ -476,7 +476,7 @@ class PeriodicKillSecondaries(CustomBehavior):
             self._check_repl_dbhash(test_report)
 
             self._restart_and_clear_fixture()
-        except:
+        except Exception as err:
             self.hook_test_case.logger.exception(
                 "Encountered an error running PeriodicKillSecondaries.")
             self.hook_test_case.return_code = 2
