@@ -89,7 +89,7 @@ StatusWith<std::string> generateNewShardName(OperationContext* txn) {
     BSONObjBuilder shardNameRegex;
     shardNameRegex.appendRegex(ShardType::name(), "^shard");
 
-    auto findStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+    auto findStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFind(
         txn,
         kConfigReadSelector,
         repl::ReadConcernLevel::kMajorityReadConcern,

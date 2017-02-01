@@ -49,11 +49,7 @@
 
 namespace mongo {
 
-ShardLocal::ShardLocal(const ShardId& id) : Shard(id) {
-    // Currently ShardLocal only works for config servers. If we ever start using ShardLocal on
-    // shards we'll need to consider how to handle shards.
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
-}
+ShardLocal::ShardLocal(const ShardId& id) : Shard(id) {}
 
 const ConnectionString ShardLocal::getConnString() const {
     auto replCoord = repl::getGlobalReplicationCoordinator();
@@ -147,7 +143,7 @@ Shard::HostWithResponse ShardLocal::_runCommand(OperationContext* txn,
     }
 }
 
-StatusWith<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
+StatusWith<Shard::QueryResponse> ShardLocal::_exhaustiveFind(
     OperationContext* txn,
     const ReadPreferenceSetting& readPref,
     const repl::ReadConcernLevel& readConcernLevel,
@@ -208,10 +204,10 @@ StatusWith<Shard::QueryResponse> ShardLocal::_exhaustiveFindOnConfig(
     }
 }
 
-Status ShardLocal::createIndexOnConfig(OperationContext* txn,
-                                       const NamespaceString& ns,
-                                       const BSONObj& keys,
-                                       bool unique) {
+Status ShardLocal::createIndex(OperationContext* txn,
+                               const NamespaceString& ns,
+                               const BSONObj& keys,
+                               bool unique) {
     invariant(ns.db() == "config" || ns.db() == "admin");
 
     try {

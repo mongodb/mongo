@@ -992,7 +992,7 @@ StatusWith<BSONObj> ShardingCatalogClientImpl::getGlobalSettings(OperationContex
 
 StatusWith<VersionType> ShardingCatalogClientImpl::getConfigVersion(
     OperationContext* txn, repl::ReadConcernLevel readConcern) {
-    auto findStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+    auto findStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFind(
         txn,
         kConfigReadSelector,
         readConcern,
@@ -1241,7 +1241,7 @@ bool ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext* 
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             dbname,
             cmdToRun,
-            Shard::kDefaultConfigCommandTimeout,
+            Shard::kDefaultCommandTimeout,
             Shard::RetryPolicy::kNotIdempotent);
 
     if (!response.isOK()) {
@@ -1287,7 +1287,7 @@ bool ShardingCatalogClientImpl::runUserManagementReadCommand(OperationContext* t
             kConfigPrimaryPreferredSelector,
             dbname,
             cmdObj,
-            Shard::kDefaultConfigCommandTimeout,
+            Shard::kDefaultCommandTimeout,
             Shard::RetryPolicy::kIdempotent);
     if (resultStatus.isOK()) {
         result->appendElements(resultStatus.getValue().response);
@@ -1397,8 +1397,8 @@ void ShardingCatalogClientImpl::writeConfigServerDirect(OperationContext* txn,
     }
 
     auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
-    *batchResponse = configShard->runBatchWriteCommandOnConfig(
-        txn, batchRequest, Shard::RetryPolicy::kNotIdempotent);
+    *batchResponse =
+        configShard->runBatchWriteCommand(txn, batchRequest, Shard::RetryPolicy::kNotIdempotent);
 }
 
 Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* txn,
@@ -1421,7 +1421,7 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* txn,
     auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
     for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
         auto response =
-            configShard->runBatchWriteCommandOnConfig(txn, request, Shard::RetryPolicy::kNoRetry);
+            configShard->runBatchWriteCommand(txn, request, Shard::RetryPolicy::kNoRetry);
 
         Status status = response.toStatus();
 
@@ -1504,7 +1504,7 @@ StatusWith<bool> ShardingCatalogClientImpl::updateConfigDocument(
 
     auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
     auto response =
-        configShard->runBatchWriteCommandOnConfig(txn, request, Shard::RetryPolicy::kIdempotent);
+        configShard->runBatchWriteCommand(txn, request, Shard::RetryPolicy::kIdempotent);
 
     Status status = response.toStatus();
     if (!status.isOK()) {
@@ -1536,7 +1536,7 @@ Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* txn,
 
     auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
     auto response =
-        configShard->runBatchWriteCommandOnConfig(txn, request, Shard::RetryPolicy::kIdempotent);
+        configShard->runBatchWriteCommand(txn, request, Shard::RetryPolicy::kIdempotent);
 
     return response.toStatus();
 }
@@ -1603,7 +1603,7 @@ Status ShardingCatalogClientImpl::_createCappedConfigCollection(
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             "config",
             createCmd,
-            Shard::kDefaultConfigCommandTimeout,
+            Shard::kDefaultCommandTimeout,
             Shard::RetryPolicy::kIdempotent);
 
     if (!result.isOK()) {
@@ -1639,7 +1639,7 @@ StatusWith<long long> ShardingCatalogClientImpl::_runCountCommandOnConfig(Operat
                                                       kConfigReadSelector,
                                                       ns.db().toString(),
                                                       countBuilder.done(),
-                                                      Shard::kDefaultConfigCommandTimeout,
+                                                      Shard::kDefaultCommandTimeout,
                                                       Shard::RetryPolicy::kIdempotent);
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
@@ -1667,7 +1667,7 @@ StatusWith<repl::OpTimeWith<vector<BSONObj>>> ShardingCatalogClientImpl::_exhaus
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit) {
-    auto response = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+    auto response = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFind(
         txn, readPref, readConcern, nss, query, sort, limit);
     if (!response.isOK()) {
         return response.getStatus();

@@ -143,15 +143,14 @@ Status checkCollectionVersionEpoch(OperationContext* txn,
                                    const NamespaceString& nss,
                                    const ChunkType& aChunk,
                                    const OID& collectionEpoch) {
-    auto findResponseWith =
-        Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-            txn,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kLocalReadConcern,
-            NamespaceString(ChunkType::ConfigNS),
-            BSON(ChunkType::ns() << nss.ns()),
-            BSONObj(),
-            1);
+    auto findResponseWith = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFind(
+        txn,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        repl::ReadConcernLevel::kLocalReadConcern,
+        NamespaceString(ChunkType::ConfigNS),
+        BSON(ChunkType::ns() << nss.ns()),
+        BSONObj(),
+        1);
     if (!findResponseWith.isOK()) {
         return findResponseWith.getStatus();
     }
@@ -203,15 +202,14 @@ Status checkChunkIsOnShard(OperationContext* txn,
                              << shard);
 
     // Must use local read concern because we're going to perform subsequent writes.
-    auto findResponseWith =
-        Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-            txn,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kLocalReadConcern,
-            NamespaceString(ChunkType::ConfigNS),
-            chunkQuery,
-            BSONObj(),
-            1);
+    auto findResponseWith = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFind(
+        txn,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        repl::ReadConcernLevel::kLocalReadConcern,
+        NamespaceString(ChunkType::ConfigNS),
+        chunkQuery,
+        BSONObj(),
+        1);
     if (!findResponseWith.isOK()) {
         return findResponseWith.getStatus();
     }
@@ -301,7 +299,7 @@ Status ShardingCatalogManagerImpl::commitChunkSplit(OperationContext* txn,
     Lock::ExclusiveLock lk(txn->lockState(), _kChunkOpLock);
 
     // Get the chunk with highest version for this namespace
-    auto findStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+    auto findStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFind(
         txn,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
@@ -491,7 +489,7 @@ Status ShardingCatalogManagerImpl::commitChunkMerge(OperationContext* txn,
     Lock::ExclusiveLock lk(txn->lockState(), _kChunkOpLock);
 
     // Get the chunk with the highest version for this namespace
-    auto findStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+    auto findStatus = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFind(
         txn,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
@@ -628,7 +626,7 @@ StatusWith<BSONObj> ShardingCatalogManagerImpl::commitChunkMigration(
     }
 
     // Must use local read concern because we will perform subsequent writes.
-    auto findResponse = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+    auto findResponse = Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFind(
         txn,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,

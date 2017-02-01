@@ -149,7 +149,7 @@ public:
                                            RetryPolicy retryPolicy);
 
     /**
-     * Same as the other variant of runCommand, but allows the operation timeout to be overriden.
+     * Same as the other variant of runCommand, but allows the operation timeout to be overridden.
      * Runs for the lesser of the remaining time on the operation context or the specified maxTimeMS
      * override.
      */
@@ -186,12 +186,12 @@ public:
         RetryPolicy retryPolicy);
 
     /**
-     * Expects a single-entry batch wrtie command and runs it on the config server's primary using
+     * Expects a single-entry batch write command and runs it with PrimaryOnly read preference using
      * the specified retry policy.
      */
-    BatchedCommandResponse runBatchWriteCommandOnConfig(OperationContext* txn,
-                                                        const BatchedCommandRequest& batchRequest,
-                                                        RetryPolicy retryPolicy);
+    BatchedCommandResponse runBatchWriteCommand(OperationContext* txn,
+                                                const BatchedCommandRequest& batchRequest,
+                                                RetryPolicy retryPolicy);
 
     /**
     * Warning: This method exhausts the cursor and pulls all data into memory.
@@ -201,33 +201,32 @@ public:
     * ShardRemote instances expect "readConcernLevel" to always be kMajorityReadConcern, whereas
     * ShardLocal instances expect either kLocalReadConcern or kMajorityReadConcern.
     */
-    StatusWith<QueryResponse> exhaustiveFindOnConfig(OperationContext* txn,
-                                                     const ReadPreferenceSetting& readPref,
-                                                     const repl::ReadConcernLevel& readConcernLevel,
-                                                     const NamespaceString& nss,
-                                                     const BSONObj& query,
-                                                     const BSONObj& sort,
-                                                     const boost::optional<long long> limit);
+    StatusWith<QueryResponse> exhaustiveFind(OperationContext* txn,
+                                             const ReadPreferenceSetting& readPref,
+                                             const repl::ReadConcernLevel& readConcernLevel,
+                                             const NamespaceString& nss,
+                                             const BSONObj& query,
+                                             const BSONObj& sort,
+                                             const boost::optional<long long> limit);
     /**
-     * Builds an index on a config server collection.
+     * Builds an index on a collection.
      * Creates the collection if it doesn't yet exist.  Does not error if the index already exists,
      * so long as the options are the same.
      * NOTE: Currently only supported for LocalShard.
      */
-    virtual Status createIndexOnConfig(OperationContext* txn,
-                                       const NamespaceString& ns,
-                                       const BSONObj& keys,
-                                       bool unique) = 0;
+    virtual Status createIndex(OperationContext* txn,
+                               const NamespaceString& ns,
+                               const BSONObj& keys,
+                               bool unique) = 0;
 
-    // This timeout will be used by default in operations against the config server, unless
-    // explicitly overridden
-    static const Milliseconds kDefaultConfigCommandTimeout;
+    // This timeout will be used by default in remote operations unless explicitly overridden.
+    static const Milliseconds kDefaultCommandTimeout;
 
     /**
      * Returns false if the error is a retriable error and/or causes a replset monitor update. These
      * errors, if from a remote call, should not be further propagated back to another server
-     * because that server will interpret them as orignating on this server rather than the one this
-     * server called.
+     * because that server will interpret them as originating on this server rather than the one
+     * this server called.
      */
     static bool shouldErrorBePropagated(ErrorCodes::Error code);
 
@@ -258,7 +257,7 @@ private:
                                          Milliseconds maxTimeMSOverride,
                                          const BSONObj& cmdObj) = 0;
 
-    virtual StatusWith<QueryResponse> _exhaustiveFindOnConfig(
+    virtual StatusWith<QueryResponse> _exhaustiveFind(
         OperationContext* txn,
         const ReadPreferenceSetting& readPref,
         const repl::ReadConcernLevel& readConcernLevel,

@@ -67,7 +67,7 @@ public:
 
 void ScopedMigrationRequestTest::checkMigrationsCollectionForDocument(
     std::string chunkName, const unsigned long expectedNumberOfDocuments) {
-    auto response = shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+    auto response = shardRegistry()->getConfigShard()->exhaustiveFind(
         operationContext(),
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kMajorityReadConcern,

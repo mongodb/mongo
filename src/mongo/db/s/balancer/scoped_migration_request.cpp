@@ -106,7 +106,7 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
             // for the request because this migration request will join the active one once
             // scheduled.
             auto statusWithMigrationQueryResult =
-                grid.shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+                grid.shardRegistry()->getConfigShard()->exhaustiveFind(
                     txn,
                     ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                     repl::ReadConcernLevel::kLocalReadConcern,
