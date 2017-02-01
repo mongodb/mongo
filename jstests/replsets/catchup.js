@@ -35,7 +35,11 @@
     });
 
     function stepUp(node) {
-        assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
+        assert.soon(function() {
+            node.adminCommand({replSetStepUp: 1});
+            return node.adminCommand('replSetGetStatus').myState == ReplSetTest.State.PRIMARY;
+        });
+
         return node;
     }
 
@@ -121,6 +125,7 @@
     conf.settings.catchUpTimeoutMillis = 10 * 1000;
     reconfig(rst, conf);
     rst.awaitReplication(ReplSetTest.kDefaultTimeoutMS, ReplSetTest.OpTimeType.LAST_DURABLE);
+    rst.awaitNodesAgreeOnPrimary();
 
     // Write documents that cannot be replicated to secondaries in time.
     originalSecondaries = rst.getSecondaries();
