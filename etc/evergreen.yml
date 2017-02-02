@@ -211,7 +211,7 @@ functions:
       working_dir: src
       script: |
         set -o errexit
-        ${decompress|unzip} mongo-binaries.tgz
+        ${decompress} mongo-binaries.tgz
         cp mongodb*/bin/* .
 
   "check binary version" : &check_binary_version
@@ -350,7 +350,7 @@ functions:
         build_phase='${task_name}_${execution}'
         END_OF_CREDS
 
-  "upload debugsymbols" :
+  "upload debugsymbols" : &upload_debugsymbols
     command: s3.put
     params:
       aws_key: ${aws_key}
@@ -363,7 +363,7 @@ functions:
       build_variants:
         *debug_symbol_variants
 
-  "fetch debugsymbols archive" :
+  "fetch debugsymbols archive" : &fetch_debugsymbols_archive
     command: s3.get
     params:
       aws_key: ${aws_key}
@@ -373,6 +373,19 @@ functions:
       local_file: src/mongo-debugsymbols.tgz
       build_variants:
         *debug_symbol_variants
+
+  "extract debugsymbols" : &extract_debugsymbols
+    command: shell.exec
+    params:
+      working_dir: src
+      build_variants:
+        *debug_symbol_variants
+      script: |
+        set -o errexit
+        set -o verbose
+        ${decompress} mongo-debugsymbols.tgz
+        mv mongodb*/mongo.{debug,dSYM,pdb} mongodb*/mongod.{debug,dSYM,pdb} mongodb*/mongos.{debug,dSYM,pdb} . 2>/dev/null || true
+        rm -r mongodb*/*.{debug,dSYM,pdb} mongo-debugsymbols.tgz 2>/dev/null || true
 
   "build rocksdb" :
     command: shell.exec
@@ -1118,12 +1131,15 @@ post:
   - func: "cleanup environment"
 
 timeout:
+  - func: "fetch debugsymbols archive"
+  - func: "extract debugsymbols"
   - command: shell.exec
     params:
       working_dir: src
       script: |
         set -o verbose
-        hang_analyzer_option="-p ${hang_analyzer_processes|dbtest,java,mongo,mongod,mongos,python,_test} -g bsondump,mongodump,mongoexport,mongofiles,mongoimport,mongooplog,mongoreplay,mongorestore,mongostat,mongotop"
+        ${set_sudo}
+        $sudo hang_analyzer_option="-p ${hang_analyzer_processes|dbtest,java,mongo,mongod,mongos,python,_test} -g bsondump,mongodump,mongoexport,mongofiles,mongoimport,mongooplog,mongoreplay,mongorestore,mongostat,mongotop"
         echo "Calling the hang analyzer: python buildscripts/hang_analyzer.py $hang_analyzer_option"
         PATH=/opt/mongodbtoolchain/gdb/bin:$PATH python buildscripts/hang_analyzer.py $hang_analyzer_option
 
