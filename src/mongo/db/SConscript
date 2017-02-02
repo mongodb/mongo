@@ -938,6 +938,37 @@ env.Library(
 )
 
 env.Library(
+    target='logical_time',
+    source=[
+        'logical_time.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
+    target='signed_logical_time',
+    source=[
+        'signed_logical_time.cpp',
+    ],
+    LIBDEPS=[
+        'logical_time',
+    ],
+)
+
+env.CppUnitTest(
+    target='logical_time_test',
+    source=[
+        'logical_time_test.cpp',
+    ],
+    LIBDEPS=[
+        'logical_time',
+        'signed_logical_time',
+    ],
+)
+
+env.Library(
     target= 'op_observer_noop',
     source= [
         'op_observer_noop.cpp',
