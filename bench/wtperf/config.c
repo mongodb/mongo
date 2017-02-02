@@ -215,6 +215,7 @@ config_threads(WTPERF *wtperf, const char *config, size_t len)
 			return (EINVAL);
 		}
 		workp = &wtperf->workload[wtperf->workload_cnt++];
+		workp->table_index = INT32_MAX;
 
 		while ((ret = scan->next(scan, &k, &v)) == 0) {
 			if (STRING_MATCH("count", k.str, k.len)) {
@@ -233,10 +234,26 @@ config_threads(WTPERF *wtperf, const char *config, size_t len)
 					goto err;
 				continue;
 			}
+			if (STRING_MATCH("pause", k.str, k.len)) {
+				if ((workp->pause = v.val) < 0)
+					goto err;
+				continue;
+			}
 			if (STRING_MATCH("read", k.str, k.len) ||
 			    STRING_MATCH("reads", k.str, k.len)) {
 				if ((workp->read = v.val) < 0)
 					goto err;
+				continue;
+			}
+			if (STRING_MATCH("read_range", k.str, k.len)) {
+				if ((workp->read_range = v.val) < 0)
+					goto err;
+				continue;
+			}
+			if (STRING_MATCH("table", k.str, k.len)) {
+				if (v.val <= 0)
+					goto err;
+				workp->table_index = (int32_t)v.val - 1;
 				continue;
 			}
 			if (STRING_MATCH("throttle", k.str, k.len)) {
@@ -760,16 +777,33 @@ config_sanity(WTPERF *wtperf)
 			opts->value_sz_min = opts->value_sz;
 	}
 
-	if (opts->readonly && wtperf->workload != NULL)
+	if (wtperf->workload != NULL)
 		for (i = 0, workp = wtperf->workload;
-		    i < wtperf->workload_cnt; ++i, ++workp)
-			if (workp->insert != 0 || workp->update != 0 ||
-			    workp->truncate != 0) {
+		    i < wtperf->workload_cnt; ++i, ++workp) {
+			if (opts->readonly &&
+			    (workp->insert != 0 || workp->update != 0 ||
+			    workp->truncate != 0)) {
 				fprintf(stderr,
 				    "Invalid workload: insert, update or "
 				    "truncate specified with readonly\n");
 				return (EINVAL);
 			}
+			if (workp->insert != 0 &&
+			    workp->table_index != INT32_MAX) {
+				fprintf(stderr,
+				    "Invalid workload: Cannot insert into "
+				    "specific table only\n");
+				return (EINVAL);
+			}
+			if (workp->table_index != INT32_MAX &&
+			    workp->table_index >= (int32_t)opts->table_count) {
+				fprintf(stderr,
+				    "Workload table index %" PRId32
+				    " is larger than table count %" PRId32,
+				    workp->table_index, opts->table_count);
+				return (EINVAL);
+			}
+		}
 	return (0);
 }
 

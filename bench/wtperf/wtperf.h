@@ -66,6 +66,9 @@ typedef struct {
 	uint64_t throttle;		/* Maximum operations/second */
 		/* Number of operations per transaction. Zero for autocommit */
 	int64_t ops_per_txn;
+	int64_t pause;			/* Time between scans */
+	int64_t read_range;		/* Range of reads */
+	int32_t table_index;		/* Table to focus ops on */
 	int64_t truncate;		/* Truncate ratio */
 	uint64_t truncate_pct;		/* Truncate Percent */
 	uint64_t truncate_count;	/* Truncate Count */
@@ -225,6 +228,7 @@ typedef struct {
 
 struct __wtperf_thread {		/* Per-thread structure */
 	WTPERF *wtperf;			/* Enclosing configuration */
+	WT_CURSOR *rand_cursor;		/* Random key cursor */
 
 	WT_RAND_STATE rnd;		/* Random number generation state */
 
@@ -241,6 +245,7 @@ struct __wtperf_thread {		/* Per-thread structure */
 	TRACK ckpt;			/* Checkpoint operations */
 	TRACK insert;			/* Insert operations */
 	TRACK read;			/* Read operations */
+	TRACK scan;			/* Scan operations */
 	TRACK update;			/* Update operations */
 	TRACK truncate;			/* Truncate operations */
 	TRACK truncate_sleep;		/* Truncate sleep operations */
