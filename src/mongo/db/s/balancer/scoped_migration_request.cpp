@@ -171,7 +171,13 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
         return std::move(scopedMigrationRequest);
     }
 
-    MONGO_UNREACHABLE;
+    return Status(ErrorCodes::OperationFailed,
+                  str::stream() << "Failed to insert the config.migrations document after max "
+                                << "number of retries. Chunk '"
+                                << ChunkRange(migrateInfo.minKey, migrateInfo.maxKey).toString()
+                                << "' in collection '"
+                                << migrateInfo.ns
+                                << "' was being moved (somewhere) by another operation.");
 }
 
 ScopedMigrationRequest ScopedMigrationRequest::createForRecovery(OperationContext* txn,
