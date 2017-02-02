@@ -237,8 +237,22 @@ DBCollection.prototype.insertOne = function(document, options) {
     var bulk = this.initializeOrderedBulkOp();
     bulk.insert(document);
 
-    // Execute insert
-    bulk.execute(writeConcern);
+    try {
+        // Execute insert
+        bulk.execute(writeConcern);
+    } catch (err) {
+        if (err instanceof BulkWriteError) {
+            if (err.hasWriteErrors()) {
+                throw err.getWriteErrorAt(0);
+            }
+
+            if (err.hasWriteConcernError()) {
+                throw err.getWriteConcernError();
+            }
+        }
+
+        throw err;
+    }
 
     if (!result.acknowledged) {
         return result;
@@ -334,7 +348,22 @@ DBCollection.prototype.deleteOne = function(filter, options) {
     // Add the deleteOne operation.
     removeOp.removeOne();
 
-    var r = bulk.execute(writeConcern);
+    try {
+        // Remove the first document that matches the selector
+        var r = bulk.execute(writeConcern);
+    } catch (err) {
+        if (err instanceof BulkWriteError) {
+            if (err.hasWriteErrors()) {
+                throw err.getWriteErrorAt(0);
+            }
+
+            if (err.hasWriteConcernError()) {
+                throw err.getWriteConcernError();
+            }
+        }
+
+        throw err;
+    }
 
     if (!result.acknowledged) {
         return result;
@@ -376,7 +405,22 @@ DBCollection.prototype.deleteMany = function(filter, options) {
     // Add the deleteOne operation.
     removeOp.remove();
 
-    var r = bulk.execute(writeConcern);
+    try {
+        // Remove all documents that matche the selector
+        var r = bulk.execute(writeConcern);
+    } catch (err) {
+        if (err instanceof BulkWriteError) {
+            if (err.hasWriteErrors()) {
+                throw err.getWriteErrorAt(0);
+            }
+
+            if (err.hasWriteConcernError()) {
+                throw err.getWriteConcernError();
+            }
+        }
+
+        throw err;
+    }
 
     if (!result.acknowledged) {
         return result;
@@ -430,7 +474,22 @@ DBCollection.prototype.replaceOne = function(filter, replacement, options) {
 
     op.replaceOne(replacement);
 
-    var r = bulk.execute(writeConcern);
+    try {
+        // Replace the document
+        var r = bulk.execute(writeConcern);
+    } catch (err) {
+        if (err instanceof BulkWriteError) {
+            if (err.hasWriteErrors()) {
+                throw err.getWriteErrorAt(0);
+            }
+
+            if (err.hasWriteConcernError()) {
+                throw err.getWriteConcernError();
+            }
+        }
+
+        throw err;
+    }
 
     if (!result.acknowledged) {
         return result;
@@ -494,7 +553,22 @@ DBCollection.prototype.updateOne = function(filter, update, options) {
 
     op.updateOne(update);
 
-    var r = bulk.execute(writeConcern);
+    try {
+        // Update the first document that matches the selector
+        var r = bulk.execute(writeConcern);
+    } catch (err) {
+        if (err instanceof BulkWriteError) {
+            if (err.hasWriteErrors()) {
+                throw err.getWriteErrorAt(0);
+            }
+
+            if (err.hasWriteConcernError()) {
+                throw err.getWriteConcernError();
+            }
+        }
+
+        throw err;
+    }
 
     if (!result.acknowledged) {
         return result;
@@ -558,7 +632,22 @@ DBCollection.prototype.updateMany = function(filter, update, options) {
 
     op.update(update);
 
-    var r = bulk.execute(writeConcern);
+    try {
+        // Update all documents that match the selector
+        var r = bulk.execute(writeConcern);
+    } catch (err) {
+        if (err instanceof BulkWriteError) {
+            if (err.hasWriteErrors()) {
+                throw err.getWriteErrorAt(0);
+            }
+
+            if (err.hasWriteConcernError()) {
+                throw err.getWriteConcernError();
+            }
+        }
+
+        throw err;
+    }
 
     if (!result.acknowledged) {
         return result;
