@@ -171,6 +171,11 @@ ClientCursorPin::ClientCursorPin(ClientCursor* cursor) : _cursor(cursor) {
     invariant(_cursor);
     invariant(_cursor->_isPinned);
     invariant(_cursor->_cursorManager);
+
+    // We keep track of the number of cursors currently pinned. The cursor can become unpinned
+    // either by being released back to the cursor manager or by being deleted. A cursor may be
+    // transferred to another pin object via move construction or move assignment, but in this case
+    // it is still considered pinned.
     cursorStatsOpenPinned.increment();
 }
 
@@ -205,7 +210,6 @@ ClientCursorPin& ClientCursorPin::operator=(ClientCursorPin&& other) {
 }
 
 ClientCursorPin::~ClientCursorPin() {
-    cursorStatsOpenPinned.decrement();
     release();
 }
 
@@ -224,6 +228,7 @@ void ClientCursorPin::release() {
         _cursor->_cursorManager->unpin(_cursor);
     }
 
+    cursorStatsOpenPinned.decrement();
     _cursor = nullptr;
 }
 
@@ -243,6 +248,8 @@ void ClientCursorPin::deleteUnderlying() {
     }
     _cursor->_isPinned = false;
     delete _cursor;
+
+    cursorStatsOpenPinned.decrement();
     _cursor = nullptr;
 }
 
