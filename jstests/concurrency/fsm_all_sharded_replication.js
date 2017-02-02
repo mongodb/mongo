@@ -33,6 +33,7 @@ var blacklist = [
     'map_reduce_reduce_nonatomic.js',
     'map_reduce_replace.js',
     'map_reduce_replace_nonexistent.js',
+    'map_reduce_replace_remove.js',
 
     // Disabled due to MongoDB restrictions and/or workload restrictions
 

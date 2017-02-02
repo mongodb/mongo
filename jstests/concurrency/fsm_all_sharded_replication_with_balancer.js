@@ -34,6 +34,7 @@ var blacklist = [
     'map_reduce_reduce_nonatomic.js',
     'map_reduce_replace.js',
     'map_reduce_replace_nonexistent.js',
+    'map_reduce_replace_remove.js',
 
     // Disabled due to SERVER-13364, 'The geoNear command doesn't handle shard versioning, so a
     // concurrent chunk migration may cause duplicate or missing results'
