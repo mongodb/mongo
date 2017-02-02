@@ -32,12 +32,20 @@
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
-
+/**
+ * Registers the specified initializer function `init` as the initialization handler for SNMP
+ * enterprise modules.
+ *
+ * NOTE: This function may only be called once.
+ * NOTE: This function is not multithread safe.
+ */
 void registerSNMPInitializer(stdx::function<void()> init);
 
+/**
+ * Performs initialization for SNMP enterprise modules, if present, otherwise does nothing.
+ *
+ * This will call the function registered by `registerSNMPInitializer`.  It is safe to call when no
+ * function has been registered.
+ */
 void initializeSNMP();
-
-// Deprecated -- will be removed.
-extern void (*snmpInit)();
-
 }  // namespace mongo

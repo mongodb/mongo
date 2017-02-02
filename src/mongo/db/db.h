@@ -33,7 +33,6 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/initialize_snmp.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {

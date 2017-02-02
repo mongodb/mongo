@@ -63,10 +63,12 @@ env.Library(
 
 env.Library(
     target='initialize_snmp',
-	source= [
-		'initialize_snmp.cpp',
-	],
-	LIBDEPS=[],
+    source= [
+        'initialize_snmp.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
 )
 
 env.CppUnitTest(

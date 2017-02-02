@@ -27,23 +27,19 @@
  */
 
 #include "mongo/db/initialize_snmp.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
-// Exposed in `src/mongo/db/db.h`, for legacy reasons.
-void (*snmpInit)() = nullptr;
-
 namespace {
-stdx::function<void()> snmpInitializer = [] {
-    if (snmpInit) {
-        snmpInit();
-    }
-};
-}
-}
+bool initSet = false;
+stdx::function<void()> snmpInitializer = [] {};
+}  // namespace
+}  // namespace mongo
 
 void mongo::registerSNMPInitializer(stdx::function<void()> init) {
-    // TODO: Check for reinitialization
+    invariant(!initSet);
     snmpInitializer = std::move(init);
+    initSet = true;
 }
 
 void mongo::initializeSNMP() {
