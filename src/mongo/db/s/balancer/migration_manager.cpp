@@ -183,10 +183,9 @@ Status MigrationManager::executeManualMigration(
         return scopedCMStatus.getStatus();
     }
 
-    auto scopedCM = std::move(scopedCMStatus.getValue());
-    ChunkManager* const cm = scopedCM.cm();
+    const auto& scopedCM = scopedCMStatus.getValue();
 
-    auto chunk = cm->findIntersectingChunkWithSimpleCollation(txn, migrateInfo.minKey);
+    auto chunk = scopedCM.cm()->findIntersectingChunkWithSimpleCollation(txn, migrateInfo.minKey);
     invariant(chunk);
 
     Status commandStatus = _processRemoteCommandResponse(
@@ -320,8 +319,7 @@ void MigrationManager::finishRecovery(OperationContext* txn,
             return;
         }
 
-        auto scopedCM = std::move(scopedCMStatus.getValue());
-        ChunkManager* const cm = scopedCM.cm();
+        const auto& scopedCM = scopedCMStatus.getValue();
 
         int scheduledMigrations = 0;
 
@@ -331,7 +329,8 @@ void MigrationManager::finishRecovery(OperationContext* txn,
             auto waitForDelete = migrationType.getWaitForDelete();
             migrateInfos.pop_front();
 
-            auto chunk = cm->findIntersectingChunkWithSimpleCollation(txn, migrationInfo.minKey);
+            auto chunk =
+                scopedCM.cm()->findIntersectingChunkWithSimpleCollation(txn, migrationInfo.minKey);
             invariant(chunk);
 
             if (chunk->getShardId() != migrationInfo.from) {

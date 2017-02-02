@@ -308,8 +308,8 @@ BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* tx
         return scopedCMStatus.getStatus();
     }
 
-    auto scopedCM = std::move(scopedCMStatus.getValue());
-    ChunkManager* const cm = scopedCM.cm();
+    const auto& scopedCM = scopedCMStatus.getValue();
+    const auto cm = scopedCM.cm().get();
 
     const auto collInfoStatus = createCollectionDistributionStatus(txn, shardStats, cm);
     if (!collInfoStatus.isOK()) {
@@ -338,8 +338,8 @@ Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* txn,
         return scopedCMStatus.getStatus();
     }
 
-    auto scopedCM = std::move(scopedCMStatus.getValue());
-    ChunkManager* const cm = scopedCM.cm();
+    const auto& scopedCM = scopedCMStatus.getValue();
+    const auto cm = scopedCM.cm().get();
 
     const auto collInfoStatus = createCollectionDistributionStatus(txn, shardStats, cm);
     if (!collInfoStatus.isOK()) {
@@ -371,8 +371,8 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidate
         return scopedCMStatus.getStatus();
     }
 
-    auto scopedCM = std::move(scopedCMStatus.getValue());
-    ChunkManager* const cm = scopedCM.cm();
+    const auto& scopedCM = scopedCMStatus.getValue();
+    const auto cm = scopedCM.cm().get();
 
     const auto& shardKeyPattern = cm->getShardKeyPattern().getKeyPattern();
 
@@ -425,8 +425,8 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
         return scopedCMStatus.getStatus();
     }
 
-    auto scopedCM = std::move(scopedCMStatus.getValue());
-    ChunkManager* const cm = scopedCM.cm();
+    const auto& scopedCM = scopedCMStatus.getValue();
+    const auto cm = scopedCM.cm().get();
 
     const auto& shardKeyPattern = cm->getShardKeyPattern().getKeyPattern();
 
