@@ -281,7 +281,7 @@ __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	bool did_work;
+	bool did_work, was_intr;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -309,8 +309,21 @@ __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 			ret = __evict_server(session, &did_work);
 			F_CLR(cache->walk_session, WT_SESSION_LOCKED_PASS);
 			F_CLR(session, WT_SESSION_LOCKED_PASS);
+			was_intr = cache->pass_intr != 0;
 			__wt_spin_unlock(session, &cache->evict_pass_lock);
 			WT_ERR(ret);
+
+			/*
+			 * If the eviction server was interrupted, wait until
+			 * requests have been processed: the system may
+			 * otherwise be busy so don't go to sleep.
+			 */
+			if (was_intr) {
+				while (cache->pass_intr != 0)
+					__wt_yield();
+				continue;
+			}
+
 			__wt_verbose(session, WT_VERB_EVICTSERVER, "sleeping");
 
 			/* Don't rely on signals: check periodically. */
@@ -372,7 +385,8 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 	/* Evict pages from the cache as needed. */
 	WT_RET(__evict_pass(session));
 
-	if (!F_ISSET(conn, WT_CONN_EVICTION_RUN))
+	if (!F_ISSET(conn, WT_CONN_EVICTION_RUN) ||
+	    cache->pass_intr != 0)
 		return (0);
 
 	/*
