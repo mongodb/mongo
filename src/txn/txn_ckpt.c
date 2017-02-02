@@ -181,7 +181,7 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 	int (*op)(WT_SESSION_IMPL *, const char *[]))
 {
 	WT_DECL_RET;
-	u_int i;
+	u_int i, j;
 
 	/* If we have already locked the handles, apply the operation. */
 	for (i = 0; i < session->ckpt_handle_next; ++i) {
@@ -189,10 +189,22 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 			continue;
 		WT_WITH_DHANDLE(session, session->ckpt_handle[i],
 		    ret = (*op)(session, cfg));
-		WT_RET(ret);
+		WT_ERR(ret);
 	}
 
-	return (0);
+err:
+	/*
+	 * If we have an error somewhere in processing the handles, then
+	 * we need to mark earlier trees dirty.
+	 */
+	if (ret != 0)
+		for (j = 0; j < i; ++j) {
+			if (session->ckpt_handle[j] == NULL)
+				continue;
+			WT_WITH_DHANDLE(session, session->ckpt_handle[j],
+			    S2BT(session)->modified = true);
+		}
+	return (ret);
 }
 
 /*
@@ -824,7 +836,7 @@ err:	/*
 	 * overwritten the checkpoint, so what ends up on disk is not
 	 * consistent.
 	 */
-	if (ret != 0 && !conn->modified)
+	if (ret != 0)
 		conn->modified = true;
 
 	session->isolation = txn->isolation = WT_ISO_READ_UNCOMMITTED;
@@ -1340,7 +1352,6 @@ __checkpoint_tree(
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_LSN ckptlsn;
-	int was_modified;
 	bool fake_ckpt;
 
 	WT_UNUSED(cfg);
@@ -1351,7 +1362,6 @@ __checkpoint_tree(
 	conn = S2C(session);
 	dhandle = session->dhandle;
 	fake_ckpt = false;
-	was_modified = btree->modified;
 
 	/*
 	 * Set the checkpoint LSN to the maximum LSN so that if logging is
@@ -1482,10 +1492,9 @@ err:	/*
 	 * If the checkpoint didn't complete successfully, make sure the
 	 * tree is marked dirty.
 	 */
-	if (ret != 0 && !btree->modified && was_modified) {
+	if (ret != 0) {
 		btree->modified = true;
-		if (!S2C(session)->modified)
-			S2C(session)->modified = true;
+		S2C(session)->modified = true;
 	}
 
 	__wt_meta_ckptlist_free(session, ckptbase);
