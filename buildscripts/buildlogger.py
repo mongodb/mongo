@@ -238,6 +238,12 @@ def run_and_echo(command):
     """
     proc = subprocess.Popen(command)
 
+    # We write the pid of the spawned process as the first line of buildlogger.py's stdout because
+    # smoke.py expects to use it to terminate processes individually if already running inside a job
+    # object.
+    sys.stdout.write("[buildlogger.py] pid: %d\n" % (proc.pid))
+    sys.stdout.flush()
+
     def handle_sigterm(signum, frame):
         try:
             proc.send_signal(signum)
@@ -414,6 +420,12 @@ def loop_and_callback(command, callback):
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
+
+    # We write the pid of the spawned process as the first line of buildlogger.py's stdout because
+    # smoke.py expects to use it to terminate processes individually if already running inside a job
+    # object.
+    sys.stdout.write("[buildlogger.py] pid: %d\n" % (proc.pid))
+    sys.stdout.flush()
 
     def handle_sigterm(signum, frame):
         try:
