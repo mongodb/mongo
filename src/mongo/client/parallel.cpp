@@ -331,11 +331,13 @@ void ParallelSortClusteredCursor::fullInit(OperationContext* txn) {
     finishInit(txn);
 }
 
-void ParallelSortClusteredCursor::_markStaleNS(const NamespaceString& staleNS,
+void ParallelSortClusteredCursor::_markStaleNS(OperationContext* txn,
+                                               const NamespaceString& staleNS,
                                                const StaleConfigException& e,
-                                               bool& forceReload,
-                                               bool& fullReload) {
-    fullReload = e.requiresFullReload();
+                                               bool& forceReload) {
+    if (e.requiresFullReload()) {
+        Grid::get(txn)->catalogCache()->invalidate(staleNS.db());
+    }
 
     if (_staleNSMap.find(staleNS.ns()) == _staleNSMap.end())
         _staleNSMap[staleNS.ns()] = 1;
@@ -354,28 +356,17 @@ void ParallelSortClusteredCursor::_markStaleNS(const NamespaceString& staleNS,
 
 void ParallelSortClusteredCursor::_handleStaleNS(OperationContext* txn,
                                                  const NamespaceString& staleNS,
-                                                 bool forceReload,
-                                                 bool fullReload) {
-    auto status = Grid::get(txn)->catalogCache()->getDatabase(txn, staleNS.db());
-    if (!status.isOK()) {
-        warning() << "cannot reload database info for stale namespace " << staleNS.ns();
+                                                 bool forceReload) {
+    auto scopedCMStatus = ScopedChunkManager::get(txn, staleNS);
+    if (!scopedCMStatus.isOK()) {
+        log() << "cannot reload database info for stale namespace " << staleNS.ns();
         return;
     }
 
-    shared_ptr<DBConfig> config = status.getValue();
+    const auto& scopedCM = scopedCMStatus.getValue();
 
-    // Reload db if needed, make sure it works
-    if (fullReload && !config->reload(txn)) {
-        // We didn't find the db after reload, the db may have been dropped, reset this ptr
-        config.reset();
-    }
-
-    if (!config) {
-        warning() << "cannot reload database info for stale namespace " << staleNS.ns();
-    } else {
-        // Reload chunk manager, potentially forcing the namespace
-        config->getChunkManagerIfExists(txn, staleNS.ns(), true, forceReload);
-    }
+    // Reload chunk manager, potentially forcing the namespace
+    scopedCM.db()->getChunkManagerIfExists(txn, staleNS.ns(), true, forceReload);
 }
 
 void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
@@ -660,20 +651,19 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
                 staleNS = nss;  // ns is the *versioned* namespace, be careful of this
 
             // Probably need to retry fully
-            bool forceReload, fullReload;
-            _markStaleNS(staleNS, e, forceReload, fullReload);
+            bool forceReload;
+            _markStaleNS(txn, staleNS, e, forceReload);
 
-            int logLevel = fullReload ? 0 : 1;
-            LOG(pc + logLevel) << "stale config of ns " << staleNS
-                               << " during initialization, will retry with forced : " << forceReload
-                               << ", full : " << fullReload << causedBy(redact(e));
+            LOG(1) << "stale config of ns " << staleNS
+                   << " during initialization, will retry with forced : " << forceReload
+                   << causedBy(redact(e));
 
             // This is somewhat strange
             if (staleNS != nss)
                 warning() << "versioned ns " << nss.ns() << " doesn't match stale config namespace "
                           << staleNS;
 
-            _handleStaleNS(txn, staleNS, forceReload, fullReload);
+            _handleStaleNS(txn, staleNS, forceReload);
 
             // Restart with new chunk manager
             startInit(txn);
@@ -887,21 +877,19 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* txn) {
                 NamespaceString staleNS(i->first);
                 const StaleConfigException& exception = i->second;
 
-                bool forceReload, fullReload;
-                _markStaleNS(staleNS, exception, forceReload, fullReload);
+                bool forceReload;
+                _markStaleNS(txn, staleNS, exception, forceReload);
 
-                int logLevel = fullReload ? 0 : 1;
-                LOG(pc + logLevel)
-                    << "stale config of ns " << staleNS
-                    << " on finishing query, will retry with forced : " << forceReload
-                    << ", full : " << fullReload << causedBy(redact(exception));
+                LOG(1) << "stale config of ns " << staleNS
+                       << " on finishing query, will retry with forced : " << forceReload
+                       << causedBy(redact(exception));
 
                 // This is somewhat strange
                 if (staleNS != ns)
                     warning() << "versioned ns " << ns << " doesn't match stale config namespace "
                               << staleNS;
 
-                _handleStaleNS(txn, staleNS, forceReload, fullReload);
+                _handleStaleNS(txn, staleNS, forceReload);
             }
         }
 
