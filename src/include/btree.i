@@ -80,13 +80,15 @@ __wt_btree_bytes_evictable(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
+	WT_PAGE *root_page;
 	uint64_t bytes_inmem, bytes_root;
 
 	btree = S2BT(session);
 	cache = S2C(session)->cache;
+	root_page = btree->root.page;
 
 	bytes_inmem = btree->bytes_inmem;
-	bytes_root = btree->root.page->memory_footprint;
+	bytes_root = root_page == NULL ? 0 : root_page->memory_footprint;
 
 	return (bytes_inmem <= bytes_root ? 0 :
 	    __wt_cache_bytes_plus_overhead(cache, bytes_inmem - bytes_root));
