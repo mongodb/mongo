@@ -44,6 +44,7 @@ const std::string MemberConfig::kIdFieldName = "_id";
 const std::string MemberConfig::kVotesFieldName = "votes";
 const std::string MemberConfig::kPriorityFieldName = "priority";
 const std::string MemberConfig::kHostFieldName = "host";
+const std::string MemberConfig::kHostInternalFieldName = "hostInternal";
 const std::string MemberConfig::kHiddenFieldName = "hidden";
 const std::string MemberConfig::kSlaveDelayFieldName = "slaveDelay";
 const std::string MemberConfig::kArbiterOnlyFieldName = "arbiterOnly";
@@ -62,7 +63,8 @@ const std::string kLegalMemberConfigFieldNames[] = {MemberConfig::kIdFieldName,
                                                     MemberConfig::kSlaveDelayFieldName,
                                                     MemberConfig::kArbiterOnlyFieldName,
                                                     MemberConfig::kBuildIndexesFieldName,
-                                                    MemberConfig::kTagsFieldName};
+                                                    MemberConfig::kTagsFieldName,
+                                                    MemberConfig::kHostInternalFieldName};
 
 const int kVotesFieldDefault = 1;
 const double kPriorityFieldDefault = 1.0;
@@ -110,6 +112,29 @@ Status MemberConfig::initialize(const BSONObj& mcfg, ReplicaSetTagConfig* tagCon
         // make port explicit even if default.
         _host = HostAndPort(_host.host(), _host.port());
     }
+
+    // Checking for internal replication host name
+    std::string internalHostAndPortString;
+    status = bsonExtractStringField(mcfg, kHostInternalFieldName,
+                                    &internalHostAndPortString);
+    // if it's not set we will use hostAndPortString
+    if ( status == ErrorCodes::NoSuchKey ){
+      internalHostAndPortString = hostAndPortString;
+    } else if ( !status.isOK() ){
+      return status;
+    } else {
+      boost::trim(internalHostAndPortString);
+    }
+
+    status = _hostInternal.initialize(internalHostAndPortString);
+    if (!status.isOK()){
+      return status;
+    }
+    if (!_hostInternal.hasPort()) {
+      // make port explicit even if default
+      _hostInternal = HostAndPort(_hostInternal.host(), _hostInternal.port());
+    }
+
 
     //
     // Parse votes field.
@@ -287,6 +312,7 @@ BSONObj MemberConfig::toBSON(const ReplicaSetTagConfig& tagConfig) const {
     BSONObjBuilder configBuilder;
     configBuilder.append("_id", _id);
     configBuilder.append("host", _host.toString());
+    configBuilder.append("hostInternal", _hostInternal.toString());
     configBuilder.append("arbiterOnly", _arbiterOnly);
     configBuilder.append("buildIndexes", _buildIndexes);
     configBuilder.append("hidden", _hidden);

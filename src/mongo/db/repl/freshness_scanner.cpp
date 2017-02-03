@@ -51,7 +51,7 @@ FreshnessScanner::Algorithm::Algorithm(const ReplicaSetConfig& rsConfig,
     : _rsConfig(rsConfig), _myIndex(myIndex), _timeout(timeout) {
     for (int index = 0; index < _rsConfig.getNumMembers(); index++) {
         if (index != _myIndex) {
-            _targets.push_back(_rsConfig.getMemberAt(index).getHostAndPort());
+            _targets.push_back(_rsConfig.getMemberAt(index).getInternalHostAndPort());
         }
     }
     _totalRequests = _targets.size();
@@ -74,9 +74,9 @@ void FreshnessScanner::Algorithm::processResponse(const RemoteCommandRequest& re
     _responsesProcessed++;
     if (!response.isOK()) {  // failed response
         LOG(2) << "FreshnessScanner: Got failed response from " << request.target << ": "
-               << response.status;
+               << response.getStatus();
     } else {
-        BSONObj opTimesObj = response.data.getObjectField("optimes");
+        BSONObj opTimesObj = response.getValue().data.getObjectField("optimes");
         OpTime lastOpTime;
         Status status = bsonExtractOpTimeField(opTimesObj, "appliedOpTime", &lastOpTime);
         if (!status.isOK()) {

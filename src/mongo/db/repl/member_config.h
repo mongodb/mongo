@@ -61,6 +61,7 @@ public:
     static const std::string kInternalVoterTagName;
     static const std::string kInternalElectableTagName;
     static const std::string kInternalAllTagName;
+    static const std::string kHostInternalFieldName;
 
     /**
      * Default constructor, produces a MemberConfig in an undefined state.
@@ -97,6 +98,14 @@ public:
      */
     const HostAndPort& getHostAndPort() const {
         return _host;
+    }
+
+    /**
+     * Gets the canonical internal replication name for this member.
+     *This will be used for all internal replication traffic.
+     */
+    const HostAndPort& getInternalHostAndPort() const {
+        return _hostInternal;
     }
 
     /**
@@ -192,6 +201,7 @@ public:
 private:
     int _id;
     HostAndPort _host;
+    HostAndPort _hostInternal;
     double _priority;  // 0 means can never be primary
     int _votes;        // Can this member vote? Only 0 and 1 are valid.  Default 1.
     bool _arbiterOnly;

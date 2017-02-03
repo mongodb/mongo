@@ -426,7 +426,8 @@ Status ReplicaSetConfig::validate() const {
         Status status = memberI.validate();
         if (!status.isOK())
             return status;
-        if (memberI.getHostAndPort().isLocalHost()) {
+        if ( memberI.getInternalHostAndPort().isLocalHost() ||
+             memberI.getHostAndPort().isLocalHost()) {
             ++localhostCount;
         }
         if (memberI.isVoter()) {
@@ -478,8 +479,29 @@ Status ReplicaSetConfig::validate() const {
                                             << "."
                                             << MemberConfig::kHostFieldName
                                             << " == "
-                                            << memberI.getHostAndPort().toString());
+                                            << memberI.HostAndPort().toString());
             }
+            // validating that the internal host is not duplicated in the configuration
+            if (!memberI.getInternalHostAndPort().empty() &&
+                memberI.getInternalHostAndPort() == memberJ.getHostInternalAndPort() ) {
+                 return Status(ErrorCodes::BadValue,
+                              str::stream() << "Found two member configurations with same "
+                                            << MemberConfig::kHostInternalFieldName
+                                            << " field, "
+                                            << kMembersFieldName
+                                            << "."
+                                            << i
+                                            << "."
+                                            << MemberConfig::kHostInternalFieldName
+                                            << " == "
+                                            << kMembersFieldName
+                                            << "."
+                                            << j
+                                            << "."
+                                            << MemberConfig::kHostInternalFieldName
+                                            << " == "
+                                            << memberI.getInternalHostAndPort().toString());
+
         }
     }
 
@@ -632,7 +654,7 @@ const int ReplicaSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap)
     int x = 0;
     for (std::vector<MemberConfig>::const_iterator it = _members.begin(); it != _members.end();
          ++it) {
-        if (it->getHostAndPort() == hap) {
+        if (it->getInternalHostAndPort() == hap || it->getHostAndPort() == hap) {
             return x;
         }
         ++x;
@@ -663,7 +685,8 @@ Milliseconds ReplicaSetConfig::getHeartbeatInterval() const {
 bool ReplicaSetConfig::isLocalHostAllowed() const {
     // It is sufficient to check any one member's hostname, since in ReplicaSetConfig::validate,
     // it's ensured that either all members have hostname localhost or none do.
-    return _members.begin()->getHostAndPort().isLocalHost();
+    return _members.begin()->getHostAndPort().isLocalHost() ||
+           _members.begin()->getInternalHostAndPort().isLocalHost();
 }
 
 ReplicaSetTag ReplicaSetConfig::findTag(StringData key, StringData value) const {

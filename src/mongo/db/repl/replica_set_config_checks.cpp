@@ -55,7 +55,7 @@ StatusWith<int> findSelfInConfig(ReplicationCoordinatorExternalState* externalSt
     for (ReplicaSetConfig::MemberIterator iter = newConfig.membersBegin();
          iter != newConfig.membersEnd();
          ++iter) {
-        if (externalState->isSelf(iter->getHostAndPort(), ctx)) {
+        if (externalState->isSelf(iter->getInternalHostAndPort(), ctx)) {
             meConfigs.push_back(iter);
         }
     }
@@ -69,11 +69,11 @@ StatusWith<int> findSelfInConfig(ReplicationCoordinatorExternalState* externalSt
     }
     if (meConfigs.size() > 1) {
         str::stream message;
-        message << "The hosts " << meConfigs.front()->getHostAndPort().toString();
+        message << "The hosts " << meConfigs.front()->getInternalHostAndPort().toString();
         for (size_t i = 1; i < meConfigs.size() - 1; ++i) {
-            message << ", " << meConfigs[i]->getHostAndPort().toString();
+            message << ", " << meConfigs[i]->getInternalHostAndPort().toString();
         }
-        message << " and " << meConfigs.back()->getHostAndPort().toString()
+        message << " and " << meConfigs.back()->getInternalHostAndPort().toString()
                 << " all map to this node in new configuration version "
                 << newConfig.getConfigVersion() << " for replica set "
                 << newConfig.getReplSetName();
@@ -93,7 +93,8 @@ Status checkElectable(const ReplicaSetConfig& newConfig, int configIndex) {
     const MemberConfig& myConfig = newConfig.getMemberAt(configIndex);
     if (!myConfig.isElectable()) {
         return Status(ErrorCodes::NodeNotElectable,
-                      str::stream() << "This node, " << myConfig.getHostAndPort().toString()
+                      str::stream() << "This node, "
+                                    << myConfig.getInternalHostAndPort().toString()
                                     << ", with _id "
                                     << myConfig.getId()
                                     << " is not electable under the new configuration version "
@@ -179,7 +180,7 @@ Status validateOldAndNewConfigsCompatible(const ReplicaSetConfig& oldConfig,
 
     //
     // For every member config mNew in newConfig, if there exists member config mOld
-    // in oldConfig such that mNew.getHostAndPort() == mOld.getHostAndPort(), it is required
+    // in oldConfig such that mNew.getInternalHostAndPort() == mOld.getInternalHostAndPort(), it is required
     // that mNew.getId() == mOld.getId().
     //
     // Also, one may not use reconfig to change the value of the buildIndexes or
@@ -192,7 +193,7 @@ Status validateOldAndNewConfigsCompatible(const ReplicaSetConfig& oldConfig,
              mOld != oldConfig.membersEnd();
              ++mOld) {
             const bool idsEqual = mOld->getId() == mNew->getId();
-            const bool hostsEqual = mOld->getHostAndPort() == mNew->getHostAndPort();
+            const bool hostsEqual = mOld->getInternalHostAndPort() == mNew->getInternalHostAndPort();
             if (!idsEqual && !hostsEqual) {
                 continue;
             }
@@ -201,7 +202,7 @@ Status validateOldAndNewConfigsCompatible(const ReplicaSetConfig& oldConfig,
                               str::stream() << "New and old configurations both have members with "
                                             << MemberConfig::kHostFieldName
                                             << " of "
-                                            << mOld->getHostAndPort().toString()
+                                            << mOld->getInternalHostAndPort().toString()
                                             << " but in the new configuration the "
                                             << MemberConfig::kIdFieldName
                                             << " field is "
@@ -220,7 +221,7 @@ Status validateOldAndNewConfigsCompatible(const ReplicaSetConfig& oldConfig,
                               str::stream()
                                   << "New and old configurations differ in the setting of the "
                                      "buildIndexes field for member "
-                                  << mOld->getHostAndPort().toString()
+                                  << mOld->getInternalHostAndPort().toString()
                                   << "; to make this change, remove then re-add the member");
             }
             const bool arbiterFlagsEqual = mOld->isArbiter() == mNew->isArbiter();
@@ -229,7 +230,7 @@ Status validateOldAndNewConfigsCompatible(const ReplicaSetConfig& oldConfig,
                               str::stream()
                                   << "New and old configurations differ in the setting of the "
                                      "arbiterOnly field for member "
-                                  << mOld->getHostAndPort().toString()
+                                  << mOld->getInternalHostAndPort().toString()
                                   << "; to make this change, remove then re-add the member");
             }
         }
