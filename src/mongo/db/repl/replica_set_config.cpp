@@ -480,7 +480,7 @@ Status ReplicaSetConfig::validate() const {
                                             << "."
                                             << MemberConfig::kHostFieldName
                                             << " == "
-                                            << memberI.getHostAndPort().toString());
+                                            << memberI.HostAndPort().toString());
             }
             // validating that the internal host is not duplicated in the configuration
             if (!memberI.getInternalHostAndPort().empty() &&

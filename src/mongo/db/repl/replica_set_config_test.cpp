@@ -1147,7 +1147,7 @@ bool operator==(const MemberConfig& a, const MemberConfig& b) {
     }
     return a.getId() == b.getId() && a.getHostAndPort() == b.getHostAndPort() &&
         a.getPriority() == b.getPriority() && a.getSlaveDelay() == b.getSlaveDelay() &&
-        a.getInternalHostAndPort() == b.getInternalHostAndPort() &&
+        a.getHostInternalAndPort() == b.getHostInternalAndPort() &&
         a.isVoter() == b.isVoter() && a.isArbiter() == b.isArbiter() &&
         a.isHidden() == b.isHidden() && a.shouldBuildIndexes() == b.shouldBuildIndexes() &&
         a.getNumTags() == b.getNumTags();
