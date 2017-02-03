@@ -319,7 +319,9 @@ __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
 			 * otherwise be busy so don't go to sleep.
 			 */
 			if (was_intr) {
-				while (cache->pass_intr != 0)
+				while (cache->pass_intr != 0 &&
+				    F_ISSET(conn, WT_CONN_EVICTION_RUN) &&
+				    F_ISSET(thread, WT_THREAD_RUN))
 					__wt_yield();
 				continue;
 			}
