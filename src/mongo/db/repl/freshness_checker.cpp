@@ -128,7 +128,7 @@ void FreshnessChecker::Algorithm::processResponse(const RemoteCommandRequest& re
 
     Status status = Status::OK();
 
-    if (!response.isOK() || !((status = getStatusFromCommandResult(response.data)).isOK())) {
+    if (!response.isOK() || !((status = getStatusFromCommandResult(response.getValue().data)).isOK())) {
         if (votingMember) {
             ++_failedVoterResponses;
             if (hadTooManyFailedVoterResponses()) {
