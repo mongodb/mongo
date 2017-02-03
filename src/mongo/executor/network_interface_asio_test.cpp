@@ -1008,7 +1008,10 @@ private:
 TEST_F(NetworkInterfaceASIOMetadataTest, Metadata) {
     bool wroteRequestMetadata = false;
     bool gotReplyMetadata = false;
-    start(stdx::make_unique<TestMetadataHook>(&wroteRequestMetadata, &gotReplyMetadata));
+    auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
+    hookList->addHook(
+        stdx::make_unique<TestMetadataHook>(&wroteRequestMetadata, &gotReplyMetadata));
+    start(std::move(hookList));
 
     RemoteCommandRequest request{testHost, "blah", BSON("ping" << 1), nullptr};
     auto deferred = startCommand(makeCallbackHandle(), request);

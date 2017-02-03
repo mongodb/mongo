@@ -36,11 +36,13 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/log.h"
@@ -76,10 +78,14 @@ shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorManager::getMonitor(StringData se
 }
 
 void ReplicaSetMonitorManager::_setupTaskExecutorInLock(const std::string& name) {
+    auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
+    // TODO SERVER-27750: add LogicalTimeMetadataHook
+
     // do not restart taskExecutor if is in shutdown
     if (!_taskExecutor && !_isShutdown) {
         // construct task executor
-        auto net = executor::makeNetworkInterface("ReplicaSetMonitor-TaskExecutor");
+        auto net = executor::makeNetworkInterface(
+            "ReplicaSetMonitor-TaskExecutor", nullptr, std::move(hookList));
         auto netPtr = net.get();
         _taskExecutor = stdx::make_unique<ThreadPoolTaskExecutor>(
             stdx::make_unique<NetworkInterfaceThreadPool>(netPtr), std::move(net));

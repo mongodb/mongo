@@ -51,9 +51,8 @@ using ShardingCatalogManagerBuilder = stdx::function<std::unique_ptr<ShardingCat
     ShardingCatalogClient*, std::unique_ptr<executor::TaskExecutor>)>;
 
 namespace rpc {
-class ShardingEgressMetadataHook;
-using ShardingEgressMetadataHookBuilder =
-    stdx::function<std::unique_ptr<ShardingEgressMetadataHook>()>;
+class EgressMetadataHook;
+using ShardingEgressMetadataHookBuilder = stdx::function<std::unique_ptr<EgressMetadataHook>()>;
 }  // namespace rpc
 
 /**

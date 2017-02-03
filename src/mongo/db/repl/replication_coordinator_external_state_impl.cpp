@@ -71,9 +71,11 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -303,8 +305,11 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
     log() << "Starting replication storage threads";
     getGlobalServiceContext()->getGlobalStorageEngine()->setJournalListener(this);
 
+    auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
+    // TODO SERVER-27750: add LogicalTimeMetadataHook
     _taskExecutor = stdx::make_unique<executor::ThreadPoolTaskExecutor>(
-        makeThreadPool(), executor::makeNetworkInterface("NetworkInterfaceASIO-RS"));
+        makeThreadPool(),
+        executor::makeNetworkInterface("NetworkInterfaceASIO-RS", nullptr, std::move(hookList)));
     _taskExecutor->startup();
 
     _initialSyncThreadPool.startThreads();

@@ -108,8 +108,10 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/ttl.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_initialization.h"
@@ -897,11 +899,16 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
     auto logicalClock =
         stdx::make_unique<LogicalClock>(serviceContext, std::move(timeProofService), false);
     LogicalClock::set(serviceContext, std::move(logicalClock));
+
+    auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
+    // TODO SERVER-27750: add LogicalTimeMetadataHook
+
     auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorImpl>(
         serviceContext,
         getGlobalReplSettings(),
         stdx::make_unique<repl::ReplicationCoordinatorExternalStateImpl>(storageInterface),
-        executor::makeNetworkInterface("NetworkInterfaceASIO-Replication"),
+        executor::makeNetworkInterface(
+            "NetworkInterfaceASIO-Replication", nullptr, std::move(hookList)),
         stdx::make_unique<repl::TopologyCoordinatorImpl>(topoCoordOptions),
         storageInterface,
         static_cast<int64_t>(curTimeMillis64()));
