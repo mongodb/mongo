@@ -71,6 +71,28 @@ __wt_btree_bytes_inuse(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_btree_bytes_evictable --
+ *	Return the number of bytes that can be evicted (i.e. bytes apart from
+ *	the pinned root page).
+ */
+static inline uint64_t
+__wt_btree_bytes_evictable(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_CACHE *cache;
+	uint64_t bytes_inmem, bytes_root;
+
+	btree = S2BT(session);
+	cache = S2C(session)->cache;
+
+	bytes_inmem = btree->bytes_inmem;
+	bytes_root = btree->root.page->memory_footprint;
+
+	return (bytes_inmem <= bytes_root ? 0 :
+	    __wt_cache_bytes_plus_overhead(cache, bytes_inmem - bytes_root));
+}
+
+/*
  * __wt_btree_dirty_inuse --
  *	Return the number of dirty bytes in use.
  */
