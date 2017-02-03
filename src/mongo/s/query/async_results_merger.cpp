@@ -332,8 +332,9 @@ StatusWith<executor::TaskExecutor::EventHandle> AsyncResultsMerger::nextEvent() 
     for (size_t i = 0; i < _remotes.size(); ++i) {
         auto& remote = _remotes[i];
 
-        // It is illegal to call this method if there is an error received from any shard.
-        invariant(remote.status.isOK());
+        if (!remote.status.isOK()) {
+            return remote.status;
+        }
 
         if (!remote.hasNext() && !remote.exhausted() && !remote.cbHandle.isValid()) {
             // If we already have established a cursor with this remote, and there is no outstanding
