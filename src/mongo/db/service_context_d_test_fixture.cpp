@@ -54,7 +54,9 @@ void ServiceContextMongoDTest::setUp() {
     Client::initThread(getThreadName().c_str());
     ServiceContext* serviceContext = getServiceContext();
 
-    auto timeProofService = stdx::make_unique<TimeProofService>();
+    std::array<std::uint8_t, 20> tempKey = {};
+    TimeProofService::Key key(std::move(tempKey));
+    auto timeProofService = stdx::make_unique<TimeProofService>(std::move(key));
     auto logicalClock =
         stdx::make_unique<LogicalClock>(serviceContext, std::move(timeProofService), false);
     LogicalClock::set(serviceContext, std::move(logicalClock));

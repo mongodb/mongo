@@ -92,9 +92,24 @@ TEST(LogicalTime, defaultInit) {
     ASSERT_TRUE(tX == lT.asTimestamp());
 }
 
+TEST(LogicalTime, toUnsignedArray) {
+    Timestamp tX(123456789);
+    auto lT = LogicalTime(tX);
+
+    unsigned char expectedBytes[sizeof(uint64_t)] = {
+        0x15, 0xCD, 0x5B, 0x07, 0x00, 0x00, 0x00, 0x00};
+
+    auto unsignedTimeArray = lT.toUnsignedArray();
+    for (size_t i = 0; i < sizeof(uint64_t); ++i) {
+        ASSERT_EQUALS(unsignedTimeArray[i], expectedBytes[i]);
+    }
+}
+
 TEST(SignedLogicalTime, roundtrip) {
     Timestamp tX(1);
-    TimeProofService tps;
+    std::array<std::uint8_t, 20> tempKey = {};
+    TimeProofService::Key key(std::move(tempKey));
+    TimeProofService tps(std::move(key));
     auto time = LogicalTime(tX);
     auto proof = tps.getProof(time);
 

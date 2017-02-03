@@ -26,45 +26,41 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/base/status.h"
-#include "mongo/crypto/sha1_block.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/time_proof_service.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
-/**
- * TODO: SERVER-28127 Add key rotation to the TimeProofService
- *
- * The TimeProofService holds the key used by mongod and mongos processes to verify logical times
- * and contains the logic to generate this key, but not to store or retrieve it.
- */
-class TimeProofService {
-public:
-    // This type must be synchronized with the library that generates SHA1 or other proof.
-    using TimeProof = SHA1Block;
-    using Key = SHA1Block;
+using TimeProof = TimeProofService::TimeProof;
 
-    TimeProofService(Key key) : _key(std::move(key)) {}
+// Verifies logical time with proof signed with the correct key.
+TEST(TimeProofService, VerifyLogicalTimeWithValidProof) {
+    std::array<std::uint8_t, 20> tempKey = {};
+    TimeProofService::Key key(std::move(tempKey));
+    TimeProofService timeProofService(std::move(key));
 
-    /**
-     * Generates a pseudorandom key to be used for HMAC authentication.
-     */
-    static Key generateRandomKey();
+    LogicalTime time(Timestamp(1));
+    TimeProof proof = timeProofService.getProof(time);
 
-    /**
-     * Returns the proof matching the time argument.
-     */
-    TimeProof getProof(const LogicalTime& time) const;
+    ASSERT_OK(timeProofService.checkProof(time, proof));
+}
 
-    /**
-     * Verifies that the proof matches the time argument.
-     */
-    Status checkProof(const LogicalTime& time, const TimeProof& proof) const;
+// Fails for logical time with proof signed with an invalid key.
+TEST(TimeProofService, LogicalTimeWithMismatchingProofShouldFail) {
+    std::array<std::uint8_t, 20> tempKey = {};
+    TimeProofService::Key key(std::move(tempKey));
+    TimeProofService timeProofService(std::move(key));
 
-private:
-    Key _key;
-};
+    LogicalTime time(Timestamp(1));
+    TimeProof invalidProof = {{1, 2, 3}};
 
+    ASSERT_EQUALS(ErrorCodes::TimeProofMismatch, timeProofService.checkProof(time, invalidProof));
+}
+
+}  // unnamed namespace
 }  // namespace mongo

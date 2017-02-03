@@ -277,9 +277,13 @@ static ExitCode runMongosServer() {
 
     auto opCtx = cc().makeOperationContext();
 
-    auto timeProofService = stdx::make_unique<TimeProofService>();
+    std::array<std::uint8_t, 20> tempKey = {};
+    TimeProofService::Key key(std::move(tempKey));
+    auto timeProofService = stdx::make_unique<TimeProofService>(std::move(key));
     auto logicalClock = stdx::make_unique<LogicalClock>(
-        opCtx->getServiceContext(), std::move(timeProofService), false);
+        opCtx->getServiceContext(),
+        std::move(timeProofService),
+        serverGlobalParams.authState == ServerGlobalParams::AuthState::kEnabled);
     LogicalClock::set(opCtx->getServiceContext(), std::move(logicalClock));
 
     {

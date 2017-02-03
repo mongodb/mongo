@@ -396,6 +396,15 @@ quick_exit_env.Library(
         "$BUILD_DIR/third_party/shim_allocator",
     ]
 )
+env.Library(
+    target="secure_compare_memory",
+    source=[
+        'secure_compare_memory.cpp',
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+    ],
+)
 
 env.Library(
     target="secure_zero_memory",

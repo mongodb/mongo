@@ -122,7 +122,9 @@ void ReplCoordTest::init() {
     // PRNG seed for tests.
     const int64_t seed = 0;
 
-    auto timeProofService = stdx::make_unique<TimeProofService>();
+    std::array<std::uint8_t, 20> tempKey = {};
+    TimeProofService::Key key(std::move(tempKey));
+    auto timeProofService = stdx::make_unique<TimeProofService>(std::move(key));
     auto logicalClock =
         stdx::make_unique<LogicalClock>(service, std::move(timeProofService), false);
     LogicalClock::set(service, std::move(logicalClock));

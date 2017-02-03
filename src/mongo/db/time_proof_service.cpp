@@ -26,45 +26,40 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/time_proof_service.h"
 
 #include "mongo/base/status.h"
-#include "mongo/crypto/sha1_block.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/platform/random.h"
 
 namespace mongo {
 
-/**
- * TODO: SERVER-28127 Add key rotation to the TimeProofService
- *
- * The TimeProofService holds the key used by mongod and mongos processes to verify logical times
- * and contains the logic to generate this key, but not to store or retrieve it.
- */
-class TimeProofService {
-public:
-    // This type must be synchronized with the library that generates SHA1 or other proof.
-    using TimeProof = SHA1Block;
-    using Key = SHA1Block;
+TimeProofService::Key TimeProofService::generateRandomKey() {
+    // SecureRandom only produces 64-bit numbers, so 3 is the minimum for 20 random bytes.
+    const size_t kRandomNumbers = 3;
+    std::array<std::int64_t, kRandomNumbers> keyBuffer;
+    std::unique_ptr<SecureRandom> rng(SecureRandom::create());
+    std::generate(keyBuffer.begin(), keyBuffer.end(), [&] { return rng->nextInt64(); });
 
-    TimeProofService(Key key) : _key(std::move(key)) {}
+    return fassertStatusOK(40384,
+                           SHA1Block::fromBuffer(reinterpret_cast<std::uint8_t*>(keyBuffer.data()),
+                                                 SHA1Block::kHashLength));
+}
 
-    /**
-     * Generates a pseudorandom key to be used for HMAC authentication.
-     */
-    static Key generateRandomKey();
+TimeProofService::TimeProof TimeProofService::getProof(const LogicalTime& time) const {
+    auto unsignedTimeArray = time.toUnsignedArray();
+    return SHA1Block::computeHmac(
+        _key.data(), _key.size(), unsignedTimeArray.data(), unsignedTimeArray.size());
+}
 
-    /**
-     * Returns the proof matching the time argument.
-     */
-    TimeProof getProof(const LogicalTime& time) const;
-
-    /**
-     * Verifies that the proof matches the time argument.
-     */
-    Status checkProof(const LogicalTime& time, const TimeProof& proof) const;
-
-private:
-    Key _key;
-};
+Status TimeProofService::checkProof(const LogicalTime& time, const TimeProof& proof) const {
+    auto myProof = getProof(time);
+    if (myProof != proof) {
+        return Status(ErrorCodes::TimeProofMismatch, "Proof does not match the logical time");
+    }
+    return Status::OK();
+}
 
 }  // namespace mongo

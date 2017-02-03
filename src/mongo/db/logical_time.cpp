@@ -28,6 +28,8 @@
 
 #include "mongo/db/logical_time.h"
 
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
 #include "mongo/platform/basic.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -49,6 +51,12 @@ std::string LogicalTime::toString() const {
     StringBuilder buf;
     buf << asTimestamp().toString();
     return buf.str();
+}
+
+std::array<unsigned char, sizeof(uint64_t)> LogicalTime::toUnsignedArray() const {
+    std::array<unsigned char, sizeof(uint64_t)> output;
+    DataView(reinterpret_cast<char*>(output.data())).write(LittleEndian<uint64_t>{_time});
+    return output;
 }
 
 }  // namespace mongo

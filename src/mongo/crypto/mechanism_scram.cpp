@@ -34,37 +34,13 @@
 
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/secure_compare_memory.h"
 #include "mongo/util/secure_zero_memory.h"
 
 namespace mongo {
 namespace scram {
 
 using std::unique_ptr;
-
-namespace {
-/**
- * Compare two arrays of bytes for equality in constant time.
- *
- * This means that the function runs for the same amount of time even if they differ. Unlike memcmp,
- * this function does not exit on the first difference.
- *
- * Returns true if the two arrays are equal.
- *
- * TODO: evaluate if LTO inlines or changes the code flow of this function.
- */
-NOINLINE_DECL
-bool consttimeMemEqual(volatile const unsigned char* s1,  // NOLINT - using volatile to
-                       volatile const unsigned char* s2,  // NOLINT - disable compiler optimizations
-                       size_t length) {
-    unsigned int ret = 0;
-
-    for (size_t i = 0; i < length; ++i) {
-        ret |= s1[i] ^ s2[i];
-    }
-
-    return (1 & ((ret - 1) >> 8));
-}
-}  // namespace
 
 // Compute the SCRAM step Hi() as defined in RFC5802
 static SHA1Block HMACIteration(const unsigned char input[],

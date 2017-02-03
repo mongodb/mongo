@@ -785,6 +785,10 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 
         // If this is a config server node becoming a primary, start the balancer
         Balancer::get(txn)->initiateBalancer(txn);
+
+        // Generate and upsert random 20 byte key for the LogicalClock's TimeProofService.
+        // TODO: SERVER-27768
+
     } else if (ShardingState::get(txn)->enabled()) {
         const auto configsvrConnStr =
             Grid::get(txn)->shardRegistry()->getConfigShard()->getConnString();

@@ -46,7 +46,9 @@ class LogicalClockTestBase : public unittest::Test {
 protected:
     void setUp() {
         _serviceContext = stdx::make_unique<ServiceContextNoop>();
-        auto pTps = stdx::make_unique<TimeProofService>();
+        std::array<std::uint8_t, 20> tempKey = {};
+        TimeProofService::Key key(std::move(tempKey));
+        auto pTps = stdx::make_unique<TimeProofService>(std::move(key));
         _timeProofService = pTps.get();
         _clock = stdx::make_unique<LogicalClock>(_serviceContext.get(), std::move(pTps), true);
     }
@@ -75,7 +77,9 @@ TEST_F(LogicalClockTestBase, roundtrip) {
     // Create different logicalClock instance to validate that the initial time is preserved.
     ServiceContextNoop serviceContext;
     Timestamp tX(1);
-    auto pTps = stdx::make_unique<TimeProofService>();
+    std::array<std::uint8_t, 20> tempKey = {};
+    TimeProofService::Key key(std::move(tempKey));
+    auto pTps = stdx::make_unique<TimeProofService>(std::move(key));
     auto time = LogicalTime(tX);
 
     LogicalClock logicalClock(&serviceContext, std::move(pTps), true);

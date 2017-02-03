@@ -90,7 +90,8 @@ public:
     void xorInline(const SHA1Block& other);
 
     std::string toString() const;
-    bool operator==(const SHA1Block& rhs) const;
+    bool operator==(const SHA1Block& other) const;
+    bool operator!=(const SHA1Block& other) const;
 
 private:
     HashType _hash;

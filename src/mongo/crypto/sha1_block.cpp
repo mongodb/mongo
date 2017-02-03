@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/secure_compare_memory.h"
 
 namespace mongo {
 
@@ -81,8 +82,12 @@ void SHA1Block::xorInline(const SHA1Block& other) {
     }
 }
 
-bool SHA1Block::operator==(const SHA1Block& rhs) const {
-    return rhs._hash == this->_hash;
+bool SHA1Block::operator==(const SHA1Block& other) const {
+    return consttimeMemEqual(this->_hash.data(), other._hash.data(), kHashLength);
+}
+
+bool SHA1Block::operator!=(const SHA1Block& other) const {
+    return !(*this == other);
 }
 
 }  // namespace mongo

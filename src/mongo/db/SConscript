@@ -945,6 +945,17 @@ env.Library(
 )
 
 env.Library(
+    target='time_proof_service',
+    source=[
+        'time_proof_service.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/crypto/sha1_block_${MONGO_CRYPTO}',
+        'logical_time',
+    ],
+)
+
+env.Library(
     target='logical_clock',
     source=[
         'logical_clock.cpp',
@@ -952,6 +963,7 @@ env.Library(
     LIBDEPS=[
         'service_context',
         'signed_logical_time',
+        'time_proof_service',
     ],
 )
 
@@ -963,6 +975,7 @@ env.CppUnitTest(
     LIBDEPS=[
         'logical_time',
         'signed_logical_time',
+        'time_proof_service',
     ],
 )
 
@@ -988,6 +1001,16 @@ env.Library(
         'logical_clock',
         'signed_logical_time',
         '$BUILD_DIR/mongo/unittest/unittest',
+    ],
+)
+
+env.CppUnitTest(
+    target='time_proof_service_test',
+    source=[
+        'time_proof_service_test.cpp',
+    ],
+    LIBDEPS=[
+        'time_proof_service',
     ],
 )
 

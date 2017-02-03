@@ -19,6 +19,7 @@ env.Library('sha1_block',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/secure_compare_memory',
     ])
 
 env.Library(
@@ -45,6 +46,7 @@ env.Library('scramauth',
             ['mechanism_scram.cpp'],
             LIBDEPS=['$BUILD_DIR/mongo/base',
                      '$BUILD_DIR/mongo/base/secure_allocator',
+                     '$BUILD_DIR/mongo/util/secure_compare_memory',
                      '$BUILD_DIR/mongo/util/secure_zero_memory',
                      'sha1_block_${MONGO_CRYPTO}'])
 

@@ -59,6 +59,12 @@ public:
     std::string toString() const;
 
     /**
+     * Returns the LogicalTime as an array of unsigned chars in little endian order for use with the
+     * crypto::hmacSHA1 function.
+     */
+    std::array<unsigned char, sizeof(uint64_t)> toUnsignedArray() const;
+
+    /**
      * An uninitialized value of LogicalTime. Default constructed.
      */
     static const LogicalTime kUninitialized;
