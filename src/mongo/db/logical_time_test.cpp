@@ -86,6 +86,12 @@ TEST(LogicalTime, addTicksConst) {
     ASSERT_TRUE(tY == lQ.asTimestamp());
 }
 
+TEST(LogicalTime, defaultInit) {
+    Timestamp tX(0);
+    LogicalTime lT;
+    ASSERT_TRUE(tX == lT.asTimestamp());
+}
+
 TEST(SignedLogicalTime, roundtrip) {
     Timestamp tX(1);
     TimeProofService tps;

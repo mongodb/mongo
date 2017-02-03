@@ -38,6 +38,7 @@ namespace mongo {
  */
 class LogicalTime {
 public:
+    LogicalTime() = default;
     explicit LogicalTime(Timestamp);
 
     Timestamp asTimestamp() const {
@@ -56,6 +57,11 @@ public:
     LogicalTime addTicks(uint64_t ticks) const;
 
     std::string toString() const;
+
+    /**
+     * An uninitialized value of LogicalTime. Default constructed.
+     */
+    static const LogicalTime kUninitialized;
 
 private:
     uint64_t _time{0};

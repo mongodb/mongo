@@ -957,6 +957,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='logical_clock',
+    source=[
+        'logical_clock.cpp',
+    ],
+    LIBDEPS=[
+        'signed_logical_time',
+    ],
+)
+
 env.CppUnitTest(
     target='logical_time_test',
     source=[
@@ -964,6 +974,18 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'logical_time',
+        'signed_logical_time',
+    ],
+)
+
+env.CppUnitTest(
+    target='logical_clock_test',
+    source=[
+        'logical_clock_test.cpp',
+    ],
+    LIBDEPS=[
+        'service_context',
+        'logical_clock',
         'signed_logical_time',
     ],
 )

@@ -42,6 +42,8 @@ class SignedLogicalTime {
 public:
     using TimeProof = TimeProofService::TimeProof;
 
+    SignedLogicalTime() = default;
+
     explicit SignedLogicalTime(LogicalTime time, TimeProof proof)
         : _time(std::move(time)), _proof(std::move(proof)) {}
 

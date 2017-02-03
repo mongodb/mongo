@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+const LogicalTime LogicalTime::kUninitialized = LogicalTime();
+
 LogicalTime::LogicalTime(Timestamp ts) : _time(ts.asULL()) {}
 
 void LogicalTime::addTicks(uint64_t ticks) {
