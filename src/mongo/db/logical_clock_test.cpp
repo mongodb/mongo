@@ -80,7 +80,7 @@ TEST_F(LogicalClockTestBase, roundtrip) {
 
     LogicalClock logicalClock(&serviceContext, std::move(pTps), true);
     logicalClock.initClusterTimeFromTrustedSource(time);
-    auto storedTime(std::move(logicalClock.getClusterTime()));
+    auto storedTime(logicalClock.getClusterTime());
 
     ASSERT_TRUE(storedTime.getTime() == time);
 }
@@ -88,7 +88,7 @@ TEST_F(LogicalClockTestBase, roundtrip) {
 // Verify the reserve ticks functionality.
 TEST_F(LogicalClockTestBase, reserveTicks) {
     auto t1 = getClock()->reserveTicks(1);
-    auto t2(std::move(getClock()->getClusterTime()));
+    auto t2(getClock()->getClusterTime());
     ASSERT_TRUE(t1 == t2.getTime());
 
     auto t3 = getClock()->reserveTicks(1);
@@ -110,7 +110,7 @@ TEST_F(LogicalClockTestBase, advanceClusterTime) {
     t1.addTicks(100);
     SignedLogicalTime l1 = makeSignedLogicalTime(t1);
     ASSERT_OK(getClock()->advanceClusterTime(l1));
-    auto l2(std::move(getClock()->getClusterTime()));
+    auto l2(getClock()->getClusterTime());
     ASSERT_TRUE(l1.getTime() == l2.getTime());
 }
 

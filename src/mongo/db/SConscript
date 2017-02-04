@@ -963,6 +963,7 @@ env.Library(
         'logical_clock.cpp',
     ],
     LIBDEPS=[
+        'service_context',
         'signed_logical_time',
     ],
 )
