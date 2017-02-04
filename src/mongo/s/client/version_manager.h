@@ -42,6 +42,7 @@ public:
     VersionManager() {}
 
     bool isVersionableCB(DBClientBase*);
+    bool forceRemoteCheckShardVersionCB(OperationContext* txn, const std::string&);
     bool checkShardVersionCB(OperationContext*, DBClientBase*, const std::string&, bool, int);
     bool checkShardVersionCB(OperationContext*, ShardConnection*, bool, int);
     void resetShardVersionCB(DBClientBase*);

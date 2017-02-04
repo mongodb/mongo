@@ -538,13 +538,14 @@ Status Balancer::_enforceTagRanges(OperationContext* txn) {
             return scopedCMStatus.getStatus();
         }
 
-        const auto& scopedCM = scopedCMStatus.getValue();
+        auto scopedCM = std::move(scopedCMStatus.getValue());
+        ChunkManager* const cm = scopedCM.cm();
 
         auto splitStatus =
             shardutil::splitChunkAtMultiplePoints(txn,
                                                   splitInfo.shardId,
                                                   splitInfo.nss,
-                                                  scopedCM.cm()->getShardKeyPattern(),
+                                                  cm->getShardKeyPattern(),
                                                   splitInfo.collectionVersion,
                                                   ChunkRange(splitInfo.minKey, splitInfo.maxKey),
                                                   splitInfo.splitKeys);
@@ -612,17 +613,17 @@ int Balancer::_moveChunks(OperationContext* txn,
 void Balancer::_splitOrMarkJumbo(OperationContext* txn,
                                  const NamespaceString& nss,
                                  const BSONObj& minKey) {
-    auto scopedCM = uassertStatusOK(ScopedChunkManager::refreshAndGet(txn, nss));
-    const auto cm = scopedCM.cm().get();
+    auto scopedChunkManager = uassertStatusOK(ScopedChunkManager::refreshAndGet(txn, nss));
+    ChunkManager* const chunkManager = scopedChunkManager.cm();
 
-    auto chunk = cm->findIntersectingChunkWithSimpleCollation(txn, minKey);
+    auto chunk = chunkManager->findIntersectingChunkWithSimpleCollation(txn, minKey);
 
     try {
         const auto splitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(
             txn,
             chunk->getShardId(),
             nss,
-            cm->getShardKeyPattern(),
+            chunkManager->getShardKeyPattern(),
             ChunkRange(chunk->getMin(), chunk->getMax()),
             Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
             boost::none));
@@ -633,8 +634,8 @@ void Balancer::_splitOrMarkJumbo(OperationContext* txn,
             shardutil::splitChunkAtMultiplePoints(txn,
                                                   chunk->getShardId(),
                                                   nss,
-                                                  cm->getShardKeyPattern(),
-                                                  cm->getVersion(),
+                                                  chunkManager->getShardKeyPattern(),
+                                                  chunkManager->getVersion(),
                                                   ChunkRange(chunk->getMin(), chunk->getMax()),
                                                   splitPoints));
     } catch (const DBException& ex) {

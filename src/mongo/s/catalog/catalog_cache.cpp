@@ -41,12 +41,11 @@ namespace mongo {
 using std::shared_ptr;
 using std::string;
 
-CatalogCache::CatalogCache() = default;
 
-CatalogCache::~CatalogCache() = default;
+CatalogCache::CatalogCache() {}
 
-StatusWith<std::shared_ptr<DBConfig>> CatalogCache::getDatabase(OperationContext* txn,
-                                                                StringData dbName) {
+StatusWith<shared_ptr<DBConfig>> CatalogCache::getDatabase(OperationContext* txn,
+                                                           const string& dbName) {
     stdx::lock_guard<stdx::mutex> guard(_mutex);
 
     ShardedDatabasesMap::iterator it = _databases.find(dbName);
@@ -55,26 +54,25 @@ StatusWith<std::shared_ptr<DBConfig>> CatalogCache::getDatabase(OperationContext
     }
 
     // Need to load from the store
-    auto status = Grid::get(txn)->catalogClient(txn)->getDatabase(txn, dbName.toString());
+    auto status = Grid::get(txn)->catalogClient(txn)->getDatabase(txn, dbName);
     if (!status.isOK()) {
         return status.getStatus();
     }
 
-    const auto& dbOpTimePair = status.getValue();
-    auto db = std::make_shared<DBConfig>(dbOpTimePair.value, dbOpTimePair.opTime);
+    const auto dbOpTimePair = status.getValue();
+    shared_ptr<DBConfig> db = std::make_shared<DBConfig>(dbOpTimePair.value, dbOpTimePair.opTime);
     try {
         db->load(txn);
     } catch (const DBException& excep) {
         return excep.toStatus();
     }
 
-    auto emplaceResult = _databases.try_emplace(dbName, std::move(db));
-    invariant(emplaceResult.second);
+    invariant(_databases.insert(std::make_pair(dbName, db)).second);
 
-    return emplaceResult.first->second;
+    return db;
 }
 
-void CatalogCache::invalidate(StringData dbName) {
+void CatalogCache::invalidate(const string& dbName) {
     stdx::lock_guard<stdx::mutex> guard(_mutex);
 
     ShardedDatabasesMap::iterator it = _databases.find(dbName);

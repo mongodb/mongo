@@ -477,7 +477,7 @@ public:
                 // If the database has sharding already enabled, we can ignore the error
                 if (status.isOK()) {
                     // Invalidate the output database so it gets reloaded on the next fetch attempt
-                    Grid::get(txn)->catalogCache()->invalidate(outputCollNss.db());
+                    Grid::get(txn)->catalogCache()->invalidate(outputCollNss.db().toString());
                 } else if (status != ErrorCodes::AlreadyInitialized) {
                     uassertStatusOK(status);
                 }

@@ -1012,7 +1012,7 @@ public:
 
         // Note that this implementation will not handle targeting retries and fails when the
         // sharding metadata is too stale
-        auto status = Grid::get(txn)->catalogCache()->getDatabase(txn, nss.db());
+        auto status = Grid::get(txn)->catalogCache()->getDatabase(txn, nss.db().toString());
         if (!status.isOK()) {
             return Status(status.getStatus().code(),
                           str::stream() << "Passthrough command failed: " << command.toString()

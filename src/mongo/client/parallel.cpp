@@ -42,9 +42,10 @@
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_raii.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_exception.h"
@@ -356,7 +357,7 @@ void ParallelSortClusteredCursor::_handleStaleNS(OperationContext* txn,
                                                  const NamespaceString& staleNS,
                                                  bool forceReload,
                                                  bool fullReload) {
-    auto status = Grid::get(txn)->catalogCache()->getDatabase(txn, staleNS.db());
+    auto status = grid.catalogCache()->getDatabase(txn, staleNS.db().toString());
     if (!status.isOK()) {
         warning() << "cannot reload database info for stale namespace " << staleNS.ns();
         return;
@@ -396,7 +397,7 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
 
     // Setup conn
     if (!state->conn) {
-        const auto shard = uassertStatusOK(Grid::get(txn)->shardRegistry()->getShard(txn, shardId));
+        const auto shard = uassertStatusOK(grid.shardRegistry()->getShard(txn, shardId));
         state->conn.reset(new ShardConnection(shard->getConnString(), ns.ns(), manager));
     }
 
@@ -463,6 +464,9 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
     const bool returnPartial = (_qSpec.options() & QueryOption_PartialResults);
     const NamespaceString nss(!_cInfo.isEmpty() ? _cInfo.versionedNS : _qSpec.ns());
 
+    shared_ptr<ChunkManager> manager;
+    shared_ptr<Shard> primary;
+
     string prefix;
     if (MONGO_unlikely(shouldLog(pc))) {
         if (_totalTries > 0) {
@@ -473,21 +477,18 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
     }
     LOG(pc) << prefix << " pcursor over " << _qSpec << " and " << _cInfo;
 
-    shared_ptr<ChunkManager> manager;
-    shared_ptr<Shard> primary;
-
-    {
-        auto scopedCMStatus = ScopedChunkManager::get(txn, nss);
-        if (scopedCMStatus != ErrorCodes::NamespaceNotFound) {
-            uassertStatusOK(scopedCMStatus.getStatus());
-            const auto& scopedCM = scopedCMStatus.getValue();
-            manager = scopedCM.cm();
-            primary = scopedCM.primary();
-        }
-    }
-
     set<ShardId> shardIds;
     string vinfo;
+
+    {
+        shared_ptr<DBConfig> config;
+
+        auto status = grid.catalogCache()->getDatabase(txn, nss.db().toString());
+        if (status.getStatus().code() != ErrorCodes::NamespaceNotFound) {
+            config = uassertStatusOK(status);
+            config->getChunkManagerOrPrimary(txn, nss.ns(), manager, primary);
+        }
+    }
 
     if (manager) {
         if (MONGO_unlikely(shouldLog(pc))) {
@@ -948,8 +949,7 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* txn) {
         _cursors[index].reset(mdata.pcState->cursor.get(), &mdata);
 
         {
-            const auto shard =
-                uassertStatusOK(Grid::get(txn)->shardRegistry()->getShard(txn, i->first));
+            const auto shard = uassertStatusOK(grid.shardRegistry()->getShard(txn, i->first));
             _servers.insert(shard->getConnString().toString());
         }
 

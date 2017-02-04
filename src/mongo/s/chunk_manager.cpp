@@ -518,7 +518,8 @@ StatusWith<shared_ptr<Chunk>> ChunkManager::findIntersectingChunk(OperationConte
 
     // Proactively force a reload on the chunk manager in case it somehow got inconsistent
     const NamespaceString nss(_ns);
-    auto config = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, nss.db()));
+    auto config =
+        uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, nss.db().toString()));
     config->getChunkManagerIfExists(txn, nss.ns(), true);
 
     msgasserted(13141, "Chunk map pointed to incorrect chunk");

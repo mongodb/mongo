@@ -90,23 +90,6 @@ public:
     ~ScopedChunkManager();
 
     /**
-     * If the specified namespace is sharded, returns a ScopedChunkManager initialized with that
-     * collection's routing information. If it is not, the object returned is initialized with the
-     * database primary node on which the unsharded collection must reside.
-     *
-     * Returns NamespaceNotFound if the database does not exist, or any other error indicating
-     * problem communicating with the config server.
-     */
-    static StatusWith<ScopedChunkManager> get(OperationContext* txn, const NamespaceString& nss);
-
-    /**
-     * If the database holding the specified namespace does not exist, creates it and then behaves
-     * like the 'get' method above.
-     */
-    static StatusWith<ScopedChunkManager> getOrCreate(OperationContext* txn,
-                                                      const NamespaceString& nss);
-
-    /**
      * If the specified database and collection do not exist in the cache, tries to load them from
      * the config server and returns a reference. If they are already in the cache, makes a call to
      * the config server to check if there are any incremental updates to the collection chunk
@@ -124,32 +107,20 @@ public:
     }
 
     /**
-     * If the collection is sharded, returns a chunk manager for it. Otherwise, nullptr.
+     * Returns the underlying chunk manager for which we hold reference.
      */
-    std::shared_ptr<ChunkManager> cm() const {
-        return _cm;
-    }
-
-    /**
-     * If the collection is not sharded, returns its primary shard. Otherwise, nullptr.
-     */
-    std::shared_ptr<Shard> primary() const {
-        return _primary;
+    ChunkManager* cm() const {
+        return _cm.get();
     }
 
 private:
     ScopedChunkManager(ScopedShardDatabase db, std::shared_ptr<ChunkManager> cm);
 
-    ScopedChunkManager(ScopedShardDatabase db, std::shared_ptr<Shard> primary);
-
     // Scoped reference to the owning database.
     ScopedShardDatabase _db;
 
-    // Reference to the corresponding chunk manager (if sharded) or null
+    // Reference to the corresponding chunk manager. Never null.
     std::shared_ptr<ChunkManager> _cm;
-
-    // Reference to the primary of the database (if not sharded) or null
-    std::shared_ptr<Shard> _primary;
 };
 
 }  // namespace mongo
