@@ -185,7 +185,7 @@ TEST_F(CheckQuorumForInitiate, ValidSingleNodeInternalHostSet) {
                                                        << BSON_ARRAY(BSON("_id" << 1
                                                                          << "host"
                                                                          << "h1"
-                                                                         << "hostinternal"
+                                                                         << "hostInternal"
                                                                          << "p1"
                                                                        ))));
      startQuorumCheck(config, 0);

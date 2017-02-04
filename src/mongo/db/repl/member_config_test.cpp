@@ -81,7 +81,7 @@ TEST(MemberConfig, ParseFailWithJustInternalHost) {
      ReplicaSetTagConfig tagConfig;
      MemberConfig mc;
      ASSERT_EQUALS(ErrorCodes::NoSuchKey,
-                mc.initialize(BSON("hostinternal" << "localhost:12345"),
+                mc.initialize(BSON("hostInternal" << "localhost:12345"),
                               &tagConfig  ));
 }
 
@@ -126,7 +126,7 @@ TEST(MemberConfig, ParseFailsWithBadHostField) {
                                 &tagConfig));
     ASSERT_EQUALS(ErrorCodes::FailedToParse,
                   mc.initialize(BSON("_id" << 0 <<
-                                     "host" << "myhost:12345"
+                                     "host" << "myhost:12345" <<
                                      "hostInternal" << "myhost:zabc"),
                                 &tagConfig));
 }

@@ -1147,7 +1147,7 @@ bool operator==(const MemberConfig& a, const MemberConfig& b) {
     }
     return a.getId() == b.getId() && a.getHostAndPort() == b.getHostAndPort() &&
         a.getPriority() == b.getPriority() && a.getSlaveDelay() == b.getSlaveDelay() &&
-        a.getHostInternalAndPort() == b.getHostInternalAndPort() &&
+        a.getInternalHostAndPort() == b.getInternalHostAndPort() &&
         a.isVoter() == b.isVoter() && a.isArbiter() == b.isArbiter() &&
         a.isHidden() == b.isHidden() && a.shouldBuildIndexes() == b.shouldBuildIndexes() &&
         a.getNumTags() == b.getNumTags();
@@ -1809,8 +1809,8 @@ TEST(ReplicaSetConfig,  ReplSetHostInternal){
                                                                       BSON("_id" << 0
                                                                             << "host" << "localhost:12345"
                                                                             << "priority"<< 1
-                                                                            << "hostinternal" << "127.0.0.1:12345")
-                                                                       )
+                                                                            << "hostInternal" << "127.0.0.1:12345")
+                                                                       )));
     ASSERT_EQUALS(Status::OK(), status);
     ASSERT_OK(configLocal.validate());
     ASSERT_TRUE(configLocal.hasReplicaSetId());
@@ -1826,7 +1826,7 @@ TEST(ReplicaSetConfig, ReplSetOnlyHostInternal){
                                                 << "version" << 1
                                                 << "members" << BSON_ARRAY(
                                                                   BSON("_id" << 0
-                                                                      << "hostinternal" << "127.0.0.1:12345"))
+                                                                      << "hostInternal" << "127.0.0.1:12345"))
                                                 ));
   ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
   //check that it's not valid

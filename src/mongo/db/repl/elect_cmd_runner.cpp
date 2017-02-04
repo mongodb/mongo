@@ -108,7 +108,7 @@ void ElectCmdRunner::Algorithm::processResponse(const RemoteCommandRequest& requ
     ++_actualResponses;
 
     if (response.isOK()) {
-        BSONObj res = response.getValue().data;
+        BSONObj res = response.data;
         log() << "received " << res["vote"] << " votes from " << request.target;
         LOG(1) << "full elect res: " << res.toString();
         BSONElement vote(res["vote"]);
@@ -122,7 +122,7 @@ void ElectCmdRunner::Algorithm::processResponse(const RemoteCommandRequest& requ
         _receivedVotes += vote._numberInt();
     } else {
         warning() << "elect command to " << request.target << " failed: "
-                  << response.getStatus();
+                  << response.status;
     }
 }
 
