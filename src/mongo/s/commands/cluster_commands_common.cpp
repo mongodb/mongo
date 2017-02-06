@@ -35,10 +35,12 @@
 #include "mongo/client/parallel.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/version_manager.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_raii.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 
@@ -46,6 +48,26 @@ namespace mongo {
 
 using std::shared_ptr;
 using std::string;
+
+namespace {
+
+bool forceRemoteCheckShardVersionCB(OperationContext* txn, const string& ns) {
+    const NamespaceString nss(ns);
+
+    // This will force the database catalog entry to be reloaded
+    Grid::get(txn)->catalogCache()->invalidate(nss.db());
+
+    auto scopedCMStatus = ScopedChunkManager::get(txn, nss);
+    if (!scopedCMStatus.isOK()) {
+        return false;
+    }
+
+    const auto& scopedCM = scopedCMStatus.getValue();
+
+    return scopedCM.cm() != nullptr;
+}
+
+}  // namespace
 
 Future::CommandResult::CommandResult(const string& server,
                                      const string& db,
@@ -133,7 +155,7 @@ bool Future::CommandResult::join(OperationContext* txn, int maxRetries) {
             }
 
             if (i >= maxRetries / 2) {
-                if (!versionManager.forceRemoteCheckShardVersionCB(txn, staleNS)) {
+                if (!forceRemoteCheckShardVersionCB(txn, staleNS)) {
                     error() << "Future::spawnCommand (part 2) no config detected"
                             << causedBy(redact(e));
                     throw e;
