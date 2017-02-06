@@ -218,7 +218,7 @@ public:
         }
 
         {
-            stdx::lock_guard<Client>(*txn->getClient());
+            stdx::lock_guard<Client> lk(*txn->getClient());
             CurOp::get(txn)->setPlanSummary_inlock(
                 Explain::getPlanSummary(executor.getValue().get()));
         }

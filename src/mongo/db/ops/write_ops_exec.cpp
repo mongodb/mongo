@@ -419,7 +419,7 @@ WriteResult performInserts(OperationContext* txn, const InsertOp& wholeOp) {
     });
 
     {
-        stdx::lock_guard<Client>(*txn->getClient());
+        stdx::lock_guard<Client> lk(*txn->getClient());
         curOp.setNS_inlock(wholeOp.ns.ns());
         curOp.setLogicalOp_inlock(LogicalOp::opInsert);
         curOp.ensureStarted();
@@ -534,7 +534,7 @@ static WriteResult::SingleResult performSingleUpdateOp(OperationContext* txn,
         getExecutorUpdate(txn, &curOp.debug(), collection->getCollection(), &parsedUpdate));
 
     {
-        stdx::lock_guard<Client>(*txn->getClient());
+        stdx::lock_guard<Client> lk(*txn->getClient());
         CurOp::get(txn)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
     }
 
@@ -580,7 +580,7 @@ WriteResult performUpdates(OperationContext* txn, const UpdateOp& wholeOp) {
         Command* cmd = parentCurOp.getCommand();
         CurOp curOp(txn);
         {
-            stdx::lock_guard<Client>(*txn->getClient());
+            stdx::lock_guard<Client> lk(*txn->getClient());
             curOp.setCommand_inlock(cmd);
         }
         ON_BLOCK_EXIT([&] { finishCurOp(txn, &curOp); });
@@ -645,7 +645,7 @@ static WriteResult::SingleResult performSingleDeleteOp(OperationContext* txn,
         getExecutorDelete(txn, &curOp.debug(), collection.getCollection(), &parsedDelete));
 
     {
-        stdx::lock_guard<Client>(*txn->getClient());
+        stdx::lock_guard<Client> lk(*txn->getClient());
         CurOp::get(txn)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
     }
 
@@ -687,7 +687,7 @@ WriteResult performDeletes(OperationContext* txn, const DeleteOp& wholeOp) {
         Command* cmd = parentCurOp.getCommand();
         CurOp curOp(txn);
         {
-            stdx::lock_guard<Client>(*txn->getClient());
+            stdx::lock_guard<Client> lk(*txn->getClient());
             curOp.setCommand_inlock(cmd);
         }
         ON_BLOCK_EXIT([&] { finishCurOp(txn, &curOp); });
