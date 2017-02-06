@@ -301,7 +301,7 @@ public:
 
         auto planSummary = Explain::getPlanSummary(exec);
         {
-            stdx::lock_guard<Client>(*txn->getClient());
+            stdx::lock_guard<Client> lk(*txn->getClient());
             CurOp::get(txn)->setPlanSummary_inlock(planSummary);
         }
 

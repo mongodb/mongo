@@ -886,7 +886,7 @@ bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, 
     curop.debug().cursorid = cursorid;
 
     {
-        stdx::lock_guard<Client>(*txn->getClient());
+        stdx::lock_guard<Client> lk(*txn->getClient());
         CurOp::get(txn)->setNS_inlock(ns);
     }
 
@@ -1158,7 +1158,7 @@ void receivedInsert(OperationContext* txn, const NamespaceString& nsString, Mess
     DbMessage d(m);
     const char* ns = d.getns();
     {
-        stdx::lock_guard<Client>(*txn->getClient());
+        stdx::lock_guard<Client> lk(*txn->getClient());
         CurOp::get(txn)->setNS_inlock(nsString.ns());
     }
 

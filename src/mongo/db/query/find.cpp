@@ -171,7 +171,7 @@ void endQueryOp(OperationContext* txn,
     if (dbProfilingLevel > 0 || curop->elapsedMillis() > serverGlobalParams.slowMS ||
         logger::globalLogDomain()->shouldLog(commandLogComponent, logLevelOne)) {
         // Generate plan summary string.
-        stdx::lock_guard<Client>(*txn->getClient());
+        stdx::lock_guard<Client> lk(*txn->getClient());
         curop->setPlanSummary_inlock(Explain::getPlanSummary(&exec));
     }
 
@@ -389,7 +389,7 @@ QueryResult::View getMore(OperationContext* txn,
 
         auto planSummary = Explain::getPlanSummary(exec);
         {
-            stdx::lock_guard<Client>(*txn->getClient());
+            stdx::lock_guard<Client> lk(*txn->getClient());
             curop.setPlanSummary_inlock(planSummary);
         }
 
