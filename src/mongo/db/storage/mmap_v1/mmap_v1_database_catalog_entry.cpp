@@ -34,6 +34,8 @@
 
 #include <utility>
 
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_access_method.h"
@@ -307,6 +309,13 @@ Status MMAPV1DatabaseCatalogEntry::renameCollection(OperationContext* txn,
             if (!s.isOK())
                 return s;
         }
+        // Invalidate index record for the old collection.
+        StringData dbName(nsToDatabaseSubstring(_collections.begin()->first));
+        invariant(txn->lockState()->isDbLockedForMode(dbName, MODE_X));
+        Database* db = dbHolder().get(txn, dbName);
+        Collection* systemIndexes = db->getCollection(db->getSystemIndexesName());
+        systemIndexes->getCursorManager()->invalidateDocument(
+            txn, record->id, INVALIDATION_DELETION);
 
         systemIndexRecordStore->deleteRecord(txn, record->id);
     }
