@@ -570,7 +570,8 @@ void CollectionCloner::_insertDocumentsCallback(
 }
 
 void CollectionCloner::_finishCallback(const Status& status) {
-    LOG(1) << "CollectionCloner ns:" << _destNss << " finished with status: " << redact(status);
+    log() << "CollectionCloner ns:" << _destNss
+          << " finished cloning with status: " << redact(status);
     // Copy the status so we can change it below if needed.
     auto finalStatus = status;
     bool callCollectionLoader = false;
@@ -590,7 +591,7 @@ void CollectionCloner::_finishCallback(const Status& status) {
         if (finalStatus.isOK()) {
             const auto loaderStatus = _collLoader->commit();
             if (!loaderStatus.isOK()) {
-                warning() << "Failed to commit changes to collection " << _destNss.ns() << ": "
+                warning() << "Failed to commit collection indexes " << _destNss.ns() << ": "
                           << redact(loaderStatus);
                 finalStatus = loaderStatus;
             }
