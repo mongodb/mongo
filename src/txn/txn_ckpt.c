@@ -181,7 +181,7 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 	int (*op)(WT_SESSION_IMPL *, const char *[]))
 {
 	WT_DECL_RET;
-	u_int i, j;
+	u_int i;
 
 	/* If we have already locked the handles, apply the operation. */
 	for (i = 0; i < session->ckpt_handle_next; ++i) {
@@ -189,22 +189,10 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 			continue;
 		WT_WITH_DHANDLE(session, session->ckpt_handle[i],
 		    ret = (*op)(session, cfg));
-		WT_ERR(ret);
+		WT_RET(ret);
 	}
 
-err:
-	/*
-	 * If we have an error somewhere in processing the handles, then
-	 * we need to mark earlier trees dirty.
-	 */
-	if (ret != 0)
-		for (j = 0; j < i; ++j) {
-			if (session->ckpt_handle[j] == NULL)
-				continue;
-			WT_WITH_DHANDLE(session, session->ckpt_handle[j],
-			    S2BT(session)->modified = true);
-		}
-	return (ret);
+	return (0);
 }
 
 /*
@@ -555,7 +543,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	void *saved_meta_next;
 	u_int i;
 	uint64_t fsync_duration_usecs;
-	bool full, idle, logging, tracking;
+	bool failed, full, idle, logging, tracking;
 	const char *txn_cfg[] = { WT_CONFIG_BASE(session,
 	    WT_SESSION_begin_transaction), "isolation=snapshot", NULL };
 
@@ -836,12 +824,13 @@ err:	/*
 	 * overwritten the checkpoint, so what ends up on disk is not
 	 * consistent.
 	 */
-	if (ret != 0)
+	failed = ret != 0;
+	if (failed)
 		conn->modified = true;
 
 	session->isolation = txn->isolation = WT_ISO_READ_UNCOMMITTED;
 	if (tracking)
-		WT_TRET(__wt_meta_track_off(session, false, ret != 0));
+		WT_TRET(__wt_meta_track_off(session, false, failed));
 
 	cache->eviction_scrub_limit = 0.0;
 	WT_STAT_CONN_SET(session, txn_checkpoint_scrub_target, 0);
@@ -874,6 +863,13 @@ err:	/*
 	for (i = 0; i < session->ckpt_handle_next; ++i) {
 		if (session->ckpt_handle[i] == NULL)
 			continue;
+		/*
+		 * If the operation failed, mark all trees dirty so they are
+		 * included if a future checkpoint can succeed.
+		 */
+		if (failed)
+			WT_WITH_DHANDLE(session, session->ckpt_handle[i],
+			    S2BT(session)->modified = true);
 		WT_WITH_DHANDLE(session, session->ckpt_handle[i],
 		    WT_TRET(__wt_session_release_btree(session)));
 	}
