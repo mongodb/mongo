@@ -126,7 +126,7 @@ load_dump(WT_SESSION *session)
 	    append ? ",append" : "", no_overwrite ? ",overwrite=false" : "");
 	if ((ret = session->open_cursor(
 	    session, uri, NULL, config, &cursor)) != 0) {
-		ret = util_err(session, ret, "%s: session.open", uri);
+		ret = util_err(session, ret, "%s: session.open_cursor", uri);
 		goto err;
 	}
 

@@ -55,7 +55,7 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 		objname = (char *)"";
 		break;
 	case 1:
-		if ((objname = util_name(session, *argv, "table")) == NULL)
+		if ((objname = util_uri(session, *argv, "table")) == NULL)
 			return (1);
 		objname_free = true;
 		break;
@@ -82,8 +82,8 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 	    (ret = cursor->next(cursor)) == 0 &&
 	    (ret = cursor->get_value(cursor, &desc, &pval, NULL)) == 0)
 		if (printf("%s=%s\n", desc, pval) < 0) {
-			ret = errno;
-			break;
+			(void)util_err(session, errno, "printf");
+			goto err;
 		}
 	if (ret == WT_NOTFOUND)
 		ret = 0;

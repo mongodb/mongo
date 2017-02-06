@@ -2905,7 +2905,7 @@ wtperf_rand(WTPERF_THREAD *thread)
 	 * If we have a random cursor set up then use it.
 	 */
 	if ((rnd_cursor = thread->rand_cursor) != NULL) {
-		if ((ret = rnd_cursor->next(rnd_cursor))) {
+		if ((ret = rnd_cursor->next(rnd_cursor)) != 0) {
 			lprintf(wtperf, ret, 0, "worker: rand next failed");
 			/* 0 is outside the expected range. */
 			return (0);

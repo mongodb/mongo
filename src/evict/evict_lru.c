@@ -198,8 +198,7 @@ __wt_evict_list_clear_page(WT_SESSION_IMPL *session, WT_REF *ref)
 			}
 		__wt_spin_unlock(session, &cache->evict_queues[q].evict_lock);
 	}
-	WT_ASSERT(session,
-	    !F_ISSET_ATOMIC(ref->page, WT_PAGE_EVICT_LRU));
+	WT_ASSERT(session, !F_ISSET_ATOMIC(ref->page, WT_PAGE_EVICT_LRU));
 
 	__wt_spin_unlock(session, &cache->evict_queue_lock);
 }
@@ -1781,7 +1780,7 @@ fast:		/* If the page can't be evicted, give up. */
 		++pages_queued;
 
 		if (WT_PAGE_IS_INTERNAL(page))
-		    ++internal_pages;
+			++internal_pages;
 
 		__wt_verbose(session, WT_VERB_EVICTSERVER,
 		    "select: %p, size %" WT_SIZET_FMT,

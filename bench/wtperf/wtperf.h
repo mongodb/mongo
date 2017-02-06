@@ -245,7 +245,6 @@ struct __wtperf_thread {		/* Per-thread structure */
 	TRACK ckpt;			/* Checkpoint operations */
 	TRACK insert;			/* Insert operations */
 	TRACK read;			/* Read operations */
-	TRACK scan;			/* Scan operations */
 	TRACK update;			/* Update operations */
 	TRACK truncate;			/* Truncate operations */
 	TRACK truncate_sleep;		/* Truncate sleep operations */
