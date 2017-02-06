@@ -658,8 +658,6 @@ var ShardingTest = function(params) {
             c = "" + collName;
         }
 
-        var isEmpty = (this.s.getCollection(c).count() == 0);
-
         if (!_isSharded(dbName)) {
             this.s.adminCommand({enableSharding: dbName});
         }

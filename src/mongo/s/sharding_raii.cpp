@@ -34,6 +34,7 @@
 #include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
@@ -81,7 +82,46 @@ StatusWith<ScopedShardDatabase> ScopedShardDatabase::getOrCreate(OperationContex
 ScopedChunkManager::ScopedChunkManager(ScopedShardDatabase db, std::shared_ptr<ChunkManager> cm)
     : _db(std::move(db)), _cm(std::move(cm)) {}
 
+ScopedChunkManager::ScopedChunkManager(ScopedShardDatabase db, std::shared_ptr<Shard> primary)
+    : _db(std::move(db)), _primary(std::move(primary)) {}
+
 ScopedChunkManager::~ScopedChunkManager() = default;
+
+StatusWith<ScopedChunkManager> ScopedChunkManager::get(OperationContext* txn,
+                                                       const NamespaceString& nss) {
+    auto scopedDbStatus = ScopedShardDatabase::getExisting(txn, nss.db());
+    if (!scopedDbStatus.isOK()) {
+        return scopedDbStatus.getStatus();
+    }
+
+    auto scopedDb = std::move(scopedDbStatus.getValue());
+
+    auto cm = scopedDb.db()->getChunkManagerIfExists(txn, nss.ns());
+    if (cm) {
+        return {ScopedChunkManager(std::move(scopedDb), std::move(cm))};
+    }
+
+    auto shardStatus =
+        Grid::get(txn)->shardRegistry()->getShard(txn, scopedDb.db()->getPrimaryId());
+    if (!shardStatus.isOK()) {
+        return {ErrorCodes::fromInt(40371),
+                str::stream() << "The primary shard for collection " << nss.ns()
+                              << " could not be loaded due to error "
+                              << shardStatus.getStatus().toString()};
+    }
+
+    return {ScopedChunkManager(std::move(scopedDb), std::move(shardStatus.getValue()))};
+}
+
+StatusWith<ScopedChunkManager> ScopedChunkManager::getOrCreate(OperationContext* txn,
+                                                               const NamespaceString& nss) {
+    auto scopedDbStatus = ScopedShardDatabase::getOrCreate(txn, nss.db());
+    if (!scopedDbStatus.isOK()) {
+        return scopedDbStatus.getStatus();
+    }
+
+    return ScopedChunkManager::get(txn, nss);
+}
 
 StatusWith<ScopedChunkManager> ScopedChunkManager::refreshAndGet(OperationContext* txn,
                                                                  const NamespaceString& nss) {

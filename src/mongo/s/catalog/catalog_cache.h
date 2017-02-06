@@ -28,12 +28,12 @@
 
 #pragma once
 
-#include <map>
 #include <memory>
-#include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/string_data.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -41,7 +41,6 @@ class DBConfig;
 class OperationContext;
 template <typename T>
 class StatusWith;
-
 
 /**
  * This is the root of the "read-only" hierarchy of cached catalog metadata. It is read only
@@ -53,24 +52,23 @@ class CatalogCache {
 
 public:
     CatalogCache();
+    ~CatalogCache();
 
     /**
-     * Retrieves the cached metadata for the specified database. The returned value is still
-     * owned by the cache and it should not be cached elsewhere, but instead only used as a
-     * local variable. The reason for this is so that if the cache gets invalidated, the caller
-     * does not miss getting the most up-to-date value.
+     * Retrieves the cached metadata for the specified database. The returned value is still owned
+     * by the cache and should not be kept elsewhere. I.e., it should only be used as a local
+     * variable. The reason for this is so that if the cache gets invalidated, the caller does not
+     * miss getting the most up-to-date value.
      *
-     * @param dbname The name of the database (must not contain dots, etc).
-     * @return The database if it exists, NULL otherwise.
+     * Returns the database cache entry if the database exists or a failed status otherwise.
      */
-    StatusWith<std::shared_ptr<DBConfig>> getDatabase(OperationContext* txn,
-                                                      const std::string& dbName);
+    StatusWith<std::shared_ptr<DBConfig>> getDatabase(OperationContext* txn, StringData dbName);
 
     /**
      * Removes the database information for the specified name from the cache, so that the
      * next time getDatabase is called, it will be reloaded.
      */
-    void invalidate(const std::string& dbName);
+    void invalidate(StringData dbName);
 
     /**
      * Purges all cached database information, which will cause the data to be reloaded again.
@@ -78,10 +76,11 @@ public:
     void invalidateAll();
 
 private:
-    typedef std::map<std::string, std::shared_ptr<DBConfig>> ShardedDatabasesMap;
+    using ShardedDatabasesMap = StringMap<std::shared_ptr<DBConfig>>;
 
-    // Databases catalog map and mutex to protect it
+    // Mutex to serialize access to the structures below
     stdx::mutex _mutex;
+
     ShardedDatabasesMap _databases;
 };
 

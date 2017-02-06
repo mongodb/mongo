@@ -1,4 +1,4 @@
-/*
+/**
  *    Copyright (C) 2010 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -57,7 +57,6 @@
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/client/version_manager.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
@@ -327,10 +326,11 @@ void Strategy::clientCommandOp(OperationContext* txn, const NamespaceString& nss
 
             ShardConnection::checkMyConnectionVersions(txn, staleNS);
             if (loops < 4) {
-                if (!versionManager.forceRemoteCheckShardVersionCB(txn, staleNS)) {
-                    LOG(1) << "Database does not exist or collection no longer sharded after a "
-                              "StaleConfigException.";
-                }
+                // This throws out the entire database cache entry in response to
+                // StaleConfigException instead of just the collection which encountered it. There
+                // is no good reason for it other than the lack of lower-granularity cache
+                // invalidation.
+                Grid::get(txn)->catalogCache()->invalidate(NamespaceString(staleNS).db());
             }
         } catch (const DBException& e) {
             OpQueryReplyBuilder reply;
@@ -387,7 +387,7 @@ void Strategy::getMore(OperationContext* txn, const NamespaceString& nss, DbMess
     // TODO: Handle stale config exceptions here from coll being dropped or sharded during op for
     // now has same semantics as legacy request.
 
-    auto statusGetDb = Grid::get(txn)->catalogCache()->getDatabase(txn, nss.db().toString());
+    auto statusGetDb = Grid::get(txn)->catalogCache()->getDatabase(txn, nss.db());
     if (statusGetDb == ErrorCodes::NamespaceNotFound) {
         replyToQuery(ResultFlag_CursorNotFound, client->session(), dbm->msg(), 0, 0, 0);
         return;
