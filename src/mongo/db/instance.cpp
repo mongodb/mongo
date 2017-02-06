@@ -465,7 +465,7 @@ bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, 
     curop.debug().cursorid = cursorid;
 
     {
-        stdx::lock_guard<Client>(*txn->getClient());
+        stdx::lock_guard<Client> lk(*txn->getClient());
         CurOp::get(txn)->setNS_inlock(ns);
     }
 

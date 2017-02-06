@@ -69,7 +69,7 @@ private:
                 {
                     // Set the namespace of the curop back to the view namespace so ctx records
                     // stats on this view namespace on destruction.
-                    stdx::lock_guard<Client>(*txn->getClient());
+                    stdx::lock_guard<Client> lk(*txn->getClient());
                     CurOp::get(txn)->setNS_inlock(nss.ns());
                 }
                 return status;
