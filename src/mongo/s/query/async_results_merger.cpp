@@ -362,9 +362,10 @@ StatusWith<executor::TaskExecutor::EventHandle> AsyncResultsMerger::nextEvent() 
     auto eventToReturn = eventStatus.getValue();
     _currentEvent = eventToReturn;
 
-    // It's possible that after we told the caller we had no ready results but before the call to
-    // this method, new results became available. In this case we have to signal the event right
-    // away so that the caller will not block.
+    // It's possible that after we told the caller we had no ready results but before we replaced
+    // _currentEvent with a new event, new results became available. In this case we have to signal
+    // the new event right away to propagate the fact that the previous event had been signaled to
+    // the new event.
     signalCurrentEventIfReady_inlock();
 
     return eventToReturn;
