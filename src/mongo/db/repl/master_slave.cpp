@@ -514,7 +514,7 @@ bool ReplSource::handleDuplicateDbName(OperationContext* txn,
     {
         // This is always a GlobalWrite lock (so no ns/db used from the context)
         invariant(txn->lockState()->isW());
-        Lock::TempRelease(txn->lockState());
+        Lock::TempRelease tempRelease(txn->lockState());
 
         // We always log an operation after executing it (never before), so
         // a database list will always be valid as of an oplog entry generated
