@@ -183,7 +183,8 @@ int CollectionRangeDeleter::_doDeletion(OperationContext* txn,
                                                PlanExecutor::YIELD_MANUAL,
                                                InternalPlanner::FORWARD,
                                                InternalPlanner::IXSCAN_FETCH);
-        RecordId rloc; BSONObj obj;
+        RecordId rloc;
+        BSONObj obj;
         PlanExecutor::ExecState state = exec->getNext(&obj, &rloc);
         if (state == PlanExecutor::IS_EOF) {
             break;
