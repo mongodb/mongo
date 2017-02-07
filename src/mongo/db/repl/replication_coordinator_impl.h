@@ -343,11 +343,17 @@ public:
      */
     Date_t getElectionTimeout_forTest() const;
 
-    /**
-     * Returns scheduled time of priority takeover callback.
-     * Returns Date_t() if callback is not scheduled.
+    /*
+     * Return a randomized offset amount that is scaled in proportion to the size of the
+     * _electionTimeoutPeriod.
      */
-    Date_t getPriorityTakeover_forTest() const;
+    Milliseconds getRandomizedElectionOffset_forTest();
+
+    /**
+     * Returns the scheduled time of the priority takeover callback. If a priority
+     * takeover has not been scheduled, returns boost::none.
+     */
+    boost::optional<Date_t> getPriorityTakeover_forTest() const;
 
     /**
      * Simple wrappers around _setLastOptime_inlock to make it easier to test.
@@ -725,6 +731,12 @@ private:
     void _trackHeartbeatHandle(const StatusWith<ReplicationExecutor::CallbackHandle>& handle);
 
     void _untrackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle);
+
+    /*
+     * Return a randomized offset amount that is scaled in proportion to the size of the
+     * _electionTimeoutPeriod. Used to add randomization to an election timeout.
+     */
+    Milliseconds _getRandomizedElectionOffset();
 
     /**
      * Helper for _handleHeartbeatResponse.

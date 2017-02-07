@@ -72,6 +72,20 @@ MONGO_FP_DECLARE(blockHeartbeatStepdown);
 
 using executor::RemoteCommandRequest;
 
+Milliseconds ReplicationCoordinatorImpl::_getRandomizedElectionOffset() {
+    long long electionTimeout = durationCount<Milliseconds>(_rsConfig.getElectionTimeoutPeriod());
+    long long randomOffsetUpperBound =
+        electionTimeout * _externalState->getElectionTimeoutOffsetLimitFraction();
+
+    // Avoid divide by zero error in random number generator.
+    if (randomOffsetUpperBound == 0) {
+        return Milliseconds(0);
+    }
+
+    int64_t randomOffset = _replExecutor.nextRandomInt64(randomOffsetUpperBound);
+    return Milliseconds(randomOffset);
+}
+
 void ReplicationCoordinatorImpl::_doMemberHeartbeat(ReplicationExecutor::CallbackArgs cbData,
                                                     const HostAndPort& target,
                                                     int targetIndex) {
@@ -276,9 +290,13 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
         }
         case HeartbeatResponseAction::PriorityTakeover: {
             stdx::unique_lock<stdx::mutex> lk(_mutex);
+            // Don't schedule a takeover if one is already scheduled.
             if (!_priorityTakeoverCbh.isValid()) {
-                _priorityTakeoverWhen =
-                    _replExecutor.now() + _rsConfig.getPriorityTakeoverDelay(_selfIndex);
+
+                // Add randomized offset to calculated priority takeover delay.
+                Milliseconds priorityTakeoverDelay = _rsConfig.getPriorityTakeoverDelay(_selfIndex);
+                Milliseconds randomOffset = _getRandomizedElectionOffset();
+                _priorityTakeoverWhen = _replExecutor.now() + priorityTakeoverDelay + randomOffset;
                 log() << "Scheduling priority takeover at " << _priorityTakeoverWhen;
                 _priorityTakeoverCbh = _scheduleWorkAt(
                     _priorityTakeoverWhen,
@@ -803,9 +821,7 @@ void ReplicationCoordinatorImpl::_cancelAndRescheduleElectionTimeout_inlock() {
         return;
     }
 
-    Milliseconds randomOffset = Milliseconds(_replExecutor.nextRandomInt64(
-        durationCount<Milliseconds>(_rsConfig.getElectionTimeoutPeriod()) *
-        _externalState->getElectionTimeoutOffsetLimitFraction()));
+    Milliseconds randomOffset = _getRandomizedElectionOffset();
     auto now = _replExecutor.now();
     auto when = now + _rsConfig.getElectionTimeoutPeriod() + randomOffset;
     invariant(when > now);
