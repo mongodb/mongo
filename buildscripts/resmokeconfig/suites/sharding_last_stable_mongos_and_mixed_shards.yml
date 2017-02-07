@@ -88,6 +88,8 @@ selector:
     - jstests/sharding/read_committed_lookup.js
     # SERVER-27438: Preserves $comment in OP_QUERY and tests for this change.
     - jstests/sharding/mongos_query_comment.js
+    # Can un-blacklist once BACKPORT-484 is finished and in 3.2 release
+    - jstests/sharding/linearizable_read_concern.js
 
 executor:
   js_test:

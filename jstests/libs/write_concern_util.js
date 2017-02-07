@@ -4,10 +4,10 @@
 
 load("jstests/libs/check_log.js");
 
-// Shards a collection and creates 2 chunks, one on each s of two shards.
-function shardCollectionWithChunks(st, coll) {
+// Shards a collection with 'numDocs' documents and creates 2 chunks, one on each of two shards.
+function shardCollectionWithChunks(st, coll, numDocs) {
     var _db = coll.getDB();
-    var numberDoc = 20;
+    var numberDoc = numDocs || 20;
     coll.ensureIndex({x: 1}, {unique: true});
     st.ensurePrimaryShard(_db.toString(), st.shard0.shardName);
     st.shardColl(
