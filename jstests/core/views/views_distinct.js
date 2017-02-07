@@ -31,26 +31,33 @@
     let identityView = viewsDB.getCollection("identityView");
     let largePopView = viewsDB.getCollection("largePopView");
 
+    function assertIdentityViewDistinctMatchesCollection(key, query) {
+        query = (query === undefined) ? {} : query;
+        const collDistinct = coll.distinct(key, query);
+        const viewDistinct = identityView.distinct(key, query);
+        assert(arrayEq(collDistinct, viewDistinct),
+               "Distinct on a collection did not match distinct on its identity view; got " +
+                   tojson(viewDistinct) + " but expected " + tojson(collDistinct));
+    }
+
     // Test basic distinct requests on known fields without a query.
-    assert(arrayEq(coll.distinct("pop"), identityView.distinct("pop")));
-    assert(arrayEq(coll.distinct("_id"), identityView.distinct("_id")));
+    assertIdentityViewDistinctMatchesCollection("pop");
+    assertIdentityViewDistinctMatchesCollection("_id");
     assert(arrayEq([7, 10], largePopView.distinct("pop")));
     assert(arrayEq(["New York", "Palo Alto"], largePopView.distinct("_id")));
 
     // Test distinct with the presence of a query.
-    assert(arrayEq(coll.distinct("state", {}), identityView.distinct("state", {})));
-    assert(arrayEq(coll.distinct("pop", {pop: {$exists: true}}),
-                   identityView.distinct("pop", {pop: {$exists: true}})));
-    assert(
-        arrayEq(coll.distinct("_id", {state: "CA"}), identityView.distinct("_id", {state: "CA"})));
+    assertIdentityViewDistinctMatchesCollection("state", {});
+    assertIdentityViewDistinctMatchesCollection("pop", {pop: {$exists: true}});
+    assertIdentityViewDistinctMatchesCollection("state", {pop: {$gt: 3}});
+    assertIdentityViewDistinctMatchesCollection("_id", {state: "CA"});
     assert(arrayEq(["CA"], largePopView.distinct("state", {pop: {$gte: 8}})));
     assert(arrayEq([7], largePopView.distinct("pop", {state: "NY"})));
 
     // Test distinct where we expect an empty set response.
-    assert.eq(coll.distinct("nonexistent"), identityView.distinct("nonexistent"));
+    assertIdentityViewDistinctMatchesCollection("nonexistent");
+    assertIdentityViewDistinctMatchesCollection("pop", {pop: {$gt: 1000}});
     assert.eq([], largePopView.distinct("nonexistent"));
-    assert.eq(coll.distinct("pop", {pop: {$gt: 1000}}),
-              identityView.distinct("pop", {pop: {$gt: 1000}}));
     assert.eq([], largePopView.distinct("_id", {state: "FL"}));
 
     // Explain works with distinct.
@@ -61,7 +68,30 @@
     assert.eq(explainPlan["stages"][0]["$cursor"]["queryPlanner"]["namespace"],
               "views_distinct.coll");
 
+    // Distinct commands fail when they try to change the collation of a view.
     assert.commandFailedWithCode(
         viewsDB.runCommand({distinct: "identityView", key: "state", collation: {locale: "en_US"}}),
         ErrorCodes.OptionNotSupportedOnView);
+
+    // Test distinct on nested objects, nested arrays and nullish values.
+    coll.drop();
+    allDocuments = [];
+    allDocuments.push({a: 1, b: [2, 3, [4, 5], {c: 6}], d: {e: [1, 2]}});
+    allDocuments.push({a: [1], b: [2, 3, 4, [5]], c: 6, d: {e: 1}});
+    allDocuments.push({a: [1, 2], b: 3, c: [6], d: [{e: 1}, {e: [1, 2]}]});
+    allDocuments.push({a: [1, 2], b: [4, 5], c: [undefined], d: [1]});
+    allDocuments.push({a: null, b: [4, 5, null, undefined], c: [], d: {e: null}});
+    allDocuments.push({a: undefined, b: null, c: [null], d: {e: undefined}});
+
+    bulk = coll.initializeUnorderedBulkOp();
+    allDocuments.forEach(function(doc) {
+        bulk.insert(doc);
+    });
+    assert.writeOK(bulk.execute());
+
+    assertIdentityViewDistinctMatchesCollection("a");
+    assertIdentityViewDistinctMatchesCollection("b");
+    assertIdentityViewDistinctMatchesCollection("c");
+    assertIdentityViewDistinctMatchesCollection("d");
+    assertIdentityViewDistinctMatchesCollection("e");
 }());
