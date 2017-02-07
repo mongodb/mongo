@@ -66,11 +66,19 @@ TEST(ParsedDistinctTest, ConvertToAggregationNoQuery) {
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
 
     std::vector<BSONObj> expectedPipeline{
+        BSON("$unwind" << BSON("path"
+                               << "$x"
+                               << "preserveNullAndEmptyArrays"
+                               << true)),
         BSON("$group" << BSON("_id" << BSONNULL << "distinct" << BSON("$addToSet"
                                                                       << "$x")))};
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getValue().getPipeline().begin(),
+                      SimpleBSONObjComparator::kInstance.makeEqualTo()));
+    ASSERT(std::equal(ar.getValue().getPipeline().begin(),
+                      ar.getValue().getPipeline().end(),
+                      expectedPipeline.begin(),
                       SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 
@@ -98,11 +106,19 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithQuery) {
 
     std::vector<BSONObj> expectedPipeline{
         BSON("$match" << BSON("z" << 7)),
+        BSON("$unwind" << BSON("path"
+                               << "$y"
+                               << "preserveNullAndEmptyArrays"
+                               << true)),
         BSON("$group" << BSON("_id" << BSONNULL << "distinct" << BSON("$addToSet"
                                                                       << "$y")))};
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getValue().getPipeline().begin(),
+                      SimpleBSONObjComparator::kInstance.makeEqualTo()));
+    ASSERT(std::equal(ar.getValue().getPipeline().begin(),
+                      ar.getValue().getPipeline().end(),
+                      expectedPipeline.begin(),
                       SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 
@@ -129,11 +145,19 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithExplain) {
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
 
     std::vector<BSONObj> expectedPipeline{
+        BSON("$unwind" << BSON("path"
+                               << "$x"
+                               << "preserveNullAndEmptyArrays"
+                               << true)),
         BSON("$group" << BSON("_id" << BSONNULL << "distinct" << BSON("$addToSet"
                                                                       << "$x")))};
     ASSERT(std::equal(expectedPipeline.begin(),
                       expectedPipeline.end(),
                       ar.getValue().getPipeline().begin(),
+                      SimpleBSONObjComparator::kInstance.makeEqualTo()));
+    ASSERT(std::equal(ar.getValue().getPipeline().begin(),
+                      ar.getValue().getPipeline().end(),
+                      expectedPipeline.begin(),
                       SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 
