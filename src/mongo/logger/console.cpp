@@ -236,7 +236,7 @@ std::ostream* windowsOutputStream = getWindowsOutputStream();
 // first logging call writing via the Console will happen elsewhere in
 // the initalizer chain.
 MONGO_INITIALIZER(EnsureIosBaseInitConstructed)(InitializerContext*) {
-    Console();
+    Console forInitializationOnly;
     return Status::OK();
 }
 

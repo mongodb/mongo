@@ -508,7 +508,8 @@ Status Collection::_insertDocuments(OperationContext* txn,
         // X-lock the metadata resource for this capped collection until the end of the WUOW. This
         // prevents the primary from executing with more concurrency than secondaries.
         // See SERVER-21646.
-        Lock::ResourceLock{txn->lockState(), ResourceId(RESOURCE_METADATA, _ns.ns()), MODE_X};
+        Lock::ResourceLock heldUntilEndOfWUOW{
+            txn->lockState(), ResourceId(RESOURCE_METADATA, _ns.ns()), MODE_X};
     }
 
     std::vector<Record> records;
@@ -632,7 +633,8 @@ StatusWith<RecordId> Collection::updateDocument(OperationContext* txn,
         // X-lock the metadata resource for this capped collection until the end of the WUOW. This
         // prevents the primary from executing with more concurrency than secondaries.
         // See SERVER-21646.
-        Lock::ResourceLock{txn->lockState(), ResourceId(RESOURCE_METADATA, _ns.ns()), MODE_X};
+        Lock::ResourceLock heldUntilEndOfWUOW{
+            txn->lockState(), ResourceId(RESOURCE_METADATA, _ns.ns()), MODE_X};
     }
 
     SnapshotId sid = txn->recoveryUnit()->getSnapshotId();

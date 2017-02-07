@@ -286,7 +286,7 @@ void synchronizeOnCappedInFlightResource(Locker* lockState, const NamespaceStrin
                 lockState->isLockHeldForMode(resourceCappedInFlightForOtherDb, MODE_IX));
     }
 
-    Lock::ResourceLock{lockState, resource, MODE_IX};  // held until end of WUOW.
+    Lock::ResourceLock heldUntilEndOfWUOW{lockState, resource, MODE_IX};
 }
 
 }  // namespace mongo
