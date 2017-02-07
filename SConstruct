@@ -2585,7 +2585,7 @@ def doConfigure(myenv):
             """)
 
             context.Message("Checking if pthread_setname_np is supported... ")
-            result = context.TryCompile(compile_test_body, ".c")
+            result = context.TryCompile(compile_test_body, ".cpp")
             context.Result(result)
             return result
 
