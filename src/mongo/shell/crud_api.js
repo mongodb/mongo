@@ -336,7 +336,6 @@ DBCollection.prototype.deleteOne = function(filter, options) {
 
     var r = bulk.execute(writeConcern);
 
-
     if (!result.acknowledged) {
         return result;
     }
