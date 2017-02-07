@@ -174,7 +174,11 @@ int CollectionRangeDeleter::_doDeletion(OperationContext* txn,
 
     int numDeleted = 0;
     do {
-        auto exec = InternalPlanner::indexScan(txn, collection, desc, min, max,
+        auto exec = InternalPlanner::indexScan(txn,
+                                               collection,
+                                               desc,
+                                               min,
+                                               max,
                                                BoundInclusion::kIncludeStartKeyOnly,
                                                PlanExecutor::YIELD_MANUAL,
                                                InternalPlanner::FORWARD,
@@ -186,10 +190,9 @@ int CollectionRangeDeleter::_doDeletion(OperationContext* txn,
         }
         if (state == PlanExecutor::FAILURE || state == PlanExecutor::DEAD) {
             warning(LogComponent::kSharding)
-                << PlanExecutor::statestr(state) << " - cursor error while trying to delete "
-                << min << " to " << max << " in " << _nss << ": "
-                << WorkingSetCommon::toStatusString(obj) << ", stats: "
-                << Explain::getWinningPlanStats(exec.get());
+                << PlanExecutor::statestr(state) << " - cursor error while trying to delete " << min
+                << " to " << max << " in " << _nss << ": " << WorkingSetCommon::toStatusString(obj)
+                << ", stats: " << Explain::getWinningPlanStats(exec.get());
             break;
         }
 

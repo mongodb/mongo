@@ -75,7 +75,8 @@ void CollectionRangeDeleterTest::setUp() {
         AutoGetCollection autoColl(operationContext(), kNamespaceString, MODE_IX);
         auto collectionShardingState =
             CollectionShardingState::get(operationContext(), kNamespaceString);
-        collectionShardingState->refreshMetadata(operationContext(),
+        collectionShardingState->refreshMetadata(
+            operationContext(),
             stdx::make_unique<CollectionMetadata>(kKeyPattern, ChunkVersion(1, 1, OID::gen())));
         _metadataManager = collectionShardingState->getMetadataManagerForTest();
     }
@@ -114,13 +115,13 @@ TEST_F(CollectionRangeDeleterTest, NoDataInGivenRangeToClean) {
 
     _dbDirectClient->insert(kNamespaceString.toString(), insertedDoc);
     ASSERT_BSONOBJ_EQ(insertedDoc,
-                  _dbDirectClient->findOne(kNamespaceString.toString(), QUERY(kPattern << 25)));
+                      _dbDirectClient->findOne(kNamespaceString.toString(), QUERY(kPattern << 25)));
 
     _metadataManager->addRangeToClean(ChunkRange(BSON(kPattern << 0), BSON(kPattern << 10)));
     ASSERT_FALSE(rangeDeleter.cleanupNextRange(operationContext(), 1));
 
     ASSERT_BSONOBJ_EQ(insertedDoc,
-                  _dbDirectClient->findOne(kNamespaceString.toString(), QUERY(kPattern << 25)));
+                      _dbDirectClient->findOne(kNamespaceString.toString(), QUERY(kPattern << 25)));
 }
 
 // Tests the case that there is a single document within a range to clean.
@@ -130,7 +131,7 @@ TEST_F(CollectionRangeDeleterTest, OneDocumentInOneRangeToClean) {
 
     _dbDirectClient->insert(kNamespaceString.toString(), BSON(kPattern << 5));
     ASSERT_BSONOBJ_EQ(insertedDoc,
-                  _dbDirectClient->findOne(kNamespaceString.toString(), QUERY(kPattern << 5)));
+                      _dbDirectClient->findOne(kNamespaceString.toString(), QUERY(kPattern << 5)));
 
     _metadataManager->addRangeToClean(ChunkRange(BSON(kPattern << 0), BSON(kPattern << 10)));
 
