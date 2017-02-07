@@ -128,55 +128,13 @@ public:
             return false;
         }
 
-        Lock::ExclusiveLock(txn->lockState(), commandMutex);
 
         const bool sync =
             !cmdObj["async"].trueValue();  // async means do an fsync, but return immediately
         const bool lock = cmdObj["lock"].trueValue();
         log() << "CMD fsync: sync:" << sync << " lock:" << lock;
-        if (lock) {
-            if (!sync) {
-                errmsg = "fsync: sync option must be true when using lock";
-                return false;
-            }
 
-            const auto lockCountAtStart = getLockCount();
-            invariant(lockCountAtStart > 0 || !_lockThread);
-
-            acquireLock();
-
-            if (lockCountAtStart == 0) {
-
-                Status status = Status::OK();
-                {
-                    stdx::unique_lock<stdx::mutex> lk(lockStateMutex);
-                    threadStatus = Status::OK();
-                    threadStarted = false;
-                    _lockThread = stdx::make_unique<FSyncLockThread>();
-                    _lockThread->go();
-
-                    while (!threadStarted && threadStatus.isOK()) {
-                        acquireFsyncLockSyncCV.wait(lk);
-                    }
-
-                    // 'threadStatus' must be copied while 'lockStateMutex' is held.
-                    status = threadStatus;
-                }
-
-                if (!status.isOK()) {
-                    releaseLock();
-                    warning() << "fsyncLock failed. Lock count reset to 0. Status: " << status;
-                    return appendCommandStatus(result, status);
-                }
-            }
-
-            log() << "mongod is locked and no writes are allowed. db.fsyncUnlock() to unlock";
-            log() << "Lock count is " << getLockCount();
-            log() << "    For more info see " << FSyncCommand::url();
-            result.append("info", "now locked against writes, use db.fsyncUnlock() to unlock");
-            result.append("lockCount", getLockCount());
-            result.append("seeAlso", FSyncCommand::url());
-        } else {
+        if (!lock) {
             // the simple fsync command case
             if (sync) {
                 // can this be GlobalRead? and if it can, it should be nongreedy.
@@ -193,7 +151,52 @@ public:
             Lock::GlobalLock global(txn->lockState(), MODE_IS, UINT_MAX);
             StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
             result.append("numFiles", storageEngine->flushAllFiles(sync));
+            return true;
         }
+
+        Lock::ExclusiveLock lk(txn->lockState(), commandMutex);
+        if (!sync) {
+            errmsg = "fsync: sync option must be true when using lock";
+            return false;
+        }
+
+        const auto lockCountAtStart = getLockCount();
+        invariant(lockCountAtStart > 0 || !_lockThread);
+
+        acquireLock();
+
+        if (lockCountAtStart == 0) {
+
+            Status status = Status::OK();
+            {
+                stdx::unique_lock<stdx::mutex> lk(lockStateMutex);
+                threadStatus = Status::OK();
+                threadStarted = false;
+                _lockThread = stdx::make_unique<FSyncLockThread>();
+                _lockThread->go();
+
+                while (!threadStarted && threadStatus.isOK()) {
+                    acquireFsyncLockSyncCV.wait(lk);
+                }
+
+                // 'threadStatus' must be copied while 'lockStateMutex' is held.
+                status = threadStatus;
+            }
+
+            if (!status.isOK()) {
+                releaseLock();
+                warning() << "fsyncLock failed. Lock count reset to 0. Status: " << status;
+                return appendCommandStatus(result, status);
+            }
+        }
+
+        log() << "mongod is locked and no writes are allowed. db.fsyncUnlock() to unlock";
+        log() << "Lock count is " << getLockCount();
+        log() << "    For more info see " << FSyncCommand::url();
+        result.append("info", "now locked against writes, use db.fsyncUnlock() to unlock");
+        result.append("lockCount", getLockCount());
+        result.append("seeAlso", FSyncCommand::url());
+
         return true;
     }
 
@@ -297,7 +300,7 @@ public:
              BSONObjBuilder& result) override {
         log() << "command: unlock requested";
 
-        Lock::ExclusiveLock(txn->lockState(), commandMutex);
+        Lock::ExclusiveLock lk(txn->lockState(), commandMutex);
 
         if (unlockFsync()) {
             const auto lockCount = fsyncCmd.getLockCount();
