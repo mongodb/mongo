@@ -89,7 +89,8 @@ class ReplicationCoordinatorImpl : public ReplicationCoordinator {
     MONGO_DISALLOW_COPYING(ReplicationCoordinatorImpl);
 
 public:
-    ReplicationCoordinatorImpl(const ReplSettings& settings,
+    ReplicationCoordinatorImpl(ServiceContext* serviceContext,
+                               const ReplSettings& settings,
                                std::unique_ptr<ReplicationCoordinatorExternalState> externalState,
                                std::unique_ptr<executor::NetworkInterface> network,
                                std::unique_ptr<TopologyCoordinator> topoCoord,
@@ -288,6 +289,11 @@ public:
      * Get current term from topology coordinator
      */
     virtual long long getTerm() override;
+
+    // Returns the ServiceContext where this instance runs.
+    virtual ServiceContext* getServiceContext() override {
+        return _service;
+    }
 
     virtual Status updateTerm(OperationContext* txn, long long term) override;
 
@@ -1171,6 +1177,9 @@ private:
     // sending heartbeat requests to that host.  This set is cleared whenever
     // a node discovers that it is a member of a config.
     unordered_set<HostAndPort> _seedList;  // (X)
+
+    // Back pointer to the ServiceContext that has started the instance.
+    ServiceContext* const _service;  // (S)
 
     // Parsed command line arguments related to replication.
     const ReplSettings _settings;  // (R)

@@ -112,15 +112,15 @@ void SyncTailTest::setUp() {
     replSettings.setOplogSizeBytes(5 * 1024 * 1024);
     replSettings.setReplSetString("repl");
 
-    auto serviceContext = getServiceContext();
-    ReplicationCoordinator::set(serviceContext,
-                                stdx::make_unique<ReplicationCoordinatorMock>(replSettings));
+    auto service = getServiceContext();
+    ReplicationCoordinator::set(
+        service, stdx::make_unique<ReplicationCoordinatorMock>(service, replSettings));
     auto storageInterface = stdx::make_unique<StorageInterfaceMock>();
     _storageInterface = storageInterface.get();
     storageInterface->insertDocumentsFn = [](OperationContext*,
                                              const NamespaceString&,
                                              const std::vector<BSONObj>&) { return Status::OK(); };
-    StorageInterface::set(serviceContext, std::move(storageInterface));
+    StorageInterface::set(service, std::move(storageInterface));
 
     _txn = cc().makeOperationContext();
     _opsApplied = 0;

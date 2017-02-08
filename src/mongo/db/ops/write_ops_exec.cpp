@@ -445,7 +445,7 @@ WriteResult performInserts(OperationContext* txn, const InsertOp& wholeOp) {
 
     for (auto&& doc : wholeOp.documents) {
         const bool isLastDoc = (&doc == &wholeOp.documents.back());
-        auto fixedDoc = fixDocumentForInsert(doc);
+        auto fixedDoc = fixDocumentForInsert(txn->getServiceContext(), doc);
         if (!fixedDoc.isOK()) {
             // Handled after we insert anything in the batch to be sure we report errors in the
             // correct order. In an ordered insert, if one of the docs ahead of us fails, we should

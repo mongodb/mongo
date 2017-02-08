@@ -110,7 +110,7 @@ OID ReplicationCoordinatorExternalStateMock::ensureMe(OperationContext*) {
 }
 
 bool ReplicationCoordinatorExternalStateMock::isSelf(const HostAndPort& host,
-                                                     ServiceContext* const ctx) {
+                                                     ServiceContext* const service) {
     return sequenceContains(_selfHosts, host);
 }
 
@@ -178,7 +178,8 @@ void ReplicationCoordinatorExternalStateMock::setLocalLastVoteDocument(
     _localRsLastVoteDocument = localLastVoteDocument;
 }
 
-void ReplicationCoordinatorExternalStateMock::setGlobalTimestamp(const Timestamp& newTime) {}
+void ReplicationCoordinatorExternalStateMock::setGlobalTimestamp(ServiceContext* service,
+                                                                 const Timestamp& newTime) {}
 
 void ReplicationCoordinatorExternalStateMock::cleanUpLastApplyBatch(OperationContext* txn) {}
 

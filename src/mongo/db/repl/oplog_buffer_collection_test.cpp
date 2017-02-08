@@ -69,18 +69,18 @@ private:
 
 void OplogBufferCollectionTest::setUp() {
     ServiceContextMongoDTest::setUp();
-    auto serviceContext = getServiceContext();
+    auto service = getServiceContext();
 
     // AutoGetCollectionForRead requires a valid replication coordinator in order to check the shard
     // version.
     ReplSettings replSettings;
     replSettings.setOplogSizeBytes(5 * 1024 * 1024);
-    ReplicationCoordinator::set(serviceContext,
-                                stdx::make_unique<ReplicationCoordinatorMock>(replSettings));
+    ReplicationCoordinator::set(
+        service, stdx::make_unique<ReplicationCoordinatorMock>(service, replSettings));
 
     auto storageInterface = stdx::make_unique<StorageInterfaceImpl>();
     _storageInterface = storageInterface.get();
-    StorageInterface::set(serviceContext, std::move(storageInterface));
+    StorageInterface::set(service, std::move(storageInterface));
 
     _txn = makeOperationContext();
 }

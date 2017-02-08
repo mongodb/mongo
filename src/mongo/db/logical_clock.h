@@ -88,7 +88,7 @@ private:
      */
     SignedLogicalTime _makeSignedLogicalTime(LogicalTime);
 
-    ServiceContext* _serviceContext;
+    ServiceContext* const _service;
     std::unique_ptr<TimeProofService> _timeProofService;
 
     // the mutex protects _clusterTime

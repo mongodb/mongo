@@ -67,7 +67,8 @@ private:
 void CollectionRangeDeleterTest::setUp() {
     ServiceContextMongoDTest::setUp();
     const repl::ReplSettings replSettings = {};
-    repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
+    repl::setGlobalReplicationCoordinator(
+        new repl::ReplicationCoordinatorMock(getServiceContext(), replSettings));
     repl::getGlobalReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY);
     _opCtx = getServiceContext()->makeOperationContext(&cc());
     _dbDirectClient = stdx::make_unique<DBDirectClient>(operationContext());

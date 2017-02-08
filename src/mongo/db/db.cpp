@@ -893,6 +893,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
     topoCoordOptions.clusterRole = serverGlobalParams.clusterRole;
 
     auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorImpl>(
+        serviceContext,
         getGlobalReplSettings(),
         stdx::make_unique<repl::ReplicationCoordinatorExternalStateImpl>(storageInterface),
         executor::makeNetworkInterface("NetworkInterfaceASIO-Replication"),

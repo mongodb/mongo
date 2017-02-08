@@ -53,12 +53,10 @@ void LogicalClock::set(ServiceContext* service, std::unique_ptr<LogicalClock> cl
     clock = std::move(clockArg);
 }
 
-LogicalClock::LogicalClock(ServiceContext* serviceContext,
+LogicalClock::LogicalClock(ServiceContext* service,
                            std::unique_ptr<TimeProofService> tps,
                            bool validateProof)
-    : _serviceContext(serviceContext),
-      _timeProofService(std::move(tps)),
-      _validateProof(validateProof) {}
+    : _service(service), _timeProofService(std::move(tps)), _validateProof(validateProof) {}
 
 SignedLogicalTime LogicalClock::getClusterTime() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -94,7 +92,7 @@ LogicalTime LogicalClock::reserveTicks(uint64_t ticks) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
     const unsigned wallClockSecs =
-        durationCount<Seconds>(_serviceContext->getFastClockSource()->now().toDurationSinceEpoch());
+        durationCount<Seconds>(_service->getFastClockSource()->now().toDurationSinceEpoch());
     unsigned currentSecs = _clusterTime.getTime().asTimestamp().getSecs();
     LogicalTime clusterTimestamp = _clusterTime.getTime();
 

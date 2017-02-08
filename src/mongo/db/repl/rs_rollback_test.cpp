@@ -77,14 +77,11 @@ ReplSettings createReplSettings() {
 
 class ReplicationCoordinatorRollbackMock : public ReplicationCoordinatorMock {
 public:
-    ReplicationCoordinatorRollbackMock();
-    void resetLastOpTimesFromOplog(OperationContext* txn) override;
+    ReplicationCoordinatorRollbackMock(ServiceContext* service)
+        : ReplicationCoordinatorMock(service, createReplSettings()) {}
+    void resetLastOpTimesFromOplog(OperationContext* txn) override {}
 };
 
-ReplicationCoordinatorRollbackMock::ReplicationCoordinatorRollbackMock()
-    : ReplicationCoordinatorMock(createReplSettings()) {}
-
-void ReplicationCoordinatorRollbackMock::resetLastOpTimesFromOplog(OperationContext* txn) {}
 
 class RollbackSourceMock : public RollbackSource {
 public:
@@ -144,7 +141,7 @@ private:
 void RSRollbackTest::setUp() {
     ServiceContextMongoDTest::setUp();
     _txn = cc().makeOperationContext();
-    _coordinator = new ReplicationCoordinatorRollbackMock();
+    _coordinator = new ReplicationCoordinatorRollbackMock(_txn->getServiceContext());
 
     auto serviceContext = getServiceContext();
     ReplicationCoordinator::set(serviceContext,

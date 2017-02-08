@@ -34,6 +34,7 @@
 #include "mongo/db/ops/field_checker.h"
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -224,7 +225,8 @@ Status ModifierCurrentDate::apply() const {
         if (!s.isOK())
             return s;
     } else {
-        Status s = elemToSet.setValueTimestamp(getNextGlobalTimestamp());
+        ServiceContext* service = getGlobalServiceContext();
+        Status s = elemToSet.setValueTimestamp(getNextGlobalTimestamp(service));
         if (!s.isOK())
             return s;
     }

@@ -81,12 +81,12 @@ public:
     OpTime onTransitionToPrimary(OperationContext* txn, bool isV1ElectionProtocol) override;
     virtual void forwardSlaveProgress();
     virtual OID ensureMe(OperationContext* txn);
-    virtual bool isSelf(const HostAndPort& host, ServiceContext* ctx);
+    virtual bool isSelf(const HostAndPort& host, ServiceContext* service);
     virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
     virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
     virtual StatusWith<LastVote> loadLocalLastVoteDocument(OperationContext* txn);
     virtual Status storeLocalLastVoteDocument(OperationContext* txn, const LastVote& lastVote);
-    virtual void setGlobalTimestamp(const Timestamp& newTime);
+    virtual void setGlobalTimestamp(ServiceContext* service, const Timestamp& newTime);
     virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
     virtual void cleanUpLastApplyBatch(OperationContext* txn);
     virtual HostAndPort getClientHostAndPort(const OperationContext* txn);

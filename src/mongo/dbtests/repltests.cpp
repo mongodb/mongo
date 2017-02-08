@@ -76,7 +76,8 @@ public:
         ReplSettings replSettings;
         replSettings.setOplogSizeBytes(10 * 1024 * 1024);
         replSettings.setMaster(true);
-        setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
+        setGlobalReplicationCoordinator(
+            new repl::ReplicationCoordinatorMock(_txn.getServiceContext(), replSettings));
 
         getGlobalServiceContext()->setOpObserver(stdx::make_unique<OpObserverImpl>());
 
@@ -100,7 +101,8 @@ public:
             deleteAll(cllNS());
             ReplSettings replSettings;
             replSettings.setOplogSizeBytes(10 * 1024 * 1024);
-            setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
+            setGlobalReplicationCoordinator(
+                new repl::ReplicationCoordinatorMock(_txn.getServiceContext(), replSettings));
         } catch (...) {
             FAIL("Exception while cleaning up test");
         }

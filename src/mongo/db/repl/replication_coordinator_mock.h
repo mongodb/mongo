@@ -50,7 +50,7 @@ class ReplicationCoordinatorMock : public ReplicationCoordinator {
     MONGO_DISALLOW_COPYING(ReplicationCoordinatorMock);
 
 public:
-    ReplicationCoordinatorMock(const ReplSettings& settings);
+    ReplicationCoordinatorMock(ServiceContext* service, const ReplSettings& settings);
     virtual ~ReplicationCoordinatorMock();
 
     virtual void startup(OperationContext* txn);
@@ -273,8 +273,13 @@ public:
      */
     void alwaysAllowWrites(bool allowWrites);
 
+    virtual ServiceContext* getServiceContext() override {
+        return _service;
+    }
+
 private:
     AtomicUInt64 _snapshotNameGenerator;
+    ServiceContext* const _service;
     const ReplSettings _settings;
     MemberState _memberState;
     OpTime _myLastDurableOpTime;

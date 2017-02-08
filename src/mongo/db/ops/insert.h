@@ -33,11 +33,13 @@
 
 namespace mongo {
 
+class ServiceContext;
+
 /**
  * if doc is ok, then return is BSONObj()
  * otherwise, BSONObj is what should be inserted instead
  */
-StatusWith<BSONObj> fixDocumentForInsert(const BSONObj& doc);
+StatusWith<BSONObj> fixDocumentForInsert(ServiceContext* service, const BSONObj& doc);
 
 
 /**

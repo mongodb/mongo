@@ -670,9 +670,12 @@ public:
                                 << 8192),
                            info);
 
-        Date_t one = Date_t::fromMillisSinceEpoch(getNextGlobalTimestamp().asLL());
-        Date_t two = Date_t::fromMillisSinceEpoch(getNextGlobalTimestamp().asLL());
-        Date_t three = Date_t::fromMillisSinceEpoch(getNextGlobalTimestamp().asLL());
+        Date_t one =
+            Date_t::fromMillisSinceEpoch(getNextGlobalTimestamp(_txn.getServiceContext()).asLL());
+        Date_t two =
+            Date_t::fromMillisSinceEpoch(getNextGlobalTimestamp(_txn.getServiceContext()).asLL());
+        Date_t three =
+            Date_t::fromMillisSinceEpoch(getNextGlobalTimestamp(_txn.getServiceContext()).asLL());
         insert(ns, BSON("ts" << one));
         insert(ns, BSON("ts" << two));
         insert(ns, BSON("ts" << three));

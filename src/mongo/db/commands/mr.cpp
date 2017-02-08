@@ -759,7 +759,7 @@ void State::insert(const NamespaceString& nss, const BSONObj& o) {
         b.appendElements(o);
         BSONObj bo = b.obj();
 
-        StatusWith<BSONObj> res = fixDocumentForInsert(bo);
+        StatusWith<BSONObj> res = fixDocumentForInsert(_txn->getServiceContext(), bo);
         uassertStatusOK(res.getStatus());
         if (!res.getValue().isEmpty()) {
             bo = res.getValue();

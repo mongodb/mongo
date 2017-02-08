@@ -79,7 +79,7 @@ public:
         OpDebug* const nullOpDebug = nullptr;
         ASSERT(!collection->insertDocument(&_txn, x, nullOpDebug, true).isOK());
 
-        StatusWith<BSONObj> fixed = fixDocumentForInsert(x);
+        StatusWith<BSONObj> fixed = fixDocumentForInsert(_txn.getServiceContext(), x);
         ASSERT(fixed.isOK());
         x = fixed.getValue();
         ASSERT(x["_id"].type() == jstOID);
@@ -96,7 +96,7 @@ public:
         b.append("_id", 1);
         BSONObj o = b.done();
 
-        BSONObj fixed = fixDocumentForInsert(o).getValue();
+        BSONObj fixed = fixDocumentForInsert(_txn.getServiceContext(), o).getValue();
         ASSERT_EQUALS(2, fixed.nFields());
         ASSERT(fixed.firstElement().fieldNameStringData() == "_id");
         ASSERT(fixed.firstElement().number() == 1);
@@ -121,7 +121,7 @@ public:
             o = b.obj();
         }
 
-        BSONObj fixed = fixDocumentForInsert(o).getValue();
+        BSONObj fixed = fixDocumentForInsert(_txn.getServiceContext(), o).getValue();
         ASSERT_EQUALS(3, fixed.nFields());
         ASSERT(fixed.firstElement().fieldNameStringData() == "_id");
         ASSERT(fixed.firstElement().number() == 1);
@@ -143,10 +143,13 @@ public:
 class ValidId : public Base {
 public:
     void run() {
-        ASSERT(fixDocumentForInsert(BSON("_id" << 5)).isOK());
-        ASSERT(fixDocumentForInsert(BSON("_id" << BSON("x" << 5))).isOK());
-        ASSERT(!fixDocumentForInsert(BSON("_id" << BSON("$x" << 5))).isOK());
-        ASSERT(!fixDocumentForInsert(BSON("_id" << BSON("$oid" << 5))).isOK());
+        ASSERT(fixDocumentForInsert(_txn.getServiceContext(), BSON("_id" << 5)).isOK());
+        ASSERT(
+            fixDocumentForInsert(_txn.getServiceContext(), BSON("_id" << BSON("x" << 5))).isOK());
+        ASSERT(
+            !fixDocumentForInsert(_txn.getServiceContext(), BSON("_id" << BSON("$x" << 5))).isOK());
+        ASSERT(!fixDocumentForInsert(_txn.getServiceContext(), BSON("_id" << BSON("$oid" << 5)))
+                    .isOK());
     }
 };
 }  // namespace Insert

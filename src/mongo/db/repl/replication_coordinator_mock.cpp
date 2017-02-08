@@ -44,8 +44,9 @@ namespace repl {
 
 using std::vector;
 
-ReplicationCoordinatorMock::ReplicationCoordinatorMock(const ReplSettings& settings)
-    : _settings(settings) {}
+ReplicationCoordinatorMock::ReplicationCoordinatorMock(ServiceContext* service,
+                                                       const ReplSettings& settings)
+    : _service(service), _settings(settings) {}
 
 ReplicationCoordinatorMock::~ReplicationCoordinatorMock() {}
 

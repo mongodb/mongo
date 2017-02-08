@@ -288,7 +288,7 @@ DataReplicatorOptions createDataReplicatorOptions(
     options.getMyLastOptime = [replCoord]() { return replCoord->getMyLastAppliedOpTime(); };
     options.setMyLastOptime = [replCoord, externalState](const OpTime& opTime) {
         replCoord->setMyLastAppliedOpTime(opTime);
-        externalState->setGlobalTimestamp(opTime.getTimestamp());
+        externalState->setGlobalTimestamp(replCoord->getServiceContext(), opTime.getTimestamp());
     };
     options.getSlaveDelay = [replCoord]() { return replCoord->getSlaveDelaySecs(); };
     options.syncSourceSelector = replCoord;
@@ -306,13 +306,15 @@ std::string ReplicationCoordinatorImpl::SnapshotInfo::toString() const {
 }
 
 ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
+    ServiceContext* service,
     const ReplSettings& settings,
     std::unique_ptr<ReplicationCoordinatorExternalState> externalState,
     std::unique_ptr<NetworkInterface> network,
     std::unique_ptr<TopologyCoordinator> topCoord,
     StorageInterface* storage,
     int64_t prngSeed)
-    : _settings(settings),
+    : _service(service),
+      _settings(settings),
       _replMode(getReplicationModeFromSettings(settings)),
       _topCoord(std::move(topCoord)),
       _replExecutor(std::move(network), prngSeed),
@@ -326,6 +328,9 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _canAcceptNonLocalWrites(!(settings.usingReplSets() || settings.isSlave())),
       _canServeNonLocalReads(0U),
       _storage(storage) {
+
+    invariant(_service);
+
     if (!isReplEnabled()) {
         return;
     }
@@ -466,8 +471,8 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
 
     LockGuard topoLock(_topoMutex);
 
-    StatusWith<int> myIndex = validateConfigForStartUp(
-        _externalState.get(), _rsConfig, localConfig, getGlobalServiceContext());
+    StatusWith<int> myIndex =
+        validateConfigForStartUp(_externalState.get(), _rsConfig, localConfig, getServiceContext());
     if (!myIndex.isOK()) {
         if (myIndex.getStatus() == ErrorCodes::NodeNotFound ||
             myIndex.getStatus() == ErrorCodes::DuplicateKey) {
@@ -530,7 +535,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         lock.unlock();
     }
 
-    _externalState->setGlobalTimestamp(lastOpTime.getTimestamp());
+    _externalState->setGlobalTimestamp(getServiceContext(), lastOpTime.getTimestamp());
     // Step down is impossible, so we don't need to wait for the returned event.
     _updateTerm_incallback(term);
     LOG(1) << "Current term is now " << term;
@@ -2676,7 +2681,7 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
             } else {
                 _electionId = OID::gen();
             }
-            _topCoord->processWinElection(_electionId, getNextGlobalTimestamp());
+            _topCoord->processWinElection(_electionId, getNextGlobalTimestamp(getServiceContext()));
             invariant(!_isCatchingUp);
             invariant(!_isWaitingForDrainToComplete);
             _isCatchingUp = true;
@@ -2871,13 +2876,13 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(const ReplicaSetConfig& n
             // Downgrade
             invariant(newConfig.getProtocolVersion() == 0);
             _electionId = OID::gen();
-            _topCoord->setElectionInfo(_electionId, getNextGlobalTimestamp());
+            _topCoord->setElectionInfo(_electionId, getNextGlobalTimestamp(getServiceContext()));
         } else if (oldConfig.getProtocolVersion() < newConfig.getProtocolVersion()) {
             // Upgrade
             invariant(newConfig.getProtocolVersion() == 1);
             invariant(_topCoord->getTerm() != OpTime::kUninitializedTerm);
             _electionId = OID::fromTerm(_topCoord->getTerm());
-            _topCoord->setElectionInfo(_electionId, getNextGlobalTimestamp());
+            _topCoord->setElectionInfo(_electionId, getNextGlobalTimestamp(getServiceContext()));
         }
     }
 
@@ -3125,7 +3130,7 @@ void ReplicationCoordinatorImpl::resetLastOpTimesFromOplog(OperationContext* txn
     _reportUpstream_inlock(std::move(lock));
     // Unlocked below.
 
-    _externalState->setGlobalTimestamp(lastOpTime.getTimestamp());
+    _externalState->setGlobalTimestamp(txn->getServiceContext(), lastOpTime.getTimestamp());
 }
 
 bool ReplicationCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource,

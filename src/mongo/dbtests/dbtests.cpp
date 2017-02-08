@@ -130,7 +130,9 @@ int dbtestsMain(int argc, char** argv, char** envp) {
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
     repl::ReplSettings replSettings;
     replSettings.setOplogSizeBytes(10 * 1024 * 1024);
-    repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
+    ServiceContext* service = getGlobalServiceContext();
+    repl::setGlobalReplicationCoordinator(
+        new repl::ReplicationCoordinatorMock(service, replSettings));
     repl::getGlobalReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY);
     getGlobalAuthorizationManager()->setAuthEnabled(false);
     ScriptEngine::setup();

@@ -800,6 +800,8 @@ public:
 
     virtual Status stepUpIfEligible() = 0;
 
+    virtual ServiceContext* getServiceContext() = 0;
+
 protected:
     ReplicationCoordinator();
 };

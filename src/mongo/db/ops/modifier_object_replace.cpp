@@ -33,6 +33,7 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/global_timestamp.h"
 #include "mongo/db/ops/log_builder.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -55,7 +56,8 @@ Status fixupTimestamps(const BSONObj& obj) {
             unsigned long long timestamp = timestampView.read<unsigned long long>();
             if (timestamp == 0) {
                 // performance note, this locks a mutex:
-                Timestamp ts(getNextGlobalTimestamp());
+                ServiceContext* service = getGlobalServiceContext();
+                Timestamp ts(getNextGlobalTimestamp(service));
                 timestampView.write(tagLittleEndian(ts.asULL()));
             }
         }

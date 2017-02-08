@@ -31,7 +31,9 @@
 #include "mongo/bson/timestamp.h"
 
 namespace mongo {
-void setGlobalTimestamp(const Timestamp& newTime);
+class ServiceContext;
+
+void setGlobalTimestamp(ServiceContext* service, const Timestamp& newTime);
 
 /**
  * Returns the value of the global Timestamp generated last time or set.
@@ -42,5 +44,5 @@ Timestamp getLastSetTimestamp();
  * Generates a new and unique Timestamp.
  * If count > 1 that many unique Timestamps are reserved starting with the returned value.
  */
-Timestamp getNextGlobalTimestamp(unsigned count = 1);
+Timestamp getNextGlobalTimestamp(ServiceContext* service, unsigned count = 1);
 }

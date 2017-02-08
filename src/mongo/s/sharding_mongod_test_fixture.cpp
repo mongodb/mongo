@@ -102,7 +102,7 @@ const Seconds ShardingMongodTestFixture::kFutureTimeout{5};
 void ShardingMongodTestFixture::setUp() {
     ServiceContextMongoDTest::setUp();
 
-    auto serviceContext = getServiceContext();
+    auto service = getServiceContext();
     _opCtx = cc().makeOperationContext();
 
     // Set up this node as part of a replica set.
@@ -122,16 +122,16 @@ void ShardingMongodTestFixture::setUp() {
                                         << serversBob.arr()));
     replCoordPtr->setGetConfigReturnValue(replSetConfig);
 
-    repl::ReplicationCoordinator::set(serviceContext, std::move(replCoordPtr));
+    repl::ReplicationCoordinator::set(service, std::move(replCoordPtr));
 
-    serviceContext->setOpObserver(stdx::make_unique<OpObserverImpl>());
+    service->setOpObserver(stdx::make_unique<OpObserverImpl>());
     repl::setOplogCollectionName();
     repl::createOplog(_opCtx.get());
 }
 
 std::unique_ptr<ReplicationCoordinatorMock> ShardingMongodTestFixture::makeReplicationCoordinator(
     ReplSettings replSettings) {
-    return stdx::make_unique<repl::ReplicationCoordinatorMock>(replSettings);
+    return stdx::make_unique<repl::ReplicationCoordinatorMock>(getServiceContext(), replSettings);
 }
 
 std::unique_ptr<executor::TaskExecutorPool> ShardingMongodTestFixture::makeTaskExecutorPool() {

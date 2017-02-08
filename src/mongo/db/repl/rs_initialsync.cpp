@@ -388,7 +388,7 @@ Status _initialSync(OperationContext* txn, BackgroundSync* bgsync) {
     OpTime lastOptime = OplogEntry(lastOp).getOpTime();
     ReplClientInfo::forClient(txn->getClient()).setLastOp(lastOptime);
     replCoord->setMyLastAppliedOpTime(lastOptime);
-    setNewTimestamp(lastOptime.getTimestamp());
+    setNewTimestamp(replCoord->getServiceContext(), lastOptime.getTimestamp());
 
     std::string msg = "oplog sync 1 of 3";
     log() << msg;

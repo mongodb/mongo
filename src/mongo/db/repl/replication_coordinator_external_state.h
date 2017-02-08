@@ -183,7 +183,7 @@ public:
     /**
      * Returns true if "host" is one of the network identities of this node.
      */
-    virtual bool isSelf(const HostAndPort& host, ServiceContext* ctx) = 0;
+    virtual bool isSelf(const HostAndPort& host, ServiceContext* service) = 0;
 
     /**
      * Gets the replica set config document from local storage, or returns an error.
@@ -208,7 +208,7 @@ public:
     /**
      * Sets the global opTime to be 'newTime'.
      */
-    virtual void setGlobalTimestamp(const Timestamp& newTime) = 0;
+    virtual void setGlobalTimestamp(ServiceContext* service, const Timestamp& newTime) = 0;
 
     /**
      * Gets the last optime of an operation performed on this host, from stable

@@ -85,7 +85,8 @@ void ShardLocalTest::setUp() {
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
     _shardLocal = stdx::make_unique<ShardLocal>(ShardId("config"));
     const repl::ReplSettings replSettings = {};
-    repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
+    repl::setGlobalReplicationCoordinator(
+        new repl::ReplicationCoordinatorMock(_txn->getServiceContext(), replSettings));
     repl::getGlobalReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY);
 }
 

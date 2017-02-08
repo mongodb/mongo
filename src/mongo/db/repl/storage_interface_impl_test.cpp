@@ -179,8 +179,9 @@ private:
         ReplSettings settings;
         settings.setOplogSizeBytes(5 * 1024 * 1024);
         settings.setReplSetString("mySet/node1:12345");
-        ReplicationCoordinator::set(getServiceContext(),
-                                    stdx::make_unique<ReplicationCoordinatorMock>(settings));
+        ReplicationCoordinator::set(
+            getServiceContext(),
+            stdx::make_unique<ReplicationCoordinatorMock>(getServiceContext(), settings));
     }
 };
 
@@ -189,7 +190,8 @@ protected:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
         createOptCtx();
-        _coordinator = new ReplicationCoordinatorMock(createReplSettings());
+        _coordinator =
+            new ReplicationCoordinatorMock(_txn->getServiceContext(), createReplSettings());
         setGlobalReplicationCoordinator(_coordinator);
     }
     void tearDown() override {

@@ -573,8 +573,9 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
     }
 }
 
-void ReplicationCoordinatorExternalStateImpl::setGlobalTimestamp(const Timestamp& newTime) {
-    setNewTimestamp(newTime);
+void ReplicationCoordinatorExternalStateImpl::setGlobalTimestamp(ServiceContext* ctx,
+                                                                 const Timestamp& newTime) {
+    setNewTimestamp(ctx, newTime);
 }
 
 void ReplicationCoordinatorExternalStateImpl::cleanUpLastApplyBatch(OperationContext* txn) {

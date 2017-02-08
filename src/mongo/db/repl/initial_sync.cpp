@@ -111,7 +111,7 @@ void InitialSync::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTim
         const OpTime lastOpTime = multiApply(txn, ops.releaseBatch());
 
         replCoord->setMyLastAppliedOpTime(lastOpTime);
-        setNewTimestamp(lastOpTime.getTimestamp());
+        setNewTimestamp(txn->getServiceContext(), lastOpTime.getTimestamp());
 
         if (globalInShutdownDeprecated()) {
             return;

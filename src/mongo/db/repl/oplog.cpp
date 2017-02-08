@@ -161,7 +161,7 @@ void getNextOpTime(OperationContext* txn,
     }
 
     stdx::lock_guard<stdx::mutex> lk(newOpMutex);
-    Timestamp ts = getNextGlobalTimestamp(count);
+    Timestamp ts = getNextGlobalTimestamp(txn->getServiceContext(), count);
     newTimestampNotifier.notify_all();
 
     fassert(28560, oplog->getRecordStore()->oplogDiskLocRegister(txn, ts));
@@ -1107,9 +1107,9 @@ Status applyCommand_inlock(OperationContext* txn,
     return Status::OK();
 }
 
-void setNewTimestamp(const Timestamp& newTime) {
+void setNewTimestamp(ServiceContext* service, const Timestamp& newTime) {
     stdx::lock_guard<stdx::mutex> lk(newOpMutex);
-    setGlobalTimestamp(newTime);
+    setGlobalTimestamp(service, newTime);
     newTimestampNotifier.notify_all();
 }
 
@@ -1120,7 +1120,7 @@ void initTimestampFromOplog(OperationContext* txn, const std::string& oplogNS) {
     if (!lastOp.isEmpty()) {
         LOG(1) << "replSet setting last Timestamp";
         const OpTime opTime = fassertStatusOK(28696, OpTime::parseFromOplogEntry(lastOp));
-        setNewTimestamp(opTime.getTimestamp());
+        setNewTimestamp(txn->getServiceContext(), opTime.getTimestamp());
     }
 }
 
@@ -1172,8 +1172,8 @@ bool SnapshotThread::shouldSleepMore(int numSleepsDone, size_t numUncommittedSna
 void SnapshotThread::run() {
     Client::initThread("SnapshotThread");
     auto& client = cc();
-    auto serviceContext = client.getServiceContext();
-    auto replCoord = ReplicationCoordinator::get(serviceContext);
+    auto service = client.getServiceContext();
+    auto replCoord = ReplicationCoordinator::get(service);
 
     Timestamp lastTimestamp = {};
     while (true) {

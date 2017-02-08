@@ -133,7 +133,7 @@ void initTimestampFromOplog(OperationContext* txn, const std::string& oplogNS);
 /**
  * Sets the global Timestamp to be 'newTime'.
  */
-void setNewTimestamp(const Timestamp& newTime);
+void setNewTimestamp(ServiceContext* txn, const Timestamp& newTime);
 
 /**
  * Detects the current replication mode and sets the "_oplogCollectionName" accordingly.

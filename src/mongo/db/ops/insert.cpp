@@ -39,7 +39,7 @@ using std::string;
 
 using namespace mongoutils;
 
-StatusWith<BSONObj> fixDocumentForInsert(const BSONObj& doc) {
+StatusWith<BSONObj> fixDocumentForInsert(ServiceContext* service, const BSONObj& doc) {
     if (doc.objsize() > BSONObjMaxUserSize)
         return StatusWith<BSONObj>(ErrorCodes::BadValue,
                                    str::stream() << "object to insert too large"
@@ -124,7 +124,7 @@ StatusWith<BSONObj> fixDocumentForInsert(const BSONObj& doc) {
         if (hadId && e.fieldNameStringData() == "_id") {
             // no-op
         } else if (e.type() == bsonTimestamp && e.timestampValue() == 0) {
-            b.append(e.fieldName(), getNextGlobalTimestamp());
+            b.append(e.fieldName(), getNextGlobalTimestamp(service));
         } else {
             b.append(e);
         }

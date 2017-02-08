@@ -79,7 +79,8 @@ private:
         setGlobalServiceContext(stdx::make_unique<ServiceContextNoop>());
         mongo::repl::ReplicationCoordinator::set(
             getServiceContext(),
-            stdx::make_unique<mongo::repl::ReplicationCoordinatorMock>(replSettings));
+            stdx::make_unique<mongo::repl::ReplicationCoordinatorMock>(getServiceContext(),
+                                                                       replSettings));
         _client = getServiceContext()->makeClient("RangeDeleterTest");
         _txn = _client->makeOperationContext();
         deleter.startWorkers();

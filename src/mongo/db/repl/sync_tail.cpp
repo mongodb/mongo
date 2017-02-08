@@ -822,9 +822,9 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord) {
 
         // Update various things that care about our last applied optime. Tests rely on 2 happening
         // before 3 even though it isn't strictly necessary. The order of 1 doesn't matter.
-        setNewTimestamp(lastOpTimeInBatch.getTimestamp());                        // 1
-        StorageInterface::get(&txn)->setAppliedThrough(&txn, lastOpTimeInBatch);  // 2
-        finalizer->record(lastOpTimeInBatch);                                     // 3
+        setNewTimestamp(txn.getServiceContext(), lastOpTimeInBatch.getTimestamp());  // 1
+        StorageInterface::get(&txn)->setAppliedThrough(&txn, lastOpTimeInBatch);     // 2
+        finalizer->record(lastOpTimeInBatch);                                        // 3
     }
 }
 
