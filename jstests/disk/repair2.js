@@ -1,5 +1,8 @@
 // repair with --directoryperdb
 
+// `--repairpath` is mmap only.
+// @tags: [requires_mmapv1]
+
 var baseName = "jstests_disk_repair2";
 
 function check() {

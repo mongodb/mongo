@@ -1,4 +1,7 @@
 // Enable failpoint
+
+// The `allocateDiskFull` failpoint is mmap only.
+// @tags: [requires_mmapv1]
 assert.commandWorked(db.adminCommand({configureFailPoint: "allocateDiskFull", mode: "alwaysOn"}));
 
 var d = db.getSisterDB("DiskFullTestDB");

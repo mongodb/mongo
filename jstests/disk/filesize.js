@@ -1,4 +1,7 @@
 // Test for SERVER-7430: Warning about smallfiles should include filename
+
+// `--smallfiles` is mmap only.
+// @tags: [requires_mmapv1]
 var baseName = "filesize";
 
 // Start mongod with --smallfiles

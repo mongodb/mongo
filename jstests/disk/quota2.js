@@ -1,5 +1,8 @@
 // Test for quotaFiles off by one file limit issue - SERVER-3420.
 
+// `--quotaFiles` is mmap only.
+// @tags: [requires_mmapv1]
+
 if (0) {  // SERVER-3420
 
     baseName = "jstests_disk_quota2";

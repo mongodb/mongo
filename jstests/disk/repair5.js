@@ -1,17 +1,17 @@
 // SERVER-2351 Test killop with repair command.
+
+// `repairDatabase` on WiredTiger does not respond to `killop`.
+// @tags: [requires_mmapv1]
 (function() {
     'use strict';
     var baseName = "jstests_disk_repair5";
 
     var dbpath = MongoRunner.dataPath + baseName + "/";
-    var repairpath = dbpath + "repairDir/";
 
     resetDbpath(dbpath);
-    resetDbpath(repairpath);
 
     var m = MongoRunner.runMongod({
         dbpath: dbpath,
-        repairpath: repairpath,
         restart: true,
         cleanData: false
     });  // So that the repair dir won't get removed
@@ -46,7 +46,7 @@
     sleep(100);  // make sure shell is actually running, lame
 
     // Repair should fail due to killOp.
-    assert.commandFailed(dbTest.runCommand({repairDatabase: 1, backupOriginalFiles: true}));
+    assert.commandFailed(dbTest.runCommand({repairDatabase: 1}));
 
     s();
 

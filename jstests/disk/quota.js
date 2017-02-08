@@ -1,6 +1,9 @@
 // Check functioning of --quotaFiles parameter, including with respect to SERVER-3293 ('local'
 // database).
 
+// `--quotaFiles` is mmap only.
+// @tags: [requires_mmapv1]
+
 baseName = "jstests_disk_quota";
 
 var m = MongoRunner.runMongod({quotaFiles: 2, smallfiles: ""});

@@ -1719,7 +1719,16 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=disk
+      resmoke_args: --suites=disk_mmapv1
+      run_multiple_jobs: false
+
+- <<: *task_template
+  name: disk_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=disk_wiredtiger --excludeWithAnyTags=requires_mmapv1
       run_multiple_jobs: false
 
 - <<: *task_template
@@ -3385,6 +3394,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: dur_jscore_passthrough
   - name: failpoints
@@ -3547,6 +3557,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: failpoints
   - name: failpoints_auth
@@ -3652,6 +3663,7 @@ buildvariants:
   - name: auth
   - name: dbtest
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: dur_jscore_passthrough
   - name: failpoints
@@ -3790,6 +3802,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: dur_jscore_passthrough
   - name: failpoints
@@ -3913,6 +3926,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: dur_jscore_passthrough
   - name: failpoints
@@ -4045,6 +4059,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: dur_jscore_passthrough
   - name: failpoints
@@ -4620,6 +4635,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: dur_jscore_passthrough
   - name: failpoints
@@ -4745,6 +4761,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: failpoints
   - name: gle_auth
@@ -4857,6 +4874,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: failpoints
   - name: gle_auth
@@ -4981,6 +4999,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: failpoints
   - name: httpinterface
@@ -5255,6 +5274,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: failpoints
   - name: jsCore
@@ -5376,6 +5396,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: failpoints
   - name: gle_auth
@@ -5480,6 +5501,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: failpoints
   - name: gle_auth
@@ -5578,6 +5600,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: failpoints
   - name: jsCore
@@ -5713,6 +5736,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: dur_jscore_passthrough
   - name: durability
   - name: ese_WT
@@ -5959,6 +5983,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: dur_jscore_passthrough
   - name: durability
   - name: ese_WT
@@ -6214,6 +6239,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: dur_jscore_passthrough
   - name: failpoints
@@ -6338,6 +6364,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: dur_jscore_passthrough
   - name: failpoints
@@ -7143,6 +7170,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: dur_jscore_passthrough
   - name: failpoints
@@ -7417,6 +7445,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: dur_jscore_passthrough
   - name: failpoints
@@ -7540,6 +7569,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: failpoints
   - name: httpinterface
@@ -7764,6 +7794,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: dur_jscore_passthrough
   - name: failpoints
@@ -7890,6 +7921,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: durability
   - name: dur_jscore_passthrough
   - name: failpoints
@@ -8439,6 +8471,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: dur_jscore_passthrough
   - name: durability
   - name: ese_WT
@@ -8620,6 +8653,7 @@ buildvariants:
   - name: dbtest
   - name: dbtest_WT
   - name: disk
+  - name: disk_WT
   - name: dur_jscore_passthrough
   - name: durability
   - name: ese_WT

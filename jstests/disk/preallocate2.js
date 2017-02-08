@@ -1,5 +1,8 @@
 // check that there is preallocation on insert
 
+// Preallocation is an mmap only behavior.
+// @tags: [requires_mmapv1]
+
 var baseName = "jstests_preallocate2";
 
 var m = MongoRunner.runMongod({});

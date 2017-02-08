@@ -1,5 +1,8 @@
 // Test for quotaFiles being ignored allocating a large collection - SERVER-3511.
 
+// `--quotaFiles` is mmap only.
+// @tags: [requires_mmapv1]
+
 if (0) {  // SERVER-3511
 
     baseName = "jstests_disk_quota3";

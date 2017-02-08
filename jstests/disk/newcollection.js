@@ -1,5 +1,8 @@
 // SERVER-594 test
 
+// When `capped: false`, the `size` option on `createCollection` is only considered by mmapv1.
+// @tags: [requires_mmapv1]
+
 var baseName = "jstests_disk_newcollection";
 var m = MongoRunner.runMongod({noprealloc: "", smallfiles: ""});
 db = m.getDB("test");

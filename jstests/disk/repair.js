@@ -1,5 +1,8 @@
 // check --repairpath and --repair
 
+// `--repairpath` is mmap only.
+// @tags: [requires_mmapv1]
+
 var baseName = "jstests_disk_repair";
 var dbpath = MongoRunner.dataPath + baseName + "/";
 var repairpath = dbpath + "repairDir/";
