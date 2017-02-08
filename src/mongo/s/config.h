@@ -95,7 +95,6 @@ public:
      * and throws on all other errors.
      */
     bool load(OperationContext* txn);
-    bool reload(OperationContext* txn);
 
     void getAllShardIds(std::set<ShardId>* shardIds);
 
