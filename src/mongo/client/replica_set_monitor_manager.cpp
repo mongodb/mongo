@@ -155,26 +155,39 @@ void ReplicaSetMonitorManager::removeMonitor(StringData setName) {
     }
 }
 
-
 void ReplicaSetMonitorManager::shutdown() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (_taskExecutor && !_isShutdown) {
-        LOG(1) << "Shutting down task executor used for monitoring replica sets";
-        _taskExecutor->shutdown();
-        _taskExecutor->join();
+
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        if (!_taskExecutor || _isShutdown) {
+            return;
+        }
         _isShutdown = true;
     }
+
+    LOG(1) << "Shutting down task executor used for monitoring replica sets";
+    _taskExecutor->shutdown();
+    _taskExecutor->join();
 }
 
 void ReplicaSetMonitorManager::removeAllMonitors() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _monitors = ReplicaSetMonitorsMap();
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _monitors = ReplicaSetMonitorsMap();
+        if (!_taskExecutor || _isShutdown) {
+            return;
+        }
+        _isShutdown = true;
+    }
 
-    if (_taskExecutor) {
-        LOG(1) << "Shutting down task executor used for monitoring replica sets";
-        _taskExecutor->shutdown();
-        _taskExecutor->join();
-        _taskExecutor.reset();
+    LOG(1) << "Shutting down task executor used for monitoring replica sets";
+    _taskExecutor->shutdown();
+    _taskExecutor->join();
+    _taskExecutor.reset();
+
+    {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        _isShutdown = false;
     }
 }
 
