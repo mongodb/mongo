@@ -115,6 +115,27 @@ TEST(ValidateConfigForInitiate, SelfMustBeElectable) {
             .getStatus());
 }
 
+TEST(ValidateConfigForInitiate, WriteConcernMustBeSatisfiable) {
+    ReplicaSetConfig config;
+    ASSERT_OK(
+        config.initializeForInitiate(BSON("_id"
+                                          << "rs0"
+                                          << "version"
+                                          << 1
+                                          << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1"))
+                                          << "settings"
+                                          << BSON("getLastErrorDefaults" << BSON("w" << 2)))));
+    ReplicationCoordinatorExternalStateMock presentOnceExternalState;
+    presentOnceExternalState.addSelf(HostAndPort("h2"));
+
+    ASSERT_EQUALS(
+        ErrorCodes::CannotSatisfyWriteConcern,
+        validateConfigForInitiate(&presentOnceExternalState, config, getGlobalServiceContext())
+            .getStatus());
+}
+
 TEST(ValidateConfigForReconfig, NewConfigVersionNumberMustBeHigherThanOld) {
     ReplicationCoordinatorExternalStateMock externalState;
     externalState.addSelf(HostAndPort("h1"));
@@ -694,6 +715,45 @@ TEST(ValidateConfigForReconfig, NewConfigInvalid) {
             .getStatus());
 }
 
+TEST(ValidateConfigForReconfig, NewConfigWriteConcernNotSatisifiable) {
+    // The new config is not valid due to an unsatisfiable write concern. This tests that if the
+    // new config is invalid, validateConfigForReconfig will return a status indicating what is
+    // wrong with the new config.
+    ReplicaSetConfig oldConfig;
+    ASSERT_OK(oldConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version"
+                                        << 1
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                 << "h2")))));
+
+    ReplicaSetConfig newConfig;
+    ASSERT_OK(newConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version"
+                                        << 1
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                 << "h2"))
+                                        << "settings"
+                                        << BSON("getLastErrorDefaults" << BSON("w" << 2)))));
+
+    ReplicationCoordinatorExternalStateMock presentOnceExternalState;
+    presentOnceExternalState.addSelf(HostAndPort("h2"));
+    ASSERT_EQUALS(
+        ErrorCodes::CannotSatisfyWriteConcern,
+        validateConfigForReconfig(
+            &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext(), false)
+            .getStatus());
+    // Forced reconfigs also do not allow this.
+    ASSERT_EQUALS(
+        ErrorCodes::CannotSatisfyWriteConcern,
+        validateConfigForReconfig(
+            &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext(), true)
+            .getStatus());
+}
+
 TEST(ValidateConfigForStartUp, NewConfigInvalid) {
     // The new config is not valid due to a duplicate _id value. This tests that if the new
     // config is invalid, validateConfigForStartUp will return a status indicating what is wrong
@@ -797,6 +857,37 @@ TEST(ValidateConfigForStartUp, OldAndNewConfigCompatible) {
                   .getStatus());
 }
 
+TEST(ValidateConfigForStartUp, NewConfigWriteConcernNotSatisfiable) {
+    // The new config contains an unsatisfiable write concern.  We don't allow these configs to be
+    // created anymore, but we allow any which exist to pass and the database to start up to
+    // maintain backwards compatibility.
+    ReplicaSetConfig oldConfig;
+    ASSERT_OK(oldConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version"
+                                        << 1
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                 << "h2")))));
+
+    ReplicaSetConfig newConfig;
+    ASSERT_OK(newConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version"
+                                        << 2
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                 << "h2"))
+                                        << "settings"
+                                        << BSON("getLastErrorDefaults" << BSON("w" << 2)))));
+
+    ReplicationCoordinatorExternalStateMock presentOnceExternalState;
+    presentOnceExternalState.addSelf(HostAndPort("h2"));
+    ASSERT_OK(validateConfigForStartUp(
+                  &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext())
+                  .getStatus());
+}
+
 TEST(ValidateConfigForHeartbeatReconfig, NewConfigInvalid) {
     // The new config is not valid due to a duplicate _id value. This tests that if the new
     // config is invalid, validateConfigForHeartbeatReconfig will return a status indicating
@@ -833,6 +924,29 @@ TEST(ValidateConfigForHeartbeatReconfig, NewConfigValid) {
                                                                  << "h2")
                                                       << BSON("_id" << 1 << "host"
                                                                     << "h3")))));
+
+    ReplicationCoordinatorExternalStateMock presentOnceExternalState;
+    presentOnceExternalState.addSelf(HostAndPort("h2"));
+    ASSERT_OK(validateConfigForHeartbeatReconfig(
+                  &presentOnceExternalState, newConfig, getGlobalServiceContext())
+                  .getStatus());
+}
+
+TEST(ValidateConfigForHeartbeatReconfig, NewConfigWriteConcernNotSatisfiable) {
+    // The new config contains an unsatisfiable write concern.  We don't allow these configs to be
+    // created anymore, but we allow any which exist to be received in a heartbeat.
+    ReplicaSetConfig newConfig;
+    ASSERT_OK(newConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version"
+                                        << 2
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                 << "h2")
+                                                      << BSON("_id" << 1 << "host"
+                                                                    << "h3"))
+                                        << "settings"
+                                        << BSON("getLastErrorDefaults" << BSON("w" << 2)))));
 
     ReplicationCoordinatorExternalStateMock presentOnceExternalState;
     presentOnceExternalState.addSelf(HostAndPort("h2"));

@@ -262,6 +262,15 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
     if (!status.isOK()) {
         return StatusWith<int>(status);
     }
+
+    status = newConfig.checkIfWriteConcernCanBeSatisfied(newConfig.getDefaultWriteConcern());
+    if (!status.isOK()) {
+        return StatusWith<int>(
+            status.code(),
+            str::stream() << "Found invalid default write concern in 'getLastErrorDefaults' field. "
+                          << causedBy(status.reason()));
+    }
+
     if (newConfig.getConfigVersion() != 1) {
         return StatusWith<int>(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                                str::stream() << "Configuration used to initiate a replica set must "
@@ -279,6 +288,14 @@ StatusWith<int> validateConfigForReconfig(ReplicationCoordinatorExternalState* e
     Status status = newConfig.validate();
     if (!status.isOK()) {
         return StatusWith<int>(status);
+    }
+
+    status = newConfig.checkIfWriteConcernCanBeSatisfied(newConfig.getDefaultWriteConcern());
+    if (!status.isOK()) {
+        return StatusWith<int>(
+            status.code(),
+            str::stream() << "Found invalid default write concern in 'getLastErrorDefaults' field. "
+                          << causedBy(status.reason()));
     }
 
     status = validateOldAndNewConfigsCompatible(oldConfig, newConfig);

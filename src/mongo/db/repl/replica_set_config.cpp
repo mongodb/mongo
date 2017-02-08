@@ -507,8 +507,6 @@ Status ReplicaSetConfig::validate() const {
                       "one non-arbiter member with priority > 0");
     }
 
-    // TODO(schwerin): Validate satisfiability of write modes? Omitting for backwards
-    // compatibility.
     if (_defaultWriteConcern.wMode.empty()) {
         if (_defaultWriteConcern.wNumNodes == 0) {
             return Status(ErrorCodes::BadValue,
