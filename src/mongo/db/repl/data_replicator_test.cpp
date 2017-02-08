@@ -590,6 +590,8 @@ TEST_F(DataReplicatorTest, StartupReturnsShutdownInProgressIfDataReplicatorIsShu
     ASSERT_FALSE(dr->isActive());
     ASSERT_OK(dr->startup(txn.get(), maxAttempts));
     ASSERT_TRUE(dr->isActive());
+    // SyncSourceSelector returns an invalid sync source so DataReplicator is stuck waiting for
+    // another sync source in 'Options::syncSourceRetryWait' ms.
     ASSERT_OK(dr->shutdown());
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, dr->startup(txn.get(), maxAttempts));
 }
@@ -637,6 +639,12 @@ TEST_F(DataReplicatorTest, DataReplicatorReturnsCallbackCanceledIfShutdownImmedi
 
     // This will cancel the _startInitialSyncAttemptCallback() task scheduled by startup().
     ASSERT_OK(dr->shutdown());
+
+    // Depending on which DataReplicator stage (_chooseSyncSource or _rollbackCheckerResetCallback)
+    // was interrupted by shutdown(), we may have to request the network interface to deliver
+    // cancellation signals to the DataReplicator callbacks in for DataReplicator to run to
+    // completion.
+    executor::NetworkInterfaceMock::InNetworkGuard(getNet())->runReadyNetworkOperations();
 
     dr->join();
 
