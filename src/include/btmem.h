@@ -483,6 +483,7 @@ struct __wt_page {
 		 */
 		struct {
 			WT_REF	*parent_ref;	/* Parent reference */
+			uint64_t split_gen;	/* Generation of last split */
 
 			struct __wt_page_index {
 				uint32_t entries;
@@ -492,6 +493,8 @@ struct __wt_page {
 		} intl;
 #undef	pg_intl_parent_ref
 #define	pg_intl_parent_ref		u.intl.parent_ref
+#undef	pg_intl_split_gen
+#define	pg_intl_split_gen		u.intl.split_gen
 
 	/*
 	 * Macros to copy/set the index because the name is obscured to ensure
@@ -593,9 +596,8 @@ struct __wt_page {
 #define	WT_PAGE_DISK_MAPPED	0x04	/* Disk image in mapped memory */
 #define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
 #define	WT_PAGE_OVERFLOW_KEYS	0x10	/* Page has overflow keys */
-#define	WT_PAGE_SPLIT_BLOCK	0x20	/* Split blocking eviction and splits */
-#define	WT_PAGE_SPLIT_INSERT	0x40	/* A leaf page was split for append */
-#define	WT_PAGE_UPDATE_IGNORE	0x80	/* Ignore updates on page discard */
+#define	WT_PAGE_SPLIT_INSERT	0x20	/* A leaf page was split for append */
+#define	WT_PAGE_UPDATE_IGNORE	0x40	/* Ignore updates on page discard */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 
 	uint8_t unused[2];		/* Unused padding */
