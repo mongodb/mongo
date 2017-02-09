@@ -52,7 +52,30 @@ class StatusWith;
 namespace executor {
 
 /**
- * A network infrastructure for testing.
+ * A network infrastructure for testing that provides helpers (onCommand*, onFind*) to extract
+ * pending requests from the NetworkInterface in this NetworkTestEnv and set a response for it.
+ * Note that these helpers are synchronous and the code that is being tested that uses the
+ * TaskExecutor will typically be also synchronously waiting for the response from the network.
+ * Therefore, the test will not make progress if it is ran on a single thread. To get around this,
+ * the launchAsync helper can be used to create a new thread that will be used to initiate the
+ * network call.
+ *
+ * Example usage:
+ *
+ * auto future = netTestEnv.launchAsync([](){
+ *     return methodWithNetCallToTest();
+ * });
+ *
+ *
+ * netTestEnv.OnCommandFunction([](const RemoteCommandRequest& request){
+ *     // check contents of request
+ *     return BSON("ok" << 1); // return desired response
+ * });
+ *
+ * // Add as many onCommand/onFind calls to match the number of network calls by the
+ * // methodWithNetCallToTest in the order they are going to be called.
+ *
+ * checkResult(future.timed_get(...));
  */
 class NetworkTestEnv {
 public:
@@ -139,7 +162,7 @@ public:
             const RemoteCommandRequest&)>;
 
     /**
-     * Create a new environment based on the given network.
+     * Create a new test environment based on an existing executor and network.
      */
     NetworkTestEnv(TaskExecutor* executor, NetworkInterfaceMock* network);
 
