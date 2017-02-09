@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
@@ -56,7 +57,8 @@ class TaskExecutor;
  * BSONObj response document describing the newly-created cursor, which is suitable for returning to
  * the client.
  */
-StatusWith<BSONObj> storePossibleCursor(const HostAndPort& server,
+StatusWith<BSONObj> storePossibleCursor(OperationContext* txn,
+                                        const HostAndPort& server,
                                         const BSONObj& cmdResult,
                                         const NamespaceString& requestedNss,
                                         executor::TaskExecutor* executor,

@@ -62,7 +62,8 @@ TEST_F(StorePossibleCursorTest, ReturnsValidCursorResponse) {
     std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
     CursorResponse cursorResponse(nss, CursorId(0), batch);
     auto outgoingCursorResponse =
-        storePossibleCursor(hostAndPort,
+        storePossibleCursor(nullptr,  // OperationContext*
+                            hostAndPort,
                             cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse),
                             nss,
                             nullptr,  // TaskExecutor
@@ -80,7 +81,8 @@ TEST_F(StorePossibleCursorTest, ReturnsValidCursorResponse) {
 
 // Test that storePossibleCursor() propagates an error if it cannot parse the cursor response.
 TEST_F(StorePossibleCursorTest, FailsGracefullyOnBadCursorResponseDocument) {
-    auto outgoingCursorResponse = storePossibleCursor(hostAndPort,
+    auto outgoingCursorResponse = storePossibleCursor(nullptr,  // OperationContext*
+                                                      hostAndPort,
                                                       fromjson("{ok: 1, cursor: {}}"),
                                                       nss,
                                                       nullptr,  // TaskExecutor
@@ -94,7 +96,8 @@ TEST_F(StorePossibleCursorTest, FailsGracefullyOnBadCursorResponseDocument) {
 TEST_F(StorePossibleCursorTest, PassesUpCommandResultIfItDoesNotDescribeACursor) {
     BSONObj notACursorObj = BSON("not"
                                  << "cursor");
-    auto outgoingCursorResponse = storePossibleCursor(hostAndPort,
+    auto outgoingCursorResponse = storePossibleCursor(nullptr,  // OperationContext*
+                                                      hostAndPort,
                                                       notACursorObj,
                                                       nss,
                                                       nullptr,  // TaskExecutor

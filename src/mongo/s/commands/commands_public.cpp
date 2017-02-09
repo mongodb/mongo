@@ -120,7 +120,8 @@ bool cursorCommandPassthrough(OperationContext* txn,
     }
 
     StatusWith<BSONObj> transformedResponse =
-        storePossibleCursor(HostAndPort(cursor->originalHost()),
+        storePossibleCursor(txn,
+                            HostAndPort(cursor->originalHost()),
                             response,
                             nss,
                             Grid::get(txn)->getExecutorPool()->getArbitraryExecutor(),

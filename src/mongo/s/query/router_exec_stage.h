@@ -66,13 +66,13 @@ public:
      * holding on to a subset of the returned results and need to minimize memory usage, call copy()
      * on the BSONObjs.
      */
-    virtual StatusWith<ClusterQueryResult> next() = 0;
+    virtual StatusWith<ClusterQueryResult> next(OperationContext* txn) = 0;
 
     /**
      * Must be called before destruction to abandon a not-yet-exhausted plan. May block waiting for
      * responses from remote hosts.
      */
-    virtual void kill() = 0;
+    virtual void kill(OperationContext* txn) = 0;
 
     /**
      * Returns whether or not all the remote cursors are exhausted.
@@ -87,13 +87,6 @@ public:
      * the cursor is not tailable + awaitData).
      */
     virtual Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) = 0;
-
-    /**
-     * Update the operation context for remote requests.
-     *
-     * Network requests depend on having a valid operation context for user initiated actions.
-     */
-    virtual void setOperationContext(OperationContext* txn) = 0;
 
 protected:
     /**

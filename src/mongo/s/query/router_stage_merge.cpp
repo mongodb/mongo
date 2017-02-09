@@ -40,9 +40,9 @@ RouterStageMerge::RouterStageMerge(executor::TaskExecutor* executor,
                                    ClusterClientCursorParams&& params)
     : _executor(executor), _arm(executor, std::move(params)) {}
 
-StatusWith<ClusterQueryResult> RouterStageMerge::next() {
+StatusWith<ClusterQueryResult> RouterStageMerge::next(OperationContext* txn) {
     while (!_arm.ready()) {
-        auto nextEventStatus = _arm.nextEvent();
+        auto nextEventStatus = _arm.nextEvent(txn);
         if (!nextEventStatus.isOK()) {
             return nextEventStatus.getStatus();
         }
@@ -55,8 +55,8 @@ StatusWith<ClusterQueryResult> RouterStageMerge::next() {
     return _arm.nextReady();
 }
 
-void RouterStageMerge::kill() {
-    auto killEvent = _arm.kill();
+void RouterStageMerge::kill(OperationContext* txn) {
+    auto killEvent = _arm.kill(txn);
     if (!killEvent) {
         // Mongos is shutting down.
         return;
@@ -70,10 +70,6 @@ bool RouterStageMerge::remotesExhausted() {
 
 Status RouterStageMerge::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
     return _arm.setAwaitDataTimeout(awaitDataTimeout);
-}
-
-void RouterStageMerge::setOperationContext(OperationContext* txn) {
-    return _arm.setOperationContext(txn);
 }
 
 }  // namespace mongo

@@ -154,7 +154,7 @@ public:
          *
          * Can block.
          */
-        StatusWith<ClusterQueryResult> next();
+        StatusWith<ClusterQueryResult> next(OperationContext* txn);
 
         /**
          * Returns whether or not the underlying cursor is tailing a capped collection.  Cannot be
@@ -201,14 +201,6 @@ public:
          * if the cursor is not tailable + awaitData).
          */
         Status setAwaitDataTimeout(Milliseconds awaitDataTimeout);
-
-
-        /**
-         * Update the operation context for remote requests.
-         *
-         * Network requests depend on having a valid operation context for user initiated actions.
-         */
-        void setOperationContext(OperationContext* txn);
 
     private:
         // ClusterCursorManager is a friend so that its methods can call the PinnedCursor
@@ -269,7 +261,8 @@ public:
      *
      * Does not block.
      */
-    StatusWith<CursorId> registerCursor(std::unique_ptr<ClusterClientCursor> cursor,
+    StatusWith<CursorId> registerCursor(OperationContext* txn,
+                                        std::unique_ptr<ClusterClientCursor> cursor,
                                         const NamespaceString& nss,
                                         CursorType cursorType,
                                         CursorLifetime cursorLifetime);

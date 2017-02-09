@@ -40,6 +40,10 @@ namespace mongo {
 
 namespace {
 
+// Note: Though the next() method on RouterExecStage and its subclasses takes an OperationContext*,
+// these stages are mocked in this test using RouterStageMock. RouterStageMock does not actually use
+// the OperationContext, so we pass a nullptr OperationContext* to next() in these tests.
+
 TEST(RouterStageRemoveSortKeyTest, RemovesSortKey) {
     auto mockStage = stdx::make_unique<RouterStageMock>();
     mockStage->queueResult(BSON("a" << 4 << "$sortKey" << 1 << "b" << 3));
@@ -50,29 +54,29 @@ TEST(RouterStageRemoveSortKeyTest, RemovesSortKey) {
 
     auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(std::move(mockStage));
 
-    auto firstResult = sortKeyStage->next();
+    auto firstResult = sortKeyStage->next(nullptr);
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 4 << "b" << 3));
 
-    auto secondResult = sortKeyStage->next();
+    auto secondResult = sortKeyStage->next(nullptr);
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(),
                       BSON("c" << BSON("d"
                                        << "foo")));
 
-    auto thirdResult = sortKeyStage->next();
+    auto thirdResult = sortKeyStage->next(nullptr);
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*thirdResult.getValue().getResult(), BSON("a" << 3));
 
-    auto fourthResult = sortKeyStage->next();
+    auto fourthResult = sortKeyStage->next(nullptr);
     ASSERT_OK(fourthResult.getStatus());
     ASSERT(fourthResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*fourthResult.getValue().getResult(), BSONObj());
 
-    auto fifthResult = sortKeyStage->next();
+    auto fifthResult = sortKeyStage->next(nullptr);
     ASSERT_OK(fifthResult.getStatus());
     ASSERT(fifthResult.getValue().isEOF());
 }
@@ -84,12 +88,12 @@ TEST(RouterStageRemoveSortKeyTest, PropagatesError) {
 
     auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(std::move(mockStage));
 
-    auto firstResult = sortKeyStage->next();
+    auto firstResult = sortKeyStage->next(nullptr);
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSONObj());
 
-    auto secondResult = sortKeyStage->next();
+    auto secondResult = sortKeyStage->next(nullptr);
     ASSERT_NOT_OK(secondResult.getStatus());
     ASSERT_EQ(secondResult.getStatus(), ErrorCodes::BadValue);
     ASSERT_EQ(secondResult.getStatus().reason(), "bad thing happened");
@@ -103,21 +107,21 @@ TEST(RouterStageRemoveSortKeyTest, ToleratesMidStreamEOF) {
 
     auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(std::move(mockStage));
 
-    auto firstResult = sortKeyStage->next();
+    auto firstResult = sortKeyStage->next(nullptr);
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1 << "b" << 1));
 
-    auto secondResult = sortKeyStage->next();
+    auto secondResult = sortKeyStage->next(nullptr);
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().isEOF());
 
-    auto thirdResult = sortKeyStage->next();
+    auto thirdResult = sortKeyStage->next(nullptr);
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*thirdResult.getValue().getResult(), BSON("a" << 2 << "b" << 2));
 
-    auto fourthResult = sortKeyStage->next();
+    auto fourthResult = sortKeyStage->next(nullptr);
     ASSERT_OK(fourthResult.getStatus());
     ASSERT(fourthResult.getValue().isEOF());
 }
@@ -131,19 +135,19 @@ TEST(RouterStageRemoveSortKeyTest, RemotesExhausted) {
     auto sortKeyStage = stdx::make_unique<RouterStageRemoveSortKey>(std::move(mockStage));
     ASSERT_TRUE(sortKeyStage->remotesExhausted());
 
-    auto firstResult = sortKeyStage->next();
+    auto firstResult = sortKeyStage->next(nullptr);
     ASSERT_OK(firstResult.getStatus());
     ASSERT(firstResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*firstResult.getValue().getResult(), BSON("a" << 1 << "b" << 1));
     ASSERT_TRUE(sortKeyStage->remotesExhausted());
 
-    auto secondResult = sortKeyStage->next();
+    auto secondResult = sortKeyStage->next(nullptr);
     ASSERT_OK(secondResult.getStatus());
     ASSERT(secondResult.getValue().getResult());
     ASSERT_BSONOBJ_EQ(*secondResult.getValue().getResult(), BSON("a" << 2 << "b" << 2));
     ASSERT_TRUE(sortKeyStage->remotesExhausted());
 
-    auto thirdResult = sortKeyStage->next();
+    auto thirdResult = sortKeyStage->next(nullptr);
     ASSERT_OK(thirdResult.getStatus());
     ASSERT(thirdResult.getValue().isEOF());
     ASSERT_TRUE(sortKeyStage->remotesExhausted());

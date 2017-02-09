@@ -39,15 +39,13 @@ class RouterStageSkip final : public RouterExecStage {
 public:
     RouterStageSkip(std::unique_ptr<RouterExecStage> child, long long skip);
 
-    StatusWith<ClusterQueryResult> next() final;
+    StatusWith<ClusterQueryResult> next(OperationContext* txn) final;
 
-    void kill() final;
+    void kill(OperationContext* txn) final;
 
     bool remotesExhausted() final;
 
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
-
-    void setOperationContext(OperationContext* txn) final;
 
 private:
     long long _skip;

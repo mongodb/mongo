@@ -187,7 +187,6 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     params.isTailable = query.getQueryRequest().isTailable();
     params.isAwaitData = query.getQueryRequest().isAwaitData();
     params.isAllowPartialResults = query.getQueryRequest().isAllowPartialResults();
-    params.txn = txn;
 
     // This is the batchSize passed to each subsequent getMore command issued by the cursor. We
     // usually use the batchSize associated with the initial find, but as it is illegal to send a
@@ -232,12 +231,12 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     }
 
     auto ccc = ClusterClientCursorImpl::make(
-        Grid::get(txn)->getExecutorPool()->getArbitraryExecutor(), std::move(params));
+        txn, Grid::get(txn)->getExecutorPool()->getArbitraryExecutor(), std::move(params));
 
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
     int bytesBuffered = 0;
     while (!FindCommon::enoughForFirstBatch(query.getQueryRequest(), results->size())) {
-        auto next = ccc->next();
+        auto next = ccc->next(txn);
         if (!next.isOK()) {
             return next.getStatus();
         }
@@ -294,7 +293,7 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
         ? ClusterCursorManager::CursorLifetime::Immortal
         : ClusterCursorManager::CursorLifetime::Mortal;
     return cursorManager->registerCursor(
-        ccc.releaseCursor(), query.nss(), cursorType, cursorLifetime);
+        txn, ccc.releaseCursor(), query.nss(), cursorType, cursorLifetime);
 }
 
 }  // namespace
@@ -389,7 +388,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* txn,
     long long startingFrom = pinnedCursor.getValue().getNumReturnedSoFar();
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
     while (!FindCommon::enoughForGetMore(batchSize, batch.size())) {
-        auto next = pinnedCursor.getValue().next();
+        auto next = pinnedCursor.getValue().next(txn);
         if (!next.isOK()) {
             return next.getStatus();
         }

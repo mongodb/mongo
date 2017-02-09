@@ -110,9 +110,9 @@ ClusterCursorManager::PinnedCursor& ClusterCursorManager::PinnedCursor::operator
     return *this;
 }
 
-StatusWith<ClusterQueryResult> ClusterCursorManager::PinnedCursor::next() {
+StatusWith<ClusterQueryResult> ClusterCursorManager::PinnedCursor::next(OperationContext* txn) {
     invariant(_cursor);
-    return _cursor->next();
+    return _cursor->next(txn);
 }
 
 bool ClusterCursorManager::PinnedCursor::isTailable() const {
@@ -152,11 +152,6 @@ Status ClusterCursorManager::PinnedCursor::setAwaitDataTimeout(Milliseconds awai
     return _cursor->setAwaitDataTimeout(awaitDataTimeout);
 }
 
-void ClusterCursorManager::PinnedCursor::setOperationContext(OperationContext* txn) {
-    return _cursor->setOperationContext(txn);
-}
-
-
 void ClusterCursorManager::PinnedCursor::returnAndKillCursor() {
     invariant(_cursor);
 
@@ -192,6 +187,7 @@ void ClusterCursorManager::shutdown() {
 }
 
 StatusWith<CursorId> ClusterCursorManager::registerCursor(
+    OperationContext* txn,
     std::unique_ptr<ClusterClientCursor> cursor,
     const NamespaceString& nss,
     CursorType cursorType,
@@ -203,7 +199,7 @@ StatusWith<CursorId> ClusterCursorManager::registerCursor(
 
     if (_inShutdown) {
         lk.unlock();
-        cursor->kill();
+        cursor->kill(txn);
         return Status(ErrorCodes::ShutdownInProgress,
                       "Cannot register new cursors as we are in the process of shutting down");
     }
@@ -274,7 +270,6 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     }
 
     entry->setLastActive(now);
-    cursor->setOperationContext(txn);
 
     // Note that pinning a cursor transfers ownership of the underlying ClusterClientCursor object
     // to the pin; the CursorEntry is left with a null ClusterClientCursor.
@@ -289,9 +284,6 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
 
     invariant(cursor);
 
-    // Reset OperationContext so that non-user initiated operations do not try to use an invalid
-    // operation context
-    cursor->setOperationContext(nullptr);
     const bool remotesExhausted = cursor->remotesExhausted();
 
     CursorEntry* entry = getEntry_inlock(nss, cursorId);
@@ -400,8 +392,11 @@ std::size_t ClusterCursorManager::reapZombieCursors() {
         }
 
         lk.unlock();
-        zombieCursor.getValue()->setOperationContext(nullptr);
-        zombieCursor.getValue()->kill();
+        // Pass a null OperationContext, because this call should not actually schedule any remote
+        // work: the cursor is already pending kill, meaning the killCursors commands are already
+        // being scheduled to be sent to the remote shard hosts. This method will just wait for them
+        // all to be scheduled.
+        zombieCursor.getValue()->kill(nullptr);
         zombieCursor.getValue().reset();
         lk.lock();
 

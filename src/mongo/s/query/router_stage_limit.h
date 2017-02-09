@@ -39,15 +39,13 @@ class RouterStageLimit final : public RouterExecStage {
 public:
     RouterStageLimit(std::unique_ptr<RouterExecStage> child, long long limit);
 
-    StatusWith<ClusterQueryResult> next() final;
+    StatusWith<ClusterQueryResult> next(OperationContext* txn) final;
 
-    void kill() final;
+    void kill(OperationContext* txn) final;
 
     bool remotesExhausted() final;
 
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
-
-    void setOperationContext(OperationContext* txn) final;
 
 private:
     long long _limit;

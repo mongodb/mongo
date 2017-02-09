@@ -44,15 +44,13 @@ class RouterStageMock final : public RouterExecStage {
 public:
     ~RouterStageMock() final {}
 
-    StatusWith<ClusterQueryResult> next() final;
+    StatusWith<ClusterQueryResult> next(OperationContext* txn) final;
 
-    void kill() final;
+    void kill(OperationContext* txn) final;
 
     bool remotesExhausted() final;
 
     Status setAwaitDataTimeout(Milliseconds awaitDataTimeout) final;
-
-    void setOperationContext(OperationContext* txn) final;
 
     /**
      * Queues a BSONObj to be returned.

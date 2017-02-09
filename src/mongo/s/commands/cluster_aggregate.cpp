@@ -209,7 +209,8 @@ Status ClusterAggregate::runAggregate(OperationContext* txn,
         invariant(shardResults[0].target.getServers().size() == 1);
         auto executorPool = Grid::get(txn)->getExecutorPool();
         const BSONObj reply =
-            uassertStatusOK(storePossibleCursor(shardResults[0].target.getServers()[0],
+            uassertStatusOK(storePossibleCursor(txn,
+                                                shardResults[0].target.getServers()[0],
                                                 shardResults[0].result,
                                                 namespaces.requestedNss,
                                                 executorPool->getArbitraryExecutor(),
@@ -410,7 +411,8 @@ BSONObj ClusterAggregate::aggRunCommand(OperationContext* txn,
     }
 
     auto executorPool = Grid::get(txn)->getExecutorPool();
-    result = uassertStatusOK(storePossibleCursor(HostAndPort(cursor->originalHost()),
+    result = uassertStatusOK(storePossibleCursor(txn,
+                                                 HostAndPort(cursor->originalHost()),
                                                  result,
                                                  namespaces.requestedNss,
                                                  executorPool->getArbitraryExecutor(),

@@ -114,11 +114,6 @@ Status AsyncResultsMerger::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
     return Status::OK();
 }
 
-void AsyncResultsMerger::setOperationContext(OperationContext* txn) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _params.txn = txn;
-}
-
 bool AsyncResultsMerger::ready() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return ready_inlock();
@@ -258,7 +253,7 @@ ClusterQueryResult AsyncResultsMerger::nextReadyUnsorted() {
     return {};
 }
 
-Status AsyncResultsMerger::askForNextBatch_inlock(size_t remoteIndex) {
+Status AsyncResultsMerger::askForNextBatch_inlock(OperationContext* txn, size_t remoteIndex) {
     auto& remote = _remotes[remoteIndex];
 
     invariant(!remote.cbHandle.isValid());
@@ -295,16 +290,16 @@ Status AsyncResultsMerger::askForNextBatch_inlock(size_t remoteIndex) {
         cmdObj = *remote.initialCmdObj;
     }
 
-    executor::RemoteCommandRequest request(remote.getTargetHost(),
-                                           _params.nsString.db().toString(),
-                                           cmdObj,
-                                           _metadataObj,
-                                           _params.txn);
+    executor::RemoteCommandRequest request(
+        remote.getTargetHost(), _params.nsString.db().toString(), cmdObj, _metadataObj, txn);
 
-    auto callbackStatus = _executor->scheduleRemoteCommand(
-        request,
-        stdx::bind(
-            &AsyncResultsMerger::handleBatchResponse, this, stdx::placeholders::_1, remoteIndex));
+    auto callbackStatus =
+        _executor->scheduleRemoteCommand(request,
+                                         stdx::bind(&AsyncResultsMerger::handleBatchResponse,
+                                                    this,
+                                                    stdx::placeholders::_1,
+                                                    txn,
+                                                    remoteIndex));
     if (!callbackStatus.isOK()) {
         return callbackStatus.getStatus();
     }
@@ -321,7 +316,8 @@ Status AsyncResultsMerger::askForNextBatch_inlock(size_t remoteIndex) {
  * 2. Remotes that already has some result will have a non-empty buffer.
  * 3. Remotes that reached maximum retries will be in 'exhausted' state.
  */
-StatusWith<executor::TaskExecutor::EventHandle> AsyncResultsMerger::nextEvent() {
+StatusWith<executor::TaskExecutor::EventHandle> AsyncResultsMerger::nextEvent(
+    OperationContext* txn) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     if (_lifecycleState != kAlive) {
@@ -349,7 +345,7 @@ StatusWith<executor::TaskExecutor::EventHandle> AsyncResultsMerger::nextEvent() 
             // If we already have established a cursor with this remote, and there is no outstanding
             // request for which we have a valid callback handle, then schedule work to retrieve the
             // next batch.
-            auto nextBatchStatus = askForNextBatch_inlock(i);
+            auto nextBatchStatus = askForNextBatch_inlock(txn, i);
             if (!nextBatchStatus.isOK()) {
                 return nextBatchStatus;
             }
@@ -394,7 +390,9 @@ StatusWith<CursorResponse> AsyncResultsMerger::parseCursorResponse(const BSONObj
 }
 
 void AsyncResultsMerger::handleBatchResponse(
-    const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData, size_t remoteIndex) {
+    const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData,
+    OperationContext* txn,
+    size_t remoteIndex) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     auto& remote = _remotes[remoteIndex];
@@ -428,7 +426,7 @@ void AsyncResultsMerger::handleBatchResponse(
             // If the event handle is invalid, then the executor is in the middle of shutting down,
             // and we can't schedule any more work for it to complete.
             if (_killCursorsScheduledEvent.isValid()) {
-                scheduleKillCursors_inlock();
+                scheduleKillCursors_inlock(txn);
                 _executor->signalEvent(_killCursorsScheduledEvent);
             }
 
@@ -583,7 +581,7 @@ void AsyncResultsMerger::handleBatchResponse(
     // We do not ask for the next batch if the cursor is tailable, as batches received from remote
     // tailable cursors should be passed through to the client without asking for more batches.
     if (!_params.isTailable && !remote.hasNext() && !remote.exhausted()) {
-        remote.status = askForNextBatch_inlock(remoteIndex);
+        remote.status = askForNextBatch_inlock(txn, remoteIndex);
         if (!remote.status.isOK()) {
             return;
         }
@@ -614,7 +612,7 @@ bool AsyncResultsMerger::haveOutstandingBatchRequests_inlock() {
     return false;
 }
 
-void AsyncResultsMerger::scheduleKillCursors_inlock() {
+void AsyncResultsMerger::scheduleKillCursors_inlock(OperationContext* txn) {
     invariant(_lifecycleState == kKillStarted);
     invariant(_killCursorsScheduledEvent.isValid());
 
@@ -625,7 +623,7 @@ void AsyncResultsMerger::scheduleKillCursors_inlock() {
             BSONObj cmdObj = KillCursorsRequest(_params.nsString, {*remote.cursorId}).toBSON();
 
             executor::RemoteCommandRequest request(
-                remote.getTargetHost(), _params.nsString.db().toString(), cmdObj, _params.txn);
+                remote.getTargetHost(), _params.nsString.db().toString(), cmdObj, txn);
 
             _executor->scheduleRemoteCommand(
                 request,
@@ -639,7 +637,7 @@ void AsyncResultsMerger::handleKillCursorsResponse(
     // We just ignore any killCursors command responses.
 }
 
-executor::TaskExecutor::EventHandle AsyncResultsMerger::kill() {
+executor::TaskExecutor::EventHandle AsyncResultsMerger::kill(OperationContext* txn) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_killCursorsScheduledEvent.isValid()) {
         invariant(_lifecycleState != kAlive);
@@ -665,7 +663,7 @@ executor::TaskExecutor::EventHandle AsyncResultsMerger::kill() {
     // remotes now. Otherwise, we have to wait until all responses are back, and then we can kill
     // the remote cursors.
     if (!haveOutstandingBatchRequests_inlock()) {
-        scheduleKillCursors_inlock();
+        scheduleKillCursors_inlock(txn);
         _lifecycleState = kKillComplete;
         _executor->signalEvent(_killCursorsScheduledEvent);
     }

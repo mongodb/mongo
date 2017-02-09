@@ -137,10 +137,6 @@ struct ClusterClientCursorParams {
     // Whether the client indicated that it is willing to receive partial results in the case of an
     // unreachable host.
     bool isAllowPartialResults = false;
-
-    // OperationContext of the calling thread. Used to append Client dependent metadata to remote
-    // requests.
-    OperationContext* txn;
 };
 
 }  // mongo

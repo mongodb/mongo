@@ -39,7 +39,8 @@
 
 namespace mongo {
 
-StatusWith<BSONObj> storePossibleCursor(const HostAndPort& server,
+StatusWith<BSONObj> storePossibleCursor(OperationContext* txn,
+                                        const HostAndPort& server,
                                         const BSONObj& cmdResult,
                                         const NamespaceString& requestedNss,
                                         executor::TaskExecutor* executor,
@@ -61,10 +62,11 @@ StatusWith<BSONObj> storePossibleCursor(const HostAndPort& server,
     params.remotes.emplace_back(server, incomingCursorResponse.getValue().getCursorId());
 
 
-    auto ccc = ClusterClientCursorImpl::make(executor, std::move(params));
+    auto ccc = ClusterClientCursorImpl::make(txn, executor, std::move(params));
 
     auto clusterCursorId =
-        cursorManager->registerCursor(ccc.releaseCursor(),
+        cursorManager->registerCursor(txn,
+                                      ccc.releaseCursor(),
                                       requestedNss,
                                       ClusterCursorManager::CursorType::NamespaceNotSharded,
                                       ClusterCursorManager::CursorLifetime::Mortal);

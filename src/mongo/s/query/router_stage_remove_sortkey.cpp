@@ -41,8 +41,8 @@ namespace mongo {
 RouterStageRemoveSortKey::RouterStageRemoveSortKey(std::unique_ptr<RouterExecStage> child)
     : RouterExecStage(std::move(child)) {}
 
-StatusWith<ClusterQueryResult> RouterStageRemoveSortKey::next() {
-    auto childResult = getChildStage()->next();
+StatusWith<ClusterQueryResult> RouterStageRemoveSortKey::next(OperationContext* txn) {
+    auto childResult = getChildStage()->next(txn);
     if (!childResult.isOK() || !childResult.getValue().getResult()) {
         return childResult;
     }
@@ -59,8 +59,8 @@ StatusWith<ClusterQueryResult> RouterStageRemoveSortKey::next() {
     return {builder.obj()};
 }
 
-void RouterStageRemoveSortKey::kill() {
-    getChildStage()->kill();
+void RouterStageRemoveSortKey::kill(OperationContext* txn) {
+    getChildStage()->kill(txn);
 }
 
 bool RouterStageRemoveSortKey::remotesExhausted() {
@@ -69,10 +69,6 @@ bool RouterStageRemoveSortKey::remotesExhausted() {
 
 Status RouterStageRemoveSortKey::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
     return getChildStage()->setAwaitDataTimeout(awaitDataTimeout);
-}
-
-void RouterStageRemoveSortKey::setOperationContext(OperationContext* txn) {
-    return getChildStage()->setOperationContext(txn);
 }
 
 }  // namespace mongo
