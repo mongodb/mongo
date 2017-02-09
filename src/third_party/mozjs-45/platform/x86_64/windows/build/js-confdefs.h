@@ -59,6 +59,14 @@
 //#define _WIN32_WINNT 0x502
 #define _WINDOWS 1
 
+// SERVER-20811 - Define manually since ESR 45 configure does not set them on Windows
+#define HAVE_ACOSH 1
+#define HAVE_ASINH 1
+#define HAVE_ATANH 1
+#define HAVE_CBRT 1
+#define HAVE_EXPM1 1
+#define HAVE_LOG1P 1
+
 #include "js/RequiredDefines.h"
 
 #endif /* js_confdefs_h */
