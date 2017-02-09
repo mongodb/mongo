@@ -39,6 +39,10 @@
 #include <sys/wait.h>
 #endif
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 #include <boost/filesystem.hpp>
 
 #include "mongo/bson/util/builder.h"
@@ -551,7 +555,7 @@ TEST(SetupOptions, MissingBinaryName) {
     ASSERT_NOT_OK(::mongo::setupServerOptions(argv));
 }
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !(defined(__APPLE__) && TARGET_OS_TV)
 
 #define ASSERT_BOOST_SUCCESS(ec) ASSERT_FALSE(ec) << ec.message()
 

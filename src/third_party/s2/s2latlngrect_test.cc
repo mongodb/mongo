@@ -99,7 +99,7 @@ TEST(S2LatLngRect, GetVertex) {
     double lat = M_PI_4 * (i - 2);
     double lng = M_PI_2 * (i - 2) + 0.2;
     S2LatLngRect r(R1Interval(lat, lat + M_PI_4),
-                   S1Interval(drem(lng, 2*M_PI), drem(lng + M_PI_2, 2*M_PI)));
+                   S1Interval(remainder(lng, 2*M_PI), remainder(lng + M_PI_2, 2*M_PI)));
     for (int k = 0; k < 4; ++k) {
       EXPECT_TRUE(S2::SimpleCCW(r.GetVertex((k - 1) & 3).ToPoint(),
                                 r.GetVertex(k).ToPoint(),

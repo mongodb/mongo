@@ -275,7 +275,7 @@ def float53_object(target, source, extra_defines=None):
     return obj_env.LibraryObject(target, source)
 
 # Set OS Defines
-if env.TargetOSIs('osx'):
+if env.TargetOSIs('darwin'):
     cpp_defines['LINUX'] = '1'
     cpp_defines['mach'] = '1'
     extra_objects = [
@@ -339,4 +339,3 @@ env.Library(
     source=source_files,
     LIBS=libs,
 )
-

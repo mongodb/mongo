@@ -58,7 +58,7 @@ def get_running_os_name():
     elif running_os == 'win32':
         running_os = 'windows'
     elif running_os == 'darwin':
-        running_os = 'osx'
+        running_os = 'macOS'
     else:
         running_os = 'unknown'
     return running_os
@@ -68,10 +68,15 @@ def env_get_os_name_wrapper(self):
 
 def is_os_raw(target_os, os_list_to_check):
     okay = False
-    posix_os_list = [ 'linux', 'openbsd', 'freebsd', 'osx', 'solaris' ]
+
+    darwin_os_list = [ 'macOS', 'tvOS', 'tvOS-sim', 'iOS', 'iOS-sim' ]
+    posix_os_list = [ 'linux', 'openbsd', 'freebsd', 'solaris' ] + darwin_os_list
 
     for p in os_list_to_check:
         if p == 'posix' and target_os in posix_os_list:
+            okay = True
+            break
+        if p == 'darwin' and target_os in darwin_os_list:
             okay = True
             break
         elif p == target_os:
@@ -1033,23 +1038,33 @@ def CheckForProcessor(context, which_arch):
 
 # Taken from http://nadeausoftware.com/articles/2012/01/c_c_tip_how_use_compiler_predefined_macros_detect_operating_system
 os_macros = {
-    "windows": "_WIN32",
-    "solaris": "__sun",
-    "freebsd": "__FreeBSD__",
-    "openbsd": "__OpenBSD__",
-    "osx": "__APPLE__",
-    "linux": "__linux__",
+    "windows": "defined(_WIN32)",
+    "solaris": "defined(__sun)",
+    "freebsd": "defined(__FreeBSD__)",
+    "openbsd": "defined(__OpenBSD__)",
+    "iOS": "defined(__APPLE__) && TARGET_OS_IOS && !TARGET_OS_SIMULATOR",
+    "iOS-sim": "defined(__APPLE__) && TARGET_OS_IOS && TARGET_OS_SIMULATOR",
+    "tvOS": "defined(__APPLE__) && TARGET_OS_TV && !TARGET_OS_SIMULATOR",
+    "tvOS-sim": "defined(__APPLE__) && TARGET_OS_TV && TARGET_OS_SIMULATOR",
+    # NOTE: Once we have XCode 8 required, we can rely on the value of TARGET_OS_OSX. In case
+    # we are on an older XCode, use TARGET_OS_MAC and TARGET_OS_IPHONE. We don't need to correct
+    # the above declarations since we will never target them with anything other than XCode 8.
+    "macOS": "defined(__APPLE__) && (TARGET_OS_OSX || (TARGET_OS_MAC && !TARGET_OS_IPHONE))",
+    "linux": "defined(__linux__)",
 }
 
 def CheckForOS(context, which_os):
     test_body = """
-    #if defined({0})
+    #if defined(__APPLE__)
+    #include <TargetConditionals.h>
+    #endif
+    #if {0}
     /* detected {1} */
     #else
     #error
     #endif
     """.format(os_macros[which_os], which_os)
-    context.Message('Checking if target OS {0} is supported by the toolchain '.format(which_os))
+    context.Message('Checking if target OS {0} is supported by the toolchain... '.format(which_os))
     ret = context.TryCompile(textwrap.dedent(test_body), ".c")
     context.Result(ret)
     return ret
@@ -1283,7 +1298,7 @@ if link_model.startswith("dynamic"):
     # have no dependencies (and thus be leaves in our linking DAG).
     # If that condition is met, then the graph will be acyclic.
 
-    if env.TargetOSIs('osx'):
+    if env.TargetOSIs('darwin'):
         if link_model == "dynamic-strict":
             # Darwin is strict by default
             pass
@@ -1380,7 +1395,7 @@ if env.TargetOSIs('linux', 'freebsd', 'openbsd'):
     env['LINK_LIBGROUP_END'] = '-Wl,--end-group'
     env['LINK_WHOLE_ARCHIVE_START'] = '-Wl,--whole-archive'
     env['LINK_WHOLE_ARCHIVE_END'] = '-Wl,--no-whole-archive'
-elif env.TargetOSIs('osx'):
+elif env.TargetOSIs('darwin'):
     env['LINK_LIBGROUP_START'] = ''
     env['LINK_LIBGROUP_END'] = ''
     env['LINK_WHOLE_ARCHIVE_START'] = '-Wl,-all_load'
@@ -1444,7 +1459,7 @@ elif env.TargetOSIs('windows'):
     #    The this pointer is valid only within nonstatic member functions. It cannot be used in the initializer list for a base class.
     # c4800
     # 'type' : forcing value to bool 'true' or 'false' (performance warning)
-    #    This warning is generated when a value that is not bool is assigned or coerced into type bool. 
+    #    This warning is generated when a value that is not bool is assigned or coerced into type bool.
     # c4267
     # 'var' : conversion from 'size_t' to 'type', possible loss of data
     # When compiling with /Wp64, or when compiling on a 64-bit operating system, type is 32 bits but size_t is 64 bits when compiling for 64-bit targets. To fix this warning, use size_t instead of a type.
@@ -1483,12 +1498,12 @@ elif env.TargetOSIs('windows'):
 
     env.Append( CPPDEFINES=["_CONSOLE","_CRT_SECURE_NO_WARNINGS"] )
 
-    # this would be for pre-compiled headers, could play with it later  
+    # this would be for pre-compiled headers, could play with it later
     #env.Append( CCFLAGS=['/Yu"pch.h"'] )
 
     # docs say don't use /FD from command line (minimal rebuild)
     # /Gy function level linking (implicit when using /Z7)
-    # /Z7 debug info goes into each individual .obj file -- no .pdb created 
+    # /Z7 debug info goes into each individual .obj file -- no .pdb created
     env.Append( CCFLAGS= ["/Z7", "/errorReport:none"] )
 
     # /DEBUG will tell the linker to create a .pdb file
@@ -1573,7 +1588,7 @@ if env.ToolchainIs('msvc'):
 if env.TargetOSIs('posix'):
 
     # Everything on OS X is position independent by default. Solaris doesn't support PIE.
-    if not env.TargetOSIs('osx', 'solaris'):
+    if not env.TargetOSIs('darwin', 'solaris'):
         if get_option('runtime-hardening') == "on":
             # If runtime hardening is requested, then build anything
             # destined for an executable with the necessary flags for PIE.
@@ -1592,7 +1607,7 @@ if env.TargetOSIs('posix'):
                          "-Wno-unknown-pragmas",
                          "-Winvalid-pch"] )
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
-    if env.TargetOSIs('linux', 'osx', 'solaris'):
+    if env.TargetOSIs('linux', 'darwin', 'solaris'):
         if not has_option("disable-warnings-as-errors"):
             env.Append( CCFLAGS=["-Werror"] )
 
@@ -1601,7 +1616,7 @@ if env.TargetOSIs('posix'):
 
     # SERVER-9761: Ensure early detection of missing symbols in dependent libraries at program
     # startup.
-    if env.TargetOSIs('osx'):
+    if env.TargetOSIs('darwin'):
         env.Append( LINKFLAGS=["-Wl,-bind_at_load"] )
     else:
         env.Append( LINKFLAGS=["-Wl,-z,now"] )
@@ -1627,7 +1642,7 @@ if env.TargetOSIs('posix'):
 
     # Promote linker warnings into errors. We can't yet do this on OS X because its linker considers
     # noall_load obsolete and warns about it.
-    if not env.TargetOSIs('osx'):
+    if not env.TargetOSIs('darwin'):
         env.Append(
             LINKFLAGS=[
                 "-Wl,--fatal-warnings",
@@ -1800,6 +1815,40 @@ def doConfigure(myenv):
         env.Append( CPPDEFINES=[("NTDDI_VERSION", "0x" + win_version_min[0] + win_version_min[1])] )
 
     conf.Finish()
+
+    # We require macOS 10.10, iOS 10.2, or tvOS 10.2
+    if env.TargetOSIs('darwin'):
+
+        # TODO: Better error messages, mention the various -mX-version-min-flags in the error, and
+        # single source of truth for versions, plumbed through #ifdef ladder and error messages.
+        def CheckDarwinMinima(context):
+            test_body = """
+            #include <Availability.h>
+            #include <AvailabilityMacros.h>
+            #include <TargetConditionals.h>
+
+            #if TARGET_OS_OSX && (MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_X_VERSION_10_10)
+            #error 1
+            #elif TARGET_OS_IOS && (__IPHONE_OS_VERSION_MIN_REQUIRED < __IPHONE_10_2)
+            #error 2
+            #elif TARGET_OS_TV && (__TV_OS_VERSION_MIN_REQUIRED < __TVOS_10_1)
+            #error 3
+            #endif
+            """
+
+            context.Message("Checking for sufficient {0} target version minimum... ".format(context.env['TARGET_OS']))
+            ret = context.TryCompile(textwrap.dedent(test_body), ".c")
+            context.Result(ret)
+            return ret
+
+        conf = Configure(myenv, help=False, custom_tests={
+            "CheckDarwinMinima" : CheckDarwinMinima,
+        })
+
+        if not conf.CheckDarwinMinima():
+            conf.env.ConfError("Required target minimum of macOS 10.10, iOS 10.2, or tvOS 10.1 not found")
+
+        conf.Finish()
 
     def AddFlagIfSupported(env, tool, extension, flag, link, **mutation):
         def CheckFlagTest(context, tool, extension, flag):
@@ -2045,20 +2094,25 @@ def doConfigure(myenv):
             env.Append( CCFLAGS="-Wno-null-conversion" )
         conf.Finish()
 
-    # This needs to happen before we check for libc++, since it affects whether libc++ is available.
-    if env.TargetOSIs('osx') and has_option('osx-version-min'):
-        min_version = get_option('osx-version-min')
-        min_version_flag = '-mmacosx-version-min=%s' % (min_version)
-        if not AddToCCFLAGSIfSupported(myenv, min_version_flag):
-            myenv.ConfError("Can't set minimum OS X version with this compiler")
-        myenv.AppendUnique(LINKFLAGS=[min_version_flag])
+    if has_option('osx-version-min'):
+        message="""
+        The --osx-version-min option is no longer supported.
+
+        To specify a target minimum for Darwin platforms, please explicitly add the appropriate options
+        to CCFLAGS and LINKFLAGS on the command line:
+
+        macOS: scons CCFLAGS="-mmacosx-version-min=10.11" LINKFLAGS="-mmacosx-version-min=10.11" ..
+        iOS  : scons CCFLAGS="-miphoneos-version-min=10.3" LINKFLAGS="-miphoneos-version-min=10.3" ...
+        tvOS : scons CCFLAGS="-mtvos-version-min=10.3" LINKFLAGS="-tvos-version-min=10.3" ...
+
+        Note that MongoDB requires macOS 10.10, iOS 10.2, or tvOS 10.2 or later.
+        """
+        myenv.ConfError(textwrap.dedent(message))
 
     usingLibStdCxx = False
     if has_option('libc++'):
         if not myenv.ToolchainIs('clang'):
             myenv.FatalError('libc++ is currently only supported for clang')
-        if env.TargetOSIs('osx') and has_option('osx-version-min') and versiontuple(min_version) < versiontuple('10.7'):
-            print("Warning: You passed option 'libc++'. You probably want to also pass 'osx-version-min=10.7' or higher for libc++ support.")
         if AddToCXXFLAGSIfSupported(myenv, '-stdlib=libc++'):
             myenv.Append(LINKFLAGS=['-stdlib=libc++'])
         else:
@@ -2624,7 +2678,7 @@ def doConfigure(myenv):
                     print("WARNING: Cannot find SSL library '%s'" % extra_file)
 
         # Used to import system certificate keychains
-        if conf.env.TargetOSIs('osx'):
+        if conf.env.TargetOSIs('darwin'):
             conf.env.AppendUnique(FRAMEWORKS=[
                 'CoreFoundation',
                 'Security',
@@ -2797,10 +2851,10 @@ def doConfigure(myenv):
 
     conf.env['MONGO_BUILD_SASL_CLIENT'] = bool(has_option("use-sasl-client"))
     if conf.env['MONGO_BUILD_SASL_CLIENT'] and not conf.CheckLibWithHeader(
-            "sasl2", 
-            ["stddef.h","sasl/sasl.h"], 
-            "C", 
-            "sasl_version_info(0, 0, 0, 0, 0, 0);", 
+            "sasl2",
+            ["stddef.h","sasl/sasl.h"],
+            "C",
+            "sasl_version_info(0, 0, 0, 0, 0, 0);",
             autoadd=False ):
         myenv.ConfError("Couldn't find SASL header/libraries")
 
@@ -2809,7 +2863,7 @@ def doConfigure(myenv):
         if not conf.CheckLib("execinfo"):
             myenv.ConfError("Cannot find libexecinfo, please install devel/libexecinfo.")
 
-    # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this 
+    # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this
     # point.
     if myenv['MONGO_ALLOCATOR'] == 'tcmalloc':
         if use_system_version_of_library('tcmalloc'):

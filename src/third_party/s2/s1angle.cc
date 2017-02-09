@@ -25,7 +25,7 @@ S1Angle S1Angle::Normalized() const {
 }
 
 void S1Angle::Normalize() {
-  radians_ = drem(radians_, 2.0 * M_PI);
+  radians_ = remainder(radians_, 2.0 * M_PI);
   if (radians_ <= -M_PI) radians_ = M_PI;
 }
 

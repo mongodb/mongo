@@ -69,6 +69,10 @@
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 namespace fs = boost::filesystem;
 
 namespace mongo {
@@ -100,7 +104,7 @@ void signalForkSuccess() {
 
 
 static bool forkServer() {
-#ifndef _WIN32
+#if !defined(_WIN32) && !(defined(__APPLE__) && TARGET_OS_TV)
     if (serverGlobalParams.doFork) {
         fassert(16447, !serverGlobalParams.logpath.empty() || serverGlobalParams.logWithSyslog);
 

@@ -131,6 +131,7 @@
 #if !defined(DPML_SIGNAL) && !defined(MINIMAL_SILENT_MODE_EXCEPTION_HANDLER) && \
     !defined(wnt)
 
+#   include <signal.h>
 #   include <sys/signal.h>
 #   define DPML_SIGNAL(p)	 raise(SIGFPE)
 

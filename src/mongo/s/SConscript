@@ -352,6 +352,7 @@ env.Library(
     ],
     LIBDEPS=[
         "coreshard",
+        "local_sharding_info",
         "$BUILD_DIR/mongo/db/commands/core",
         "$BUILD_DIR/mongo/db/concurrency/lock_manager",
         "$BUILD_DIR/mongo/db/query/query",

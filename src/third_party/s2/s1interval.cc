@@ -110,7 +110,7 @@ bool S1Interval::InteriorIntersects(S1Interval const& y) const {
 
 inline static double PositiveDistance(double a, double b) {
   // Compute the distance from "a" to "b" in the range [0, 2*Pi).
-  // This is equivalent to (drem(b - a - M_PI, 2 * M_PI) + M_PI),
+  // This is equivalent to (remainder(b - a - M_PI, 2 * M_PI) + M_PI),
   // except that it is more numerically stable (it does not lose
   // precision for very small positive distances).
   double d = b - a;
@@ -180,7 +180,7 @@ S1Interval S1Interval::Expanded(double radius) const {
   // for a 1-bit rounding error when computing each endpoint.
   if (GetLength() + 2 * radius >= 2 * M_PI - 1e-15) return Full();
 
-  S1Interval result(drem(lo() - radius, 2*M_PI), drem(hi() + radius, 2*M_PI));
+  S1Interval result(remainder(lo() - radius, 2*M_PI), remainder(hi() + radius, 2*M_PI));
   if (result.lo() <= -M_PI) result.set_lo(M_PI);
   return result;
 }
@@ -245,6 +245,6 @@ S1Interval S1Interval::Intersection(S1Interval const& y) const {
 bool S1Interval::ApproxEquals(S1Interval const& y, double max_error) const {
   if (is_empty()) return y.GetLength() <= max_error;
   if (y.is_empty()) return GetLength() <= max_error;
-  return (fabs(drem(y.lo() - lo(), 2 * M_PI)) +
-          fabs(drem(y.hi() - hi(), 2 * M_PI))) <= max_error;
+  return (fabs(remainder(y.lo() - lo(), 2 * M_PI)) +
+          fabs(remainder(y.hi() - hi(), 2 * M_PI))) <= max_error;
 }

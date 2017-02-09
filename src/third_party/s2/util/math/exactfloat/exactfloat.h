@@ -436,7 +436,7 @@ class ExactFloat {
   }
 
   // A synonym for remainder().
-  friend ExactFloat drem(const ExactFloat& a, const ExactFloat& b) {
+  friend ExactFloat remainder(const ExactFloat& a, const ExactFloat& b) {
     return remainder(a, b);
   }
 

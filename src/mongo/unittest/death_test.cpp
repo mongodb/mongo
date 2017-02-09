@@ -37,6 +37,10 @@
 #include <unistd.h>
 #endif
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 #include <sstream>
 
 #include "mongo/util/assert_util.h"
@@ -58,8 +62,11 @@ namespace unittest {
 DeathTestImpl::DeathTestImpl(std::unique_ptr<Test> test) : _test(std::move(test)) {}
 
 void DeathTestImpl::_doTest() {
-#ifdef _WIN32
+#if defined(_WIN32)
     log() << "Skipping death test on Windows";
+    return;
+#elif defined(__APPLE__) && TARGET_OS_TV
+    log() << "Skipping death test on tvOS";
     return;
 #else
     int pipes[2];

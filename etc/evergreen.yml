@@ -5378,7 +5378,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: osx
     push_arch: x86_64
-    compile_flags: --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
+    compile_flags: --allocator=system -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
     num_jobs_available: 1
     build_mongoreplay: true
   tasks:
@@ -5481,7 +5481,7 @@ buildvariants:
     push_name: osx-ssl
     push_arch: x86_64
     tooltags: "-tags ssl"
-    compile_flags: --ssl --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
+    compile_flags: --ssl --allocator=system -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
     num_jobs_available: 1
     build_mongoreplay: true
   tasks:
@@ -5583,7 +5583,7 @@ buildvariants:
     push_name: osx-debug
     push_arch: x86_64
     num_jobs_available: 1
-    compile_flags: --dbg=on --opt=on --allocator=system -j$(sysctl -n hw.logicalcpu) --osx-version-min=10.7 --libc++
+    compile_flags: --dbg=on --opt=on --allocator=system -j$(sysctl -n hw.logicalcpu) --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
     build_mongoreplay: true
   tasks:
   - name: compile
@@ -5626,7 +5626,7 @@ buildvariants:
     push_name: osx
     push_arch: x86_64-enterprise
     tooltags: "-tags 'ssl sasl'"
-    compile_flags: --ssl --allocator=system -j$(sysctl -n hw.logicalcpu) --release --osx-version-min=10.7 --libc++
+    compile_flags: --ssl --allocator=system -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
     num_jobs_available: 1
     build_mongoreplay: true
   tasks:
