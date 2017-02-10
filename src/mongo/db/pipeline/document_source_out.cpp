@@ -220,7 +220,7 @@ intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
     return new DocumentSourceOut(outputNs, pExpCtx);
 }
 
-Value DocumentSourceOut::serialize(bool explain) const {
+Value DocumentSourceOut::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
     massert(
         17000, "$out shouldn't have different db than input", _outputNs.db() == pExpCtx->ns.db());
 

@@ -46,7 +46,8 @@ public:
 
     GetNextResult getNext() override;
     const char* getSourceName() const override;
-    Value serialize(bool explain = false) const override;
+    Value serialize(
+        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override;
     void dispose() override;
     bool isValidInitialSource() const override {
         return true;

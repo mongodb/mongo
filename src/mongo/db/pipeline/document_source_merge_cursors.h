@@ -52,7 +52,7 @@ public:
     GetNextResult getNext() final;
     const char* getSourceName() const final;
     void dispose() final;
-    Value serialize(bool explain = false) const final;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     bool isValidInitialSource() const final {
         return true;
     }

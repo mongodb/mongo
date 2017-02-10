@@ -55,7 +55,7 @@ public:
         virtual ~TransformerInterface() = default;
         virtual Document applyTransformation(Document input) = 0;
         virtual void optimize() = 0;
-        virtual Document serialize(bool explain) const = 0;
+        virtual Document serialize(boost::optional<ExplainOptions::Verbosity> explain) const = 0;
         virtual DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const = 0;
         virtual GetModPathsReturn getModifiedPaths() const = 0;
     };
@@ -70,7 +70,7 @@ public:
     GetNextResult getNext() final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
     void dispose() final;
-    Value serialize(bool explain) const final;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
     DocumentSource::GetDepsReturn getDependencies(DepsTracker* deps) const final;

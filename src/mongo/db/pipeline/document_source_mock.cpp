@@ -54,7 +54,7 @@ const char* DocumentSourceMock::getSourceName() const {
     return "mock";
 }
 
-Value DocumentSourceMock::serialize(bool explain) const {
+Value DocumentSourceMock::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
     return Value(Document{{getSourceName(), Document()}});
 }
 

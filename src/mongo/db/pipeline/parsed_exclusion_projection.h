@@ -103,7 +103,7 @@ public:
         return ProjectionType::kExclusion;
     }
 
-    Document serialize(bool explain = false) const final;
+    Document serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
     /**
      * Parses the projection specification given by 'spec', populating internal data structures.

@@ -76,14 +76,14 @@ StatusWith<BSONObj> ViewShardingCheck::getResolvedViewIfSharded(OperationContext
     return viewDetailBob.obj();
 }
 
-void ViewShardingCheck::appendShardedViewStatus(const BSONObj& resolvedView, BSONObjBuilder* out) {
+Status ViewShardingCheck::appendShardedViewResponse(const BSONObj& resolvedView,
+                                                    BSONObjBuilder* out) {
     invariant(out);
     invariant(!resolvedView.isEmpty());
 
     out->append("resolvedView", resolvedView);
-    Status status{ErrorCodes::CommandOnShardedViewNotSupportedOnMongod,
-                  str::stream() << "Command on view must be executed by mongos"};
-    Command::appendCommandStatus(*out, status);
+    return {ErrorCodes::CommandOnShardedViewNotSupportedOnMongod,
+            str::stream() << "Command on view must be executed by mongos"};
 }
 
 bool ViewShardingCheck::collectionIsSharded(OperationContext* opCtx, const NamespaceString& nss) {

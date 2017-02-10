@@ -174,7 +174,7 @@ void DocumentSourceCursor::recordPlanSummaryStats() {
     _planSummaryStats.hasSortStage = hasSortStage;
 }
 
-Value DocumentSourceCursor::serialize(bool explain) const {
+Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
     // we never parse a documentSourceCursor, so we only serialize for explain
     if (!explain)
         return Value();
@@ -187,8 +187,7 @@ Value DocumentSourceCursor::serialize(bool explain) const {
         massert(17392, "No _exec. Were we disposed before explained?", _exec);
 
         _exec->restoreState();
-        Explain::explainStages(
-            _exec.get(), autoColl.getCollection(), ExplainCommon::QUERY_PLANNER, &explainBuilder);
+        Explain::explainStages(_exec.get(), autoColl.getCollection(), *explain, &explainBuilder);
 
         _exec->saveState();
     }
@@ -209,6 +208,10 @@ Value DocumentSourceCursor::serialize(bool explain) const {
     BSONObj explainObj = explainBuilder.obj();
     invariant(explainObj.hasField("queryPlanner"));
     out["queryPlanner"] = Value(explainObj["queryPlanner"]);
+    if (*explain >= ExplainOptions::Verbosity::kExecStats) {
+        invariant(explainObj.hasField("executionStats"));
+        out["executionStats"] = Value(explainObj["executionStats"]);
+    }
 
     return Value(DOC(getSourceName() << out.freezeToValue()));
 }

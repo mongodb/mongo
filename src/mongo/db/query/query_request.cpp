@@ -1058,9 +1058,6 @@ StatusWith<BSONObj> QueryRequest::asAggregationCommand() const {
 
     // Other options.
     aggregationBuilder.append("collation", _collation);
-    if (_explain) {
-        aggregationBuilder.append("explain", _explain);
-    }
     if (_maxTimeMS > 0) {
         aggregationBuilder.append(cmdOptionMaxTimeMS, _maxTimeMS);
     }

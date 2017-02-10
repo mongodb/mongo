@@ -54,7 +54,8 @@ void InclusionNode::optimize() {
     }
 }
 
-void InclusionNode::serialize(MutableDocument* output, bool explain) const {
+void InclusionNode::serialize(MutableDocument* output,
+                              boost::optional<ExplainOptions::Verbosity> explain) const {
     // Always put "_id" first if it was included (implicitly or explicitly).
     if (_inclusions.find("_id") != _inclusions.end()) {
         output->addField("_id", Value(true));
@@ -77,7 +78,7 @@ void InclusionNode::serialize(MutableDocument* output, bool explain) const {
         } else {
             auto expressionIt = _expressions.find(field);
             invariant(expressionIt != _expressions.end());
-            output->addField(field, expressionIt->second->serialize(explain));
+            output->addField(field, expressionIt->second->serialize(static_cast<bool>(explain)));
         }
     }
 }

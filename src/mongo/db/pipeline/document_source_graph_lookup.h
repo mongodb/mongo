@@ -45,7 +45,9 @@ public:
     const char* getSourceName() const final;
     void dispose() final;
     BSONObjSet getOutputSorts() final;
-    void serializeToArray(std::vector<Value>& array, bool explain = false) const final;
+    void serializeToArray(
+        std::vector<Value>& array,
+        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     /**
      * Returns the 'as' path, and possibly the fields modified by an absorbed $unwind.
@@ -107,7 +109,7 @@ private:
         boost::optional<long long> maxDepth,
         boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> unwindSrc);
 
-    Value serialize(bool explain = false) const final {
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
         // Should not be called; use serializeToArray instead.
         MONGO_UNREACHABLE;
     }

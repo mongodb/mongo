@@ -87,9 +87,9 @@ public:
         auto bucketAutoStage = createBucketAuto(bucketAutoSpec);
         assertBucketAutoType(bucketAutoStage);
 
-        const bool explain = true;
         vector<Value> explainedStages;
-        bucketAutoStage->serializeToArray(explainedStages, explain);
+        bucketAutoStage->serializeToArray(explainedStages,
+                                          ExplainOptions::Verbosity::kQueryPlanner);
         ASSERT_EQUALS(explainedStages.size(), 1UL);
 
         Value expectedExplain = Value(expectedObj);

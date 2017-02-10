@@ -105,9 +105,20 @@ var Explainable = (function() {
 
             // Add the explain option.
             extraOpts = extraOpts || {};
-            extraOpts.explain = true;
 
-            return this._collection.aggregate(pipeline, extraOpts);
+            // For compatibility with 3.4 and older versions, when the verbosity is "queryPlanner",
+            // we use the explain option to the aggregate command. Otherwise we issue an explain
+            // command wrapping the agg command, which is supported by newer versions of the server.
+            if (this._verbosity === "queryPlanner") {
+                extraOpts.explain = true;
+                return this._collection.aggregate(pipeline, extraOpts);
+            } else {
+                let aggCmd = Object.extend(
+                    {"aggregate": this._collection.getName(), "pipeline": pipeline}, extraOpts);
+                let explainCmd = {"explain": aggCmd, "verbosity": this._verbosity};
+                let explainResult = this._collection.runReadCommand(explainCmd);
+                return throwOrReturn(explainResult);
+            }
         };
 
         this.count = function(query, options) {

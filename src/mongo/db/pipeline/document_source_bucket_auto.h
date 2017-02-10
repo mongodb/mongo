@@ -43,7 +43,7 @@ namespace mongo {
  */
 class DocumentSourceBucketAuto final : public DocumentSource, public SplittableDocumentSource {
 public:
-    Value serialize(bool explain = false) const final;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
     GetNextResult getNext() final;
     void dispose() final;

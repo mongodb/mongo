@@ -97,8 +97,9 @@ public:
         auto outputPipe = uassertStatusOK(Pipeline::parse(request.getPipeline(), ctx));
         outputPipe->optimizePipeline();
 
-        ASSERT_VALUE_EQ(Value(outputPipe->writeExplainOps()),
-                        Value(outputPipeExpected["pipeline"]));
+        ASSERT_VALUE_EQ(
+            Value(outputPipe->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner)),
+            Value(outputPipeExpected["pipeline"]));
         ASSERT_VALUE_EQ(Value(outputPipe->serialize()), Value(serializePipeExpected["pipeline"]));
     }
 
@@ -963,8 +964,10 @@ public:
         shardPipe = mergePipe->splitForSharded();
         ASSERT(shardPipe != nullptr);
 
-        ASSERT_VALUE_EQ(Value(shardPipe->writeExplainOps()), Value(shardPipeExpected["pipeline"]));
-        ASSERT_VALUE_EQ(Value(mergePipe->writeExplainOps()), Value(mergePipeExpected["pipeline"]));
+        ASSERT_VALUE_EQ(Value(shardPipe->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner)),
+                        Value(shardPipeExpected["pipeline"]));
+        ASSERT_VALUE_EQ(Value(mergePipe->writeExplainOps(ExplainOptions::Verbosity::kQueryPlanner)),
+                        Value(mergePipeExpected["pipeline"]));
     }
 
     virtual ~Base() {}

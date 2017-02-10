@@ -190,7 +190,7 @@ void Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss, DbMe
         const BSONObj findCommand = queryRequest.asFindCommand();
 
         // We default to allPlansExecution verbosity.
-        const auto verbosity = ExplainCommon::EXEC_ALL_PLANS;
+        const auto verbosity = ExplainOptions::Verbosity::kExecAllPlans;
 
         const bool secondaryOk = (readPreference.pref != ReadPreference::PrimaryOnly);
         const rpc::ServerSelectionMetadata metadata(secondaryOk, readPreference);
@@ -567,7 +567,7 @@ void Strategy::writeOp(OperationContext* opCtx, DbMessage* dbm) {
 Status Strategy::explainFind(OperationContext* opCtx,
                              const BSONObj& findCommand,
                              const QueryRequest& qr,
-                             ExplainCommon::Verbosity verbosity,
+                             ExplainOptions::Verbosity verbosity,
                              const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                              BSONObjBuilder* out) {
     BSONObjBuilder explainCmdBob;

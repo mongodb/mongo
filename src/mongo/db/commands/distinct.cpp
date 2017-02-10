@@ -45,6 +45,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
@@ -114,7 +115,7 @@ public:
     virtual Status explain(OperationContext* opCtx,
                            const std::string& dbname,
                            const BSONObj& cmdObj,
-                           ExplainCommon::Verbosity verbosity,
+                           ExplainOptions::Verbosity verbosity,
                            const rpc::ServerSelectionMetadata&,
                            BSONObjBuilder* out) const {
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
@@ -143,10 +144,15 @@ public:
             if (!viewAggregation.isOK()) {
                 return viewAggregation.getStatus();
             }
-            std::string errmsg;
-            (void)Command::findCommand("aggregate")
-                ->run(opCtx, dbname, viewAggregation.getValue(), 0, errmsg, *out);
-            return Status::OK();
+
+            auto viewAggRequest =
+                AggregationRequest::parseFromBSON(nss, viewAggregation.getValue(), verbosity);
+            if (!viewAggRequest.isOK()) {
+                return viewAggRequest.getStatus();
+            }
+
+            return runAggregate(
+                opCtx, nss, viewAggRequest.getValue(), viewAggregation.getValue(), *out);
         }
 
         auto executor = getExecutorDistinct(

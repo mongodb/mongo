@@ -14,6 +14,8 @@ selector:
     - jstests/sharding/covered_shard_key_indexes.js
     # Can un-blacklist once SERVER-27701 backport (BACKPORT-483) is finished and in 3.4 release
     - jstests/sharding/linearizable_read_concern.js
+    # Enable when 3.6 becomes last-stable.
+    - jstests/sharding/views.js
 
 executor:
   js_test:

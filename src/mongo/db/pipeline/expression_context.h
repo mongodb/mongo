@@ -29,6 +29,7 @@
 #pragma once
 
 #include <boost/intrusive_ptr.hpp>
+#include <boost/optional.hpp>
 #include <memory>
 #include <string>
 #include <vector>
@@ -40,6 +41,7 @@
 #include "mongo/db/pipeline/document_comparator.h"
 #include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/string_map.h"
 
@@ -98,7 +100,9 @@ public:
         return it->second;
     };
 
-    bool isExplain = false;
+    // The explain verbosity requested by the user, or boost::none if no explain was requested.
+    boost::optional<ExplainOptions::Verbosity> explain;
+
     bool inShard = false;
     bool inRouter = false;
     bool extSortAllowed = false;

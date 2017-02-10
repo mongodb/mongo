@@ -271,15 +271,17 @@ TEST(CountRequest, ConvertToAggregationWithQueryAndFilterAndLimit) {
                       SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 
-TEST(CountRequest, ConvertToAggregationWithExplain) {
+TEST(CountRequest, ConvertToAggregationOmitsExplain) {
     CountRequest countRequest(testns, BSONObj());
     countRequest.setExplain(true);
     auto agg = countRequest.asAggregationCommand();
     ASSERT_OK(agg);
 
+    ASSERT_FALSE(agg.getValue().hasField("explain"));
+
     auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
     ASSERT_OK(ar.getStatus());
-    ASSERT(ar.getValue().isExplain());
+    ASSERT_FALSE(ar.getValue().getExplain());
     ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
 

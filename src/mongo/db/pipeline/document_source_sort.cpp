@@ -79,16 +79,17 @@ DocumentSource::GetNextResult DocumentSourceSort::getNext() {
     return _output->next().second;
 }
 
-void DocumentSourceSort::serializeToArray(vector<Value>& array, bool explain) const {
+void DocumentSourceSort::serializeToArray(
+    std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
     if (explain) {  // always one Value for combined $sort + $limit
-        array.push_back(
-            Value(DOC(getSourceName()
-                      << DOC("sortKey" << serializeSortKey(explain) << "mergePresorted"
-                                       << (_mergingPresorted ? Value(true) : Value())
-                                       << "limit"
-                                       << (limitSrc ? Value(limitSrc->getLimit()) : Value())))));
+        array.push_back(Value(
+            DOC(getSourceName() << DOC(
+                    "sortKey" << serializeSortKey(static_cast<bool>(explain)) << "mergePresorted"
+                              << (_mergingPresorted ? Value(true) : Value())
+                              << "limit"
+                              << (limitSrc ? Value(limitSrc->getLimit()) : Value())))));
     } else {  // one Value for $sort and maybe a Value for $limit
-        MutableDocument inner(serializeSortKey(explain));
+        MutableDocument inner(serializeSortKey(static_cast<bool>(explain)));
         if (_mergingPresorted)
             inner["$mergePresorted"] = Value(true);
         array.push_back(Value(DOC(getSourceName() << inner.freeze())));

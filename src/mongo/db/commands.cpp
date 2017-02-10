@@ -146,7 +146,7 @@ void Command::help(stringstream& help) const {
 Status Command::explain(OperationContext* opCtx,
                         const string& dbname,
                         const BSONObj& cmdObj,
-                        ExplainCommon::Verbosity verbosity,
+                        ExplainOptions::Verbosity verbosity,
                         const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                         BSONObjBuilder* out) const {
     return {ErrorCodes::IllegalOperation, str::stream() << "Cannot explain cmd: " << getName()};

@@ -33,7 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/query/cursor_response.h"
-#include "mongo/db/query/explain_common.h"
+#include "mongo/db/query/explain_options.h"
 
 namespace mongo {
 

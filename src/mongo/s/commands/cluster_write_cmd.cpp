@@ -95,7 +95,7 @@ public:
     virtual Status explain(OperationContext* opCtx,
                            const std::string& dbname,
                            const BSONObj& cmdObj,
-                           ExplainCommon::Verbosity verbosity,
+                           ExplainOptions::Verbosity verbosity,
                            const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                            BSONObjBuilder* out) const {
         BatchedCommandRequest request(_writeType);

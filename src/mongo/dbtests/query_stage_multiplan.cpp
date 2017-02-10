@@ -364,7 +364,7 @@ public:
 
         BSONObjBuilder bob;
         Explain::explainStages(
-            exec.get(), ctx.getCollection(), ExplainCommon::EXEC_ALL_PLANS, &bob);
+            exec.get(), ctx.getCollection(), ExplainOptions::Verbosity::kExecAllPlans, &bob);
         BSONObj explained = bob.done();
 
         ASSERT_EQ(explained["executionStats"]["nReturned"].Int(), nDocs);

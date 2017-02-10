@@ -62,7 +62,8 @@ void DocumentSourceTeeConsumer::dispose() {
     _bufferSource->dispose(_facetId);
 }
 
-Value DocumentSourceTeeConsumer::serialize(bool explain) const {
+Value DocumentSourceTeeConsumer::serialize(
+    boost::optional<ExplainOptions::Verbosity> explain) const {
     // This stage will be inserted into the beginning of a pipeline, but should not show up in the
     // explain output.
     return Value();

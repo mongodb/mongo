@@ -39,6 +39,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
@@ -132,7 +133,7 @@ public:
     Status explain(OperationContext* opCtx,
                    const std::string& dbname,
                    const BSONObj& cmdObj,
-                   ExplainCommon::Verbosity verbosity,
+                   ExplainOptions::Verbosity verbosity,
                    const rpc::ServerSelectionMetadata&,
                    BSONObjBuilder* out) const override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
@@ -180,11 +181,17 @@ public:
             if (!viewAggregationCommand.isOK())
                 return viewAggregationCommand.getStatus();
 
-            Command* agg = Command::findCommand("aggregate");
-            std::string errmsg;
+            // Create the agg request equivalent of the find operation, with the explain verbosity
+            // included.
+            auto aggRequest = AggregationRequest::parseFromBSON(
+                nss, viewAggregationCommand.getValue(), verbosity);
+            if (!aggRequest.isOK()) {
+                return aggRequest.getStatus();
+            }
 
             try {
-                agg->run(opCtx, dbname, viewAggregationCommand.getValue(), 0, errmsg, *out);
+                return runAggregate(
+                    opCtx, nss, aggRequest.getValue(), viewAggregationCommand.getValue(), *out);
             } catch (DBException& error) {
                 if (error.getCode() == ErrorCodes::InvalidPipelineOperator) {
                     return {ErrorCodes::InvalidPipelineOperator,
@@ -192,7 +199,6 @@ public:
                 }
                 return error.toStatus();
             }
-            return Status::OK();
         }
 
         // The collection may be NULL. If so, getExecutor() should handle it by returning an

@@ -62,7 +62,8 @@ public:
     /**
      * Serialize this projection.
      */
-    void serialize(MutableDocument* output, bool explain) const;
+    void serialize(MutableDocument* output,
+                   boost::optional<ExplainOptions::Verbosity> explain) const;
 
     /**
      * Adds dependencies of any fields that need to be included, or that are used by any
@@ -197,7 +198,7 @@ public:
     /**
      * Serialize the projection.
      */
-    Document serialize(bool explain = false) const final {
+    Document serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
         MutableDocument output;
         if (_idExcluded) {
             output.addField("_id", Value(false));

@@ -198,7 +198,8 @@ void DocumentSource::dispose() {
     }
 }
 
-void DocumentSource::serializeToArray(vector<Value>& array, bool explain) const {
+void DocumentSource::serializeToArray(vector<Value>& array,
+                                      boost::optional<ExplainOptions::Verbosity> explain) const {
     Value entry = serialize(explain);
     if (!entry.missing()) {
         array.push_back(entry);

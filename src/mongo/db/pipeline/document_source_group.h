@@ -48,7 +48,7 @@ public:
     // Virtuals from DocumentSource.
     boost::intrusive_ptr<DocumentSource> optimize() final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
-    Value serialize(bool explain = false) const final;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     GetNextResult getNext() final;
     void dispose() final;
     const char* getSourceName() const final;

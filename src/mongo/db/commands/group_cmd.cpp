@@ -123,7 +123,7 @@ private:
     virtual Status explain(OperationContext* opCtx,
                            const std::string& dbname,
                            const BSONObj& cmdObj,
-                           ExplainCommon::Verbosity verbosity,
+                           ExplainOptions::Verbosity verbosity,
                            const rpc::ServerSelectionMetadata&,
                            BSONObjBuilder* out) const {
         GroupRequest groupRequest;

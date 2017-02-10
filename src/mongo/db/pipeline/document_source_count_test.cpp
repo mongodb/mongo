@@ -63,7 +63,7 @@ public:
             dynamic_cast<DocumentSourceSingleDocumentTransformation*>(result[1].get());
         ASSERT(projectStage);
 
-        const bool explain = true;
+        auto explain = ExplainOptions::Verbosity::kQueryPlanner;
         vector<Value> explainedStages;
         groupStage->serializeToArray(explainedStages, explain);
         projectStage->serializeToArray(explainedStages, explain);

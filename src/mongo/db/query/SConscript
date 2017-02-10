@@ -96,15 +96,35 @@ env.Library(
     source=[
         "collation/collator_factory_icu_decoration.cpp",
         "find_common.cpp",
-        "explain_common.cpp",
         "parsed_distinct.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/util/fail_point",
         "collation/collator_icu",
+        "explain_options",
         "query_planner",
         "query_request",
+    ],
+)
+
+env.Library(
+    target="explain_options",
+    source=[
+        "explain_options.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+    ],
+)
+
+env.CppUnitTest(
+    target="explain_options_test",
+    source=[
+        "explain_options_test.cpp",
+    ],
+    LIBDEPS=[
+        "explain_options",
     ],
 )
 

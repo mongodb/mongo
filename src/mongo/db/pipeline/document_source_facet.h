@@ -135,7 +135,7 @@ private:
     DocumentSourceFacet(std::vector<FacetPipeline> facetPipelines,
                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    Value serialize(bool explain = false) const final;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     boost::intrusive_ptr<TeeBuffer> _teeBuffer;
     std::vector<FacetPipeline> _facets;

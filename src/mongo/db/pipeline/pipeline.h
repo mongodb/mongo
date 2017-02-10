@@ -36,6 +36,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/timer.h"
 
@@ -148,10 +149,10 @@ public:
     boost::optional<Document> getNext();
 
     /**
-     * Write the pipeline's operators to a std::vector<Value>, with the
-     * explain flag true (for DocumentSource::serializeToArray()).
+     * Write the pipeline's operators to a std::vector<Value>, providing the level of detail
+     * specified by 'verbosity'.
      */
-    std::vector<Value> writeExplainOps() const;
+    std::vector<Value> writeExplainOps(ExplainOptions::Verbosity verbosity) const;
 
     /**
      * Returns the dependencies needed by this pipeline. 'metadataAvailable' should reflect what

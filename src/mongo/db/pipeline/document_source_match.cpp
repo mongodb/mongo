@@ -57,7 +57,7 @@ const char* DocumentSourceMatch::getSourceName() const {
     return "$match";
 }
 
-Value DocumentSourceMatch::serialize(bool explain) const {
+Value DocumentSourceMatch::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
     return Value(DOC(getSourceName() << Document(getQuery())));
 }
 

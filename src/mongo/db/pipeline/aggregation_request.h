@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/explain_options.h"
 
 namespace mongo {
 
@@ -62,8 +63,15 @@ public:
      * Create a new instance of AggregationRequest by parsing the raw command object. Returns a
      * non-OK status if a required field was missing, if there was an unrecognized field name or if
      * there was a bad value for one of the fields.
+     *
+     * If we are parsing a request for an explained aggregation with an explain verbosity provided,
+     * then 'explainVerbosity' contains this information. In this case, 'cmdObj' may not itself
+     * contain the explain specifier. Otherwise, 'explainVerbosity' should be boost::none.
      */
-    static StatusWith<AggregationRequest> parseFromBSON(NamespaceString nss, const BSONObj& cmdObj);
+    static StatusWith<AggregationRequest> parseFromBSON(
+        NamespaceString nss,
+        const BSONObj& cmdObj,
+        boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none);
 
     /**
      * Constructs an AggregationRequest over the given namespace with the given pipeline. All
@@ -75,6 +83,9 @@ public:
      * Serializes the options to a Document. Note that this serialization includes the original
      * pipeline object, as specified. Callers will likely want to override this field with a
      * serialization of a parsed and optimized Pipeline object.
+     *
+     * The explain option is not serialized. Since the explain command format is {explain:
+     * {aggregate: ...}, ...}, explain options are not part of the aggregate command object.
      */
     Document serializeToCommandObj() const;
 
@@ -95,10 +106,6 @@ public:
      */
     const std::vector<BSONObj>& getPipeline() const {
         return _pipeline;
-    }
-
-    bool isExplain() const {
-        return _explain;
     }
 
     bool isFromRouter() const {
@@ -124,6 +131,10 @@ public:
         return _hint;
     }
 
+    boost::optional<ExplainOptions::Verbosity> getExplain() const {
+        return _explainMode;
+    }
+
     //
     // Setters for optional fields.
     //
@@ -144,8 +155,8 @@ public:
         _hint = hint.getOwned();
     }
 
-    void setExplain(bool isExplain) {
-        _explain = isExplain;
+    void setExplain(boost::optional<ExplainOptions::Verbosity> verbosity) {
+        _explainMode = verbosity;
     }
 
     void setAllowDiskUse(bool allowDiskUse) {
@@ -162,7 +173,6 @@ public:
 
 private:
     // Required fields.
-
     const NamespaceString _nss;
 
     // An unparsed version of the pipeline.
@@ -181,7 +191,9 @@ private:
     // {$hint: <String>}, where <String> is the index name hinted.
     BSONObj _hint;
 
-    bool _explain = false;
+    // The explain mode to use, or boost::none if this is not a request for an aggregation explain.
+    boost::optional<ExplainOptions::Verbosity> _explainMode;
+
     bool _allowDiskUse = false;
     bool _fromRouter = false;
     bool _bypassDocumentValidation = false;

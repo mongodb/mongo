@@ -58,7 +58,7 @@ public:
      */
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
-    Value serialize(bool explain = false) const final;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     bool isValidInitialSource() const final {
         return true;
     }

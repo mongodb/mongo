@@ -320,10 +320,10 @@ boost::optional<Document> Pipeline::getNext() {
                               : boost::optional<Document>{nextResult.releaseDocument()};
 }
 
-vector<Value> Pipeline::writeExplainOps() const {
+vector<Value> Pipeline::writeExplainOps(ExplainOptions::Verbosity verbosity) const {
     vector<Value> array;
     for (SourceContainer::const_iterator it = _sources.begin(); it != _sources.end(); ++it) {
-        (*it)->serializeToArray(array, /*explain=*/true);
+        (*it)->serializeToArray(array, verbosity);
     }
     return array;
 }

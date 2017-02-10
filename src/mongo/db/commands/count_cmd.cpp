@@ -30,9 +30,9 @@
 
 #include "mongo/platform/basic.h"
 
-
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/count.h"
@@ -104,7 +104,7 @@ public:
     virtual Status explain(OperationContext* opCtx,
                            const std::string& dbname,
                            const BSONObj& cmdObj,
-                           ExplainCommon::Verbosity verbosity,
+                           ExplainOptions::Verbosity verbosity,
                            const rpc::ServerSelectionMetadata&,
                            BSONObjBuilder* out) const {
         const bool isExplain = true;
@@ -133,10 +133,17 @@ public:
                 return viewAggregation.getStatus();
             }
 
-            std::string errmsg;
-            (void)Command::findCommand("aggregate")
-                ->run(opCtx, dbname, viewAggregation.getValue(), 0, errmsg, *out);
-            return Status::OK();
+            auto viewAggRequest = AggregationRequest::parseFromBSON(
+                request.getValue().getNs(), viewAggregation.getValue(), verbosity);
+            if (!viewAggRequest.isOK()) {
+                return viewAggRequest.getStatus();
+            }
+
+            return runAggregate(opCtx,
+                                viewAggRequest.getValue().getNamespaceString(),
+                                viewAggRequest.getValue(),
+                                viewAggregation.getValue(),
+                                *out);
         }
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the

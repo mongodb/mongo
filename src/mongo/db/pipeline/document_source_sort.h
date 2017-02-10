@@ -43,7 +43,9 @@ public:
     // virtuals from DocumentSource
     GetNextResult getNext() final;
     const char* getSourceName() const final;
-    void serializeToArray(std::vector<Value>& array, bool explain = false) const final;
+    void serializeToArray(
+        std::vector<Value>& array,
+        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     GetModPathsReturn getModifiedPaths() const final {
         // A $sort does not modify any paths.
@@ -123,7 +125,7 @@ public:
 private:
     explicit DocumentSourceSort(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    Value serialize(bool explain = false) const final {
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
         MONGO_UNREACHABLE;  // Should call serializeToArray instead.
     }
 

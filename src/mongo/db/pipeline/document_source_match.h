@@ -42,7 +42,7 @@ public:
     // virtuals from DocumentSource
     GetNextResult getNext() final;
     const char* getSourceName() const final;
-    Value serialize(bool explain = false) const final;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     boost::intrusive_ptr<DocumentSource> optimize() final;
     BSONObjSet getOutputSorts() final {
         return pSource ? pSource->getOutputSorts()

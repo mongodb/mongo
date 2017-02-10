@@ -31,7 +31,7 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/explain_common.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
@@ -64,7 +64,7 @@ public:
      */
     static void explainStages(PlanExecutor* exec,
                               const Collection* collection,
-                              ExplainCommon::Verbosity verbosity,
+                              ExplainOptions::Verbosity verbosity,
                               BSONObjBuilder* out);
 
     /**
@@ -85,8 +85,9 @@ public:
      * Generates the BSON stats at a verbosity specified by 'verbosity'. Defaults
      * to execution stats verbosity.
      */
-    static BSONObj statsToBSON(const PlanStageStats& stats,
-                               ExplainCommon::Verbosity verbosity = ExplainCommon::EXEC_STATS);
+    static BSONObj statsToBSON(
+        const PlanStageStats& stats,
+        ExplainOptions::Verbosity verbosity = ExplainOptions::Verbosity::kExecStats);
 
     /**
      * This version of stats tree to BSON conversion returns the result through the
@@ -95,9 +96,10 @@ public:
      * Generates the BSON stats at a verbosity specified by 'verbosity'. Defaults
      * to execution stats verbosity.
      */
-    static void statsToBSON(const PlanStageStats& stats,
-                            BSONObjBuilder* bob,
-                            ExplainCommon::Verbosity verbosity = ExplainCommon::EXEC_STATS);
+    static void statsToBSON(
+        const PlanStageStats& stats,
+        BSONObjBuilder* bob,
+        ExplainOptions::Verbosity verbosity = ExplainOptions::Verbosity::kExecStats);
 
     /**
      * Returns a short plan summary std::string describing the leaves of the query plan.
@@ -128,7 +130,7 @@ private:
      * Not used except as a helper to the public statsToBSON(...) functions.
      */
     static void statsToBSON(const PlanStageStats& stats,
-                            ExplainCommon::Verbosity verbosity,
+                            ExplainOptions::Verbosity verbosity,
                             BSONObjBuilder* bob,
                             BSONObjBuilder* topLevelBob);
 
@@ -164,7 +166,7 @@ private:
      * This is a helper for generating explain BSON. It is used by explainStages(...).
      */
     static void generateExecStats(PlanStageStats* stats,
-                                  ExplainCommon::Verbosity verbosity,
+                                  ExplainOptions::Verbosity verbosity,
                                   BSONObjBuilder* out,
                                   boost::optional<long long> totalTimeMillis);
 

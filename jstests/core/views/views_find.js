@@ -72,6 +72,23 @@
     // Views support find with explain.
     assert.commandWorked(viewsDB.identityView.find().explain());
 
+    // Find with explicit explain modes works on a view.
+    let explainPlan = assert.commandWorked(viewsDB.identityView.find().explain("queryPlanner"));
+    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_find.coll");
+    assert(!explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
+
+    explainPlan = assert.commandWorked(viewsDB.identityView.find().explain("executionStats"));
+    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_find.coll");
+    assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
+    assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 5);
+    assert(!explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"));
+
+    explainPlan = assert.commandWorked(viewsDB.identityView.find().explain("allPlansExecution"));
+    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_find.coll");
+    assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
+    assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 5);
+    assert(explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"));
+
     // Only simple 0 or 1 projections are allowed on views.
     assert.writeOK(viewsDB.coll.insert({arr: [{x: 1}]}));
     assert.commandFailedWithCode(

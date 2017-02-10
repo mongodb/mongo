@@ -41,7 +41,7 @@ public:
     ~DocumentSourceOut() final;
     GetNextResult getNext() final;
     const char* getSourceName() const final;
-    Value serialize(bool explain = false) const final;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
     bool needsPrimaryShard() const final {
         return true;

@@ -171,10 +171,6 @@ StatusWith<BSONObj> CountRequest::asAggregationCommand() const {
     pipelineBuilder.doneFast();
 
     // Complete the command by appending the other options to count.
-    if (_explain) {
-        aggregationBuilder.append(kExplainField, _explain);
-    }
-
     if (_collation) {
         aggregationBuilder.append(kCollationField, *_collation);
     }

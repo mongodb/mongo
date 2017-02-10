@@ -86,7 +86,8 @@ intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
     return new DocumentSourceMergeCursors(std::move(cursorDescriptors), pExpCtx);
 }
 
-Value DocumentSourceMergeCursors::serialize(bool explain) const {
+Value DocumentSourceMergeCursors::serialize(
+    boost::optional<ExplainOptions::Verbosity> explain) const {
     vector<Value> cursors;
     for (size_t i = 0; i < _cursorDescriptors.size(); i++) {
         cursors.push_back(

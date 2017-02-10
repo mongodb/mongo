@@ -333,10 +333,11 @@ void DocumentSourceBucketAuto::dispose() {
     pSource->dispose();
 }
 
-Value DocumentSourceBucketAuto::serialize(bool explain) const {
+Value DocumentSourceBucketAuto::serialize(
+    boost::optional<ExplainOptions::Verbosity> explain) const {
     MutableDocument insides;
 
-    insides["groupBy"] = _groupByExpression->serialize(explain);
+    insides["groupBy"] = _groupByExpression->serialize(static_cast<bool>(explain));
     insides["buckets"] = Value(_nBuckets);
 
     if (_granularityRounder) {
@@ -347,8 +348,8 @@ Value DocumentSourceBucketAuto::serialize(bool explain) const {
     MutableDocument outputSpec(nOutputFields);
     for (size_t i = 0; i < nOutputFields; i++) {
         intrusive_ptr<Accumulator> accum = _accumulatorFactories[i](pExpCtx);
-        outputSpec[_fieldNames[i]] =
-            Value{Document{{accum->getOpName(), _expressions[i]->serialize(explain)}}};
+        outputSpec[_fieldNames[i]] = Value{
+            Document{{accum->getOpName(), _expressions[i]->serialize(static_cast<bool>(explain))}}};
     }
     insides["output"] = outputSpec.freezeToValue();
 

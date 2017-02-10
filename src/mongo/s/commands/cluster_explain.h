@@ -30,7 +30,7 @@
 
 #include <string>
 
-#include "mongo/db/query/explain_common.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 
@@ -58,7 +58,7 @@ public:
      * that send the command over the NetworkInterfaceASIO rather than DBClient.
      */
     static void wrapAsExplainForOP_COMMAND(const BSONObj& cmdObj,
-                                           ExplainCommon::Verbosity verbosity,
+                                           ExplainOptions::Verbosity verbosity,
                                            BSONObjBuilder* explainBuilder);
 
     /**
@@ -72,7 +72,7 @@ public:
      * be forwarded to the shards.
      */
     static void wrapAsExplain(const BSONObj& cmdObj,
-                              ExplainCommon::Verbosity verbosity,
+                              ExplainOptions::Verbosity verbosity,
                               const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                               BSONObjBuilder* out,
                               int* optionsOut);

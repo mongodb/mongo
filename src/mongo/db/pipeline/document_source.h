@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -244,11 +245,15 @@ public:
     /**
      * In the default case, serializes the DocumentSource and adds it to the std::vector<Value>.
      *
-     * A subclass may choose to overwrite this, rather than serialize,
-     * if it should output multiple stages (eg, $sort sometimes also outputs a $limit).
+     * A subclass may choose to overwrite this, rather than serialize, if it should output multiple
+     * stages (eg, $sort sometimes also outputs a $limit).
+     *
+     * The 'explain' parameter indicates the explain verbosity mode, or is equal boost::none if no
+     * explain is requested.
      */
-
-    virtual void serializeToArray(std::vector<Value>& array, bool explain = false) const;
+    virtual void serializeToArray(
+        std::vector<Value>& array,
+        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const;
 
     /**
      * Returns true if doesn't require an input source (most DocumentSources do).
@@ -473,8 +478,12 @@ private:
      * This is used by the default implementation of serializeToArray() to add this object
      * to a pipeline being serialized. Returning a missing() Value results in no entry
      * being added to the array for this stage (DocumentSource).
+     *
+     * The 'explain' parameter indicates the explain verbosity mode, or is equal boost::none if no
+     * explain is requested.
      */
-    virtual Value serialize(bool explain = false) const = 0;
+    virtual Value serialize(
+        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const = 0;
 };
 
 /** This class marks DocumentSources that should be split between the merger and the shards.

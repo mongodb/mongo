@@ -252,7 +252,7 @@ public:
     Status explain(OperationContext* opCtx,
                    const std::string& dbName,
                    const BSONObj& cmdObj,
-                   ExplainCommon::Verbosity verbosity,
+                   ExplainOptions::Verbosity verbosity,
                    const rpc::ServerSelectionMetadata&,
                    BSONObjBuilder* out) const override {
         const NamespaceString fullNs = parseNsCollectionRequired(dbName, cmdObj);

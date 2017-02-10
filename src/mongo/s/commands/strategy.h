@@ -31,7 +31,7 @@
 #include <atomic>
 
 #include "mongo/client/connection_string.h"
-#include "mongo/db/query/explain_common.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/s/client/shard.h"
 
 namespace mongo {
@@ -99,7 +99,7 @@ public:
     static Status explainFind(OperationContext* opCtx,
                               const BSONObj& findCommand,
                               const QueryRequest& qr,
-                              ExplainCommon::Verbosity verbosity,
+                              ExplainOptions::Verbosity verbosity,
                               const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                               BSONObjBuilder* out);
 

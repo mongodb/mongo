@@ -65,54 +65,30 @@ ResolvedView ResolvedView::fromBSON(BSONObj commandResponseObj) {
     return {ResolvedView(NamespaceString(viewDef["ns"].valueStringData()), pipeline)};
 }
 
-StatusWith<BSONObj> ResolvedView::asExpandedViewAggregation(
+AggregationRequest ResolvedView::asExpandedViewAggregation(
     const AggregationRequest& request) const {
-    BSONObjBuilder aggregationBuilder;
-    // Perform the aggregation on the resolved namespace.
-    aggregationBuilder.append("aggregate", _namespace.coll());
+    // Perform the aggregation on the resolved namespace.  The new pipeline consists of two parts:
+    // first, 'pipeline' in this ResolvedView; then, the pipeline in 'request'.
+    std::vector<BSONObj> resolvedPipeline;
+    resolvedPipeline.reserve(_pipeline.size() + request.getPipeline().size());
+    resolvedPipeline.insert(resolvedPipeline.end(), _pipeline.begin(), _pipeline.end());
+    resolvedPipeline.insert(
+        resolvedPipeline.end(), request.getPipeline().begin(), request.getPipeline().end());
 
-    // The new pipeline consists of two parts: first, 'pipeline' in this ResolvedView;
-    // then, the pipeline in 'request'.
-    BSONArrayBuilder pipelineBuilder(aggregationBuilder.subarrayStart("pipeline"));
-    for (auto&& item : _pipeline) {
-        pipelineBuilder.append(item);
-    }
+    AggregationRequest expandedRequest{_namespace, resolvedPipeline};
 
-    for (auto&& item : request.getPipeline()) {
-        pipelineBuilder.append(item);
-    }
-    pipelineBuilder.doneFast();
-
-    if (request.isExplain()) {
-        aggregationBuilder.append("explain", true);
+    if (request.getExplain()) {
+        expandedRequest.setExplain(request.getExplain());
     } else {
-        BSONObjBuilder batchSizeBuilder(aggregationBuilder.subobjStart("cursor"));
-        batchSizeBuilder.append(AggregationRequest::kBatchSizeName, request.getBatchSize());
-        batchSizeBuilder.doneFast();
+        expandedRequest.setBatchSize(request.getBatchSize());
     }
 
-    if (!request.getHint().isEmpty()) {
-        aggregationBuilder.append(AggregationRequest::kHintName, request.getHint());
-    }
+    expandedRequest.setHint(request.getHint());
+    expandedRequest.setBypassDocumentValidation(request.shouldBypassDocumentValidation());
+    expandedRequest.setAllowDiskUse(request.shouldAllowDiskUse());
+    expandedRequest.setCollation(request.getCollation());
 
-    if (request.shouldBypassDocumentValidation()) {
-        aggregationBuilder.append("bypassDocumentValidation", true);
-    }
-
-    if (request.shouldAllowDiskUse()) {
-        aggregationBuilder.append("allowDiskUse", true);
-    }
-
-    return aggregationBuilder.obj();
-}
-
-StatusWith<BSONObj> ResolvedView::asExpandedViewAggregation(const BSONObj& aggCommand) const {
-    auto aggRequest = AggregationRequest::parseFromBSON(_namespace, aggCommand);
-    if (!aggRequest.isOK()) {
-        return aggRequest.getStatus();
-    }
-
-    return asExpandedViewAggregation(aggRequest.getValue());
+    return expandedRequest;
 }
 
 }  // namespace mongo

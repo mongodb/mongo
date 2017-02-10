@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016 MongoDB Inc.
+ * Copyright (C) 2017 MongoDB Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -28,35 +28,26 @@
 
 #pragma once
 
-#include "mongo/db/collection_index_usage_tracker.h"
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregation_request.h"
 
 namespace mongo {
 
 /**
- * Provides a document source interface to retrieve index statistics for a given namespace.
- * Each document returned represents a single index and mongod instance.
+ * Executes the aggregation 'request' over the specified namespace 'nss' using context 'opCtx'.
+ *
+ * The raw aggregate command parameters should be passed in 'cmdObj', and will be reported as the
+ * originatingCommand in subsequent getMores on the resulting agg cursor.
+ *
+ * On success, fills out 'result' with the command response.
  */
-class DocumentSourceIndexStats final : public DocumentSourceNeedsMongod {
-public:
-    // virtuals from DocumentSource
-    GetNextResult getNext() final;
-    const char* getSourceName() const final;
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-
-    virtual bool isValidInitialSource() const final {
-        return true;
-    }
-
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-private:
-    DocumentSourceIndexStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
-    CollectionIndexUsageMap _indexStatsMap;
-    CollectionIndexUsageMap::const_iterator _indexStatsIter;
-    std::string _processName;
-};
+Status runAggregate(OperationContext* opCtx,
+                    const NamespaceString& nss,
+                    const AggregationRequest& request,
+                    const BSONObj& cmdObj,
+                    BSONObjBuilder& result);
 
 }  // namespace mongo

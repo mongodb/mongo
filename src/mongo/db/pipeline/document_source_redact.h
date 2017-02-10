@@ -50,7 +50,7 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
-    Value serialize(bool explain = false) const final;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
 private:
     DocumentSourceRedact(const boost::intrusive_ptr<ExpressionContext>& expCtx,

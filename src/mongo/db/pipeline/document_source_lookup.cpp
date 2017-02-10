@@ -414,7 +414,8 @@ DocumentSource::GetNextResult DocumentSourceLookUp::unwindResult() {
     return output.freeze();
 }
 
-void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array, bool explain) const {
+void DocumentSourceLookUp::serializeToArray(
+    std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
     MutableDocument output(DOC(
         getSourceName() << DOC("from" << _fromNs.coll() << "as" << _as.fullPath() << "localField"
                                       << _localField.fullPath()

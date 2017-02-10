@@ -49,7 +49,9 @@ public:
 
     GetNextResult getNext() final;
     const char* getSourceName() const final;
-    void serializeToArray(std::vector<Value>& array, bool explain = false) const final;
+    void serializeToArray(
+        std::vector<Value>& array,
+        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     /**
      * Returns the 'as' path, and possibly fields modified by an absorbed $unwind.
@@ -120,7 +122,7 @@ private:
                          std::string foreignField,
                          const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    Value serialize(bool explain = false) const final {
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
         // Should not be called; use serializeToArray instead.
         MONGO_UNREACHABLE;
     }

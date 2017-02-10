@@ -390,7 +390,8 @@ void DocumentSourceGraphLookUp::checkMemoryUsage() {
     _cache.evictDownTo(_maxMemoryUsageBytes - _frontierUsageBytes - _visitedUsageBytes);
 }
 
-void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array, bool explain) const {
+void DocumentSourceGraphLookUp::serializeToArray(
+    std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
     // Serialize default options.
     MutableDocument spec(DOC("from" << _from.coll() << "as" << _as.fullPath() << "connectToField"
                                     << _connectToField.fullPath()

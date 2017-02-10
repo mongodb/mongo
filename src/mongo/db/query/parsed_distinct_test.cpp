@@ -60,7 +60,7 @@ TEST(ParsedDistinctTest, ConvertToAggregationNoQuery) {
 
     auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
     ASSERT_OK(ar.getStatus());
-    ASSERT(!ar.getValue().isExplain());
+    ASSERT(!ar.getValue().getExplain());
     ASSERT_EQ(ar.getValue().getBatchSize(), AggregationRequest::kDefaultBatchSize);
     ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
@@ -96,7 +96,7 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithQuery) {
 
     auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
     ASSERT_OK(ar.getStatus());
-    ASSERT(!ar.getValue().isExplain());
+    ASSERT(!ar.getValue().getExplain());
     ASSERT_EQ(ar.getValue().getBatchSize(), AggregationRequest::kDefaultBatchSize);
     ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
@@ -116,7 +116,7 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithQuery) {
                       SimpleBSONObjComparator::kInstance.makeEqualTo()));
 }
 
-TEST(ParsedDistinctTest, ConvertToAggregationWithExplain) {
+TEST(ParsedDistinctTest, ExplainNotIncludedWhenConvertingToAggregationCommand) {
     QueryTestServiceContext serviceContext;
     auto uniqueTxn = serviceContext.makeOperationContext();
     OperationContext* opCtx = uniqueTxn.get();
@@ -131,9 +131,11 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithExplain) {
     auto agg = pd.getValue().asAggregationCommand();
     ASSERT_OK(agg);
 
+    ASSERT_FALSE(agg.getValue().hasField("explain"));
+
     auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
     ASSERT_OK(ar.getStatus());
-    ASSERT(ar.getValue().isExplain());
+    ASSERT(!ar.getValue().getExplain());
     ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
     ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
 

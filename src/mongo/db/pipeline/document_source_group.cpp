@@ -198,19 +198,19 @@ intrusive_ptr<DocumentSource> DocumentSourceGroup::optimize() {
     return this;
 }
 
-Value DocumentSourceGroup::serialize(bool explain) const {
+Value DocumentSourceGroup::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
     MutableDocument insides;
 
     // Add the _id.
     if (_idFieldNames.empty()) {
         invariant(_idExpressions.size() == 1);
-        insides["_id"] = _idExpressions[0]->serialize(explain);
+        insides["_id"] = _idExpressions[0]->serialize(static_cast<bool>(explain));
     } else {
         // Decomposed document case.
         invariant(_idExpressions.size() == _idFieldNames.size());
         MutableDocument md;
         for (size_t i = 0; i < _idExpressions.size(); i++) {
-            md[_idFieldNames[i]] = _idExpressions[i]->serialize(explain);
+            md[_idFieldNames[i]] = _idExpressions[i]->serialize(static_cast<bool>(explain));
         }
         insides["_id"] = md.freezeToValue();
     }
@@ -219,8 +219,8 @@ Value DocumentSourceGroup::serialize(bool explain) const {
     const size_t n = vFieldName.size();
     for (size_t i = 0; i < n; ++i) {
         intrusive_ptr<Accumulator> accum = vpAccumulatorFactory[i](pExpCtx);
-        insides[vFieldName[i]] =
-            Value(DOC(accum->getOpName() << vpExpression[i]->serialize(explain)));
+        insides[vFieldName[i]] = Value(
+            DOC(accum->getOpName() << vpExpression[i]->serialize(static_cast<bool>(explain))));
     }
 
     if (_doingMerge) {

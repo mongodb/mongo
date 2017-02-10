@@ -63,7 +63,7 @@ public:
         return GetDepsReturn::SEE_NEXT;
     }
 
-    Value serialize(bool explain = false) const final;
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
 private:
     DocumentSourceTeeConsumer(const boost::intrusive_ptr<ExpressionContext>& expCtx,

@@ -36,6 +36,7 @@
 #include "mongo/db/query/view_response_formatter.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/commands/cluster_aggregate.h"
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/strategy.h"
@@ -158,16 +159,19 @@ public:
                 return appendCommandStatus(result, aggCmdOnView.getStatus());
             }
 
-            auto resolvedView = ResolvedView::fromBSON(countResult[0].result);
-            auto aggCmd = resolvedView.asExpandedViewAggregation(aggCmdOnView.getValue());
-            if (!aggCmd.isOK()) {
-                return appendCommandStatus(result, aggCmd.getStatus());
+            auto aggRequestOnView = AggregationRequest::parseFromBSON(nss, aggCmdOnView.getValue());
+            if (!aggRequestOnView.isOK()) {
+                return appendCommandStatus(result, aggRequestOnView.getStatus());
             }
 
+            auto resolvedView = ResolvedView::fromBSON(countResult[0].result);
+            auto resolvedAggRequest =
+                resolvedView.asExpandedViewAggregation(aggRequestOnView.getValue());
+            auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
 
             BSONObjBuilder aggResult;
             Command::findCommand("aggregate")
-                ->run(opCtx, dbname, aggCmd.getValue(), options, errmsg, aggResult);
+                ->run(opCtx, dbname, resolvedAggCmd, options, errmsg, aggResult);
 
             result.resetToEmpty();
             ViewResponseFormatter formatter(aggResult.obj());
@@ -178,7 +182,6 @@ public:
 
             return true;
         }
-
 
         long long total = 0;
         BSONObjBuilder shardSubTotal(result.subobjStart("shards"));
@@ -218,7 +221,7 @@ public:
     Status explain(OperationContext* opCtx,
                    const std::string& dbname,
                    const BSONObj& cmdObj,
-                   ExplainCommon::Verbosity verbosity,
+                   ExplainOptions::Verbosity verbosity,
                    const rpc::ServerSelectionMetadata& serverSelectionMetadata,
                    BSONObjBuilder* out) const override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
@@ -275,19 +278,23 @@ public:
                 return aggCmdOnView.getStatus();
             }
 
+            auto aggRequestOnView =
+                AggregationRequest::parseFromBSON(nss, aggCmdOnView.getValue(), verbosity);
+            if (!aggRequestOnView.isOK()) {
+                return aggRequestOnView.getStatus();
+            }
+
             auto resolvedView = ResolvedView::fromBSON(shardResults[0].result);
-            auto aggCmd = resolvedView.asExpandedViewAggregation(aggCmdOnView.getValue());
-            if (!aggCmd.isOK()) {
-                return aggCmd.getStatus();
-            }
+            auto resolvedAggRequest =
+                resolvedView.asExpandedViewAggregation(aggRequestOnView.getValue());
+            auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
 
-            std::string errMsg;
-            if (Command::findCommand("aggregate")
-                    ->run(opCtx, dbname, aggCmd.getValue(), 0, errMsg, *out)) {
-                return Status::OK();
-            }
+            ClusterAggregate::Namespaces nsStruct;
+            nsStruct.requestedNss = nss;
+            nsStruct.executionNss = resolvedAggRequest.getNamespaceString();
 
-            return getStatusFromCommandResult(out->asTempObj());
+            return ClusterAggregate::runAggregate(
+                opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, 0, out);
         }
 
         const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, cmdObj);

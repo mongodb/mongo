@@ -114,10 +114,9 @@ public:
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
-        ExplainCommon::Verbosity verbosity;
-        Status parseStatus = ExplainCommon::parseCmdBSON(cmdObj, &verbosity);
-        if (!parseStatus.isOK()) {
-            return appendCommandStatus(result, parseStatus);
+        auto verbosity = ExplainOptions::parseCmdBSON(cmdObj);
+        if (!verbosity.isOK()) {
+            return appendCommandStatus(result, verbosity.getStatus());
         }
 
         // This is the nested command which we are explaining.
@@ -157,7 +156,7 @@ public:
         Status explainStatus = commToExplain->explain(opCtx,
                                                       dbname,
                                                       explainObj,
-                                                      verbosity,
+                                                      verbosity.getValue(),
                                                       rpc::ServerSelectionMetadata::get(opCtx),
                                                       &result);
         if (!explainStatus.isOK()) {

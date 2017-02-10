@@ -76,8 +76,8 @@ public:
         _newRoot->optimize();
     }
 
-    Document serialize(bool explain) const final {
-        return Document{{"newRoot", _newRoot->serialize(explain)}};
+    Document serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
+        return Document{{"newRoot", _newRoot->serialize(static_cast<bool>(explain))}};
     }
 
     DocumentSource::GetDepsReturn addDependencies(DepsTracker* deps) const final {

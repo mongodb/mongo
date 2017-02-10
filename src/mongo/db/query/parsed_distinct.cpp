@@ -86,9 +86,6 @@ StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
     groupStageBuilder.doneFast();
     pipelineBuilder.doneFast();
 
-    if (_query->getQueryRequest().isExplain()) {
-        aggregationBuilder.append("explain", true);
-    }
     aggregationBuilder.append(kCollationField, qr.getCollation());
 
     // Specify the 'cursor' option so that aggregation uses the cursor interface.

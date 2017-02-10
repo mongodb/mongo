@@ -304,7 +304,7 @@ public:
     Status explain(OperationContext* opCtx,
                    const std::string& dbname,
                    const BSONObj& cmdObj,
-                   ExplainCommon::Verbosity verbosity,
+                   ExplainOptions::Verbosity verbosity,
                    const rpc::ServerSelectionMetadata&,
                    BSONObjBuilder* out) const final {
         const auto batch = parseUpdateCommand(dbname, cmdObj);
@@ -376,7 +376,7 @@ public:
     Status explain(OperationContext* opCtx,
                    const std::string& dbname,
                    const BSONObj& cmdObj,
-                   ExplainCommon::Verbosity verbosity,
+                   ExplainOptions::Verbosity verbosity,
                    const rpc::ServerSelectionMetadata&,
                    BSONObjBuilder* out) const final {
         const auto batch = parseDeleteCommand(dbname, cmdObj);

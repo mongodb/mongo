@@ -75,7 +75,7 @@ public:
         _variables = stdx::make_unique<Variables>(idGenerator.getIdCount());
     }
 
-    Document serialize(bool explain = false) const final {
+    Document serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
         MutableDocument output;
         _root->serialize(&output, explain);
         return output.freeze();

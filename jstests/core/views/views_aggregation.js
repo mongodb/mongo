@@ -119,6 +119,48 @@
             {aggregate: "largeView", pipeline: [{$sort: {x: -1}}], cursor: {}, allowDiskUse: true}),
         "Expected aggregate to succeed since 'allowDiskUse' was specified");
 
+    // Test explain modes on a view.
+    let explainPlan = assert.commandWorked(
+        viewsDB.popSortedView.explain("queryPlanner").aggregate([{$limit: 1}, {$match: {pop: 3}}]));
+    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_aggregation.coll");
+    assert(!explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
+
+    explainPlan = assert.commandWorked(viewsDB.popSortedView.explain("executionStats")
+                                           .aggregate([{$limit: 1}, {$match: {pop: 3}}]));
+    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_aggregation.coll");
+    assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
+    assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 1);
+    assert(!explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"));
+
+    explainPlan = assert.commandWorked(viewsDB.popSortedView.explain("allPlansExecution")
+                                           .aggregate([{$limit: 1}, {$match: {pop: 3}}]));
+    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_aggregation.coll");
+    assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
+    assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 1);
+    assert(explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"));
+
+    // Passing a value of true for the explain option to the aggregation command, without using the
+    // shell explain helper, should continue to work.
+    explainPlan = assert.commandWorked(
+        viewsDB.popSortedView.aggregate([{$limit: 1}, {$match: {pop: 3}}], {explain: true}));
+    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_aggregation.coll");
+    assert(!explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
+
+    // Test allPlansExecution explain mode on the base collection.
+    explainPlan = assert.commandWorked(
+        viewsDB.coll.explain("allPlansExecution").aggregate([{$limit: 1}, {$match: {pop: 3}}]));
+    assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_aggregation.coll");
+    assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
+    printjson(explainPlan.stages[0].$cursor.executionStats);
+    assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 5);
+    assert(explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"));
+
+    // The explain:true option should not work when paired with the explain shell helper.
+    assert.throws(function() {
+        viewsDB.popSortedView.explain("executionStats")
+            .aggregate([{$limit: 1}, {$match: {pop: 3}}], {explain: true});
+    });
+
     // The remaining tests involve $lookup and $graphLookup. We cannot lookup into sharded
     // collections, so skip these tests if running in a sharded configuration.
     let isMasterResponse = assert.commandWorked(viewsDB.runCommand("isMaster"));

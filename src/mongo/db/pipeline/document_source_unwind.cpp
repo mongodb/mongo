@@ -239,7 +239,7 @@ DocumentSource::GetModPathsReturn DocumentSourceUnwind::getModifiedPaths() const
     return {GetModPathsReturn::Type::kFiniteSet, std::move(modifiedFields)};
 }
 
-Value DocumentSourceUnwind::serialize(bool explain) const {
+Value DocumentSourceUnwind::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
     return Value(DOC(getSourceName() << DOC(
                          "path" << _unwindPath.fullPathWithPrefix() << "preserveNullAndEmptyArrays"
                                 << (_preserveNullAndEmptyArrays ? Value(true) : Value())
