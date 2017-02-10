@@ -94,6 +94,15 @@ public:
         setupShards(shards);
     }
 
+    void tearDown() override {
+        ShardingTestFixture::tearDown();
+        // Reset _params only after shutting down the network interface (through
+        // ShardingTestFixture::tearDown()), because shutting down the network interface will
+        // deliver blackholed responses to the AsyncResultsMerger, and the AsyncResultsMerger's
+        // callback may still access _params.
+        _params.reset();
+    }
+
 protected:
     /**
      * Given a find command specification, 'findCmd', and a list of remote host:port pairs,
@@ -111,20 +120,20 @@ protected:
         const auto qr =
             unittest::assertGet(QueryRequest::makeFromFindCommand(_nss, findCmd, isExplain));
 
-        ClusterClientCursorParams params = ClusterClientCursorParams(_nss, readPref);
-        params.sort = qr->getSort();
-        params.limit = qr->getLimit();
-        params.batchSize = getMoreBatchSize ? getMoreBatchSize : qr->getBatchSize();
-        params.skip = qr->getSkip();
-        params.isTailable = qr->isTailable();
-        params.isAwaitData = qr->isAwaitData();
-        params.isAllowPartialResults = qr->isAllowPartialResults();
+        _params = stdx::make_unique<ClusterClientCursorParams>(_nss, readPref);
+        _params->sort = qr->getSort();
+        _params->limit = qr->getLimit();
+        _params->batchSize = getMoreBatchSize ? getMoreBatchSize : qr->getBatchSize();
+        _params->skip = qr->getSkip();
+        _params->isTailable = qr->isTailable();
+        _params->isAwaitData = qr->isAwaitData();
+        _params->isAllowPartialResults = qr->isAllowPartialResults();
 
         for (const auto& shardId : shardIds) {
-            params.remotes.emplace_back(shardId, findCmd);
+            _params->remotes.emplace_back(shardId, findCmd);
         }
 
-        arm = stdx::make_unique<AsyncResultsMerger>(executor(), std::move(params));
+        arm = stdx::make_unique<AsyncResultsMerger>(executor(), _params.get());
     }
 
     /**
@@ -133,13 +142,13 @@ protected:
      */
     void makeCursorFromExistingCursors(
         const std::vector<std::pair<HostAndPort, CursorId>>& remotes) {
-        ClusterClientCursorParams params = ClusterClientCursorParams(_nss);
+        _params = stdx::make_unique<ClusterClientCursorParams>(_nss);
 
         for (const auto& hostIdPair : remotes) {
-            params.remotes.emplace_back(hostIdPair.first, hostIdPair.second);
+            _params->remotes.emplace_back(hostIdPair.first, hostIdPair.second);
         }
 
-        arm = stdx::make_unique<AsyncResultsMerger>(executor(), std::move(params));
+        arm = stdx::make_unique<AsyncResultsMerger>(executor(), _params.get());
     }
 
     /**
@@ -219,6 +228,7 @@ protected:
     }
 
     const NamespaceString _nss;
+    std::unique_ptr<ClusterClientCursorParams> _params;
 
     std::unique_ptr<AsyncResultsMerger> arm;
 };
@@ -616,18 +626,23 @@ TEST_F(AsyncResultsMergerTest, ReceivedViewDefinitionFromShard) {
     ASSERT_TRUE(arm->ready());
 
     auto statusWithNext = arm->nextReady();
-    ASSERT(statusWithNext.isOK());
+    ASSERT(!statusWithNext.isOK());
+    ASSERT_EQ(statusWithNext.getStatus().code(),
+              ErrorCodes::CommandOnShardedViewNotSupportedOnMongod);
 
-    auto viewDef = statusWithNext.getValue().getViewDefinition();
-    ASSERT(viewDef);
+    ASSERT(_params->viewDefinition);
 
-    auto outputPipeline = (*viewDef)["pipeline"];
+    auto outputPipeline = (*_params->viewDefinition)["pipeline"];
     ASSERT(!outputPipeline.eoo());
     ASSERT_BSONOBJ_EQ(fromjson(inputPipeline), outputPipeline.Obj());
 
-    auto outputNs = (*viewDef)["ns"];
+    auto outputNs = (*_params->viewDefinition)["ns"];
     ASSERT(!outputNs.eoo());
     ASSERT_EQ(outputNs.String(), inputNs);
+
+    // Required to kill the 'arm' on error before destruction.
+    auto killEvent = arm->kill(nullptr);
+    executor()->waitForEvent(killEvent);
 }
 
 TEST_F(AsyncResultsMergerTest, ExistingCursors) {

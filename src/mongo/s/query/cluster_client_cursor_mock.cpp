@@ -77,6 +77,10 @@ bool ClusterClientCursorMock::isTailable() const {
     return false;
 }
 
+boost::optional<BSONObj> ClusterClientCursorMock::viewDefinition() const {
+    return boost::none;
+}
+
 void ClusterClientCursorMock::queueResult(const ClusterQueryResult& result) {
     _resultsQueue.push({result});
 }

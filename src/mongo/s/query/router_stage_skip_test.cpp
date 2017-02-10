@@ -152,29 +152,6 @@ TEST(RouterStageSkipTest, ErrorAfterSkippingResults) {
     ASSERT_EQ(secondResult.getStatus().reason(), "bad thing happened");
 }
 
-TEST(RouterStageSkipTest, SkipStagePropagatesViewDefinition) {
-    auto mockStage = stdx::make_unique<RouterStageMock>();
-
-    ClusterQueryResult cqResult;
-    cqResult.setViewDefinition(BSON("ns"
-                                    << "view_ns"
-                                    << "pipeline"
-                                    << BSON_ARRAY(BSON("$match" << BSONNULL))));
-    mockStage->queueResult(cqResult);
-
-    auto skipStage = stdx::make_unique<RouterStageSkip>(std::move(mockStage), 3);
-
-    auto result = skipStage->next(nullptr);
-    ASSERT_OK(result.getStatus());
-    ASSERT(!result.getValue().getResult());
-    ASSERT(result.getValue().getViewDefinition());
-    ASSERT_BSONOBJ_EQ(*result.getValue().getViewDefinition(),
-                      BSON("ns"
-                           << "view_ns"
-                           << "pipeline"
-                           << BSON_ARRAY(BSON("$match" << BSONNULL))));
-}
-
 TEST(RouterStageSkipTest, SkipStageToleratesMidStreamEOF) {
     // Skip stage must propagate a boost::none, but not count it towards the skip value.
     auto mockStage = stdx::make_unique<RouterStageMock>();

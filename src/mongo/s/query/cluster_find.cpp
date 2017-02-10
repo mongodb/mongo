@@ -237,7 +237,18 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
     int bytesBuffered = 0;
     while (!FindCommon::enoughForFirstBatch(query.getQueryRequest(), results->size())) {
         auto next = ccc->next(txn);
+
         if (!next.isOK()) {
+            if (viewDefinition &&
+                ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == next.getStatus().code()) {
+                if (!ccc->viewDefinition()) {
+                    return {ErrorCodes::InternalError,
+                            str::stream()
+                                << "Missing resolved view definition, but remote returned "
+                                << ErrorCodes::errorString(next.getStatus().code())};
+                }
+                *viewDefinition = BSON("resolvedView" << *ccc->viewDefinition());
+            }
             return next.getStatus();
         }
 
@@ -250,14 +261,6 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* txn,
                 cursorState = ClusterCursorManager::CursorState::Exhausted;
             }
             break;
-        }
-
-        if (next.getValue().getViewDefinition()) {
-            if (viewDefinition) {
-                *viewDefinition = BSON("resolvedView" << *next.getValue().getViewDefinition());
-            }
-            return {ErrorCodes::CommandOnShardedViewNotSupportedOnMongod,
-                    "Find must be transformed for view and run against base collection"};
         }
 
         auto nextObj = *next.getValue().getResult();

@@ -50,7 +50,8 @@ TEST(ClusterClientCursorImpl, NumReturnedSoFar) {
         mockStage->queueResult(BSON("a" << i));
     }
 
-    ClusterClientCursorImpl cursor(std::move(mockStage));
+    ClusterClientCursorImpl cursor(std::move(mockStage),
+                                   ClusterClientCursorParams(NamespaceString("unused")));
 
     ASSERT_EQ(cursor.getNumReturnedSoFar(), 0);
 
@@ -72,7 +73,8 @@ TEST(ClusterClientCursorImpl, QueueResult) {
     mockStage->queueResult(BSON("a" << 1));
     mockStage->queueResult(BSON("a" << 4));
 
-    ClusterClientCursorImpl cursor(std::move(mockStage));
+    ClusterClientCursorImpl cursor(std::move(mockStage),
+                                   ClusterClientCursorParams(NamespaceString("unused")));
 
     auto firstResult = cursor.next(nullptr);
     ASSERT_OK(firstResult.getStatus());
@@ -104,34 +106,14 @@ TEST(ClusterClientCursorImpl, QueueResult) {
     ASSERT_EQ(cursor.getNumReturnedSoFar(), 4LL);
 }
 
-TEST(ClusterClientCursorImpl, CursorPropagatesViewDefinition) {
-    auto mockStage = stdx::make_unique<RouterStageMock>();
-
-    auto viewDef = BSON("ns"
-                        << "view_ns"
-                        << "pipeline"
-                        << BSON_ARRAY(BSON("$match" << BSONNULL)));
-
-    ClusterQueryResult cqResult;
-    cqResult.setViewDefinition(viewDef);
-    mockStage->queueResult(cqResult);
-
-    ClusterClientCursorImpl cursor(std::move(mockStage));
-
-    auto result = cursor.next(nullptr);
-    ASSERT_OK(result.getStatus());
-    ASSERT(!result.getValue().getResult());
-    ASSERT(result.getValue().getViewDefinition());
-    ASSERT_BSONOBJ_EQ(*result.getValue().getViewDefinition(), viewDef);
-}
-
 TEST(ClusterClientCursorImpl, RemotesExhausted) {
     auto mockStage = stdx::make_unique<RouterStageMock>();
     mockStage->queueResult(BSON("a" << 1));
     mockStage->queueResult(BSON("a" << 2));
     mockStage->markRemotesExhausted();
 
-    ClusterClientCursorImpl cursor(std::move(mockStage));
+    ClusterClientCursorImpl cursor(std::move(mockStage),
+                                   ClusterClientCursorParams(NamespaceString("unused")));
     ASSERT_TRUE(cursor.remotesExhausted());
 
     auto firstResult = cursor.next(nullptr);
@@ -159,7 +141,8 @@ TEST(ClusterClientCursorImpl, ForwardsAwaitDataTimeout) {
     auto mockStagePtr = mockStage.get();
     ASSERT_NOT_OK(mockStage->getAwaitDataTimeout().getStatus());
 
-    ClusterClientCursorImpl cursor(std::move(mockStage));
+    ClusterClientCursorImpl cursor(std::move(mockStage),
+                                   ClusterClientCursorParams(NamespaceString("unused")));
     ASSERT_OK(cursor.setAwaitDataTimeout(Milliseconds(789)));
 
     auto awaitDataTimeout = mockStagePtr->getAwaitDataTimeout();

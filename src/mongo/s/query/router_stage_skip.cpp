@@ -50,10 +50,6 @@ StatusWith<ClusterQueryResult> RouterStageSkip::next(OperationContext* txn) {
             return next;
         }
 
-        if (next.getValue().getViewDefinition()) {
-            return next;
-        }
-
         ++_skippedSoFar;
     }
 

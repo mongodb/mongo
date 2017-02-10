@@ -35,11 +35,8 @@
 namespace mongo {
 
 /**
- * Holds a single result from a mongoS find command shard request. This result can represent one of
- * several states:
- * - Contains collection data, stored in '_resultObj'.
- * - Contains a view definition, stored in '_viewDefinition'.
- * - EOF. Both '_resultObj' and '_viewDefinition' are isEOF() returns true.
+ * Holds a single result from a mongos find command shard request. The result can either contain
+ * collection data, stored in '_resultObj'; or be EOF, and isEOF() returns true.
  */
 class ClusterQueryResult {
 public:
@@ -48,25 +45,15 @@ public:
     ClusterQueryResult(BSONObj resObj) : _resultObj(resObj) {}
 
     bool isEOF() const {
-        return !_resultObj && !_viewDefinition;
+        return !_resultObj;
     }
 
     boost::optional<BSONObj> getResult() const {
         return _resultObj;
     }
 
-    boost::optional<BSONObj> getViewDefinition() const {
-        return _viewDefinition;
-    }
-
-    void setViewDefinition(BSONObj viewDef) {
-        invariant(isEOF());
-        _viewDefinition = viewDef;
-    }
-
 private:
     boost::optional<BSONObj> _resultObj;
-    boost::optional<BSONObj> _viewDefinition;
 };
 
 }  // namespace mongo

@@ -110,27 +110,6 @@ TEST(RouterStageLimitTest, LimitStagePropagatesError) {
     ASSERT_EQ(secondResult.getStatus().reason(), "bad thing happened");
 }
 
-TEST(RouterStageLimitTest, LimitStagePropagatesViewDefinition) {
-    auto mockStage = stdx::make_unique<RouterStageMock>();
-
-    auto viewDef = BSON("ns"
-                        << "view_ns"
-                        << "pipeline"
-                        << BSON_ARRAY(BSON("$match" << BSONNULL)));
-
-    ClusterQueryResult cqResult;
-    cqResult.setViewDefinition(viewDef);
-    mockStage->queueResult(cqResult);
-
-    auto limitStage = stdx::make_unique<RouterStageLimit>(std::move(mockStage), 3);
-
-    auto result = limitStage->next(nullptr);
-    ASSERT_OK(result.getStatus());
-    ASSERT(!result.getValue().getResult());
-    ASSERT(result.getValue().getViewDefinition());
-    ASSERT_BSONOBJ_EQ(*result.getValue().getViewDefinition(), viewDef);
-}
-
 TEST(RouterStageLimitTest, LimitStageToleratesMidStreamEOF) {
     // Here we're mocking the tailable case, where there may be a boost::none returned before the
     // remote cursor is closed. Our goal is to make sure that the limit stage handles this properly,

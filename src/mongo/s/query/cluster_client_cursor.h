@@ -80,6 +80,11 @@ public:
     virtual bool isTailable() const = 0;
 
     /**
+     * Returns the view definition associated with this cursor, if any.
+     */
+    virtual boost::optional<BSONObj> viewDefinition() const = 0;
+
+    /**
      * Returns the number of result documents returned so far by this cursor via the next() method.
      */
     virtual long long getNumReturnedSoFar() const = 0;

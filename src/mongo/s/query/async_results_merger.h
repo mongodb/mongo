@@ -77,7 +77,7 @@ public:
      * Constructs a new AsyncResultsMerger. The TaskExecutor* must remain valid for the lifetime of
      * the ARM.
      */
-    AsyncResultsMerger(executor::TaskExecutor* executor, ClusterClientCursorParams&& params);
+    AsyncResultsMerger(executor::TaskExecutor* executor, ClusterClientCursorParams* params);
 
     /**
      * In order to be destroyed, either
@@ -347,7 +347,8 @@ private:
     // Not owned here.
     executor::TaskExecutor* _executor;
 
-    ClusterClientCursorParams _params;
+    // Not owned here.
+    ClusterClientCursorParams* _params;
 
     // The metadata obj to pass along with the command request. Used to indicate that the command is
     // ok to run on secondaries.
