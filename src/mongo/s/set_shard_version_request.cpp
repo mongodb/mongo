@@ -112,19 +112,6 @@ StatusWith<SetShardVersionRequest> SetShardVersionRequest::parseFromBSON(const B
     SetShardVersionRequest request;
 
     {
-        std::string configServer;
-        Status status = bsonExtractStringField(cmdObj, kConfigServer, &configServer);
-        if (!status.isOK())
-            return status;
-
-        auto configServerStatus = ConnectionString::parse(configServer);
-        if (!configServerStatus.isOK())
-            return configServerStatus.getStatus();
-
-        request._configServer = std::move(configServerStatus.getValue());
-    }
-
-    {
         std::string shardName;
         Status status = bsonExtractStringField(cmdObj, kShardName, &shardName);
         request._shardName = ShardId(shardName);
@@ -205,6 +192,7 @@ BSONObj SetShardVersionRequest::toBSON() const {
     cmdBuilder.append(kCmdName, _init ? "" : _nss.get().ns());
     cmdBuilder.append(kInit, _init);
     cmdBuilder.append(kAuthoritative, _isAuthoritative);
+    // 'configdb' field is only included for v3.4 backwards compatibility
     cmdBuilder.append(kConfigServer, _configServer.toString());
     cmdBuilder.append(kShardName, _shardName.toString());
     cmdBuilder.append(kShardConnectionString, _shardCS.toString());

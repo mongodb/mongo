@@ -165,8 +165,6 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
 
     BSONObjBuilder cmd;
     cmd.append("splitChunk", nss.ns());
-    cmd.append("configdb",
-               Grid::get(txn)->shardRegistry()->getConfigServerConnectionString().toString());
     cmd.append("from", shardId.toString());
     cmd.append("keyPattern", shardKeyPattern.toBSON());
     collectionVersion.appendForCommands(&cmd);

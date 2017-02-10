@@ -154,6 +154,13 @@ public:
      */
     void startup();
 
+    /**
+     * This is invalid to use on the config server and will hit an invariant if it is done.
+     * If the config server has need of a connection string for itself, it should get it from the
+     * replication state.
+     *
+     * Returns the connection string for the config server.
+     */
     ConnectionString getConfigServerConnectionString() const;
 
     /**

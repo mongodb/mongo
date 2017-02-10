@@ -73,22 +73,6 @@ StatusWith<MoveChunkRequest> MoveChunkRequest::createFromCommand(NamespaceString
                              std::move(secondaryThrottleStatus.getValue()));
 
     {
-        std::string configServerConnectionString;
-        Status status = bsonExtractStringField(
-            obj, kConfigServerConnectionString, &configServerConnectionString);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        auto statusConfigServerCS = ConnectionString::parse(configServerConnectionString);
-        if (!statusConfigServerCS.isOK()) {
-            return statusConfigServerCS.getStatus();
-        }
-
-        request._configServerCS = std::move(statusConfigServerCS.getValue());
-    }
-
-    {
         std::string shardStr;
         Status status = bsonExtractStringField(obj, kFromShardId, &shardStr);
         request._fromShardId = shardStr;
@@ -161,6 +145,7 @@ void MoveChunkRequest::appendAsCommand(BSONObjBuilder* builder,
     builder->append(kMoveChunk, nss.ns());
     chunkVersion.appendForCommands(builder);  // 3.4 shard compatibility
     builder->append(kEpoch, chunkVersion.epoch());
+    // config connection string is included for 3.4 shard compatibility
     builder->append(kConfigServerConnectionString, configServerConnectionString.toString());
     builder->append(kFromShardId, fromShardId.toString());
     builder->append(kToShardId, toShardId.toString());
@@ -173,8 +158,6 @@ void MoveChunkRequest::appendAsCommand(BSONObjBuilder* builder,
 
 bool MoveChunkRequest::operator==(const MoveChunkRequest& other) const {
     if (_nss != other._nss)
-        return false;
-    if (_configServerCS != other._configServerCS)
         return false;
     if (_fromShardId != other._fromShardId)
         return false;

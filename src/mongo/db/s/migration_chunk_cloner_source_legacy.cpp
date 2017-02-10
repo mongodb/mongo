@@ -197,7 +197,6 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* txn) {
     StartChunkCloneRequest::appendAsCommand(&cmdBuilder,
                                             _args.getNss(),
                                             _sessionId,
-                                            _args.getConfigServerCS(),
                                             _donorConnStr,
                                             _args.getFromShardId(),
                                             _args.getToShardId(),

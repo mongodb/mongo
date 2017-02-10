@@ -52,8 +52,7 @@ namespace mongo {
 ShardLocal::ShardLocal(const ShardId& id) : Shard(id) {}
 
 const ConnectionString ShardLocal::getConnString() const {
-    auto replCoord = repl::getGlobalReplicationCoordinator();
-    return replCoord->getConfig().getConnectionString();
+    MONGO_UNREACHABLE;
 }
 
 std::shared_ptr<RemoteCommandTargeter> ShardLocal::getTargeter() const {

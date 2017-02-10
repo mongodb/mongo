@@ -461,8 +461,6 @@ void ShardingTestFixture::expectSetShardVersion(const HostAndPort& expectedHost,
 
         ASSERT(!ssv.isInit());
         ASSERT(ssv.isAuthoritative());
-        ASSERT_EQ(shardRegistry()->getConfigServerConnectionString().toString(),
-                  ssv.getConfigServer().toString());
         ASSERT_EQ(expectedShard.getHost(), ssv.getShardConnectionString().toString());
         ASSERT_EQ(expectedNs.toString(), ssv.getNS().ns());
         ASSERT_EQ(expectedChunkVersion.toString(), ssv.getNSVersion().toString());

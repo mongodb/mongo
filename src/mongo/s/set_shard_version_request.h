@@ -118,10 +118,6 @@ public:
         return _isAuthoritative;
     }
 
-    const ConnectionString& getConfigServer() const {
-        return _configServer;
-    }
-
     const ShardId& getShardName() const {
         return _shardName;
     }
@@ -168,6 +164,7 @@ private:
     bool _isAuthoritative{false};
     bool _noConnectionVersioning{false};
 
+    // Only required for v3.4 backwards compatibility.
     ConnectionString _configServer;
 
     ShardId _shardName;

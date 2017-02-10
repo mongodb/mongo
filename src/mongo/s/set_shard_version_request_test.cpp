@@ -51,8 +51,6 @@ TEST(SetShardVersionRequest, ParseInitMissingAuthoritative) {
                                                              << ""
                                                              << "init"
                                                              << true
-                                                             << "configdb"
-                                                             << configCS.toString()
                                                              << "shard"
                                                              << "TestShard"
                                                              << "shardHost"
@@ -61,7 +59,6 @@ TEST(SetShardVersionRequest, ParseInitMissingAuthoritative) {
     ASSERT(request.isInit());
     ASSERT(!request.isAuthoritative());
     ASSERT(!request.getNoConnectionVersioning());
-    ASSERT_EQ(request.getConfigServer().toString(), configCS.toString());
     ASSERT_EQ(request.getShardName(), "TestShard");
     ASSERT_EQ(request.getShardConnectionString().toString(), shardCS.toString());
 }
@@ -74,8 +71,6 @@ TEST(SetShardVersionRequest, ParseInitWithAuthoritative) {
                                                              << true
                                                              << "authoritative"
                                                              << true
-                                                             << "configdb"
-                                                             << configCS.toString()
                                                              << "shard"
                                                              << "TestShard"
                                                              << "shardHost"
@@ -84,7 +79,6 @@ TEST(SetShardVersionRequest, ParseInitWithAuthoritative) {
     ASSERT(request.isInit());
     ASSERT(request.isAuthoritative());
     ASSERT(!request.getNoConnectionVersioning());
-    ASSERT_EQ(request.getConfigServer().toString(), configCS.toString());
     ASSERT_EQ(request.getShardName(), "TestShard");
     ASSERT_EQ(request.getShardConnectionString().toString(), shardCS.toString());
 }
@@ -97,8 +91,6 @@ TEST(SetShardVersionRequest, ParseInitNoConnectionVersioning) {
                                                              << true
                                                              << "authoritative"
                                                              << true
-                                                             << "configdb"
-                                                             << configCS.toString()
                                                              << "shard"
                                                              << "TestShard"
                                                              << "shardHost"
@@ -109,7 +101,6 @@ TEST(SetShardVersionRequest, ParseInitNoConnectionVersioning) {
     ASSERT(request.isInit());
     ASSERT(request.isAuthoritative());
     ASSERT(request.getNoConnectionVersioning());
-    ASSERT_EQ(request.getConfigServer().toString(), configCS.toString());
     ASSERT_EQ(request.getShardName(), "TestShard");
     ASSERT_EQ(request.getShardConnectionString().toString(), shardCS.toString());
 }
@@ -120,8 +111,6 @@ TEST(SetShardVersionRequest, ParseFull) {
     SetShardVersionRequest request =
         assertGet(SetShardVersionRequest::parseFromBSON(BSON("setShardVersion"
                                                              << "db.coll"
-                                                             << "configdb"
-                                                             << configCS.toString()
                                                              << "shard"
                                                              << "TestShard"
                                                              << "shardHost"
@@ -134,7 +123,6 @@ TEST(SetShardVersionRequest, ParseFull) {
     ASSERT(!request.isInit());
     ASSERT(!request.isAuthoritative());
     ASSERT(!request.getNoConnectionVersioning());
-    ASSERT_EQ(request.getConfigServer().toString(), configCS.toString());
     ASSERT_EQ(request.getShardName(), "TestShard");
     ASSERT_EQ(request.getShardConnectionString().toString(), shardCS.toString());
     ASSERT_EQ(request.getNS().toString(), "db.coll");
@@ -149,8 +137,6 @@ TEST(SetShardVersionRequest, ParseFullWithAuthoritative) {
     SetShardVersionRequest request =
         assertGet(SetShardVersionRequest::parseFromBSON(BSON("setShardVersion"
                                                              << "db.coll"
-                                                             << "configdb"
-                                                             << configCS.toString()
                                                              << "shard"
                                                              << "TestShard"
                                                              << "shardHost"
@@ -165,7 +151,6 @@ TEST(SetShardVersionRequest, ParseFullWithAuthoritative) {
     ASSERT(!request.isInit());
     ASSERT(request.isAuthoritative());
     ASSERT(!request.getNoConnectionVersioning());
-    ASSERT_EQ(request.getConfigServer().toString(), configCS.toString());
     ASSERT_EQ(request.getShardName(), "TestShard");
     ASSERT_EQ(request.getShardConnectionString().toString(), shardCS.toString());
     ASSERT_EQ(request.getNS().toString(), "db.coll");
@@ -180,8 +165,6 @@ TEST(SetShardVersionRequest, ParseFullNoConnectionVersioning) {
     SetShardVersionRequest request =
         assertGet(SetShardVersionRequest::parseFromBSON(BSON("setShardVersion"
                                                              << "db.coll"
-                                                             << "configdb"
-                                                             << configCS.toString()
                                                              << "shard"
                                                              << "TestShard"
                                                              << "shardHost"
@@ -196,7 +179,6 @@ TEST(SetShardVersionRequest, ParseFullNoConnectionVersioning) {
     ASSERT(!request.isInit());
     ASSERT(!request.isAuthoritative());
     ASSERT(request.getNoConnectionVersioning());
-    ASSERT_EQ(request.getConfigServer().toString(), configCS.toString());
     ASSERT_EQ(request.getShardName(), "TestShard");
     ASSERT_EQ(request.getShardConnectionString().toString(), shardCS.toString());
     ASSERT_EQ(request.getNS().toString(), "db.coll");
@@ -205,26 +187,11 @@ TEST(SetShardVersionRequest, ParseFullNoConnectionVersioning) {
     ASSERT_EQ(request.getNSVersion().epoch(), chunkVersion.epoch());
 }
 
-TEST(SetShardVersionRequest, ParseInitNoConfigServer) {
-    auto ssvStatus = SetShardVersionRequest::parseFromBSON(BSON("setShardVersion"
-                                                                << ""
-                                                                << "init"
-                                                                << true
-                                                                << "shard"
-                                                                << "TestShard"
-                                                                << "shardHost"
-                                                                << shardCS.toString()));
-
-    ASSERT_EQ(ErrorCodes::NoSuchKey, ssvStatus.getStatus().code());
-}
-
 TEST(SetShardVersionRequest, ParseFullNoNS) {
     const ChunkVersion chunkVersion(1, 2, OID::gen());
 
     auto ssvStatus = SetShardVersionRequest::parseFromBSON(BSON("setShardVersion"
                                                                 << ""
-                                                                << "configdb"
-                                                                << configCS.toString()
                                                                 << "shard"
                                                                 << "TestShard"
                                                                 << "shardHost"
@@ -242,8 +209,6 @@ TEST(SetShardVersionRequest, ParseFullNSContainsDBOnly) {
 
     auto ssvStatus = SetShardVersionRequest::parseFromBSON(BSON("setShardVersion"
                                                                 << "dbOnly"
-                                                                << "configdb"
-                                                                << configCS.toString()
                                                                 << "shard"
                                                                 << "TestShard"
                                                                 << "shardHost"
@@ -263,7 +228,6 @@ TEST(SetShardVersionRequest, ToSSVCommandInit) {
     ASSERT(ssv.isInit());
     ASSERT(ssv.isAuthoritative());
     ASSERT(!ssv.getNoConnectionVersioning());
-    ASSERT_EQ(ssv.getConfigServer().toString(), configCS.toString());
     ASSERT_EQ(ssv.getShardName(), "TestShard");
     ASSERT_EQ(ssv.getShardConnectionString().toString(), shardCS.toString());
 
@@ -293,7 +257,6 @@ TEST(SetShardVersionRequest, ToSSVCommandFull) {
     ASSERT(!ssv.isInit());
     ASSERT(!ssv.isAuthoritative());
     ASSERT(!ssv.getNoConnectionVersioning());
-    ASSERT_EQ(ssv.getConfigServer().toString(), configCS.toString());
     ASSERT_EQ(ssv.getShardName(), "TestShard");
     ASSERT_EQ(ssv.getShardConnectionString().toString(), shardCS.toString());
     ASSERT_EQ(ssv.getNS().ns(), "db.coll");
@@ -328,7 +291,6 @@ TEST(SetShardVersionRequest, ToSSVCommandFullAuthoritative) {
     ASSERT(!ssv.isInit());
     ASSERT(ssv.isAuthoritative());
     ASSERT(!ssv.getNoConnectionVersioning());
-    ASSERT_EQ(ssv.getConfigServer().toString(), configCS.toString());
     ASSERT_EQ(ssv.getShardName(), "TestShard");
     ASSERT_EQ(ssv.getShardConnectionString().toString(), shardCS.toString());
     ASSERT_EQ(ssv.getNS().ns(), "db.coll");
@@ -363,7 +325,6 @@ TEST(SetShardVersionRequest, ToSSVCommandFullNoConnectionVersioning) {
     ASSERT(!ssv.isInit());
     ASSERT(ssv.isAuthoritative());
     ASSERT(ssv.getNoConnectionVersioning());
-    ASSERT_EQ(ssv.getConfigServer().toString(), configCS.toString());
     ASSERT_EQ(ssv.getShardName(), "TestShard");
     ASSERT_EQ(ssv.getShardConnectionString().toString(), shardCS.toString());
     ASSERT_EQ(ssv.getNS().ns(), "db.coll");

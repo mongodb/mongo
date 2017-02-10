@@ -50,7 +50,6 @@ TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
         &builder,
         NamespaceString("TestDB.TestColl"),
         sessionId,
-        assertGet(ConnectionString::parse("TestConfigRS/CS1:12345,CS2:12345,CS3:12345")),
         assertGet(ConnectionString::parse("TestDonorRS/Donor1:12345,Donor2:12345,Donor3:12345")),
         ShardId("shard0001"),
         ShardId("shard0002"),
@@ -67,7 +66,6 @@ TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
     ASSERT_EQ("TestDB.TestColl", request.getNss().ns());
     ASSERT_EQ(sessionId.toString(), request.getSessionId().toString());
     ASSERT(sessionId.matches(request.getSessionId()));
-    ASSERT_EQ("TestConfigRS/CS1:12345,CS2:12345,CS3:12345", request.getConfigServerCS().toString());
     ASSERT_EQ(
         assertGet(ConnectionString::parse("TestDonorRS/Donor1:12345,Donor2:12345,Donor3:12345"))
             .toString(),

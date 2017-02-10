@@ -326,20 +326,21 @@ TEST_F(AddShardTest, CreateShardIdentityUpsertForAddShard) {
     BSONObj expectedBSON = BSON("update"
                                 << "system.version"
                                 << "updates"
-                                << BSON_ARRAY(BSON(
-                                       "q"
-                                       << BSON("_id"
-                                               << "shardIdentity"
-                                               << "shardName"
-                                               << shardName
-                                               << "clusterId"
-                                               << _clusterId)
-                                       << "u"
-                                       << BSON("$set" << BSON(
-                                                   "configsvrConnectionString"
-                                                   << getConfigShard()->getConnString().toString()))
-                                       << "upsert"
-                                       << true))
+                                << BSON_ARRAY(
+                                       BSON("q" << BSON("_id"
+                                                        << "shardIdentity"
+                                                        << "shardName"
+                                                        << shardName
+                                                        << "clusterId"
+                                                        << _clusterId)
+                                                << "u"
+                                                << BSON("$set" << BSON("configsvrConnectionString"
+                                                                       << replicationCoordinator()
+                                                                              ->getConfig()
+                                                                              .getConnectionString()
+                                                                              .toString()))
+                                                << "upsert"
+                                                << true))
                                 << "writeConcern"
                                 << BSON("w"
                                         << "majority"

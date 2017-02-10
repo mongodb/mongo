@@ -61,7 +61,6 @@ public:
     static void appendAsCommand(BSONObjBuilder* builder,
                                 const NamespaceString& nss,
                                 const MigrationSessionId& sessionId,
-                                const ConnectionString& configServerConnectionString,
                                 const ConnectionString& fromShardConnectionString,
                                 const ShardId& fromShardId,
                                 const ShardId& toShardId,
@@ -76,10 +75,6 @@ public:
 
     const MigrationSessionId& getSessionId() const {
         return _sessionId;
-    }
-
-    const ConnectionString& getConfigServerCS() const {
-        return _configServerCS;
     }
 
     const ConnectionString& getFromShardConnectionString() const {
@@ -120,11 +115,6 @@ private:
 
     // The session id of this migration
     MigrationSessionId _sessionId;
-
-    // Connections string for the config server. This is a legacy field and is used in order to
-    // initialize the sharding state on the donor shard in case it doesn't yet know that it is part
-    // of a sharded system.
-    ConnectionString _configServerCS;
 
     // The source host and port
     ConnectionString _fromShardCS;

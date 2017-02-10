@@ -48,6 +48,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/task_executor.h"
@@ -717,8 +719,9 @@ BSONObj ShardingCatalogManagerImpl::createShardIdentityUpsertForAddShard(
     BSONObjBuilder update;
     {
         BSONObjBuilder set(update.subobjStart("$set"));
-        set.append(ShardIdentityType::configsvrConnString(),
-                   Grid::get(txn)->shardRegistry()->getConfigServerConnectionString().toString());
+        set.append(
+            ShardIdentityType::configsvrConnString(),
+            repl::ReplicationCoordinator::get(txn)->getConfig().getConnectionString().toString());
     }
     updateDoc->setUpdateExpr(update.obj());
     updateDoc->setUpsert(true);

@@ -38,6 +38,8 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/client.h"
+#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/balancer/scoped_migration_request.h"
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -442,7 +444,7 @@ shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule(
         &builder,
         nss,
         migrateInfo.version,
-        Grid::get(txn)->shardRegistry()->getConfigServerConnectionString(),
+        repl::ReplicationCoordinator::get(txn)->getConfig().getConnectionString(),
         migrateInfo.from,
         migrateInfo.to,
         ChunkRange(migrateInfo.minKey, migrateInfo.maxKey),

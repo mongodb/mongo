@@ -72,7 +72,6 @@ TEST(MoveChunkRequest, Roundtrip) {
     auto request = assertGet(
         MoveChunkRequest::createFromCommand(NamespaceString(cmdObj["moveChunk"].String()), cmdObj));
     ASSERT_EQ(kNs, request.getNss().ns());
-    ASSERT_EQ(kTestConfigServerConnectionString.toString(), request.getConfigServerCS().toString());
     ASSERT_EQ(kFromShard, request.getFromShardId());
     ASSERT_EQ(kToShard, request.getToShardId());
     ASSERT_BSONOBJ_EQ(kMin, request.getMinKey());

@@ -38,7 +38,6 @@ namespace mongo {
 namespace {
 
 const char kRecvChunkStart[] = "_recvChunkStart";
-const char kConfigServerConnectionString[] = "configdb";
 const char kFromShardConnectionString[] = "from";
 const char kFromShardId[] = "fromShardName";
 const char kToShardId[] = "toShardName";
@@ -70,22 +69,6 @@ StatusWith<StartChunkCloneRequest> StartChunkCloneRequest::createFromCommand(Nam
     StartChunkCloneRequest request(std::move(nss),
                                    std::move(sessionIdStatus.getValue()),
                                    std::move(secondaryThrottleStatus.getValue()));
-
-    {
-        std::string configServerConnectionString;
-        Status status = bsonExtractStringField(
-            obj, kConfigServerConnectionString, &configServerConnectionString);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        auto statusConfigServerCS = ConnectionString::parse(configServerConnectionString);
-        if (!statusConfigServerCS.isOK()) {
-            return statusConfigServerCS.getStatus();
-        }
-
-        request._configServerCS = std::move(statusConfigServerCS.getValue());
-    }
 
     {
         std::string fromShardConnectionString;
@@ -170,7 +153,6 @@ void StartChunkCloneRequest::appendAsCommand(
     BSONObjBuilder* builder,
     const NamespaceString& nss,
     const MigrationSessionId& sessionId,
-    const ConnectionString& configServerConnectionString,
     const ConnectionString& fromShardConnectionString,
     const ShardId& fromShardId,
     const ShardId& toShardId,
@@ -184,7 +166,6 @@ void StartChunkCloneRequest::appendAsCommand(
 
     builder->append(kRecvChunkStart, nss.ns());
     sessionId.append(builder);
-    builder->append(kConfigServerConnectionString, configServerConnectionString.toString());
     builder->append(kFromShardConnectionString, fromShardConnectionString.toString());
     builder->append(kFromShardId, fromShardId.toString());
     builder->append(kToShardId, toShardId.toString());

@@ -78,10 +78,6 @@ public:
         return _nss;
     }
 
-    const ConnectionString& getConfigServerCS() const {
-        return _configServerCS;
-    }
-
     const ShardId& getFromShardId() const {
         return _fromShardId;
     }
@@ -133,11 +129,6 @@ private:
 
     // The collection for which this request applies
     NamespaceString _nss;
-
-    // Connections string for the config server. This is a legacy field and is used in order to
-    // initialize the sharding state on the donor shard in case it doesn't yet know that it is part
-    // of a sharded system.
-    ConnectionString _configServerCS;
 
     // The source shard id
     ShardId _fromShardId;
