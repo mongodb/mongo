@@ -860,23 +860,18 @@ functions:
 
         for i in {1..3}
         do
-          if ! kitchen converge "${packager_distro}"; then
-            converged="false"
+          if ! kitchen verify "${packager_distro}"; then
+            verified="false"
             kitchen destroy "${packager_distro}" || true
             sleep 30
           else
+            verified="true"
             break
           fi
         done
 
-        test "$converged" != "false"
-
-        if ! kitchen verify "${packager_distro}"; then
-          verified="false"
-        fi
-
         kitchen destroy "${packager_distro}" || true
-        test "$verified" != "false"
+        test "$verified" = "true"
 
 pre:
   - func: "kill processes"
