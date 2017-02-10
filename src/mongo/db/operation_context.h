@@ -203,16 +203,16 @@ public:
      * cv_status::no_timeout indicating that "pred" finally returned true.
      */
     template <typename Pred>
-    stdx::cv_status waitForConditionOrInterruptUntil(stdx::condition_variable& cv,
-                                                     stdx::unique_lock<stdx::mutex>& m,
-                                                     Date_t deadline,
-                                                     Pred pred) {
+    bool waitForConditionOrInterruptUntil(stdx::condition_variable& cv,
+                                          stdx::unique_lock<stdx::mutex>& m,
+                                          Date_t deadline,
+                                          Pred pred) {
         while (!pred()) {
             if (stdx::cv_status::timeout == waitForConditionOrInterruptUntil(cv, m, deadline)) {
-                return stdx::cv_status::timeout;
+                return pred();
             }
         }
-        return stdx::cv_status::no_timeout;
+        return true;
     }
 
     /**
@@ -220,10 +220,10 @@ public:
      * amount of time to wait instead of an absolute time point.
      */
     template <typename Pred>
-    stdx::cv_status waitForConditionOrInterruptFor(stdx::condition_variable& cv,
-                                                   stdx::unique_lock<stdx::mutex>& m,
-                                                   Milliseconds duration,
-                                                   Pred pred) {
+    bool waitForConditionOrInterruptFor(stdx::condition_variable& cv,
+                                        stdx::unique_lock<stdx::mutex>& m,
+                                        Milliseconds duration,
+                                        Pred pred) {
         return waitForConditionOrInterruptUntil(
             cv, m, getExpirationDateForWaitForValue(duration), pred);
     }

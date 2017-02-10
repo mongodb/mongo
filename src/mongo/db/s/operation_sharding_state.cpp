@@ -40,7 +40,7 @@ const OperationContext::Decoration<OperationShardingState> shardingMetadataDecor
     OperationContext::declareDecoration<OperationShardingState>();
 
 // Max time to wait for the migration critical section to complete
-const Microseconds kMaxWaitForMigrationCriticalSection = Minutes(5);
+const Milliseconds kMaxWaitForMigrationCriticalSection = Minutes(5);
 
 }  // namespace
 
@@ -109,7 +109,7 @@ bool OperationShardingState::waitForMigrationCriticalSectionSignal(OperationCont
         _migrationCriticalSectionSignal->waitFor(
             opCtx,
             opCtx->hasDeadline()
-                ? std::min(opCtx->getRemainingMaxTimeMicros(), kMaxWaitForMigrationCriticalSection)
+                ? std::min(opCtx->getRemainingMaxTimeMillis(), kMaxWaitForMigrationCriticalSection)
                 : kMaxWaitForMigrationCriticalSection);
         _migrationCriticalSectionSignal = nullptr;
         return true;

@@ -206,9 +206,8 @@ TEST_F(OperationDeadlineTests, WaitForDurationExpired) {
     stdx::mutex m;
     stdx::condition_variable cv;
     stdx::unique_lock<stdx::mutex> lk(m);
-    ASSERT(stdx::cv_status::timeout ==
-           opCtx->waitForConditionOrInterruptFor(
-               cv, lk, Milliseconds(-1000), []() -> bool { return false; }));
+    ASSERT_FALSE(opCtx->waitForConditionOrInterruptFor(
+        cv, lk, Milliseconds(-1000), []() -> bool { return false; }));
 }
 
 TEST_F(OperationDeadlineTests, DuringWaitMaxTimeExpirationDominatesUntilExpiration) {
@@ -224,7 +223,7 @@ TEST_F(OperationDeadlineTests, DuringWaitMaxTimeExpirationDominatesUntilExpirati
 class ThreadedOperationDeadlineTests : public OperationDeadlineTests {
 public:
     using CvPred = stdx::function<bool()>;
-    using WaitFn = stdx::function<stdx::cv_status(
+    using WaitFn = stdx::function<bool(
         OperationContext*, stdx::condition_variable&, stdx::unique_lock<stdx::mutex>&, CvPred)>;
 
     struct WaitTestState {
@@ -240,13 +239,13 @@ public:
         bool isSignaled = false;
     };
 
-    stdx::future<stdx::cv_status> startWaiterWithMaxTime(OperationContext* opCtx,
-                                                         WaitTestState* state,
-                                                         WaitFn waitFn,
-                                                         Date_t maxTime) {
+    stdx::future<bool> startWaiterWithMaxTime(OperationContext* opCtx,
+                                              WaitTestState* state,
+                                              WaitFn waitFn,
+                                              Date_t maxTime) {
 
         auto barrier = std::make_shared<unittest::Barrier>(2);
-        auto task = stdx::packaged_task<stdx::cv_status()>([=] {
+        auto task = stdx::packaged_task<bool()>([=] {
             if (maxTime < Date_t::max()) {
                 opCtx->setDeadlineByDate(maxTime);
             }
@@ -270,10 +269,10 @@ public:
         return result;
     }
 
-    stdx::future<stdx::cv_status> startWaiterWithUntilAndMaxTime(OperationContext* opCtx,
-                                                                 WaitTestState* state,
-                                                                 Date_t until,
-                                                                 Date_t maxTime) {
+    stdx::future<bool> startWaiterWithUntilAndMaxTime(OperationContext* opCtx,
+                                                      WaitTestState* state,
+                                                      Date_t until,
+                                                      Date_t maxTime) {
         const auto waitFn = [until](OperationContext* opCtx,
                                     stdx::condition_variable& cv,
                                     stdx::unique_lock<stdx::mutex>& lk,
@@ -282,17 +281,17 @@ public:
                 return opCtx->waitForConditionOrInterruptUntil(cv, lk, until, predicate);
             } else {
                 opCtx->waitForConditionOrInterrupt(cv, lk, predicate);
-                return stdx::cv_status::no_timeout;
+                return true;
             }
         };
         return startWaiterWithMaxTime(opCtx, state, waitFn, maxTime);
     }
 
     template <typename Period>
-    stdx::future<stdx::cv_status> startWaiterWithDurationAndMaxTime(OperationContext* opCtx,
-                                                                    WaitTestState* state,
-                                                                    Duration<Period> duration,
-                                                                    Date_t maxTime) {
+    stdx::future<bool> startWaiterWithDurationAndMaxTime(OperationContext* opCtx,
+                                                         WaitTestState* state,
+                                                         Duration<Period> duration,
+                                                         Date_t maxTime) {
         const auto waitFn = [duration](OperationContext* opCtx,
                                        stdx::condition_variable& cv,
                                        stdx::unique_lock<stdx::mutex>& lk,
@@ -302,14 +301,14 @@ public:
         return startWaiterWithMaxTime(opCtx, state, waitFn, maxTime);
     }
 
-    stdx::future<stdx::cv_status> startWaiter(OperationContext* opCtx, WaitTestState* state) {
+    stdx::future<bool> startWaiter(OperationContext* opCtx, WaitTestState* state) {
         return startWaiterWithUntilAndMaxTime(opCtx, state, Date_t::max(), Date_t::max());
     }
 
-    stdx::future<stdx::cv_status> startWaiterWithSleepUntilAndMaxTime(OperationContext* opCtx,
-                                                                      WaitTestState* state,
-                                                                      Date_t sleepUntil,
-                                                                      Date_t maxTime) {
+    stdx::future<bool> startWaiterWithSleepUntilAndMaxTime(OperationContext* opCtx,
+                                                           WaitTestState* state,
+                                                           Date_t sleepUntil,
+                                                           Date_t maxTime) {
         auto waitFn = [sleepUntil](OperationContext* opCtx,
                                    stdx::condition_variable& cv,
                                    stdx::unique_lock<stdx::mutex>& lk,
@@ -317,16 +316,16 @@ public:
             lk.unlock();
             opCtx->sleepUntil(sleepUntil);
             lk.lock();
-            return stdx::cv_status::timeout;
+            return false;
         };
         return startWaiterWithMaxTime(opCtx, state, waitFn, maxTime);
     }
 
     template <typename Period>
-    stdx::future<stdx::cv_status> startWaiterWithSleepForAndMaxTime(OperationContext* opCtx,
-                                                                    WaitTestState* state,
-                                                                    Duration<Period> sleepFor,
-                                                                    Date_t maxTime) {
+    stdx::future<bool> startWaiterWithSleepForAndMaxTime(OperationContext* opCtx,
+                                                         WaitTestState* state,
+                                                         Duration<Period> sleepFor,
+                                                         Date_t maxTime) {
         auto waitFn = [sleepFor](OperationContext* opCtx,
                                  stdx::condition_variable& cv,
                                  stdx::unique_lock<stdx::mutex>& lk,
@@ -334,7 +333,7 @@ public:
             lk.unlock();
             opCtx->sleepFor(sleepFor);
             lk.lock();
-            return stdx::cv_status::timeout;
+            return false;
         };
         return startWaiterWithMaxTime(opCtx, state, waitFn, maxTime);
     }
@@ -386,7 +385,7 @@ TEST_F(ThreadedOperationDeadlineTests, UntilExpiresWhileWaiting) {
     ASSERT(stdx::future_status::ready !=
            waiterResult.wait_for(Milliseconds::zero().toSystemDuration()));
     mockClock->advance(Seconds{2});
-    ASSERT(stdx::cv_status::timeout == waiterResult.get());
+    ASSERT_FALSE(waiterResult.get());
 }
 
 TEST_F(ThreadedOperationDeadlineTests, ForExpiresWhileWaiting) {
@@ -402,7 +401,7 @@ TEST_F(ThreadedOperationDeadlineTests, ForExpiresWhileWaiting) {
     ASSERT(stdx::future_status::ready !=
            waiterResult.wait_for(Milliseconds::zero().toSystemDuration()));
     mockClock->advance(Seconds{2});
-    ASSERT(stdx::cv_status::timeout == waiterResult.get());
+    ASSERT_FALSE(waiterResult.get());
 }
 
 TEST_F(ThreadedOperationDeadlineTests, SignalOne) {
@@ -414,7 +413,7 @@ TEST_F(ThreadedOperationDeadlineTests, SignalOne) {
            waiterResult.wait_for(Milliseconds::zero().toSystemDuration()))
         << waiterResult.get();
     state.signal();
-    ASSERT(stdx::cv_status::no_timeout == waiterResult.get());
+    ASSERT_TRUE(waiterResult.get());
 }
 
 TEST_F(ThreadedOperationDeadlineTests, KillOneSignalAnother) {
@@ -438,7 +437,7 @@ TEST_F(ThreadedOperationDeadlineTests, KillOneSignalAnother) {
     ASSERT(stdx::future_status::ready !=
            waiterResult2.wait_for(Milliseconds::zero().toSystemDuration()));
     state2.signal();
-    ASSERT(stdx::cv_status::no_timeout == waiterResult2.get());
+    ASSERT_TRUE(waiterResult2.get());
 }
 
 TEST_F(ThreadedOperationDeadlineTests, SignalBeforeUntilExpires) {
@@ -456,7 +455,7 @@ TEST_F(ThreadedOperationDeadlineTests, SignalBeforeUntilExpires) {
     ASSERT(stdx::future_status::ready !=
            waiterResult.wait_for(Milliseconds::zero().toSystemDuration()));
     state.signal();
-    ASSERT(stdx::cv_status::no_timeout == waiterResult.get());
+    ASSERT_TRUE(waiterResult.get());
 }
 
 TEST_F(ThreadedOperationDeadlineTests, SignalBeforeMaxTimeExpires) {
@@ -474,7 +473,7 @@ TEST_F(ThreadedOperationDeadlineTests, SignalBeforeMaxTimeExpires) {
     ASSERT(stdx::future_status::ready !=
            waiterResult.wait_for(Milliseconds::zero().toSystemDuration()));
     state.signal();
-    ASSERT(stdx::cv_status::no_timeout == waiterResult.get());
+    ASSERT_TRUE(waiterResult.get());
 }
 
 TEST_F(ThreadedOperationDeadlineTests, SleepUntilWithExpiredUntilDoesNotBlock) {
@@ -485,7 +484,7 @@ TEST_F(ThreadedOperationDeadlineTests, SleepUntilWithExpiredUntilDoesNotBlock) {
                                                             &state,
                                                             startDate - Seconds{10},   // until
                                                             startDate + Seconds{60});  // maxTime
-    ASSERT(stdx::cv_status::timeout == waiterResult.get());
+    ASSERT_FALSE(waiterResult.get());
 }
 
 TEST_F(ThreadedOperationDeadlineTests, SleepUntilExpires) {
@@ -502,7 +501,7 @@ TEST_F(ThreadedOperationDeadlineTests, SleepUntilExpires) {
     ASSERT(stdx::future_status::ready !=
            waiterResult.wait_for(Milliseconds::zero().toSystemDuration()));
     mockClock->advance(Seconds{2});
-    ASSERT(stdx::cv_status::timeout == waiterResult.get());
+    ASSERT_FALSE(waiterResult.get());
 }
 
 TEST_F(ThreadedOperationDeadlineTests, SleepForWithExpiredForDoesNotBlock) {
@@ -511,7 +510,7 @@ TEST_F(ThreadedOperationDeadlineTests, SleepForWithExpiredForDoesNotBlock) {
     const auto startDate = mockClock->now();
     auto waiterResult = startWaiterWithSleepForAndMaxTime(
         opCtx.get(), &state, Seconds{-10}, startDate + Seconds{60});  // maxTime
-    ASSERT(stdx::cv_status::timeout == waiterResult.get());
+    ASSERT_FALSE(waiterResult.get());
 }
 
 TEST_F(ThreadedOperationDeadlineTests, SleepForExpires) {
@@ -526,7 +525,7 @@ TEST_F(ThreadedOperationDeadlineTests, SleepForExpires) {
     ASSERT(stdx::future_status::ready !=
            waiterResult.wait_for(Milliseconds::zero().toSystemDuration()));
     mockClock->advance(Seconds{2});
-    ASSERT(stdx::cv_status::timeout == waiterResult.get());
+    ASSERT_FALSE(waiterResult.get());
 }
 
 }  // namespace

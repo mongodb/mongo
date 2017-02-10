@@ -214,16 +214,14 @@ void OperationContext::sleepUntil(Date_t deadline) {
     stdx::mutex m;
     stdx::condition_variable cv;
     stdx::unique_lock<stdx::mutex> lk(m);
-    invariant(stdx::cv_status::timeout ==
-              waitForConditionOrInterruptUntil(cv, lk, deadline, [] { return false; }));
+    invariant(!waitForConditionOrInterruptUntil(cv, lk, deadline, [] { return false; }));
 }
 
 void OperationContext::sleepFor(Milliseconds duration) {
     stdx::mutex m;
     stdx::condition_variable cv;
     stdx::unique_lock<stdx::mutex> lk(m);
-    invariant(stdx::cv_status::timeout ==
-              waitForConditionOrInterruptFor(cv, lk, duration, [] { return false; }));
+    invariant(!waitForConditionOrInterruptFor(cv, lk, duration, [] { return false; }));
 }
 
 void OperationContext::waitForConditionOrInterrupt(stdx::condition_variable& cv,
