@@ -756,7 +756,7 @@ __evict_pass(WT_SESSION_IMPL *session)
  *	Clear a single walk point.
  */
 static int
-__evict_clear_walk(WT_SESSION_IMPL *session, bool count_stat)
+__evict_clear_walk(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
@@ -773,14 +773,14 @@ __evict_clear_walk(WT_SESSION_IMPL *session, bool count_stat)
 	if ((ref = btree->evict_ref) == NULL)
 		return (0);
 
-	if (count_stat)
-		WT_STAT_CONN_INCR(session, cache_eviction_walks_abandoned);
+	WT_STAT_CONN_INCR(session, cache_eviction_walks_abandoned);
 
 	/*
-	 * Clear evict_ref first, in case releasing it forces eviction (we
-	 * assert we never try to evict the current eviction walk point).
+	 * Clear evict_ref before releasing it in case that forces eviction (we
+	 * assert that we never try to evict the current eviction walk point).
 	 */
 	btree->evict_ref = NULL;
+
 	WT_WITH_DHANDLE(cache->walk_session, session->dhandle,
 	    (ret = __wt_page_release(cache->walk_session,
 	    ref, WT_READ_NO_EVICT)));
@@ -803,7 +803,7 @@ __evict_clear_all_walks(WT_SESSION_IMPL *session)
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q)
 		if (WT_PREFIX_MATCH(dhandle->name, "file:"))
 			WT_WITH_DHANDLE(session, dhandle,
-			    WT_TRET(__evict_clear_walk(session, true)));
+			    WT_TRET(__evict_clear_walk(session)));
 	return (ret);
 }
 
@@ -848,7 +848,7 @@ __wt_evict_file_exclusive_on(WT_SESSION_IMPL *session)
 
 	/* Clear any existing LRU eviction walk for the file. */
 	WT_WITH_PASS_LOCK(session,
-	    ret = __evict_clear_walk(session, true));
+	    ret = __evict_clear_walk(session));
 	(void)__wt_atomic_subv32(&cache->pass_intr, 1);
 	WT_ERR(ret);
 
@@ -1662,8 +1662,15 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 		FLD_SET(walk_flags, WT_READ_PREV);
 
 	/*
-	 * Get some more eviction candidate pages.
-	 *
+	 * Get some more eviction candidate pages, starting at the last saved
+	 * point. Clear the saved point immediately, we assert when discarding
+	 * pages we're not discarding an eviction point, so this clear must be
+	 * complete before the page is released.
+	 */
+	ref = btree->evict_ref;
+	btree->evict_ref = NULL;
+
+	/*
 	 * !!! Take care terminating this loop.
 	 *
 	 * Don't make an extra call to __wt_tree_walk after we hit the end of a
@@ -1676,7 +1683,7 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	for (evict = start, pages_queued = pages_seen = refs_walked = 0;
 	    evict < end && (ret == 0 || ret == WT_NOTFOUND);
 	    ret = __wt_tree_walk_count(
-	    session, &btree->evict_ref, &refs_walked, walk_flags)) {
+	    session, &ref, &refs_walked, walk_flags)) {
 		/*
 		 * Check whether we're finding a good ratio of candidates vs
 		 * pages seen.  Some workloads create "deserts" in trees where
@@ -1690,7 +1697,7 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 		if (give_up)
 			break;
 
-		if ((ref = btree->evict_ref) == NULL) {
+		if (ref == NULL) {
 			if (++restarts == 2)
 				break;
 			WT_STAT_CONN_INCR(
@@ -1812,6 +1819,8 @@ fast:		/* If the page can't be evicted, give up. */
 		btree->evict_walk_period /= 2;
 
 	/*
+	 * Give up the walk occasionally.
+	 *
 	 * If we happen to end up on the root page or a page requiring urgent
 	 * eviction, clear it.  We have to track hazard pointers, and the root
 	 * page complicates that calculation.
@@ -1823,16 +1832,20 @@ fast:		/* If the page can't be evicted, give up. */
 	 * If we land on a page requiring forced eviction, move on to the next
 	 * page: we want this page evicted as quickly as possible.
 	 */
-	if ((ref = btree->evict_ref) != NULL) {
-		/* Give up the walk occasionally. */
+	if (ref != NULL) {
 		if (__wt_ref_is_root(ref) || evict == start || give_up ||
 		    ref->page->read_gen == WT_READGEN_OLDEST ||
-		    ref->page->memory_footprint >= btree->splitmempage)
-			WT_RET(__evict_clear_walk(session, restarts == 0));
-		else if (ref->page->read_gen == WT_READGEN_OLDEST)
+		    ref->page->memory_footprint >= btree->splitmempage) {
+			if (restarts == 0)
+				WT_STAT_CONN_INCR(
+				    session, cache_eviction_walks_abandoned);
+			WT_RET(__wt_page_release(cache->walk_session,
+			    ref, WT_READ_NO_EVICT));
+			ref = NULL;
+		} else if (ref->page->read_gen == WT_READGEN_OLDEST)
 			WT_RET_NOTFOUND_OK(__wt_tree_walk_count(
-			    session, &btree->evict_ref,
-			    &refs_walked, walk_flags));
+			    session, &ref, &refs_walked, walk_flags));
+		btree->evict_ref = ref;
 	}
 
 	WT_STAT_CONN_INCRV(session, cache_eviction_walk, refs_walked);
