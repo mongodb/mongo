@@ -382,6 +382,15 @@ Status MMAPV1DatabaseCatalogEntry::_renameSingleNamespace(OperationContext* txn,
 
     RecordId rid = _addNamespaceToNamespaceCollection(txn, toNS, newSpec.isEmpty() ? 0 : &newSpec);
 
+    // Invalidate old namespace record
+    const NamespaceString nsn(name(), "system.namespaces");
+    StringData dbName(name());
+    invariant(txn->lockState()->isDbLockedForMode(dbName, MODE_X));
+    Database* db = dbHolder().get(txn, dbName);
+    Collection* systemNamespaces = db->getCollection(nsn);
+    systemNamespaces->getCursorManager()->invalidateDocument(
+        txn, oldSpecLocation, INVALIDATION_DELETION);
+
     _getNamespaceRecordStore()->deleteRecord(txn, oldSpecLocation);
 
     Entry*& entry = _collections[toNS.toString()];
@@ -849,7 +858,17 @@ void MMAPV1DatabaseCatalogEntry::_removeNamespaceFromNamespaceCollection(Operati
     RecordStoreV1Base* rs = _getNamespaceRecordStore();
     invariant(rs);
 
-    rs->deleteRecord(txn, entry->second->catalogEntry->getNamespacesRecordId());
+    // Invalidate old namespace record
+    RecordId oldSpecLocation = entry->second->catalogEntry->getNamespacesRecordId();
+    const NamespaceString nsn(name(), "system.namespaces");
+    StringData dbName(name());
+    invariant(txn->lockState()->isDbLockedForMode(dbName, MODE_X));
+    Database* db = dbHolder().get(txn, dbName);
+    Collection* systemNamespaces = db->getCollection(nsn);
+    systemNamespaces->getCursorManager()->invalidateDocument(
+        txn, oldSpecLocation, INVALIDATION_DELETION);
+
+    rs->deleteRecord(txn, oldSpecLocation);
 }
 
 CollectionOptions MMAPV1DatabaseCatalogEntry::getCollectionOptions(OperationContext* txn,
