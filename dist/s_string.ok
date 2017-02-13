@@ -1182,6 +1182,7 @@ txt
 typedef
 uB
 uS
+ui
 uint
 uintmax
 unbare
