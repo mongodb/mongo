@@ -26,20 +26,15 @@
 # apt-get install dpkg-dev rpm debhelper fakeroot ia32-libs createrepo git-core libsnmp15
 # echo "Now put the dist gnupg signing keys in ~root/.gnupg"
 
-import argparse
 import errno
-import getopt
 from glob import glob
 import packager
 import os
 import re
 import shutil
-import stat
-import subprocess
 import sys
 import tempfile
 import time
-import urlparse
 
 # The MongoDB names for the architectures we support.
 ARCH_CHOICES=["x86_64", "ppc64le"]
@@ -143,8 +138,6 @@ def main(argv):
 
     os.chdir(prefix)
     try:
-      # Download the binaries.
-      urlfmt="http://downloads.mongodb.com/linux/mongodb-linux-%s-enterprise-%s-%s.tgz"
       made_pkg = False
 
       # Build a package for each distro/spec/arch tuple, and
@@ -154,12 +147,9 @@ def main(argv):
           for build_os in distro.build_os(arch):
             if build_os in args.distros or not args.distros:
 
-              if args.tarball:
-                filename = tarfile(build_os, arch, spec)
-                packager.ensure_dir(filename)
-                shutil.copyfile(args.tarball,filename)
-              else:
-                packager.httpget(urlfmt % (arch, build_os, spec.version()), packager.ensure_dir(tarfile(build_os, arch, spec)))
+              filename = tarfile(build_os, arch, spec)
+              packager.ensure_dir(filename)
+              shutil.copyfile(args.tarball,filename)
 
               repo = make_package(distro, build_os, arch, spec, srcdir)
               make_repo(repo, distro, build_os, spec)
