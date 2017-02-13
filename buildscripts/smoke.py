@@ -36,6 +36,7 @@
 from datetime import datetime
 from itertools import izip
 import glob
+import logging
 from optparse import OptionParser
 import os
 import pprint
@@ -74,6 +75,12 @@ except:
         import simplejson as json
     except:
         json = None
+
+# Get relative imports to work when the package is not installed on the PYTHONPATH.
+if __name__ == "__main__" and __package__ is None:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
+
+from buildscripts.resmokelib.core import pipe
 
 
 # TODO clean this up so we don't need globals...
@@ -166,6 +173,10 @@ class mongod(NullMongod):
         self.kwargs = kwargs
         self.proc = None
         self.auth = False
+
+        self.job_object = None
+        self._inner_proc_pid = None
+        self._stdout_pipe = None
 
     def ensure_test_dirs(self):
         utils.ensureDir(smoke_db_prefix + "/tmp/unittest/")
@@ -262,6 +273,28 @@ class mongod(NullMongod):
         print "running " + " ".join(argv)
         self.proc = self._start(buildlogger(argv, is_global=True))
 
+        # If the mongod process is spawned under buildlogger.py, then the first line of output
+        # should include the pid of the underlying mongod process. If smoke.py didn't create its own
+        # job object because it is already inside one, then the pid is used to attempt to terminate
+        # the underlying mongod process.
+        first_line = self.proc.stdout.readline()
+        match = re.search("^\[buildlogger.py\] pid: (?P<pid>[0-9]+)$", first_line.rstrip())
+        if match is not None:
+            self._inner_proc_pid = int(match.group("pid"))
+        else:
+            # The first line of output didn't include the pid of the underlying mongod process. We
+            # write the first line of output to smoke.py's stdout to ensure the message doesn't get
+            # lost since it's possible that buildlogger.py isn't being used.
+            sys.stdout.write(first_line)
+
+        logger = logging.Logger("", level=logging.DEBUG)
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(logging.Formatter(fmt="%(message)s"))
+        logger.addHandler(handler)
+
+        self._stdout_pipe = pipe.LoggerPipe(logger, logging.INFO, self.proc.stdout)
+        self._stdout_pipe.wait_until_started()
+
         if not self.did_mongod_start(self.port):
             raise Exception("Failed to start mongod")
 
@@ -275,11 +308,14 @@ class mongod(NullMongod):
                     synced = synced and "syncedTo" in source and source["syncedTo"]
 
     def _start(self, argv):
-        """In most cases, just call subprocess.Popen(). On windows,
-        add the started process to a new Job Object, so that any
-        child processes of this process can be killed with a single
-        call to TerminateJobObject (see self.stop()).
+        """In most cases, just call subprocess.Popen(). On Windows, this
+        method also assigns the started process to a job object if a new
+        one was created. This ensures that any child processes of this
+        process can be killed with a single call to TerminateJobObject
+        (see self.stop()).
         """
+
+        creation_flags = 0
 
         if os.sys.platform == "win32":
             # Create a job object with the "kill on job close"
@@ -288,27 +324,29 @@ class mongod(NullMongod):
             # and lets us terminate the whole tree of processes
             # rather than orphaning the mongod.
             import win32job
+            import win32process
 
-            # Magic number needed to allow job reassignment in Windows 7
-            # see: MSDN - Process Creation Flags - ms684863
-            CREATE_BREAKAWAY_FROM_JOB = 0x01000000
+            # Don't create a job object if the current process is already inside one.
+            if not win32job.IsProcessInJob(win32process.GetCurrentProcess(), None):
+                self.job_object = win32job.CreateJobObject(None, '')
 
-            proc = Popen(argv, creationflags=CREATE_BREAKAWAY_FROM_JOB)
+                job_info = win32job.QueryInformationJobObject(
+                    self.job_object, win32job.JobObjectExtendedLimitInformation)
+                job_info['BasicLimitInformation']['LimitFlags'] |= \
+                    win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+                win32job.SetInformationJobObject(
+                    self.job_object,
+                    win32job.JobObjectExtendedLimitInformation,
+                    job_info)
 
-            self.job_object = win32job.CreateJobObject(None, '')
+                # Magic number needed to allow job reassignment in Windows 7
+                # see: MSDN - Process Creation Flags - ms684863
+                creation_flags |= win32process.CREATE_BREAKAWAY_FROM_JOB
 
-            job_info = win32job.QueryInformationJobObject(
-                self.job_object, win32job.JobObjectExtendedLimitInformation)
-            job_info['BasicLimitInformation']['LimitFlags'] |= win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-            win32job.SetInformationJobObject(
-                self.job_object,
-                win32job.JobObjectExtendedLimitInformation,
-                job_info)
+        proc = Popen(argv, creationflags=creation_flags, stdout=PIPE, stderr=None, bufsize=0)
 
+        if self.job_object is not None:
             win32job.AssignProcessToJobObject(self.job_object, proc._handle)
-
-        else:
-            proc = Popen(argv)
 
         return proc
 
@@ -317,11 +355,53 @@ class mongod(NullMongod):
             print >> sys.stderr, "probable bug: self.proc unset in stop()"
             return
         try:
-            if os.sys.platform == "win32":
+            if os.sys.platform == "win32" and self.job_object is not None:
+                # If smoke.py created its own job object, then we clean up the spawned processes by
+                # terminating it.
                 import win32job
                 win32job.TerminateJobObject(self.job_object, -1)
                 # Windows doesn't seem to kill the process immediately, so give it some time to die
                 time.sleep(5)
+            elif os.sys.platform == "win32":
+                # If smoke.py didn't create its own job object, then we attempt to clean up the
+                # spawned processes by terminating them individually.
+                import win32api
+                import win32con
+                import win32event
+                import win32process
+                import winerror
+
+                def win32_terminate(handle):
+                    # Adapted from implementation of Popen.terminate() in subprocess.py of Python
+                    # 2.7 because earlier versions do not catch exceptions.
+                    try:
+                        win32process.TerminateProcess(handle, -1)
+                    except win32process.error as err:
+                        # ERROR_ACCESS_DENIED (winerror=5) is received when the process has
+                        # already died.
+                        if err.winerror != winerror.ERROR_ACCESS_DENIED:
+                            raise
+                        return_code = win32process.GetExitCodeProcess(handle)
+                        if return_code == win32con.STILL_ACTIVE:
+                            raise
+
+                # Terminate the mongod process underlying buildlogger.py if one exists.
+                if self._inner_proc_pid is not None:
+                    # The PROCESS_TERMINATE privilege is necessary to call TerminateProcess() and
+                    # the SYNCHRONIZE privilege is necessary to call WaitForSingleObject(). See
+                    # https://msdn.microsoft.com/en-us/library/windows/desktop/ms684880(v=vs.85).aspx
+                    # for more details.
+                    required_access = win32con.PROCESS_TERMINATE | win32con.SYNCHRONIZE
+                    inner_proc_handle = win32api.OpenProcess(required_access,
+                                                                False,
+                                                                self._inner_proc_pid)
+                    try:
+                        win32_terminate(inner_proc_handle)
+                        win32event.WaitForSingleObject(inner_proc_handle, win32event.INFINITE)
+                    finally:
+                        win32api.CloseHandle(inner_proc_handle)
+
+                win32_terminate(self.proc._handle)
             elif hasattr(self.proc, "terminate"):
                 # This method added in Python 2.6
                 self.proc.terminate()
@@ -331,6 +411,10 @@ class mongod(NullMongod):
             print >> sys.stderr, "error shutting down mongod"
             print >> sys.stderr, e
         self.proc.wait()
+
+        if self._stdout_pipe is not None:
+            self._stdout_pipe.wait_until_finished()
+
         sys.stderr.flush()
         sys.stdout.flush()
 
