@@ -57,7 +57,7 @@ item_str_equal(WT_ITEM *item, const char *str)
 }
 
 static int
-compare_int(int a, int b)
+compare_int(int64_t a, int64_t b)
 {
 	return (a < b ? -1 : (a > b ? 1 : 0));
 }
@@ -329,7 +329,7 @@ main(int argc, char *argv[])
 {
 	TEST_OPTS *opts, _opts;
 	WT_SESSION *session;
-	int32_t i;
+	size_t i;
 
 	opts = &_opts;
 	memset(opts, 0, sizeof(*opts));
@@ -349,8 +349,8 @@ main(int argc, char *argv[])
 	testutil_check(opts->conn->add_extractor(opts->conn, "extractor_u",
 	    &extractor_u, NULL));
 
-	for (i = 0; i < (int32_t)TEST_SET_COUNT; i++) {
-		printf("test set %d\n", i);
+	for (i = 0; i < TEST_SET_COUNT; i++) {
+		printf("test set %" WT_SIZET_FMT "\n", i);
 		test_one_set(session, test_sets[i]);
 	}
 

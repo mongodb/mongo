@@ -651,14 +651,14 @@ __split_root(WT_SESSION_IMPL *session, WT_PAGE *root)
 	WT_INTL_INDEX_SET(root, alloc_index);
 	alloc_index = NULL;
 
-	/* The split is complete and correct, ignore benign errors. */
-	complete = WT_ERR_IGNORE;
-
 #ifdef HAVE_DIAGNOSTIC
 	WT_WITH_PAGE_INDEX(session,
 	    ret = __split_verify_intl(session, root, NULL, root, false));
 	WT_ERR(ret);
 #endif
+
+	/* The split is complete and verified, ignore benign errors. */
+	complete = WT_ERR_IGNORE;
 
 	/*
 	 * We can't free the previous root's index, there may be threads using
@@ -864,13 +864,13 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 		WT_FULL_BARRIER();
 	}
 
-	/* The split is complete and correct, ignore benign errors. */
-	complete = WT_ERR_IGNORE;
-
 #ifdef HAVE_DIAGNOSTIC
 	WT_WITH_PAGE_INDEX(session,
 	    __split_verify_intl_key_order(session, parent));
 #endif
+
+	/* The split is complete and verified, ignore benign errors. */
+	complete = WT_ERR_IGNORE;
 
 	/*
 	 * !!!
@@ -1168,14 +1168,14 @@ __split_internal(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *page)
 	WT_ASSERT(session, WT_INTL_INDEX_GET_SAFE(page) == pindex);
 	WT_INTL_INDEX_SET(page, replace_index);
 
-	/* The split is complete and correct, ignore benign errors. */
-	complete = WT_ERR_IGNORE;
-
 #ifdef HAVE_DIAGNOSTIC
 	WT_WITH_PAGE_INDEX(session,
 	    ret = __split_verify_intl(session, parent, page, page, true));
 	WT_ERR(ret);
 #endif
+
+	/* The split is complete and verified, ignore benign errors. */
+	complete = WT_ERR_IGNORE;
 
 	/*
 	 * We don't care about the page-index we allocated, all we needed was
