@@ -332,9 +332,8 @@ Status Pipeline::checkAuthForCommand(ClientBasic* client,
     std::vector<Privilege> privileges;
 
     if (cmdObj.getFieldDotted("pipeline.0.$indexStats")) {
-        Privilege::addPrivilegeToPrivilegeVector(
-            &privileges,
-            Privilege(ResourcePattern::forAnyNormalResource(), ActionType::indexStats));
+        Privilege::addPrivilegeToPrivilegeVector(&privileges,
+                                                 Privilege(inputResource, ActionType::indexStats));
     } else {
         // If no source requiring an alternative permission scheme is specified then default to
         // requiring find() privileges on the given namespace.
