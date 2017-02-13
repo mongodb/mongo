@@ -71,7 +71,7 @@ std::string SHA1Block::toString() const {
     return base64::encode(reinterpret_cast<const char*>(_hash.data()), _hash.size());
 }
 
-void SHA1Block::appendAsBinData(BSONObjBuilder& builder, StringData fieldName) {
+void SHA1Block::appendAsBinData(BSONObjBuilder& builder, StringData fieldName) const {
     builder.appendBinData(fieldName, _hash.size(), BinDataGeneral, _hash.data());
 }
 

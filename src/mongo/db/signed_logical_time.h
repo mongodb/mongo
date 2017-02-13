@@ -36,7 +36,7 @@ namespace mongo {
 
 /**
  * The SignedLogicalTime class is a pair of value i.e. time and a signature i.e. _proof
- * The class is immutable and is used to hold the cryptogrphically protected LogicalTime.
+ * The class is immutable and is used to hold the cryptographically protected LogicalTime.
  */
 class SignedLogicalTime {
 public:

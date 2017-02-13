@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2017 MongoDB, Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,16 +26,43 @@
  *    it in the license file.
  */
 
-#include "mongo/db/signed_logical_time.h"
+#pragma once
 
-#include "mongo/util/mongoutils/str.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/signed_logical_time.h"
 
 namespace mongo {
 
-std::string SignedLogicalTime::toString() const {
-    StringBuilder buf;
-    buf << _time.toString() << "|" << _proof.toString();
-    return buf.str();
-}
+class BSONElement;
+class BSONObjBuilder;
 
+namespace rpc {
+
+/**
+ * Format:
+ * logicalTime: {
+ *     clusterTime: <Timestamp>,
+ *     signature: <SHA1 hash of clusterTime as BinData>
+ * }
+ */
+class LogicalTimeMetadata {
+public:
+    explicit LogicalTimeMetadata(SignedLogicalTime time);
+
+    static StatusWith<LogicalTimeMetadata> readFromMetadata(const BSONObj& metadata);
+    static StatusWith<LogicalTimeMetadata> readFromMetadata(const BSONElement& metadataElem);
+
+    void writeToMetadata(BSONObjBuilder* metadataBuilder) const;
+
+    const SignedLogicalTime& getSignedTime() const;
+
+    static StringData fieldName() {
+        return "logicalTime";
+    }
+
+private:
+    SignedLogicalTime _clusterTime;
+};
+
+}  // namespace rpc
 }  // namespace mongo

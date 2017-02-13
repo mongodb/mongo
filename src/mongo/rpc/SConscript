@@ -150,6 +150,7 @@ env.Clone().InjectModule("enterprise").Library(
         'metadata/audit_metadata.cpp',
         'metadata/config_server_metadata.cpp',
         'metadata/egress_metadata_hook_list.cpp',
+        'metadata/logical_time_metadata.cpp',
         'metadata/server_selection_metadata.cpp',
         'metadata/sharding_metadata.cpp',
         'metadata/repl_set_metadata.cpp',
@@ -162,6 +163,7 @@ env.Clone().InjectModule("enterprise").Library(
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/db/repl/optime',
+        '$BUILD_DIR/mongo/db/signed_logical_time',
         '$BUILD_DIR/mongo/util/decorable',
     ],
 )
@@ -172,6 +174,7 @@ env.CppUnitTest(
     ],
     source=[
         'metadata/egress_metadata_hook_list_test.cpp',
+        'metadata/logical_time_metadata_test.cpp',
         'metadata/server_selection_metadata_test.cpp',
         'metadata/sharding_metadata_test.cpp',
         'metadata/tracking_metadata_test.cpp',

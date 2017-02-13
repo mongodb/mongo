@@ -81,7 +81,7 @@ public:
     /**
      * Append this to a builder using the given name as a BSON BinData type value.
      */
-    void appendAsBinData(BSONObjBuilder& builder, StringData fieldName);
+    void appendAsBinData(BSONObjBuilder& builder, StringData fieldName) const;
 
     /**
      * Do a bitwise xor against another SHA1Block and replace the current contents of this block

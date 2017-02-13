@@ -941,6 +941,7 @@ env.Library(
     ],
     LIBDEPS=[
         'logical_time',
+        '$BUILD_DIR/mongo/crypto/sha1_block',
     ],
 )
 

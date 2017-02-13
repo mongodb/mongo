@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/crypto/sha1_block.h"
 #include "mongo/db/logical_time.h"
 
 namespace mongo {
@@ -40,14 +41,13 @@ namespace mongo {
 class TimeProofService {
 public:
     // This type must be synchronized with the library that generates SHA1 or other proof.
-    using TimeProof = std::string;
+    using TimeProof = SHA1Block;
 
     /**
      *  Returns the proof matching the time argument.
      */
     TimeProof getProof(LogicalTime time) {
-        TimeProof proof = "12345678901234567890";
-        return proof;
+        return SHA1Block();
     }
 
     /**
