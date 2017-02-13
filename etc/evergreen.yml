@@ -24,7 +24,6 @@
 # - 'builde
 
 command_type: system
-disable_cleanup: true
 
 ## Some variables for convenience:
 variables:
