@@ -267,7 +267,7 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
     if (!status.isOK()) {
         return StatusWith<int>(
             status.code(),
-            str::stream() << "Found invalid default write concern in 'getLastErrorDefaults' field. "
+            str::stream() << "Found invalid default write concern in 'getLastErrorDefaults' field"
                           << causedBy(status.reason()));
     }
 
@@ -294,7 +294,7 @@ StatusWith<int> validateConfigForReconfig(ReplicationCoordinatorExternalState* e
     if (!status.isOK()) {
         return StatusWith<int>(
             status.code(),
-            str::stream() << "Found invalid default write concern in 'getLastErrorDefaults' field. "
+            str::stream() << "Found invalid default write concern in 'getLastErrorDefaults' field"
                           << causedBy(status.reason()));
     }
 
