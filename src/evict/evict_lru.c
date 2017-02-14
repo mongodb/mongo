@@ -1654,10 +1654,29 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	    !F_ISSET(cache, WT_CACHE_EVICT_CLEAN))
 		min_pages *= 10;
 
+	/*
+	 * Choose a random point in the tree if looking for candidates in a
+	 * tree with no starting point set. This is mostly aimed at ensuring
+	 * eviction fairly visits all pages in trees with a lot of in-cache
+	 * content.
+	 */
+	if (btree->evict_ref == NULL) {
+		/* Ensure internal pages indexes remain valid for our walk */
+		WT_WITH_PAGE_INDEX(session, ret =
+		    __wt_random_descent(session, &btree->evict_ref, true));
+		WT_RET_NOTFOUND_OK(ret);
+
+		/*
+		 * Reverse the direction of the walk each time we start at a
+		 * random point so both ends of the tree are equally likely to
+		 * be visited.
+		 */
+		btree->evict_walk_reverse = !btree->evict_walk_reverse;
+	}
+
 	walk_flags =
 	    WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT;
 
-	/* Randomize the walk direction. */
 	if (btree->evict_walk_reverse)
 		FLD_SET(walk_flags, WT_READ_PREV);
 
@@ -1798,13 +1817,6 @@ fast:		/* If the page can't be evicted, give up. */
 	*slotp += (u_int)(evict - start);
 	WT_STAT_CONN_INCRV(
 	    session, cache_eviction_pages_queued, (u_int)(evict - start));
-
-	/*
-	 * If gave up the walk, reverse the direction of the walk and skip it
-	 * next time.
-	 */
-	if (give_up)
-		btree->evict_walk_reverse = !btree->evict_walk_reverse;
 
 	/*
 	 * If we couldn't find the number of pages we were looking for, skip
