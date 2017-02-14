@@ -931,7 +931,7 @@ if not use_system_version_of_library("pcre"):
 
 if not use_system_version_of_library("boost"):
     env.Prepend(CPPPATH=['$BUILD_DIR/third_party/boost'],
-                CPPDEFINES=['BOOST_ALL_NO_LIB'])
+                CPPDEFINES=['BOOST_ALL_NO_LIB', 'BOOST_NO_VARIADIC_TEMPLATES'])
 
 env.Prepend(CPPPATH=['$BUILD_DIR/third_party/s2'])
 

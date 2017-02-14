@@ -212,7 +212,7 @@ namespace mongo {
         // This is a read lock. The query cache is owned by the collection.
         Client::ReadContext readCtx(ns);
         Client::Context& ctx = readCtx.ctx();
-        PlanCache* planCache;
+        PlanCache* planCache = NULL;
         Status status = getPlanCache(ctx.db(), ns, &planCache);
         if (!status.isOK()) {
             // No collection - return results with empty shapes array.
@@ -258,7 +258,7 @@ namespace mongo {
         // This is a read lock. The query cache is owned by the collection.
         Client::ReadContext readCtx(ns);
         Client::Context& ctx = readCtx.ctx();
-        PlanCache* planCache;
+        PlanCache* planCache = NULL;
         Status status = getPlanCache(ctx.db(), ns, &planCache);
         if (!status.isOK()) {
             // No collection - nothing to do. Return OK status.
@@ -327,7 +327,7 @@ namespace mongo {
                                                    BSONObjBuilder* bob) {
         Client::ReadContext readCtx(ns);
         Client::Context& ctx = readCtx.ctx();
-        PlanCache* planCache;
+        PlanCache* planCache = NULL;
         Status status = getPlanCache(ctx.db(), ns, &planCache);
         if (!status.isOK()) {
             // No collection - return empty plans array.
