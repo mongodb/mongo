@@ -20,7 +20,13 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/mman.h>
+
+#ifdef __GLIBC__
 #include <gnu/libc-version.h>
+#else
+#define gnu_get_libc_version(x) "Unknow"
+#endif
+
 #include <sys/utsname.h>
 
 #include "processinfo.h"
@@ -299,6 +305,7 @@ namespace mongo {
             paths.push_back( "/etc/debian_release" );
             paths.push_back( "/etc/slackware-version" );
             paths.push_back( "/etc/centos-release" );
+            paths.push_back("/etc/alpine-release");
             paths.push_back( "/etc/os-release" );
         
             for ( i = paths.begin(); i != paths.end(); ++i ) {
@@ -384,8 +391,10 @@ namespace mongo {
 
     void ProcessInfo::getExtraInfo( BSONObjBuilder& info ) {
         // [dm] i don't think mallinfo works. (64 bit.)  ??
-        struct mallinfo malloc_info = mallinfo(); // structure has same name as function that returns it. (see malloc.h)
-        info.append("heap_usage_bytes", malloc_info.uordblks/*main arena*/ + malloc_info.hblkhd/*mmap blocks*/);
+        #if defined(__GNU_LIBRARY__) || defined(_WIN32)
+            struct mallinfo malloc_info = mallinfo(); // structure has same name as function that returns it. (see malloc.h)
+            info.append("heap_usage_bytes", malloc_info.uordblks/*main arena*/ + malloc_info.hblkhd/*mmap blocks*/);
+        #endif
         //docs claim hblkhd is included in uordblks but it isn't
 
         LinuxProc p(_pid);
