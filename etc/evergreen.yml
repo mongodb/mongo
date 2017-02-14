@@ -928,7 +928,7 @@ post:
         ${set_sudo}
         # Use dmesg -T option, if supported, to display timestamps.
         dmesg=dmesg
-        dmesg -T > /dev/null 2>&1
+        $sudo dmesg -T > /dev/null 2>&1
         if [ $? -eq 0 ]; then
           dmesg="dmesg -T"
         fi
