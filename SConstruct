@@ -2925,6 +2925,11 @@ env = doConfigure( env )
 # compilation database entries for the configure tests, which is weird.
 env.Tool("compilation_db")
 
+# If we can, load the dagger tool for build dependency graph introspection.
+# Dagger is only supported on Linux and OSX (not Windows or Solaris).
+if is_running_os('osx') or is_running_os('linux'):
+    env.Tool("dagger")
+
 def checkErrorCodes():
     import buildscripts.errorcodes as x
     if x.checkErrorCodes() == False:
@@ -3071,12 +3076,9 @@ env.SConscript(
 
 all = env.Alias('all', ['core', 'tools', 'dbtest', 'unittests', 'integration_tests'])
 
-# If we can, load the dagger tool for build dependency graph introspection.
-# Dagger is only supported on Linux and OSX (not Windows or Solaris).
+# run the Dagger tool if it's installed
 if is_running_os('osx') or is_running_os('linux'):
-    env.Tool("dagger")
     dependencyDb = env.Alias("dagger", env.Dagger('library_dependency_graph.json'))
-
     # Require everything to be built before trying to extract build dependency information
     env.Requires(dependencyDb, all)
 
