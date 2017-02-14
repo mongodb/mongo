@@ -39,10 +39,11 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/global_timestamp.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/service_context.h"
@@ -670,12 +671,12 @@ public:
                                 << 8192),
                            info);
 
-        Date_t one =
-            Date_t::fromMillisSinceEpoch(getNextGlobalTimestamp(_txn.getServiceContext()).asLL());
-        Date_t two =
-            Date_t::fromMillisSinceEpoch(getNextGlobalTimestamp(_txn.getServiceContext()).asLL());
-        Date_t three =
-            Date_t::fromMillisSinceEpoch(getNextGlobalTimestamp(_txn.getServiceContext()).asLL());
+        Date_t one = Date_t::fromMillisSinceEpoch(
+            LogicalClock::get(&_txn)->reserveTicks(1).asTimestamp().asLL());
+        Date_t two = Date_t::fromMillisSinceEpoch(
+            LogicalClock::get(&_txn)->reserveTicks(1).asTimestamp().asLL());
+        Date_t three = Date_t::fromMillisSinceEpoch(
+            LogicalClock::get(&_txn)->reserveTicks(1).asTimestamp().asLL());
         insert(ns, BSON("ts" << one));
         insert(ns, BSON("ts" << two));
         insert(ns, BSON("ts" << three));

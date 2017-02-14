@@ -39,6 +39,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/query/cursor_response.h"
@@ -49,6 +50,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_noop.h"
+#include "mongo/db/time_proof_service.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
@@ -106,6 +108,11 @@ void ShardingMongodTestFixture::setUp() {
     _opCtx = cc().makeOperationContext();
 
     // Set up this node as part of a replica set.
+
+    auto timeProofService = stdx::make_unique<TimeProofService>();
+    auto logicalClock =
+        stdx::make_unique<LogicalClock>(service, std::move(timeProofService), false);
+    LogicalClock::set(service, std::move(logicalClock));
 
     repl::ReplSettings replSettings;
     replSettings.setReplSetString(ConnectionString::forReplicaSet(_setName, _servers).toString());

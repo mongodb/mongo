@@ -32,6 +32,7 @@
 
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
@@ -41,6 +42,7 @@
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
+#include "mongo/db/time_proof_service.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
@@ -119,6 +121,11 @@ void ReplCoordTest::init() {
     ASSERT_TRUE(storageInterface == StorageInterface::get(service));
     // PRNG seed for tests.
     const int64_t seed = 0;
+
+    auto timeProofService = stdx::make_unique<TimeProofService>();
+    auto logicalClock =
+        stdx::make_unique<LogicalClock>(service, std::move(timeProofService), false);
+    LogicalClock::set(service, std::move(logicalClock));
 
     TopologyCoordinatorImpl::Options settings;
     auto topo = stdx::make_unique<TopologyCoordinatorImpl>(settings);

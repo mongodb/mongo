@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2014 MongoDB, Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,23 +26,24 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/bson/timestamp.h"
+#include "mongo/db/logical_clock_test_fixture.h"
+
+#include "mongo/db/logical_clock.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/time_proof_service.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
-class ServiceContext;
 
-void setGlobalTimestamp(ServiceContext* service, const Timestamp& newTime);
+void LogicalClockTest::setUp() {
+    auto service = getGlobalServiceContext();
 
-/**
- * Returns the value of the global Timestamp generated last time or set.
- */
-Timestamp getLastSetTimestamp();
-
-/**
- * Generates a new and unique Timestamp.
- * If count > 1 that many unique Timestamps are reserved starting with the returned value.
- */
-Timestamp getNextGlobalTimestamp(ServiceContext* service, unsigned count = 1);
+    auto timeProofService = stdx::make_unique<TimeProofService>();
+    auto logicalClock =
+        stdx::make_unique<LogicalClock>(service, std::move(timeProofService), false);
+    LogicalClock::set(service, std::move(logicalClock));
 }
+
+}  // namespace mongo

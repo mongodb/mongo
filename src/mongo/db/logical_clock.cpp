@@ -26,13 +26,17 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/logical_clock.h"
 
 #include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/time_proof_service.h"
-#include "mongo/platform/basic.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -85,6 +89,16 @@ Status LogicalClock::advanceClusterTime(const SignedLogicalTime& newTime) {
     return Status::OK();
 }
 
+Status LogicalClock::advanceClusterTimeFromTrustedSource(LogicalTime newTime) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    // TODO: rate check per SERVER-27721
+    if (newTime > _clusterTime.getTime()) {
+        _clusterTime = _makeSignedLogicalTime(newTime);
+    }
+
+    return Status::OK();
+}
+
 LogicalTime LogicalClock::reserveTicks(uint64_t ticks) {
 
     invariant(ticks > 0);
@@ -103,6 +117,14 @@ LogicalTime LogicalClock::reserveTicks(uint64_t ticks) {
     }
     auto currentTime = clusterTimestamp;
     clusterTimestamp.addTicks(ticks - 1);
+
+    // Fail if time is not moving forward for 2**31 ticks
+    if (MONGO_unlikely(clusterTimestamp.asTimestamp().getSecs() > wallClockSecs) &&
+        clusterTimestamp.asTimestamp().getInc() >= 1U << 31) {
+        mongo::severe() << "clock skew detected, prev: " << wallClockSecs
+                        << " now: " << clusterTimestamp.asTimestamp().getSecs();
+        fassertFailed(17449);
+    }
 
     _clusterTime = _makeSignedLogicalTime(clusterTimestamp);
     return currentTime;

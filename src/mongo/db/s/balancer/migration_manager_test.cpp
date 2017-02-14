@@ -43,6 +43,7 @@
 #include "mongo/s/config_server_test_fixture.h"
 #include "mongo/s/move_chunk_request.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -311,6 +312,7 @@ TEST_F(MigrationManagerTest, OneCollectionTwoMigrations) {
     const std::vector<MigrateInfo> migrationRequests{{kShardId1, chunk1}, {kShardId3, chunk2}};
 
     auto future = launchAsync([this, migrationRequests] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
         auto txn = cc().makeOperationContext();
 
@@ -373,6 +375,7 @@ TEST_F(MigrationManagerTest, TwoCollectionsTwoMigrationsEach) {
                                                      {kShardId3, chunk2coll2}};
 
     auto future = launchAsync([this, migrationRequests] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
         auto txn = cc().makeOperationContext();
 
@@ -427,6 +430,7 @@ TEST_F(MigrationManagerTest, SourceShardNotFound) {
     const std::vector<MigrateInfo> migrationRequests{{kShardId1, chunk1}, {kShardId3, chunk2}};
 
     auto future = launchAsync([this, chunk1, chunk2, migrationRequests] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
         auto txn = cc().makeOperationContext();
 
@@ -473,6 +477,7 @@ TEST_F(MigrationManagerTest, JumboChunkResponseBackwardsCompatibility) {
     const std::vector<MigrateInfo> migrationRequests{{kShardId1, chunk1}};
 
     auto future = launchAsync([this, chunk1, migrationRequests] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
         auto txn = cc().makeOperationContext();
 
@@ -511,6 +516,7 @@ TEST_F(MigrationManagerTest, InterruptMigration) {
         setUpChunk(collName, kKeyPattern.globalMin(), kKeyPattern.globalMax(), kShardId0, version);
 
     auto future = launchAsync([&] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
         auto txn = cc().makeOperationContext();
 
@@ -598,6 +604,7 @@ TEST_F(MigrationManagerTest, RestartMigrationManager) {
     _migrationManager->finishRecovery(operationContext(), 0, kDefaultSecondaryThrottle);
 
     auto future = launchAsync([&] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
         auto txn = cc().makeOperationContext();
 
@@ -652,6 +659,7 @@ TEST_F(MigrationManagerTest, MigrationRecovery) {
     _migrationManager->startRecoveryAndAcquireDistLocks(operationContext());
 
     auto future = launchAsync([this] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
         auto txn = cc().makeOperationContext();
 
@@ -753,6 +761,7 @@ TEST_F(MigrationManagerTest, RemoteCallErrorConversionToOperationFailed) {
         setUpChunk(collName, BSON(kPattern << 49), kKeyPattern.globalMax(), kShardId2, version);
 
     auto future = launchAsync([&] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
         auto txn = cc().makeOperationContext();
 

@@ -243,17 +243,6 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='global_timestamp',
-    source=[
-        'global_timestamp.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context'
-    ]
-)
-
-env.Library(
     target='namespace_string',
     source=[
         'namespace_string.cpp',
@@ -881,7 +870,6 @@ env.Library(
         "exec/working_set",
         "fts/ftsmongod",
         "ftdc/ftdc_mongod",
-        "global_timestamp",
         "index/index_descriptor",
         "index/index_access_methods",
         "index_d",
@@ -988,6 +976,19 @@ env.CppUnitTest(
         'service_context',
         'logical_clock',
         'signed_logical_time',
+    ],
+)
+
+env.Library(
+    target= 'logical_clock_test_fixture',
+    source= [
+        'logical_clock_test_fixture.cpp',
+    ],
+    LIBDEPS= [
+        'service_context',
+        'logical_clock',
+        'signed_logical_time',
+        '$BUILD_DIR/mongo/unittest/unittest',
     ],
 )
 

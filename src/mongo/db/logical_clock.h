@@ -63,7 +63,12 @@ public:
      * Returns an error if the newTime does not pass the rate check or proof validation,
      * OK otherwise.
      */
-    Status advanceClusterTime(const SignedLogicalTime& newTime);
+    Status advanceClusterTime(const SignedLogicalTime&);
+
+    /**
+     * Simliar to advaneClusterTime, but only does rate checking and not proof validation.
+     */
+    Status advanceClusterTimeFromTrustedSource(LogicalTime);
 
     /**
      * Returns the current clusterTime.
@@ -74,7 +79,7 @@ public:
      * Returns the next  clusterTime value and provides the guarantee that the next reserveTicks
      * call will return the value at least nTicks ticks in the future from the current clusterTime.
      */
-    LogicalTime reserveTicks(uint64_t nTicks = 1);
+    LogicalTime reserveTicks(uint64_t nTicks);
 
     /**
      * Resets _clusterTime to the signed time created from newTime. Should be used at the

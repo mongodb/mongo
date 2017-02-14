@@ -31,7 +31,8 @@
 #include "mongo/base/data_view.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/document.h"
-#include "mongo/db/global_timestamp.h"
+#include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/mongoutils/str.h"
@@ -57,7 +58,7 @@ Status fixupTimestamps(const BSONObj& obj) {
             if (timestamp == 0) {
                 // performance note, this locks a mutex:
                 ServiceContext* service = getGlobalServiceContext();
-                Timestamp ts(getNextGlobalTimestamp(service));
+                auto ts = LogicalClock::get(service)->reserveTicks(1).asTimestamp();
                 timestampView.write(tagLittleEndian(ts.asULL()));
             }
         }

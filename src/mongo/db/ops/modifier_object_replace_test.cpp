@@ -39,6 +39,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
+#include "mongo/db/logical_clock_test_fixture.h"
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/unittest/unittest.h"
 
@@ -57,6 +58,11 @@ using mongo::mutablebson::findFirstChildNamed;
 using mongo::NumberInt;
 using mongo::Status;
 using mongo::StringData;
+
+using Normal = mongo::LogicalClockTest;
+using IdLeft = mongo::LogicalClockTest;
+using IdImmutable = mongo::LogicalClockTest;
+using Timestamp = mongo::LogicalClockTest;
 
 /** Helper to build and manipulate a $set mod. */
 class Mod {
@@ -94,7 +100,7 @@ private:
 };
 
 // Normal replacements below
-TEST(Normal, SingleFieldDoc) {
+TEST_F(Normal, SingleFieldDoc) {
     Document doc(fromjson("{_id:1, a:1}"));
     Mod mod(fromjson("{_id:1, b:12}"));
 
@@ -111,7 +117,7 @@ TEST(Normal, SingleFieldDoc) {
     ASSERT_EQUALS(doc, logDoc);
 }
 
-TEST(Normal, ComplexDoc) {
+TEST_F(Normal, ComplexDoc) {
     Document doc(fromjson("{_id:1, a:1}"));
     Mod mod(fromjson("{_id:1, b:[123], c: {r:true}}"));
 
@@ -128,7 +134,7 @@ TEST(Normal, ComplexDoc) {
     ASSERT_EQUALS(doc, logDoc);
 }
 
-TEST(Normal, OnlyIdField) {
+TEST_F(Normal, OnlyIdField) {
     Document doc(fromjson("{}"));
     Mod mod(fromjson("{_id:1}"));
 
@@ -147,7 +153,7 @@ TEST(Normal, OnlyIdField) {
 
 // These updates have to do with updates without an _id field
 // (the existing _id isn't removed)
-TEST(IdLeft, EmptyDocReplacement) {
+TEST_F(IdLeft, EmptyDocReplacement) {
     Document doc(fromjson("{_id:1}"));
     Mod mod(fromjson("{}"));
 
@@ -164,7 +170,7 @@ TEST(IdLeft, EmptyDocReplacement) {
     ASSERT_EQUALS(doc, logDoc);
 }
 
-TEST(IdLeft, EmptyDoc) {
+TEST_F(IdLeft, EmptyDoc) {
     Document doc(fromjson("{_id:1}"));
     Mod mod(fromjson("{}"));
 
@@ -181,7 +187,7 @@ TEST(IdLeft, EmptyDoc) {
     ASSERT_EQUALS(doc, logDoc);
 }
 
-TEST(IdLeft, SingleFieldAddition) {
+TEST_F(IdLeft, SingleFieldAddition) {
     Document doc(fromjson("{_id:1}"));
     Mod mod(fromjson("{a:1}"));
 
@@ -198,7 +204,7 @@ TEST(IdLeft, SingleFieldAddition) {
     ASSERT_EQUALS(doc, logDoc);
 }
 
-TEST(IdLeft, SingleFieldReplaced) {
+TEST_F(IdLeft, SingleFieldReplaced) {
     Document doc(fromjson("{a: []}"));
     Mod mod(fromjson("{a:10}"));
 
@@ -215,7 +221,7 @@ TEST(IdLeft, SingleFieldReplaced) {
     ASSERT_EQUALS(doc, logDoc);
 }
 
-TEST(IdLeft, SwapFields) {
+TEST_F(IdLeft, SwapFields) {
     Document doc(fromjson("{_id:1, a:1}"));
     Mod mod(fromjson("{b:1}"));
 
@@ -232,7 +238,7 @@ TEST(IdLeft, SwapFields) {
     ASSERT_EQUALS(doc, logDoc);
 }
 
-TEST(IdImmutable, ReplaceIdNumber) {
+TEST_F(IdImmutable, ReplaceIdNumber) {
     Document doc(fromjson("{_id:1, a:1}"));
     Mod mod(fromjson("{_id:2}"));
 
@@ -242,7 +248,7 @@ TEST(IdImmutable, ReplaceIdNumber) {
     ASSERT_NOT_OK(mod.apply());
 }
 
-TEST(IdImmutable, ReplaceIdNumberSameVal) {
+TEST_F(IdImmutable, ReplaceIdNumberSameVal) {
     Document doc(fromjson("{_id:1, a:1}"));
     Mod mod(fromjson("{_id:2}"));
 
@@ -252,7 +258,7 @@ TEST(IdImmutable, ReplaceIdNumberSameVal) {
     ASSERT_NOT_OK(mod.apply());
 }
 
-TEST(IdImmutable, ReplaceEmbeddedId) {
+TEST_F(IdImmutable, ReplaceEmbeddedId) {
     Document doc(fromjson("{_id:{a:1, b:2}, a:1}"));
     Mod mod(fromjson("{_id:{b:2, a:1}}"));
 
@@ -262,7 +268,7 @@ TEST(IdImmutable, ReplaceEmbeddedId) {
     ASSERT_NOT_OK(mod.apply());
 }
 
-TEST(Timestamp, IdNotReplaced) {
+TEST_F(Timestamp, IdNotReplaced) {
     Document doc(fromjson("{}"));
     Mod mod(fromjson("{_id:Timestamp(0,0), a:1}"));
 
@@ -283,7 +289,7 @@ TEST(Timestamp, IdNotReplaced) {
     ASSERT(idElem.getValueTimestamp().isNull());
 }
 
-TEST(Timestamp, ReplaceAll) {
+TEST_F(Timestamp, ReplaceAll) {
     Document doc(fromjson("{}"));
     Mod mod(fromjson("{a:Timestamp(0,0), r:1, x:1, b:Timestamp(0,0)}"));
 

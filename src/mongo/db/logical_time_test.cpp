@@ -80,7 +80,7 @@ TEST(LogicalTime, addTicksConst) {
     Timestamp tY(2);
 
     const auto lT = LogicalTime(tX);
-    auto lQ = lT.addTicks(1);
+    const auto lQ = lT.addTicks(1);
 
     ASSERT_TRUE(tX == lT.asTimestamp());
     ASSERT_TRUE(tY == lQ.asTimestamp());

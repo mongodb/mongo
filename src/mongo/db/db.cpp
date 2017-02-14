@@ -74,6 +74,7 @@
 #include "mongo/db/introspect.h"
 #include "mongo/db/json.h"
 #include "mongo/db/log_process_details.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/operation_context.h"
@@ -892,6 +893,10 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
     topoCoordOptions.maxSyncSourceLagSecs = Seconds(repl::maxSyncSourceLagSecs);
     topoCoordOptions.clusterRole = serverGlobalParams.clusterRole;
 
+    auto timeProofService = stdx::make_unique<TimeProofService>();
+    auto logicalClock =
+        stdx::make_unique<LogicalClock>(serviceContext, std::move(timeProofService), false);
+    LogicalClock::set(serviceContext, std::move(logicalClock));
     auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorImpl>(
         serviceContext,
         getGlobalReplSettings(),

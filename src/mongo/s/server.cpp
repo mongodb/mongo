@@ -54,6 +54,8 @@
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
+#include "mongo/db/logical_clock.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_noop.h"
@@ -265,6 +267,11 @@ static ExitCode runMongosServer() {
     }
 
     auto opCtx = cc().makeOperationContext();
+
+    auto timeProofService = stdx::make_unique<TimeProofService>();
+    auto logicalClock = stdx::make_unique<LogicalClock>(
+        opCtx->getServiceContext(), std::move(timeProofService), false);
+    LogicalClock::set(opCtx->getServiceContext(), std::move(logicalClock));
 
     {
         Status status = initializeSharding(opCtx.get());
