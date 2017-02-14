@@ -156,11 +156,13 @@ static int
 fail_file_close(WT_FILE_HANDLE *file_handle, WT_SESSION *session)
 {
 	FAIL_FILE_HANDLE *fail_fh;
+	FAIL_FILE_SYSTEM *fail_fs;
 	int ret;
 
 	(void)session;						/* Unused */
 
 	fail_fh = (FAIL_FILE_HANDLE *)file_handle;
+	fail_fs = fail_fh->fail_fs;
 
 	/*
 	 * We don't actually open an fd when opening directories for flushing,
@@ -170,14 +172,16 @@ fail_file_close(WT_FILE_HANDLE *file_handle, WT_SESSION *session)
 		return (0);
 	ret = close(fail_fh->fd);
 	fail_fh->fd = -1;
+	fail_fs_lock(&fail_fs->lock);
 	fail_file_handle_remove(session, fail_fh);
+	fail_fs_unlock(&fail_fs->lock);
 	return (ret);
 }
 
 /*
  * fail_file_handle_remove --
  *	Destroy an in-memory file handle. Should only happen on remove or
- *	shutdown.
+ *	shutdown. The file system lock must be held during this call.
  */
 static void
 fail_file_handle_remove(WT_SESSION *session, FAIL_FILE_HANDLE *fail_fh)
