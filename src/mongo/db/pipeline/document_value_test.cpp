@@ -39,11 +39,9 @@
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/util/print.h"
 
 namespace DocumentTests {
 
-using std::endl;
 using std::numeric_limits;
 using std::string;
 using std::vector;
@@ -178,7 +176,7 @@ public:
 
         // Remove the second field.
         md.setField("b", Value());
-        PRINT(md.peek().toString());
+        log() << md.peek().toString();
         ASSERT_EQUALS(2U, md.peek().size());
         ASSERT(md.peek()["b"].missing());
         ASSERT_EQUALS("a", getNthField(md.peek(), 0).first.toString());
@@ -1601,7 +1599,8 @@ private:
         assertComparison(expectedResult, fromBson(a), fromBson(b));
     }
     void assertComparison(int expectedResult, const Value& a, const Value& b) {
-        mongo::unittest::log() << "testing " << a.toString() << " and " << b.toString() << endl;
+        mongo::unittest::log() << "testing " << a.toString() << " and " << b.toString();
+
         // reflexivity
         ASSERT_EQUALS(0, cmp(a, a));
         ASSERT_EQUALS(0, cmp(b, b));

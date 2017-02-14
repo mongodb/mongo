@@ -111,12 +111,10 @@
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/md5.hpp"
-#include "mongo/util/print.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
-using std::endl;
 using std::ostringstream;
 using std::string;
 using std::stringstream;
@@ -848,8 +846,9 @@ public:
         Query q(query);
         q.sort(sort);
         unique_ptr<DBClientCursor> c = client.query(ns, q);
-        while (c->more())
-            PRINT(c->nextSafe());
+        while (c->more()) {
+            log() << c->nextSafe();
+        }
     }
 
 } cmdFileMD5;

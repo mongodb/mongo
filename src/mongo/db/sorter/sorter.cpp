@@ -63,7 +63,6 @@
 #include "mongo/util/bufreader.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/print.h"
 #include "mongo/util/unowned_ptr.h"
 
 namespace mongo {
@@ -78,18 +77,6 @@ inline std::string myErrnoWithDescription() {
     StringBuilder sb;
     sb << "errno:" << errnoCopy << ' ' << strerror(errnoCopy);
     return sb.str();
-}
-
-template <typename Data, typename Comparator>
-void compIsntSane(const Comparator& comp, const Data& lhs, const Data& rhs) {
-    PRINT(typeid(comp).name());
-    PRINT(lhs.first);
-    PRINT(lhs.second);
-    PRINT(rhs.first);
-    PRINT(rhs.second);
-    PRINT(comp(lhs, rhs));
-    PRINT(comp(rhs, lhs));
-    dassert(false);
 }
 
 template <typename Data, typename Comparator>
@@ -113,10 +100,8 @@ void dassertCompIsSane(const Comparator& comp, const Data& lhs, const Data& rhs)
     }
 
     // test reflexivity
-    if (!(comp(lhs, lhs) == 0))
-        compIsntSane(comp, lhs, lhs);
-    if (!(comp(rhs, rhs) == 0))
-        compIsntSane(comp, rhs, rhs);
+    invariant(comp(lhs, lhs) == 0);
+    invariant(comp(rhs, rhs) == 0);
 #endif
 }
 
