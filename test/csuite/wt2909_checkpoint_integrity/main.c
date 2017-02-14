@@ -27,6 +27,8 @@
  */
 #include "test_util.h"
 
+#include <sys/time.h>
+#include <sys/resource.h>
 #include <sys/wait.h>
 
 /*
@@ -87,8 +89,8 @@ static int create_big_string(char **);
 static void cursor_count_items(WT_CURSOR *, uint64_t *);
 static void disable_failures(void);
 static void enable_failures(uint64_t, uint64_t);
-static void generate_key(uint32_t, int *);
-static void generate_value(uint32_t, uint32_t, char *, int *, int *, int *,
+static void generate_key(uint64_t, int *);
+static void generate_value(uint32_t, uint64_t, char *, int *, int *, int *,
     char **);
 static void run_check_subtest(TEST_OPTS *, const char *, uint64_t, bool,
     uint64_t *);
@@ -140,9 +142,8 @@ check_results(TEST_OPTS *opts, uint64_t *foundp)
 		testutil_check(maincur2->get_key(maincur2, &key_got));
 		testutil_check(maincur2->get_value(maincur2, &rndint));
 
-		generate_key((uint32_t)count, &key);
-		generate_value(rndint, (uint32_t)count,
-		    bigref, &v0, &v1, &v2, &big);
+		generate_key(count, &key);
+		generate_value(rndint, count, bigref, &v0, &v1, &v2, &big);
 		testutil_assert(key == key_got);
 
 		/* Check the key/values in main table. */
@@ -278,7 +279,7 @@ enable_failures(uint64_t allow_writes, uint64_t allow_reads)
  *	Generate a key used by the "subtest" and "subtest2" tables.
  */
 static void
-generate_key(uint32_t i, int *keyp)
+generate_key(uint64_t i, int *keyp)
 {
 	*keyp = (int)i;
 }
@@ -288,7 +289,7 @@ generate_key(uint32_t i, int *keyp)
  *	Generate values for the "subtest" table.
  */
 static void
-generate_value(uint32_t rndint, uint32_t i, char *bigref,
+generate_value(uint32_t rndint, uint64_t i, char *bigref,
     int *v0p, int *v1p, int *v2p, char **bigp)
 {
 	*v0p = (int)(i * 7);
@@ -451,12 +452,16 @@ subtest_main(int argc, char *argv[], bool close_test)
 	TEST_OPTS *opts, _opts;
 	WT_SESSION *session;
 	char config[1024], filename[1024];
+	struct rlimit rlim;
 
-	opts = &_opts;
 	if (testutil_disable_long_tests())
 		return (0);
+	opts = &_opts;
 	memset(opts, 0, sizeof(*opts));
+	memset(&rlim, 0, sizeof(rlim));
 
+	/* No core files during fault injection tests. */
+	testutil_check(setrlimit(RLIMIT_CORE, &rlim));
 	testutil_check(testutil_parse_opts(argc, argv, opts));
 	testutil_make_work_dir(opts->home);
 
@@ -527,8 +532,8 @@ subtest_populate(TEST_OPTS *opts, bool close_test)
 	WT_CURSOR *maincur, *maincur2;
 	WT_RAND_STATE rnd;
 	WT_SESSION *session;
-	uint64_t nrecords;
-	uint32_t i, rndint;
+	uint64_t i, nrecords;
+	uint32_t rndint;
 	int key, v0, v1, v2;
 	char *big, *bigref;
 	bool failed, failmode;
@@ -570,7 +575,7 @@ subtest_populate(TEST_OPTS *opts, bool close_test)
 			CHECK(session->checkpoint(session, NULL));
 
 		if ((i + 1) % VERBOSE_PRINT == 0 && opts->verbose)
-			printf("  %" PRIu32 "/%" PRIu64 "\n",
+			printf("  %" PRIu64 "/%" PRIu64 "\n",
 			    (i + 1), nrecords);
 		/* Attempt to isolate the failures to checkpointing. */
 		if (i == (nrecords/100)) {
@@ -617,6 +622,8 @@ main(int argc, char *argv[])
 	uint64_t nresults;
 	const char *debugger;
 
+	if (testutil_disable_long_tests())
+		return (0);
 	opts = &_opts;
 	memset(opts, 0, sizeof(*opts));
 	debugger = NULL;
