@@ -162,7 +162,7 @@ __session_alter(WT_SESSION *wt_session, const char *uri, const char *config)
 	cfg[1] = NULL;
 	WT_WITH_CHECKPOINT_LOCK(session,
 	    WT_WITH_SCHEMA_LOCK(session,
-		WT_WITH_TABLE_LOCK(session,
+		WT_WITH_TABLE_WRITE_LOCK(session,
 		    ret = __wt_schema_alter(session, uri, cfg))));
 
 err:	if (ret != 0)
@@ -518,7 +518,7 @@ __wt_session_create(
 	WT_DECL_RET;
 
 	WT_WITH_SCHEMA_LOCK(session,
-	    WT_WITH_TABLE_LOCK(session,
+	    WT_WITH_TABLE_WRITE_LOCK(session,
 		ret = __wt_schema_create(session, uri, config)));
 	return (ret);
 }
@@ -766,7 +766,7 @@ __session_rename(WT_SESSION *wt_session,
 
 	WT_WITH_CHECKPOINT_LOCK(session,
 	    WT_WITH_SCHEMA_LOCK(session,
-		WT_WITH_TABLE_LOCK(session,
+		WT_WITH_TABLE_WRITE_LOCK(session,
 		    ret = __wt_schema_rename(session, uri, newuri, cfg))));
 
 err:	if (ret != 0)
@@ -855,21 +855,22 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 		if (lock_wait)
 			WT_WITH_CHECKPOINT_LOCK(session,
 			    WT_WITH_SCHEMA_LOCK(session,
-				WT_WITH_TABLE_LOCK(session, ret =
+				WT_WITH_TABLE_WRITE_LOCK(session, ret =
 				    __wt_schema_drop(session, uri, cfg))));
 		else
 			WT_WITH_CHECKPOINT_LOCK_NOWAIT(session, ret,
 			    WT_WITH_SCHEMA_LOCK_NOWAIT(session, ret,
-				WT_WITH_TABLE_LOCK_NOWAIT(session, ret, ret =
+				WT_WITH_TABLE_WRITE_LOCK_NOWAIT(session, ret,
+				    ret =
 				    __wt_schema_drop(session, uri, cfg))));
 	} else {
 		if (lock_wait)
 			WT_WITH_SCHEMA_LOCK(session,
-			    WT_WITH_TABLE_LOCK(session,
+			    WT_WITH_TABLE_WRITE_LOCK(session,
 				ret = __wt_schema_drop(session, uri, cfg)));
 		else
 			WT_WITH_SCHEMA_LOCK_NOWAIT(session, ret,
-			    WT_WITH_TABLE_LOCK_NOWAIT(session, ret,
+			    WT_WITH_TABLE_WRITE_LOCK_NOWAIT(session, ret,
 				ret = __wt_schema_drop(session, uri, cfg)));
 	}
 

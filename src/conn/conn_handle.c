@@ -59,12 +59,12 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_SPIN_INIT_TRACKED(session, &conn->metadata_lock, metadata);
 	WT_RET(__wt_spin_init(session, &conn->reconfig_lock, "reconfigure"));
 	WT_SPIN_INIT_TRACKED(session, &conn->schema_lock, schema);
-	WT_SPIN_INIT_TRACKED(session, &conn->table_lock, table);
 	WT_RET(__wt_spin_init(session, &conn->turtle_lock, "turtle file"));
 
 	/* Read-write locks */
 	__wt_rwlock_init(session, &conn->dhandle_lock);
 	__wt_rwlock_init(session, &conn->hot_backup_lock);
+	__wt_rwlock_init(session, &conn->table_lock);
 
 	WT_RET(__wt_calloc_def(session, WT_PAGE_LOCKS, &conn->page_lock));
 	for (i = 0; i < WT_PAGE_LOCKS; ++i)
@@ -142,7 +142,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->metadata_lock);
 	__wt_spin_destroy(session, &conn->reconfig_lock);
 	__wt_spin_destroy(session, &conn->schema_lock);
-	__wt_spin_destroy(session, &conn->table_lock);
+	__wt_rwlock_destroy(session, &conn->table_lock);
 	__wt_spin_destroy(session, &conn->turtle_lock);
 	for (i = 0; i < WT_PAGE_LOCKS; ++i)
 		__wt_spin_destroy(session, &conn->page_lock[i]);

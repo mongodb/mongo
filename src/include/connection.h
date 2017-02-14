@@ -171,7 +171,7 @@ struct __wt_connection_impl {
 	WT_SPINLOCK metadata_lock;	/* Metadata update spinlock */
 	WT_SPINLOCK reconfig_lock;	/* Single thread reconfigure */
 	WT_SPINLOCK schema_lock;	/* Schema operation spinlock */
-	WT_SPINLOCK table_lock;		/* Table creation spinlock */
+	WT_RWLOCK table_lock;		/* Table list lock */
 	WT_SPINLOCK turtle_lock;	/* Turtle file spinlock */
 	WT_RWLOCK dhandle_lock;		/* Data handle list lock */
 
