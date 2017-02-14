@@ -56,6 +56,23 @@ MONGO_FP_DECLARE(stopReplProducer);
 
 namespace {
 
+Seconds kOplogInitialFindMaxTime{60};
+Seconds kOplogQueryNetworkTimeout{65};  // 5 seconds past the find command's 1 minute maxTimeMs
+
+Counter64 readersCreatedStats;
+ServerStatusMetricField<Counter64> displayReadersCreated("repl.network.readersCreated",
+                                                         &readersCreatedStats);
+// The number and time spent reading batches off the network
+TimerStats getmoreReplStats;
+ServerStatusMetricField<TimerStats> displayBatchesRecieved("repl.network.getmores",
+                                                           &getmoreReplStats);
+// The oplog entries read via the oplog reader
+Counter64 opsReadStats;
+ServerStatusMetricField<Counter64> displayOpsRead("repl.network.ops", &opsReadStats);
+// The bytes read via the oplog reader
+Counter64 networkByteStats;
+ServerStatusMetricField<Counter64> displayBytesRead("repl.network.bytes", &networkByteStats);
+
 /**
  * Calculates await data timeout based on the current replica set configuration.
  */
@@ -82,7 +99,7 @@ BSONObj makeFindCommandObject(DataReplicatorExternalState* dataReplicatorExterna
     cmdBob.append("tailable", true);
     cmdBob.append("oplogReplay", true);
     cmdBob.append("awaitData", true);
-    cmdBob.append("maxTimeMS", durationCount<Milliseconds>(Minutes(1)));  // 1 min initial find.
+    cmdBob.append("maxTimeMS", durationCount<Milliseconds>(kOplogInitialFindMaxTime));
     auto opTimeWithTerm = dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime();
     if (opTimeWithTerm.value != OpTime::kUninitializedTerm) {
         cmdBob.append("term", opTimeWithTerm.value);
@@ -167,20 +184,6 @@ Status checkRemoteOplogStart(const Fetcher::Documents& documents, OpTimeWithHash
     return Status::OK();
 }
 
-Counter64 readersCreatedStats;
-ServerStatusMetricField<Counter64> displayReadersCreated("repl.network.readersCreated",
-                                                         &readersCreatedStats);
-// The number and time spent reading batches off the network
-TimerStats getmoreReplStats;
-ServerStatusMetricField<TimerStats> displayBatchesRecieved("repl.network.getmores",
-                                                           &getmoreReplStats);
-// The oplog entries read via the oplog reader
-Counter64 opsReadStats;
-ServerStatusMetricField<Counter64> displayOpsRead("repl.network.ops", &opsReadStats);
-// The bytes read via the oplog reader
-Counter64 networkByteStats;
-ServerStatusMetricField<Counter64> displayBytesRead("repl.network.bytes", &networkByteStats);
-
 }  // namespace
 
 StatusWith<OplogFetcher::DocumentsInfo> OplogFetcher::validateDocuments(
@@ -257,7 +260,6 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
       _source(source),
       _nss(nss),
       _metadataObject(uassertStatusOK(makeMetadataObject(config.getProtocolVersion() == 1LL))),
-      _remoteCommandTimeout(config.getElectionTimeoutPeriod()),
       _maxFetcherRestarts(maxFetcherRestarts),
       _dataReplicatorExternalState(dataReplicatorExternalState),
       _enqueueDocumentsFn(enqueueDocumentsFn),
@@ -354,10 +356,6 @@ BSONObj OplogFetcher::getCommandObject_forTest() const {
 
 BSONObj OplogFetcher::getMetadataObject_forTest() const {
     return _metadataObject;
-}
-
-Milliseconds OplogFetcher::getRemoteCommandTimeout_forTest() const {
-    return _remoteCommandTimeout;
 }
 
 Milliseconds OplogFetcher::getAwaitDataTimeout_forTest() const {
@@ -572,7 +570,7 @@ std::unique_ptr<Fetcher> OplogFetcher::_makeFetcher(OpTime lastFetchedOpTime) {
         makeFindCommandObject(_dataReplicatorExternalState, _nss, lastFetchedOpTime),
         stdx::bind(&OplogFetcher::_callback, this, stdx::placeholders::_1, stdx::placeholders::_3),
         _metadataObject,
-        _remoteCommandTimeout);
+        kOplogQueryNetworkTimeout);
 }
 
 bool OplogFetcher::_isShuttingDown() const {
