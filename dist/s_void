@@ -82,6 +82,7 @@ func_ok()
 	    -e '/int fail_file_sync$/d' \
 	    -e '/int fail_fs_directory_list_free$/d' \
 	    -e '/int fail_fs_exist$/d' \
+	    -e '/int fail_fs_simulate_fail$/d' \
 	    -e '/int fail_fs_terminate$/d' \
 	    -e '/int handle_message$/d' \
 	    -e '/int handle_progress$/d' \

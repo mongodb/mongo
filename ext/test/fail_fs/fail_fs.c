@@ -35,16 +35,29 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <execinfo.h>
 
 #include <wiredtiger_ext.h>
 #include "queue.h"
 
-#define	FAIL_FS_GIGABYTE (1024 * 1024 * 1024)
+#define	FAIL_FS_GIGABYTE		 (1024 * 1024 * 1024)
+
+#define	FAIL_FS_ENV_ENABLE		"WT_FAIL_FS_ENABLE"
+#define	FAIL_FS_ENV_WRITE_ALLOW		"WT_FAIL_FS_WRITE_ALLOW"
+#define	FAIL_FS_ENV_READ_ALLOW		"WT_FAIL_FS_READ_ALLOW"
 
 /*
  * A "fail file system", that is, a file system extension that fails when we
- * want it to.  This is only used in test frameworks, this fact allows us
- * to simplify some error paths.
+ * want it to.  This is only used in test frameworks, this fact allows us to
+ * simplify some error paths. This code is not portable to Windows, as it has
+ * direct knowledge of file descriptors, environment variables and stack
+ * traces.
+ *
+ * When the filesystem extension is configured, parameters can set how many
+ * reads or writes can be allowed before failure. If this is not fine-grained
+ * enough, an 'environment' configuration parameter can be specified. If that
+ * is used, then on every file system read or write, environment variables are
+ * checked that control when reading or writing should fail.
  */
 typedef struct {
 	WT_FILE_SYSTEM iface;
@@ -54,6 +67,9 @@ typedef struct {
 	 * uses a single, global file system lock.
 	 */
 	pthread_rwlock_t lock;                  /* Lock */
+	bool fail_enabled;
+	bool use_environment;
+	bool verbose;
 	int64_t read_ops;
 	int64_t write_ops;
 	int64_t allow_reads;
@@ -86,12 +102,12 @@ static int fail_file_truncate(WT_FILE_HANDLE *, WT_SESSION *, wt_off_t);
 static int fail_file_write(
     WT_FILE_HANDLE *, WT_SESSION *, wt_off_t, size_t, const void *);
 static bool fail_fs_arg(
-    const char *match, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value,
-    int64_t *argp);
+    const char *, WT_CONFIG_ITEM *, WT_CONFIG_ITEM *, int64_t *);
 static int fail_fs_directory_list(WT_FILE_SYSTEM *, WT_SESSION *,
     const char *, const char *, char ***, uint32_t *);
 static int fail_fs_directory_list_free(
     WT_FILE_SYSTEM *, WT_SESSION *, char **, uint32_t);
+static void fail_fs_env(const char *, int64_t *);
 static int fail_fs_exist(WT_FILE_SYSTEM *, WT_SESSION *, const char *, bool *);
 static int fail_fs_open(WT_FILE_SYSTEM *, WT_SESSION *,
     const char *, WT_FS_OPEN_FILE_TYPE, uint32_t, WT_FILE_HANDLE **);
@@ -99,6 +115,8 @@ static int fail_fs_remove(
     WT_FILE_SYSTEM *, WT_SESSION *, const char *, uint32_t);
 static int fail_fs_rename(
     WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, uint32_t);
+static int fail_fs_simulate_fail(
+    FAIL_FILE_HANDLE *, WT_SESSION *, int64_t, const char *);
 static int fail_fs_size(
     WT_FILE_SYSTEM *, WT_SESSION *, const char *, wt_off_t *);
 static int fail_fs_terminate(WT_FILE_SYSTEM *, WT_SESSION *);
@@ -145,8 +163,12 @@ fail_file_close(WT_FILE_HANDLE *file_handle, WT_SESSION *session)
 
 	fail_fh = (FAIL_FILE_HANDLE *)file_handle;
 
+	/*
+	 * We don't actually open an fd when opening directories for flushing,
+	 * so ignore that case here.
+	 */
 	if (fail_fh->fd < 0)
-		return (EINVAL);
+		return (0);
 	ret = close(fail_fh->fd);
 	fail_fh->fd = -1;
 	fail_file_handle_remove(session, fail_fh);
@@ -198,7 +220,7 @@ fail_file_read(WT_FILE_HANDLE *file_handle,
 	FAIL_FILE_HANDLE *fail_fh;
 	FAIL_FILE_SYSTEM *fail_fs;
 	WT_EXTENSION_API *wtext;
-	int64_t read_ops;
+	int64_t envint, read_ops;
 	int ret;
 	size_t chunk;
 	ssize_t nr;
@@ -207,19 +229,34 @@ fail_file_read(WT_FILE_HANDLE *file_handle,
 	fail_fh = (FAIL_FILE_HANDLE *)file_handle;
 	fail_fs = fail_fh->fail_fs;
 	wtext = fail_fs->wtext;
+	read_ops = 0;
 	ret = 0;
 
 	fail_fs_lock(&fail_fs->lock);
-	read_ops = ++fail_fs->read_ops;
+
+	if (fail_fs->use_environment) {
+		fail_fs_env(FAIL_FS_ENV_ENABLE, &envint);
+		if (envint != 0) {
+			if (!fail_fs->fail_enabled) {
+				fail_fs->fail_enabled = true;
+				fail_fs_env(FAIL_FS_ENV_READ_ALLOW,
+				    &fail_fs->allow_reads);
+				fail_fs->read_ops = 0;
+			}
+			read_ops = ++fail_fs->read_ops;
+		} else
+			fail_fs->fail_enabled = false;
+	} else
+		read_ops = ++fail_fs->read_ops;
+
 	fail_fs_unlock(&fail_fs->lock);
 
-	if (fail_fs->allow_reads != 0 && read_ops % fail_fs->allow_reads == 0) {
-		(void)wtext->msg_printf(wtext, session,
-		    "fail_fs: %s: simulated failure after %" PRId64
-		    " reads\n", fail_fh->iface.name, read_ops);
-		return (EIO);
-	}
+	if (fail_fs->fail_enabled && fail_fs->allow_reads != 0 &&
+	    read_ops % fail_fs->allow_reads == 0)
+		return (fail_fs_simulate_fail(
+		    fail_fh, session, read_ops, "read"));
 
+	/* Break reads larger than 1GB into 1GB chunks. */
 	for (addr = buf; len > 0; addr += nr, len -= (size_t)nr, offset += nr) {
 		chunk = (len < FAIL_FS_GIGABYTE) ? len : FAIL_FS_GIGABYTE;
 		if ((nr = pread(fail_fh->fd, addr, chunk, offset)) <= 0) {
@@ -262,7 +299,7 @@ fail_file_size(
 /*
  * fail_file_sync --
  *	Ensure the content of the file is stable. This is a no-op in our
- *	memory backed file system.
+ *	file system.
  */
 static int
 fail_file_sync(WT_FILE_HANDLE *file_handle, WT_SESSION *session)
@@ -300,7 +337,7 @@ fail_file_write(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
 	FAIL_FILE_HANDLE *fail_fh;
 	FAIL_FILE_SYSTEM *fail_fs;
 	WT_EXTENSION_API *wtext;
-	int64_t write_ops;
+	int64_t envint, write_ops;
 	int ret;
 	size_t chunk;
 	ssize_t nr;
@@ -309,19 +346,32 @@ fail_file_write(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
 	fail_fh = (FAIL_FILE_HANDLE *)file_handle;
 	fail_fs = fail_fh->fail_fs;
 	wtext = fail_fs->wtext;
+	write_ops = 0;
 	ret = 0;
 
 	fail_fs_lock(&fail_fs->lock);
-	write_ops = ++fail_fs->write_ops;
+
+	if (fail_fs->use_environment) {
+		fail_fs_env(FAIL_FS_ENV_ENABLE, &envint);
+		if (envint != 0) {
+			if (!fail_fs->fail_enabled) {
+				fail_fs->fail_enabled = true;
+				fail_fs_env(FAIL_FS_ENV_WRITE_ALLOW,
+				    &fail_fs->allow_writes);
+				fail_fs->write_ops = 0;
+			}
+			write_ops = ++fail_fs->write_ops;
+		} else
+			fail_fs->fail_enabled = false;
+	} else
+		write_ops = ++fail_fs->write_ops;
+
 	fail_fs_unlock(&fail_fs->lock);
 
-	if (fail_fs->allow_writes != 0 &&
-	    write_ops % fail_fs->allow_writes == 0) {
-		(void)wtext->msg_printf(wtext, session,
-		    "fail_fs: %s: simulated failure after %" PRId64
-		    " writes\n", fail_fh->iface.name, write_ops);
-		return (EIO);
-	}
+	if (fail_fs->fail_enabled && fail_fs->allow_writes != 0 &&
+	    write_ops % fail_fs->allow_writes == 0)
+		return (fail_fs_simulate_fail(
+		    fail_fh, session, write_ops, "write"));
 
 	/* Break writes larger than 1GB into 1GB chunks. */
 	for (addr = buf; len > 0; addr += nr, len -= (size_t)nr, offset += nr) {
@@ -348,17 +398,12 @@ static bool
 fail_fs_arg(const char *match, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value,
     int64_t *argp)
 {
-	char *s;
-	int64_t result;
-
 	if (strncmp(match, key->str, key->len) == 0 &&
-	    match[key->len] == '\0') {
-		s = (char *)value->str;
-		result = strtoll(s, &s, 10);
-		if ((size_t)(s - (char *)value->str) == value->len) {
-			*argp = result;
-			return (true);
-		}
+	    match[key->len] == '\0' &&
+	    (value->type == WT_CONFIG_ITEM_BOOL ||
+	    value->type == WT_CONFIG_ITEM_NUM)) {
+		*argp = value->val;
+		return (true);
 	}
 	return (false);
 }
@@ -454,6 +499,30 @@ fail_fs_directory_list_free(WT_FILE_SYSTEM *file_system,
 }
 
 /*
+ * fail_fs_env --
+ *      If the name is in the environment, return its integral value.
+ */
+static void
+fail_fs_env(const char *name, int64_t *valp)
+{
+	int64_t result;
+	char *s, *value;
+
+	result = 0;
+	if ((value = getenv(name)) != NULL) {
+		s = value;
+		if (strcmp(value, "true") == 0)
+			result = 1;
+		else if (strcmp(value, "false") != 0) {
+			result = strtoll(value, &s, 10);
+			if (*s != '\0')
+				result = 0;
+		}
+	}
+	*valp = result;
+}
+
+/*
  * fail_fs_exist --
  *	Return if the file exists.
  */
@@ -482,7 +551,6 @@ fail_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 	WT_FILE_HANDLE *file_handle;
 	int fd, open_flags, ret;
 
-	(void)file_type;					/* Unused */
 	(void)session;						/* Unused */
 
 	*file_handlep = NULL;
@@ -491,6 +559,9 @@ fail_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 	fail_fs = (FAIL_FILE_SYSTEM *)file_system;
 	fd = -1;
 	ret = 0;
+
+	if (fail_fs->verbose)
+		fprintf(stderr, "fail_fs: open: %s\n", name);
 
 	fail_fs_lock(&fail_fs->lock);
 
@@ -504,7 +575,14 @@ fail_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 	else
 		open_flags |= O_RDWR;
 
-	if ((fd = open(name, open_flags, 0666)) < 0) {
+	/*
+	 * Opening a file handle on a directory is only to support filesystems
+	 * that require a directory sync for durability.  This is a no-op
+	 * for this file system.
+	 */
+	if (file_type == WT_FS_OPEN_FILE_TYPE_DIRECTORY)
+		fd = -1;
+	else if ((fd = open(name, open_flags, 0666)) < 0) {
 		ret = errno;
 		goto err;
 	}
@@ -588,6 +666,38 @@ fail_fs_rename(WT_FILE_SYSTEM *file_system,
 }
 
 /*
+ * fail_fs_simulate_fail --
+ *	Simulate a failure from this file system by reporting it
+ *	and returning a non-zero return code.
+ */
+static int
+fail_fs_simulate_fail(FAIL_FILE_HANDLE *fail_fh, WT_SESSION *session,
+    int64_t nops, const char *opkind)
+{
+	FAIL_FILE_SYSTEM *fail_fs;
+	WT_EXTENSION_API *wtext;
+	int btret, i;
+	void *bt[100];
+	char **btstr;
+
+	fail_fs = fail_fh->fail_fs;
+	if (fail_fs->verbose) {
+		wtext = fail_fs->wtext;
+		(void)wtext->msg_printf(wtext, session,
+		    "fail_fs: %s: simulated failure after %" PRId64
+		    " %s operations\n", fail_fh->iface.name, nops, opkind);
+		btret = backtrace(bt, sizeof(bt)/sizeof(bt[0]));
+		if ((btstr = backtrace_symbols(bt, btret)) != NULL) {
+			for (i = 0; i < btret; i++)
+				(void)wtext->msg_printf(wtext, session, "  %s",
+				    btstr[i]);
+			free(btstr);
+		}
+	}
+	return (EIO);
+}
+
+/*
  * fail_fs_size --
  *	Get the size of a file in bytes, by file name.
  */
@@ -641,6 +751,7 @@ wiredtiger_extension_init(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
 	WT_CONFIG_PARSER *config_parser;
 	WT_EXTENSION_API *wtext;
 	WT_FILE_SYSTEM *file_system;
+	int64_t argval;
 	int ret;
 
 	ret = 0;
@@ -663,9 +774,17 @@ wiredtiger_extension_init(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
 		goto err;
 	}
 	while ((ret = config_parser->next(config_parser, &k, &v)) == 0) {
-		if (fail_fs_arg("allow_writes", &k, &v, &fail_fs->allow_writes))
+		if (fail_fs_arg("environment", &k, &v, &argval)) {
+			fail_fs->use_environment = (argval != 0);
 			continue;
-		if (fail_fs_arg("allow_reads", &k, &v, &fail_fs->allow_reads))
+		} else if (fail_fs_arg("verbose", &k, &v, &argval)) {
+			fail_fs->verbose = (argval != 0);
+			continue;
+		} else if (fail_fs_arg("allow_writes", &k, &v,
+		    &fail_fs->allow_writes))
+			continue;
+		else if (fail_fs_arg("allow_reads", &k, &v,
+		    &fail_fs->allow_reads))
 			continue;
 
 		(void)wtext->err_printf(wtext, NULL,
@@ -687,6 +806,8 @@ wiredtiger_extension_init(WT_CONNECTION *conn, WT_CONFIG_ARG *config)
 		    wtext->strerror(wtext, NULL, ret));
 		goto err;
 	}
+	if (fail_fs->allow_writes != 0 || fail_fs->allow_reads != 0)
+		fail_fs->fail_enabled = true;
 
 	fail_fs_allocate_lock(&fail_fs->lock);
 	/* Initialize the in-memory jump table. */

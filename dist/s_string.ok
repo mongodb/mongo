@@ -770,6 +770,7 @@ idx
 ifdef
 ifdef's
 iiSii
+iiiS
 iiii
 iiu
 ikey
@@ -1138,6 +1139,7 @@ subgetraw
 subgets
 subinit
 sublicense
+subtest
 subtree
 sunique
 superset

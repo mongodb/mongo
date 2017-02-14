@@ -183,7 +183,7 @@ void *dmalloc(size_t);
 void *drealloc(void *, size_t);
 void *dstrdup(const void *);
 void *dstrndup(const char *, size_t);
-void  testutil_clean_work_dir(char *);
+void  testutil_clean_work_dir(const char *);
 void  testutil_cleanup(TEST_OPTS *);
 bool  testutil_disable_long_tests(void);
 void  testutil_make_work_dir(char *);
