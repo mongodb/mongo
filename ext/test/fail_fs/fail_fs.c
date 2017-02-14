@@ -675,10 +675,10 @@ fail_fs_simulate_fail(FAIL_FILE_HANDLE *fail_fh, WT_SESSION *session,
 {
 	FAIL_FILE_SYSTEM *fail_fs;
 	WT_EXTENSION_API *wtext;
-#ifdef __linux__
-	int btret, i;
-#else
+#ifdef __FreeBSD__
 	size_t btret, i;
+#else
+	int btret, i;
 #endif
 	void *bt[100];
 	char **btstr;
@@ -689,10 +689,10 @@ fail_fs_simulate_fail(FAIL_FILE_HANDLE *fail_fh, WT_SESSION *session,
 		(void)wtext->msg_printf(wtext, session,
 		    "fail_fs: %s: simulated failure after %" PRId64
 		    " %s operations\n", fail_fh->iface.name, nops, opkind);
-#ifdef __linux__
-		btret = backtrace(bt, (int)(sizeof(bt) / sizeof(bt[0])));
-#else
+#ifdef __FreeBSD__
 		btret = backtrace(bt, sizeof(bt) / sizeof(bt[0]));
+#else
+		btret = backtrace(bt, (int)(sizeof(bt) / sizeof(bt[0])));
 #endif
 		if ((btstr = backtrace_symbols(bt, btret)) != NULL) {
 			for (i = 0; i < btret; i++)
