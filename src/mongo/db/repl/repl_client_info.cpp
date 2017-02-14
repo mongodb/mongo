@@ -43,6 +43,11 @@ namespace repl {
 const Client::Decoration<ReplClientInfo> ReplClientInfo::forClient =
     Client::declareDecoration<ReplClientInfo>();
 
+void ReplClientInfo::setLastOp(const OpTime& ot) {
+    invariant(ot >= _lastOp);
+    _lastOp = ot;
+}
+
 void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* txn) {
     ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(txn->getServiceContext());
     if (replCoord->isReplEnabled() && txn->writesAreReplicated()) {
