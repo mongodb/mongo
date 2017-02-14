@@ -419,21 +419,6 @@ TEST_F(OplogFetcherTest, MetadataObjectIsEmptyUnderProtocolVersion0) {
                       metadataObj);
 }
 
-TEST_F(OplogFetcherTest, RemoteCommandTimeoutShouldEqualElectionTimeout) {
-    auto config = _createConfig(true);
-    auto timeout = OplogFetcher(&getExecutor(),
-                                lastFetched,
-                                source,
-                                nss,
-                                config,
-                                0,
-                                dataReplicatorExternalState.get(),
-                                enqueueDocumentsFn,
-                                [](Status, OpTimeWithHash) {})
-                       .getRemoteCommandTimeout_forTest();
-    ASSERT_EQUALS(config.getElectionTimeoutPeriod(), timeout);
-}
-
 TEST_F(OplogFetcherTest, AwaitDataTimeoutShouldEqualHalfElectionTimeoutUnderProtocolVersion1) {
     auto config = _createConfig(true);
     auto timeout = OplogFetcher(&getExecutor(),
