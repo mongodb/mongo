@@ -536,7 +536,7 @@ fail_fs_exist(WT_FILE_SYSTEM *file_system,
 	(void)file_system;					/* Unused */
 	(void)session;						/* Unused */
 
-	*existp = (access(name, 0) == 0);
+	*existp = (access(name, F_OK) == 0);
 	return (0);
 }
 
@@ -551,6 +551,7 @@ fail_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 {
 	FAIL_FILE_HANDLE *fail_fh;
 	FAIL_FILE_SYSTEM *fail_fs;
+	WT_EXTENSION_API *wtext;
 	WT_FILE_HANDLE *file_handle;
 	int fd, open_flags, ret;
 
@@ -563,8 +564,11 @@ fail_fs_open(WT_FILE_SYSTEM *file_system, WT_SESSION *session,
 	fd = -1;
 	ret = 0;
 
-	if (fail_fs->verbose)
-		fprintf(stderr, "fail_fs: open: %s\n", name);
+	if (fail_fs->verbose) {
+		wtext = fail_fs->wtext;
+		(void)wtext->msg_printf(wtext, session, "fail_fs: open: %s",
+		    name);
+	}
 
 	fail_fs_lock(&fail_fs->lock);
 
@@ -692,7 +696,7 @@ fail_fs_simulate_fail(FAIL_FILE_HANDLE *fail_fh, WT_SESSION *session,
 		wtext = fail_fs->wtext;
 		(void)wtext->msg_printf(wtext, session,
 		    "fail_fs: %s: simulated failure after %" PRId64
-		    " %s operations\n", fail_fh->iface.name, nops, opkind);
+		    " %s operations", fail_fh->iface.name, nops, opkind);
 #ifdef __FreeBSD__
 		btret = backtrace(bt, sizeof(bt) / sizeof(bt[0]));
 #else
