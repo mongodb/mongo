@@ -2450,6 +2450,7 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
+    timeout_secs: 21600 # 6 hour timeout
     vars:
       resmoke_args: --suites=concurrency --storageEngine=mmapv1
 
@@ -2458,6 +2459,7 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
+    timeout_secs: 21600 # 6 hour timeout
     vars:
       resmoke_args: --suites=concurrency --storageEngine=wiredTiger
 
@@ -2466,6 +2468,7 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
+    timeout_secs: 21600 # 6 hour timeout
     vars:
       resmoke_args: --suites=concurrency_replication --storageEngine=mmapv1
 
@@ -2474,22 +2477,27 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
+    timeout_secs: 21600 # 6 hour timeout
     vars:
       resmoke_args: --suites=concurrency_replication --storageEngine=wiredTiger
 
 - <<: *task_template
   name: concurrency_sharded
+  exec_timeout_secs: 43200 # 12 hour timeout for the task overall
   commands:
   - func: "do setup"
   - func: "run tests"
+    timeout_secs: 21600 # 6 hour timeout for each test
     vars:
       resmoke_args: --suites=concurrency_sharded --storageEngine=mmapv1
 
 - <<: *task_template
   name: concurrency_sharded_WT
+  exec_timeout_secs: 43200 # 12 hour timeout for the task overall
   commands:
   - func: "do setup"
   - func: "run tests"
+    timeout_secs: 21600 # 6 hour timeout for each test
     vars:
       resmoke_args: --suites=concurrency_sharded --storageEngine=wiredTiger
 
@@ -2498,7 +2506,7 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
-    timeout_secs: 10800 # 3 hour timeout
+    timeout_secs: 21600 # 6 hour timeout
     vars:
       resmoke_args: --executor=concurrency jstests/concurrency/fsm_all_simultaneous.js --storageEngine=mmapv1
 
@@ -2507,6 +2515,7 @@ tasks:
   commands:
   - func: "do setup"
   - func: "run tests"
+    timeout_secs: 21600 # 6 hour timeout
     vars:
       resmoke_args: --executor=concurrency jstests/concurrency/fsm_all_simultaneous.js --storageEngine=wiredTiger
 
