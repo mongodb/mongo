@@ -45,11 +45,15 @@ class ReplClientInfo {
 public:
     static const Client::Decoration<ReplClientInfo> forClient;
 
-    void setLastOp(const OpTime& op) {
-        _lastOp = op;
-    }
+    void setLastOp(const OpTime& op);
+
     OpTime getLastOp() const {
         return _lastOp;
+    }
+
+    // Resets the last op on this client; should only be used in testing.
+    void clearLastOp_forTest() {
+        _lastOp = OpTime();
     }
 
     void setLastSnapshot(SnapshotName name) {

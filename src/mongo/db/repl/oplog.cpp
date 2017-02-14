@@ -377,10 +377,10 @@ void _logOpsInner(OperationContext* txn,
     checkOplogInsert(oplogCollection->insertDocumentsForOplog(txn, writers, nWriters));
 
     // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.
-    txn->recoveryUnit()->onCommit(
-        [replCoord, finalOpTime] { replCoord->setMyLastAppliedOpTimeForward(finalOpTime); });
-
-    ReplClientInfo::forClient(txn->getClient()).setLastOp(finalOpTime);
+    txn->recoveryUnit()->onCommit([txn, replCoord, finalOpTime] {
+        replCoord->setMyLastAppliedOpTimeForward(finalOpTime);
+        ReplClientInfo::forClient(txn->getClient()).setLastOp(finalOpTime);
+    });
 }
 
 void logOp(OperationContext* txn,
