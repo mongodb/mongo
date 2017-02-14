@@ -798,14 +798,7 @@ __wt_row_random_descent(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	current = NULL;
 	retry = 100;
 
-	if (0) {
-restart:	/*
-		 * Discard the currently held page and restart the search from
-		 * the root.
-		 */
-		WT_RET(__wt_page_release(session, current, 0));
-	}
-
+restart:
 	/* Search the internal pages of the tree. */
 	current = &btree->root;
 	for (;;) {
@@ -837,6 +830,11 @@ restart:	/*
 					break;
 			}
 		if (i == entries || descent == NULL) {
+			/*
+			 * Discard the currently held page and restart from the
+			 * root.
+			 */
+			WT_RET(__wt_page_release(session, current, 0));
 			if (--retry > 0)
 				goto restart;
 			return (WT_NOTFOUND);

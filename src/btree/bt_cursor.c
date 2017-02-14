@@ -846,7 +846,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 	wt_off_t size;
-	uint64_t skip;
+	uint64_t n, skip;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = cbt->btree;
@@ -862,60 +862,104 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	WT_STAT_CONN_INCR(session, cursor_next);
 	WT_STAT_DATA_INCR(session, cursor_next);
 
+#ifdef HAVE_DIAGNOSTIC
 	/*
-	 * If retrieving random values without sampling, or we don't have a
-	 * page reference, pick a roughly random leaf page in the tree.
+	 * Under some conditions we end up using the underlying cursor.next to
+	 * walk through the object. Since there are multiple calls, we can hit
+	 * the cursor-order checks, turn them off.
+	 */
+	__wt_cursor_key_order_reset(cbt);
+#endif
+
+	/*
+	 * If we don't have a current position in the tree, or if retrieving
+	 * random values without sampling, pick a roughly random leaf page in
+	 * the tree and return an entry from it.
 	 */
 	if (cbt->ref == NULL || cbt->next_random_sample_size == 0) {
-		/*
-		 * Skip past the sample size of the leaf pages in the tree
-		 * between each random key return to compensate for unbalanced
-		 * trees.
-		 *
-		 * Use the underlying file size divided by its block allocation
-		 * size as our guess of leaf pages in the file (this can be
-		 * entirely wrong, as it depends on how many pages are in this
-		 * particular checkpoint, how large the leaf and internal pages
-		 * really are, and other factors). Then, divide that value by
-		 * the configured sample size and increment the final result to
-		 * make sure tiny files don't leave us with a skip value of 0.
-		 *
-		 * !!!
-		 * Ideally, the number would be prime to avoid restart issues.
-		 */
-		if (cbt->next_random_sample_size != 0) {
-			WT_ERR(btree->bm->size(btree->bm, session, &size));
-			cbt->next_random_leaf_skip = (uint64_t)
-			    ((size / btree->allocsize) /
-			    cbt->next_random_sample_size) + 1;
-		}
-
-		/*
-		 * Choose a leaf page from the tree.
-		 */
 		WT_ERR(__cursor_func_init(cbt, true));
 		WT_WITH_PAGE_INDEX(
 		    session, ret = __wt_row_random_descent(session, cbt));
-		WT_ERR(ret);
-	} else {
+		if (ret == 0)
+			goto random_page_entry;
+
 		/*
-		 * Read through the tree, skipping leaf pages. Be cautious about
-		 * the skip count: if the last leaf page skipped was also the
-		 * last leaf page in the tree, it may be set to zero on return
-		 * with the end-of-walk condition.
-		 *
-		 * Pages read for data sampling aren't "useful"; don't update
-		 * the read generation of pages already in memory, and if a page
-		 * is read, set its generation to a low value so it is evicted
-		 * quickly.
+		 * Random descent may return not-found: the tree might be empty
+		 * or have so many deleted items we didn't find any valid pages.
+		 * We can't return WT_NOTFOUND to the application unless a tree
+		 * is really empty, fallback to skipping through tree pages.
 		 */
-		for (skip =
-		    cbt->next_random_leaf_skip; cbt->ref == NULL || skip > 0;)
-			WT_ERR(__wt_tree_walk_skip(session, &cbt->ref, &skip,
-			    WT_READ_NO_GEN |
-			    WT_READ_SKIP_INTL | WT_READ_WONT_NEED));
+		WT_ERR_NOTFOUND_OK(ret);
 	}
 
+	/*
+	 * Cursor through the tree, skipping past the sample size of the leaf
+	 * pages in the tree between each random key return to compensate for
+	 * unbalanced trees.
+	 *
+	 * If the random descent attempt failed, we don't have a configured
+	 * sample size, use 100 for no particular reason.
+	 */
+	if (cbt->next_random_sample_size == 0)
+		cbt->next_random_sample_size = 100;
+
+	/*
+	 * If the random descent attempt failed, or it's our first skip attempt,
+	 * we haven't yet set the pages to skip, do it now.
+	 *
+	 * Use the underlying file size divided by its block allocation size as
+	 * our guess of leaf pages in the file (this can be entirely wrong, as
+	 * it depends on how many pages are in this particular checkpoint, how
+	 * large the leaf and internal pages really are, and other factors).
+	 * Then, divide that value by the configured sample size and increment
+	 * the final result to make sure tiny files don't leave us with a skip
+	 * value of 0.
+	 *
+	 * !!!
+	 * Ideally, the number would be prime to avoid restart issues.
+	 */
+	if (cbt->next_random_leaf_skip == 0) {
+		WT_ERR(btree->bm->size(btree->bm, session, &size));
+		cbt->next_random_leaf_skip = (uint64_t)
+		    ((size / btree->allocsize) /
+		    cbt->next_random_sample_size) + 1;
+	}
+
+	/*
+	 * Be paranoid about loop termination: first, if the last leaf page
+	 * skipped was also the last leaf page in the tree, skip may be set to
+	 * zero on return along with the NULL WT_REF end-of-walk condition.
+	 * Second, if a tree has no valid pages at all (the condition after
+	 * initial creation), we might make no progress at all, or finally, if
+	 * a tree has only deleted pages, we'll make progress, but never get a
+	 * useful WT_REF. And, of course, the tree can switch from one of these
+	 * states to another without warning. Decrement skip regardless of what
+	 * is happening in the search, guarantee we eventually quit.
+	 *
+	 * Pages read for data sampling aren't "useful"; don't update the read
+	 * generation of pages already in memory, and if a page is read, set
+	 * its generation to a low value so it is evicted quickly.
+	 */
+	for (skip = cbt->next_random_leaf_skip; cbt->ref == NULL || skip > 0;) {
+		n = skip;
+		WT_ERR(__wt_tree_walk_skip(session, &cbt->ref, &skip,
+		    WT_READ_NO_GEN | WT_READ_SKIP_INTL | WT_READ_WONT_NEED));
+		if (n == skip) {
+			if (skip == 0)
+				break;
+			--skip;
+		}
+	}
+
+	/*
+	 * We can't return WT_NOTFOUND to the application unless a tree is
+	 * really empty, fallback to a random entry from the first page in the
+	 * tree that has anything at all.
+	 */
+	if (cbt->ref == NULL)
+		WT_ERR(__wt_btcur_next(cbt, false));
+
+random_page_entry:
 	/*
 	 * Select a random entry from the leaf page. If it's not valid, move to
 	 * the next entry, if that doesn't work, move to the previous entry.
