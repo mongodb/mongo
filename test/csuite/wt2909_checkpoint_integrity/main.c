@@ -27,8 +27,6 @@
  */
 #include "test_util.h"
 
-#include <unistd.h>
-#include <sys/types.h>
 #include <sys/wait.h>
 
 /*
@@ -243,7 +241,7 @@ cursor_count_items(WT_CURSOR *cursor, uint64_t *countp)
 
 	*countp = 0;
 
-	cursor->reset(cursor);
+	testutil_check(cursor->reset(cursor));
 	while ((ret = cursor->next(cursor)) == 0)
 		(*countp)++;
 	testutil_assert(ret == WT_NOTFOUND);
@@ -256,7 +254,7 @@ cursor_count_items(WT_CURSOR *cursor, uint64_t *countp)
 static void
 disable_failures(void)
 {
-	setenv("WT_FAIL_FS_ENABLE", "0", 1);
+	testutil_check(setenv("WT_FAIL_FS_ENABLE", "0", 1));
 }
 
 /*
@@ -268,11 +266,11 @@ enable_failures(uint64_t allow_writes, uint64_t allow_reads)
 {
 	char value[100];
 
-	setenv("WT_FAIL_FS_ENABLE", "1", 1);
+	testutil_check(setenv("WT_FAIL_FS_ENABLE", "1", 1));
 	snprintf(value, sizeof(value), "%" PRIu64, allow_writes);
-	setenv("WT_FAIL_FS_WRITE_ALLOW", value, 1);
+	testutil_check(setenv("WT_FAIL_FS_WRITE_ALLOW", value, 1));
 	snprintf(value, sizeof(value), "%" PRIu64, allow_reads);
-	setenv("WT_FAIL_FS_READ_ALLOW", value, 1);
+	testutil_check(setenv("WT_FAIL_FS_READ_ALLOW", value, 1));
 }
 
 /*
@@ -307,10 +305,8 @@ static void
 run_check_subtest(TEST_OPTS *opts, const char *debugger, uint64_t nops,
     bool close_test, uint64_t *nresultsp)
 {
-	int narg;
-	int estatus;
-	char rarg[20], sarg[20];
-	char *subtest_args[MAX_ARGS];
+	int estatus, narg;
+	char rarg[20], sarg[20], *subtest_args[MAX_ARGS];
 
 	narg = 0;
 	if (debugger != NULL) {
@@ -427,19 +423,21 @@ static int
 run_process(TEST_OPTS *opts, const char *prog, char *argv[], int *status)
 {
 	int pid;
+	char **arg;
 
 	if (opts->verbose) {
 		printf("running: ");
-		for (char **arg = argv; *arg != NULL; arg++)
+		for (arg = argv; *arg != NULL; arg++)
 			printf("%s ", *arg);
 		printf("\n");
 	}
 	if ((pid = fork()) == 0) {
-		execv(prog, argv);
+		(void)execv(prog, argv);
+		testutil_die(errno, "%s", prog);
 	} else if (pid < 0)
 		return (errno);
 
-	waitpid(pid, status, 0);
+	(void)waitpid(pid, status, 0);
 	return (0);
 }
 
@@ -464,9 +462,9 @@ subtest_main(int argc, char *argv[], bool close_test)
 
 	/* Redirect stderr, stdout. */
 	sprintf(filename, "%s/%s", opts->home, STDERR_FILE);
-	freopen(filename, "a", stderr);
+	testutil_assert(freopen(filename, "a", stderr) != NULL);
 	sprintf(filename, "%s/%s", opts->home, STDOUT_FILE);
-	freopen(filename, "a", stdout);
+	testutil_assert(freopen(filename, "a", stdout) != NULL);
 	snprintf(config, sizeof(config),
 	    "create,cache_size=250M,log=(enabled),"
 	    "transaction_sync=(enabled,method=none),extensions=("
@@ -572,7 +570,8 @@ subtest_populate(TEST_OPTS *opts, bool close_test)
 			CHECK(session->checkpoint(session, NULL));
 
 		if ((i + 1) % VERBOSE_PRINT == 0 && opts->verbose)
-			printf("  %d/%" PRIu64 "\n", (i + 1), nrecords);
+			printf("  %" PRIu32 "/%" PRIu64 "\n",
+			    (i + 1), nrecords);
 		/* Attempt to isolate the failures to checkpointing. */
 		if (i == (nrecords/100)) {
 			enable_failures(opts->nops, 1000000);
