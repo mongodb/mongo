@@ -87,7 +87,7 @@ functions:
           platform: ${platform}
           setup: ${setup}
           storageEngine: ${storageEngine}
-          test: ${test}
+          test: ${test}.longevity
           production: true
           EOF
 
@@ -141,14 +141,16 @@ functions:
         # setup execution environment
         # configure environment
         script: |
+          set -e
           virtualenv ./venv
           source ./venv/bin/activate
           pip install -r ../src/dsi/dsi/requirements.txt
-          python ../src/dsi/dsi/bin/setup_work_env.py --production
+          python ../src/dsi/dsi/bin/bootstrap.py --production
     - command: shell.exec
       params:
         script: |
           set -v
+          set -e
           source work/dsienv.sh
           $DSI_PATH/bin/setup-dsi-env.sh
           cp terraform/* work/
@@ -158,6 +160,7 @@ functions:
         working_dir: work
         script: |
            set -v
+           set -e
            ./terraform get --update
 
   "bring up 3 shard cluster":
@@ -183,7 +186,6 @@ functions:
           set -o verbose
           source ./dsienv.sh
           source ./venv/bin/activate
-          cp mongodb_setup.${setup}.${storageEngine}.yml mongodb_setup.yml
           $DSI_PATH/bin/mongodb_setup.py && echo "${setup} MongoDB Cluster STARTED."
 
   "run test":
@@ -196,8 +198,6 @@ functions:
           echo "Run test for ${test}-${storageEngine} with setup ${setup}"
           source ./dsienv.sh
           source ./venv/bin/activate
-          # Copy over the proper test control file
-          cp $DSI_PATH/test_control/test_control.${test}.longevity.yml test_control.yml
           $DSI_PATH/bin/run-${test}.sh ${storageEngine} ${setup} ${cluster}
           echo "Complete test for ${test} with setup ${setup}!"
     - command: "json.send"
@@ -321,6 +321,9 @@ tasks:
   exec_timeout_secs: 216000
   commands:
     - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "ycsb"
     - func: "bring up 3 shard cluster"
     - func: "configure mongodb cluster"
     - func: "run test"
@@ -339,6 +342,9 @@ tasks:
   exec_timeout_secs: 216000
   commands:
     - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "ycsb"
     - func: "bring up 3 shard cluster"
     - func: "configure mongodb cluster"
     - func: "run test"
@@ -379,7 +385,7 @@ buildvariants:
     - YCSB
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
-    setup: shard
+    setup: shard-longevity
     cluster: longevity
     numShard: 3
     storageEngine: wiredTiger
@@ -399,7 +405,7 @@ buildvariants:
   modules: *modules
   expansions:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
-    setup: shard
+    setup: shard-longevity
     cluster: longevity
     numShard: 3
     storageEngine: mmapv1

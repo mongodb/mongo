@@ -136,16 +136,18 @@ functions:
         # setup execution environment
         # configure environment, has private information, no logging
         script: |
+          set -e
           virtualenv ./venv
           source ./venv/bin/activate
           pip install -r ../src/dsi/dsi/requirements.txt
-          python ../src/dsi/dsi/bin/setup_work_env.py --production
+          python ../src/dsi/dsi/bin/bootstrap.py --production
           ls
           pwd
     - command: shell.exec
       params:
         script: |
           set -v
+          set -e
           source work/dsienv.sh
           $DSI_PATH/bin/setup-dsi-env.sh
           cp terraform/* work/
@@ -155,6 +157,7 @@ functions:
         working_dir: work
         script: |
           set -v
+          set -e
           ./terraform get --update
     - command: shell.exec
       # set up /data/infrastructure_provisioning to keep track of resources,
@@ -249,7 +252,6 @@ functions:
           set -o verbose
           source ./dsienv.sh
           source ./venv/bin/activate
-          cp mongodb_setup.${setup}.${storageEngine}.yml mongodb_setup.yml
           $DSI_PATH/bin/mongodb_setup.py && echo "${cluster} MongoDB Cluster STARTED."
 
   "run test":
@@ -262,15 +264,6 @@ functions:
           source ./dsienv.sh
           source ./venv/bin/activate
           echo "Run test for ${test}-${storageEngine} with setup ${setup}"
-          # Copy over the proper test control file
-          # This is to work around the fact that multinode clusters need a different ycsb test control.
-          # This should eventually be fixed in a better fashion and removed.
-          if [ ${test} == 'ycsb' ] && ( [ ${cluster} == 'shard' ] || [ ${cluster} == 'replica' ] )
-          then
-            cp $DSI_PATH/test_control/test_control.ycsb.multi_node.yml test_control.yml
-          else
-            cp $DSI_PATH/test_control/test_control.${test}.yml test_control.yml
-          fi
           # Specify the test list to use. Change the testList parameter
           # if you want to run a non-default list.
           $DSI_PATH/bin/update_test_list.py ${testList}
@@ -436,6 +429,9 @@ tasks:
       variant: linux-standalone
   commands:
     - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "ycsb"
     - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
       vars:
@@ -456,6 +452,9 @@ tasks:
       variant: linux-standalone
   commands:
     - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "ycsb"
     - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
       vars:
@@ -476,6 +475,9 @@ tasks:
       variant: linux-standalone
   commands:
     - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "benchRun"
     - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
       vars:
@@ -494,6 +496,9 @@ tasks:
       variant: linux-standalone
   commands:
     - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "benchRun"
     - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
       vars:
@@ -512,6 +517,10 @@ tasks:
       variant: linux-standalone
   commands:
     - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "benchRun"
+        setup: "replica-2node"
     - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
       vars:
@@ -531,6 +540,10 @@ tasks:
       variant: linux-standalone
   commands:
     - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "benchRun"
+        setup: "replica-2node"
     - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
       vars:
@@ -614,6 +627,9 @@ tasks:
       variant: linux-standalone
   commands:
     - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "initialSync"
     - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
       vars:
@@ -632,6 +648,9 @@ tasks:
       variant : linux-standalone
   commands:
     - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        test: "initialSync"
     - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
       vars:
@@ -650,11 +669,15 @@ tasks:
       variant: linux-standalone
   commands:
     - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        setup: "replica-2node.dr"
+        test: "initialSync"
     - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
       vars:
         storageEngine: "wiredTiger"
-        setup: replica-2node.dr
+        setup: "replica-2node.dr"
     - func: "run test"
       vars:
         storageEngine: "wiredTiger"
@@ -669,11 +692,15 @@ tasks:
       variant: linux-standalone
   commands:
     - func: "prepare environment"
+      vars:
+        storageEngine: "mmapv1"
+        setup: "replica-2node.dr"
+        test: "initialSync"
     - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
       vars:
         storageEngine: "mmapv1"
-        setup: replica-2node.dr
+        setup: "replica-2node.dr"
     - func: "run test"
       vars:
         storageEngine: "mmapv1"
@@ -689,6 +716,9 @@ tasks:
   exec_timeout_secs: 216000 # 2.5 days
   commands:
     - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "initialsync-logkeeper"
     - func: "infrastructure provisioning"
     - func: "configure mongodb cluster"
       vars:
