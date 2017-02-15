@@ -259,15 +259,10 @@ Status NamespaceDetailsCollectionCatalogEntry::removeIndex(OperationContext* txn
         d->idx(getTotalIndexCount(txn)) = IndexDetails();
     }
 
-    // Soneone may be querying the system.indexes namespace directly, so we need to invalidate
-    // its cursors. Having to go back up through the DatabaseHolder is a bit of a layering
-    // violation, but at this point we're not going to add more MMAPv1 specific interfaces.
-    // We can find the name of the database through the first entries of the CollectionMap.
-    StringData dbName(nsToDatabaseSubstring(_db->_collections.begin()->first));
-    invariant(txn->lockState()->isDbLockedForMode(dbName, MODE_X));
-    Database* db = dbHolder().get(txn, dbName);
-    Collection* systemIndexes = db->getCollection(db->getSystemIndexesName());
-    systemIndexes->getCursorManager()->invalidateDocument(txn, infoLocation, INVALIDATION_DELETION);
+    // Someone may be querying the system.indexes namespace directly, so we need to invalidate
+    // its cursors.
+    MMAPV1DatabaseCatalogEntry::invalidateSystemCollectionRecord(
+        txn, NamespaceString(_db->name(), "system.indexes"), infoLocation);
 
     // remove from system.indexes
     _indexRecordStore->deleteRecord(txn, infoLocation);
@@ -393,6 +388,10 @@ void NamespaceDetailsCollectionCatalogEntry::_updateSystemNamespaces(OperationCo
         StatusWith<RecordId> newLocation = _namespacesRecordStore->insertRecord(
             txn, newEntry.objdata(), newEntry.objsize(), false);
         fassert(40074, newLocation.getStatus().isOK());
+
+        // Invalidate old namespace record
+        MMAPV1DatabaseCatalogEntry::invalidateSystemCollectionRecord(
+            txn, NamespaceString(_db->name(), "system.namespaces"), _namespacesRecordId);
 
         _namespacesRecordStore->deleteRecord(txn, _namespacesRecordId);
 

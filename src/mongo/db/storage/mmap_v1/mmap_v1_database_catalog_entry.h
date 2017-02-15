@@ -132,6 +132,9 @@ public:
      * exist.
      */
     void createNamespaceForIndex(OperationContext* txn, StringData name);
+    static void invalidateSystemCollectionRecord(OperationContext* txn,
+                                                 NamespaceString systemCollectionNamespace,
+                                                 RecordId record);
 
 private:
     class EntryInsertion;
