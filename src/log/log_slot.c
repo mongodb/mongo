@@ -160,6 +160,7 @@ retry:
 #endif
 	if (WT_LOG_SLOT_UNBUFFERED_ISSET(old_state)) {
 		while (slot->slot_unbuffered == 0) {
+			WT_RET(WT_SESSION_CHECK_PANIC(session));
 			__wt_yield();
 #ifdef	HAVE_DIAGNOSTIC
 			++count;
@@ -464,7 +465,7 @@ __wt_log_slot_destroy(WT_SESSION_IMPL *session)
  * __wt_log_slot_join --
  *	Join a consolidated logging slot.
  */
-void
+int
 __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
     uint32_t flags, WT_MYSLOT *myslot)
 {
@@ -498,6 +499,7 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	}
 	for (;;) {
 		WT_BARRIER();
+		WT_RET(WT_SESSION_CHECK_PANIC(session));
 		slot = log->active_slot;
 		old_state = slot->slot_state;
 		if (WT_LOG_SLOT_OPEN(old_state)) {
@@ -555,6 +557,7 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	myslot->slot = slot;
 	myslot->offset = join_offset;
 	myslot->end_offset = (wt_off_t)((uint64_t)join_offset + mysize);
+	return (0);
 }
 
 /*
