@@ -32,6 +32,7 @@
 
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details_collection_entry.h"
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -253,15 +254,10 @@ Status NamespaceDetailsCollectionCatalogEntry::removeIndex(OperationContext* txn
         d->idx(getTotalIndexCount(txn)) = IndexDetails();
     }
 
-    // Soneone may be querying the system.indexes namespace directly, so we need to invalidate
-    // its cursors. Having to go back up through the DatabaseHolder is a bit of a layering
-    // violation, but at this point we're not going to add more MMAPv1 specific interfaces.
-    // We can find the name of the database through the first entries of the CollectionMap.
-    StringData dbName(nsToDatabaseSubstring(_db->_collections.begin()->first));
-    invariant(txn->lockState()->isDbLockedForMode(dbName, MODE_X));
-    Database* db = dbHolder().get(txn, dbName);
-    Collection* systemIndexes = db->getCollection(db->getSystemIndexesName());
-    systemIndexes->getCursorManager()->invalidateDocument(txn, infoLocation, INVALIDATION_DELETION);
+    // Someone may be querying the system.indexes namespace directly, so we need to invalidate
+    // its cursors.
+    MMAPV1DatabaseCatalogEntry::invalidateSystemCollectionRecord(
+        txn, NamespaceString(_db->name(), "system.indexes"), infoLocation);
 
     // remove from system.indexes
     _indexRecordStore->deleteRecord(txn, infoLocation);
@@ -372,8 +368,20 @@ void NamespaceDetailsCollectionCatalogEntry::_updateSystemNamespaces(OperationCo
 
     RecordData entry = _namespacesRecordStore->dataFor(txn, _namespacesRecordId);
     const BSONObj newEntry = applyUpdateOperators(entry.releaseToBson(), update);
-    StatusWith<RecordId> result = _namespacesRecordStore->updateRecord(
-        txn, _namespacesRecordId, newEntry.objdata(), newEntry.objsize(), false, NULL);
+
+    // Get update notifier
+    invariant(txn->lockState()->isDbLockedForMode(_db->name(), MODE_X));
+    Database* db = dbHolder().get(txn, _db->name());
+    Collection* systemCollection =
+        db->getCollection(NamespaceString(_db->name(), "system.namespaces"));
+    UpdateNotifier* namespacesNotifier = systemCollection->getUpdateNotifier();
+
+    StatusWith<RecordId> result = _namespacesRecordStore->updateRecord(txn,
+                                                                       _namespacesRecordId,
+                                                                       newEntry.objdata(),
+                                                                       newEntry.objsize(),
+                                                                       false,
+                                                                       namespacesNotifier);
     fassert(17486, result.getStatus());
     setNamespacesRecordId(txn, result.getValue());
 }

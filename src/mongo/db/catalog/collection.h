@@ -433,6 +433,12 @@ public:
      */
     void notifyCappedWaitersIfNeeded();
 
+    /**
+     * This function is necessary for a 3.2 backport. We have a better fix for the
+     * underlying issue in later versions.
+     */
+    UpdateNotifier* getUpdateNotifier();
+
 private:
     /**
      * Returns a non-ok Status if document does not pass this collection's validator.

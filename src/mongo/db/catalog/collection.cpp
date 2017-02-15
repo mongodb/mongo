@@ -1047,4 +1047,8 @@ Status Collection::touch(OperationContext* txn,
 
     return Status::OK();
 }
+
+UpdateNotifier* Collection::getUpdateNotifier() {
+    return this;
+}
 }

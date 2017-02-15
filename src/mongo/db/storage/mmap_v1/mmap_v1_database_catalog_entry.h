@@ -127,6 +127,9 @@ public:
      * exist.
      */
     void createNamespaceForIndex(OperationContext* txn, StringData name);
+    static void invalidateSystemCollectionRecord(OperationContext* txn,
+                                                 NamespaceString systemCollectionNamespace,
+                                                 RecordId record);
 
     /**
      * Ensures data files are compatible, in case we are downgrading from a newer version. Returns
