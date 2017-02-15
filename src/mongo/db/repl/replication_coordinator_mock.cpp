@@ -250,8 +250,9 @@ void ReplicationCoordinatorMock::processReplSetGetConfig(BSONObjBuilder* result)
     // TODO
 }
 
-void ReplicationCoordinatorMock::processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata,
-                                                        bool advanceCommitPoint) {}
+void ReplicationCoordinatorMock::processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) {}
+
+void ReplicationCoordinatorMock::advanceCommitPoint(const OpTime& committedOptime) {}
 
 void ReplicationCoordinatorMock::cancelAndRescheduleElectionTimeout() {}
 
@@ -382,8 +383,10 @@ void ReplicationCoordinatorMock::resetLastOpTimesFromOplog(OperationContext* txn
     invariant(false);
 }
 
-bool ReplicationCoordinatorMock::shouldChangeSyncSource(const HostAndPort& currentSource,
-                                                        const rpc::ReplSetMetadata& metadata) {
+bool ReplicationCoordinatorMock::shouldChangeSyncSource(
+    const HostAndPort& currentSource,
+    const rpc::ReplSetMetadata& replMetadata,
+    boost::optional<rpc::OplogQueryMetadata> oqMetadata) {
     invariant(false);
 }
 

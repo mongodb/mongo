@@ -155,8 +155,9 @@ public:
 
     virtual void processReplSetGetConfig(BSONObjBuilder* result);
 
-    void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata,
-                                bool advanceCommitPoint) override;
+    virtual void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) override;
+
+    virtual void advanceCommitPoint(const OpTime& committedOptime) override;
 
     virtual void cancelAndRescheduleElectionTimeout() override;
 
@@ -213,7 +214,8 @@ public:
     virtual void resetLastOpTimesFromOplog(OperationContext* txn);
 
     virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
-                                        const rpc::ReplSetMetadata& metadata);
+                                        const rpc::ReplSetMetadata& replMetadata,
+                                        boost::optional<rpc::OplogQueryMetadata> oqMetadata);
 
     virtual OpTime getLastCommittedOpTime() const;
 

@@ -481,11 +481,16 @@ public:
     /**
      * Processes the ReplSetMetadata returned from a command run against another
      * replica set member and so long as the config version in the metadata matches the replica set
-     * config version this node currently has, updates the current term and optionally updates
-     * this node's notion of the commit point.
+     * config version this node currently has, updates the current term.
+     *
+     * This does NOT update this node's notion of the commit point.
      */
-    virtual void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata,
-                                        bool advanceCommitPoint) = 0;
+    virtual void processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) = 0;
+
+    /**
+     * This updates the node's notion of the commit point.
+     */
+    virtual void advanceCommitPoint(const OpTime& committedOptime) = 0;
 
     /**
      * Elections under protocol version 1 are triggered by a timer.

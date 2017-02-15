@@ -113,5 +113,16 @@ Status OplogQueryMetadata::writeToMetadata(BSONObjBuilder* builder) const {
     return Status::OK();
 }
 
+std::string OplogQueryMetadata::toString() const {
+    str::stream output;
+    output << "OplogQueryMetadata";
+    output << " Primary Index: " << _currentPrimaryIndex;
+    output << " Sync Source Index: " << _currentSyncSourceIndex;
+    output << " RBID: " << _rbid;
+    output << " Last Op Committed: " << _lastOpCommitted.toString();
+    output << " Last Op Applied: " << _lastOpApplied.toString();
+    return output;
+}
+
 }  // namespace rpc
 }  // namespace mongo

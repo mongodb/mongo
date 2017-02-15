@@ -133,6 +133,11 @@ public:
         return _currentTerm;
     }
 
+    /**
+     * Returns a stringified version of the metadata.
+     */
+    std::string toString() const;
+
 private:
     repl::OpTime _lastOpCommitted;
     repl::OpTime _lastOpVisible;

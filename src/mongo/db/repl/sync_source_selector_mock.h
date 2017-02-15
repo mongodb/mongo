@@ -51,7 +51,9 @@ public:
     void clearSyncSourceBlacklist() override;
     HostAndPort chooseNewSyncSource(const OpTime& ot) override;
     void blacklistSyncSource(const HostAndPort& host, Date_t until) override;
-    bool shouldChangeSyncSource(const HostAndPort&, const rpc::ReplSetMetadata&) override;
+    bool shouldChangeSyncSource(const HostAndPort&,
+                                const rpc::ReplSetMetadata&,
+                                boost::optional<rpc::OplogQueryMetadata> oqMetadata) override;
 
     /**
      * Sets a function that will be run every time chooseNewSyncSource() is called.

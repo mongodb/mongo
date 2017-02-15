@@ -162,11 +162,13 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
             replMetadata = responseStatus;
         }
         if (replMetadata.isOK()) {
+            // Arbiters are the only nodes allowed to advance their commit point via heartbeats.
+            if (getMemberState().arbiter()) {
+                advanceCommitPoint(replMetadata.getValue().getLastOpCommitted());
+            }
             // Asynchronous stepdown could happen, but it will wait for _topoMutex and execute
             // after this function, so we cannot and don't need to wait for it to finish.
-            // Arbiters are the only nodes allowed to advance their commit point via heartbeats.
-            bool advanceCommitPoint = getMemberState().arbiter();
-            _processReplSetMetadata_incallback(replMetadata.getValue(), advanceCommitPoint);
+            _processReplSetMetadata_incallback(replMetadata.getValue());
         }
     }
     const Date_t now = _replExecutor.now();

@@ -60,21 +60,46 @@ OpTimeWithTerm DataReplicatorExternalStateImpl::getCurrentTermAndLastCommittedOp
     return {_replicationCoordinator->getTerm(), _replicationCoordinator->getLastCommittedOpTime()};
 }
 
-void DataReplicatorExternalStateImpl::processMetadata(const rpc::ReplSetMetadata& metadata) {
-    _replicationCoordinator->processReplSetMetadata(metadata, true /*advance the commit point*/);
-    if (metadata.getPrimaryIndex() != rpc::ReplSetMetadata::kNoPrimary) {
+void DataReplicatorExternalStateImpl::processMetadata(
+    const rpc::ReplSetMetadata& replMetadata, boost::optional<rpc::OplogQueryMetadata> oqMetadata) {
+    OpTime newCommitPoint;
+    // If OplogQueryMetadata was provided, use its values, otherwise use the ones in
+    // ReplSetMetadata.
+    if (oqMetadata) {
+        newCommitPoint = oqMetadata->getLastOpCommitted();
+    } else {
+        newCommitPoint = replMetadata.getLastOpCommitted();
+    }
+    _replicationCoordinator->advanceCommitPoint(newCommitPoint);
+
+    _replicationCoordinator->processReplSetMetadata(replMetadata);
+
+    if ((oqMetadata && (oqMetadata->getPrimaryIndex() != rpc::OplogQueryMetadata::kNoPrimary)) ||
+        (replMetadata.getPrimaryIndex() != rpc::ReplSetMetadata::kNoPrimary)) {
         _replicationCoordinator->cancelAndRescheduleElectionTimeout();
     }
 }
 
-bool DataReplicatorExternalStateImpl::shouldStopFetching(const HostAndPort& source,
-                                                         const rpc::ReplSetMetadata& metadata) {
+bool DataReplicatorExternalStateImpl::shouldStopFetching(
+    const HostAndPort& source,
+    const rpc::ReplSetMetadata& replMetadata,
+    boost::optional<rpc::OplogQueryMetadata> oqMetadata) {
     // Re-evaluate quality of sync target.
-    if (_replicationCoordinator->shouldChangeSyncSource(source, metadata)) {
-        log()
-            << "Canceling oplog query because we have to choose a new sync source. Current source: "
-            << source << ", OpTime " << metadata.getLastOpVisible()
-            << ", its sync source index:" << metadata.getSyncSourceIndex();
+    if (_replicationCoordinator->shouldChangeSyncSource(source, replMetadata, oqMetadata)) {
+        // If OplogQueryMetadata was provided, its values were used to determine if we should
+        // change sync sources.
+        if (oqMetadata) {
+            log() << "Canceling oplog query due to OplogQueryMetadata. We have to choose a new "
+                     "sync source. Current source: "
+                  << source << ", OpTime " << oqMetadata->getLastOpApplied()
+                  << ", its sync source index:" << oqMetadata->getSyncSourceIndex();
+
+        } else {
+            log() << "Canceling oplog query due to ReplSetMetadata. We have to choose a new sync "
+                     "source. Current source: "
+                  << source << ", OpTime " << replMetadata.getLastOpVisible()
+                  << ", its sync source index:" << replMetadata.getSyncSourceIndex();
+        }
         return true;
     }
     return false;

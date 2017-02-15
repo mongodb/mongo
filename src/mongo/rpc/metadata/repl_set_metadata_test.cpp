@@ -88,6 +88,20 @@ TEST(ReplResponseMetadataTest, Roundtrip) {
     ASSERT_BSONOBJ_EQ(expectedObj, clonedSerializedObj);
 }
 
+TEST(ReplResponseMetadataTest, MetadataCanBeConstructedWhenMissingOplogQueryMetadataFields) {
+    auto id = OID::gen();
+    BSONObj obj(BSON(kReplSetMetadataFieldName
+                     << BSON("term" << 3 << "configVersion" << 6 << "replicaSetId" << id)));
+
+    auto status = ReplSetMetadata::readFromMetadata(obj);
+    ASSERT_OK(status.getStatus());
+
+    const auto& metadata = status.getValue();
+    ASSERT_EQ(metadata.getConfigVersion(), 6);
+    ASSERT_EQ(metadata.getReplicaSetId(), id);
+    ASSERT_EQ(metadata.getTerm(), 3);
+}
+
 }  // unnamed namespace
 }  // namespace rpc
 }  // namespace mongo

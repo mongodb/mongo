@@ -2126,13 +2126,12 @@ void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result)
     result->append("config", _rsConfig.toBSON());
 }
 
-void ReplicationCoordinatorImpl::processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata,
-                                                        bool advanceCommitPoint) {
+void ReplicationCoordinatorImpl::processReplSetMetadata(const rpc::ReplSetMetadata& replMetadata) {
     EventHandle evh;
 
     {
         LockGuard topoLock(_topoMutex);
-        evh = _processReplSetMetadata_incallback(replMetadata, advanceCommitPoint);
+        evh = _processReplSetMetadata_incallback(replMetadata);
     }
 
     if (evh) {
@@ -2146,12 +2145,9 @@ void ReplicationCoordinatorImpl::cancelAndRescheduleElectionTimeout() {
 }
 
 EventHandle ReplicationCoordinatorImpl::_processReplSetMetadata_incallback(
-    const rpc::ReplSetMetadata& replMetadata, bool advanceCommitPoint) {
+    const rpc::ReplSetMetadata& replMetadata) {
     if (replMetadata.getConfigVersion() != _rsConfig.getConfigVersion()) {
         return EventHandle();
-    }
-    if (advanceCommitPoint) {
-        _setLastCommittedOpTime(replMetadata.getLastOpCommitted());
     }
     return _updateTerm_incallback(replMetadata.getTerm());
 }
@@ -3133,11 +3129,13 @@ void ReplicationCoordinatorImpl::resetLastOpTimesFromOplog(OperationContext* txn
     _externalState->setGlobalTimestamp(txn->getServiceContext(), lastOpTime.getTimestamp());
 }
 
-bool ReplicationCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource,
-                                                        const rpc::ReplSetMetadata& metadata) {
+bool ReplicationCoordinatorImpl::shouldChangeSyncSource(
+    const HostAndPort& currentSource,
+    const rpc::ReplSetMetadata& replMetadata,
+    boost::optional<rpc::OplogQueryMetadata> oqMetadata) {
     LockGuard topoLock(_topoMutex);
     return _topCoord->shouldChangeSyncSource(
-        currentSource, getMyLastAppliedOpTime(), metadata, _replExecutor.now());
+        currentSource, getMyLastAppliedOpTime(), replMetadata, oqMetadata, _replExecutor.now());
 }
 
 void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
@@ -3168,15 +3166,15 @@ void ReplicationCoordinatorImpl::_updateLastCommittedOpTime_inlock() {
     // need the majority to have this OpTime
     OpTime committedOpTime =
         votingNodesOpTimes[votingNodesOpTimes.size() - _rsConfig.getWriteMajority()];
-    _setLastCommittedOpTime_inlock(committedOpTime);
+    _advanceCommitPoint_inlock(committedOpTime);
 }
 
-void ReplicationCoordinatorImpl::_setLastCommittedOpTime(const OpTime& committedOpTime) {
+void ReplicationCoordinatorImpl::advanceCommitPoint(const OpTime& committedOpTime) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    _setLastCommittedOpTime_inlock(committedOpTime);
+    _advanceCommitPoint_inlock(committedOpTime);
 }
 
-void ReplicationCoordinatorImpl::_setLastCommittedOpTime_inlock(const OpTime& committedOpTime) {
+void ReplicationCoordinatorImpl::_advanceCommitPoint_inlock(const OpTime& committedOpTime) {
     if (committedOpTime == _lastCommittedOpTime) {
         return;  // Hasn't changed, so ignore it.
     } else if (committedOpTime < _lastCommittedOpTime) {

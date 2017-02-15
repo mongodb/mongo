@@ -3837,8 +3837,8 @@ TEST_F(ReplCoordTest, IgnoreTheContentsOfMetadataWhenItsConfigVersionDoesNotMatc
                                   << 2
                                   << "syncSourceIndex"
                                   << 1)));
-    getReplCoord()->processReplSetMetadata(metadata.getValue(), true);
-    ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
+    getReplCoord()->processReplSetMetadata(metadata.getValue());
+    ASSERT_EQUALS(0, getReplCoord()->getTerm());
 
     // higher configVersion
     StatusWith<rpc::ReplSetMetadata> metadata2 = rpc::ReplSetMetadata::readFromMetadata(BSON(
@@ -3853,11 +3853,11 @@ TEST_F(ReplCoordTest, IgnoreTheContentsOfMetadataWhenItsConfigVersionDoesNotMatc
                                   << 2
                                   << "syncSourceIndex"
                                   << 1)));
-    getReplCoord()->processReplSetMetadata(metadata2.getValue(), true);
-    ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
+    getReplCoord()->processReplSetMetadata(metadata2.getValue());
+    ASSERT_EQUALS(0, getReplCoord()->getTerm());
 }
 
-TEST_F(ReplCoordTest, UpdateLastCommittedOpTimeWhenTheLastCommittedOpTimeFromMetadataIsNewer) {
+TEST_F(ReplCoordTest, UpdateLastCommittedOpTimeWhenTheLastCommittedOpTimeIsNewer) {
     // Ensure that LastCommittedOpTime updates when a newer OpTime comes in via ReplSetMetadata,
     // but not if the OpTime is older than the current LastCommittedOpTime.
     assertStartSuccess(BSON("_id"
@@ -3887,42 +3887,19 @@ TEST_F(ReplCoordTest, UpdateLastCommittedOpTimeWhenTheLastCommittedOpTimeFromMet
     ASSERT_EQUALS(1, getReplCoord()->getTerm());
 
     OpTime time(Timestamp(10, 0), 1);
+    OpTime oldTime(Timestamp(9, 0), 1);
     getReplCoord()->createSnapshot(txn.get(), time, SnapshotName(1));
 
     // higher OpTime, should change
-    StatusWith<rpc::ReplSetMetadata> metadata = rpc::ReplSetMetadata::readFromMetadata(BSON(
-        rpc::kReplSetMetadataFieldName
-        << BSON("lastOpCommitted" << BSON("ts" << Timestamp(10, 0) << "t" << 1) << "lastOpVisible"
-                                  << BSON("ts" << Timestamp(10, 0) << "t" << 1)
-                                  << "configVersion"
-                                  << 2
-                                  << "primaryIndex"
-                                  << 2
-                                  << "term"
-                                  << 1
-                                  << "syncSourceIndex"
-                                  << 1)));
-    getReplCoord()->processReplSetMetadata(metadata.getValue(), true);
-    ASSERT_EQUALS(OpTime(Timestamp(10, 0), 1), getReplCoord()->getLastCommittedOpTime());
-    ASSERT_EQUALS(OpTime(Timestamp(10, 0), 1), getReplCoord()->getCurrentCommittedSnapshotOpTime());
+    getReplCoord()->advanceCommitPoint(time);
+    ASSERT_EQUALS(time, getReplCoord()->getLastCommittedOpTime());
+    ASSERT_EQUALS(time, getReplCoord()->getCurrentCommittedSnapshotOpTime());
 
     // lower OpTime, should not change
-    StatusWith<rpc::ReplSetMetadata> metadata2 = rpc::ReplSetMetadata::readFromMetadata(BSON(
-        rpc::kReplSetMetadataFieldName
-        << BSON("lastOpCommitted" << BSON("ts" << Timestamp(9, 0) << "t" << 1) << "lastOpVisible"
-                                  << BSON("ts" << Timestamp(9, 0) << "t" << 1)
-                                  << "configVersion"
-                                  << 2
-                                  << "primaryIndex"
-                                  << 2
-                                  << "term"
-                                  << 1
-                                  << "syncSourceIndex"
-                                  << 1)));
-    getReplCoord()->processReplSetMetadata(metadata2.getValue(), true);
-    ASSERT_EQUALS(OpTime(Timestamp(10, 0), 1), getReplCoord()->getLastCommittedOpTime());
+    getReplCoord()->advanceCommitPoint(oldTime);
+    ASSERT_EQUALS(time, getReplCoord()->getLastCommittedOpTime());
+    ASSERT_EQUALS(time, getReplCoord()->getCurrentCommittedSnapshotOpTime());
 }
-
 TEST_F(ReplCoordTest, UpdateTermWhenTheTermFromMetadataIsNewerButNeverUpdateCurrentPrimaryIndex) {
     // Ensure that the term is updated if and only if the term is greater than our current term.
     // Ensure that currentPrimaryIndex is never altered by ReplSetMetadata.
@@ -3964,10 +3941,10 @@ TEST_F(ReplCoordTest, UpdateTermWhenTheTermFromMetadataIsNewerButNeverUpdateCurr
                                   << 3
                                   << "syncSourceIndex"
                                   << 1)));
-    getReplCoord()->processReplSetMetadata(metadata.getValue(), true);
-    ASSERT_EQUALS(OpTime(Timestamp(10, 0), 3), getReplCoord()->getLastCommittedOpTime());
+    getReplCoord()->processReplSetMetadata(metadata.getValue());
     ASSERT_EQUALS(3, getReplCoord()->getTerm());
     ASSERT_EQUALS(-1, getTopoCoord().getCurrentPrimaryIndex());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
 
     // lower term, should not change
     StatusWith<rpc::ReplSetMetadata> metadata2 = rpc::ReplSetMetadata::readFromMetadata(BSON(
@@ -3982,10 +3959,10 @@ TEST_F(ReplCoordTest, UpdateTermWhenTheTermFromMetadataIsNewerButNeverUpdateCurr
                                   << 2
                                   << "syncSourceIndex"
                                   << 1)));
-    getReplCoord()->processReplSetMetadata(metadata2.getValue(), true);
-    ASSERT_EQUALS(OpTime(Timestamp(11, 0), 3), getReplCoord()->getLastCommittedOpTime());
+    getReplCoord()->processReplSetMetadata(metadata2.getValue());
     ASSERT_EQUALS(3, getReplCoord()->getTerm());
     ASSERT_EQUALS(-1, getTopoCoord().getCurrentPrimaryIndex());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
 
     // same term, should not change
     StatusWith<rpc::ReplSetMetadata> metadata3 = rpc::ReplSetMetadata::readFromMetadata(BSON(
@@ -4000,10 +3977,10 @@ TEST_F(ReplCoordTest, UpdateTermWhenTheTermFromMetadataIsNewerButNeverUpdateCurr
                                   << 3
                                   << "syncSourceIndex"
                                   << 1)));
-    getReplCoord()->processReplSetMetadata(metadata3.getValue(), true);
-    ASSERT_EQUALS(OpTime(Timestamp(11, 0), 3), getReplCoord()->getLastCommittedOpTime());
+    getReplCoord()->processReplSetMetadata(metadata3.getValue());
     ASSERT_EQUALS(3, getReplCoord()->getTerm());
     ASSERT_EQUALS(-1, getTopoCoord().getCurrentPrimaryIndex());
+    ASSERT_EQUALS(OpTime(Timestamp(0, 0), 0), getReplCoord()->getLastCommittedOpTime());
 }
 
 TEST_F(ReplCoordTest,
@@ -4095,23 +4072,10 @@ TEST_F(ReplCoordTest, PrepareOplogQueryMetadata) {
                        HostAndPort("node1", 12345));
     getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
 
-    // Update committed optime with ReplSetMetadata.
     OpTime optime1{Timestamp(10, 0), 3};
     OpTime optime2{Timestamp(11, 2), 5};
 
-    StatusWith<rpc::ReplSetMetadata> metadataToProcess = rpc::ReplSetMetadata::readFromMetadata(
-        BSON(rpc::kReplSetMetadataFieldName
-             << BSON("lastOpCommitted" << optime1.toBSON() << "lastOpVisible" << optime1.toBSON()
-                                       << "configVersion"
-                                       << 2
-                                       << "primaryIndex"
-                                       << 2
-                                       << "term"
-                                       << 3
-                                       << "syncSourceIndex"
-                                       << 1)));
-    getReplCoord()->processReplSetMetadata(metadataToProcess.getValue(), true);
-
+    getReplCoord()->advanceCommitPoint(optime1);
     getReplCoord()->setMyLastAppliedOpTime(optime2);
 
     // Get current rbid to check against.
@@ -4141,7 +4105,7 @@ TEST_F(ReplCoordTest, PrepareOplogQueryMetadata) {
     ASSERT_EQ(replMetadata.getValue().getLastOpCommitted(), optime1);
     ASSERT_EQ(replMetadata.getValue().getLastOpVisible(), OpTime());
     ASSERT_EQ(replMetadata.getValue().getConfigVersion(), 2);
-    ASSERT_EQ(replMetadata.getValue().getTerm(), 3);
+    ASSERT_EQ(replMetadata.getValue().getTerm(), 0);
     ASSERT_EQ(replMetadata.getValue().getSyncSourceIndex(), -1);
     ASSERT_EQ(replMetadata.getValue().getPrimaryIndex(), -1);
 }
@@ -4884,7 +4848,8 @@ TEST_F(ReplCoordTest, NewStyleUpdatePositionCmdHasMetadata) {
 
     // Set last committed optime via metadata.
     rpc::ReplSetMetadata syncSourceMetadata(optime.getTerm(), optime, optime, 1, OID(), -1, 1);
-    getReplCoord()->processReplSetMetadata(syncSourceMetadata, true);
+    getReplCoord()->processReplSetMetadata(syncSourceMetadata);
+    getReplCoord()->advanceCommitPoint(optime);
     getReplCoord()->createSnapshot(txn.get(), optime, SnapshotName(1));
 
     BSONObj cmd = unittest::assertGet(getReplCoord()->prepareReplSetUpdatePositionCommand(
@@ -4892,6 +4857,9 @@ TEST_F(ReplCoordTest, NewStyleUpdatePositionCmdHasMetadata) {
     auto metadata = unittest::assertGet(rpc::ReplSetMetadata::readFromMetadata(cmd));
     ASSERT_EQUALS(metadata.getTerm(), getReplCoord()->getTerm());
     ASSERT_EQUALS(metadata.getLastOpVisible(), optime);
+
+    auto oqMetadataStatus = rpc::OplogQueryMetadata::readFromMetadata(cmd);
+    ASSERT_EQUALS(oqMetadataStatus.getStatus(), ErrorCodes::NoSuchKey);
 }
 
 TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNodesDown) {

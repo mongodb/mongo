@@ -171,8 +171,9 @@ public:
         _syncSourceSelector->blacklistSyncSource(host, until);
     }
     bool shouldChangeSyncSource(const HostAndPort& currentSource,
-                                const rpc::ReplSetMetadata& metadata) override {
-        return _syncSourceSelector->shouldChangeSyncSource(currentSource, metadata);
+                                const rpc::ReplSetMetadata& replMetadata,
+                                boost::optional<rpc::OplogQueryMetadata> oqMetadata) override {
+        return _syncSourceSelector->shouldChangeSyncSource(currentSource, replMetadata, oqMetadata);
     }
 
     void scheduleNetworkResponse(std::string cmdName, const BSONObj& obj) {
