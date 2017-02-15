@@ -98,9 +98,9 @@ protected:
 
     executor::TaskExecutor* executor() const;
 
-    const transport::SessionHandle& getTransportSession() const;
-
     DistLockManagerMock* distLock() const;
+
+    ServiceContext* serviceContext() const;
 
     OperationContext* operationContext() const;
 

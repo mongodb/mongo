@@ -68,7 +68,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"

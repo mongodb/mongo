@@ -208,17 +208,6 @@ env.CppUnitTest(
     ]
 )
 
-env.CppUnitTest(
-    target='chunk_manager_tests',
-    source=[
-        'chunk_manager_tests.cpp'
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_test_fixture',
-        'coreshard',
-    ]
-)
-
 env.CppUnitTest('request_types_test',
     source=[
         'request_types/add_shard_request_test.cpp',
@@ -240,7 +229,7 @@ env.Library(
     target='coreshard',
     source=[
         'balancer_configuration.cpp',
-        'catalog/catalog_cache.cpp',
+        'catalog_cache.cpp',
         'chunk.cpp',
         'chunk_manager.cpp',
         'cluster_identity_loader.cpp',
@@ -257,10 +246,20 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
-        'catalog/sharding_catalog_client_impl',
         'client/sharding_client',
         'common',
     ],
+)
+
+env.CppUnitTest(
+    target='catalog_cache_test',
+    source=[
+        'chunk_manager_test.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_test_fixture',
+        'coreshard',
+    ]
 )
 
 env.Library(

@@ -223,8 +223,9 @@ public:
 
 private:
     // Ordered, parsed paths
-    const OwnedPointerVector<FieldRef> _keyPatternPaths;
+    OwnedPointerVector<FieldRef> _keyPatternPaths;
 
-    const KeyPattern _keyPattern;
+    KeyPattern _keyPattern;
 };
-}
+
+}  // namespace mongo

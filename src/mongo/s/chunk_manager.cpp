@@ -32,7 +32,7 @@
 
 #include "mongo/s/chunk_manager.h"
 
-#include <iterator>
+#include <boost/next_prior.hpp>
 #include <map>
 #include <set>
 
@@ -50,9 +50,9 @@
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
@@ -170,20 +170,21 @@ ChunkManager::ChunkManager(const string& ns,
                            const ShardKeyPattern& pattern,
                            std::unique_ptr<CollatorInterface> defaultCollator,
                            bool unique)
-    : _ns(ns),
+    : _sequenceNumber(nextCMSequenceNumber.addAndFetch(1)),
+      _ns(ns),
       _keyPattern(pattern.getKeyPattern()),
       _defaultCollator(std::move(defaultCollator)),
       _unique(unique),
-      _sequenceNumber(nextCMSequenceNumber.addAndFetch(1)),
       _chunkMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<std::shared_ptr<Chunk>>()),
       _chunkRangeMap(
           SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<ShardAndChunkRange>()) {}
 
 ChunkManager::ChunkManager(OperationContext* txn, const CollectionType& coll)
-    : _ns(coll.getNs().ns()),
+    : _sequenceNumber(nextCMSequenceNumber.addAndFetch(1)),
+      _ns(coll.getNs().ns()),
       _keyPattern(coll.getKeyPattern()),
       _unique(coll.getUnique()),
-      _sequenceNumber(nextCMSequenceNumber.addAndFetch(1)),
+
       _chunkMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<std::shared_ptr<Chunk>>()),
       _chunkRangeMap(
           SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<ShardAndChunkRange>()) {
@@ -200,6 +201,8 @@ ChunkManager::ChunkManager(OperationContext* txn, const CollectionType& coll)
         _defaultCollator = std::move(statusWithCollator.getValue());
     }
 }
+
+ChunkManager::~ChunkManager() = default;
 
 void ChunkManager::loadExistingRanges(OperationContext* txn, const ChunkManager* oldManager) {
     invariant(!_version.isSet());
@@ -624,8 +627,6 @@ void ChunkManager::getShardIdsForRange(set<ShardId>& shardIds,
 }
 
 void ChunkManager::getAllShardIds(set<ShardId>* all) const {
-    dassert(all);
-
     all->insert(_shardIds.begin(), _shardIds.end());
 }
 
