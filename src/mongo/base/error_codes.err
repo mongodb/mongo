@@ -222,7 +222,7 @@ error_code("SendStaleConfig", 13388);
 error_code("DatabaseDifferCase", 13297);
 error_code("OBSOLETE_PrepareConfigsFailed", 13104);
 
-# SERVER-21428 explains the extra changes needed if error_class components change.
+# Group related errors into classes, can be checked against ErrorCodes::isXXXClassName methods.
 error_class("NetworkError", ["HostUnreachable", "HostNotFound", "NetworkTimeout", "SocketException"])
 error_class("Interruption", ["Interrupted",
                              "InterruptedAtShutdown",
