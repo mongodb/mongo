@@ -590,6 +590,8 @@
         assert.eq(0, coll.find({str: "FOO"}).itcount());
         assert.eq(0, coll.find({str: "FOO"}).collation({locale: "en_US"}).itcount());
         assert.eq(1, coll.find({str: "FOO"}).collation({locale: "en_US", strength: 2}).itcount());
+        assert.eq(
+            1, coll.find({str: {$ne: "FOO"}}).collation({locale: "en_US", strength: 2}).itcount());
 
         // Find should return correct results when collation specified and compatible index exists.
         assert.commandWorked(
@@ -598,6 +600,11 @@
         assert.eq(0, coll.find({str: "FOO"}).collation({locale: "en_US"}).hint({str: 1}).itcount());
         assert.eq(1,
                   coll.find({str: "FOO"})
+                      .collation({locale: "en_US", strength: 2})
+                      .hint({str: 1})
+                      .itcount());
+        assert.eq(1,
+                  coll.find({str: {$ne: "FOO"}})
                       .collation({locale: "en_US", strength: 2})
                       .hint({str: 1})
                       .itcount());
@@ -647,6 +654,7 @@
     assert.writeOK(coll.insert({str: "bar"}));
     assert.eq(3, coll.find({str: {$in: ["foo", "bar"]}}).itcount());
     assert.eq(2, coll.find({str: "foo"}).itcount());
+    assert.eq(1, coll.find({str: {$ne: "foo"}}).itcount());
     assert.eq([{str: "bar"}, {str: "foo"}, {str: "FOO"}],
               coll.find({}, {_id: 0, str: 1}).sort({str: 1}).toArray());
 

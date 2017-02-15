@@ -35,6 +35,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 
 namespace mongo {
 
@@ -78,6 +79,21 @@ TEST(NotMatchExpression, ElemMatchKey) {
     // elemMatchKey is not implemented for negative match operators.
     ASSERT(!details.hasElemMatchKey());
 }
+
+TEST(NotMatchExpression, SetCollatorPropagatesToChild) {
+    BSONObj baseOperand = BSON("a"
+                               << "string");
+    unique_ptr<ComparisonMatchExpression> eq(new EqualityMatchExpression());
+    ASSERT(eq->init("a", baseOperand["a"]).isOK());
+    NotMatchExpression notOp;
+    ASSERT(notOp.init(eq.release()).isOK());
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    notOp.setCollator(&collator);
+    ASSERT(!notOp.matchesBSON(BSON("a"
+                                   << "string2"),
+                              nullptr));
+}
+
 /*
   TEST( NotMatchExpression, MatchesIndexKey ) {
   BSONObj baseOperand = BSON( "$lt" << 5 );
