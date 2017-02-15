@@ -189,6 +189,7 @@ def find_changed_tests(branch_name, base_commit, max_revisions, buildvariant, ch
     """
     Use git to find which files have changed in this patch.
     TODO: This should be expanded to search for enterprise modules.
+    The returned file paths are in normalized form (see os.path.normpath(path)).
     """
     changed_tests = []
 
@@ -232,7 +233,8 @@ def find_changed_tests(branch_name, base_commit, max_revisions, buildvariant, ch
         if os.path.splitext(line)[1] != ".js" or not os.path.isfile(line):
             continue
         if "jstests" in line:
-            changed_tests.append(line)
+            path = os.path.normpath(line)
+            changed_tests.append(path)
     return changed_tests
 
 
@@ -262,6 +264,7 @@ def filter_tests(tests, exclude_tests):
     """
     Excludes tests which have been blacklisted.
     A test is in the tests list, i.e., ['jstests/core/a.js']
+    The tests paths must be in normalized form (see os.path.normpath(path)).
     """
 
     if not exclude_tests or not tests:
