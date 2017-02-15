@@ -38,7 +38,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
-#include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"

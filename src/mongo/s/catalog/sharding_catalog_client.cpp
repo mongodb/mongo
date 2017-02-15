@@ -34,11 +34,9 @@ namespace mongo {
 
 const WriteConcernOptions ShardingCatalogClient::kMajorityWriteConcern(
     WriteConcernOptions::kMajority,
-    // Note: Even though we're setting UNSET here,
-    // kMajority implies JOURNAL if journaling is
-    // supported by mongod and
-    // writeConcernMajorityJournalDefault is set to true
-    // in the ReplicaSetConfig.
+    // Note: Even though we're setting UNSET here, kMajority implies JOURNAL if journaling is
+    // supported by mongod and writeConcernMajorityJournalDefault is set to true in the
+    // ReplicaSetConfig.
     WriteConcernOptions::SyncMode::UNSET,
     Seconds(15));
 

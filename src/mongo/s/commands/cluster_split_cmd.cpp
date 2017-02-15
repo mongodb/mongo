@@ -40,7 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/field_parser.h"
-#include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"

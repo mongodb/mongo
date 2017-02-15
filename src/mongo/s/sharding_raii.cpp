@@ -31,8 +31,8 @@
 #include "mongo/s/sharding_raii.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/s/catalog/catalog_cache.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"

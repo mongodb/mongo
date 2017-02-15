@@ -41,7 +41,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/query/query_request.h"
-#include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_raii.h"

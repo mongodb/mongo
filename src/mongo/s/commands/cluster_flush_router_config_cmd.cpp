@@ -29,7 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
-#include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {

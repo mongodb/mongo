@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/catalog_cache.h"
+#include "mongo/s/catalog_cache.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
