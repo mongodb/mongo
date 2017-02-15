@@ -9,19 +9,22 @@
     function testIndexInvalidation(isRename) {
         coll.drop();
         collRenamed.drop();
-        assert.commandWorked(coll.createIndexes([{a: 1}, {b: 1}, {c: 1}]));
+        assert.commandWorked(coll.createIndex({a: 1}));
+        assert.commandWorked(coll.createIndex({b: 1}));
+        assert.commandWorked(coll.createIndex({c: 1}));
 
         // Get the first two indexes. Use find on 'system.indexes' on MMAPv1, listIndexes otherwise.
-        var cmd = db.system.indexes.count() ? {find: 'system.indexes'} : {listIndexes: collName};
-        Object.extend(cmd, {batchSize: 2});
-        var res = db.runCommand(cmd);
-        assert.commandWorked(res, 'could not run ' + tojson(cmd));
-        printjson(res);
+        var cursor;
+        if (db.system.indexes.count()) {
+            cursor = db.system.indexes.find().batchSize(2);
+        } else {
+            var res = db.runCommand({listIndexes: collName});
+            assert.commandWorked(res, 'could not run listIndexes');
+            cursor = new DBCommandCursor(db.getMongo(), res);
+        }
 
         // Ensure the cursor has data, rename or drop the collection, and exhaust the cursor.
-        var cursor = new DBCommandCursor(db.getMongo(), res);
-        var errMsg =
-            'expected more data from command ' + tojson(cmd) + ', with result ' + tojson(res);
+        var errMsg = 'expected more data from system.indexes find cursor';
         assert(cursor.hasNext(), errMsg);
         if (isRename) {
             assert.commandWorked(coll.renameCollection(collNameRenamed));

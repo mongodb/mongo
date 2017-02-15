@@ -123,10 +123,15 @@ public:
     CollectionOptions getCollectionOptions(OperationContext* txn, RecordId nsRid) const;
 
     /**
-     * Creates a CollectionCatalogEntry in the for an index rather than a collection. MMAPv1
-     * puts both indexes and collections into CCEs. A namespace named 'name' must not exist.
+     * Creates a CollectionCatalogEntry in the form of an index rather than a collection.
+     * MMAPv1 puts both indexes and collections into CCEs. A namespace named 'name' must not
+     * exist.
      */
     void createNamespaceForIndex(OperationContext* txn, const StringData& name);
+
+    static void invalidateSystemCollectionRecord(OperationContext* txn,
+                                                 NamespaceString systemCollectionNamespace,
+                                                 RecordId record);
 
 private:
     class EntryInsertion;

@@ -32,6 +32,9 @@
 
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details_collection_entry.h"
 
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/record_id.h"
@@ -252,6 +255,11 @@ Status NamespaceDetailsCollectionCatalogEntry::removeIndex(OperationContext* txn
         d->idx(getTotalIndexCount(txn)) = IndexDetails();
     }
 
+    // Someone may be querying the system.indexes namespace directly, so we need to invalidate
+    // its cursors.
+    MMAPV1DatabaseCatalogEntry::invalidateSystemCollectionRecord(
+        txn, NamespaceString(_db->name(), "system.indexes"), infoLocation);
+
     // remove from system.indexes
     _indexRecordStore->deleteRecord(txn, infoLocation);
 
@@ -361,8 +369,20 @@ void NamespaceDetailsCollectionCatalogEntry::_updateSystemNamespaces(OperationCo
 
     RecordData entry = _namespacesRecordStore->dataFor(txn, _namespacesRecordId);
     const BSONObj newEntry = applyUpdateOperators(entry.releaseToBson(), update);
-    StatusWith<RecordId> result = _namespacesRecordStore->updateRecord(
-        txn, _namespacesRecordId, newEntry.objdata(), newEntry.objsize(), false, NULL);
+
+    // Get update notifier
+    invariant(txn->lockState()->isDbLockedForMode(_db->name(), MODE_X));
+    Database* db = dbHolder().get(txn, _db->name());
+    Collection* systemCollection =
+        db->getCollection(NamespaceString(_db->name(), "system.namespaces"));
+    UpdateNotifier* namespacesNotifier = systemCollection->getUpdateNotifier();
+
+    StatusWith<RecordId> result = _namespacesRecordStore->updateRecord(txn,
+                                                                       _namespacesRecordId,
+                                                                       newEntry.objdata(),
+                                                                       newEntry.objsize(),
+                                                                       false,
+                                                                       namespacesNotifier);
     fassert(17486, result.getStatus());
     setNamespacesRecordId(txn, result.getValue());
 }

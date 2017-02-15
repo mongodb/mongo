@@ -296,6 +296,12 @@ public:
 
     // --- end suspect things
 
+    /**
+     * This function is necessary for a 3.2 and 3.0 backport. We have a better fix for the
+     * underlying issue in later versions.
+     */
+    UpdateNotifier* getUpdateNotifier();
+
 private:
     Status recordStoreGoingToMove(OperationContext* txn,
                                   const RecordId& oldLocation,
