@@ -128,7 +128,11 @@ public:
     }
 
     /**
-     * Get all the children of a node
+     * Returns the underlying vector storing the children of a logical node. Note that this is not
+     * guaranteed to return all children. It can be used to modify the children of logical nodes
+     * like AND/OR, but it cannot be used to traverse the MatchExpression tree. Traversing the
+     * MatchExpression tree should instead be achieved using numChildren() and getChild(), which are
+     * guaranteed to be accurate.
      */
     virtual std::vector<MatchExpression*>* getChildVector() {
         return NULL;

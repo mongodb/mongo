@@ -35,6 +35,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 
 namespace mongo {
 
@@ -151,6 +152,23 @@ TEST(ElemMatchObjectMatchExpression, ElemMatchKey) {
     ASSERT(details.hasElemMatchKey());
     // The entry within a parent of the $elemMatch array is reported.
     ASSERT_EQUALS("2", details.elemMatchKey());
+}
+
+TEST(ElemMatchObjectMatchExpression, Collation) {
+    BSONObj baseOperand = BSON("b"
+                               << "string");
+    BSONObj match = BSON("a" << BSON_ARRAY(BSON("b"
+                                                << "string")));
+    BSONObj notMatch = BSON("a" << BSON_ARRAY(BSON("b"
+                                                   << "string2")));
+    unique_ptr<ComparisonMatchExpression> eq(new EqualityMatchExpression());
+    ASSERT(eq->init("b", baseOperand["b"]).isOK());
+    ElemMatchObjectMatchExpression op;
+    ASSERT(op.init("a", eq.release()).isOK());
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kAlwaysEqual);
+    op.setCollator(&collator);
+    ASSERT(op.matchesSingleElement(match["a"]));
+    ASSERT(op.matchesSingleElement(notMatch["a"]));
 }
 
 /**
