@@ -71,7 +71,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
             if (scope->isJavaScriptProtectionEnabled()) {
                 JS::AutoValueArray<2> args(_context);
 
-                ValueReader(_context, args[0]).fromStringData(elem.valueStringData());
+                ValueReader(_context, args[0]).fromStringData(elem.codeWScopeCode());
                 ValueReader(_context, args[1]).fromBSON(elem.codeWScopeObject(), nullptr, readOnly);
 
                 scope->getProto<CodeInfo>().newInstance(args, _value);
