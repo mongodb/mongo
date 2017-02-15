@@ -31,7 +31,6 @@
 #include <map>
 #include <set>
 #include <string>
-#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -46,8 +45,8 @@
 namespace mongo {
 
 class CanonicalQuery;
-class CollectionType;
 struct QuerySolutionNode;
+class NamespaceString;
 class OperationContext;
 
 // The key for the map is max for each Chunk or ChunkRange
@@ -57,11 +56,9 @@ class ChunkManager {
     MONGO_DISALLOW_COPYING(ChunkManager);
 
 public:
-    ChunkManager(OperationContext* txn, const CollectionType& coll);
-
-    // Creates an empty chunk manager for the namespace
-    ChunkManager(const std::string& ns,
-                 const ShardKeyPattern& pattern,
+    ChunkManager(const NamespaceString& nss,
+                 const OID& epoch,
+                 const ShardKeyPattern& shardKeyPattern,
                  std::unique_ptr<CollatorInterface> defaultCollator,
                  bool unique);
 
@@ -91,28 +88,8 @@ public:
         return _sequenceNumber;
     }
 
-    //
-    // After constructor is invoked, we need to call loadExistingRanges.  If this is a new
-    // sharded collection, we can call createFirstChunks first.
-    //
-
-    // Creates new chunks based on info in chunk manager
-    Status createFirstChunks(OperationContext* txn,
-                             const ShardId& primaryShardId,
-                             const std::vector<BSONObj>* initPoints,
-                             const std::set<ShardId>* initShardIds);
-
     // Loads existing ranges based on info in chunk manager
     void loadExistingRanges(OperationContext* txn, const ChunkManager* oldManager);
-
-
-    // Helpers for load
-    void calcInitSplitsAndShards(OperationContext* txn,
-                                 const ShardId& primaryShardId,
-                                 const std::vector<BSONObj>* initPoints,
-                                 const std::set<ShardId>* initShardIds,
-                                 std::vector<BSONObj>* splitPoints,
-                                 std::vector<ShardId>* shardIds) const;
 
     //
     // Methods to use once loaded / created

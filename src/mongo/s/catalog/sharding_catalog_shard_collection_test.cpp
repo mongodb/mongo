@@ -154,37 +154,6 @@ public:
         return actualVersion;
     }
 
-    void expectReloadChunks(const std::string& ns, const vector<ChunkType>& chunks) {
-        onFindCommand([&](const RemoteCommandRequest& request) {
-            ASSERT_EQUALS(configHost, request.target);
-            ASSERT_BSONOBJ_EQ(kReplSecondaryOkMetadata,
-                              rpc::TrackingMetadata::removeTrackingData(request.metadata));
-
-            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-            ASSERT_EQ(nss.ns(), ChunkType::ConfigNS);
-
-            auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
-            BSONObj expectedQuery =
-                BSON(ChunkType::ns(ns) << ChunkType::DEPRECATED_lastmod << GTE << Timestamp());
-            BSONObj expectedSort = BSON(ChunkType::DEPRECATED_lastmod() << 1);
-
-            ASSERT_EQ(ChunkType::ConfigNS, query->ns());
-            ASSERT_BSONOBJ_EQ(expectedQuery, query->getFilter());
-            ASSERT_BSONOBJ_EQ(expectedSort, query->getSort());
-            ASSERT_FALSE(query->getLimit().is_initialized());
-
-            checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
-
-            vector<BSONObj> chunksToReturn;
-
-            std::transform(chunks.begin(),
-                           chunks.end(),
-                           std::back_inserter(chunksToReturn),
-                           [](const ChunkType& chunk) { return chunk.toConfigBSON(); });
-            return chunksToReturn;
-        });
-    }
-
     void expectUpdateCollection(const CollectionType& expectedCollection) {
         onCommand([&](const RemoteCommandRequest& request) {
             ASSERT_EQUALS(configHost, request.target);
@@ -387,9 +356,6 @@ TEST_F(ShardCollectionTest, noInitialChunksOrData) {
     // written, to avoid problems relating to non-matching epochs down the road.
     expectedChunk.setVersion(actualVersion);
 
-    // Handle the query to load the newly created chunk
-    expectReloadChunks(ns, {expectedChunk});
-
     CollectionType expectedCollection;
     expectedCollection.setNs(NamespaceString(ns));
     expectedCollection.setEpoch(expectedChunk.getVersion().epoch());
@@ -579,9 +545,6 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
         // written, to avoid problems relating to non-matching epochs down the road.
         expectedChunk.setVersion(actualVersion);
     }
-
-    // Handle the query to load the newly created chunk
-    expectReloadChunks(ns, expectedChunks);
 
     CollectionType expectedCollection;
     expectedCollection.setNs(NamespaceString(ns));
@@ -775,9 +738,6 @@ TEST_F(ShardCollectionTest, withInitialData) {
         // written, to avoid problems relating to non-matching epochs down the road.
         expectedChunk.setVersion(actualVersion);
     }
-
-    // Handle the query to load the newly created chunk
-    expectReloadChunks(ns, expectedChunks);
 
     CollectionType expectedCollection;
     expectedCollection.setNs(NamespaceString(ns));

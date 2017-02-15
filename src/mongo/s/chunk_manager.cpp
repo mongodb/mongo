@@ -35,6 +35,7 @@
 #include <boost/next_prior.hpp>
 #include <map>
 #include <set>
+#include <vector>
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
@@ -42,16 +43,13 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collation_index_key.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/client/shard_registry.h"
@@ -69,7 +67,6 @@ using std::set;
 using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
-using std::vector;
 
 namespace {
 
@@ -166,41 +163,20 @@ bool isChunkMapValid(const ChunkMap& chunkMap) {
 
 }  // namespace
 
-ChunkManager::ChunkManager(const string& ns,
-                           const ShardKeyPattern& pattern,
+ChunkManager::ChunkManager(const NamespaceString& nss,
+                           const OID& epoch,
+                           const ShardKeyPattern& shardKeyPattern,
                            std::unique_ptr<CollatorInterface> defaultCollator,
                            bool unique)
     : _sequenceNumber(nextCMSequenceNumber.addAndFetch(1)),
-      _ns(ns),
-      _keyPattern(pattern.getKeyPattern()),
+      _ns(nss.ns()),
+      _keyPattern(shardKeyPattern.getKeyPattern()),
       _defaultCollator(std::move(defaultCollator)),
       _unique(unique),
       _chunkMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<std::shared_ptr<Chunk>>()),
       _chunkRangeMap(
-          SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<ShardAndChunkRange>()) {}
-
-ChunkManager::ChunkManager(OperationContext* txn, const CollectionType& coll)
-    : _sequenceNumber(nextCMSequenceNumber.addAndFetch(1)),
-      _ns(coll.getNs().ns()),
-      _keyPattern(coll.getKeyPattern()),
-      _unique(coll.getUnique()),
-
-      _chunkMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<std::shared_ptr<Chunk>>()),
-      _chunkRangeMap(
-          SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<ShardAndChunkRange>()) {
-    // coll does not have correct version. Use same initial version as _load and createFirstChunks.
-    _version = ChunkVersion(0, 0, coll.getEpoch());
-
-    if (!coll.getDefaultCollation().isEmpty()) {
-        auto statusWithCollator = CollatorFactoryInterface::get(txn->getServiceContext())
-                                      ->makeFromBSON(coll.getDefaultCollation());
-
-        // The collation was validated upon collection creation.
-        invariantOK(statusWithCollator.getStatus());
-
-        _defaultCollator = std::move(statusWithCollator.getValue());
-    }
-}
+          SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<ShardAndChunkRange>()),
+      _version(0, 0, epoch) {}
 
 ChunkManager::~ChunkManager() = default;
 
@@ -286,14 +262,14 @@ bool ChunkManager::_load(OperationContext* txn,
 
     repl::OpTime opTime;
     std::vector<ChunkType> chunks;
-    uassertStatusOK(
-        grid.catalogClient(txn)->getChunks(txn,
-                                           diffQuery.query,
-                                           diffQuery.sort,
-                                           boost::none,
-                                           &chunks,
-                                           &opTime,
-                                           repl::ReadConcernLevel::kMajorityReadConcern));
+    uassertStatusOK(Grid::get(txn)->catalogClient(txn)->getChunks(
+        txn,
+        diffQuery.query,
+        diffQuery.sort,
+        boost::none,
+        &chunks,
+        &opTime,
+        repl::ReadConcernLevel::kMajorityReadConcern));
 
     invariant(opTime >= _configOpTime);
     _configOpTime = opTime;
@@ -305,7 +281,7 @@ bool ChunkManager::_load(OperationContext* txn,
 
         // Add all existing shards we find to the shards set
         for (ShardVersionMap::iterator it = shardVersions->begin(); it != shardVersions->end();) {
-            auto shardStatus = grid.shardRegistry()->getShard(txn, it->first);
+            auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, it->first);
             if (shardStatus.isOK()) {
                 shardIds.insert(it->first);
                 ++it;
@@ -353,115 +329,6 @@ bool ChunkManager::_load(OperationContext* txn,
 
         return allInconsistent;
     }
-}
-
-void ChunkManager::calcInitSplitsAndShards(OperationContext* txn,
-                                           const ShardId& primaryShardId,
-                                           const vector<BSONObj>* initPoints,
-                                           const set<ShardId>* initShardIds,
-                                           vector<BSONObj>* splitPoints,
-                                           vector<ShardId>* shardIds) const {
-    invariant(_chunkMap.empty());
-
-    if (!initPoints || initPoints->empty()) {
-        // discover split points
-        auto primaryShard = uassertStatusOK(grid.shardRegistry()->getShard(txn, primaryShardId));
-        const NamespaceString nss{getns()};
-
-        auto result = uassertStatusOK(primaryShard->runCommandWithFixedRetryAttempts(
-            txn,
-            ReadPreferenceSetting{ReadPreference::PrimaryPreferred},
-            nss.db().toString(),
-            BSON("count" << nss.coll()),
-            Shard::RetryPolicy::kIdempotent));
-
-        long long numObjects = 0;
-        uassertStatusOK(result.commandStatus);
-        uassertStatusOK(bsonExtractIntegerField(result.response, "n", &numObjects));
-
-        if (numObjects > 0) {
-            *splitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(
-                txn,
-                primaryShardId,
-                NamespaceString(_ns),
-                _keyPattern,
-                ChunkRange(_keyPattern.getKeyPattern().globalMin(),
-                           _keyPattern.getKeyPattern().globalMax()),
-                Grid::get(txn)->getBalancerConfiguration()->getMaxChunkSizeBytes(),
-                0));
-        }
-
-        // since docs already exists, must use primary shard
-        shardIds->push_back(primaryShardId);
-    } else {
-        // make sure points are unique and ordered
-        auto orderedPts = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-        for (unsigned i = 0; i < initPoints->size(); ++i) {
-            BSONObj pt = (*initPoints)[i];
-            orderedPts.insert(pt);
-        }
-        for (auto it = orderedPts.begin(); it != orderedPts.end(); ++it) {
-            splitPoints->push_back(*it);
-        }
-
-        if (!initShardIds || !initShardIds->size()) {
-            // If not specified, only use the primary shard (note that it's not safe for mongos
-            // to put initial chunks on other shards without the primary mongod knowing).
-            shardIds->push_back(primaryShardId);
-        } else {
-            std::copy(initShardIds->begin(), initShardIds->end(), std::back_inserter(*shardIds));
-        }
-    }
-}
-
-Status ChunkManager::createFirstChunks(OperationContext* txn,
-                                       const ShardId& primaryShardId,
-                                       const vector<BSONObj>* initPoints,
-                                       const set<ShardId>* initShardIds) {
-    // TODO distlock?
-    // TODO: Race condition if we shard the collection and insert data while we split across
-    // the non-primary shard.
-
-    vector<BSONObj> splitPoints;
-    vector<ShardId> shardIds;
-    calcInitSplitsAndShards(txn, primaryShardId, initPoints, initShardIds, &splitPoints, &shardIds);
-
-    // this is the first chunk; start the versioning from scratch
-    ChunkVersion version(1, 0, OID::gen());
-
-    log() << "going to create " << splitPoints.size() + 1 << " chunk(s) for: " << _ns
-          << " using new epoch " << version.epoch();
-
-    for (unsigned i = 0; i <= splitPoints.size(); i++) {
-        BSONObj min = i == 0 ? _keyPattern.getKeyPattern().globalMin() : splitPoints[i - 1];
-        BSONObj max =
-            i < splitPoints.size() ? splitPoints[i] : _keyPattern.getKeyPattern().globalMax();
-
-        ChunkType chunk;
-        chunk.setNS(_ns);
-        chunk.setMin(min);
-        chunk.setMax(max);
-        chunk.setShard(shardIds[i % shardIds.size()]);
-        chunk.setVersion(version);
-
-        Status status = grid.catalogClient(txn)->insertConfigDocument(
-            txn,
-            ChunkType::ConfigNS,
-            chunk.toConfigBSON(),
-            ShardingCatalogClient::kMajorityWriteConcern);
-        if (!status.isOK()) {
-            const string errMsg = str::stream() << "Creating first chunks failed: "
-                                                << redact(status.reason());
-            error() << errMsg;
-            return Status(status.code(), errMsg);
-        }
-
-        version.incMinor();
-    }
-
-    _version = ChunkVersion(0, 0, version.epoch());
-
-    return Status::OK();
 }
 
 StatusWith<shared_ptr<Chunk>> ChunkManager::findIntersectingChunk(OperationContext* txn,
@@ -657,7 +524,7 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
 
     IndexBounds bounds;
 
-    for (vector<QuerySolution*>::const_iterator it = solutions.begin();
+    for (std::vector<QuerySolution*>::const_iterator it = solutions.begin();
          bounds.size() == 0 && it != solutions.end();
          it++) {
         // Try next solution if we failed to generate index bounds, i.e. bounds.size() == 0
@@ -696,7 +563,7 @@ IndexBounds ChunkManager::collapseQuerySolution(const QuerySolutionNode* node) {
     }
 
     IndexBounds bounds;
-    for (vector<QuerySolutionNode*>::const_iterator it = node->children.begin();
+    for (std::vector<QuerySolutionNode*>::const_iterator it = node->children.begin();
          it != node->children.end();
          it++) {
         // The first branch under OR
