@@ -52,10 +52,12 @@ public:
 
     OpTimeWithTerm getCurrentTermAndLastCommittedOpTime() override;
 
-    void processMetadata(const rpc::ReplSetMetadata& metadata) override;
+    void processMetadata(const rpc::ReplSetMetadata& replMetadata,
+                         boost::optional<rpc::OplogQueryMetadata> oqMetadata) override;
 
     bool shouldStopFetching(const HostAndPort& source,
-                            const rpc::ReplSetMetadata& metadata) override;
+                            const rpc::ReplSetMetadata& replMetadata,
+                            boost::optional<rpc::OplogQueryMetadata> oqMetadata) override;
 
     std::unique_ptr<OplogBuffer> makeInitialSyncOplogBuffer(OperationContext* txn) const override;
 

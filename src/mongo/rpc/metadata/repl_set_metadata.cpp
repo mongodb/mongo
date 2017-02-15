@@ -89,13 +89,16 @@ StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& met
     if (!status.isOK())
         return status;
 
+    // We provide a default because these fields will be removed in SERVER-27668.
     long long primaryIndex;
-    status = bsonExtractIntegerField(replMetadataObj, kPrimaryIndexFieldName, &primaryIndex);
+    status = bsonExtractIntegerFieldWithDefault(
+        replMetadataObj, kPrimaryIndexFieldName, -1, &primaryIndex);
     if (!status.isOK())
         return status;
 
     long long syncSourceIndex;
-    status = bsonExtractIntegerField(replMetadataObj, kSyncSourceIndexFieldName, &syncSourceIndex);
+    status = bsonExtractIntegerFieldWithDefault(
+        replMetadataObj, kSyncSourceIndexFieldName, -1, &syncSourceIndex);
     if (!status.isOK())
         return status;
 
@@ -106,12 +109,13 @@ StatusWith<ReplSetMetadata> ReplSetMetadata::readFromMetadata(const BSONObj& met
 
     repl::OpTime lastOpCommitted;
     status = bsonExtractOpTimeField(replMetadataObj, kLastOpCommittedFieldName, &lastOpCommitted);
-    if (!status.isOK())
+    // We check for NoSuchKey because these fields will be removed in SERVER-27668.
+    if (!status.isOK() && status != ErrorCodes::NoSuchKey)
         return status;
 
     repl::OpTime lastOpVisible;
     status = bsonExtractOpTimeField(replMetadataObj, kLastOpVisibleFieldName, &lastOpVisible);
-    if (!status.isOK())
+    if (!status.isOK() && status != ErrorCodes::NoSuchKey)
         return status;
 
     return ReplSetMetadata(
@@ -130,6 +134,19 @@ Status ReplSetMetadata::writeToMetadata(BSONObjBuilder* builder) const {
     replMetadataBuilder.doneFast();
 
     return Status::OK();
+}
+
+std::string ReplSetMetadata::toString() const {
+    str::stream output;
+    output << "ReplSetMetadata";
+    output << " Config Version: " << _configVersion;
+    output << " Replicaset ID: " << _replicaSetId;
+    output << " Term: " << _currentTerm;
+    output << " Primary Index: " << _currentPrimaryIndex;
+    output << " Sync Source Index: " << _currentSyncSourceIndex;
+    output << " Last Op Committed: " << _lastOpCommitted.toString();
+    output << " Last Op Visible: " << _lastOpVisible.toString();
+    return output;
 }
 
 }  // namespace rpc

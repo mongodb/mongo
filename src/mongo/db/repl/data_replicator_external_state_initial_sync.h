@@ -44,7 +44,8 @@ public:
         ReplicationCoordinatorExternalState* replicationCoordinatorExternalState);
 
     bool shouldStopFetching(const HostAndPort& source,
-                            const rpc::ReplSetMetadata& metadata) override;
+                            const rpc::ReplSetMetadata& replMetadata,
+                            boost::optional<rpc::OplogQueryMetadata> oqMetadata) override;
 };
 
 }  // namespace repl

@@ -97,7 +97,8 @@ protected:
     /**
      * Tests checkSyncSource result handling.
      */
-    void testSyncSourceChecking(rpc::ReplSetMetadata* metadata);
+    void testSyncSourceChecking(rpc::ReplSetMetadata* replMetadata,
+                                rpc::OplogQueryMetadata* oqMetadata);
 
     /**
      * Tests handling of two batches of operations returned from query.
@@ -389,7 +390,7 @@ TEST_F(
     _checkDefaultCommandObjectFields(cmdObj);
 }
 
-TEST_F(OplogFetcherTest, MetadataObjectContainsReplSetMetadataFieldUnderProtocolVersion1) {
+TEST_F(OplogFetcherTest, MetadataObjectContainsMetadataFieldsUnderProtocolVersion1) {
     auto metadataObj = OplogFetcher(&getExecutor(),
                                     lastFetched,
                                     source,
@@ -537,7 +538,7 @@ BSONObj makeCursorResponse(CursorId cursorId,
     return bob.obj();
 }
 
-TEST_F(OplogFetcherTest, InvalidMetadataInResponseStopsTheOplogFetcher) {
+TEST_F(OplogFetcherTest, InvalidReplSetMetadataInResponseStopsTheOplogFetcher) {
     auto shutdownState = processSingleBatch(
         {makeCursorResponse(0, {makeNoopOplogEntry(lastFetched)}),
          BSON(rpc::kReplSetMetadataFieldName << BSON("invalid_repl_metadata_field" << 1)),
@@ -546,7 +547,17 @@ TEST_F(OplogFetcherTest, InvalidMetadataInResponseStopsTheOplogFetcher) {
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, shutdownState->getStatus());
 }
 
-TEST_F(OplogFetcherTest, VaidMetadataInResponseShouldBeForwardedToProcessMetadataFn) {
+TEST_F(OplogFetcherTest, InvalidOplogQueryMetadataInResponseStopsTheOplogFetcher) {
+    auto shutdownState = processSingleBatch(
+        {makeCursorResponse(0, {makeNoopOplogEntry(lastFetched)}),
+         BSON(rpc::kOplogQueryMetadataFieldName << BSON("invalid_oq_metadata_field" << 1)),
+         Milliseconds(0)});
+
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey, shutdownState->getStatus());
+}
+
+TEST_F(OplogFetcherTest,
+       ValidMetadataInResponseWithoutOplogMetadataShouldBeForwardedToProcessMetadataFn) {
     rpc::ReplSetMetadata metadata(1, lastFetched.opTime, lastFetched.opTime, 1, OID::gen(), 2, 2);
     BSONObjBuilder bob;
     ASSERT_OK(metadata.writeToMetadata(&bob));
@@ -557,10 +568,30 @@ TEST_F(OplogFetcherTest, VaidMetadataInResponseShouldBeForwardedToProcessMetadat
                   ->getStatus());
     ASSERT_TRUE(dataReplicatorExternalState->metadataWasProcessed);
     ASSERT_EQUALS(metadata.getPrimaryIndex(),
-                  dataReplicatorExternalState->metadataProcessed.getPrimaryIndex());
+                  dataReplicatorExternalState->replMetadataProcessed.getPrimaryIndex());
+    ASSERT_EQUALS(-1, dataReplicatorExternalState->oqMetadataProcessed.getPrimaryIndex());
 }
 
-TEST_F(OplogFetcherTest, MetadataIsNotProcessedOnBatchThatTriggersRollback) {
+TEST_F(OplogFetcherTest, ValidMetadataWithInResponseShouldBeForwardedToProcessMetadataFn) {
+    rpc::ReplSetMetadata replMetadata(1, OpTime(), OpTime(), 1, OID::gen(), -1, -1);
+    rpc::OplogQueryMetadata oqMetadata(lastFetched.opTime, lastFetched.opTime, 1, 2, 2);
+    BSONObjBuilder bob;
+    ASSERT_OK(replMetadata.writeToMetadata(&bob));
+    ASSERT_OK(oqMetadata.writeToMetadata(&bob));
+    auto metadataObj = bob.obj();
+    ASSERT_OK(processSingleBatch({makeCursorResponse(0, {makeNoopOplogEntry(lastFetched)}),
+                                  metadataObj,
+                                  Milliseconds(0)})
+                  ->getStatus());
+    ASSERT_TRUE(dataReplicatorExternalState->metadataWasProcessed);
+    ASSERT_EQUALS(replMetadata.getPrimaryIndex(),
+                  dataReplicatorExternalState->replMetadataProcessed.getPrimaryIndex());
+    ASSERT_EQUALS(oqMetadata.getPrimaryIndex(),
+                  dataReplicatorExternalState->oqMetadataProcessed.getPrimaryIndex());
+}
+
+TEST_F(OplogFetcherTest,
+       MetadataWithoutOplogQueryMetadataIsNotProcessedOnBatchThatTriggersRollback) {
     rpc::ReplSetMetadata metadata(1, lastFetched.opTime, lastFetched.opTime, 1, OID::gen(), 2, 2);
     BSONObjBuilder bob;
     ASSERT_OK(metadata.writeToMetadata(&bob));
@@ -571,6 +602,30 @@ TEST_F(OplogFetcherTest, MetadataIsNotProcessedOnBatchThatTriggersRollback) {
                        metadataObj,
                        Milliseconds(0)})
                       ->getStatus());
+    ASSERT_FALSE(dataReplicatorExternalState->metadataWasProcessed);
+}
+
+TEST_F(OplogFetcherTest, MetadataIsNotProcessedOnBatchThatTriggersRollback) {
+    rpc::ReplSetMetadata replMetadata(1, OpTime(), OpTime(), 1, OID::gen(), -1, -1);
+    rpc::OplogQueryMetadata oqMetadata(lastFetched.opTime, lastFetched.opTime, 1, 2, 2);
+    BSONObjBuilder bob;
+    ASSERT_OK(replMetadata.writeToMetadata(&bob));
+    ASSERT_OK(oqMetadata.writeToMetadata(&bob));
+    auto metadataObj = bob.obj();
+    ASSERT_EQUALS(ErrorCodes::OplogStartMissing,
+                  processSingleBatch(
+                      {makeCursorResponse(0, {makeNoopOplogEntry(Seconds(456), lastFetched.value)}),
+                       metadataObj,
+                       Milliseconds(0)})
+                      ->getStatus());
+    ASSERT_FALSE(dataReplicatorExternalState->metadataWasProcessed);
+}
+
+TEST_F(OplogFetcherTest, EmptyMetadataIsNotProcessed) {
+    ASSERT_OK(processSingleBatch({makeCursorResponse(0, {makeNoopOplogEntry(lastFetched)}),
+                                  rpc::makeEmptyMetadata(),
+                                  Milliseconds(0)})
+                  ->getStatus());
     ASSERT_FALSE(dataReplicatorExternalState->metadataWasProcessed);
 }
 
@@ -674,18 +729,21 @@ TEST_F(OplogFetcherTest, OplogFetcherShouldReportErrorsThrownFromCallback) {
     ASSERT_EQ(shutdownState->getStatus(), Status(ErrorCodes::InternalError, "my custom error"));
 }
 
-void OplogFetcherTest::testSyncSourceChecking(rpc::ReplSetMetadata* metadata) {
+void OplogFetcherTest::testSyncSourceChecking(rpc::ReplSetMetadata* replMetadata,
+                                              rpc::OplogQueryMetadata* oqMetadata) {
     auto firstEntry = makeNoopOplogEntry(lastFetched);
     auto secondEntry = makeNoopOplogEntry({{Seconds(456), 0}, lastFetched.opTime.getTerm()}, 200);
     auto thirdEntry = makeNoopOplogEntry({{Seconds(789), 0}, lastFetched.opTime.getTerm()}, 300);
     Fetcher::Documents documents{firstEntry, secondEntry, thirdEntry};
 
-    BSONObj metadataObj;
-    if (metadata) {
-        BSONObjBuilder bob;
-        ASSERT_OK(metadata->writeToMetadata(&bob));
-        metadataObj = bob.obj();
+    BSONObjBuilder bob;
+    if (replMetadata) {
+        ASSERT_OK(replMetadata->writeToMetadata(&bob));
     }
+    if (oqMetadata) {
+        ASSERT_OK(oqMetadata->writeToMetadata(&bob));
+    }
+    BSONObj metadataObj = bob.obj();
 
     dataReplicatorExternalState->shouldStopFetchingResult = true;
 
@@ -703,7 +761,7 @@ void OplogFetcherTest::testSyncSourceChecking(rpc::ReplSetMetadata* metadata) {
 }
 
 TEST_F(OplogFetcherTest, FailedSyncSourceCheckWithoutMetadataStopsTheOplogFetcher) {
-    testSyncSourceChecking(nullptr);
+    testSyncSourceChecking(nullptr, nullptr);
 
     // Sync source optime and "hasSyncSource" are not available if the response does not
     // contain metadata.
@@ -712,7 +770,7 @@ TEST_F(OplogFetcherTest, FailedSyncSourceCheckWithoutMetadataStopsTheOplogFetche
     ASSERT_FALSE(dataReplicatorExternalState->syncSourceHasSyncSource);
 }
 
-TEST_F(OplogFetcherTest, FailedSyncSourceCheckWithMetadataStopsTheOplogFetcher) {
+TEST_F(OplogFetcherTest, FailedSyncSourceCheckWithReplSetMetadataStopsTheOplogFetcher) {
     rpc::ReplSetMetadata metadata(lastFetched.opTime.getTerm(),
                                   {{Seconds(10000), 0}, 1},
                                   {{Seconds(20000), 0}, 1},
@@ -721,7 +779,7 @@ TEST_F(OplogFetcherTest, FailedSyncSourceCheckWithMetadataStopsTheOplogFetcher) 
                                   2,
                                   2);
 
-    testSyncSourceChecking(&metadata);
+    testSyncSourceChecking(&metadata, nullptr);
 
     // Sync source optime and "hasSyncSource" can be set if the respone contains metadata.
     ASSERT_EQUALS(source, dataReplicatorExternalState->lastSyncSourceChecked);
@@ -729,8 +787,21 @@ TEST_F(OplogFetcherTest, FailedSyncSourceCheckWithMetadataStopsTheOplogFetcher) 
     ASSERT_TRUE(dataReplicatorExternalState->syncSourceHasSyncSource);
 }
 
+TEST_F(OplogFetcherTest, FailedSyncSourceCheckWithBothMetadatasStopsTheOplogFetcher) {
+    rpc::ReplSetMetadata replMetadata(
+        lastFetched.opTime.getTerm(), OpTime(), OpTime(), 1, OID::gen(), -1, -1);
+    rpc::OplogQueryMetadata oqMetadata({{Seconds(10000), 0}, 1}, {{Seconds(20000), 0}, 1}, 1, 2, 2);
+
+    testSyncSourceChecking(&replMetadata, &oqMetadata);
+
+    // Sync source optime and "hasSyncSource" can be set if the respone contains metadata.
+    ASSERT_EQUALS(source, dataReplicatorExternalState->lastSyncSourceChecked);
+    ASSERT_EQUALS(oqMetadata.getLastOpApplied(), dataReplicatorExternalState->syncSourceLastOpTime);
+    ASSERT_TRUE(dataReplicatorExternalState->syncSourceHasSyncSource);
+}
+
 TEST_F(OplogFetcherTest,
-       FailedSyncSourceCheckWithSyncSourceHavingNoSyncSourceStopsTheOplogFetcher) {
+       FailedSyncSourceCheckWithSyncSourceHavingNoSyncSourceInReplSetMetadataStopsTheOplogFetcher) {
     rpc::ReplSetMetadata metadata(lastFetched.opTime.getTerm(),
                                   {{Seconds(10000), 0}, 1},
                                   {{Seconds(20000), 0}, 1},
@@ -739,7 +810,7 @@ TEST_F(OplogFetcherTest,
                                   2,
                                   -1);
 
-    testSyncSourceChecking(&metadata);
+    testSyncSourceChecking(&metadata, nullptr);
 
     // Sync source "hasSyncSource" is derived from metadata.
     ASSERT_EQUALS(source, dataReplicatorExternalState->lastSyncSourceChecked);
@@ -747,6 +818,25 @@ TEST_F(OplogFetcherTest,
     ASSERT_FALSE(dataReplicatorExternalState->syncSourceHasSyncSource);
 }
 
+TEST_F(OplogFetcherTest,
+       FailedSyncSourceCheckWithSyncSourceHavingNoSyncSourceStopsTheOplogFetcher) {
+    rpc::ReplSetMetadata replMetadata(lastFetched.opTime.getTerm(),
+                                      {{Seconds(10000), 0}, 1},
+                                      {{Seconds(20000), 0}, 1},
+                                      1,
+                                      OID::gen(),
+                                      2,
+                                      2);
+    rpc::OplogQueryMetadata oqMetadata(
+        {{Seconds(10000), 0}, 1}, {{Seconds(20000), 0}, 1}, 1, 2, -1);
+
+    testSyncSourceChecking(&replMetadata, &oqMetadata);
+
+    // Sync source "hasSyncSource" is derived from metadata.
+    ASSERT_EQUALS(source, dataReplicatorExternalState->lastSyncSourceChecked);
+    ASSERT_EQUALS(oqMetadata.getLastOpApplied(), dataReplicatorExternalState->syncSourceLastOpTime);
+    ASSERT_FALSE(dataReplicatorExternalState->syncSourceHasSyncSource);
+}
 
 RemoteCommandRequest OplogFetcherTest::testTwoBatchHandling(bool isV1ElectionProtocol) {
     ShutdownState shutdownState;

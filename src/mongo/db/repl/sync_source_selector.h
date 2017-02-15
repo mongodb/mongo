@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -39,6 +40,7 @@ class Timestamp;
 
 namespace rpc {
 class ReplSetMetadata;
+class OplogQueryMetadata;
 }
 
 namespace repl {
@@ -73,16 +75,21 @@ public:
 
     /**
      * Determines if a new sync source should be chosen, if a better candidate sync source is
-     * available.  If the current sync source's last optime (visibleOpTime of metadata under
-     * protocolVersion 1, but pulled from the MemberHeartbeatData in protocolVersion 0) is more than
-     * _maxSyncSourceLagSecs behind any syncable source, this function returns true. If we are
-     * running in ProtocolVersion 1, our current sync source is not primary, has no sync source
-     * and only has data up to "myLastOpTime", returns true.
+     * available.  If the current sync source's last optime (visibleOpTime or appliedOpTime of
+     * metadata under protocolVersion 1, but pulled from the MemberHeartbeatData in protocolVersion
+     * 0) is more than _maxSyncSourceLagSecs behind any syncable source, this function returns true.
+     * If we are running in ProtocolVersion 1, our current sync source is not primary, has no sync
+     * source and only has data up to "myLastOpTime", returns true.
      *
      * "now" is used to skip over currently blacklisted sync sources.
+     *
+     * OplogQueryMetadata is optional for compatibility with 3.4 servers that do not know to
+     * send OplogQueryMetadata.
+     * TODO (SERVER-27668): Make OplogQueryMetadata non-optional in mongodb 3.8.
      */
     virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
-                                        const rpc::ReplSetMetadata& metadata) = 0;
+                                        const rpc::ReplSetMetadata& replMetadata,
+                                        boost::optional<rpc::OplogQueryMetadata> oqMetadata) = 0;
 };
 
 }  // namespace repl

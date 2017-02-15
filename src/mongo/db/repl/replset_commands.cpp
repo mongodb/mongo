@@ -640,7 +640,7 @@ public:
             // New style update position command has metadata, which may inform the
             // upstream of a higher term.
             auto metadata = metadataResult.getValue();
-            replCoord->processReplSetMetadata(metadata, false /*don't advance the commit point*/);
+            replCoord->processReplSetMetadata(metadata);
         }
 
         // In the case of an update from a member with an invalid replica set config,

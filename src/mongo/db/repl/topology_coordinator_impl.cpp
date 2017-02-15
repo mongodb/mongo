@@ -2431,10 +2431,12 @@ long long TopologyCoordinatorImpl::getTerm() {
 
 // TODO(siyuan): Merge _hddata into _slaveInfo, so that we have a single view of the
 // replset. Passing metadata is unnecessary.
-bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource,
-                                                     const OpTime& myLastOpTime,
-                                                     const rpc::ReplSetMetadata& metadata,
-                                                     Date_t now) const {
+bool TopologyCoordinatorImpl::shouldChangeSyncSource(
+    const HostAndPort& currentSource,
+    const OpTime& myLastOpTime,
+    const rpc::ReplSetMetadata& replMetadata,
+    boost::optional<rpc::OplogQueryMetadata> oqMetadata,
+    Date_t now) const {
     // Methodology:
     // If there exists a viable sync source member other than currentSource, whose oplog has
     // reached an optime greater than _options.maxSyncSourceLagSecs later than currentSource's,
@@ -2451,9 +2453,9 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
     }
 
     if (_rsConfig.getProtocolVersion() == 1 &&
-        metadata.getConfigVersion() != _rsConfig.getConfigVersion()) {
+        replMetadata.getConfigVersion() != _rsConfig.getConfigVersion()) {
         log() << "Choosing new sync source because the config version supplied by " << currentSource
-              << ", " << metadata.getConfigVersion() << ", does not match ours, "
+              << ", " << replMetadata.getConfigVersion() << ", does not match ours, "
               << _rsConfig.getConfigVersion();
         return true;
     }
@@ -2468,8 +2470,22 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
 
     invariant(currentSourceIndex != _selfIndex);
 
-    OpTime currentSourceOpTime =
-        std::max(metadata.getLastOpVisible(), _hbdata.at(currentSourceIndex).getAppliedOpTime());
+    // If OplogQueryMetadata was provided, use its values, otherwise use the ones in
+    // ReplSetMetadata.
+    OpTime currentSourceOpTime;
+    int syncSourceIndex = -1;
+    int primaryIndex = -1;
+    if (oqMetadata) {
+        currentSourceOpTime = std::max(oqMetadata->getLastOpApplied(),
+                                       _hbdata.at(currentSourceIndex).getAppliedOpTime());
+        syncSourceIndex = oqMetadata->getSyncSourceIndex();
+        primaryIndex = oqMetadata->getPrimaryIndex();
+    } else {
+        currentSourceOpTime = std::max(replMetadata.getLastOpVisible(),
+                                       _hbdata.at(currentSourceIndex).getAppliedOpTime());
+        syncSourceIndex = replMetadata.getSyncSourceIndex();
+        primaryIndex = replMetadata.getPrimaryIndex();
+    }
 
     if (currentSourceOpTime.isNull()) {
         // Haven't received a heartbeat from the sync source yet, so can't tell if we should
@@ -2479,16 +2495,15 @@ bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentS
 
     // Change sync source if they are not ahead of us, and don't have a sync source,
     // unless they are primary.
-    if (_rsConfig.getProtocolVersion() == 1 && metadata.getSyncSourceIndex() == -1 &&
-        currentSourceOpTime <= myLastOpTime && metadata.getPrimaryIndex() != currentSourceIndex) {
+    if (_rsConfig.getProtocolVersion() == 1 && syncSourceIndex == -1 &&
+        currentSourceOpTime <= myLastOpTime && primaryIndex != currentSourceIndex) {
         std::stringstream logMessage;
         logMessage << "Choosing new sync source because our current sync source, "
                    << currentSource.toString() << ", has an OpTime (" << currentSourceOpTime
                    << ") which is not ahead of ours (" << myLastOpTime
                    << "), it does not have a sync source, and it's not the primary";
-        if (metadata.getPrimaryIndex() >= 0) {
-            logMessage << " (" << _rsConfig.getMemberAt(metadata.getPrimaryIndex()).getHostAndPort()
-                       << " is)";
+        if (primaryIndex >= 0) {
+            logMessage << " (" << _rsConfig.getMemberAt(primaryIndex).getHostAndPort() << " is)";
         } else {
             logMessage << " (sync source does not know the primary)";
         }

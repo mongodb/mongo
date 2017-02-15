@@ -341,45 +341,6 @@ TEST_F(ReplCoordHBV1Test,
     assertMemberState(MemberState::RS_RECOVERING, "0");
 }
 
-TEST_F(ReplCoordHBV1Test, ArbiterRecordsCommittedOpTimeFromHeartbeatMetadata) {
-    // Tests that an arbiter will update its committed optime from the heartbeat metadata
-    assertStartSuccess(fromjson("{_id:'mySet', version:1, protocolVersion:1, members:["
-                                "{_id:1, host:'node1:12345', arbiterOnly:true}, "
-                                "{_id:2, host:'node2:12345'}]}"),
-                       HostAndPort("node1", 12345));
-    ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_ARBITER));
-
-    // calls processReplSetMetadata with the "committed" optime and verifies that the arbiter sets
-    // its current optime to 'expected'
-    auto test = [this](OpTime committedOpTime, OpTime expected) {
-        // process heartbeat metadata directly
-        StatusWith<rpc::ReplSetMetadata> metadata = rpc::ReplSetMetadata::readFromMetadata(
-            BSON(rpc::kReplSetMetadataFieldName
-                 << BSON("lastOpCommitted" << BSON("ts" << committedOpTime.getTimestamp() << "t"
-                                                        << committedOpTime.getTerm())
-                                           << "lastOpVisible"
-                                           << BSON("ts" << committedOpTime.getTimestamp() << "t"
-                                                        << committedOpTime.getTerm())
-                                           << "configVersion"
-                                           << 1
-                                           << "primaryIndex"
-                                           << 1
-                                           << "term"
-                                           << committedOpTime.getTerm()
-                                           << "syncSourceIndex"
-                                           << 1)));
-        ASSERT_OK(metadata.getStatus());
-        getReplCoord()->processReplSetMetadata(metadata.getValue(), true);
-
-        ASSERT_EQ(getReplCoord()->getMyLastAppliedOpTime().getTimestamp(), expected.getTimestamp());
-    };
-
-    OpTime committedOpTime{Timestamp{10, 10}, 10};
-    test(committedOpTime, committedOpTime);
-    OpTime olderOpTime{Timestamp{2, 2}, 9};
-    test(olderOpTime, committedOpTime);
-}
-
 TEST_F(ReplCoordHBV1Test, IgnoreTheContentsOfMetadataWhenItsReplicaSetIdDoesNotMatchOurs) {
     // Tests that a secondary node will not update its committed optime from the heartbeat metadata
     // if the replica set ID is inconsistent with the existing configuration.

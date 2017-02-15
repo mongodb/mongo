@@ -80,7 +80,8 @@ public:
         ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
         BackgroundSync* bgsync);
     bool shouldStopFetching(const HostAndPort& source,
-                            const rpc::ReplSetMetadata& metadata) override;
+                            const rpc::ReplSetMetadata& replMetadata,
+                            boost::optional<rpc::OplogQueryMetadata> oqMetadata) override;
 
 private:
     BackgroundSync* _bgsync;
@@ -94,12 +95,14 @@ DataReplicatorExternalStateBackgroundSync::DataReplicatorExternalStateBackground
       _bgsync(bgsync) {}
 
 bool DataReplicatorExternalStateBackgroundSync::shouldStopFetching(
-    const HostAndPort& source, const rpc::ReplSetMetadata& metadata) {
+    const HostAndPort& source,
+    const rpc::ReplSetMetadata& replMetadata,
+    boost::optional<rpc::OplogQueryMetadata> oqMetadata) {
     if (_bgsync->shouldStopFetching()) {
         return true;
     }
 
-    return DataReplicatorExternalStateImpl::shouldStopFetching(source, metadata);
+    return DataReplicatorExternalStateImpl::shouldStopFetching(source, replMetadata, oqMetadata);
 }
 
 size_t getSize(const BSONObj& o) {

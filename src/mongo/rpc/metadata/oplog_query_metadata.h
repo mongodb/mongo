@@ -51,6 +51,7 @@ public:
      */
     static const int kNoPrimary = -1;
 
+    OplogQueryMetadata() = default;
     OplogQueryMetadata(repl::OpTime lastOpCommitted,
                        repl::OpTime lastOpApplied,
                        int rbid,
@@ -106,6 +107,11 @@ public:
     int getRBID() const {
         return _rbid;
     }
+
+    /**
+     * Returns a stringified version of the metadata.
+     */
+    std::string toString() const;
 
 private:
     repl::OpTime _lastOpCommitted;
