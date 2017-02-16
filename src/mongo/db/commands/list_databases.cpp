@@ -43,6 +43,7 @@
 namespace mongo {
 namespace {
 static const StringData kFilterField{"filter"};
+static const StringData kNameOnlyField{"nameOnly"};
 }  // namespace
 
 using std::set;
@@ -68,7 +69,8 @@ public:
         return false;
     }
     virtual void help(stringstream& help) const {
-        help << "list databases on this server";
+        help << "{ listDatabases:1, [filter: <filterObject>] [, nameOnly: true ] }\n"
+                "list databases on this server";
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
@@ -106,6 +108,7 @@ public:
             }
             filter = std::move(statusWithMatcher.getValue());
         }
+        bool nameOnly = jsobj[kNameOnlyField].trueValue();
 
         vector<string> dbNames;
         StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
@@ -124,9 +127,8 @@ public:
             BSONObjBuilder b;
             b.append("name", dbname);
 
-            BSONObj curDbObj;
             int64_t size = 0;
-            {
+            if (!nameOnly) {
                 ScopedTransaction transaction(txn, MODE_IS);
                 Lock::DBLock dbLock(txn->lockState(), dbname, MODE_IS);
 
@@ -141,9 +143,8 @@ public:
                 b.append("sizeOnDisk", static_cast<double>(size));
 
                 b.appendBool("empty", entry->isEmpty());
-
-                curDbObj = b.obj();
             }
+            BSONObj curDbObj = b.obj();
 
             if (!filter || filter->matchesBSON(curDbObj)) {
                 totalSize += size;
@@ -152,7 +153,9 @@ public:
         }
 
         result.append("databases", dbInfos);
-        result.append("totalSize", double(totalSize));
+        if (!nameOnly) {
+            result.append("totalSize", double(totalSize));
+        }
         return true;
     }
 } cmdListDatabases;
