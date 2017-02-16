@@ -102,7 +102,7 @@ public:
 
     pair<BSONObj, shared_ptr<Chunk>> rangeFor(OperationContext* txn,
                                               const ChunkType& chunk) const final {
-        return std::make_pair(chunk.getMax(), std::make_shared<Chunk>(_manager, chunk));
+        return std::make_pair(chunk.getMax(), std::make_shared<Chunk>(chunk));
     }
 
     ShardId shardFor(OperationContext* txn, const ShardId& shardId) const final {
@@ -267,19 +267,9 @@ bool ChunkManager::_load(OperationContext* txn,
         // Load a copy of the chunk map, replacing the chunk manager with our own
         const ChunkMap& oldChunkMap = oldManager->getChunkMap();
 
-        // Could be v.expensive
-        // TODO: If chunks were immutable and didn't reference the manager, we could do more
-        // interesting things here
         for (const auto& oldChunkMapEntry : oldChunkMap) {
-            shared_ptr<Chunk> oldC = oldChunkMapEntry.second;
-            shared_ptr<Chunk> newC(new Chunk(this,
-                                             oldC->getMin(),
-                                             oldC->getMax(),
-                                             oldC->getShardId(),
-                                             oldC->getLastmod(),
-                                             oldC->getBytesWritten()));
-
-            chunkMap.insert(std::make_pair(oldC->getMax(), newC));
+            const auto& oldC = oldChunkMapEntry.second;
+            chunkMap.emplace(oldC->getMax(), std::make_shared<Chunk>(*oldC));
         }
 
         LOG(2) << "loading chunk manager for collection " << _ns

@@ -28,38 +28,27 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {
 
-class ChunkManager;
-class ChunkType;
-class OperationContext;
+class BSONObj;
 
 /**
  * Represents a cache entry for a single Chunk. Owned by a ChunkManager.
  */
 class Chunk {
-    MONGO_DISALLOW_COPYING(Chunk);
-
 public:
-    Chunk(ChunkManager* manager, const ChunkType& from);
-
-    Chunk(ChunkManager* manager,
-          const BSONObj& min,
-          const BSONObj& max,
-          const ShardId& shardId,
-          ChunkVersion lastmod,
-          uint64_t initialDataWritten);
+    explicit Chunk(const ChunkType& from);
 
     const BSONObj& getMin() const {
-        return _min;
+        return _range.getMin();
     }
 
     const BSONObj& getMax() const {
-        return _max;
+        return _range.getMax();
     }
 
     const ShardId& getShardId() const {
@@ -94,18 +83,12 @@ public:
     void randomizeBytesWritten();
 
     /**
-     * marks this chunk as a jumbo chunk
-     * that means the chunk will be inelligble for migrates
+     * Marks this chunk as jumbo. Only moves from false to true once and is used by the balancer.
      */
-    void markAsJumbo(OperationContext* txn) const;
+    void markAsJumbo();
 
 private:
-    // The chunk manager, which owns this chunk. Not owned by the chunk.
-    const ChunkManager* _manager;
-
-    const BSONObj _min;
-
-    const BSONObj _max;
+    const ChunkRange _range;
 
     const ShardId _shardId;
 

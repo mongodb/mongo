@@ -34,9 +34,6 @@
 
 #include "mongo/platform/random.h"
 #include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/chunk_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
@@ -57,30 +54,14 @@ int64_t mkDataWritten() {
 
 }  // namespace
 
-Chunk::Chunk(ChunkManager* manager, const ChunkType& from)
-    : _manager(manager),
-      _min(from.getMin().getOwned()),
-      _max(from.getMax().getOwned()),
+Chunk::Chunk(const ChunkType& from)
+    : _range(from.getMin(), from.getMax()),
       _shardId(from.getShard()),
       _lastmod(from.getVersion()),
       _jumbo(from.getJumbo()),
       _dataWritten(mkDataWritten()) {
     invariantOK(from.validate());
 }
-
-Chunk::Chunk(ChunkManager* manager,
-             const BSONObj& min,
-             const BSONObj& max,
-             const ShardId& shardId,
-             ChunkVersion lastmod,
-             uint64_t initialDataWritten)
-    : _manager(manager),
-      _min(min),
-      _max(max),
-      _shardId(shardId),
-      _lastmod(lastmod),
-      _jumbo(false),
-      _dataWritten(initialDataWritten) {}
 
 bool Chunk::containsKey(const BSONObj& shardKey) const {
     return getMin().woCompare(shardKey) <= 0 && shardKey.woCompare(getMax()) < 0;
@@ -106,30 +87,11 @@ void Chunk::randomizeBytesWritten() {
 std::string Chunk::toString() const {
     return str::stream() << ChunkType::shard() << ": " << _shardId << ", "
                          << ChunkType::DEPRECATED_lastmod() << ": " << _lastmod.toString() << ", "
-                         << ChunkType::min() << ": " << _min << ", " << ChunkType::max() << ": "
-                         << _max;
+                         << _range.toString();
 }
 
-void Chunk::markAsJumbo(OperationContext* txn) const {
-    log() << "Marking chunk " << toString() << " as jumbo.";
-
-    // set this first
-    // even if we can't set it in the db
-    // at least this mongos won't try and keep moving
+void Chunk::markAsJumbo() {
     _jumbo = true;
-
-    const std::string chunkName = ChunkType::genID(_manager->getns(), _min);
-
-    auto status = Grid::get(txn)->catalogClient(txn)->updateConfigDocument(
-        txn,
-        ChunkType::ConfigNS,
-        BSON(ChunkType::name(chunkName)),
-        BSON("$set" << BSON(ChunkType::jumbo(true))),
-        false,
-        ShardingCatalogClient::kMajorityWriteConcern);
-    if (!status.isOK()) {
-        warning() << "couldn't set jumbo for chunk: " << chunkName << causedBy(status.getStatus());
-    }
 }
 
 }  // namespace mongo
