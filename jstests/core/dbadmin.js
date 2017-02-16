@@ -7,8 +7,12 @@ load('jstests/aggregation/extras/utils.js');
     t.save({x: 1});
     t.save({x: 1});
 
-    var res = db._adminCommand("listDatabases");
-    assert(res.databases && res.databases.length > 0, "listDatabases 1 " + tojson(res));
+    var res = db.adminCommand("listDatabases");
+    assert(res.databases && res.databases.length > 0, "listDatabases: " + tojson(res));
+
+    var res = db.adminCommand({listDatabases: 1, nameOnly: true});
+    assert(res.databases && res.databases.length > 0 && res.totalSize === undefined,
+           "listDatabases nameOnly: " + tojson(res));
 
     var now = new Date();
     var x = db._adminCommand("ismaster");

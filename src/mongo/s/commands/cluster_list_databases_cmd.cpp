@@ -87,6 +87,8 @@ public:
                      int options,
                      std::string& errmsg,
                      BSONObjBuilder& result) {
+        const bool nameOnly = cmdObj["nameOnly"].trueValue();
+
         map<string, long long> sizes;
         map<string, unique_ptr<BSONObjBuilder>> dbShardInfo;
 
@@ -152,9 +154,11 @@ public:
 
             BSONObjBuilder temp;
             temp.append("name", name);
-            temp.appendNumber("sizeOnDisk", size);
-            temp.appendBool("empty", size == 1);
-            temp.append("shards", dbShardInfo[name]->obj());
+            if (!nameOnly) {
+                temp.appendNumber("sizeOnDisk", size);
+                temp.appendBool("empty", size == 1);
+                temp.append("shards", dbShardInfo[name]->obj());
+            }
 
             dbListBuilder.append(temp.obj());
         }
@@ -167,6 +171,9 @@ public:
         }
 
         dbListBuilder.done();
+
+        if (nameOnly)
+            return true;
 
         result.appendNumber("totalSize", totalSize);
         result.appendNumber("totalSizeMb", totalSize / (1024 * 1024));

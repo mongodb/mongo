@@ -37,6 +37,9 @@
 #include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
+namespace {
+static const StringData kNameOnlyField{"nameOnly"};
+}  // namespace
 
 using std::set;
 using std::string;
@@ -61,7 +64,8 @@ public:
         return false;
     }
     virtual void help(stringstream& help) const {
-        help << "list databases on this server";
+        help << "{ listDatabases:1, [filter: <filterObject>] [, nameOnly: true ] }\n"
+                "list databases on this server";
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
@@ -79,6 +83,8 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
+        bool nameOnly = jsobj[kNameOnlyField].trueValue();
+
         vector<string> dbNames;
         StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
         storageEngine->listDatabases(&dbNames);
@@ -93,7 +99,7 @@ public:
             BSONObjBuilder b;
             b.append("name", dbname);
 
-            {
+            if (!nameOnly) {
                 ScopedTransaction transaction(txn, MODE_IS);
                 Lock::DBLock dbLock(txn->lockState(), dbname, MODE_IS);
 
@@ -117,7 +123,9 @@ public:
         }
 
         result.append("databases", dbInfos);
-        result.append("totalSize", double(totalSize));
+        if (!nameOnly) {
+            result.append("totalSize", double(totalSize));
+        }
         return true;
     }
 } cmdListDatabases;
