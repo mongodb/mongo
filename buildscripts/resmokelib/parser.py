@@ -45,6 +45,7 @@ DEST_TO_CONFIG = {
     "shuffle": "shuffle",
     "storage_engine": "storageEngine",
     "storage_engine_cache_size": "storageEngineCacheSizeGB",
+    "task_id": "taskId",
     "wt_coll_config": "wiredTigerCollectionConfigString",
     "wt_engine_config": "wiredTigerEngineConfigString",
     "wt_index_config": "wiredTigerIndexConfigString"
@@ -200,6 +201,9 @@ def parse_command_line():
                       metavar="CONFIG", help="Set the storage engine cache size configuration"
                       " setting for all mongod's.")
 
+    parser.add_option("--taskId", dest="task_id", metavar="TASK_ID",
+                      help="Set the Id of the Evergreen task running the tests.")
+
     parser.add_option("--wiredTigerCollectionConfigString", dest="wt_coll_config", metavar="CONFIG",
                       help="Set the WiredTiger collection configuration setting for all mongod's.")
 
@@ -264,6 +268,7 @@ def update_config_vars(values):
     _config.SHUFFLE = config.pop("shuffle")
     _config.STORAGE_ENGINE = config.pop("storageEngine")
     _config.STORAGE_ENGINE_CACHE_SIZE = config.pop("storageEngineCacheSizeGB")
+    _config.TASK_ID = config.pop("taskId")
     _config.WT_COLL_CONFIG = config.pop("wiredTigerCollectionConfigString")
     _config.WT_ENGINE_CONFIG = config.pop("wiredTigerEngineConfigString")
     _config.WT_INDEX_CONFIG = config.pop("wiredTigerIndexConfigString")

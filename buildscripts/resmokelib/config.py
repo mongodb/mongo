@@ -59,6 +59,7 @@ DEFAULTS = {
     "shuffle": False,
     "storageEngine": None,
     "storageEngineCacheSizeGB": None,
+    "taskId": None,
     "wiredTigerCollectionConfigString": None,
     "wiredTigerEngineConfigString": None,
     "wiredTigerIndexConfigString": None
@@ -160,6 +161,10 @@ STORAGE_ENGINE = None
 # If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
 # storage engine cache size.
 STORAGE_ENGINE_CACHE_SIZE = None
+
+# If set, then the Evergreen task Id value will be transmitted to logkeeper when creating builds and
+# tests.
+TASK_ID = None
 
 # If set, then all mongod's started by resmoke.py and by the mongo shell will use the specified
 # WiredTiger collection configuration settings.
