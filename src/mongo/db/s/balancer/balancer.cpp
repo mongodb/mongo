@@ -638,7 +638,23 @@ void Balancer::_splitOrMarkJumbo(OperationContext* txn,
                                                   ChunkRange(chunk->getMin(), chunk->getMax()),
                                                   splitPoints));
     } catch (const DBException& ex) {
-        chunk->markAsJumbo(txn);
+        log() << "Marking chunk " << redact(chunk->toString()) << " as jumbo.";
+
+        chunk->markAsJumbo();
+
+        const std::string chunkName = ChunkType::genID(nss.ns(), chunk->getMin());
+
+        auto status = Grid::get(txn)->catalogClient(txn)->updateConfigDocument(
+            txn,
+            ChunkType::ConfigNS,
+            BSON(ChunkType::name(chunkName)),
+            BSON("$set" << BSON(ChunkType::jumbo(true))),
+            false,
+            ShardingCatalogClient::kMajorityWriteConcern);
+        if (!status.isOK()) {
+            log() << "Couldn't set jumbo for chunk: " << redact(chunkName)
+                  << causedBy(redact(status.getStatus()));
+        }
     }
 }
 

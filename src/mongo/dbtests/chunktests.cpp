@@ -58,13 +58,14 @@ public:
             const string shardId = str::stream() << (i - 1);
             _shardIds.insert(shardId);
 
-            std::shared_ptr<Chunk> chunk(new Chunk(this,
-                                                   mySplitPoints[i - 1],
-                                                   mySplitPoints[i],
-                                                   shardId,
-                                                   ChunkVersion(0, 0, OID()),
-                                                   0));
-            _chunkMap[mySplitPoints[i]] = chunk;
+            ChunkType chunk;
+            chunk.setNS(getns());
+            chunk.setMin(mySplitPoints[i - 1]);
+            chunk.setMax(mySplitPoints[i]);
+            chunk.setShard(shardId);
+            chunk.setVersion(ChunkVersion(0, 0, OID()));
+
+            _chunkMap[mySplitPoints[i]] = std::make_shared<Chunk>(chunk);
         }
 
         _chunkRangeMap = _constructRanges(_chunkMap);
@@ -84,8 +85,9 @@ public:
         auto opCtx = serviceContext.makeOperationContext();
 
         ShardKeyPattern shardKeyPattern(shardKey());
-        TestableChunkManager chunkManager("", shardKeyPattern, defaultCollator(), false);
-        chunkManager.setSingleChunkForShards(splitPointsVector());
+        TestableChunkManager chunkManager(
+            "TestDB.TestColl", shardKeyPattern, defaultCollator(), false);
+        chunkManager.setSingleChunkForShards(splitPoints());
 
         set<ShardId> shardIds;
         chunkManager.getShardIdsForQuery(opCtx.get(), query(), queryCollation(), &shardIds);
@@ -106,8 +108,8 @@ protected:
         return {nullptr};
     }
 
-    virtual BSONArray splitPoints() const {
-        return BSONArray();
+    virtual std::vector<BSONObj> splitPoints() const {
+        return {};
     }
 
     virtual BSONObj query() const {
@@ -121,30 +123,21 @@ protected:
     virtual BSONArray expectedShardNames() const {
         return BSON_ARRAY("0");
     }
-
-    virtual vector<BSONObj> splitPointsVector() const {
-        vector<BSONObj> ret;
-        BSONArray a = splitPoints();
-        BSONObjIterator i(a);
-        while (i.more()) {
-            ret.push_back(i.next().Obj().getOwned());
-        }
-        return ret;
-    }
 };
 
 class EmptyQuerySingleShard : public Base {};
 
 class MultiShardBase : public Base {
-    virtual BSONArray splitPoints() const {
-        return BSON_ARRAY(BSON("a"
-                               << "x")
-                          << BSON("a"
-                                  << "y")
-                          << BSON("a"
-                                  << "z"));
+    virtual std::vector<BSONObj> splitPoints() const {
+        return {BSON("a"
+                     << "x"),
+                BSON("a"
+                     << "y"),
+                BSON("a"
+                     << "z")};
     }
 };
+
 class EmptyQueryMultiShard : public MultiShardBase {
     virtual BSONArray expectedShardNames() const {
         return BSON_ARRAY("0"
@@ -172,6 +165,7 @@ class EqualityRangeMultiShard : public MultiShardBase {
         return BSON("a"
                     << "y");
     }
+
     virtual BSONArray expectedShardNames() const {
         return BSON_ARRAY("2");
     }
@@ -181,6 +175,7 @@ class SetRangeMultiShard : public MultiShardBase {
     virtual BSONObj query() const {
         return fromjson("{a:{$in:['u','y']}}");
     }
+
     virtual BSONArray expectedShardNames() const {
         return BSON_ARRAY("0"
                           << "2");
@@ -191,6 +186,7 @@ class GTRangeMultiShard : public MultiShardBase {
     virtual BSONObj query() const {
         return BSON("a" << GT << "x");
     }
+
     virtual BSONArray expectedShardNames() const {
         return BSON_ARRAY("1"
                           << "2"
@@ -202,6 +198,7 @@ class GTERangeMultiShard : public MultiShardBase {
     virtual BSONObj query() const {
         return BSON("a" << GTE << "x");
     }
+
     virtual BSONArray expectedShardNames() const {
         return BSON_ARRAY("1"
                           << "2"
@@ -229,6 +226,7 @@ class LTERangeMultiShard : public MultiShardBase {
     virtual BSONObj query() const {
         return BSON("a" << LTE << "y");
     }
+
     virtual BSONArray expectedShardNames() const {
         return BSON_ARRAY("0"
                           << "1"
@@ -240,6 +238,7 @@ class OrEqualities : public MultiShardBase {
     virtual BSONObj query() const {
         return fromjson("{$or:[{a:'u'},{a:'y'}]}");
     }
+
     virtual BSONArray expectedShardNames() const {
         return BSON_ARRAY("0"
                           << "2");
@@ -250,6 +249,7 @@ class OrEqualityInequality : public MultiShardBase {
     virtual BSONObj query() const {
         return fromjson("{$or:[{a:'u'},{a:{$gte:'y'}}]}");
     }
+
     virtual BSONArray expectedShardNames() const {
         return BSON_ARRAY("0"
                           << "2"
@@ -297,6 +297,7 @@ class EqualityThenUnsatisfiable : public Unsatisfiable<Base> {
     virtual BSONObj shardKey() const {
         return BSON("a" << 1 << "b" << 1);
     }
+
     virtual BSONObj query() const {
         return BSON("a" << 1 << "b" << GT << 4 << LT << 4);
     }
@@ -306,6 +307,7 @@ class InequalityThenUnsatisfiable : public Unsatisfiable<Base> {
     virtual BSONObj shardKey() const {
         return BSON("a" << 1 << "b" << 1);
     }
+
     virtual BSONObj query() const {
         return BSON("a" << GT << 1 << "b" << GT << 4 << LT << 4);
     }
@@ -328,8 +330,8 @@ class CompoundKeyBase : public Base {
         return BSON("a" << 1 << "b" << 1);
     }
 
-    virtual BSONArray splitPoints() const {
-        return BSON_ARRAY(BSON("a" << 5 << "b" << 10) << BSON("a" << 5 << "b" << 20));
+    virtual std::vector<BSONObj> splitPoints() const {
+        return {BSON("a" << 5 << "b" << 10), BSON("a" << 5 << "b" << 20)};
     }
 };
 
@@ -354,10 +356,12 @@ class CollationStringsMultiShard : public MultiShardBase {
         return BSON("a"
                     << "y");
     }
+
     virtual BSONObj queryCollation() const {
         return BSON("locale"
                     << "mock_reverse_string");
     }
+
     virtual BSONArray expectedShardNames() const {
         return BSON_ARRAY("0"
                           << "1"
@@ -371,11 +375,13 @@ class DefaultCollationStringsMultiShard : public MultiShardBase {
         return BSON("a"
                     << "y");
     }
+
     virtual std::unique_ptr<CollatorInterface> defaultCollator() const {
         auto collator = stdx::make_unique<CollatorInterfaceMock>(
             CollatorInterfaceMock::MockType::kReverseString);
         return {std::move(collator)};
     }
+
     virtual BSONArray expectedShardNames() const {
         return BSON_ARRAY("0"
                           << "1"
@@ -389,15 +395,18 @@ class SimpleCollationStringsMultiShard : public MultiShardBase {
         return BSON("a"
                     << "y");
     }
+
     virtual std::unique_ptr<CollatorInterface> defaultCollator() const {
         auto collator = stdx::make_unique<CollatorInterfaceMock>(
             CollatorInterfaceMock::MockType::kReverseString);
         return {std::move(collator)};
     }
+
     virtual BSONObj queryCollation() const {
         return BSON("locale"
                     << "simple");
     }
+
     virtual BSONArray expectedShardNames() const {
         return BSON_ARRAY("2");
     }
@@ -407,10 +416,12 @@ class CollationNumbersMultiShard : public MultiShardBase {
     virtual BSONObj query() const {
         return BSON("a" << 5);
     }
+
     virtual BSONObj queryCollation() const {
         return BSON("locale"
                     << "mock_reverse_string");
     }
+
     virtual BSONArray expectedShardNames() const {
         return BSON_ARRAY("0");
     }
@@ -420,11 +431,13 @@ class DefaultCollationNumbersMultiShard : public MultiShardBase {
     virtual BSONObj query() const {
         return BSON("a" << 5);
     }
+
     virtual std::unique_ptr<CollatorInterface> defaultCollator() const {
         auto collator = stdx::make_unique<CollatorInterfaceMock>(
             CollatorInterfaceMock::MockType::kReverseString);
         return {std::move(collator)};
     }
+
     virtual BSONArray expectedShardNames() const {
         return BSON_ARRAY("0");
     }
@@ -434,15 +447,18 @@ class SimpleCollationNumbersMultiShard : public MultiShardBase {
     virtual BSONObj query() const {
         return BSON("a" << 5);
     }
+
     virtual std::unique_ptr<CollatorInterface> defaultCollator() const {
         auto collator = stdx::make_unique<CollatorInterfaceMock>(
             CollatorInterfaceMock::MockType::kReverseString);
         return {std::move(collator)};
     }
+
     virtual BSONObj queryCollation() const {
         return BSON("locale"
                     << "simple");
     }
+
     virtual BSONArray expectedShardNames() const {
         return BSON_ARRAY("0");
     }
