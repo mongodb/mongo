@@ -149,8 +149,7 @@ public:
 
     void injectNative(const char* field, NativeFunction func, void* data = 0) override;
 
-    ScriptingFunction _createFunction(const char* code,
-                                      ScriptingFunction functionNumber = 0) override;
+    ScriptingFunction _createFunction(const char* code) override;
 
     void newFunction(StringData code, JS::MutableHandleValue out);
 
@@ -342,9 +341,7 @@ public:
     };
 
 private:
-    void _MozJSCreateFunction(const char* raw,
-                              ScriptingFunction functionNumber,
-                              JS::MutableHandleValue fun);
+    void _MozJSCreateFunction(StringData raw, JS::MutableHandleValue fun);
 
     /**
      * This structure exists exclusively to construct the runtime and context
