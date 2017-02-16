@@ -106,7 +106,7 @@ class EnterpriseDistro(packager.Distro):
             raise Exception("BUG: unsupported platform?")
 
     def build_os(self, arch):
-        """Return the build os label in the binary package to download ("rhel57", "rhel62" and "rhel70"
+        """Return the build os label in the binary package to download ("rhel57", "rhel62", "rhel67" and "rhel70"
         for redhat, the others are delegated to the super class
         """
         if arch == "ppc64le":
@@ -118,7 +118,7 @@ class EnterpriseDistro(packager.Distro):
                 return []
         if arch == "s390x":
             if self.n == 'redhat':
-                return [ "rhel72" ]
+                return [ "rhel67", "rhel72" ]
             if self.n == 'suse':
                 return [ "suse11", "suse12" ]
             if self.n == 'ubuntu':
