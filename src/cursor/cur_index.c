@@ -245,7 +245,8 @@ __curindex_search(WT_CURSOR *cursor)
 	 * Custom collators expect to see complete keys, pass an item containing
 	 * all the visible fields so it unpacks correctly.
 	 */
-	if (cindex->index->collator != NULL)
+	if (cindex->index->collator != NULL &&
+	    !F_ISSET(cursor, WT_CURSTD_RAW_SEARCH))
 		WT_ERR(__wt_struct_repack(session, child->key_format,
 		    cindex->iface.key_format, &child->key, &found_key));
 	else
