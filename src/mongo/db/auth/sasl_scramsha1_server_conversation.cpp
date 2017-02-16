@@ -35,8 +35,8 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/replace.hpp>
 
-#include "mongo/crypto/crypto.h"
 #include "mongo/crypto/mechanism_scram.h"
+#include "mongo/crypto/sha1_block.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
@@ -290,14 +290,14 @@ StatusWith<bool> SaslSCRAMSHA1ServerConversation::_secondStep(const std::vector<
 
     // ServerSignature := HMAC(ServerKey, AuthMessage)
     std::string decodedServerKey = base64::decode(_creds.scram.serverKey);
-    SHA1Hash serverSignature =
-        crypto::hmacSha1(reinterpret_cast<const unsigned char*>(decodedServerKey.c_str()),
-                         decodedServerKey.size(),
-                         reinterpret_cast<const unsigned char*>(_authMessage.c_str()),
-                         _authMessage.size());
+    SHA1Block serverSignature =
+        SHA1Block::computeHmac(reinterpret_cast<const unsigned char*>(decodedServerKey.c_str()),
+                               decodedServerKey.size(),
+                               reinterpret_cast<const unsigned char*>(_authMessage.c_str()),
+                               _authMessage.size());
 
     StringBuilder sb;
-    sb << "v=" << scram::hashToBase64(serverSignature);
+    sb << "v=" << serverSignature.toString();
     *outputData = sb.str();
 
     return StatusWith<bool>(false);

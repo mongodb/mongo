@@ -8,22 +8,32 @@ env.SConscript(
     ],
 )
 
-env.Library(
-    target='crypto_tom',
+env.Library('sha1_block',
     source=[
-        'crypto_tom.cpp'
-    ],
-    LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
-            'tom/tomcrypt'
-    ])
-
-env.Library('crypto_openssl',
-    source=[
-        'crypto_openssl.cpp'
+        'sha1_block.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+    ])
+
+env.Library(
+    target='sha1_block_tom',
+    source=[
+        'sha1_block_tom.cpp'
+    ],
+    LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+            'sha1_block',
+            'tom/tomcrypt'
+    ])
+
+env.Library('sha1_block_openssl',
+    source=[
+        'sha1_block_openssl.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'sha1_block',
     ])
 
 env.Library('scramauth',
@@ -31,8 +41,8 @@ env.Library('scramauth',
             LIBDEPS=['$BUILD_DIR/mongo/base',
                      '$BUILD_DIR/mongo/base/secure_allocator',
                      '$BUILD_DIR/mongo/util/secure_zero_memory',
-                     'crypto_${MONGO_CRYPTO}'])
+                     'sha1_block_${MONGO_CRYPTO}'])
 
-env.CppUnitTest('crypto_test',
-                ['crypto_test.cpp'],
-                LIBDEPS=['crypto_${MONGO_CRYPTO}'])
+env.CppUnitTest('sha1_block_test',
+                ['sha1_block_test.cpp'],
+                LIBDEPS=['sha1_block_${MONGO_CRYPTO}'])
