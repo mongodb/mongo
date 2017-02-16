@@ -231,10 +231,9 @@ void MozJSProxyScope::injectNative(const char* field, NativeFunction func, void*
     run([&] { _implScope->injectNative(field, func, data); });
 }
 
-ScriptingFunction MozJSProxyScope::_createFunction(const char* raw,
-                                                   ScriptingFunction functionNumber) {
+ScriptingFunction MozJSProxyScope::_createFunction(const char* raw) {
     ScriptingFunction out;
-    run([&] { out = _implScope->_createFunction(raw, functionNumber); });
+    run([&] { out = _implScope->_createFunction(raw); });
     return out;
 }
 
