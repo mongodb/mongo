@@ -126,11 +126,20 @@ Status MemberConfig::initialize(const BSONObj& mcfg, ReplicaSetTagConfig* tagCon
     }
 
     //
+    // Parse arbiterOnly field.
+    //
+    status = bsonExtractBooleanFieldWithDefault(
+        mcfg, kArbiterOnlyFieldName, kArbiterOnlyFieldDefault, &_arbiterOnly);
+    if (!status.isOK())
+        return status;
+
+    //
     // Parse priority field.
     //
     BSONElement priorityElement = mcfg[kPriorityFieldName];
-    if (priorityElement.eoo()) {
-        _priority = kPriorityFieldDefault;
+    if (priorityElement.eoo() ||
+        (priorityElement.isNumber() && priorityElement.numberDouble() == kPriorityFieldDefault)) {
+        _priority = _arbiterOnly ? 0.0 : kPriorityFieldDefault;
     } else if (priorityElement.isNumber()) {
         _priority = priorityElement.numberDouble();
     } else {
@@ -138,14 +147,6 @@ Status MemberConfig::initialize(const BSONObj& mcfg, ReplicaSetTagConfig* tagCon
                       str::stream() << kPriorityFieldName << " field has non-numeric type "
                                     << typeName(priorityElement.type()));
     }
-
-    //
-    // Parse arbiterOnly field.
-    //
-    status = bsonExtractBooleanFieldWithDefault(
-        mcfg, kArbiterOnlyFieldName, kArbiterOnlyFieldDefault, &_arbiterOnly);
-    if (!status.isOK())
-        return status;
 
     //
     // Parse slaveDelay field.

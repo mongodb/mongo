@@ -123,6 +123,24 @@ StatusWith<int> findSelfInConfigIfElectable(ReplicationCoordinatorExternalState*
 }
 
 /**
+ * Checks that the priorities of all the arbiters in the configuration are 0.  If they were 1,
+ * they should have been set to 0 in MemberConfig::initialize().  Otherwise, they are illegal.
+ */
+Status validateArbiterPriorities(const ReplicaSetConfig& config) {
+    for (ReplicaSetConfig::MemberIterator iter = config.membersBegin(); iter != config.membersEnd();
+         ++iter) {
+        if (iter->isArbiter() && iter->getPriority() != 0) {
+            return Status(ErrorCodes::InvalidReplicaSetConfig,
+                          str::stream() << "Member " << iter->getHostAndPort().toString()
+                                        << " is an arbiter but has priority "
+                                        << iter->getPriority()
+                                        << ". Arbiter priority must be 0.");
+        }
+    }
+    return Status::OK();
+}
+
+/**
  * Compares two initialized and validated replica set configurations, and checks to
  * see if "newConfig" is a legal successor configuration to "oldConfig".
  *
@@ -271,6 +289,11 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
                           << causedBy(status.reason()));
     }
 
+    status = validateArbiterPriorities(newConfig);
+    if (!status.isOK()) {
+        return StatusWith<int>(status);
+    }
+
     if (newConfig.getConfigVersion() != 1) {
         return StatusWith<int>(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                                str::stream() << "Configuration used to initiate a replica set must "
@@ -299,6 +322,11 @@ StatusWith<int> validateConfigForReconfig(ReplicationCoordinatorExternalState* e
     }
 
     status = validateOldAndNewConfigsCompatible(oldConfig, newConfig);
+    if (!status.isOK()) {
+        return StatusWith<int>(status);
+    }
+
+    status = validateArbiterPriorities(newConfig);
     if (!status.isOK()) {
         return StatusWith<int>(status);
     }

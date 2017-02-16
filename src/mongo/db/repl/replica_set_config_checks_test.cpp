@@ -136,6 +136,72 @@ TEST(ValidateConfigForInitiate, WriteConcernMustBeSatisfiable) {
             .getStatus());
 }
 
+TEST(ValidateConfigForInitiate, ArbiterPriorityMustBeZeroOrOne) {
+    ReplicaSetConfig zeroConfig;
+    ReplicaSetConfig oneConfig;
+    ReplicaSetConfig twoConfig;
+    ASSERT_OK(zeroConfig.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "version"
+                                         << 1
+                                         << "members"
+                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                  << "h1")
+                                                       << BSON("_id" << 2 << "host"
+                                                                     << "h2"
+                                                                     << "priority"
+                                                                     << 0
+                                                                     << "arbiterOnly"
+                                                                     << true)
+                                                       << BSON("_id" << 3 << "host"
+                                                                     << "h3")))));
+
+    ASSERT_OK(oneConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version"
+                                        << 1
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "h1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "h2"
+                                                                    << "priority"
+                                                                    << 1
+                                                                    << "arbiterOnly"
+                                                                    << true)
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "h3")))));
+
+    ASSERT_OK(twoConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version"
+                                        << 1
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "h1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "h2"
+                                                                    << "priority"
+                                                                    << 2
+                                                                    << "arbiterOnly"
+                                                                    << true)
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "h3")))));
+    ReplicationCoordinatorExternalStateMock presentOnceExternalState;
+    presentOnceExternalState.addSelf(HostAndPort("h1"));
+
+    ASSERT_OK(
+        validateConfigForInitiate(&presentOnceExternalState, zeroConfig, getGlobalServiceContext())
+            .getStatus());
+    ASSERT_OK(
+        validateConfigForInitiate(&presentOnceExternalState, oneConfig, getGlobalServiceContext())
+            .getStatus());
+    ASSERT_EQUALS(
+        ErrorCodes::InvalidReplicaSetConfig,
+        validateConfigForInitiate(&presentOnceExternalState, twoConfig, getGlobalServiceContext())
+            .getStatus());
+}
+
 TEST(ValidateConfigForReconfig, NewConfigVersionNumberMustBeHigherThanOld) {
     ReplicationCoordinatorExternalStateMock externalState;
     externalState.addSelf(HostAndPort("h1"));
@@ -607,6 +673,96 @@ TEST(ValidateConfigForReconfig, MustFindSelf) {
         1,
         unittest::assertGet(validateConfigForReconfig(
             &presentOnceExternalState, oldConfig, newConfig, getGlobalServiceContext(), true)));
+}
+
+TEST(ValidateConfigForReconfig, ArbiterPriorityValueMustBeZeroOrOne) {
+    ReplicationCoordinatorExternalStateMock externalState;
+    externalState.addSelf(HostAndPort("h1"));
+
+    ReplicaSetConfig oldConfig;
+    ReplicaSetConfig zeroConfig;
+    ReplicaSetConfig oneConfig;
+    ReplicaSetConfig twoConfig;
+
+    ASSERT_OK(oldConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version"
+                                        << 1
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "h1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "h2"
+                                                                    << "arbiterOnly"
+                                                                    << true)
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "h3")))));
+
+    ASSERT_OK(zeroConfig.initialize(BSON("_id"
+                                         << "rs0"
+                                         << "version"
+                                         << 2
+                                         << "members"
+                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                  << "h1")
+                                                       << BSON("_id" << 2 << "host"
+                                                                     << "h2"
+                                                                     << "priority"
+                                                                     << 0
+                                                                     << "arbiterOnly"
+                                                                     << true)
+                                                       << BSON("_id" << 3 << "host"
+                                                                     << "h3")))));
+    ASSERT_OK(oneConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version"
+                                        << 2
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "h1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "h2"
+                                                                    << "priority"
+                                                                    << 1
+                                                                    << "arbiterOnly"
+                                                                    << true)
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "h3")))));
+    ASSERT_OK(twoConfig.initialize(BSON("_id"
+                                        << "rs0"
+                                        << "version"
+                                        << 2
+                                        << "members"
+                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                 << "h1")
+                                                      << BSON("_id" << 2 << "host"
+                                                                    << "h2"
+                                                                    << "priority"
+                                                                    << 2
+                                                                    << "arbiterOnly"
+                                                                    << true)
+                                                      << BSON("_id" << 3 << "host"
+                                                                    << "h3")))));
+
+    ASSERT_OK(oldConfig.validate());
+    ASSERT_OK(zeroConfig.validate());
+    ASSERT_OK(oneConfig.validate());
+    ASSERT_OK(twoConfig.validate());
+    ASSERT_OK(validateConfigForReconfig(
+                  &externalState, oldConfig, zeroConfig, getGlobalServiceContext(), false)
+                  .getStatus());
+    ASSERT_OK(validateConfigForReconfig(
+                  &externalState, oldConfig, oneConfig, getGlobalServiceContext(), false)
+                  .getStatus());
+    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
+                  validateConfigForReconfig(
+                      &externalState, oldConfig, twoConfig, getGlobalServiceContext(), false)
+                      .getStatus());
+    // Forced reconfigs also do not allow this.
+    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
+                  validateConfigForReconfig(
+                      &externalState, oldConfig, twoConfig, getGlobalServiceContext(), true)
+                      .getStatus());
 }
 
 TEST(ValidateConfigForReconfig, SelfMustEndElectable) {

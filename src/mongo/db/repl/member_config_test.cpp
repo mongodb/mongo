@@ -126,12 +126,14 @@ TEST(MemberConfig, ParseArbiterOnly) {
                                        << 1.0),
                             &tagConfig));
     ASSERT_TRUE(mc.isArbiter());
+    ASSERT_EQUALS(0.0, mc.getPriority());
     ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
                                        << "h"
                                        << "arbiterOnly"
                                        << false),
                             &tagConfig));
     ASSERT_TRUE(!mc.isArbiter());
+    ASSERT_EQUALS(1.0, mc.getPriority());
 }
 
 TEST(MemberConfig, ParseHidden) {
