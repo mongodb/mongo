@@ -267,13 +267,11 @@ ScriptingFunction Scope::createFunction(const char* code) {
     FunctionCacheMap::iterator i = _cachedFunctions.find(code);
     if (i != _cachedFunctions.end())
         return i->second;
-    // NB: we calculate the function number for v8 so the cache can be utilized to
-    //     lookup the source on an exception, but SpiderMonkey uses the value
-    //     returned by JS_CompileFunction.
-    ScriptingFunction defaultFunctionNumber = getFunctionCache().size() + 1;
-    ScriptingFunction actualFunctionNumber = _createFunction(code, defaultFunctionNumber);
-    _cachedFunctions[code] = actualFunctionNumber;
-    return actualFunctionNumber;
+
+    // Get a function number, so the cache can be utilized to lookup the source on an exception
+    ScriptingFunction functionNumber = _createFunction(code);
+    _cachedFunctions[code] = functionNumber;
+    return functionNumber;
 }
 
 namespace JSFiles {
@@ -507,12 +505,8 @@ public:
     }
 
 protected:
-    FunctionCacheMap& getFunctionCache() {
-        return _real->getFunctionCache();
-    }
-
-    ScriptingFunction _createFunction(const char* code, ScriptingFunction functionNumber = 0) {
-        return _real->_createFunction(code, functionNumber);
+    ScriptingFunction _createFunction(const char* code) {
+        return _real->_createFunction(code);
     }
 
 private:

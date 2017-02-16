@@ -165,8 +165,7 @@ public:
 
     void injectNative(const char* field, NativeFunction func, void* data = 0) override;
 
-    ScriptingFunction _createFunction(const char* code,
-                                      ScriptingFunction functionNumber = 0) override;
+    ScriptingFunction _createFunction(const char* code) override;
 
     OperationContext* getOpContext() const;
 
