@@ -16,6 +16,18 @@
         assert.eq(sizeSum, listDatabasesOut.totalSize);
     }
 
+    function verifyNameOnly(listDatabasesOut) {
+        for (let field in listDatabasesOut) {
+            assert(['databases', 'nameOnly', 'ok'].some((f) => f == field),
+                   'unexpected field ' + field);
+        }
+        listDatabasesOut.databases.forEach((database) => {
+            for (let field in database) {
+                assert.eq(field, "name", "expected name only");
+            }
+        });
+    }
+
     // Make 4 test databases.
     db.getSiblingDB("jstest_list_databases_foo").coll.insert({});
     db.getSiblingDB("jstest_list_databases_bar").coll.insert({});
@@ -37,4 +49,15 @@
     cmdRes = assert.commandWorked(db.adminCommand({listDatabases: 1, filter: {name: "admin"}}));
     assert.eq(1, cmdRes.databases.length);
     verifySizeSum(cmdRes);
+
+    // Now return only the names.
+    cmdRes = assert.commandWorked(db.adminCommand({listDatabases: 1, nameOnly: true}));
+    assert.lte(4, cmdRes.databases.length, tojson(cmdRes));
+    verifyNameOnly(cmdRes);
+
+    // Now return only the name of the zap database.
+    cmdRes = assert.commandWorked(
+        db.adminCommand({listDatabases: 1, nameOnly: true, filter: {name: /zap/}}));
+    assert.eq(1, cmdRes.databases.length, tojson(cmdRes));
+    verifyNameOnly(cmdRes);
 }());

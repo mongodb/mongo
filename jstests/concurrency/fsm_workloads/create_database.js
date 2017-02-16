@@ -97,6 +97,14 @@ var $config = (function() {
                 assertAlways.neq(database.name, this.myDB.toString(), "this DB shouldn't exist");
             }
         },
+
+        listDatabasesNameOnly: function listDatabases(db, collName) {
+            for (let database of db.adminCommand({listDatabases: 1, nameOnly: 1}).databases) {
+                let res = db.getSiblingDB(database.name).runCommand({listCollections: 1});
+                assertAlways.commandWorked(res);
+                assertAlways.neq(database.name, this.myDB.toString(), "this DB shouldn't exist");
+            }
+        },
     };
 
     var transitions = {
@@ -115,8 +123,9 @@ var $config = (function() {
         insert: {dropDatabase: 0.2, drop: 0.05, insert: 0.5, upsert: 0.25},
         upsert: {dropDatabase: 0.2, drop: 0.05, insert: 0.25, upsert: 0.5},
         drop: {dropDatabase: 0.75, init: 0.25},  // OK to leave the empty database behind sometimes
-        dropDatabase: {init: 0.75, listDatabases: 0.25},
-        listDatabases: {init: 0.75, listDatabases: 0.25},
+        dropDatabase: {init: 0.75, listDatabases: 0.15, listDatabasesNameOnly: 0.10},
+        listDatabases: {init: 0.75, listDatabases: 0.15, listDatabasesNameOnly: 0.10},
+        listDatabasesNameOnly: {init: 0.75, listDatabases: 0.10, listDatabasesNameOnly: 0.15},
     };
 
     return {
