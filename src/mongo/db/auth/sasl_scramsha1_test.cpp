@@ -460,12 +460,9 @@ TEST(SCRAMSHA1Cache, testSetAndGet) {
     cache.setCachedSecrets(host, scram::SCRAMPresecrets("aaa", salt, 10000), secret);
     auto cachedSecret = cache.getCachedSecrets(host, scram::SCRAMPresecrets("aaa", salt, 10000));
     ASSERT_TRUE(cachedSecret);
-    ASSERT_TRUE(std::equal(
-        secret.clientKey->begin(), secret.clientKey->end(), cachedSecret->clientKey->begin()));
-    ASSERT_TRUE(std::equal(
-        secret.serverKey->begin(), secret.serverKey->end(), cachedSecret->serverKey->begin()));
-    ASSERT_TRUE(std::equal(
-        secret.storedKey->begin(), secret.storedKey->end(), cachedSecret->storedKey->begin()));
+    ASSERT_TRUE(*secret.clientKey == *cachedSecret->clientKey);
+    ASSERT_TRUE(*secret.serverKey == *cachedSecret->serverKey);
+    ASSERT_TRUE(*secret.storedKey == *cachedSecret->storedKey);
 }
 
 
@@ -502,15 +499,9 @@ TEST(SCRAMSHA1Cache, testSetAndReset) {
     ASSERT_FALSE(cache.getCachedSecrets(host, scram::SCRAMPresecrets("aaa", salt, 10000)));
     auto cachedSecret = cache.getCachedSecrets(host, scram::SCRAMPresecrets("aab", salt, 10000));
     ASSERT_TRUE(cachedSecret);
-    ASSERT_TRUE(std::equal(newSecret.clientKey->begin(),
-                           newSecret.clientKey->end(),
-                           cachedSecret->clientKey->begin()));
-    ASSERT_TRUE(std::equal(newSecret.serverKey->begin(),
-                           newSecret.serverKey->end(),
-                           cachedSecret->serverKey->begin()));
-    ASSERT_TRUE(std::equal(newSecret.storedKey->begin(),
-                           newSecret.storedKey->end(),
-                           cachedSecret->storedKey->begin()));
+    ASSERT_TRUE(*newSecret.clientKey == *cachedSecret->clientKey);
+    ASSERT_TRUE(*newSecret.serverKey == *cachedSecret->serverKey);
+    ASSERT_TRUE(*newSecret.storedKey == *cachedSecret->storedKey);
 }
 
 }  // namespace mongo
