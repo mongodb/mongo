@@ -263,7 +263,7 @@ private:
     static RecordId _fromKey(int64_t k);
 
     void _dealtWithCappedId(SortedRecordIds::iterator it, bool didCommit);
-    void _addUncommitedRecordId_inlock(OperationContext* txn, const RecordId& id);
+    void _addUncommittedRecordId_inlock(OperationContext* txn, RecordId id);
 
     Status _insertRecords(OperationContext* txn, Record* records, size_t nRecords);
 
