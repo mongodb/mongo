@@ -180,17 +180,17 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckCanceledByShutdown) {
 
 TEST_F(CheckQuorumForInitiate, ValidSingleNodeInternalHostSet) {
     ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
-                                                       << "rs0"
-                                                       << "version" << 1 << "members"
-                                                       << BSON_ARRAY(BSON("_id" << 1
-                                                                         << "host"
-                                                                         << "h1"
-                                                                         << "hostInternal"
-                                                                         << "p1"
-                                                                       ))));
-     startQuorumCheck(config, 0);
-     ASSERT_OK(waitForQuorumCheck());
- }
+                                                      << "rs0"
+                                                      << "version"
+                                                      << 1
+                                                      << "members"
+                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                               << "h1"
+                                                                               << "hostInternal"
+                                                                               << "p1"))));
+    startQuorumCheck(config, 0);
+    ASSERT_OK(waitForQuorumCheck());
+}
 
 TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSeveralDownNodes) {
     // In this test, "we" are host "h3:1".  All other nodes time out on
@@ -201,11 +201,16 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSeveralDownNodes) {
                                                       << "version"
                                                       << 1
                                                       << "members"
-                                                      << BSON_ARRAY(BSON("_id" << 1 << "host" << "h1:1")
-                                                                    << BSON("_id" << 2 << "host" << "h2:1")
-                                                                    << BSON("_id" << 3 << "host" << "h3:1")
-                                                                    << BSON("_id" << 4 << "host" << "h4:1")
-                                                                    << BSON("_id" << 5 << "host" << "h5:1"))));
+                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                               << "h1:1")
+                                                                    << BSON("_id" << 2 << "host"
+                                                                                  << "h2:1")
+                                                                    << BSON("_id" << 3 << "host"
+                                                                                  << "h3:1")
+                                                                    << BSON("_id" << 4 << "host"
+                                                                                  << "h4:1")
+                                                                    << BSON("_id" << 5 << "host"
+                                                                                  << "h5:1"))));
     startQuorumCheck(config, 2);
     _net->enterNetwork();
     const Date_t startDate = _net->now();

@@ -59,7 +59,7 @@ QuorumChecker::QuorumChecker(const ReplicaSetConfig* rsConfig, int myIndex)
     const MemberConfig& myConfig = _rsConfig->getMemberAt(_myIndex);
 
     if (myConfig.isVoter()) {
-         _voters.push_back(myConfig.getInternalHostAndPort());
+        _voters.push_back(myConfig.getInternalHostAndPort());
     }
     if (myConfig.isElectable()) {
         _numElectable = 1;
@@ -180,11 +180,9 @@ void QuorumChecker::_tabulateHeartbeatResponse(const RemoteCommandRequest& reque
                                                const ResponseStatus& response) {
     ++_numResponses;
     if (!response.isOK()) {
-        warning() << "Failed to complete heartbeat request to "
-                  << request.target << "; "
+        warning() << "Failed to complete heartbeat request to " << request.target << "; "
                   << response.status;
-        _badResponses.push_back(std::make_pair(request.target,
-          response.status));
+        _badResponses.push_back(std::make_pair(request.target, response.status));
         return;
     }
 

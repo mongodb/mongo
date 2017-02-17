@@ -426,8 +426,8 @@ Status ReplicaSetConfig::validate() const {
         Status status = memberI.validate();
         if (!status.isOK())
             return status;
-        if ( memberI.getInternalHostAndPort().isLocalHost() ||
-             memberI.getHostAndPort().isLocalHost()) {
+        if (memberI.getInternalHostAndPort().isLocalHost() ||
+            memberI.getHostAndPort().isLocalHost()) {
             ++localhostCount;
         }
         if (memberI.isVoter()) {
@@ -484,8 +484,8 @@ Status ReplicaSetConfig::validate() const {
             }
             // validating that the internal host is not duplicated in the configuration
             if (!memberI.getInternalHostAndPort().empty() &&
-                memberI.getInternalHostAndPort() == memberJ.getInternalHostAndPort() ) {
-                 return Status(ErrorCodes::BadValue,
+                memberI.getInternalHostAndPort() == memberJ.getInternalHostAndPort()) {
+                return Status(ErrorCodes::BadValue,
                               str::stream() << "Found two member configurations with same "
                                             << MemberConfig::kHostInternalFieldName
                                             << " field, "
@@ -502,7 +502,6 @@ Status ReplicaSetConfig::validate() const {
                                             << MemberConfig::kHostInternalFieldName
                                             << " == "
                                             << memberI.getInternalHostAndPort().toString());
-
             }
         }
     }
@@ -688,7 +687,7 @@ bool ReplicaSetConfig::isLocalHostAllowed() const {
     // It is sufficient to check any one member's hostname, since in ReplicaSetConfig::validate,
     // it's ensured that either all members have hostname localhost or none do.
     return _members.begin()->getHostAndPort().isLocalHost() ||
-           _members.begin()->getInternalHostAndPort().isLocalHost();
+        _members.begin()->getInternalHostAndPort().isLocalHost();
 }
 
 ReplicaSetTag ReplicaSetConfig::findTag(StringData key, StringData value) const {

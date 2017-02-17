@@ -222,8 +222,10 @@ TEST_F(ElectCmdRunnerTest, ShuttingDown) {
                                                       << "version"
                                                       << 1
                                                       << "members"
-                                                      << BSON_ARRAY(BSON("_id" << 1 << "host" << "h0")
-                                                                    << BSON("_id" << 2 << "host" << "h1"))));
+                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                               << "h0")
+                                                                    << BSON("_id" << 2 << "host"
+                                                                                  << "h1"))));
 
     std::vector<HostAndPort> hosts;
     hosts.push_back(config.getMemberAt(1).getInternalHostAndPort());

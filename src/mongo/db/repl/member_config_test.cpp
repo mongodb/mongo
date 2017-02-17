@@ -77,12 +77,13 @@ TEST(MemberConfig, ParseFailsWithMissingIdField) {
                                 &tagConfig));
 }
 
-TEST(MemberConfig, ParseFailWithJustInternalHost) {
-     ReplicaSetTagConfig tagConfig;
-     MemberConfig mc;
-     ASSERT_EQUALS(ErrorCodes::NoSuchKey,
-                mc.initialize(BSON("hostInternal" << "localhost:12345"),
-                              &tagConfig  ));
+TEST(MemberConfig, ParseFailsWithJustInternalHost) {
+    ReplicaSetTagConfig tagConfig;
+    MemberConfig mc;
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey,
+                  mc.initialize(BSON("hostInternal"
+                                     << "localhost:12345"),
+                                &tagConfig));
 }
 
 TEST(MemberConfig, ParseFailsWithBadIdField) {
@@ -125,9 +126,10 @@ TEST(MemberConfig, ParseFailsWithBadHostField) {
                                            << "myhost:zabc"),
                                 &tagConfig));
     ASSERT_EQUALS(ErrorCodes::FailedToParse,
-                  mc.initialize(BSON("_id" << 0 <<
-                                     "host" << "myhost:12345" <<
-                                     "hostInternal" << "myhost:zabc"),
+                  mc.initialize(BSON("_id" << 0 << "host"
+                                           << "myhost:12345"
+                                           << "hostInternal"
+                                           << "myhost:zabc"),
                                 &tagConfig));
 }
 
@@ -323,10 +325,12 @@ TEST(MemberConfig, ValidateVotes) {
                                        << "votes"
                                        << 1.0),
                             &tagConfig));
-    ASSERT_OK(mc.initialize(BSON("_id" << 0 <<
-                                 "host" << "h" <<
-                                 "hostInternal" << "hh" <<
-                                 "votes" << 1.0),
+    ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
+                                       << "h"
+                                       << "hostInternal"
+                                       << "hh"
+                                       << "votes"
+                                       << 1.0),
                             &tagConfig));
 
     ASSERT_OK(mc.validate());

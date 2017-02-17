@@ -115,24 +115,23 @@ Status MemberConfig::initialize(const BSONObj& mcfg, ReplicaSetTagConfig* tagCon
 
     // Checking for internal replication host name
     std::string internalHostAndPortString;
-    status = bsonExtractStringField(mcfg, kHostInternalFieldName,
-                                    &internalHostAndPortString);
+    status = bsonExtractStringField(mcfg, kHostInternalFieldName, &internalHostAndPortString);
     // if it's not set we will use hostAndPortString
-    if ( status == ErrorCodes::NoSuchKey ){
-      internalHostAndPortString = hostAndPortString;
-    } else if ( !status.isOK() ){
-      return status;
+    if (status == ErrorCodes::NoSuchKey) {
+        internalHostAndPortString = hostAndPortString;
+    } else if (!status.isOK()) {
+        return status;
     } else {
-      boost::trim(internalHostAndPortString);
+        boost::trim(internalHostAndPortString);
     }
 
     status = _hostInternal.initialize(internalHostAndPortString);
-    if (!status.isOK()){
-      return status;
+    if (!status.isOK()) {
+        return status;
     }
     if (!_hostInternal.hasPort()) {
-      // make port explicit even if default
-      _hostInternal = HostAndPort(_hostInternal.host(), _hostInternal.port());
+        // make port explicit even if default
+        _hostInternal = HostAndPort(_hostInternal.host(), _hostInternal.port());
     }
 
 

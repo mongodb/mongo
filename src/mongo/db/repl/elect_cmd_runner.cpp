@@ -121,8 +121,7 @@ void ElectCmdRunner::Algorithm::processResponse(const RemoteCommandRequest& requ
 
         _receivedVotes += vote._numberInt();
     } else {
-        warning() << "elect command to " << request.target << " failed: "
-                  << response.status;
+        warning() << "elect command to " << request.target << " failed: " << response.status;
     }
 }
 

@@ -121,8 +121,8 @@ repl::ReplicaSetConfig _getConfigWithMemberRemoved(const repl::ReplicaSetConfig&
             continue;
         }
 
-        membersBuilder.append(
-            BSON("_id" << member->getId() << "host" << member->getInternalHostAndPort().toString()));
+        membersBuilder.append(BSON("_id" << member->getId() << "host"
+                                         << member->getInternalHostAndPort().toString()));
     }
 
     membersBuilder.done();

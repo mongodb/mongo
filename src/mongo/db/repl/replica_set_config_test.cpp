@@ -1147,10 +1147,9 @@ bool operator==(const MemberConfig& a, const MemberConfig& b) {
     }
     return a.getId() == b.getId() && a.getHostAndPort() == b.getHostAndPort() &&
         a.getPriority() == b.getPriority() && a.getSlaveDelay() == b.getSlaveDelay() &&
-        a.getInternalHostAndPort() == b.getInternalHostAndPort() &&
-        a.isVoter() == b.isVoter() && a.isArbiter() == b.isArbiter() &&
-        a.isHidden() == b.isHidden() && a.shouldBuildIndexes() == b.shouldBuildIndexes() &&
-        a.getNumTags() == b.getNumTags();
+        a.getInternalHostAndPort() == b.getInternalHostAndPort() && a.isVoter() == b.isVoter() &&
+        a.isArbiter() == b.isArbiter() && a.isHidden() == b.isHidden() &&
+        a.shouldBuildIndexes() == b.shouldBuildIndexes() && a.getNumTags() == b.getNumTags();
 }
 
 bool operator==(const ReplicaSetConfig& a, const ReplicaSetConfig& b) {
@@ -1799,39 +1798,42 @@ TEST(ReplicaSetConfig, ReplSetId) {
                            "\"replicaSetId\" had the wrong type. Expected objectId, found int");
 }
 
-TEST(ReplicaSetConfig,  ReplSetHostInternal){
+TEST(ReplicaSetConfig, ReplSetHostInternal) {
     ReplicaSetConfig configLocal;
-    auto status = configLocal.initializeForInitiate(BSON("_id" << "rs0"
-                                                         << "version"
-                                                         << 1
-                                                         << "members"
-                                                         << BSON_ARRAY(
-                                                                      BSON("_id" << 0
-                                                                            << "host" << "localhost:12345"
-                                                                            << "priority"<< 1
-                                                                            << "hostInternal" << "127.0.0.1:12345")
-                                                                       )));
+    auto status =
+        configLocal.initializeForInitiate(BSON("_id"
+                                               << "rs0"
+                                               << "version"
+                                               << 1
+                                               << "members"
+                                               << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                        << "localhost:12345"
+                                                                        << "priority"
+                                                                        << 1
+                                                                        << "hostInternal"
+                                                                        << "127.0.0.1:12345"))));
     ASSERT_EQUALS(Status::OK(), status);
     ASSERT_OK(configLocal.validate());
     ASSERT_TRUE(configLocal.hasReplicaSetId());
     auto hap = HostAndPort("127.0.0.1", 12345);
-    ASSERT_EQUALS( 0, configLocal.findMemberIndexByHostAndPort(hap));
+    ASSERT_EQUALS(0, configLocal.findMemberIndexByHostAndPort(hap));
 }
 
-TEST(ReplicaSetConfig, ReplSetOnlyHostInternal){
-  // Configuration initialized having only hostinternal should fail
-  ReplicaSetConfig configLocal;
-  auto status = configLocal.initializeForInitiate(BSON("_id"
-                                                << "rs0"
-                                                << "version" << 1
-                                                << "members" << BSON_ARRAY(
-                                                                  BSON("_id" << 0
-                                                                      << "hostInternal" << "127.0.0.1:12345"))
-                                                ));
-  ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
-  //check that it's not valid
-  ASSERT_NOT_OK(configLocal.validate());
-  ASSERT_FALSE(configLocal.hasReplicaSetId());
+TEST(ReplicaSetConfig, ReplSetOnlyHostInternal) {
+    // Configuration initialized having only hostinternal should fail
+    ReplicaSetConfig configLocal;
+    auto status =
+        configLocal.initializeForInitiate(BSON("_id"
+                                               << "rs0"
+                                               << "version"
+                                               << 1
+                                               << "members"
+                                               << BSON_ARRAY(BSON("_id" << 0 << "hostInternal"
+                                                                        << "127.0.0.1:12345"))));
+    ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
+    // check that it's not valid
+    ASSERT_NOT_OK(configLocal.validate());
+    ASSERT_FALSE(configLocal.hasReplicaSetId());
 }
 
 }  // namespace

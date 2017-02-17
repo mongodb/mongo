@@ -275,8 +275,8 @@ ReplicaSetConfig _getConfigWithMemberRemoved(const ReplicaSetConfig& oldConfig,
             continue;
         }
 
-        membersBuilder.append(
-            BSON("_id" << member->getId() << "host" << member->getInternalHostAndPort().toString()));
+        membersBuilder.append(BSON("_id" << member->getId() << "host"
+                                         << member->getInternalHostAndPort().toString()));
     }
 
     membersBuilder.done();
