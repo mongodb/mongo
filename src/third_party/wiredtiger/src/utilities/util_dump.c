@@ -37,10 +37,10 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 	size_t len;
 	int ch, i;
 	bool hex, json, reverse;
-	char *checkpoint, *config, *name, *p, *simplename;
+	char *checkpoint, *config, *p, *simpleuri, *uri;
 
 	hex = json = reverse = false;
-	checkpoint = config = name = simplename = NULL;
+	checkpoint = config = simpleuri = uri = NULL;
 	cursor = NULL;
 	while ((ch = __wt_getopt(progname, argc, argv, "c:f:jrx")) != EOF)
 		switch (ch) {
@@ -89,11 +89,11 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		if (json && i > 0)
 			if (dump_json_separator(session) != 0)
 				goto err;
-		free(name);
-		free(simplename);
-		name = simplename = NULL;
+		free(uri);
+		free(simpleuri);
+		uri = simpleuri = NULL;
 
-		if ((name = util_name(session, argv[i], "table")) == NULL)
+		if ((uri = util_uri(session, argv[i], "table")) == NULL)
 			goto err;
 
 		len =
@@ -113,19 +113,19 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		(void)strcat(config, json ? "dump=json" :
 		    (hex ? "dump=hex" : "dump=print"));
 		if ((ret = session->open_cursor(
-		    session, name, NULL, config, &cursor)) != 0) {
+		    session, uri, NULL, config, &cursor)) != 0) {
 			fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
-			    progname, name, session->strerror(session, ret));
+			    progname, uri, session->strerror(session, ret));
 			goto err;
 		}
 
-		if ((simplename = strdup(name)) == NULL) {
+		if ((simpleuri = strdup(uri)) == NULL) {
 			(void)util_err(session, errno, NULL);
 			goto err;
 		}
-		if ((p = strchr(simplename, '(')) != NULL)
+		if ((p = strchr(simpleuri, '(')) != NULL)
 			*p = '\0';
-		if (dump_config(session, simplename, cursor, hex, json) != 0)
+		if (dump_config(session, simpleuri, cursor, hex, json) != 0)
 			goto err;
 
 		if (dump_record(cursor, reverse, json) != 0)
@@ -148,8 +148,8 @@ err:		ret = 1;
 	}
 
 	free(config);
-	free(name);
-	free(simplename);
+	free(uri);
+	free(simpleuri);
 	if (cursor != NULL && (ret = cursor->close(cursor)) != 0) {
 		(void)util_err(session, ret, NULL);
 		ret = 1;

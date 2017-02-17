@@ -285,11 +285,11 @@ usage(void)
 }
 
 /*
- * util_name --
+ * util_uri --
  *	Build a name.
  */
 char *
-util_name(WT_SESSION *session, const char *s, const char *type)
+util_uri(WT_SESSION *session, const char *s, const char *type)
 {
 	size_t len;
 	char *name;

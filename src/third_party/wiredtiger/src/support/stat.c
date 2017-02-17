@@ -759,9 +759,7 @@ static const char * const __stats_connection_desc[] = {
 	"lock: checkpoint lock acquisitions",
 	"lock: checkpoint lock application thread wait time (usecs)",
 	"lock: checkpoint lock internal thread wait time (usecs)",
-	"lock: handle-list lock acquisitions",
-	"lock: handle-list lock application thread wait time (usecs)",
-	"lock: handle-list lock internal thread wait time (usecs)",
+	"lock: handle-list lock eviction thread wait time (usecs)",
 	"lock: metadata lock acquisitions",
 	"lock: metadata lock application thread wait time (usecs)",
 	"lock: metadata lock internal thread wait time (usecs)",
@@ -1044,9 +1042,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->lock_checkpoint_count = 0;
 	stats->lock_checkpoint_wait_application = 0;
 	stats->lock_checkpoint_wait_internal = 0;
-	stats->lock_handle_list_count = 0;
-	stats->lock_handle_list_wait_application = 0;
-	stats->lock_handle_list_wait_internal = 0;
+	stats->lock_handle_list_wait_eviction = 0;
 	stats->lock_metadata_count = 0;
 	stats->lock_metadata_wait_application = 0;
 	stats->lock_metadata_wait_internal = 0;
@@ -1351,12 +1347,8 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, lock_checkpoint_wait_application);
 	to->lock_checkpoint_wait_internal +=
 	    WT_STAT_READ(from, lock_checkpoint_wait_internal);
-	to->lock_handle_list_count +=
-	    WT_STAT_READ(from, lock_handle_list_count);
-	to->lock_handle_list_wait_application +=
-	    WT_STAT_READ(from, lock_handle_list_wait_application);
-	to->lock_handle_list_wait_internal +=
-	    WT_STAT_READ(from, lock_handle_list_wait_internal);
+	to->lock_handle_list_wait_eviction +=
+	    WT_STAT_READ(from, lock_handle_list_wait_eviction);
 	to->lock_metadata_count += WT_STAT_READ(from, lock_metadata_count);
 	to->lock_metadata_wait_application +=
 	    WT_STAT_READ(from, lock_metadata_wait_application);

@@ -18,8 +18,9 @@ util_read(WT_SESSION *session, int argc, char *argv[])
 	uint64_t recno;
 	int ch;
 	bool rkey, rval;
-	const char *uri, *value;
+	char *uri, *value;
 
+	uri = NULL;
 	while ((ch = __wt_getopt(progname, argc, argv, "")) != EOF)
 		switch (ch) {
 		case '?':
@@ -32,13 +33,19 @@ util_read(WT_SESSION *session, int argc, char *argv[])
 	/* The remaining arguments are a uri followed by a list of keys. */
 	if (argc < 2)
 		return (usage());
-	if ((uri = util_name(session, *argv, "table")) == NULL)
+	if ((uri = util_uri(session, *argv, "table")) == NULL)
 		return (1);
 
-	/* Open the object. */
-	if ((ret = session->open_cursor(
-	    session, uri, NULL, NULL, &cursor)) != 0)
-		return (util_err(session, ret, "%s: session.open", uri));
+	/*
+	 * Open the object; free allocated memory immediately to simplify
+	 * future error handling.
+	 */
+	if ((ret =
+	    session->open_cursor(session, uri, NULL, NULL, &cursor)) != 0)
+		(void)util_err(session, ret, "%s: session.open_cursor", uri);
+	free(uri);
+	if (ret != 0)
+		return (ret);
 
 	/*
 	 * A simple search only makes sense if the key format is a string or a

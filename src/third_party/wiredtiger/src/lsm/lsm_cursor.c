@@ -1692,8 +1692,8 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	bulk = cval.val != 0;
 
 	/* Get the LSM tree. */
-	WT_WITH_HANDLE_LIST_LOCK(session,
-	    ret = __wt_lsm_tree_get(session, uri, bulk, &lsm_tree));
+	ret = __wt_lsm_tree_get(session, uri, bulk, &lsm_tree);
+
 	/*
 	 * Check whether the exclusive open for a bulk load succeeded, and
 	 * if it did ensure that it's safe to bulk load into the tree.

@@ -340,9 +340,7 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 	 * Take a copy of any held page and clear the return value.  Remember
 	 * the hazard pointer we're currently holding.
 	 *
-	 * We may be passed a pointer to btree->evict_page that we are clearing
-	 * here.  We check when discarding pages that we're not discarding that
-	 * page, so this clear must be done before the page is released.
+	 * Clear the returned value, it makes future error handling easier.
 	 */
 	couple = couple_orig = ref = *refp;
 	*refp = NULL;
