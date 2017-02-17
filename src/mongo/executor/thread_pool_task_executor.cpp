@@ -292,7 +292,6 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleWorkAt(
         if (cbState->canceled.load()) {
             return;
         }
-        invariant(now() >= when);
         stdx::unique_lock<stdx::mutex> lk(_mutex);
         if (cbState->canceled.load()) {
             return;

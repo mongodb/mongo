@@ -477,7 +477,17 @@ Status NetworkInterfaceASIO::setAlarm(Date_t when, const stdx::function<void()>&
         return exceptionToStatus();
     }
 
-    alarm->async_wait([alarm, this, action](std::error_code ec) {
+    alarm->async_wait([alarm, this, action, when](std::error_code ec) {
+        const auto nowValue = now();
+        if (nowValue < when) {
+            warning() << "ASIO alarm returned early. Expected at: " << when
+                      << ", fired at: " << nowValue;
+            const auto status = setAlarm(when, action);
+            if ((!status.isOK()) && (status.code() != ErrorCodes::ShutdownInProgress)) {
+                fassertFailedWithStatus(40383, status);
+            }
+            return;
+        }
         if (!ec) {
             return action();
         } else if (ec != asio::error::operation_aborted) {
