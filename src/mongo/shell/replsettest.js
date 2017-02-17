@@ -114,6 +114,7 @@ var ReplSetTest = function(opts) {
         var twoPrimaries = false;
         self.nodes.forEach(function(node) {
             try {
+                node.setSlaveOk();
                 var n = node.getDB('admin').runCommand({ismaster: 1});
                 if (n.ismaster == true) {
                     if (self.liveNodes.master) {
@@ -122,7 +123,6 @@ var ReplSetTest = function(opts) {
                         self.liveNodes.master = node;
                     }
                 } else {
-                    node.setSlaveOk();
                     self.liveNodes.slaves.push(node);
                 }
             } catch (err) {
