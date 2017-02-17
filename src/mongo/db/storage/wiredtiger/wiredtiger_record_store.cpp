@@ -1274,7 +1274,7 @@ Status WiredTigerRecordStore::insertRecords(OperationContext* txn,
         } else if (_isCapped) {
             stdx::lock_guard<stdx::mutex> lk(_uncommittedRecordIdsMutex);
             record.id = _nextId();
-            _addUncommitedRecordId_inlock(txn, record.id);
+            _addUncommittedRecordId_inlock(txn, record.id);
         } else {
             record.id = _nextId();
         }
@@ -1324,7 +1324,7 @@ StatusWith<RecordId> WiredTigerRecordStore::insertRecord(OperationContext* txn,
 }
 
 void WiredTigerRecordStore::_dealtWithCappedId(SortedRecordIds::iterator it, bool didCommit) {
-    invariant(&(*it) != NULL);
+    invariant(it->isNormal());
     stdx::lock_guard<stdx::mutex> lk(_uncommittedRecordIdsMutex);
     if (didCommit && _isOplog && *it != _oplog_highestSeen) {
         // Defer removal from _uncommittedRecordIds until it is durable. We don't need to wait for
@@ -1621,7 +1621,7 @@ Status WiredTigerRecordStore::oplogDiskLocRegister(OperationContext* txn, const 
         return id.getStatus();
 
     stdx::lock_guard<stdx::mutex> lk(_uncommittedRecordIdsMutex);
-    _addUncommitedRecordId_inlock(txn, id.getValue());
+    _addUncommittedRecordId_inlock(txn, id.getValue());
     return Status::OK();
 }
 
@@ -1703,11 +1703,10 @@ void WiredTigerRecordStore::waitForAllEarlierOplogWritesToBeVisible(OperationCon
     }
 }
 
-void WiredTigerRecordStore::_addUncommitedRecordId_inlock(OperationContext* txn,
-                                                          const RecordId& id) {
-    // todo: make this a dassert at some point
-    // invariant(_uncommittedRecordIds.empty() || _uncommittedRecordIds.back() < id);
+void WiredTigerRecordStore::_addUncommittedRecordId_inlock(OperationContext* txn, RecordId id) {
+    dassert(_uncommittedRecordIds.empty() || _uncommittedRecordIds.back() < id);
     SortedRecordIds::iterator it = _uncommittedRecordIds.insert(_uncommittedRecordIds.end(), id);
+    invariant(it->isNormal());
     txn->recoveryUnit()->registerChange(new CappedInsertChange(this, it));
     _oplog_highestSeen = id;
 }
