@@ -31,7 +31,6 @@
         master = replTest.getPrimary();
         return master === conns[0];
     }, replTest.kDefaultTimeoutMS, "node 0 did not become primary quickly enough");
-    replTest.awaitNodesAgreeOnPrimary();
 
     replTest.awaitReplication();
     jsTestLog("Checking that ops still replicate correctly");
