@@ -224,6 +224,7 @@ string getURIFromArgs(const std::string& url, const std::string& host, const std
     }
 
     bool hostEndsInSock = str::endsWith(host, ".sock");
+    const auto hostHasPort = (host.find(":") != std::string::npos);
 
     // If host looks like a full URI (i.e. has a slash and isn't a unix socket) and the other fields
     // are empty, then just return host.
@@ -252,8 +253,12 @@ string getURIFromArgs(const std::string& url, const std::string& host, const std
 
     if (!hostEndsInSock) {
         if (port.size() > 0) {
+            if (hostHasPort) {
+                std::cerr << "Cannot specify a port in --host and also with --port" << std::endl;
+                quickExit(-1);
+            }
             ss << ":" << port;
-        } else if (host.find(':') == string::npos || str::endsWith(host, "]")) {
+        } else if (!hostHasPort || str::endsWith(host, "]")) {
             // Default the port to 27017 if the host did not provide one (i.e. the host has no
             // colons or ends in ']' like an IPv6 address).
             ss << ":27017";
