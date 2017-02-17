@@ -32,7 +32,7 @@
  */
 #define	WT_CACHE_POOL_APP_EVICT_MULTIPLIER	3
 #define	WT_CACHE_POOL_APP_WAIT_MULTIPLIER	6
-#define	WT_CACHE_POOL_READ_MULTIPLIER	1
+#define	WT_CACHE_POOL_READ_MULTIPLIER		1
 
 static void __cache_pool_adjust(
     WT_SESSION_IMPL *, uint64_t, uint64_t, bool, bool *);
@@ -104,8 +104,8 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		TAILQ_INIT(&cp->cache_pool_qh);
 		WT_ERR(__wt_spin_init(
 		    session, &cp->cache_pool_lock, "cache shared pool"));
-		WT_ERR(__wt_cond_alloc(session,
-		    "cache pool server", false, &cp->cache_pool_cond));
+		WT_ERR(__wt_cond_alloc(
+		    session, "cache pool server", &cp->cache_pool_cond));
 
 		__wt_process.cache_pool = cp;
 		__wt_verbose(session,
@@ -733,7 +733,7 @@ __wt_cache_pool_server(void *arg)
 	    F_ISSET(cache, WT_CACHE_POOL_RUN)) {
 		if (cp->currently_used <= cp->size)
 			__wt_cond_wait(
-			    session, cp->cache_pool_cond, WT_MILLION);
+			    session, cp->cache_pool_cond, WT_MILLION, NULL);
 
 		/*
 		 * Re-check pool run flag - since we want to avoid getting the

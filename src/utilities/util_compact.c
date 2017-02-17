@@ -30,21 +30,13 @@ util_compact(WT_SESSION *session, int argc, char *argv[])
 	/* The remaining argument is the table name. */
 	if (argc != 1)
 		return (usage());
-	if ((uri = util_name(session, *argv, "table")) == NULL)
+	if ((uri = util_uri(session, *argv, "table")) == NULL)
 		return (1);
 
-	if ((ret = session->compact(session, uri, NULL)) != 0) {
-		fprintf(stderr, "%s: compact(%s): %s\n",
-		    progname, uri, session->strerror(session, ret));
-		goto err;
-	}
-
-	if (0) {
-err:		ret = 1;
-	}
+	if ((ret = session->compact(session, uri, NULL)) != 0)
+		(void)util_err(session, ret, "session.compact: %s", uri);
 
 	free(uri);
-
 	return (ret);
 }
 

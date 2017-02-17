@@ -116,10 +116,15 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
             # Give slow machines time to process files.
             stat_cursor = self.session.open_cursor('statistics:', None, None)
             this_nfile = stat_cursor[stat.conn.file_open][2]
+            removed = stat_cursor[stat.conn.dh_sweep_remove][2]
             stat_cursor.close()
             self.pr("==== loop " + str(sleep))
             self.pr("this_nfile " + str(this_nfile))
-            if this_nfile == final_nfile:
+            self.pr("removed " + str(removed))
+            # On slow machines there can be a lag where files get closed but
+            # the sweep server cannot yet remove the handles.  So wait for the
+            # removed statistic to indicate forward progress too.
+            if this_nfile == final_nfile and removed != remove1:
                 break
         c.close()
         self.pr("Sweep loop took " + str(sleep))

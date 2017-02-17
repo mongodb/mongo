@@ -17,6 +17,7 @@ ext/encryptors/nop
 ext/encryptors/rotn
 ext/extractors/csv
 ext/test/kvs_bdb HAVE_BERKELEY_DB
+ext/test/fail_fs
 .
 api/leveldb LEVELDB
 examples/c

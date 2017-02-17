@@ -6,8 +6,20 @@
  * Author(s): Hendrik Brueckner <brueckner@linux.vnet.ibm.com>
  *
  */
+#include "wt_internal.h"
+
 #include <sys/types.h>
 #include <endian.h>
+
+#if defined(HAVE_CRC32_HARDWARE)
+
+#include <sys/auxv.h>
+
+/* RHEL 7 has kernel support, but does not define this constant in the lib c headers. */
+#ifndef HWCAP_S390_VX
+#define HWCAP_S390_VX           2048
+#endif
+
 #include "crc32-s390x.h"
 #include "slicing-consts.h"
 
@@ -69,8 +81,6 @@ unsigned int __wt_crc32c_le(unsigned int crc, const unsigned char *buf, size_t l
 /* Main CRC-32 functions */
 DEFINE_CRC32_VX(__wt_crc32c_le_vx, __wt_crc32c_le_vgfm_16, __wt_crc32c_le)
 
-#include "wt_internal.h"
-
 /*
  * __wt_checksum_hw --
  *      WiredTiger: return a checksum for a chunk of memory.
@@ -81,6 +91,8 @@ __wt_checksum_hw(const void *chunk, size_t len)
 	return (~__wt_crc32c_le_vx(0xffffffff, chunk, len));
 }
 
+#endif
+
 /*
  * __wt_checksum_init --
  *      WiredTiger: detect CRC hardware and set the checksum function.
@@ -89,8 +101,14 @@ void
 __wt_checksum_init(void)
 {
 #if defined(HAVE_CRC32_HARDWARE)
-	__wt_process.checksum = __wt_checksum_hw;
-#else
+	unsigned long caps = getauxval(AT_HWCAP);
+
+	if (caps & HWCAP_S390_VX)
+		__wt_process.checksum = __wt_checksum_hw;
+	else
+		__wt_process.checksum = __wt_checksum_sw;
+
+#else /* !HAVE_CRC32_HARDWARE */
 	__wt_process.checksum = __wt_checksum_sw;
 #endif
 }

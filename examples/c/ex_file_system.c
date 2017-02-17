@@ -399,6 +399,7 @@ demo_fs_directory_list(WT_FILE_SYSTEM *file_system,
 	uint32_t allocated, count;
 	int ret = 0;
 	char *name, **entries;
+	void *p;
 
 	(void)session;						/* Unused */
 
@@ -424,14 +425,16 @@ demo_fs_directory_list(WT_FILE_SYSTEM *file_system,
 		 * matter if the list is a bit longer than necessary.
 		 */
 		if (count >= allocated) {
-			entries = realloc(
-			    entries, (allocated + 10) * sizeof(char *));
-			if (entries == NULL) {
+			p = realloc(
+			    entries, (allocated + 10) * sizeof(*entries));
+			if (p == NULL) {
 				ret = ENOMEM;
 				goto err;
 			}
-			memset(entries + allocated * sizeof(char *),
-			    0, 10 * sizeof(char *));
+
+			entries = p;
+			memset(entries + allocated * sizeof(*entries),
+			    0, 10 * sizeof(*entries));
 			allocated += 10;
 		}
 		entries[count++] = strdup(name);

@@ -524,6 +524,7 @@ connection_runtime_config = [
             'checkpoint',
             'compact',
             'evict',
+            'evict_stuck',
             'evictserver',
             'fileops',
             'handleops',
@@ -717,7 +718,7 @@ wiredtiger_open_common =\
         ]),
     Config('extensions', '', r'''
         list of shared library extensions to load (using dlopen).
-        Any values specified to an library extension are passed to
+        Any values specified to a library extension are passed to
         WT_CONNECTION::load_extension as the \c config parameter
         (for example,
         <code>extensions=(/path/ext.so={entry=my_entry})</code>)''',

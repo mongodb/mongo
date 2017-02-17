@@ -7,6 +7,12 @@
 The WiredTiger Utility can now \c truncate an object. Removing all contents
 from the specified object.
 </dd>
+<dt>Handle list lock statistics</dt>
+<dd>
+In the 2.9.1 release we added statistics tracking handle list lock timing, we
+have switched that lock from a spin lock to a read-write lock, and consequently
+changed the statistics tracking lock related wait time.
+</dd>
 </dl>
 
 @section version_291 Upgrading to Version 2.9.1

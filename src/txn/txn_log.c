@@ -269,7 +269,7 @@ __wt_txn_checkpoint_logread(WT_SESSION_IMPL *session,
 	WT_ITEM ckpt_snapshot_unused;
 	uint32_t ckpt_file, ckpt_offset;
 	u_int ckpt_nsnapshot_unused;
-	const char *fmt = WT_UNCHECKED_STRING(IIIU);
+	const char *fmt = WT_UNCHECKED_STRING(IIIu);
 
 	if ((ret = __wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), fmt,
 	    &ckpt_file, &ckpt_offset,
@@ -297,7 +297,7 @@ __wt_txn_checkpoint_log(
 	uint8_t *end, *p;
 	size_t recsize;
 	uint32_t i, rectype = WT_LOGREC_CHECKPOINT;
-	const char *fmt = WT_UNCHECKED_STRING(IIIIU);
+	const char *fmt = WT_UNCHECKED_STRING(IIIIu);
 
 	txn = &session->txn;
 	ckpt_lsn = &txn->ckpt_lsn;

@@ -6,5 +6,4 @@ run_time=300
 reopen_connection=false
 populate_threads=2
 value_sz=256
-read_range=100
-threads=((count=4,inserts=1,throttle=100000),(count=8,reads=1))
+threads=((count=4,inserts=1,throttle=100000),(count=8,reads=1,read_range=100))

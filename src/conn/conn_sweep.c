@@ -233,7 +233,7 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
 		if (!WT_DHANDLE_CAN_DISCARD(dhandle))
 			continue;
 
-		WT_WITH_HANDLE_LIST_LOCK(session,
+		WT_WITH_HANDLE_LIST_WRITE_LOCK(session,
 		    ret = __sweep_remove_one(session, dhandle));
 		if (ret == 0)
 			WT_STAT_CONN_INCR(session, dh_sweep_remove);
@@ -243,6 +243,16 @@ __sweep_remove_handles(WT_SESSION_IMPL *session)
 	}
 
 	return (ret == EBUSY ? 0 : ret);
+}
+
+/*
+ * __sweep_server_run_chk --
+ *	Check to decide if the checkpoint server should continue running.
+ */
+static bool
+__sweep_server_run_chk(WT_SESSION_IMPL *session)
+{
+	return (F_ISSET(S2C(session), WT_CONN_SERVER_SWEEP));
 }
 
 /*
@@ -266,11 +276,15 @@ __sweep_server(void *arg)
 	/*
 	 * Sweep for dead and excess handles.
 	 */
-	while (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
-	    F_ISSET(conn, WT_CONN_SERVER_SWEEP)) {
+	for (;;) {
 		/* Wait until the next event. */
-		__wt_cond_wait(session,
-		    conn->sweep_cond, conn->sweep_interval * WT_MILLION);
+		__wt_cond_wait(session, conn->sweep_cond,
+		    conn->sweep_interval * WT_MILLION, __sweep_server_run_chk);
+
+		/* Check if we're quitting or being reconfigured. */
+		if (!__sweep_server_run_chk(session))
+			break;
+
 		__wt_seconds(session, &now);
 
 		WT_STAT_CONN_INCR(session, dh_sweeps);
@@ -390,7 +404,7 @@ __wt_sweep_create(WT_SESSION_IMPL *session)
 	session = conn->sweep_session;
 
 	WT_RET(__wt_cond_alloc(
-	    session, "handle sweep server", false, &conn->sweep_cond));
+	    session, "handle sweep server", &conn->sweep_cond));
 
 	WT_RET(__wt_thread_create(
 	    session, &conn->sweep_tid, __sweep_server, session));

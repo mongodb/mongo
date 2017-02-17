@@ -20,9 +20,4 @@ cursor configured using \c next_random_sample_size divides the object
 into \c next_random_sample_size pieces, and each subsequent retrieval
 returns a record from the next one of those pieces.
 
-For example, setting \c next_random_sample_percent to \c 10 would cause
-the cursor to sequentially return records from each tenth part of the
-object. Setting \c next_random_sample_percent to \c 1000 would cause the
-cursor to sequentially return records from each .1% of the object.
-
  */

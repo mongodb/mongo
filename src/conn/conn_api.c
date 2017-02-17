@@ -1798,6 +1798,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "checkpoint",		WT_VERB_CHECKPOINT },
 		{ "compact",		WT_VERB_COMPACT },
 		{ "evict",		WT_VERB_EVICT },
+		{ "evict_stuck",	WT_VERB_EVICT_STUCK },
 		{ "evictserver",	WT_VERB_EVICTSERVER },
 		{ "fileops",		WT_VERB_FILEOPS },
 		{ "handleops",		WT_VERB_HANDLEOPS },
@@ -1986,6 +1987,16 @@ __conn_set_file_system(
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, set_file_system, config, cfg);
 	WT_UNUSED(cfg);
+
+	/*
+	 * You can only configure a file system once, and attempting to do it
+	 * again probably means the extension argument didn't have early-load
+	 * set and we've already configured the default file system.
+	 */
+	if (conn->file_system != NULL)
+		WT_ERR_MSG(session, EPERM,
+		    "filesystem already configured; custom filesystems should "
+		    "enable \"early_load\" configuration");
 
 	conn->file_system = file_system;
 

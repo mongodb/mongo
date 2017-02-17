@@ -71,6 +71,15 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         self.assertEquals(cursor.reset(), 0)
         cursor.close()
 
+    # Check that next_random fails with an empty tree, repeatedly.
+    def test_cursor_random_empty(self):
+        uri = self.type
+        self.session.create(uri, 'key_format=S,value_format=S')
+        cursor = self.session.open_cursor(uri, None, self.config)
+        for i in range(1,5):
+            self.assertTrue(cursor.next(), wiredtiger.WT_NOTFOUND)
+        cursor.close
+
     # Check that next_random works with a single value, repeatedly.
     def test_cursor_random_single_record(self):
         uri = self.type
@@ -126,6 +135,46 @@ class test_cursor_random(wttest.WiredTigerTestCase):
         self.cursor_random_multiple_page_records(1)
     def test_cursor_random_multiple_page_records(self):
         self.cursor_random_multiple_page_records(0)
+
+    # Check that next_random fails in the presence of a set of values, some of
+    # which are deleted.
+    def test_cursor_random_deleted_partial(self):
+        uri = self.type
+        ds = self.dataset(self, uri, 10000,
+            config='allocation_size=512,leaf_page_max=512')
+        ds.populate()
+
+        # Close the connection so everything is forced to disk.
+        self.reopen_conn()
+
+        start = self.session.open_cursor(uri, None)
+        start.set_key(ds.key(10))
+        end = self.session.open_cursor(uri, None)
+        end.set_key(ds.key(10000-10))
+        self.session.truncate(None, start, end, None)
+        self.assertEqual(start.close(), 0)
+        self.assertEqual(end.close(), 0)
+
+        cursor = self.session.open_cursor(uri, None, self.config)
+        for i in range(1,10):
+            self.assertEqual(cursor.next(), 0)
+
+    # Check that next_random fails in the presence of a set of values, all of
+    # which are deleted.
+    def test_cursor_random_deleted_all(self):
+        uri = self.type
+        ds = self.dataset(self, uri, 10000,
+            config='allocation_size=512,leaf_page_max=512')
+        ds.populate()
+
+        # Close the connection so everything is forced to disk.
+        self.reopen_conn()
+
+        self.session.truncate(uri, None, None, None)
+
+        cursor = self.session.open_cursor(uri, None, self.config)
+        for i in range(1,10):
+            self.assertTrue(cursor.next(), wiredtiger.WT_NOTFOUND)
 
 # Check that opening a random cursor on column-store returns not-supported.
 class test_cursor_random_column(wttest.WiredTigerTestCase):

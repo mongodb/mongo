@@ -76,11 +76,11 @@ __cursor_fix_implicit(WT_BTREE *btree, WT_CURSOR_BTREE *cbt)
 }
 
 /*
- * __cursor_valid --
+ * __wt_cursor_valid --
  *	Return if the cursor references an valid key/value pair.
  */
-static inline bool
-__cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
+bool
+__wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -330,7 +330,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 		WT_ERR(btree->type == BTREE_ROW ?
 		    __cursor_row_search(session, cbt, cbt->ref, false) :
 		    __cursor_col_search(session, cbt, cbt->ref));
-		valid = cbt->compare == 0 && __cursor_valid(cbt, &upd);
+		valid = cbt->compare == 0 && __wt_cursor_valid(cbt, &upd);
 	}
 	if (!valid) {
 		WT_ERR(__cursor_func_init(cbt, true));
@@ -338,7 +338,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 		WT_ERR(btree->type == BTREE_ROW ?
 		    __cursor_row_search(session, cbt, NULL, false) :
 		    __cursor_col_search(session, cbt, NULL));
-		valid = cbt->compare == 0 && __cursor_valid(cbt, &upd);
+		valid = cbt->compare == 0 && __wt_cursor_valid(cbt, &upd);
 	}
 
 	if (valid)
@@ -419,14 +419,14 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 		 * Ignore those cases, it makes things too complicated.
 		 */
 		if (cbt->slot != 0 && cbt->slot != cbt->ref->page->entries - 1)
-			valid = __cursor_valid(cbt, &upd);
+			valid = __wt_cursor_valid(cbt, &upd);
 	}
 	if (!valid) {
 		WT_ERR(__cursor_func_init(cbt, true));
 		WT_ERR(btree->type == BTREE_ROW ?
 		    __cursor_row_search(session, cbt, NULL, true) :
 		    __cursor_col_search(session, cbt, NULL));
-		valid = __cursor_valid(cbt, &upd);
+		valid = __wt_cursor_valid(cbt, &upd);
 	}
 
 	/*
@@ -462,7 +462,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 		WT_ERR(btree->type == BTREE_ROW ?
 		    __cursor_row_search(session, cbt, NULL, true) :
 		    __cursor_col_search(session, cbt, NULL));
-		if (__cursor_valid(cbt, &upd)) {
+		if (__wt_cursor_valid(cbt, &upd)) {
 			exact = cbt->compare;
 			ret = __wt_kv_return(session, cbt, upd);
 		} else if ((ret = __wt_btcur_prev(cbt, false)) != WT_NOTFOUND)
@@ -537,7 +537,7 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 		 * Fail in that case, the record exists.
 		 */
 		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
-		    ((cbt->compare == 0 && __cursor_valid(cbt, NULL)) ||
+		    ((cbt->compare == 0 && __wt_cursor_valid(cbt, NULL)) ||
 		    (cbt->compare != 0 && __cursor_fix_implicit(btree, cbt))))
 			WT_ERR(WT_DUPLICATE_KEY);
 
@@ -552,7 +552,7 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 		 * key/value pair.
 		 */
 		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
-		    cbt->compare == 0 && __cursor_valid(cbt, NULL))
+		    cbt->compare == 0 && __wt_cursor_valid(cbt, NULL))
 			WT_ERR(WT_DUPLICATE_KEY);
 
 		ret = __cursor_row_modify(session, cbt, false);
@@ -682,12 +682,12 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 		/*
 		 * If we find a matching record, check whether an update would
 		 * conflict.  Do this before checking if the update is visible
-		 * in __cursor_valid, or we can miss conflict.
+		 * in __wt_cursor_valid, or we can miss conflict.
 		 */
 		WT_ERR(__curfile_update_check(cbt));
 
 		/* Remove the record if it exists. */
-		if (cbt->compare != 0 || !__cursor_valid(cbt, NULL)) {
+		if (cbt->compare != 0 || !__wt_cursor_valid(cbt, NULL)) {
 			if (!__cursor_fix_implicit(btree, cbt))
 				WT_ERR(WT_NOTFOUND);
 			/*
@@ -711,7 +711,7 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 		/* Check whether an update would conflict. */
 		WT_ERR(__curfile_update_check(cbt));
 
-		if (cbt->compare != 0 || !__cursor_valid(cbt, NULL))
+		if (cbt->compare != 0 || !__wt_cursor_valid(cbt, NULL))
 			WT_ERR(WT_NOTFOUND);
 
 		ret = __cursor_row_modify(session, cbt, true);
@@ -786,7 +786,8 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 		 */
 		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
 			WT_ERR(__curfile_update_check(cbt));
-			if ((cbt->compare != 0 || !__cursor_valid(cbt, NULL)) &&
+			if ((cbt->compare != 0 ||
+			    !__wt_cursor_valid(cbt, NULL)) &&
 			    !__cursor_fix_implicit(btree, cbt))
 				WT_ERR(WT_NOTFOUND);
 		}
@@ -800,7 +801,7 @@ retry:	WT_RET(__cursor_func_init(cbt, true));
 		 */
 		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
 			WT_ERR(__curfile_update_check(cbt));
-			if (cbt->compare != 0 || !__cursor_valid(cbt, NULL))
+			if (cbt->compare != 0 || !__wt_cursor_valid(cbt, NULL))
 				WT_ERR(WT_NOTFOUND);
 		}
 		ret = __cursor_row_modify(session, cbt, false);
@@ -826,111 +827,6 @@ err:	if (ret == WT_RESTART) {
 
 	if (ret != 0)
 		WT_TRET(__cursor_reset(cbt));
-	return (ret);
-}
-
-/*
- * __wt_btcur_next_random --
- *	Move to a random record in the tree. There are two algorithms, one
- *	where we select a record at random from the whole tree on each
- *	retrieval and one where we first select a record at random from the
- *	whole tree, and then subsequently sample forward from that location.
- *	The sampling approach allows us to select reasonably uniform random
- *	points from unbalanced trees.
- */
-int
-__wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
-{
-	WT_BTREE *btree;
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
-	WT_UPDATE *upd;
-	wt_off_t size;
-	uint64_t skip;
-
-	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	btree = cbt->btree;
-
-	/*
-	 * Only supports row-store: applications can trivially select a random
-	 * value from a column-store, if there were any reason to do so.
-	 */
-	if (btree->type != BTREE_ROW)
-		WT_RET_MSG(session, ENOTSUP,
-		    "WT_CURSOR.next_random only supported by row-store tables");
-
-	WT_STAT_CONN_INCR(session, cursor_next);
-	WT_STAT_DATA_INCR(session, cursor_next);
-
-	/*
-	 * If retrieving random values without sampling, or we don't have a
-	 * page reference, pick a roughly random leaf page in the tree.
-	 */
-	if (cbt->ref == NULL || cbt->next_random_sample_size == 0) {
-		/*
-		 * Skip past the sample size of the leaf pages in the tree
-		 * between each random key return to compensate for unbalanced
-		 * trees.
-		 *
-		 * Use the underlying file size divided by its block allocation
-		 * size as our guess of leaf pages in the file (this can be
-		 * entirely wrong, as it depends on how many pages are in this
-		 * particular checkpoint, how large the leaf and internal pages
-		 * really are, and other factors). Then, divide that value by
-		 * the configured sample size and increment the final result to
-		 * make sure tiny files don't leave us with a skip value of 0.
-		 *
-		 * !!!
-		 * Ideally, the number would be prime to avoid restart issues.
-		 */
-		if (cbt->next_random_sample_size != 0) {
-			WT_ERR(btree->bm->size(btree->bm, session, &size));
-			cbt->next_random_leaf_skip = (uint64_t)
-			    ((size / btree->allocsize) /
-			    cbt->next_random_sample_size) + 1;
-		}
-
-		/*
-		 * Choose a leaf page from the tree.
-		 */
-		WT_ERR(__cursor_func_init(cbt, true));
-		WT_WITH_PAGE_INDEX(
-		    session, ret = __wt_row_random_descent(session, cbt));
-		WT_ERR(ret);
-	} else {
-		/*
-		 * Read through the tree, skipping leaf pages. Be cautious about
-		 * the skip count: if the last leaf page skipped was also the
-		 * last leaf page in the tree, it may be set to zero on return
-		 * with the end-of-walk condition.
-		 *
-		 * Pages read for data sampling aren't "useful"; don't update
-		 * the read generation of pages already in memory, and if a page
-		 * is read, set its generation to a low value so it is evicted
-		 * quickly.
-		 */
-		for (skip =
-		    cbt->next_random_leaf_skip; cbt->ref == NULL || skip > 0;)
-			WT_ERR(__wt_tree_walk_skip(session, &cbt->ref, &skip,
-			    WT_READ_NO_GEN |
-			    WT_READ_SKIP_INTL | WT_READ_WONT_NEED));
-	}
-
-	/*
-	 * Select a random entry from the leaf page. If it's not valid, move to
-	 * the next entry, if that doesn't work, move to the previous entry.
-	 */
-	WT_ERR(__wt_row_random_leaf(session, cbt));
-	if (__cursor_valid(cbt, &upd))
-		WT_ERR(__wt_kv_return(session, cbt, upd));
-	else {
-		if ((ret = __wt_btcur_next(cbt, false)) == WT_NOTFOUND)
-			ret = __wt_btcur_prev(cbt, false);
-		WT_ERR(ret);
-	}
-	return (0);
-
-err:	WT_TRET(__cursor_reset(cbt));
 	return (ret);
 }
 

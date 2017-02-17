@@ -78,10 +78,20 @@ func_ok()
 	    -e '/int demo_file_sync$/d' \
 	    -e '/int demo_fs_directory_list_free$/d' \
 	    -e '/int demo_fs_exist$/d' \
+	    -e '/int fail_file_lock$/d' \
+	    -e '/int fail_file_sync$/d' \
+	    -e '/int fail_fs_directory_list_free$/d' \
+	    -e '/int fail_fs_exist$/d' \
+	    -e '/int fail_fs_simulate_fail$/d' \
+	    -e '/int fail_fs_terminate$/d' \
 	    -e '/int handle_message$/d' \
 	    -e '/int handle_progress$/d' \
 	    -e '/int helium_cursor_reset$/d' \
 	    -e '/int helium_session_verify$/d' \
+	    -e '/int index_compare_primary$/d' \
+	    -e '/int index_compare_S$/d' \
+	    -e '/int index_compare_u$/d' \
+	    -e '/int index_extractor_u$/d' \
 	    -e '/int log_print_err$/d' \
 	    -e '/int lz4_error$/d' \
 	    -e '/int lz4_pre_size$/d' \

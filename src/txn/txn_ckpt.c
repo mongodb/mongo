@@ -525,6 +525,17 @@ __checkpoint_verbose_track(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __checkpoint_fail_reset --
+ *	Reset fields when a failure occurs.
+ */
+static void
+__checkpoint_fail_reset(WT_SESSION_IMPL *session)
+{
+	S2BT(session)->modified = true;
+	S2BT(session)->ckpt = NULL;
+}
+
+/*
  * __txn_checkpoint --
  *	Checkpoint a database or a list of objects in the database.
  */
@@ -543,7 +554,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	void *saved_meta_next;
 	u_int i;
 	uint64_t fsync_duration_usecs;
-	bool full, idle, logging, tracking;
+	bool failed, full, idle, logging, tracking;
 	const char *txn_cfg[] = { WT_CONFIG_BASE(session,
 	    WT_SESSION_begin_transaction), "isolation=snapshot", NULL };
 
@@ -639,10 +650,9 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	WT_ASSERT(session, session->ckpt_handle_next == 0);
 	WT_WITH_SCHEMA_LOCK(session,
-	    WT_WITH_TABLE_LOCK(session,
-		WT_WITH_HANDLE_LIST_LOCK(session,
-		    ret = __checkpoint_apply_all(
-		    session, cfg, __wt_checkpoint_get_handles, NULL))));
+	    WT_WITH_TABLE_READ_LOCK(session,
+		ret = __checkpoint_apply_all(
+		    session, cfg, __wt_checkpoint_get_handles, NULL)));
 	WT_ERR(ret);
 
 	/*
@@ -825,12 +835,13 @@ err:	/*
 	 * overwritten the checkpoint, so what ends up on disk is not
 	 * consistent.
 	 */
-	if (ret != 0 && !conn->modified)
+	failed = ret != 0;
+	if (failed)
 		conn->modified = true;
 
 	session->isolation = txn->isolation = WT_ISO_READ_UNCOMMITTED;
 	if (tracking)
-		WT_TRET(__wt_meta_track_off(session, false, ret != 0));
+		WT_TRET(__wt_meta_track_off(session, false, failed));
 
 	cache->eviction_scrub_limit = 0.0;
 	WT_STAT_CONN_SET(session, txn_checkpoint_scrub_target, 0);
@@ -863,6 +874,13 @@ err:	/*
 	for (i = 0; i < session->ckpt_handle_next; ++i) {
 		if (session->ckpt_handle[i] == NULL)
 			continue;
+		/*
+		 * If the operation failed, mark all trees dirty so they are
+		 * included if a future checkpoint can succeed.
+		 */
+		if (failed)
+			WT_WITH_DHANDLE(session, session->ckpt_handle[i],
+			    __checkpoint_fail_reset(session));
 		WT_WITH_DHANDLE(session, session->ckpt_handle[i],
 		    WT_TRET(__wt_session_release_btree(session)));
 	}
@@ -1341,7 +1359,6 @@ __checkpoint_tree(
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	WT_LSN ckptlsn;
-	int was_modified;
 	bool fake_ckpt;
 
 	WT_UNUSED(cfg);
@@ -1352,7 +1369,6 @@ __checkpoint_tree(
 	conn = S2C(session);
 	dhandle = session->dhandle;
 	fake_ckpt = false;
-	was_modified = btree->modified;
 
 	/*
 	 * Set the checkpoint LSN to the maximum LSN so that if logging is
@@ -1483,10 +1499,9 @@ err:	/*
 	 * If the checkpoint didn't complete successfully, make sure the
 	 * tree is marked dirty.
 	 */
-	if (ret != 0 && !btree->modified && was_modified) {
+	if (ret != 0) {
 		btree->modified = true;
-		if (!S2C(session)->modified)
-			S2C(session)->modified = true;
+		S2C(session)->modified = true;
 	}
 
 	__wt_meta_ckptlist_free(session, ckptbase);

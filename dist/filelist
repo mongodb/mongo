@@ -30,6 +30,7 @@ src/btree/bt_io.c
 src/btree/bt_misc.c
 src/btree/bt_ovfl.c
 src/btree/bt_page.c
+src/btree/bt_random.c
 src/btree/bt_read.c
 src/btree/bt_rebalance.c
 src/btree/bt_ret.c

@@ -52,8 +52,6 @@ struct __wt_session_impl {
 	const char *lastop;		/* Last operation */
 	uint32_t id;			/* UID, offset in session array */
 
-	WT_CONDVAR *cond;		/* Condition variable */
-
 	WT_EVENT_HANDLER *event_handler;/* Application's event handlers */
 
 	WT_DATA_HANDLE *dhandle;	/* Current data handle */

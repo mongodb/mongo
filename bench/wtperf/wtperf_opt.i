@@ -145,12 +145,13 @@ DEF_OPT_AS_UINT32(populate_ops_per_txn, 0,
     "phase, zero for auto-commit")
 DEF_OPT_AS_UINT32(populate_threads, 1,
     "number of populate threads, 1 for bulk load")
+DEF_OPT_AS_BOOL(pre_load_data, 0,
+    "Scan all data prior to starting the workload phase to warm the cache")
 DEF_OPT_AS_UINT32(random_range, 0,
     "if non zero choose a value from within this range as the key for "
     "insert operations")
 DEF_OPT_AS_BOOL(random_value, 0, "generate random content for the value")
 DEF_OPT_AS_BOOL(range_partition, 0, "partition data by range (vs hash)")
-DEF_OPT_AS_UINT32(read_range, 0, "scan a range of keys after each search")
 DEF_OPT_AS_BOOL(readonly, 0,
     "reopen the connection between populate and workload phases in readonly "
     "mode.  Requires reopen_connection turned on (default).  Requires that "
@@ -192,9 +193,10 @@ DEF_OPT_AS_STRING(threads, "", "workload configuration: each 'count' "
     "'threads=((count=2,reads=1)(count=8,reads=1,inserts=2,updates=1))' "
     "which would create 2 threads doing nothing but reads and 8 threads "
     "each doing 50% inserts and 25% reads and updates.  Allowed configuration "
-    "values are 'count', 'throttle', 'update_delta', 'reads', 'inserts', "
-    "'updates', 'truncate', 'truncate_pct' and 'truncate_count'. There are "
-    "also behavior modifiers, supported modifiers are 'ops_per_txn'")
+    "values are 'count', 'throttle', 'update_delta', 'reads', 'read_range', "
+    "'inserts', 'updates', 'truncate', 'truncate_pct' and 'truncate_count'. "
+    "There are also behavior modifiers, supported modifiers are "
+    "'ops_per_txn'")
 DEF_OPT_AS_CONFIG_STRING(transaction_config, "",
     "WT_SESSION.begin_transaction configuration string, applied during the "
     "populate phase when populate_ops_per_txn is nonzero")

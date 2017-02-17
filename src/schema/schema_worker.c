@@ -49,7 +49,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 			 * any open file handles, including checkpoints.
 			 */
 			if (FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE)) {
-				WT_WITH_HANDLE_LIST_LOCK(session,
+				WT_WITH_HANDLE_LIST_WRITE_LOCK(session,
 				    ret = __wt_conn_dhandle_close_all(
 				    session, uri, false));
 				WT_ERR(ret);

@@ -120,6 +120,7 @@ cycle_idle_tables(void *arg)
 			return (NULL);
 		start = stop;
 
+#if 1
 		/*
 		 * Drop the table. Keep retrying on EBUSY failure - it is an
 		 * expected return when checkpoints are happening.
@@ -136,6 +137,7 @@ cycle_idle_tables(void *arg)
 		}
 		if (check_timing(wtperf, "drop", start, &stop) != 0)
 			return (NULL);
+#endif
 	}
 
 	return (NULL);

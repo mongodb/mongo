@@ -346,13 +346,9 @@ __backup_stop(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 static int
 __backup_all(WT_SESSION_IMPL *session)
 {
-	WT_DECL_RET;
-
 	/* Build a list of the file objects that need to be copied. */
-	WT_WITH_HANDLE_LIST_LOCK(session, ret =
-	    __wt_meta_apply_all(session, NULL, __backup_list_uri_append, NULL));
-
-	return (ret);
+	return (__wt_meta_apply_all(
+	    session, NULL, __backup_list_uri_append, NULL));
 }
 
 /*

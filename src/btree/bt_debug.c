@@ -652,7 +652,7 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
 	page = ref->page;
 	mod = page->modify;
 
-	WT_RET(ds->f(ds, "%p", (void *)page));
+	WT_RET(ds->f(ds, "%p", (void *)ref));
 
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
@@ -699,8 +699,6 @@ __debug_page_metadata(WT_DBG *ds, WT_REF *ref)
 		WT_RET(ds->f(ds, ", evict-lru"));
 	if (F_ISSET_ATOMIC(page, WT_PAGE_OVERFLOW_KEYS))
 		WT_RET(ds->f(ds, ", overflow-keys"));
-	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_BLOCK))
-		WT_RET(ds->f(ds, ", split-block"));
 	if (F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_INSERT))
 		WT_RET(ds->f(ds, ", split-insert"));
 	if (F_ISSET_ATOMIC(page, WT_PAGE_UPDATE_IGNORE))

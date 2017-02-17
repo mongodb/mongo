@@ -259,7 +259,7 @@ __wt_thread_group_create(
 
 	__wt_rwlock_init(session, &group->lock);
 	WT_ERR(__wt_cond_alloc(
-	    session, "Thread group cond", false, &group->wait_cond));
+	    session, "thread group cond", &group->wait_cond));
 	cond_alloced = true;
 
 	__wt_writelock(session, &group->lock);
