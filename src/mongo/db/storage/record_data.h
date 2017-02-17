@@ -69,7 +69,7 @@ public:
         return std::move(_ownedData);
     }
 
-    BSONObj toBson() const {
+    BSONObj toBson() const& {
         return isOwned() ? BSONObj(_ownedData) : BSONObj(_data);
     }
 
@@ -77,8 +77,9 @@ public:
         return isOwned() ? BSONObj(releaseBuffer()) : BSONObj(_data);
     }
 
-    // TODO uncomment once we require compilers that support overloading for rvalue this.
-    // BSONObj toBson() && { return releaseToBson(); }
+    BSONObj toBson() && {
+        return releaseToBson();
+    }
 
     RecordData getOwned() const {
         if (isOwned())
