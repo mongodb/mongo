@@ -899,7 +899,8 @@ void LockManager::_dumpBucket(const LockBucket* bucket) const {
         for (const LockRequest* iter = lock->grantedList._front; iter != nullptr;
              iter = iter->next) {
             std::stringstream threadId;
-            threadId << iter->locker->getThreadId();
+            threadId << iter->locker->getThreadId() << " | " << std::showbase << std::hex
+                     << iter->locker->getThreadId();
             sb << '\t' << "LockRequest " << iter->locker->getId() << " @ " << iter->locker << ": "
                << "Mode = " << modeName(iter->mode) << "; "
                << "Thread = " << threadId.str() << "; "
