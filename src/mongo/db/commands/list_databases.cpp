@@ -43,6 +43,7 @@
 namespace mongo {
 namespace {
 static const StringData kFilterField{"filter"};
+static const StringData kNameField{"name"};
 static const StringData kNameOnlyField{"nameOnly"};
 }  // namespace
 
@@ -120,6 +121,7 @@ public:
 
         vector<BSONObj> dbInfos;
 
+        bool filterNameOnly = filter && filter->isLeaf() && filter->path() == kNameField;
         intmax_t totalSize = 0;
         for (vector<string>::iterator i = dbNames.begin(); i != dbNames.end(); ++i) {
             const string& dbname = *i;
@@ -129,6 +131,10 @@ public:
 
             int64_t size = 0;
             if (!nameOnly) {
+                // Filtering on name only should not require taking locks on filtered-out names.
+                if (filterNameOnly && !filter->matchesBSON(b.asTempObj()))
+                    continue;
+
                 ScopedTransaction transaction(txn, MODE_IS);
                 Lock::DBLock dbLock(txn->lockState(), dbname, MODE_IS);
 
