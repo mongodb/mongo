@@ -42,6 +42,7 @@
 #include "mongo/executor/test_network_connection_hook.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/legacy_reply_builder.h"
+#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
