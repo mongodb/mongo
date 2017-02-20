@@ -1680,9 +1680,6 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 			WT_RET_NOTFOUND_OK(ret);
 		}
 		break;
-	default:
-		WT_RET_MSG(session, EINVAL,
-		    "Invalid btree walk state encountered");
 	}
 
 	/*
