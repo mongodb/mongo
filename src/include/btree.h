@@ -141,7 +141,11 @@ struct __wt_btree {
 	u_int	    evict_walk_skips;	/* Number of walks skipped */
 	u_int	    evict_disabled;	/* Eviction disabled count */
 	volatile uint32_t evict_busy;	/* Count of threads in eviction */
-	bool	    evict_walk_reverse;	/* Walk direction */
+	enum {
+	    WT_EVICT_WALK_NEXT, WT_EVICT_WALK_PREV,
+	    WT_EVICT_WALK_RAND_NEXT, WT_EVICT_WALK_RAND_PREV
+	} evict_walk_state;		/* Eviction walk state */
+#define	WT_EVICT_WALK_MAX_LEGAL_VALUE	WT_EVICT_WALK_RAND_PREV + 1
 
 	enum {
 		WT_CKPT_OFF, WT_CKPT_PREPARE, WT_CKPT_RUNNING

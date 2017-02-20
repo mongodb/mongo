@@ -1654,31 +1654,33 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	    !F_ISSET(cache, WT_CACHE_EVICT_CLEAN))
 		min_pages *= 10;
 
+	walk_flags =
+	    WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT;
+
 	/*
 	 * Choose a random point in the tree if looking for candidates in a
 	 * tree with no starting point set. This is mostly aimed at ensuring
 	 * eviction fairly visits all pages in trees with a lot of in-cache
 	 * content.
 	 */
-	if (btree->evict_ref == NULL) {
-		/* Ensure internal pages indexes remain valid for our walk */
-		WT_WITH_PAGE_INDEX(session, ret =
-		    __wt_random_descent(session, &btree->evict_ref, true));
-		WT_RET_NOTFOUND_OK(ret);
-
-		/*
-		 * Reverse the direction of the walk each time we start at a
-		 * random point so both ends of the tree are equally likely to
-		 * be visited.
-		 */
-		btree->evict_walk_reverse = !btree->evict_walk_reverse;
-	}
-
-	walk_flags =
-	    WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT;
-
-	if (btree->evict_walk_reverse)
+	switch (btree->evict_walk_state) {
+	case WT_EVICT_WALK_NEXT:
+		break;
+	case WT_EVICT_WALK_PREV:
 		FLD_SET(walk_flags, WT_READ_PREV);
+		break;
+	case WT_EVICT_WALK_RAND_PREV:
+		FLD_SET(walk_flags, WT_READ_PREV);
+		/* FALLTHROUGH */
+	case WT_EVICT_WALK_RAND_NEXT:
+		if (btree->evict_ref == NULL) {
+			/* Ensure internal pages indexes remain valid */
+			WT_WITH_PAGE_INDEX(session, ret = __wt_random_descent(
+			    session, &btree->evict_ref, true));
+			WT_RET_NOTFOUND_OK(ret);
+		}
+		break;
+	}
 
 	/*
 	 * Get some more eviction candidate pages, starting at the last saved
@@ -1713,8 +1715,16 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 		    pages_seen > min_pages &&
 		    (pages_queued == 0 || (pages_seen / pages_queued) >
 		    (min_pages / target_pages));
-		if (give_up)
+		if (give_up) {
+			/*
+			 * Try a different walk start point next time if a
+			 * walk gave up.
+			 */
+			btree->evict_walk_state =
+			    (btree->evict_walk_state + 1) %
+			    WT_EVICT_WALK_MAX_LEGAL_VALUE;
 			break;
+		}
 
 		if (ref == NULL) {
 			if (++restarts == 2)

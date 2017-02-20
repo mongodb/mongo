@@ -220,6 +220,7 @@ __log_slot_switch_internal(
 	if (slot != log->active_slot)
 		return (0);
 
+	WT_RET(WT_SESSION_CHECK_PANIC(session));
 	/*
 	 * We may come through here multiple times if we were able to close
 	 * a slot but could not set up a new one.  If we closed it already,
@@ -582,6 +583,7 @@ __wt_log_slot_release(WT_SESSION_IMPL *session, WT_MYSLOT *myslot, int64_t size)
 	 * was written rather than the beginning record of the slot.
 	 */
 	while ((cur_offset = slot->slot_last_offset) < my_start) {
+		WT_RET(WT_SESSION_CHECK_PANIC(session));
 		/*
 		 * Set our offset if we are larger.
 		 */
