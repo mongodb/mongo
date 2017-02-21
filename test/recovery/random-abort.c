@@ -32,7 +32,7 @@
 #include <signal.h>
 
 static char home[1024];			/* Program working dir */
-static const char *progname;		/* Program name */
+
 /*
  * These two names for the URI and file system must be maintained in tandem.
  */
@@ -229,10 +229,7 @@ main(int argc, char *argv[])
 	const char *working_dir;
 	char fname[64], kname[64], statname[1024];
 
-	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
-		progname = argv[0];
-	else
-		++progname;
+	(void)testutil_set_progname(argv);
 
 	inmem = false;
 	nth = MIN_TH;

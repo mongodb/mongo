@@ -574,7 +574,6 @@ __wt_log_slot_release(WT_SESSION_IMPL *session, WT_MYSLOT *myslot, int64_t size)
 	wt_off_t cur_offset, my_start;
 	int64_t my_size, rel_size;
 
-	WT_UNUSED(session);
 	slot = myslot->slot;
 	my_start = slot->slot_start_offset + myslot->offset;
 	/*

@@ -157,9 +157,9 @@ main(int argc, char *argv[])
 	printf("duplicating cursor\n");
 	testutil_check(session->open_cursor(session, NULL, cursor, NULL,
 	    &cursor1));
-	cursor->get_value(cursor, &got);
+	testutil_check(cursor->get_value(cursor, &got));
 	testutil_assert(item_to_int(&got) == 17);
-	cursor1->get_value(cursor1, &got);
+	testutil_check(cursor1->get_value(cursor1, &got));
 	testutil_assert(item_to_int(&got) == 17);
 
 	testutil_check(session->close(session, NULL));

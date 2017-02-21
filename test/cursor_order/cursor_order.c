@@ -29,7 +29,6 @@
 #include "cursor_order.h"
 
 static char home[512];				/* Program working dir */
-static char *progname;				/* Program name */
 static FILE *logfp;				/* Log file */
 
 static int  handle_error(WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
@@ -51,10 +50,7 @@ main(int argc, char *argv[])
 	int ch, cnt, runs;
 	char *config_open, *working_dir;
 
-	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
-		progname = argv[0];
-	else
-		++progname;
+	(void)testutil_set_progname(argv);
 
 	cfg = &_cfg;
 	config_open = NULL;

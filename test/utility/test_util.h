@@ -48,7 +48,7 @@
 /* Generic option parsing structure shared by all test cases. */
 typedef struct {
 	char  *home;
-	char  *progname;
+	const char  *progname;
 	enum {	TABLE_COL=1,	/* Fixed-length column store */
 		TABLE_FIX=2,	/* Variable-length column store */
 		TABLE_ROW=3	/* Row-store */
@@ -192,3 +192,6 @@ void  testutil_work_dir_from_path(char *, size_t, const char *);
 void *thread_append(void *);
 void *thread_insert_append(void *);
 void *thread_prev(void *);
+
+extern const char *progname;
+const char *testutil_set_progname(char * const *);

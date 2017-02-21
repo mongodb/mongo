@@ -1663,7 +1663,7 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	 * eviction fairly visits all pages in trees with a lot of in-cache
 	 * content.
 	 */
-	switch (btree->evict_walk_state) {
+	switch ((WT_EVICT_WALK_START)btree->evict_start_type) {
 	case WT_EVICT_WALK_NEXT:
 		break;
 	case WT_EVICT_WALK_PREV:
@@ -1720,9 +1720,9 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 			 * Try a different walk start point next time if a
 			 * walk gave up.
 			 */
-			btree->evict_walk_state =
-			    (btree->evict_walk_state + 1) %
-			    WT_EVICT_WALK_MAX_LEGAL_VALUE;
+			btree->evict_start_type =
+			    (btree->evict_start_type + 1) %
+			    WT_EVICT_WALK_START_NUM;
 			break;
 		}
 

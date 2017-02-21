@@ -130,22 +130,19 @@ struct __wt_btree {
 	uint64_t rec_max_txn;		/* Maximum txn seen (clean trees) */
 	uint64_t write_gen;		/* Write generation */
 
-	uint64_t    bytes_inmem;	/* Cache bytes in memory. */
-	uint64_t    bytes_dirty_intl;	/* Bytes in dirty internal pages. */
-	uint64_t    bytes_dirty_leaf;	/* Bytes in dirty leaf pages. */
+	uint64_t bytes_inmem;		/* Cache bytes in memory. */
+	uint64_t bytes_dirty_intl;	/* Bytes in dirty internal pages. */
+	uint64_t bytes_dirty_leaf;	/* Bytes in dirty leaf pages. */
 
-	WT_REF	   *evict_ref;		/* Eviction thread's location */
-	uint64_t    evict_priority;	/* Relative priority of cached pages */
-	u_int	    evict_walk_period;	/* Skip this many LRU walks */
-	u_int	    evict_walk_saved;	/* Saved walk skips for checkpoints */
-	u_int	    evict_walk_skips;	/* Number of walks skipped */
-	u_int	    evict_disabled;	/* Eviction disabled count */
+	WT_REF	*evict_ref;		/* Eviction thread's location */
+	uint64_t evict_priority;	/* Relative priority of cached pages */
+	u_int	 evict_walk_period;	/* Skip this many LRU walks */
+	u_int	 evict_walk_saved;	/* Saved walk skips for checkpoints */
+	u_int	 evict_walk_skips;	/* Number of walks skipped */
+	u_int	 evict_disabled;	/* Eviction disabled count */
 	volatile uint32_t evict_busy;	/* Count of threads in eviction */
-	enum {
-	    WT_EVICT_WALK_NEXT, WT_EVICT_WALK_PREV,
-	    WT_EVICT_WALK_RAND_NEXT, WT_EVICT_WALK_RAND_PREV
-	} evict_walk_state;		/* Eviction walk state */
-#define	WT_EVICT_WALK_MAX_LEGAL_VALUE	WT_EVICT_WALK_RAND_PREV + 1
+	int      evict_start_type;	/* Start position for eviction walk
+					   (see WT_EVICT_WALK_START). */
 
 	enum {
 		WT_CKPT_OFF, WT_CKPT_PREPARE, WT_CKPT_RUNNING

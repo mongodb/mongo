@@ -34,7 +34,6 @@ u_int nops;					/* Operations */
 const char *uri;				/* Object */
 const char *config;				/* Object config */
 
-static char *progname;				/* Program name */
 static FILE *logfp;				/* Log file */
 
 static char home[512];
@@ -71,22 +70,15 @@ main(int argc, char *argv[])
 	int ch, cnt, ret, runs;
 	char *config_open, *working_dir;
 
-	working_dir = NULL;
-
-	/* Remove directories */
-	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
-		progname = argv[0];
-	else
-		++progname;
+	(void)testutil_set_progname(argv);
 
 	if ((ret = pthread_rwlock_init(&single, NULL)) != 0)
 		testutil_die(ret, "pthread_rwlock_init: single");
 
-	config_open = NULL;
 	nops = 1000;
 	nthreads = 10;
 	runs = 1;
-
+	config_open = working_dir = NULL;
 	while ((ch = __wt_getopt(progname, argc, argv, "C:h:l:n:r:t:")) != EOF)
 		switch (ch) {
 		case 'C':			/* wiredtiger_open config */

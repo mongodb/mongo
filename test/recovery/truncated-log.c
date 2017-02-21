@@ -36,7 +36,6 @@
 #endif
 
 static char home[1024];			/* Program working dir */
-static const char *progname;		/* Program name */
 static const char * const uri = "table:main";
 
 #define	RECORDS_FILE "records"
@@ -271,10 +270,7 @@ main(int argc, char *argv[])
 	pid_t pid;
 	const char *working_dir;
 
-	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
-		progname = argv[0];
-	else
-		++progname;
+	(void)testutil_set_progname(argv);
 
 	working_dir = "WT_TEST.truncated-log";
 	while ((ch = __wt_getopt(progname, argc, argv, "h:")) != EOF)

@@ -104,7 +104,7 @@ config_setup(void)
 	if (DATASOURCE("lsm") && g.type != ROW) {
 		fprintf(stderr,
 	    "%s: lsm data_source is only compatible with row file_type\n",
-		    g.progname);
+		    progname);
 		exit(EXIT_FAILURE);
 	}
 
@@ -681,7 +681,7 @@ config_single(const char *s, int perm)
 
 	if ((ep = strchr(s, '=')) == NULL) {
 		fprintf(stderr,
-		    "%s: %s: illegal configuration value\n", g.progname, s);
+		    "%s: %s: illegal configuration value\n", progname, s);
 		exit(EXIT_FAILURE);
 	}
 
@@ -751,20 +751,20 @@ config_single(const char *s, int perm)
 		v = strtol(ep, &p, 10);
 		if (*p != '\0') {
 			fprintf(stderr, "%s: %s: illegal numeric value\n",
-			    g.progname, s);
+			    progname, s);
 			exit(EXIT_FAILURE);
 		}
 	}
 	if (F_ISSET(cp, C_BOOL)) {
 		if (v != 0 && v != 1) {
 			fprintf(stderr, "%s: %s: value of boolean not 0 or 1\n",
-			    g.progname, s);
+			    progname, s);
 			exit(EXIT_FAILURE);
 		}
 	} else if (v < cp->min || v > cp->maxset) {
 		fprintf(stderr, "%s: %s: value outside min/max values of %"
 		    PRIu32 "-%" PRIu32 "\n",
-		    g.progname, s, cp->min, cp->maxset);
+		    progname, s, cp->min, cp->maxset);
 		exit(EXIT_FAILURE);
 	}
 	*cp->v = (uint32_t)v;
@@ -883,7 +883,7 @@ config_find(const char *s, size_t len)
 			return (cp);
 
 	fprintf(stderr,
-	    "%s: %s: unknown configuration keyword\n", g.progname, s);
+	    "%s: %s: unknown configuration keyword\n", progname, s);
 	config_error();
 	exit(EXIT_FAILURE);
 }

@@ -1448,7 +1448,7 @@ notfound_chk(const char *f, int wt_ret, int bdb_notfound, uint64_t keyno)
 		return (1);
 
 	if (bdb_notfound) {
-		fprintf(stderr, "%s: %s:", g.progname, f);
+		fprintf(stderr, "%s: %s:", progname, f);
 		if (keyno != 0)
 			fprintf(stderr, " row %" PRIu64 ":", keyno);
 		fprintf(stderr,
@@ -1456,7 +1456,7 @@ notfound_chk(const char *f, int wt_ret, int bdb_notfound, uint64_t keyno)
 		testutil_die(0, NULL);
 	}
 	if (wt_ret == WT_NOTFOUND) {
-		fprintf(stderr, "%s: %s:", g.progname, f);
+		fprintf(stderr, "%s: %s:", progname, f);
 		if (keyno != 0)
 			fprintf(stderr, " row %" PRIu64 ":", keyno);
 		fprintf(stderr,

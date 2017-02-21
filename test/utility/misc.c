@@ -28,6 +28,7 @@
 #include "test_util.h"
 
 void (*custom_die)(void) = NULL;
+const char *progname = "program name not set";
 
 /*
  * die --
@@ -42,7 +43,9 @@ testutil_die(int e, const char *fmt, ...)
 	if (custom_die != NULL)
 		(*custom_die)();
 
+	fprintf(stderr, "%s: FAILED", progname);
 	if (fmt != NULL) {
+		fprintf(stderr, ": ");
 		va_start(ap, fmt);
 		vfprintf(stderr, fmt, ap);
 		va_end(ap);
@@ -52,6 +55,20 @@ testutil_die(int e, const char *fmt, ...)
 	fprintf(stderr, "\n");
 
 	exit(EXIT_FAILURE);
+}
+
+/*
+ * testutil_set_progname --
+ *	Set the global program name for error handling.
+ */
+const char *
+testutil_set_progname(char * const *argv)
+{
+	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
+		progname = argv[0];
+	else
+		++progname;
+	return (progname);
 }
 
 /*

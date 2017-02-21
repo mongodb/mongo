@@ -54,8 +54,6 @@ void run(int);
 void t(int, u_int, int);
 int  usage(void);
 
-static const char *progname;			/* Program name */
-
 static FILE	*res_fp;			/* Results file */
 static u_int	 page_type;			/* File types */
 static int	 value_unique;			/* Values are unique */
@@ -70,10 +68,7 @@ main(int argc, char *argv[])
 	u_int ptype;
 	int ch, r;
 
-	if ((progname = strrchr(argv[0], DIR_DELIM)) == NULL)
-		progname = argv[0];
-	else
-		++progname;
+	(void)testutil_set_progname(argv);
 
 	r = 0;
 	ptype = 0;

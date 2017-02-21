@@ -43,10 +43,7 @@ testutil_parse_opts(int argc, char * const *argv, TEST_OPTS *opts)
 	opts->running = true;
 	opts->verbose = false;
 
-	if ((opts->progname = strrchr(argv[0], DIR_DELIM)) == NULL)
-		opts->progname = argv[0];
-	else
-		++opts->progname;
+	opts->progname = testutil_set_progname(argv);
 
 	while ((ch = __wt_getopt(opts->progname,
 		argc, argv, "A:h:n:o:pR:T:t:vW:")) != EOF)
