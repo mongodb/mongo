@@ -8,6 +8,8 @@ selector:
     - jstests/core/opcounters_write_cmd.js
     - jstests/core/read_after_optime.js
     - jstests/core/capped_update.js
+    # Having duplicate namespaces is not supported and will cause initial sync to fail.
+    - jstests/core/views/duplicate_ns.js
 
 run_hook_interval: &run_hook_interval 20
 executor:
