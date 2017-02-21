@@ -60,8 +60,7 @@ WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerSessionCache* sc)
     : _sessionCache(sc),
       _inUnitOfWork(false),
       _active(false),
-      _mySnapshotId(nextSnapshotId.fetchAndAdd(1)),
-      _everStartedWrite(false) {}
+      _mySnapshotId(nextSnapshotId.fetchAndAdd(1)) {}
 
 WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
     invariant(!_inUnitOfWork);
@@ -120,7 +119,6 @@ void WiredTigerRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
     invariant(!_areWriteUnitOfWorksBanned);
     invariant(!_inUnitOfWork);
     _inUnitOfWork = true;
-    _everStartedWrite = true;
 }
 
 void WiredTigerRecoveryUnit::commitUnitOfWork() {
@@ -276,9 +274,5 @@ WiredTigerCursor::~WiredTigerCursor() {
 
 void WiredTigerCursor::reset() {
     invariantWTOK(_cursor->reset(_cursor));
-}
-
-WT_SESSION* WiredTigerCursor::getWTSession() {
-    return _session->getSession();
 }
 }

@@ -96,10 +96,6 @@ public:
     }
     void assertInActiveTxn() const;
 
-    bool everStartedWrite() const {
-        return _everStartedWrite;
-    }
-
     void setOplogReadTill(const RecordId& id);
     RecordId getOplogReadTill() const {
         return _oplogReadTill;
@@ -133,7 +129,6 @@ private:
     bool _inUnitOfWork;
     bool _active;
     uint64_t _mySnapshotId;
-    bool _everStartedWrite;
     RecordId _oplogReadTill;
     bool _readFromMajorityCommittedSnapshot = false;
     SnapshotName _majorityCommittedSnapshot = SnapshotName::min();
@@ -168,7 +163,6 @@ public:
     WiredTigerSession* getSession() {
         return _session;
     }
-    WT_SESSION* getWTSession();
 
     void reset();
 
