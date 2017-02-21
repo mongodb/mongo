@@ -160,7 +160,8 @@ private:
 
     /**
      * Runs the listDatabases command on the specified host and returns the names of all databases
-     * it returns excluding those named local and admin, since they serve administrative purpose.
+     * it returns excluding those named local, config and admin, since they serve administrative
+     * purposes.
      */
     StatusWith<std::vector<std::string>> _getDBNamesListFromShard(
         OperationContext* txn, std::shared_ptr<RemoteCommandTargeter> targeter);

@@ -109,6 +109,7 @@ void ShardingMongodTestFixture::setUp() {
 
     repl::ReplSettings replSettings;
     replSettings.setReplSetString(ConnectionString::forReplicaSet(_setName, _servers).toString());
+    replSettings.setMaster(true);
     auto replCoordPtr = makeReplicationCoordinator(replSettings);
     _replCoord = replCoordPtr.get();
 

@@ -273,6 +273,8 @@ public:
      */
     void alwaysAllowWrites(bool allowWrites);
 
+    void setMaster(bool isMaster);
+
     virtual ServiceContext* getServiceContext() override {
         return _service;
     }
@@ -280,7 +282,7 @@ public:
 private:
     AtomicUInt64 _snapshotNameGenerator;
     ServiceContext* const _service;
-    const ReplSettings _settings;
+    ReplSettings _settings;
     MemberState _memberState;
     OpTime _myLastDurableOpTime;
     OpTime _myLastAppliedOpTime;

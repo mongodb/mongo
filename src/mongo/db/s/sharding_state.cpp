@@ -84,7 +84,9 @@ namespace {
 const auto getShardingState = ServiceContext::declareDecoration<ShardingState>();
 
 // Max number of concurrent config server refresh threads
-const int kMaxConfigServerRefreshThreads = 3;
+// TODO: temporarily decreased from 3 to 1 to serialize refresh writes. Alternate per collection
+// serialization must be implemented: SERVER-28118
+const int kMaxConfigServerRefreshThreads = 1;
 
 // Maximum number of times to try to refresh the collection metadata if conflicts are occurring
 const int kMaxNumMetadataRefreshAttempts = 3;

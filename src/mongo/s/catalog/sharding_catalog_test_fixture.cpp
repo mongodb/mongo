@@ -43,16 +43,6 @@ ShardingCatalogTestFixture::ShardingCatalogTestFixture() = default;
 
 ShardingCatalogTestFixture::~ShardingCatalogTestFixture() = default;
 
-void ShardingCatalogTestFixture::expectFindOnConfigSendErrorCode(ErrorCodes::Error code) {
-    onCommand([&, code](const RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, HostAndPort(CONFIG_HOST_PORT));
-        ASSERT_EQ(request.dbname, "config");
-        BSONObjBuilder responseBuilder;
-        Command::appendCommandStatus(responseBuilder, Status(code, ""));
-        return responseBuilder.obj();
-    });
-}
-
 void ShardingCatalogTestFixture::expectFindOnConfigSendBSONObjVector(std::vector<BSONObj> obj) {
     onFindCommand([&, obj](const RemoteCommandRequest& request) {
         ASSERT_EQ(request.target, HostAndPort(CONFIG_HOST_PORT));

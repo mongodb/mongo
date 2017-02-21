@@ -474,5 +474,9 @@ void ReplicationCoordinatorMock::alwaysAllowWrites(bool allowWrites) {
     _alwaysAllowWrites = allowWrites;
 }
 
+void ReplicationCoordinatorMock::setMaster(bool isMaster) {
+    _settings.setMaster(isMaster);
+}
+
 }  // namespace repl
 }  // namespace mongo

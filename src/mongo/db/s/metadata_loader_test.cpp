@@ -29,12 +29,23 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/status.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/metadata_loader.h"
-#include "mongo/s/catalog/sharding_catalog_test_fixture.h"
+#include "mongo/db/server_options.h"
+#include "mongo/s/catalog/dist_lock_catalog_mock.h"
+#include "mongo/s/catalog/dist_lock_manager_mock.h"
+#include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/shard_server_test_fixture.h"
+#include "mongo/stdx/memory.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -42,24 +53,52 @@ namespace {
 using std::string;
 using std::unique_ptr;
 using std::vector;
+using unittest::assertGet;
 
-class MetadataLoaderFixture : public ShardingCatalogTestFixture {
-public:
-    MetadataLoaderFixture() = default;
-    ~MetadataLoaderFixture() = default;
+const HostAndPort kConfigHostAndPort = HostAndPort("dummy", 123);
+const NamespaceString kNss = NamespaceString("test.foo");
+const NamespaceString kChunkMetadataNss = NamespaceString("config.chunks.test.foo");
+const ShardId kShardId = ShardId("shard0");
 
+class MetadataLoaderTest : public ShardServerTestFixture {
 protected:
-    void setUp() override {
-        ShardingCatalogTestFixture::setUp();
-        setRemote(HostAndPort("FakeRemoteClient:34567"));
-        configTargeter()->setFindHostReturnValue(configHost);
-        _maxCollVersion = ChunkVersion(1, 0, OID::gen());
-        _loader.reset(new MetadataLoader);
+    /**
+     * Goes throught the chunks in 'metadata' and uses a DBDirectClient to check that they are all
+     * persisted. Also checks that 'totalNumChunksPersisted' is correct because 'metadata' is only
+     * aware of a shard's chunks.
+     */
+    void checkCollectionMetadataChunksMatchPersistedChunks(
+        const NamespaceString& nss,
+        const CollectionMetadata& metadata,
+        unsigned long long totalNumChunksPersisted) {
+        try {
+            DBDirectClient client(operationContext());
+            ASSERT_EQUALS(client.count(nss.ns()), totalNumChunksPersisted);
+
+            auto chunks = metadata.getChunks();
+            for (auto& chunk : chunks) {
+                Query query(BSON(ChunkType::minShardID() << chunk.first << ChunkType::max()
+                                                         << chunk.second.getMaxKey()));
+                query.readPref(ReadPreference::Nearest, BSONArray());
+
+                std::unique_ptr<DBClientCursor> cursor = client.query(nss.ns().c_str(), query, 1);
+                ASSERT(cursor);
+
+                ASSERT(cursor->more());
+                BSONObj queryResult = cursor->nextSafe();
+                ChunkType foundChunk = assertGet(
+                    ChunkType::fromShardBSON(queryResult, chunk.second.getVersion().epoch()));
+                ASSERT_BSONOBJ_EQ(chunk.first, foundChunk.getMin());
+                ASSERT_BSONOBJ_EQ(chunk.second.getMaxKey(), foundChunk.getMax());
+            }
+        } catch (const DBException& ex) {
+            ASSERT(false);
+        }
     }
 
     void expectFindOnConfigSendCollectionDefault() {
         CollectionType collType;
-        collType.setNs(NamespaceString{"test.foo"});
+        collType.setNs(kNss);
         collType.setKeyPattern(BSON("a" << 1));
         collType.setUnique(false);
         collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
@@ -71,62 +110,37 @@ protected:
     void expectFindOnConfigSendChunksDefault() {
         BSONObj chunk = BSON(
             ChunkType::name("test.foo-a_MinKey")
-            << ChunkType::ns("test.foo")
+            << ChunkType::ns(kNss.ns())
             << ChunkType::min(BSON("a" << MINKEY))
             << ChunkType::max(BSON("a" << MAXKEY))
             << ChunkType::DEPRECATED_lastmod(Date_t::fromMillisSinceEpoch(_maxCollVersion.toLong()))
             << ChunkType::DEPRECATED_epoch(_maxCollVersion.epoch())
-            << ChunkType::shard("shard0000"));
+            << ChunkType::shard(kShardId.toString()));
         expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{chunk});
     }
 
-    MetadataLoader& loader() const {
-        return *_loader;
-    }
-
-    void getMetadataFor(const OwnedPointerVector<ChunkType>& chunks, CollectionMetadata* metadata) {
-        // Infer namespace, shard, epoch, keypattern from first chunk
-        const ChunkType* firstChunk = *(chunks.vector().begin());
-        const string ns = firstChunk->getNS();
-        const string shardName = firstChunk->getShard().toString();
-        const OID epoch = firstChunk->getVersion().epoch();
-
-        CollectionType coll;
-        coll.setNs(NamespaceString{ns});
-        coll.setKeyPattern(BSON("a" << 1));
-        coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
-        coll.setEpoch(epoch);
-        ASSERT_OK(coll.validate());
-        std::vector<BSONObj> collToSend{coll.toBSON()};
-
-        ChunkVersion version(1, 0, epoch);
-        std::vector<BSONObj> chunksToSend;
-        for (const auto chunkVal : chunks.vector()) {
-            ChunkType chunk(*chunkVal);
-
-            if (!chunk.isVersionSet()) {
-                chunk.setVersion(version);
-                version.incMajor();
-            }
-
-            ASSERT(chunk.validate().isOK());
-            chunksToSend.push_back(chunk.toConfigBSON());
+    /**
+     * Helper to make a number of chunks that can then be manipulated in various ways in the tests.
+     */
+    std::vector<BSONObj> makeFourChunks() {
+        std::vector<BSONObj> chunks;
+        std::string names[] = {
+            "test.foo-a_MinKey", "test.foo-a_10", "test.foo-a_50", "test.foo-a_100"};
+        BSONObj mins[] = {BSON("a" << MINKEY), BSON("a" << 10), BSON("a" << 50), BSON("a" << 100)};
+        BSONObj maxs[] = {BSON("a" << 10), BSON("a" << 50), BSON("a" << 100), BSON("a" << MAXKEY)};
+        for (int i = 0; i < 4; ++i) {
+            _maxCollVersion.incMajor();
+            BSONObj chunk = BSON(ChunkType::name(names[i])
+                                 << ChunkType::ns(kNss.ns())
+                                 << ChunkType::min(mins[i])
+                                 << ChunkType::max(maxs[i])
+                                 << ChunkType::DEPRECATED_lastmod(
+                                        Date_t::fromMillisSinceEpoch(_maxCollVersion.toLong()))
+                                 << ChunkType::DEPRECATED_epoch(_maxCollVersion.epoch())
+                                 << ChunkType::shard(kShardId.toString()));
+            chunks.push_back(std::move(chunk));
         }
-
-        auto future = launchAsync([this, ns, shardName, metadata] {
-            auto status = loader().makeCollectionMetadata(operationContext(),
-                                                          catalogClient(),
-                                                          ns,
-                                                          shardName,
-                                                          NULL, /* no old metadata */
-                                                          metadata);
-            ASSERT_OK(status);
-        });
-
-        expectFindOnConfigSendBSONObjVector(collToSend);
-        expectFindOnConfigSendBSONObjVector(chunksToSend);
-
-        future.timed_get(kFutureTimeout);
+        return chunks;
     }
 
     ChunkVersion getMaxCollVersion() const {
@@ -138,19 +152,16 @@ protected:
     }
 
 private:
-    const HostAndPort configHost{HostAndPort(CONFIG_HOST_PORT)};
-
-    unique_ptr<MetadataLoader> _loader;
-    ChunkVersion _maxCollVersion;
+    ChunkVersion _maxCollVersion{1, 0, OID::gen()};
 };
 
 // TODO: Test config server down
 // TODO: Test read of chunks with new epoch
 // TODO: Test that you can properly load config using format with deprecated fields?
 
-TEST_F(MetadataLoaderFixture, DroppedColl) {
+TEST_F(MetadataLoaderTest, DroppedColl) {
     CollectionType collType;
-    collType.setNs(NamespaceString{"test.foo"});
+    collType.setNs(kNss);
     collType.setKeyPattern(BSON("a" << 1));
     collType.setUpdatedAt(Date_t());
     collType.setEpoch(OID());
@@ -160,8 +171,8 @@ TEST_F(MetadataLoaderFixture, DroppedColl) {
         CollectionMetadata metadata;
         auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
                                                              catalogClient(),
-                                                             "test.foo",
-                                                             "shard0000",
+                                                             kNss.ns(),
+                                                             kShardId.toString(),
                                                              NULL, /* no old metadata */
                                                              &metadata);
         ASSERT_EQUALS(status.code(), ErrorCodes::NamespaceNotFound);
@@ -170,13 +181,13 @@ TEST_F(MetadataLoaderFixture, DroppedColl) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(MetadataLoaderFixture, EmptyColl) {
+TEST_F(MetadataLoaderTest, EmptyColl) {
     auto future = launchAsync([this] {
         CollectionMetadata metadata;
         auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
                                                              catalogClient(),
-                                                             "test.foo",
-                                                             "shard0000",
+                                                             kNss.ns(),
+                                                             kShardId.toString(),
                                                              NULL, /* no old metadata */
                                                              &metadata);
         ASSERT_EQUALS(status.code(), ErrorCodes::NamespaceNotFound);
@@ -185,14 +196,14 @@ TEST_F(MetadataLoaderFixture, EmptyColl) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(MetadataLoaderFixture, BadColl) {
-    BSONObj badCollToSend = BSON(CollectionType::fullNs("test.foo"));
+TEST_F(MetadataLoaderTest, BadColl) {
+    BSONObj badCollToSend = BSON(CollectionType::fullNs(kNss.ns()));
     auto future = launchAsync([this] {
         CollectionMetadata metadata;
         auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
                                                              catalogClient(),
-                                                             "test.foo",
-                                                             "shard0000",
+                                                             kNss.ns(),
+                                                             kShardId.toString(),
                                                              NULL, /* no old metadata */
                                                              &metadata);
         ASSERT_EQUALS(status.code(), ErrorCodes::NoSuchKey);
@@ -201,116 +212,108 @@ TEST_F(MetadataLoaderFixture, BadColl) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(MetadataLoaderFixture, BadChunk) {
-    CollectionType collType;
-    collType.setNs(NamespaceString{"test.foo"});
-    collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
-    collType.setKeyPattern(BSON("a" << 1));
-    collType.setEpoch(OID::gen());
-    ASSERT_OK(collType.validate());
-
+TEST_F(MetadataLoaderTest, BadChunk) {
     ChunkType chunkInfo;
-    chunkInfo.setNS(NamespaceString{"test.foo"}.ns());
-    chunkInfo.setVersion(ChunkVersion(1, 0, collType.getEpoch()));
+    chunkInfo.setNS(kNss.ns());
+    chunkInfo.setVersion(ChunkVersion(1, 0, getMaxCollVersion().epoch()));
     ASSERT(!chunkInfo.validate().isOK());
 
     auto future = launchAsync([this] {
         CollectionMetadata metadata;
         auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
                                                              catalogClient(),
-                                                             "test.foo",
-                                                             "shard0000",
+                                                             kNss.ns(),
+                                                             kShardId.toString(),
                                                              NULL, /* no old metadata */
                                                              &metadata);
         ASSERT_EQUALS(status.code(), ErrorCodes::NoSuchKey);
     });
 
-    expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{collType.toBSON()});
+    expectFindOnConfigSendCollectionDefault();
     expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{chunkInfo.toConfigBSON()});
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(MetadataLoaderFixture, NoChunksIsDropped) {
-    OID epoch = OID::gen();
-
-    CollectionType collType;
-    collType.setNs(NamespaceString{"test.foo"});
-    collType.setKeyPattern(BSON("a" << 1));
-    collType.setUnique(false);
-    collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
-    collType.setEpoch(epoch);
-
+TEST_F(MetadataLoaderTest, NoChunksIsDropped) {
     auto future = launchAsync([this] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
+        Client::initThreadIfNotAlready("Test");
+        auto txn = cc().makeOperationContext();
+
         CollectionMetadata metadata;
-        auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
+        auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
                                                              catalogClient(),
-                                                             "test.foo",
-                                                             "shard0000",
+                                                             kNss.ns(),
+                                                             kShardId.toString(),
                                                              NULL, /* no old metadata */
                                                              &metadata);
         // This is interpreted as a dropped ns, since we drop the chunks first
         ASSERT_EQUALS(status.code(), ErrorCodes::NamespaceNotFound);
+
+        checkCollectionMetadataChunksMatchPersistedChunks(kChunkMetadataNss, metadata, 0);
     });
-    expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{collType.toBSON()});
-    expectFindOnConfigSendErrorCode(ErrorCodes::NamespaceNotFound);
+    expectFindOnConfigSendCollectionDefault();
+    expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{});
+
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(MetadataLoaderFixture, CheckNumChunk) {
-    OID epoch = OID::gen();
-
-    CollectionType collType;
-    collType.setNs(NamespaceString{"test.foo"});
-    collType.setKeyPattern(BSON("a" << 1));
-    collType.setUnique(false);
-    collType.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
-    collType.setEpoch(epoch);
-    ASSERT_OK(collType.validate());
-
+TEST_F(MetadataLoaderTest, CheckNumChunk) {
     // Need a chunk on another shard, otherwise the chunks are invalid in general and we
     // can't load metadata
     ChunkType chunkType;
-    chunkType.setNS("test.foo");
-    chunkType.setShard(ShardId("shard0001"));
+    chunkType.setNS(kNss.ns());
+    chunkType.setShard(ShardId("altshard"));
     chunkType.setMin(BSON("a" << MINKEY));
     chunkType.setMax(BSON("a" << MAXKEY));
-    chunkType.setVersion(ChunkVersion(1, 0, epoch));
+    chunkType.setVersion(ChunkVersion(1, 0, getMaxCollVersion().epoch()));
     ASSERT(chunkType.validate().isOK());
 
     auto future = launchAsync([this] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
+        Client::initThreadIfNotAlready("Test");
+        auto txn = cc().makeOperationContext();
+
         CollectionMetadata metadata;
-        auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
+        auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
                                                              catalogClient(),
-                                                             "test.foo",
-                                                             "shard0000",
+                                                             kNss.ns(),
+                                                             kShardId.toString(),
                                                              NULL, /* no old metadata */
                                                              &metadata);
-        std::cout << "status: " << status << std::endl;
         ASSERT_OK(status);
         ASSERT_EQUALS(0U, metadata.getNumChunks());
         ASSERT_EQUALS(1, metadata.getCollVersion().majorVersion());
         ASSERT_EQUALS(0, metadata.getShardVersion().majorVersion());
-        ASSERT_NOT_EQUALS(OID(), metadata.getCollVersion().epoch());
-        ASSERT_NOT_EQUALS(OID(), metadata.getShardVersion().epoch());
+
+        checkCollectionMetadataChunksMatchPersistedChunks(kChunkMetadataNss, metadata, 1);
     });
 
-    expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{collType.toBSON()});
+    expectFindOnConfigSendCollectionDefault();
     expectFindOnConfigSendBSONObjVector(std::vector<BSONObj>{chunkType.toConfigBSON()});
 
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(MetadataLoaderFixture, SingleChunkCheckNumChunk) {
+TEST_F(MetadataLoaderTest, SingleChunkCheckNumChunk) {
     auto future = launchAsync([this] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
+        Client::initThreadIfNotAlready("Test");
+        auto txn = cc().makeOperationContext();
+
         CollectionMetadata metadata;
-        auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
+        auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
                                                              catalogClient(),
-                                                             "test.foo",
-                                                             "shard0000",
+                                                             kNss.ns(),
+                                                             kShardId.toString(),
                                                              NULL, /* no old metadata */
                                                              &metadata);
         ASSERT_OK(status);
         ASSERT_EQUALS(1U, metadata.getNumChunks());
+        ASSERT_EQUALS(getMaxCollVersion(), metadata.getCollVersion());
+        ASSERT_EQUALS(getMaxCollVersion(), metadata.getShardVersion());
+
+        checkCollectionMetadataChunksMatchPersistedChunks(kChunkMetadataNss, metadata, 1);
     });
 
     expectFindOnConfigSendCollectionDefault();
@@ -319,92 +322,55 @@ TEST_F(MetadataLoaderFixture, SingleChunkCheckNumChunk) {
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(MetadataLoaderFixture, SingleChunkGetNext) {
+TEST_F(MetadataLoaderTest, SeveralChunksCheckNumChunks) {
     auto future = launchAsync([this] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
+        Client::initThreadIfNotAlready("Test");
+        auto txn = cc().makeOperationContext();
+
         CollectionMetadata metadata;
-        auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
+        auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
                                                              catalogClient(),
-                                                             "test.foo",
-                                                             "shard0000",
+                                                             kNss.ns(),
+                                                             kShardId.toString(),
                                                              NULL, /* no old metadata */
                                                              &metadata);
-        ChunkType chunkInfo;
-        ASSERT_TRUE(metadata.getNextChunk(metadata.getMinKey(), &chunkInfo));
+        ASSERT_OK(status);
+        ASSERT_EQUALS(4U, metadata.getNumChunks());
+        ASSERT_EQUALS(getMaxCollVersion(), metadata.getCollVersion());
+        ASSERT_EQUALS(getMaxCollVersion(), metadata.getShardVersion());
+
+        checkCollectionMetadataChunksMatchPersistedChunks(kChunkMetadataNss, metadata, 4);
     });
 
     expectFindOnConfigSendCollectionDefault();
-    expectFindOnConfigSendChunksDefault();
+    expectFindOnConfigSendBSONObjVector(makeFourChunks());
 
     future.timed_get(kFutureTimeout);
 }
 
-TEST_F(MetadataLoaderFixture, SingleChunkGetShardKey) {
+TEST_F(MetadataLoaderTest, CollectionMetadataSetUp) {
     auto future = launchAsync([this] {
+        ON_BLOCK_EXIT([&] { Client::destroy(); });
+        Client::initThreadIfNotAlready("Test");
+        auto txn = cc().makeOperationContext();
+
         CollectionMetadata metadata;
-        auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
+        auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
                                                              catalogClient(),
-                                                             "test.foo",
-                                                             "shard0000",
+                                                             kNss.ns(),
+                                                             kShardId.toString(),
                                                              NULL, /* no old metadata */
                                                              &metadata);
-        ChunkType chunkInfo;
         ASSERT_BSONOBJ_EQ(metadata.getKeyPattern(), BSON("a" << 1));
-    });
-
-    expectFindOnConfigSendCollectionDefault();
-    expectFindOnConfigSendChunksDefault();
-
-    future.timed_get(kFutureTimeout);
-}
-
-TEST_F(MetadataLoaderFixture, SingleChunkGetMaxCollVersion) {
-    auto future = launchAsync([this] {
-        CollectionMetadata metadata;
-        auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
-                                                             catalogClient(),
-                                                             "test.foo",
-                                                             "shard0000",
-                                                             NULL, /* no old metadata */
-                                                             &metadata);
         ASSERT_TRUE(getMaxCollVersion().equals(metadata.getCollVersion()));
-    });
-
-    expectFindOnConfigSendCollectionDefault();
-    expectFindOnConfigSendChunksDefault();
-
-    future.timed_get(kFutureTimeout);
-}
-TEST_F(MetadataLoaderFixture, SingleChunkGetMaxShardVersion) {
-    auto future = launchAsync([this] {
-        CollectionMetadata metadata;
-        auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
-                                                             catalogClient(),
-                                                             "test.foo",
-                                                             "shard0000",
-                                                             NULL, /* no old metadata */
-                                                             &metadata);
         ASSERT_TRUE(getMaxShardVersion().equals(metadata.getShardVersion()));
+
+        checkCollectionMetadataChunksMatchPersistedChunks(kChunkMetadataNss, metadata, 1);
     });
+
     expectFindOnConfigSendCollectionDefault();
     expectFindOnConfigSendChunksDefault();
-
-    future.timed_get(kFutureTimeout);
-}
-
-TEST_F(MetadataLoaderFixture, NoChunks) {
-    auto future = launchAsync([this] {
-        CollectionMetadata metadata;
-        auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
-                                                             catalogClient(),
-                                                             "test.foo",
-                                                             "shard0000",
-                                                             NULL, /* no old metadata */
-                                                             &metadata);
-        // NSNotFound because we're reloading with no old metadata
-        ASSERT_EQUALS(status.code(), ErrorCodes::NamespaceNotFound);
-    });
-    expectFindOnConfigSendCollectionDefault();
-    expectFindOnConfigSendErrorCode(ErrorCodes::NamespaceNotFound);
 
     future.timed_get(kFutureTimeout);
 }

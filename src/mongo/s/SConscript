@@ -124,6 +124,18 @@ env.Library(
 )
 
 env.Library(
+    target='shard_server_test_fixture',
+    source=[
+        'shard_server_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        'sharding_mongod_test_fixture',
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_mock',
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
+    ],
+)
+
+env.Library(
     target='sharding_mongod_test_fixture',
     source=[
         'sharding_mongod_test_fixture.cpp',

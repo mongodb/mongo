@@ -33,10 +33,11 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/metadata_loader.h"
-#include "mongo/s/catalog/sharding_catalog_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/shard_server_test_fixture.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
@@ -46,12 +47,10 @@ using std::unique_ptr;
 using std::vector;
 using unittest::assertGet;
 
-class NoChunkFixture : public ShardingCatalogTestFixture {
+class NoChunkFixture : public ShardServerTestFixture {
 protected:
     void setUp() {
-        ShardingCatalogTestFixture::setUp();
-        setRemote(HostAndPort("FakeRemoteClient:34567"));
-        configTargeter()->setFindHostReturnValue(configHost);
+        ShardServerTestFixture::setUp();
 
         OID epoch = OID::gen();
 
@@ -75,7 +74,11 @@ protected:
         std::vector<BSONObj> chunksToSend{chunkType.toConfigBSON()};
 
         auto future = launchAsync([this] {
-            auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
+            ON_BLOCK_EXIT([&] { Client::destroy(); });
+            Client::initThreadIfNotAlready("Test");
+            auto txn = cc().makeOperationContext();
+
+            auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
                                                                  catalogClient(),
                                                                  "test.foo",
                                                                  "shard0000",
@@ -97,7 +100,6 @@ protected:
 
 private:
     CollectionMetadata _metadata;
-    const HostAndPort configHost{HostAndPort(CONFIG_HOST_PORT)};
 };
 
 TEST_F(NoChunkFixture, BasicBelongsToMe) {
@@ -278,12 +280,10 @@ TEST_F(NoChunkFixture, PendingOrphanedDataRanges) {
  * Fixture with single chunk containing:
  * [10->20)
  */
-class SingleChunkFixture : public ShardingCatalogTestFixture {
+class SingleChunkFixture : public ShardServerTestFixture {
 protected:
     void setUp() {
-        ShardingCatalogTestFixture::setUp();
-        setRemote(HostAndPort("FakeRemoteClient:34567"));
-        configTargeter()->setFindHostReturnValue(configHost);
+        ShardServerTestFixture::setUp();
 
         CollectionType collType;
         collType.setNs(NamespaceString{"test.foo"});
@@ -303,7 +303,11 @@ protected:
         std::vector<BSONObj> chunksToSend{fooSingle};
 
         auto future = launchAsync([this] {
-            auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
+            ON_BLOCK_EXIT([&] { Client::destroy(); });
+            Client::initThreadIfNotAlready("Test");
+            auto txn = cc().makeOperationContext();
+
+            auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
                                                                  catalogClient(),
                                                                  "test.foo",
                                                                  "shard0000",
@@ -326,7 +330,6 @@ protected:
 
 private:
     CollectionMetadata _metadata;
-    const HostAndPort configHost{HostAndPort(CONFIG_HOST_PORT)};
 };
 
 TEST_F(SingleChunkFixture, BasicBelongsToMe) {
@@ -398,12 +401,10 @@ TEST_F(SingleChunkFixture, ChunkOrphanedDataRanges) {
  * Fixture with single chunk containing:
  * [(min, min)->(max, max))
  */
-class SingleChunkMinMaxCompoundKeyFixture : public ShardingCatalogTestFixture {
+class SingleChunkMinMaxCompoundKeyFixture : public ShardServerTestFixture {
 protected:
     void setUp() {
-        ShardingCatalogTestFixture::setUp();
-        setRemote(HostAndPort("FakeRemoteClient:34567"));
-        configTargeter()->setFindHostReturnValue(configHost);
+        ShardServerTestFixture::setUp();
 
         OID epoch = OID::gen();
 
@@ -427,7 +428,11 @@ protected:
         std::vector<BSONObj> chunksToSend{fooSingle};
 
         auto future = launchAsync([this] {
-            auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
+            ON_BLOCK_EXIT([&] { Client::destroy(); });
+            Client::initThreadIfNotAlready("Test");
+            auto txn = cc().makeOperationContext();
+
+            auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
                                                                  catalogClient(),
                                                                  "test.foo",
                                                                  "shard0000",
@@ -450,7 +455,6 @@ protected:
 
 private:
     CollectionMetadata _metadata;
-    const HostAndPort configHost{HostAndPort(CONFIG_HOST_PORT)};
 };
 
 // Note: no tests for single key belongsToMe because they are not allowed
@@ -467,12 +471,10 @@ TEST_F(SingleChunkMinMaxCompoundKeyFixture, CompoudKeyBelongsToMe) {
  * Fixture with chunks:
  * [(10, 0)->(20, 0)), [(30, 0)->(40, 0))
  */
-class TwoChunksWithGapCompoundKeyFixture : public ShardingCatalogTestFixture {
+class TwoChunksWithGapCompoundKeyFixture : public ShardServerTestFixture {
 protected:
     void setUp() {
-        ShardingCatalogTestFixture::setUp();
-        setRemote(HostAndPort("FakeRemoteClient:34567"));
-        configTargeter()->setFindHostReturnValue(configHost);
+        ShardServerTestFixture::setUp();
 
         ChunkVersion chunkVersion = ChunkVersion(1, 0, OID::gen());
 
@@ -505,7 +507,11 @@ protected:
             << ChunkType::shard("shard0000")));
 
         auto future = launchAsync([this] {
-            auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
+            ON_BLOCK_EXIT([&] { Client::destroy(); });
+            Client::initThreadIfNotAlready("Test");
+            auto txn = cc().makeOperationContext();
+
+            auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
                                                                  catalogClient(),
                                                                  "test.foo",
                                                                  "shard0000",
@@ -526,7 +532,6 @@ protected:
 
 private:
     CollectionMetadata _metadata;
-    const HostAndPort configHost{HostAndPort(CONFIG_HOST_PORT)};
 };
 
 TEST_F(TwoChunksWithGapCompoundKeyFixture, ChunkGapOrphanedDataRanges) {
@@ -574,12 +579,10 @@ TEST_F(TwoChunksWithGapCompoundKeyFixture, ChunkGapAndPendingOrphanedDataRanges)
  * Fixture with chunk containing:
  * [min->10) , [10->20) , <gap> , [30->max)
  */
-class ThreeChunkWithRangeGapFixture : public ShardingCatalogTestFixture {
+class ThreeChunkWithRangeGapFixture : public ShardServerTestFixture {
 protected:
     void setUp() {
-        ShardingCatalogTestFixture::setUp();
-        setRemote(HostAndPort("FakeRemoteClient:34567"));
-        configTargeter()->setFindHostReturnValue(configHost);
+        ShardServerTestFixture::setUp();
 
         OID epoch = OID::gen();
 
@@ -628,7 +631,11 @@ protected:
         }
 
         auto future = launchAsync([this] {
-            auto status = MetadataLoader::makeCollectionMetadata(operationContext(),
+            ON_BLOCK_EXIT([&] { Client::destroy(); });
+            Client::initThreadIfNotAlready("Test");
+            auto txn = cc().makeOperationContext();
+
+            auto status = MetadataLoader::makeCollectionMetadata(txn.get(),
                                                                  catalogClient(),
                                                                  "test.foo",
                                                                  "shard0000",
@@ -649,7 +656,6 @@ protected:
 
 private:
     CollectionMetadata _metadata;
-    const HostAndPort configHost{HostAndPort(CONFIG_HOST_PORT)};
 };
 
 TEST_F(ThreeChunkWithRangeGapFixture, ChunkVersionsMatch) {

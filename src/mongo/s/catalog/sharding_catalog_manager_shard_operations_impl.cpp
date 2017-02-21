@@ -499,7 +499,8 @@ StatusWith<std::vector<std::string>> ShardingCatalogManagerImpl::_getDBNamesList
     for (const auto& dbEntry : cmdResult["databases"].Obj()) {
         const auto& dbName = dbEntry["name"].String();
 
-        if (!(dbName == NamespaceString::kAdminDb || dbName == NamespaceString::kLocalDb)) {
+        if (!(dbName == NamespaceString::kAdminDb || dbName == NamespaceString::kLocalDb ||
+              dbName == NamespaceString::kConfigDb)) {
             dbNames.push_back(dbName);
         }
     }
