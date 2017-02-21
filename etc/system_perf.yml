@@ -223,7 +223,7 @@ functions:
           if [ $? -eq 0 ]; then
             echo "Resource provisioned/updated."
             # copy terraform information needed for teardown
-            cp {terraform.tfstate,cluster.tf,terraform.tfvars,security.tf} /data/infrastructure_provisioning/terraform/.
+            cp {terraform.tfstate,cluster.tf,terraform.tfvars,security.tf,cluster.json} /data/infrastructure_provisioning/terraform/.
             rsync -vr ../modules /data/infrastructure_provisioning/modules
             cd /data/infrastructure_provisioning/terraform
             ./terraform get
@@ -234,8 +234,8 @@ functions:
             echo "Provisioning state updated on Evergreen host."
           else
             echo "Failed to provision resources. Cleaning up partial state."
-            yes yes | ./terraform destroy
-            if [ $? != 0 ]; then yes yes | ./terraform destroy; fi
+            cp src/dsi/dsi/bin/destroy_cluster.sh .
+            ./destroy_cluster.sh
             echo "Resource released."
             rm -r /data/infrastructure_provisioning
             echo "Cleaned up provisioning state on Evergreen host. Exiting test."

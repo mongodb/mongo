@@ -42,8 +42,8 @@ post:
           set -e
           set -o verbose
           # call terraform destroy twice to avoid AWS timeout
-          yes yes | ./terraform destroy
-          yes yes | ./terraform destroy
+          yes yes | ./terraform destroy --var-file=cluster.json
+          yes yes | ./terraform destroy --var-file=cluster.json
           # clean all file to be safe
           rm -rf *
           echo "Cluster DESTROYED."
@@ -215,8 +215,8 @@ functions:
           set -o verbose
           source ./dsienv.sh
           # destroy the EC2 cluster
-          yes yes | ./terraform destroy
-          yes yes | ./terraform destroy
+          yes yes | ./terraform destroy --var-file=cluster.json
+          yes yes | ./terraform destroy --var-file=cluster.json
           echo "Cluster DESTROYED."
           echo "All perf results"
           cd ..
