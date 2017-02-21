@@ -129,6 +129,7 @@ class WindowsDumper(object):
             "!peb",     # Dump current exe, & environment variables
             "lm",       # Dump loaded modules
             "~* kp 100", # Dump All Threads with function arguments
+            "!cs -l",   # Dump all locked critical sections
             ".dump /ma /u dump_" + process_name + "." + str(pid) + "." + self.get_dump_ext() if take_dump else "",
                         # Dump to file, dump_<process name>_<time stamp>_<pid in hex>.<pid>.mdmp
             ".detach",  # Detach
