@@ -1260,11 +1260,12 @@ var ReplSetTest = function(opts) {
                     var secondaryCollInfo = secondary.getDB(dbName).getCollectionInfos();
                     secondaryCollInfo.forEach(secondaryInfo => {
                         primaryCollInfo.forEach(primaryInfo => {
-                            if (secondaryInfo.name === primaryInfo.name) {
+                            if (secondaryInfo.name === primaryInfo.name &&
+                                secondaryInfo.type === primaryInfo.type) {
                                 if (!bsonBinaryEqual(secondaryInfo, primaryInfo)) {
                                     print(msgPrefix +
                                           ', the primary and secondary have different ' +
-                                          'attributes for the collection ' + dbName + '.' +
+                                          'attributes for the collection or view' + dbName + '.' +
                                           secondaryInfo.name);
                                     print('Collection info on the primary: ' + tojson(primaryInfo));
                                     print('Collection info on the secondary: ' +
