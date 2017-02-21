@@ -905,7 +905,7 @@ pre:
         ulimit -a
         # Clear the dmesg ring buffer. The "post" phase will check dmesg for OOM messages.
         ${set_sudo}
-        $sudo dmesg --clear > /dev/null 2>&1
+        $sudo dmesg -c > /dev/null 2>&1
         if [ $? -eq 0 ]; then
           echo "Cleared the dmesg ring buffer"
         else
