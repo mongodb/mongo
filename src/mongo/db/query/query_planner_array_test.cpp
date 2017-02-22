@@ -1439,7 +1439,7 @@ TEST_F(QueryPlannerTest, CanMakeCoveredPlanForNonArrayTrailingFieldWithPathLevel
         "bounds: {'a.z':[[1,1,true,true]],b:[[3,3,true,true]],'c.z':[[2,2,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerTest, CannotCoverNonMultikeyDottedField) {
+TEST_F(QueryPlannerTest, CanCoverNonMultikeyDottedField) {
     MultikeyPaths multikeyPaths{{}, {0U}};
     addIndex(BSON("a.y" << 1 << "b.z" << 1), multikeyPaths);
     runQueryAsCommand(
@@ -1448,9 +1448,9 @@ TEST_F(QueryPlannerTest, CannotCoverNonMultikeyDottedField) {
     assertNumSolutions(2U);
     assertSolutionExists("{proj: {spec: {_id:0,'a.y':1}, node: {cscan: {dir: 1}}}}");
     assertSolutionExists(
-        "{proj: {spec: {_id:0,'a.y':1}, node: {fetch: {filter: null, node: {ixscan:"
+        "{proj: {spec: {_id:0,'a.y':1}, node: {ixscan:"
         "{pattern: {'a.y':1,'b.z':1}, filter: null,"
-        "bounds: {'a.y':[[1,1,true,true]],'b.z':[[2,2,true,true]]}}}}}}}");
+        "bounds: {'a.y':[[1,1,true,true]],'b.z':[[2,2,true,true]]}}}}}");
 }
 
 TEST_F(QueryPlannerTest, ContainedOrElemMatchValue) {

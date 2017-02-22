@@ -3878,9 +3878,7 @@ TEST_F(QueryPlannerTest, ShardFilterCompoundProjCovered) {
         "{ixscan: {pattern: {a: 1, b: 1}}}}}}}");
 }
 
-TEST_F(QueryPlannerTest, ShardFilterNestedProjNotCovered) {
-    // Nested projections can't be covered currently, though the shard key filter shouldn't need
-    // to fetch.
+TEST_F(QueryPlannerTest, ShardFilterNestedProjCovered) {
     params.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
     params.shardKey = BSON("a" << 1 << "b.c" << 1);
     addIndex(BSON("a" << 1 << "b.c" << 1));
@@ -3890,9 +3888,8 @@ TEST_F(QueryPlannerTest, ShardFilterNestedProjNotCovered) {
     assertNumSolutions(1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, a: 1, 'b.c': 1 }, type: 'default', node: "
-        "{fetch: {node: "
         "{sharding_filter: {node: "
-        "{ixscan: {pattern: {a: 1, 'b.c': 1}}}}}}}}}");
+        "{ixscan: {filter: null, pattern: {a: 1, 'b.c': 1}}}}}}}");
 }
 
 TEST_F(QueryPlannerTest, ShardFilterHashProjNotCovered) {

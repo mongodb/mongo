@@ -176,6 +176,19 @@ BSONObj transformMetaSortKeyCovered(const BSONObj& sortKey,
     return wsm->obj.value();
 }
 
+BSONObj transformCovered(BSONObj projSpec, const IndexKeyDatum& ikd) {
+    WorkingSet ws;
+    WorkingSetID wsid = ws.allocate();
+    WorkingSetMember* wsm = ws.get(wsid);
+    wsm->keyData.push_back(ikd);
+    ws.transitionToRecordIdAndIdx(wsid);
+
+    ProjectionExec projExec(projSpec, nullptr, nullptr, ExtensionsCallbackDisallowExtensions());
+    ASSERT_OK(projExec.transform(wsm));
+
+    return wsm->obj.value();
+}
+
 //
 // position $
 //
@@ -246,6 +259,26 @@ TEST(ProjectionExecTest, TransformSliceSkipLimit) {
     testTransform("{a: {$slice: [1, 1]}}", "{}", "{a: [4, 6, 8]}", true, "{a: [6]}");
     testTransform("{a: {$slice: [3, 5]}}", "{}", "{a: [4, 6, 8]}", true, "{a: []}");
     testTransform("{a: {$slice: [10, 10]}}", "{}", "{a: [4, 6, 8]}", true, "{a: []}");
+}
+
+//
+// Dotted projections.
+//
+
+TEST(ProjectionExecTest, TransformCoveredDottedProjection) {
+    BSONObj projection = fromjson("{'b.c': 1, 'b.d': 1, 'b.f.g': 1, 'b.f.h': 1}");
+    BSONObj keyPattern = fromjson("{a: 1, 'b.c': 1, 'b.d': 1, 'b.f.g': 1, 'b.f.h': 1}");
+    BSONObj keyData = fromjson("{'': 1, '': 2, '': 3, '': 4, '': 5}");
+    BSONObj result = transformCovered(projection, IndexKeyDatum(keyPattern, keyData, nullptr));
+    ASSERT_BSONOBJ_EQ(result, fromjson("{b: {c: 2, d: 3, f: {g: 4, h: 5}}}"));
+}
+
+TEST(ProjectionExecTest, TransformNonCoveredDottedProjection) {
+    testTransform("{'b.c': 1, 'b.d': 1, 'b.f.g': 1, 'b.f.h': 1}",
+                  "{}",
+                  "{a: 1, b: {c: 2, d: 3, f: {g: 4, h: 5}}}",
+                  true,
+                  "{b: {c: 2, d: 3, f: {g: 4, h: 5}}}");
 }
 
 //

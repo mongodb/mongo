@@ -108,6 +108,14 @@ public:
      */
     bool isFieldRetainedExactly(StringData path) const;
 
+    /**
+     * Returns true if the project contains any paths with multiple path pieces (e.g. returns true
+     * for {_id: 0, "a.b": 1} and returns false for {_id: 0, a: 1, b: 1}).
+     */
+    bool hasDottedFieldPath() const {
+        return _hasDottedFieldPath;
+    }
+
 private:
     /**
      * Must go through ::make
@@ -180,6 +188,8 @@ private:
 
     // Whether this projection includes a sortKey meta-projection.
     bool _wantSortKey = false;
+
+    bool _hasDottedFieldPath = false;
 };
 
 }  // namespace mongo

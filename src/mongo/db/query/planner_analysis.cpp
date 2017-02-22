@@ -712,14 +712,12 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
 
     // Project the results.
     if (NULL != query.getProj()) {
-        LOG(5) << "PROJECTION: fetched status: " << solnRoot->fetched();
         LOG(5) << "PROJECTION: Current plan is:\n" << redact(solnRoot->toString());
 
         ProjectionNode::ProjectionType projType = ProjectionNode::DEFAULT;
         BSONObj coveredKeyObj;
 
         if (query.getProj()->requiresDocument()) {
-            LOG(5) << "PROJECTION: claims to require doc adding fetch.";
             // If the projection requires the entire document, somebody must fetch.
             if (!solnRoot->fetched()) {
                 FetchNode* fetch = new FetchNode();
@@ -727,21 +725,18 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
                 solnRoot = fetch;
             }
         } else if (!query.getProj()->wantIndexKey()) {
-            // The only way we're here is if it's a simple projection.  That is, we can pick out
-            // the fields we want to include and they're not dotted.  So we want to execute the
-            // projection in the fast-path simple fashion.  Just don't know which fast path yet.
-            LOG(5) << "PROJECTION: requires fields";
+            // The only way we're here is if it's a simple inclusion projection. Often such
+            // simple projections are eligible for an optimized execution path. However, in some
+            // special cases (e.g. dotted paths or the presence of a sortKey $meta projection), we
+            // may have to fall back to the default execution path.
             const vector<StringData>& fields = query.getProj()->getRequiredFields();
             bool covered = true;
             for (size_t i = 0; i < fields.size(); ++i) {
                 if (!solnRoot->hasField(fields[i].toString())) {
-                    LOG(5) << "PROJECTION: not covered due to field " << fields[i];
                     covered = false;
                     break;
                 }
             }
-
-            LOG(5) << "PROJECTION: is covered?: = " << covered;
 
             // If any field is missing from the list of fields the projection wants,
             // a fetch is required.
@@ -753,12 +748,10 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
                 // It's simple but we'll have the full document and we should just iterate
                 // over that.
                 projType = ProjectionNode::SIMPLE_DOC;
-                LOG(5) << "PROJECTION: not covered, fetching.";
             } else {
                 if (solnRoot->fetched()) {
                     // Fetched implies hasObj() so let's run with that.
                     projType = ProjectionNode::SIMPLE_DOC;
-                    LOG(5) << "PROJECTION: covered via FETCH, using SIMPLE_DOC fast path";
                 } else {
                     // If we're here we're not fetched so we're covered.  Let's see if we can
                     // get out of using the default projType.  If there's only one leaf
@@ -773,12 +766,10 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
                             projType = ProjectionNode::COVERED_ONE_INDEX;
                             IndexScanNode* ixn = static_cast<IndexScanNode*>(leafNodes[0]);
                             coveredKeyObj = ixn->index.keyPattern;
-                            LOG(5) << "PROJECTION: covered via IXSCAN, using COVERED fast path";
                         } else if (STAGE_DISTINCT_SCAN == leafNodes[0]->getType()) {
                             projType = ProjectionNode::COVERED_ONE_INDEX;
                             DistinctNode* dn = static_cast<DistinctNode*>(leafNodes[0]);
                             coveredKeyObj = dn->index.keyPattern;
-                            LOG(5) << "PROJECTION: covered via DISTINCT, using COVERED fast path";
                         }
                     }
                 }
@@ -786,9 +777,10 @@ QuerySolution* QueryPlannerAnalysis::analyzeDataAccess(const CanonicalQuery& que
 
             // If we have a $meta sortKey, just use the project default path, as currently the
             // project fast paths cannot handle $meta sortKey projections.
-            if (query.getProj()->wantSortKey()) {
+            //
+            // Similarly, the fast paths cannot handle dotted field paths.
+            if (query.getProj()->wantSortKey() || query.getProj()->hasDottedFieldPath()) {
                 projType = ProjectionNode::DEFAULT;
-                LOG(5) << "PROJECTION: needs $meta sortKey, using DEFAULT path instead";
             }
         }
         // If we don't have a covered project, and we're not allowed to put an uncovered one in,

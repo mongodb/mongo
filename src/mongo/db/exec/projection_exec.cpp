@@ -28,9 +28,11 @@
 
 #include "mongo/db/exec/projection_exec.h"
 
+#include "mongo/bson/mutable/document.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/ops/path_support.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/util/mongoutils/str.h"
@@ -39,6 +41,8 @@ namespace mongo {
 
 using std::max;
 using std::string;
+
+namespace mmb = mongo::mutablebson;
 
 namespace {
 
@@ -284,9 +288,9 @@ Status ProjectionExec::transform(WorkingSetMember* member) const {
             }
         }
 
-        BSONObjIterator it(_source);
-        while (it.more()) {
-            BSONElement specElt = it.next();
+        mmb::Document projectedDoc;
+
+        for (auto&& specElt : _source) {
             if (mongoutils::str::equals("_id", specElt.fieldName())) {
                 continue;
             }
@@ -306,9 +310,16 @@ Status ProjectionExec::transform(WorkingSetMember* member) const {
             BSONElement keyElt;
             // We can project a field that doesn't exist.  We just ignore it.
             if (member->getFieldDotted(specElt.fieldName(), &keyElt) && !keyElt.eoo()) {
-                bob.appendAs(keyElt, specElt.fieldName());
+                FieldRef projectedFieldPath{specElt.fieldNameStringData()};
+                auto setElementStatus =
+                    pathsupport::setElementAtPath(projectedFieldPath, keyElt, &projectedDoc);
+                if (!setElementStatus.isOK()) {
+                    return setElementStatus;
+                }
             }
         }
+
+        bob.appendElements(projectedDoc.getObject());
     }
 
     for (MetaMap::const_iterator it = _meta.begin(); it != _meta.end(); ++it) {

@@ -11,6 +11,9 @@ selector:
     - jstests/sharding/addshard_idempotent.js
     # SERVER-27438: Preserves $comment in OP_QUERY and tests for this change.
     - jstests/sharding/mongos_query_comment.js
+    # 3.6 mongods have improved covering behavior for queries on shard key index. Un-blacklist when
+    # 3.6 becomes 'last-stable'.
+    - jstests/sharding/covered_shard_key_indexes.js
 
 executor:
   js_test:

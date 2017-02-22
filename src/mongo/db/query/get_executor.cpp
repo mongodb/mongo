@@ -307,7 +307,8 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
             // Stuff the right data into the params depending on what proj impl we use.
             if (canonicalQuery->getProj()->requiresDocument() ||
                 canonicalQuery->getProj()->wantIndexKey() ||
-                canonicalQuery->getProj()->wantSortKey()) {
+                canonicalQuery->getProj()->wantSortKey() ||
+                canonicalQuery->getProj()->hasDottedFieldPath()) {
                 params.fullExpression = canonicalQuery->root();
                 params.projImpl = ProjectionStageParams::NO_FAST_PATH;
             } else {

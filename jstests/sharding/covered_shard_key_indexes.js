@@ -130,12 +130,12 @@ assert.eq(
     coll.find({c: true}, {_id: 0, 'a.b': 1, c: 1}).explain(true).executionStats.totalDocsExamined);
 
 //
-// Index with shard key query - nested query not covered even when projecting
+// Index with shard key query - can be covered given the appropriate projection.
 assert.commandWorked(coll.dropIndex({c: 1}));
 assert.commandWorked(coll.ensureIndex({c: 1, 'a.b': 1}));
 assert.eq(1, coll.find({c: true}).explain(true).executionStats.totalDocsExamined);
 assert.eq(
-    1,
+    0,
     coll.find({c: true}, {_id: 0, 'a.b': 1, c: 1}).explain(true).executionStats.totalDocsExamined);
 
 //
