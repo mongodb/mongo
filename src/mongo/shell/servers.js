@@ -985,22 +985,29 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
      * Returns a new argArray with any test-specific arguments added.
      */
     function appendSetParameterArgs(argArray) {
+        function argArrayContains(key) {
+            return (argArray
+                        .filter((val) => {
+                            return typeof val === "string" && val.indexOf(key) === 0;
+                        })
+                        .length > 0);
+        }
+
         // programName includes the version, e.g., mongod-3.2.
         // baseProgramName is the program name without any version information, e.g., mongod.
         var programName = argArray[0];
+
+        // Object containing log component levels for the "logComponentVerbosity" parameter
+        var logComponentVerbosity = {};
+
         var [baseProgramName, programVersion] = programName.split("-");
         if (baseProgramName === 'mongod' || baseProgramName === 'mongos') {
             if (jsTest.options().enableTestCommands) {
                 argArray.push(...['--setParameter', "enableTestCommands=1"]);
                 if (!programVersion || (parseInt(programVersion.split(".")[0]) >= 3 &&
                                         parseInt(programVersion.split(".")[1]) >= 3)) {
-                    if (argArray
-                            .filter((val) => {
-                                return typeof val === "string" &&
-                                    val.indexOf("logComponentVerbosity") === 0;
-                            })
-                            .length === 0) {
-                        argArray.push(...['--setParameter', "logComponentVerbosity={tracking:0}"]);
+                    if (!argArrayContains("logComponentVerbosity")) {
+                        logComponentVerbosity["tracking"] = 0;
                     }
                 }
             }
@@ -1022,7 +1029,6 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             if (jsTest.options().auth) {
                 argArray.push(...['--setParameter', "enableLocalhostAuthBypass=false"]);
             }
-
             // Since options may not be backward compatible, mongos options are not
             // set on older versions, e.g., mongos-3.0.
             if (programName.endsWith('mongos')) {
@@ -1044,9 +1050,15 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                         argArray.push(...['--storageEngine', jsTest.options().storageEngine]);
                     }
                 }
+
                 // Since options may not be backward compatible, mongod options are not
                 // set on older versions, e.g., mongod-3.0.
                 if (programName.endsWith('mongod')) {
+                    // Enable heartbeat logging for replica set nodes.
+                    if (!argArrayContains("logComponentVerbosity")) {
+                        logComponentVerbosity["replication"] = {"heartbeats": 2};
+                    }
+
                     if (jsTest.options().storageEngine === "wiredTiger" ||
                         !jsTest.options().storageEngine) {
                         if (jsTest.options().storageEngineCacheSizeGB) {
@@ -1083,7 +1095,15 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                     }
                 }
             }
+
+            // Add any enabled log components.
+            if (Object.keys(logComponentVerbosity).length > 0) {
+                argArray.push(
+                    ...['--setParameter',
+                        "logComponentVerbosity=" + JSON.stringify(logComponentVerbosity)]);
+            }
         }
+
         return argArray;
     }
 

@@ -32,6 +32,10 @@ def mongod_program(logger, executable=None, process_kwargs=None, **kwargs):
     if config.MONGOD_SET_PARAMETERS is not None:
         suite_set_parameters.update(utils.load_yaml(config.MONGOD_SET_PARAMETERS))
 
+    # Turn on replication heartbeat logging.
+    if "replSet" in kwargs and "logComponentVerbosity" not in suite_set_parameters:
+        suite_set_parameters["logComponentVerbosity"] = {"replication": {"heartbeats": 2}}
+
     _apply_set_parameters(args, suite_set_parameters)
 
     shortcut_opts = {

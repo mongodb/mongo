@@ -27,6 +27,8 @@
  */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+#define LOG_FOR_HEARTBEATS(level) \
+    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kReplicationHeartbeats)
 
 #include "mongo/platform/basic.h"
 
@@ -119,13 +121,16 @@ void ReplicationCoordinatorImpl::_doMemberHeartbeat(ReplicationExecutor::Callbac
                    stdx::placeholders::_1,
                    targetIndex);
 
+    LOG_FOR_HEARTBEATS(2) << "Sending heartbeat (requestId: " << request.id << ") to " << target
+                          << ", " << heartbeatObj;
     _trackHeartbeatHandle(_replExecutor.scheduleRemoteCommand(request, callback));
 }
 
 void ReplicationCoordinatorImpl::_scheduleHeartbeatToTarget(const HostAndPort& target,
                                                             int targetIndex,
                                                             Date_t when) {
-    LOG(2) << "Scheduling heartbeat to " << target << " at " << dateToISOStringUTC(when);
+    LOG_FOR_HEARTBEATS(2) << "Scheduling heartbeat to " << target << " at "
+                          << dateToISOStringUTC(when);
     _trackHeartbeatHandle(
         _replExecutor.scheduleWorkAt(when,
                                      stdx::bind(&ReplicationCoordinatorImpl::_doMemberHeartbeat,
@@ -145,11 +150,14 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
     // Parse and validate the response.  At the end of this step, if responseStatus is OK then
     // hbResponse is valid.
     Status responseStatus = cbData.response.status;
+    const HostAndPort& target = cbData.request.target;
+
     if (responseStatus == ErrorCodes::CallbackCanceled) {
+        LOG_FOR_HEARTBEATS(2) << "Received response to heartbeat (requestId: " << cbData.request.id
+                              << ") from " << target << " but the heartbeat was cancelled.";
         return;
     }
 
-    const HostAndPort& target = cbData.request.target;
     ReplSetHeartbeatResponse hbResponse;
     BSONObj resp;
     if (responseStatus.isOK()) {
@@ -157,6 +165,9 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         responseStatus = hbResponse.initialize(resp, _topCoord->getTerm());
         StatusWith<rpc::ReplSetMetadata> replMetadata =
             rpc::ReplSetMetadata::readFromMetadata(cbData.response.metadata);
+
+        LOG_FOR_HEARTBEATS(2) << "Received response to heartbeat (requestId: " << cbData.request.id
+                              << ") from " << target << ", " << resp;
 
         // Reject heartbeat responses (and metadata) from nodes with mismatched replica set IDs.
         // It is problematic to perform this check in the heartbeat reconfiguring logic because it
@@ -202,10 +213,8 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
             cancelAndRescheduleElectionTimeout();
         }
     } else {
-        log() << "Error in heartbeat request to " << target << "; " << responseStatus;
-        if (!resp.isEmpty()) {
-            LOG(3) << "heartbeat response: " << resp;
-        }
+        LOG_FOR_HEARTBEATS(0) << "Error in heartbeat (requestId: " << cbData.request.id << ") to "
+                              << target << ", response status: " << responseStatus;
 
         hbStatusResponse = StatusWith<ReplSetHeartbeatResponse>(responseStatus);
     }
@@ -633,6 +642,8 @@ void ReplicationCoordinatorImpl::_untrackHeartbeatHandle(const CBHandle& handle)
 }
 
 void ReplicationCoordinatorImpl::_cancelHeartbeats_inlock() {
+    LOG_FOR_HEARTBEATS(2) << "Cancelling all heartbeats.";
+
     std::for_each(_heartbeatHandles.begin(),
                   _heartbeatHandles.end(),
                   stdx::bind(&ReplicationExecutor::cancel, &_replExecutor, stdx::placeholders::_1));

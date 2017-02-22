@@ -53,6 +53,7 @@ public:
         kNetwork,
         kQuery,
         kReplication,
+        kReplicationHeartbeats,
         kSharding,
         kStorage,
         kJournal,

@@ -27,6 +27,8 @@
 */
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+#define LOG_FOR_HEARTBEATS(level) \
+    MONGO_LOG_COMPONENT(level, ::mongo::logger::LogComponent::kReplicationHeartbeats)
 
 #include "mongo/platform/basic.h"
 
@@ -730,6 +732,9 @@ public:
             sleepsecs(data["delay"].numberInt());
         }
 
+        LOG_FOR_HEARTBEATS(2) << "Received heartbeat request from " << cmdObj.getStringField("from")
+                              << ", " << cmdObj;
+
         Status status = Status(ErrorCodes::InternalError, "status not set in heartbeat code");
         /* we don't call ReplSetCommand::check() here because heartbeat
            checks many things that are pre-initialization. */
@@ -764,6 +769,10 @@ public:
                 status = getGlobalReplicationCoordinator()->processHeartbeatV1(args, &response);
                 if (status.isOK())
                     response.addToBSON(&result, true);
+
+                LOG_FOR_HEARTBEATS(2) << "Processed heartbeat from "
+                                      << cmdObj.getStringField("from")
+                                      << " and generated response, " << response;
                 return appendCommandStatus(result, status);
             }
             // else: fall through to old heartbeat protocol as it is likely that
@@ -785,6 +794,9 @@ public:
         status = getGlobalReplicationCoordinator()->processHeartbeat(args, &response);
         if (status.isOK())
             response.addToBSON(&result, false);
+
+        LOG_FOR_HEARTBEATS(2) << "Processed heartbeat from " << cmdObj.getStringField("from")
+                              << " and generated response, " << response;
         return appendCommandStatus(result, status);
     }
 } cmdReplSetHeartbeat;
