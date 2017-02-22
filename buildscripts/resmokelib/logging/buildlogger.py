@@ -5,7 +5,6 @@ Defines handlers for communicating with a buildlogger server.
 from __future__ import absolute_import
 
 import functools
-import urllib2
 
 from . import handlers
 from . import loggers
@@ -17,7 +16,6 @@ APPEND_GLOBAL_LOGS_ENDPOINT = "/build/%(build_id)s"
 CREATE_TEST_ENDPOINT = "/build/%(build_id)s/test"
 APPEND_TEST_LOGS_ENDPOINT = "/build/%(build_id)s/test/%(test_id)s"
 
-_BUILDLOGGER_REALM = "buildlogs"
 _BUILDLOGGER_CONFIG = "mci.buildlogger"
 
 _SEND_AFTER_LINES = 2000
@@ -37,20 +35,6 @@ def _log_on_error(func):
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except urllib2.HTTPError as err:
-            sb = []  # String builder.
-            sb.append("HTTP Error %s: %s" % (err.code, err.msg))
-            sb.append("POST %s" % (err.filename))
-
-            for name in err.hdrs:
-                value = err.hdrs[name]
-                sb.append("  %s: %s" % (name, value))
-
-            # Try to read the response back from the server.
-            if hasattr(err, "read"):
-                sb.append(err.read())
-
-            loggers._BUILDLOGGER_FALLBACK.exception("\n".join(sb))
         except:
             loggers._BUILDLOGGER_FALLBACK.exception("Encountered an error.")
         return None
@@ -94,7 +78,6 @@ def new_build_id(config):
     build_num = int(config["build_num"])
 
     handler = handlers.HTTPHandler(
-        realm=_BUILDLOGGER_REALM,
         url_root=_config.BUILDLOGGER_URL,
         username=username,
         password=password)
@@ -117,7 +100,6 @@ def new_test_id(build_id, build_config, test_filename, test_command):
         return None
 
     handler = handlers.HTTPHandler(
-        realm=_BUILDLOGGER_REALM,
         url_root=_config.BUILDLOGGER_URL,
         username=build_config["username"],
         password=build_config["password"])
@@ -154,8 +136,7 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
         username = build_config["username"]
         password = build_config["password"]
 
-        self.http_handler = handlers.HTTPHandler(_BUILDLOGGER_REALM,
-                                                 _config.BUILDLOGGER_URL,
+        self.http_handler = handlers.HTTPHandler(_config.BUILDLOGGER_URL,
                                                  username,
                                                  password)
 
