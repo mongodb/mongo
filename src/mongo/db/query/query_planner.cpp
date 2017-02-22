@@ -299,6 +299,21 @@ Status QueryPlanner::cacheDataFromTaggedTree(const MatchExpression* const tagged
     } else if (taggedTree->getTag() &&
                taggedTree->getTag()->getType() == MatchExpression::TagData::Type::OrPushdownTag) {
         OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(taggedTree->getTag());
+
+        if (orPushdownTag->getIndexTag()) {
+            const IndexTag* itag = static_cast<const IndexTag*>(orPushdownTag->getIndexTag());
+
+            if (is2DIndex(relevantIndices[itag->index].keyPattern)) {
+                return Status(ErrorCodes::BadValue, "can't cache '2d' index");
+            }
+
+            std::unique_ptr<IndexEntry> indexEntry =
+                stdx::make_unique<IndexEntry>(relevantIndices[itag->index]);
+            indexTree->entry.reset(indexEntry.release());
+            indexTree->index_pos = itag->pos;
+            indexTree->canCombineBounds = itag->canCombineBounds;
+        }
+
         for (const auto& dest : orPushdownTag->getDestinations()) {
             PlanCacheIndexTree::OrPushdown orPushdown;
             orPushdown.route = dest.route;
@@ -355,16 +370,7 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
         }
     }
 
-    if (NULL != indexTree->entry.get()) {
-        map<StringData, size_t>::const_iterator got = indexMap.find(indexTree->entry->name);
-        if (got == indexMap.end()) {
-            mongoutils::str::stream ss;
-            ss << "Did not find index with name: " << indexTree->entry->name;
-            return Status(ErrorCodes::BadValue, ss);
-        }
-        filter->setTag(
-            new IndexTag(got->second, indexTree->index_pos, indexTree->canCombineBounds));
-    } else if (!indexTree->orPushdowns.empty()) {
+    if (!indexTree->orPushdowns.empty()) {
         filter->setTag(new OrPushdownTag());
         OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(filter->getTag());
         for (const auto& orPushdown : indexTree->orPushdowns) {
@@ -379,6 +385,23 @@ Status QueryPlanner::tagAccordingToCache(MatchExpression* filter,
             dest.tagData = stdx::make_unique<IndexTag>(
                 index->second, orPushdown.position, orPushdown.canCombineBounds);
             orPushdownTag->addDestination(std::move(dest));
+        }
+    }
+
+    if (indexTree->entry.get()) {
+        map<StringData, size_t>::const_iterator got = indexMap.find(indexTree->entry->name);
+        if (got == indexMap.end()) {
+            mongoutils::str::stream ss;
+            ss << "Did not find index with name: " << indexTree->entry->name;
+            return Status(ErrorCodes::BadValue, ss);
+        }
+        if (filter->getTag()) {
+            OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(filter->getTag());
+            orPushdownTag->setIndexTag(
+                new IndexTag(got->second, indexTree->index_pos, indexTree->canCombineBounds));
+        } else {
+            filter->setTag(
+                new IndexTag(got->second, indexTree->index_pos, indexTree->canCombineBounds));
         }
     }
 

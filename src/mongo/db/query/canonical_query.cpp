@@ -33,6 +33,7 @@
 #include "mongo/db/query/canonical_query.h"
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -335,6 +336,13 @@ MatchExpression* CanonicalQuery::normalizeTree(MatchExpression* root) {
         // normalizeTree(...) takes ownership of 'child', and then
         // transfers ownership of its return value to 'nme'.
         nme->resetChild(normalizeTree(child));
+    } else if (MatchExpression::ELEM_MATCH_OBJECT == root->matchType()) {
+        // Normalize the rest of the tree hanging off this ELEM_MATCH_OBJECT node.
+        ElemMatchObjectMatchExpression* emome = static_cast<ElemMatchObjectMatchExpression*>(root);
+        auto child = emome->releaseChild();
+        // normalizeTree(...) takes ownership of 'child', and then
+        // transfers ownership of its return value to 'emome'.
+        emome->resetChild(std::unique_ptr<MatchExpression>(normalizeTree(child.release())));
     } else if (MatchExpression::ELEM_MATCH_VALUE == root->matchType()) {
         // Just normalize our children.
         for (size_t i = 0; i < root->getChildVector()->size(); ++i) {

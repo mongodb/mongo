@@ -167,11 +167,6 @@ private:
      * The PlanEnumerator is interested in matching predicates and indices.  Predicates
      * are leaf nodes in the parse tree.  {x:5}, {x: {$geoWithin:...}} are both predicates.
      *
-     * When we have simple predicates, like {x:5}, the task is easy: any indices prefixed
-     * with 'x' can be used to answer the predicate.  This is where the PredicateAssignment
-     * is used.
-     *
-     * With logical operators, things are more complicated.  Let's start with OR, the simplest.
      * Since the output of an OR is the union of its results, each of its children must be
      * indexed for the entire OR to be indexed.  If each subtree of an OR is indexable, the
      * OR is as well.
@@ -179,25 +174,10 @@ private:
      * For an AND to be indexed, only one of its children must be indexed.  AND is an
      * intersection of its children, so each of its children describes a superset of the
      * produced results.
+     *
+     * Leaf predicates are also given AND assignments, since they may index outside predicates that
+     * have been pushed down through OR nodes.
      */
-
-    struct PredicateAssignment {
-        PredicateAssignment() : indexToAssign(0) {}
-
-        std::vector<IndexID> indexes;
-        // Not owned here.
-        MatchExpression* expr;
-
-        // The position of 'expr' in each index key pattern.
-        std::vector<size_t> positions;
-
-        // Enumeration state. The current index in 'indexes', 'positions', and 'orPushdowns'.
-        size_t indexToAssign;
-
-        // The expressions that should receive an OrPushdownTag for each index.
-        std::vector<std::vector<std::pair<MatchExpression*, OrPushdownTag::Destination>>>
-            orPushdowns;
-    };
 
     struct OrAssignment {
         OrAssignment() : counter(0) {}
@@ -224,14 +204,14 @@ private:
         // multiple predicates are assigned to the same position of a multikey index, then the
         // access planner should generate a self-intersection plan.
         bool canCombineBounds = true;
+
+        // The expressions that should receive an OrPushdownTag when this assignment is made.
+        std::vector<std::pair<MatchExpression*, OrPushdownTag::Destination>> orPushdowns;
     };
 
     struct AndEnumerableState {
         std::vector<OneIndexAssignment> assignments;
         std::vector<MemoID> subnodesToIndex;
-
-        // The expressions that should receive an OrPushdownTag when this assignment is made.
-        std::vector<std::pair<MatchExpression*, OrPushdownTag::Destination>> orPushdowns;
     };
 
     struct AndAssignment {
@@ -253,7 +233,6 @@ private:
      * Associates indices with predicates.
      */
     struct NodeAssignment {
-        std::unique_ptr<PredicateAssignment> pred;
         std::unique_ptr<OrAssignment> orAssignment;
         std::unique_ptr<AndAssignment> andAssignment;
         std::unique_ptr<ArrayAssignment> arrayAssignment;
@@ -384,11 +363,18 @@ private:
      *       (b) a shared prefix of the paths X and Y inside the innermost $elemMatch causes the
      *           index to be multikey.
      *
+     * If a predicate in 'couldAssign' is also in 'outsidePreds', then it is assumed to be an
+     * outside predicate that was pushed down through an OR. Instead of adding it to
+     * indexAssignment->preds, we add it to indexAssignment->orPushdowns. We create its
+     * OrPushdownTag using the route specified in 'outsidePreds'.
+     *
      * This function should only be called if the index has path-level multikey information.
      * Otherwise, getMultikeyCompoundablePreds() and compound() should be used instead.
      */
-    void assignMultikeySafePredicates(const std::vector<MatchExpression*>& couldAssign,
-                                      OneIndexAssignment* indexAssignment);
+    void assignMultikeySafePredicates(
+        const std::vector<MatchExpression*>& couldAssign,
+        const unordered_map<MatchExpression*, std::deque<size_t>>& outsidePreds,
+        OneIndexAssignment* indexAssignment);
 
     /**
      * 'andAssignment' contains assignments that we've already committed to outputting,
@@ -431,10 +417,10 @@ private:
      * and idxToNotFirst (and the sub-trees in 'subnodes').  Outputs the assignments into
      * 'andAssignment'. The predicates in 'outsidePreds' are considered for OrPushdownTags.
      */
-    void enumerateOneIndex(const IndexToPredMap& idxToFirst,
-                           const IndexToPredMap& idxToNotFirst,
+    void enumerateOneIndex(IndexToPredMap idxToFirst,
+                           IndexToPredMap idxToNotFirst,
                            const std::vector<MemoID>& subnodes,
-                           const unordered_map<MatchExpression*, std::deque<size_t>> outsidePreds,
+                           const unordered_map<MatchExpression*, std::deque<size_t>>& outsidePreds,
                            AndAssignment* andAssignment);
 
     /**
@@ -460,17 +446,23 @@ private:
                   OneIndexAssignment* assign);
 
     /**
-     * Returns the position of 'path' in the key pattern for 'indexEntry'. It is illegal to call
-     * this if 'path' is not present in the key pattern.
+     * Returns the position that 'predicate' can use in the key pattern for 'indexEntry'. It is
+     * illegal to call this if 'predicate' does not have a RelevantTag, or it cannot use the index.
      */
-    size_t getPosition(const IndexEntry& indexEntry, const std::string& path);
+    size_t getPosition(const IndexEntry& indexEntry, MatchExpression* predicate);
 
-    /*
-     * Finds all predicates in 'outsidePreds' for which 'index' is relevant, and constructs
-     * OrPushdownTag::Destinations for those predicates.
+    /**
+     * Adds 'pred' to 'indexAssignment', using 'position' as its position in the index. If 'pred' is
+     * in 'outsidePreds', then it is assumed to be an outside predicate that was pushed down through
+     * an OR. Instead of adding it to indexAssignment->preds, we add it to
+     * indexAssignment->orPushdowns. We create its OrPushdownTag using the route specified in
+     * 'outsidePreds'. 'pred' must be able to use the index and be multikey-safe to add to
+     * 'indexAssignment'.
      */
-    std::vector<std::pair<MatchExpression*, OrPushdownTag::Destination>> getOrPushdowns(
-        IndexID index, const unordered_map<MatchExpression*, std::deque<size_t>>& outsidePreds);
+    void assignPredicate(const unordered_map<MatchExpression*, std::deque<size_t>>& outsidePreds,
+                         MatchExpression* pred,
+                         size_t position,
+                         OneIndexAssignment* indexAssignment);
 
     /**
      * Return the memo entry for 'node'.  Does some sanity checking to ensure that a memo entry

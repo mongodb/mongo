@@ -96,6 +96,14 @@ public:
         return _sub.get();
     }
 
+    std::unique_ptr<MatchExpression> releaseChild() {
+        return std::move(_sub);
+    }
+
+    void resetChild(std::unique_ptr<MatchExpression> newChild) {
+        _sub = std::move(newChild);
+    }
+
 private:
     std::unique_ptr<MatchExpression> _sub;
 };

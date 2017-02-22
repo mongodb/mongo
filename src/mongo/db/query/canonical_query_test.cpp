@@ -521,6 +521,8 @@ TEST(CanonicalQueryTest, NormalizeQueryTree) {
     // $in with 0 or more than 1 argument is not modified.
     testNormalizeQuery("{a: {$in: []}}", "{a: {$in: []}}");
     testNormalizeQuery("{a: {$in: [/./, 3]}}", "{a: {$in: [/./, 3]}}");
+    // Child of $elemMatch object expression is normalized.
+    testNormalizeQuery("{a: {$elemMatch: {$or: [{b: 1}]}}}", "{a: {$elemMatch: {b: 1}}}");
 }
 
 TEST(CanonicalQueryTest, NormalizeWithInPreservesTags) {

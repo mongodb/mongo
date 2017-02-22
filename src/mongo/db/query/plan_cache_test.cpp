@@ -1292,6 +1292,29 @@ TEST_F(CachePlanSelectionTest, ContainedOr) {
         "]}}}}");
 }
 
+TEST_F(CachePlanSelectionTest, ContainedOrAndIntersection) {
+    bool oldEnableHashIntersection = internalQueryPlannerEnableHashIntersection.load();
+    ON_BLOCK_EXIT([oldEnableHashIntersection] {
+        internalQueryPlannerEnableHashIntersection.store(oldEnableHashIntersection);
+    });
+    internalQueryPlannerEnableHashIntersection.store(true);
+    params.options = QueryPlannerParams::INCLUDE_COLLSCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    addIndex(BSON("a" << 1 << "b" << 1), "a_1_b_1");
+    addIndex(BSON("c" << 1), "c_1");
+    BSONObj query = fromjson("{$and: [{a: 5}, {$or: [{b: 6}, {c: 7}]}]}");
+    runQuery(query);
+    assertPlanCacheRecoversSolution(
+        query,
+        "{fetch: {filter: null, node: {andHash: {nodes: ["
+        "{or: {nodes: ["
+        "{ixscan: {pattern: {a: 1, b: 1}, bounds: {a: [[5, 5, true, true]], b: [[6, 6, true, "
+        "true]]}}},"
+        "{ixscan: {pattern: {c: 1}, bounds: {c: [[7, 7, true, true]]}}}]}},"
+        "{ixscan: {pattern: {a: 1, b: 1}, bounds: {a: [[5, 5, true, true]], b: [['MinKey', "
+        "'MaxKey', true, true]]}}}"
+        "]}}}}");
+}
+
 /**
  * Test functions for computeKey.  Cache keys are intentionally obfuscated and are
  * meaningful only within the current lifetime of the server process. Users should treat plan

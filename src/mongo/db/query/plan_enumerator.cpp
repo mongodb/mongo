@@ -288,20 +288,7 @@ std::string PlanEnumerator::dumpMemo() {
 }
 
 string PlanEnumerator::NodeAssignment::toString() const {
-    if (NULL != pred) {
-        mongoutils::str::stream ss;
-        ss << "predicate\n";
-        ss << "\tfirst indices: [";
-        for (size_t i = 0; i < pred->indexes.size(); ++i) {
-            ss << pred->indexes[i];
-            if (i < pred->indexes.size() - 1)
-                ss << ", ";
-        }
-        ss << "]\n";
-        ss << "\tpred: " << pred->expr->toString();
-        ss << "\tindexToAssign: " << pred->indexToAssign;
-        return ss;
-    } else if (NULL != andAssignment) {
+    if (NULL != andAssignment) {
         mongoutils::str::stream ss;
         ss << "AND enumstate counter " << andAssignment->counter;
         for (size_t i = 0; i < andAssignment->choices.size(); ++i) {
@@ -396,69 +383,7 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
     childContext.elemMatchExpr = context.elemMatchExpr;
     childContext.outsidePreds = context.outsidePreds;
 
-    if (Indexability::nodeCanUseIndexOnOwnField(node)) {
-        // We only get here if our parent is an OR, an array operator, or we're the root.
-
-        // If we have no index tag there are no indices we can use.
-        if (NULL == node->getTag()) {
-            return false;
-        }
-
-        RelevantTag* rt = static_cast<RelevantTag*>(node->getTag());
-
-        size_t myMemoID;
-        NodeAssignment* assign;
-        allocateAssignment(node, &assign, &myMemoID);
-
-        assign->pred.reset(new PredicateAssignment());
-        assign->pred->expr = node;
-
-        // 'expr' can use any index in 'first'.
-        if (!rt->first.empty()) {
-            assign->pred->indexes.swap(rt->first);
-
-            for (auto index : assign->pred->indexes) {
-                assign->pred->positions.push_back(0);
-                assign->pred->orPushdowns.push_back(
-                    getOrPushdowns(index, childContext.outsidePreds));
-            }
-        }
-
-        // 'expr' can use an index in 'notFirst' if an outside predicate can be combined with this
-        // node and use the first position in the index.
-        for (auto index : rt->notFirst) {
-            auto orPushdowns = getOrPushdowns(index, childContext.outsidePreds);
-            for (const auto& orPushdown : orPushdowns) {
-                IndexTag* indexTag = static_cast<IndexTag*>(orPushdown.second.tagData.get());
-                if (indexTag->pos == 0) {
-                    const auto indexEntry = (*_indices)[index];
-                    assign->pred->indexes.push_back(index);
-                    assign->pred->positions.push_back(getPosition(indexEntry, rt->path));
-                    assign->pred->orPushdowns.push_back(std::move(orPushdowns));
-                    break;
-                }
-            }
-        }
-
-        return !assign->pred->indexes.empty();
-    } else if (Indexability::isBoundsGeneratingNot(node)) {
-        bool childIndexable = prepMemo(node->getChild(0), childContext);
-        // If the child isn't indexable then bail out now.
-        if (!childIndexable) {
-            return false;
-        }
-
-        // Our parent node, if any exists, will expect a memo entry keyed on 'node'.  As such we
-        // have the node ID for 'node' just point to the memo created for the child that
-        // actually generates the bounds.
-        size_t myMemoID;
-        NodeAssignment* assign;
-        allocateAssignment(node, &assign, &myMemoID);
-        OrAssignment* orAssignment = new OrAssignment();
-        orAssignment->subnodes.push_back(memoIDForNode(node->getChild(0)));
-        assign->orAssignment.reset(orAssignment);
-        return true;
-    } else if (MatchExpression::OR == node->matchType()) {
+    if (MatchExpression::OR == node->matchType()) {
         // For an OR to be indexed, all its children must be indexed.
         for (size_t i = 0; i < node->numChildren(); ++i) {
 
@@ -510,7 +435,9 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
 
         assign->arrayAssignment.reset(aa.release());
         return true;
-    } else if (MatchExpression::AND == node->matchType()) {
+    } else if (Indexability::nodeCanUseIndexOnOwnField(node) ||
+               Indexability::isBoundsGeneratingNot(node) ||
+               (MatchExpression::AND == node->matchType())) {
         // Map from idx id to children that have a pred over it.
 
         // TODO: The index intersection logic could be simplified if we could iterate over these
@@ -701,12 +628,16 @@ bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
                 if (compIt != idxToNotFirst.end()) {
                     // Assign any predicates on the non-leading index fields to 'indexAssign' that
                     // don't violate the intersecting or compounding rules for multikey indexes.
-                    assignMultikeySafePredicates(compIt->second, &indexAssign);
+                    // We do not currently try to assign outside predicates to mandatory indexes.
+                    const unordered_map<MatchExpression*, std::deque<size_t>> outsidePreds{};
+                    assignMultikeySafePredicates(compIt->second, outsidePreds, &indexAssign);
                 }
             } else {
                 // Assign any predicates on the leading index field to 'indexAssign' that don't
                 // violate the intersecting rules for multikey indexes.
-                assignMultikeySafePredicates(predsOverLeadingField, &indexAssign);
+                // We do not currently try to assign outside predicates to mandatory indexes.
+                const unordered_map<MatchExpression*, std::deque<size_t>> outsidePreds{};
+                assignMultikeySafePredicates(predsOverLeadingField, outsidePreds, &indexAssign);
 
                 // Assign the mandatory predicate to 'thisIndex'. Due to how keys are generated for
                 // 2dsphere indexes, it is always safe to assign a predicate on a distinct path to
@@ -730,7 +661,9 @@ bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
 
                     // Assign any predicates on the non-leading index fields to 'indexAssign' that
                     // don't violate the intersecting or compounding rules for multikey indexes.
-                    assignMultikeySafePredicates(predsOverNonLeadingFields, &indexAssign);
+                    // We do not currently try to assign outside predicates to mandatory indexes.
+                    assignMultikeySafePredicates(
+                        predsOverNonLeadingFields, outsidePreds, &indexAssign);
                 }
             }
         } else if (thisIndex.multikey) {
@@ -812,75 +745,45 @@ bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
 
         // Output the assignments for this index.
         AndEnumerableState state;
-        state.assignments.push_back(indexAssign);
+        state.assignments.push_back(std::move(indexAssign));
         andAssignment->choices.push_back(std::move(state));
     }
 
     return andAssignment->choices.size() > 0;
 }
 
-std::vector<std::pair<MatchExpression*, OrPushdownTag::Destination>> PlanEnumerator::getOrPushdowns(
-    IndexID index, const unordered_map<MatchExpression*, std::deque<size_t>>& outsidePreds) {
-    std::vector<std::pair<MatchExpression*, OrPushdownTag::Destination>> orPushdowns;
-    const auto indexEntry = (*_indices)[index];
+void PlanEnumerator::assignPredicate(
+    const unordered_map<MatchExpression*, std::deque<size_t>>& outsidePreds,
+    MatchExpression* pred,
+    size_t position,
+    OneIndexAssignment* indexAssignment) {
+    if (outsidePreds.find(pred) != outsidePreds.end()) {
+        OrPushdownTag::Destination dest;
+        dest.route = outsidePreds.at(pred);
 
-    // TODO SERVER-27904: Determine whether we can combine bounds.
-    if (indexEntry.multikey) {
-        return orPushdowns;
+        // This method should only be called if we can combine bounds.
+        const bool canCombineBounds = true;
+        dest.tagData =
+            stdx::make_unique<IndexTag>(indexAssignment->index, position, canCombineBounds);
+        indexAssignment->orPushdowns.emplace_back(pred, std::move(dest));
+    } else {
+        indexAssignment->preds.push_back(pred);
+        indexAssignment->positions.push_back(position);
     }
-
-    for (const auto& pred : outsidePreds) {
-        RelevantTag* relevantTag = static_cast<RelevantTag*>(pred.first->getTag());
-        const auto& first = relevantTag->first;
-        const auto& notFirst = relevantTag->notFirst;
-        if ((std::find(first.begin(), first.end(), index) != first.end()) ||
-            (std::find(notFirst.begin(), notFirst.end(), index) != notFirst.end())) {
-            OrPushdownTag::Destination dest;
-            dest.route = pred.second;
-
-            // The index is not multikey, so we can combine bounds.
-            const bool canCombineBounds = true;
-
-            dest.tagData = stdx::make_unique<IndexTag>(
-                index, getPosition(indexEntry, relevantTag->path), canCombineBounds);
-            orPushdowns.emplace_back(pred.first, std::move(dest));
-        }
-    }
-    return orPushdowns;
 }
 
 void PlanEnumerator::enumerateOneIndex(
-    const IndexToPredMap& idxToFirst,
-    const IndexToPredMap& idxToNotFirst,
+    IndexToPredMap idxToFirst,
+    IndexToPredMap idxToNotFirst,
     const vector<MemoID>& subnodes,
-    const unordered_map<MatchExpression*, std::deque<size_t>> outsidePreds,
+    const unordered_map<MatchExpression*, std::deque<size_t>>& outsidePreds,
     AndAssignment* andAssignment) {
-    // In the simplest case, an AndAssignment picks indices like a PredicateAssignment.  To
-    // be indexed we must only pick one index
-    //
-    // Complications:
-    //
-    // Some of our child predicates cannot be answered without an index.  As such, the
-    // indices that those predicates require must always be outputted.  We store these
-    // mandatory index assignments in 'mandatoryIndices'.
-    //
-    // Some of our children may not be predicates.  We may have ORs (or array operators) as
-    // children.  If one of these subtrees provides an index, the AND is indexed.  We store
-    // these subtree choices in 'subnodes'.
-    //
-    // With the above two cases out of the way, we can focus on the remaining case: what to
-    // do with our children that are leaf predicates.
-    //
-    // Guiding principles for index assignment to leaf predicates:
-    //
-    // 1. If we assign an index to {x:{$gt: 5}} we should assign the same index to
-    //    {x:{$lt: 50}}.  That is, an index assignment should include all predicates
-    //    over its leading field.
-    //
-    // 2. If we have the index {a:1, b:1} and we assign it to {a: 5} we should assign it
-    //    to {b:7}, since with a predicate over the first field of the compound index,
-    //    the second field can be bounded as well.  We may only assign indices to predicates
-    //    if all fields to the left of the index field are constrained.
+    // Each choice in the 'andAssignment' will consist of a single subnode to index (an OR or array
+    // operator) or a OneIndexAssignment. When creating a OneIndexAssignment, we ensure that at
+    // least one predicate can fulfill the first position in the key pattern, then we assign all
+    // predicates that can use the key pattern to the index. However, if the index is multikey,
+    // certain predicates cannot be combined/compounded. We determine which predicates can be
+    // combined/compounded using path-level multikey info, if available.
 
     // First, add the state of using each subnode.
     for (size_t i = 0; i < subnodes.size(); ++i) {
@@ -889,7 +792,31 @@ void PlanEnumerator::enumerateOneIndex(
         andAssignment->choices.push_back(std::move(aes));
     }
 
-    // For each FIRST, we assign nodes to it.
+    // Next we create OneIndexAssignments.
+
+    // If there are any 'outsidePreds', then we are in a contained OR, and the 'outsidePreds' are
+    // AND-related to the contained OR and can be pushed inside of it. Add all of the 'outsidePreds'
+    // to 'idxToFirst' and 'idxToNotFirst'. We will treat them as normal predicates that can be
+    // assigned to the index, but we will ensure that any OneIndexAssignment contains some
+    // predicates from the current node.
+    for (const auto& pred : outsidePreds) {
+        invariant(pred.first->getTag());
+        RelevantTag* relevantTag = static_cast<RelevantTag*>(pred.first->getTag());
+        for (auto index : relevantTag->first) {
+            if (idxToFirst.find(index) != idxToFirst.end() ||
+                idxToNotFirst.find(index) != idxToNotFirst.end()) {
+                idxToFirst[index].push_back(pred.first);
+            }
+        }
+        for (auto index : relevantTag->notFirst) {
+            if (idxToFirst.find(index) != idxToFirst.end() ||
+                idxToNotFirst.find(index) != idxToNotFirst.end()) {
+                idxToNotFirst[index].push_back(pred.first);
+            }
+        }
+    }
+
+    // For each FIRST, we assign predicates to it.
     for (IndexToPredMap::const_iterator it = idxToFirst.begin(); it != idxToFirst.end(); ++it) {
         const IndexEntry& thisIndex = (*_indices)[it->first];
 
@@ -909,20 +836,24 @@ void PlanEnumerator::enumerateOneIndex(
             for (const auto& firstAssignment : possibleFirstAssignments) {
                 OneIndexAssignment indexAssign;
                 indexAssign.index = it->first;
-                indexAssign.preds = firstAssignment;
-                indexAssign.positions.resize(indexAssign.preds.size(), 0);
+
+                for (auto pred : firstAssignment) {
+                    assignPredicate(outsidePreds, pred, 0, &indexAssign);
+                }
 
                 auto compIt = idxToNotFirst.find(indexAssign.index);
                 if (compIt != idxToNotFirst.end()) {
                     // Assign any predicates on the non-leading index fields to 'indexAssign' that
                     // don't violate the intersecting and compounding rules for multikey indexes.
-                    assignMultikeySafePredicates(compIt->second, &indexAssign);
+                    assignMultikeySafePredicates(compIt->second, outsidePreds, &indexAssign);
                 }
 
-                AndEnumerableState state;
-                state.assignments.push_back(indexAssign);
-                // TODO SERVER-27904: Use outsidePreds to get orPushdowns.
-                andAssignment->choices.push_back(std::move(state));
+                // Do not output this assignment if it consists only of outside predicates.
+                if (!indexAssign.preds.empty()) {
+                    AndEnumerableState state;
+                    state.assignments.push_back(std::move(indexAssign));
+                    andAssignment->choices.push_back(std::move(state));
+                }
             }
         } else if (thisIndex.multikey) {
             // We don't have path-level information about what causes 'thisIndex' to be multikey.
@@ -934,29 +865,34 @@ void PlanEnumerator::enumerateOneIndex(
                 OneIndexAssignment indexAssign;
                 indexAssign.index = it->first;
 
-                indexAssign.preds.push_back(pred);
-                indexAssign.positions.push_back(0);
+                assignPredicate(outsidePreds, pred, 0, &indexAssign);
 
                 // If there are any preds that could possibly be compounded with this
                 // index...
                 IndexToPredMap::const_iterator compIt = idxToNotFirst.find(indexAssign.index);
                 if (compIt != idxToNotFirst.end()) {
                     const vector<MatchExpression*>& couldCompound = compIt->second;
-                    vector<MatchExpression*> tryCompound;
+                    vector<MatchExpression*> toCompound;
+                    vector<MatchExpression*> assigned = indexAssign.preds;
+                    for (const auto& orPushdown : indexAssign.orPushdowns) {
+                        assigned.push_back(orPushdown.first);
+                    }
 
-                    // ...select the predicates that are safe to compound and try to
-                    // compound them.
-                    getMultikeyCompoundablePreds(indexAssign.preds, couldCompound, &tryCompound);
-                    if (tryCompound.size()) {
-                        compound(tryCompound, thisIndex, &indexAssign);
+                    // ...select the predicates that are safe to compound and compound them.
+                    getMultikeyCompoundablePreds(assigned, couldCompound, &toCompound);
+
+                    for (auto pred : toCompound) {
+                        assignPredicate(
+                            outsidePreds, pred, getPosition(thisIndex, pred), &indexAssign);
                     }
                 }
 
-                // Output the assignment.
-                AndEnumerableState state;
-                state.assignments.push_back(indexAssign);
-                // TODO SERVER-27904: Use outsidePreds to get orPushdowns.
-                andAssignment->choices.push_back(std::move(state));
+                // Do not output this assignment if it consists only of outside predicates.
+                if (!indexAssign.preds.empty()) {
+                    AndEnumerableState state;
+                    state.assignments.push_back(std::move(indexAssign));
+                    andAssignment->choices.push_back(std::move(state));
+                }
             }
         } else {
             // The assignment we're filling out.
@@ -967,46 +903,24 @@ void PlanEnumerator::enumerateOneIndex(
 
             // The index isn't multikey.  Assign all preds to it.  The planner will
             // intersect the bounds.
-            indexAssign.preds = it->second;
-
-            // Since everything in assign.preds prefixes the index, they all go
-            // at position '0' in the index, the first position.
-            indexAssign.positions.resize(indexAssign.preds.size(), 0);
+            for (auto pred : it->second) {
+                assignPredicate(outsidePreds, pred, 0, &indexAssign);
+            }
 
             // Find everything that could use assign.index but isn't a pred over
             // the first field of that index.
             IndexToPredMap::const_iterator compIt = idxToNotFirst.find(indexAssign.index);
             if (compIt != idxToNotFirst.end()) {
-                compound(compIt->second, thisIndex, &indexAssign);
+                for (auto pred : compIt->second) {
+                    assignPredicate(outsidePreds, pred, getPosition(thisIndex, pred), &indexAssign);
+                }
             }
 
             // Output the assignment.
+            invariant(!indexAssign.preds.empty());
             AndEnumerableState state;
-            state.assignments.push_back(indexAssign);
-            state.orPushdowns = getOrPushdowns(indexAssign.index, outsidePreds);
+            state.assignments.push_back(std::move(indexAssign));
             andAssignment->choices.push_back(std::move(state));
-        }
-    }
-
-    // If an outside predicate can fulfill the first position in the index, we can use it.
-    for (const auto& index : idxToNotFirst) {
-        if (idxToFirst.find(index.first) != idxToFirst.end()) {
-            continue;
-        }
-        auto orPushdowns = getOrPushdowns(index.first, outsidePreds);
-        for (const auto& orPushdown : orPushdowns) {
-            IndexTag* indexTag = static_cast<IndexTag*>(orPushdown.second.tagData.get());
-            if (indexTag->pos == 0) {
-                OneIndexAssignment indexAssign;
-                indexAssign.index = index.first;
-                const IndexEntry& indexEntry = (*_indices)[index.first];
-                compound(index.second, indexEntry, &indexAssign);
-                AndEnumerableState state;
-                state.assignments.push_back(indexAssign);
-                state.orPushdowns = std::move(orPushdowns);
-                andAssignment->choices.push_back(std::move(state));
-                break;
-            }
         }
     }
 }
@@ -1077,7 +991,7 @@ void PlanEnumerator::enumerateAndIntersect(const IndexToPredMap& idxToFirst,
                 oneAssign.positions.resize(kMaxSelfIntersections);
             }
             AndEnumerableState state;
-            state.assignments.push_back(oneAssign);
+            state.assignments.push_back(std::move(oneAssign));
             andAssignment->choices.push_back(std::move(state));
             continue;
         }
@@ -1085,7 +999,7 @@ void PlanEnumerator::enumerateAndIntersect(const IndexToPredMap& idxToFirst,
         // Output (subnode, firstAssign) pairs.
         for (size_t i = 0; i < subnodes.size(); ++i) {
             AndEnumerableState indexAndSubnode;
-            indexAndSubnode.assignments.push_back(oneAssign);
+            indexAndSubnode.assignments.push_back(std::move(oneAssign));
             indexAndSubnode.subnodesToIndex.push_back(subnodes[i]);
             andAssignment->choices.push_back(std::move(indexAndSubnode));
             // Limit n^2.
@@ -1252,8 +1166,8 @@ void PlanEnumerator::enumerateAndIntersect(const IndexToPredMap& idxToFirst,
             // We're done with this particular pair of indices; output
             // the resulting assignments.
             AndEnumerableState state;
-            state.assignments.push_back(firstAssign);
-            state.assignments.push_back(secondAssign);
+            state.assignments.push_back(std::move(firstAssign));
+            state.assignments.push_back(std::move(secondAssign));
             andAssignment->choices.push_back(std::move(state));
         }
     }
@@ -1278,32 +1192,33 @@ void PlanEnumerator::enumerateAndIntersect(const IndexToPredMap& idxToFirst,
 void PlanEnumerator::getIndexedPreds(MatchExpression* node,
                                      PrepMemoContext context,
                                      vector<MatchExpression*>* indexedPreds) {
-    for (size_t i = 0; i < node->numChildren(); ++i) {
-        MatchExpression* child = node->getChild(i);
-        if (Indexability::nodeCanUseIndexOnOwnField(child)) {
-            RelevantTag* rt = static_cast<RelevantTag*>(child->getTag());
-            if (context.elemMatchExpr) {
-                // If we're in an $elemMatch context, store the
-                // innermost parent $elemMatch, as well as the
-                // inner path prefix.
-                rt->elemMatchExpr = context.elemMatchExpr;
-                rt->pathPrefix = getPathPrefix(child->path().toString());
-            } else {
-                // We're not an $elemMatch context, so we should store
-                // the prefix of the full path.
-                rt->pathPrefix = getPathPrefix(rt->path);
-            }
+    if (Indexability::nodeCanUseIndexOnOwnField(node)) {
+        RelevantTag* rt = static_cast<RelevantTag*>(node->getTag());
+        if (context.elemMatchExpr) {
+            // If we're in an $elemMatch context, store the
+            // innermost parent $elemMatch, as well as the
+            // inner path prefix.
+            rt->elemMatchExpr = context.elemMatchExpr;
+            rt->pathPrefix = getPathPrefix(node->path().toString());
+        } else {
+            // We're not an $elemMatch context, so we should store
+            // the prefix of the full path.
+            rt->pathPrefix = getPathPrefix(rt->path);
+        }
 
-            // Output this as a pred that can use the index.
-            indexedPreds->push_back(child);
-        } else if (Indexability::isBoundsGeneratingNot(child)) {
-            getIndexedPreds(child, context, indexedPreds);
-        } else if (MatchExpression::ELEM_MATCH_OBJECT == child->matchType()) {
-            PrepMemoContext childContext;
-            childContext.elemMatchExpr = child;
-            getIndexedPreds(child, childContext, indexedPreds);
-        } else if (MatchExpression::AND == child->matchType()) {
-            getIndexedPreds(child, context, indexedPreds);
+        // Output this as a pred that can use the index.
+        indexedPreds->push_back(node);
+    } else if (Indexability::isBoundsGeneratingNot(node)) {
+        getIndexedPreds(node->getChild(0), context, indexedPreds);
+    } else if (MatchExpression::ELEM_MATCH_OBJECT == node->matchType()) {
+        PrepMemoContext childContext;
+        childContext.elemMatchExpr = node;
+        for (size_t i = 0; i < node->numChildren(); ++i) {
+            getIndexedPreds(node->getChild(i), childContext, indexedPreds);
+        }
+    } else if (MatchExpression::AND == node->matchType()) {
+        for (size_t i = 0; i < node->numChildren(); ++i) {
+            getIndexedPreds(node->getChild(i), context, indexedPreds);
         }
     }
 }
@@ -1422,8 +1337,10 @@ void PlanEnumerator::getMultikeyCompoundablePreds(const vector<MatchExpression*>
     }
 }
 
-void PlanEnumerator::assignMultikeySafePredicates(const std::vector<MatchExpression*>& couldAssign,
-                                                  OneIndexAssignment* indexAssignment) {
+void PlanEnumerator::assignMultikeySafePredicates(
+    const std::vector<MatchExpression*>& couldAssign,
+    const unordered_map<MatchExpression*, std::deque<size_t>>& outsidePreds,
+    OneIndexAssignment* indexAssignment) {
     invariant(indexAssignment);
     invariant(indexAssignment->preds.size() == indexAssignment->positions.size());
 
@@ -1458,6 +1375,19 @@ void PlanEnumerator::assignMultikeySafePredicates(const std::vector<MatchExpress
         }
     }
 
+    // Update 'used' with all outside predicates already assigned to 'thisIndex';
+    for (const auto& orPushdown : indexAssignment->orPushdowns) {
+        invariant(orPushdown.first->getTag());
+        RelevantTag* rt = static_cast<RelevantTag*>(orPushdown.first->getTag());
+
+        // Any outside predicates already assigned to 'thisIndex' were assigned in the first
+        // position.
+        const size_t position = 0;
+        const bool shouldHaveAssigned =
+            canAssignPredToIndex(rt, thisIndex.multikeyPaths[position], &used);
+        invariant(shouldHaveAssigned);
+    }
+
     size_t posInIdx = 0;
 
     for (const auto keyElem : thisIndex.keyPattern) {
@@ -1474,8 +1404,7 @@ void PlanEnumerator::assignMultikeySafePredicates(const std::vector<MatchExpress
             if (thisIndex.multikeyPaths[posInIdx].empty()) {
                 // We can always intersect or compound the bounds when no prefix of the queried path
                 // causes the index to be multikey.
-                indexAssignment->preds.push_back(couldAssignPred);
-                indexAssignment->positions.push_back(posInIdx);
+                assignPredicate(outsidePreds, couldAssignPred, posInIdx, indexAssignment);
                 continue;
             }
 
@@ -1485,8 +1414,7 @@ void PlanEnumerator::assignMultikeySafePredicates(const std::vector<MatchExpress
                 canAssignPredToIndex(rt, thisIndex.multikeyPaths[posInIdx], &used);
 
             if (shouldAssign) {
-                indexAssignment->preds.push_back(couldAssignPred);
-                indexAssignment->positions.push_back(posInIdx);
+                assignPredicate(outsidePreds, couldAssignPred, posInIdx, indexAssignment);
             }
         }
 
@@ -1536,10 +1464,12 @@ bool PlanEnumerator::alreadyCompounded(const set<MatchExpression*>& ixisectAssig
     return false;
 }
 
-size_t PlanEnumerator::getPosition(const IndexEntry& indexEntry, const std::string& path) {
+size_t PlanEnumerator::getPosition(const IndexEntry& indexEntry, MatchExpression* predicate) {
+    invariant(predicate->getTag());
+    RelevantTag* relevantTag = static_cast<RelevantTag*>(predicate->getTag());
     size_t position = 0;
     for (auto&& element : indexEntry.keyPattern) {
-        if (element.fieldName() == path) {
+        if (element.fieldName() == relevantTag->path) {
             return position;
         }
         ++position;
@@ -1594,25 +1524,7 @@ void PlanEnumerator::tagMemo(size_t id) {
     NodeAssignment* assign = _memo[id];
     verify(NULL != assign);
 
-    if (NULL != assign->pred) {
-        PredicateAssignment* pa = assign->pred.get();
-        verify(NULL == pa->expr->getTag());
-        verify(pa->indexToAssign < pa->indexes.size());
-        auto index = pa->indexes[pa->indexToAssign];
-        auto position = pa->positions[pa->indexToAssign];
-        const bool canCombineBounds = true;
-        pa->expr->setTag(new IndexTag(index, position, canCombineBounds));
-
-        // Add all OrPushdownTags for this index assignment.
-        for (const auto& orPushdown : pa->orPushdowns[pa->indexToAssign]) {
-            auto expr = orPushdown.first;
-            if (!expr->getTag()) {
-                expr->setTag(new OrPushdownTag());
-            }
-            OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(expr->getTag());
-            orPushdownTag->addDestination(orPushdown.second.clone());
-        }
-    } else if (NULL != assign->orAssignment) {
+    if (NULL != assign->orAssignment) {
         OrAssignment* oa = assign->orAssignment.get();
         for (size_t i = 0; i < oa->subnodes.size(); ++i) {
             tagMemo(oa->subnodes[i]);
@@ -1644,16 +1556,16 @@ void PlanEnumerator::tagMemo(size_t id) {
                         new IndexTag(assign.index, assign.positions[j], assign.canCombineBounds));
                 }
             }
-        }
 
-        // Add all OrPushdownTags for this index assignment.
-        for (const auto& orPushdown : aes.orPushdowns) {
-            auto expr = orPushdown.first;
-            if (!expr->getTag()) {
-                expr->setTag(new OrPushdownTag());
+            // Add all OrPushdownTags for this index assignment.
+            for (const auto& orPushdown : assign.orPushdowns) {
+                auto expr = orPushdown.first;
+                if (!expr->getTag()) {
+                    expr->setTag(new OrPushdownTag());
+                }
+                OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(expr->getTag());
+                orPushdownTag->addDestination(orPushdown.second.clone());
             }
-            OrPushdownTag* orPushdownTag = static_cast<OrPushdownTag*>(expr->getTag());
-            orPushdownTag->addDestination(orPushdown.second.clone());
         }
     } else {
         verify(0);
@@ -1664,15 +1576,7 @@ bool PlanEnumerator::nextMemo(size_t id) {
     NodeAssignment* assign = _memo[id];
     verify(NULL != assign);
 
-    if (NULL != assign->pred) {
-        PredicateAssignment* pa = assign->pred.get();
-        pa->indexToAssign++;
-        if (pa->indexToAssign >= pa->indexes.size()) {
-            pa->indexToAssign = 0;
-            return true;
-        }
-        return false;
-    } else if (NULL != assign->orAssignment) {
+    if (NULL != assign->orAssignment) {
         OrAssignment* oa = assign->orAssignment.get();
 
         // Limit the number of OR enumerations
