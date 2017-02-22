@@ -34,10 +34,7 @@
 
 namespace mongo {
 
-class DBConfig;
 class OperationContext;
-template <typename T>
-class StatusWith;
 
 class ScopedShardDatabase {
     MONGO_DISALLOW_COPYING(ScopedShardDatabase);

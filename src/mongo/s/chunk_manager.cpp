@@ -33,29 +33,21 @@
 #include "mongo/s/chunk_manager.h"
 
 #include <boost/next_prior.hpp>
-#include <map>
-#include <set>
 #include <vector>
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/config.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/shard_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 
@@ -163,13 +155,13 @@ bool isChunkMapValid(const ChunkMap& chunkMap) {
 
 }  // namespace
 
-ChunkManager::ChunkManager(const NamespaceString& nss,
+ChunkManager::ChunkManager(NamespaceString nss,
                            const OID& epoch,
                            const ShardKeyPattern& shardKeyPattern,
                            std::unique_ptr<CollatorInterface> defaultCollator,
                            bool unique)
     : _sequenceNumber(nextCMSequenceNumber.addAndFetch(1)),
-      _ns(nss.ns()),
+      _nss(std::move(nss)),
       _keyPattern(shardKeyPattern.getKeyPattern()),
       _defaultCollator(std::move(defaultCollator)),
       _unique(unique),
@@ -193,7 +185,8 @@ void ChunkManager::loadExistingRanges(OperationContext* txn, const ChunkManager*
 
         Timer t;
 
-        log() << "ChunkManager loading chunks for " << _ns << " sequenceNumber: " << _sequenceNumber
+        log() << "ChunkManager loading chunks for " << _nss
+              << " sequenceNumber: " << _sequenceNumber
               << " based on: " << (oldManager ? oldManager->getVersion().toString() : "(empty)");
 
         if (_load(txn, chunkMap, shardIds, &shardVersions, oldManager)) {
@@ -219,7 +212,7 @@ void ChunkManager::loadExistingRanges(OperationContext* txn, const ChunkManager*
 
     // This will abort construction so we should never have a reference to an invalid config
     msgasserted(13282,
-                str::stream() << "Couldn't load a valid config for " << _ns
+                str::stream() << "Couldn't load a valid config for " << _nss.ns()
                               << " after 3 attempts. Please try again.");
 }
 
@@ -248,13 +241,13 @@ bool ChunkManager::_load(OperationContext* txn,
             chunkMap.emplace(oldC->getMax(), std::make_shared<Chunk>(*oldC));
         }
 
-        LOG(2) << "loading chunk manager for collection " << _ns
+        LOG(2) << "loading chunk manager for collection " << _nss
                << " using old chunk manager w/ version " << _version.toString() << " and "
                << oldChunkMap.size() << " chunks";
     }
 
     // Attach a diff tracker for the versioned chunk data
-    CMConfigDiffTracker differ(_ns, &chunkMap, &_version, shardVersions, this);
+    CMConfigDiffTracker differ(_nss.ns(), &chunkMap, &_version, shardVersions, this);
 
     // Diff tracker should *always* find at least one chunk if collection exists
     // Get the diff query required
@@ -276,7 +269,7 @@ bool ChunkManager::_load(OperationContext* txn,
 
     int diffsApplied = differ.calculateConfigDiff(txn, chunks);
     if (diffsApplied > 0) {
-        LOG(2) << "loaded " << diffsApplied << " chunks into new chunk manager for " << _ns
+        LOG(2) << "loaded " << diffsApplied << " chunks into new chunk manager for " << _nss
                << " with version " << _version;
 
         // Add all existing shards we find to the shards set
@@ -296,7 +289,7 @@ bool ChunkManager::_load(OperationContext* txn,
         return true;
     } else if (diffsApplied == 0) {
         // No chunks were found for the ns
-        warning() << "no chunks found when reloading " << _ns << ", previous version was "
+        warning() << "no chunks found when reloading " << _nss << ", previous version was "
                   << _version;
 
         // Set all our data to empty
@@ -312,12 +305,12 @@ bool ChunkManager::_load(OperationContext* txn,
         bool allInconsistent = (differ.numValidDiffs() == 0);
         if (allInconsistent) {
             // All versions are different, this can be normal
-            warning() << "major change in chunk information found when reloading " << _ns
+            warning() << "major change in chunk information found when reloading " << _nss
                       << ", previous version was " << _version;
         } else {
             // Inconsistent load halfway through (due to yielding cursor during load)
             // should be rare
-            warning() << "inconsistent chunks found when reloading " << _ns
+            warning() << "inconsistent chunks found when reloading " << _nss
                       << ", previous version was " << _version << ", this should be rare";
         }
 
@@ -360,7 +353,7 @@ StatusWith<shared_ptr<Chunk>> ChunkManager::findIntersectingChunk(OperationConte
         msgasserted(8070,
                     str::stream() << "couldn't find a chunk intersecting: " << shardKey
                                   << " for ns: "
-                                  << _ns
+                                  << _nss.ns()
                                   << " at version: "
                                   << _version.toString()
                                   << ", number of chunks: "
@@ -377,9 +370,8 @@ StatusWith<shared_ptr<Chunk>> ChunkManager::findIntersectingChunk(OperationConte
     log() << redact(shardKey);
 
     // Proactively force a reload on the chunk manager in case it somehow got inconsistent
-    const NamespaceString nss(_ns);
-    auto config = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, nss.db()));
-    config->getChunkManagerIfExists(txn, nss.ns(), true);
+    auto config = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, _nss.db()));
+    config->getChunkManagerIfExists(txn, _nss.ns(), true);
 
     msgasserted(13141, "Chunk map pointed to incorrect chunk");
 }
@@ -398,7 +390,7 @@ void ChunkManager::getShardIdsForQuery(OperationContext* txn,
                                        const BSONObj& query,
                                        const BSONObj& collation,
                                        set<ShardId>* shardIds) const {
-    auto qr = stdx::make_unique<QueryRequest>(NamespaceString(_ns));
+    auto qr = stdx::make_unique<QueryRequest>(_nss);
     qr->setFilter(query);
 
     if (!collation.isEmpty()) {
@@ -407,10 +399,8 @@ void ChunkManager::getShardIdsForQuery(OperationContext* txn,
         qr->setCollation(_defaultCollator->getSpec().toBSON());
     }
 
-    auto statusWithCQ = CanonicalQuery::canonicalize(txn, std::move(qr), ExtensionsCallbackNoop());
-
-    uassertStatusOK(statusWithCQ.getStatus());
-    unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
+    std::unique_ptr<CanonicalQuery> cq =
+        uassertStatusOK(CanonicalQuery::canonicalize(txn, std::move(qr), ExtensionsCallbackNoop()));
 
     // Query validation
     if (QueryPlannerCommon::hasNode(cq->root(), MatchExpression::GEO_NEAR)) {
@@ -443,11 +433,12 @@ void ChunkManager::getShardIdsForQuery(OperationContext* txn,
     BoundList ranges = _keyPattern.flattenBounds(bounds);
 
     for (BoundList::const_iterator it = ranges.begin(); it != ranges.end(); ++it) {
-        getShardIdsForRange(*shardIds, it->first /*min*/, it->second /*max*/);
+        getShardIdsForRange(it->first /*min*/, it->second /*max*/, shardIds);
 
         // once we know we need to visit all shards no need to keep looping
-        if (shardIds->size() == _shardIds.size())
+        if (shardIds->size() == _shardIds.size()) {
             break;
+        }
     }
 
     // SERVER-4914 Some clients of getShardIdsForQuery() assume at least one shard will be returned.
@@ -458,9 +449,9 @@ void ChunkManager::getShardIdsForQuery(OperationContext* txn,
     }
 }
 
-void ChunkManager::getShardIdsForRange(set<ShardId>& shardIds,
-                                       const BSONObj& min,
-                                       const BSONObj& max) const {
+void ChunkManager::getShardIdsForRange(const BSONObj& min,
+                                       const BSONObj& max,
+                                       std::set<ShardId>* shardIds) const {
     auto it = _chunkRangeMap.upper_bound(min);
     auto end = _chunkRangeMap.upper_bound(max);
 
@@ -473,11 +464,11 @@ void ChunkManager::getShardIdsForRange(set<ShardId>& shardIds,
     }
 
     for (; it != end; ++it) {
-        shardIds.insert(it->second.getShardId());
+        shardIds->insert(it->second.getShardId());
 
         // No need to iterate through the rest of the ranges, because we already know we need to use
         // all shards.
-        if (shardIds.size() == _shardIds.size()) {
+        if (shardIds->size() == _shardIds.size()) {
             break;
         }
     }
@@ -539,7 +530,7 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
 }
 
 IndexBounds ChunkManager::collapseQuerySolution(const QuerySolutionNode* node) {
-    if (node->children.size() == 0) {
+    if (node->children.empty()) {
         invariant(node->getType() == STAGE_IXSCAN);
 
         const IndexScanNode* ixNode = static_cast<const IndexScanNode*>(node);
@@ -563,6 +554,7 @@ IndexBounds ChunkManager::collapseQuerySolution(const QuerySolutionNode* node) {
     }
 
     IndexBounds bounds;
+
     for (std::vector<QuerySolutionNode*>::const_iterator it = node->children.begin();
          it != node->children.end();
          it++) {
@@ -577,11 +569,13 @@ IndexBounds ChunkManager::collapseQuerySolution(const QuerySolutionNode* node) {
         }
 
         IndexBounds childBounds = collapseQuerySolution(*it);
-        if (childBounds.size() == 0) {  // Got unexpected node in query solution tree
+        if (childBounds.size() == 0) {
+            // Got unexpected node in query solution tree
             return IndexBounds();
         }
 
         invariant(childBounds.size() == bounds.size());
+
         for (size_t i = 0; i < bounds.size(); i++) {
             bounds.fields[i].intervals.insert(bounds.fields[i].intervals.end(),
                                               childBounds.fields[i].intervals.begin(),
@@ -603,27 +597,22 @@ bool ChunkManager::compatibleWith(const ChunkManager& other, const ShardId& shar
 }
 
 ChunkVersion ChunkManager::getVersion(const ShardId& shardName) const {
-    ShardVersionMap::const_iterator i = _shardVersions.find(shardName);
-    if (i == _shardVersions.end()) {
-        // Shards without explicitly tracked shard versions (meaning they have
-        // no chunks) always have a version of (0, 0, epoch).  Note this is
-        // *different* from the dropped chunk version of (0, 0, OID(000...)).
-        // See s/chunk_version.h.
+    auto it = _shardVersions.find(shardName);
+    if (it == _shardVersions.end()) {
+        // Shards without explicitly tracked shard versions (meaning they have no chunks) always
+        // have a version of (0, 0, epoch)
         return ChunkVersion(0, 0, _version.epoch());
     }
-    return i->second;
-}
 
-ChunkVersion ChunkManager::getVersion() const {
-    return _version;
+    return it->second;
 }
 
 string ChunkManager::toString() const {
     StringBuilder sb;
-    sb << "ChunkManager: " << _ns << " key:" << _keyPattern.toString() << '\n';
+    sb << "ChunkManager: " << _nss.ns() << " key:" << _keyPattern.toString() << '\n';
 
-    for (ChunkMap::const_iterator i = _chunkMap.begin(); i != _chunkMap.end(); ++i) {
-        sb << "\t" << i->second->toString() << '\n';
+    for (const auto& entry : _chunkMap) {
+        sb << "\t" << entry.second->toString() << '\n';
     }
 
     return sb.str();
