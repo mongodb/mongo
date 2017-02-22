@@ -510,9 +510,8 @@ public:
      * collection.  The collection cannot be completely emptied using this
      * function.  An assertion will be thrown if that is attempted.
      * @param inclusive - Truncate 'end' as well iff true
-     * XXX: this will go away soon, just needed to move for now
      */
-    virtual void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) = 0;
+    virtual void cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) = 0;
 
     /**
      * does this RecordStore support the compact operation?

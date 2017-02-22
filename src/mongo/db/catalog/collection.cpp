@@ -914,14 +914,14 @@ Status Collection::truncate(OperationContext* txn) {
     return Status::OK();
 }
 
-void Collection::temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) {
+void Collection::cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) {
     dassert(txn->lockState()->isCollectionLockedForMode(ns().toString(), MODE_IX));
     invariant(isCapped());
     BackgroundOperation::assertNoBgOpInProgForNs(ns());
     invariant(_indexCatalog.numIndexesInProgress(txn) == 0);
 
     _cursorManager.invalidateAll(false, "capped collection truncated");
-    _recordStore->temp_cappedTruncateAfter(txn, end, inclusive);
+    _recordStore->cappedTruncateAfter(txn, end, inclusive);
 }
 
 Status Collection::setValidator(OperationContext* txn, BSONObj validatorDoc) {

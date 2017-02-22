@@ -518,9 +518,9 @@ Status EphemeralForTestRecordStore::truncate(OperationContext* txn) {
     return Status::OK();
 }
 
-void EphemeralForTestRecordStore::temp_cappedTruncateAfter(OperationContext* txn,
-                                                           RecordId end,
-                                                           bool inclusive) {
+void EphemeralForTestRecordStore::cappedTruncateAfter(OperationContext* txn,
+                                                      RecordId end,
+                                                      bool inclusive) {
     Records::iterator it =
         inclusive ? _data->records.lower_bound(end) : _data->records.upper_bound(end);
     while (it != _data->records.end()) {

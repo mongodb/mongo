@@ -60,9 +60,8 @@ public:
      * collection.  The collection cannot be completely emptied using this
      * function.  An assertion will be thrown if that is attempted.
      * @param inclusive - Truncate 'end' as well iff true
-     * XXX: this will go away soon, just needed to move for now
      */
-    void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) final;
+    void cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) final;
 
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* txn,
                                                     bool forward) const final;

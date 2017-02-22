@@ -277,7 +277,7 @@ public:
             }
         }
 
-        collection->temp_cappedTruncateAfter(txn, end, inc);
+        collection->cappedTruncateAfter(txn, end, inc);
 
         return true;
     }

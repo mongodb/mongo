@@ -376,9 +376,8 @@ public:
      * collection.  The collection cannot be completely emptied using this
      * function.  An assertion will be thrown if that is attempted.
      * @param inclusive - Truncate 'end' as well iff true
-     * XXX: this will go away soon, just needed to move for now
      */
-    void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive);
+    void cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive);
 
     enum ValidationAction { WARN, ERROR_V };
     enum ValidationLevel { OFF, MODERATE, STRICT_V };

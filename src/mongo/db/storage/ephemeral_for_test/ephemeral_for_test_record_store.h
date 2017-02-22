@@ -90,7 +90,7 @@ public:
 
     virtual Status truncate(OperationContext* txn);
 
-    virtual void temp_cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive);
+    virtual void cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive);
 
     virtual Status validate(OperationContext* txn,
                             ValidateCmdLevel level,

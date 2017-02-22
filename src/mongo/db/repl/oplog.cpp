@@ -325,8 +325,7 @@ void truncateOplogTo(OperationContext* txn, Timestamp truncateTimestamp) {
             // oplog is < truncateTimestamp.
             if (count != 1) {
                 invariant(!oldestIDToDelete.isNull());
-                oplogCollection->temp_cappedTruncateAfter(
-                    txn, oldestIDToDelete, /*inclusive=*/true);
+                oplogCollection->cappedTruncateAfter(txn, oldestIDToDelete, /*inclusive=*/true);
             }
             return;
         }

@@ -253,9 +253,7 @@ Status CappedRecordStoreV1::truncate(OperationContext* txn) {
     return Status::OK();
 }
 
-void CappedRecordStoreV1::temp_cappedTruncateAfter(OperationContext* txn,
-                                                   RecordId end,
-                                                   bool inclusive) {
+void CappedRecordStoreV1::cappedTruncateAfter(OperationContext* txn, RecordId end, bool inclusive) {
     cappedTruncateAfter(txn, _ns.c_str(), DiskLoc::fromRecordId(end), inclusive);
 }
 

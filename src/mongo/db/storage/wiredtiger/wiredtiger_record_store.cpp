@@ -1856,9 +1856,9 @@ RecordId WiredTigerRecordStore::_fromKey(int64_t key) {
     return RecordId(key);
 }
 
-void WiredTigerRecordStore::temp_cappedTruncateAfter(OperationContext* txn,
-                                                     RecordId end,
-                                                     bool inclusive) {
+void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* txn,
+                                                RecordId end,
+                                                bool inclusive) {
     Cursor cursor(txn, *this);
 
     auto record = cursor.seekExact(end);

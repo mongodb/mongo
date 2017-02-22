@@ -620,7 +620,7 @@ TEST(WiredTigerRecordStoreTest, OplogHack) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
-        rs->temp_cappedTruncateAfter(opCtx.get(), RecordId(2, 2), false);  // no-op
+        rs->cappedTruncateAfter(opCtx.get(), RecordId(2, 2), false);  // no-op
     }
 
     {
@@ -630,7 +630,7 @@ TEST(WiredTigerRecordStoreTest, OplogHack) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
-        rs->temp_cappedTruncateAfter(opCtx.get(), RecordId(1, 2), false);  // deletes 2,2
+        rs->cappedTruncateAfter(opCtx.get(), RecordId(1, 2), false);  // deletes 2,2
     }
 
     {
@@ -640,7 +640,7 @@ TEST(WiredTigerRecordStoreTest, OplogHack) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
-        rs->temp_cappedTruncateAfter(opCtx.get(), RecordId(1, 2), true);  // deletes 1,2
+        rs->cappedTruncateAfter(opCtx.get(), RecordId(1, 2), true);  // deletes 1,2
     }
 
     {
@@ -880,7 +880,7 @@ TEST(WiredTigerRecordStoreTest, OplogOrder) {
     {
         auto client2 = harnessHelper->serviceContext()->makeClient("c2");
         auto txn = harnessHelper->newOperationContext(client2.get());
-        rs->temp_cappedTruncateAfter(txn.get(), id1, /*inclusive*/ false);
+        rs->cappedTruncateAfter(txn.get(), id1, /*inclusive*/ false);
     }
 
     {
@@ -1280,7 +1280,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_Truncate) {
     }
 }
 
-// Insert multiple records, truncate the oplog using RecordStore::temp_cappedTruncateAfter(), and
+// Insert multiple records, truncate the oplog using RecordStore::cappedTruncateAfter(), and
 // verify that the metadata for each stone is updated. If a full stone is partially truncated, then
 // it should become the stone currently being filled.
 TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
@@ -1322,7 +1322,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
 
-        rs->temp_cappedTruncateAfter(opCtx.get(), RecordId(1, 8), true);
+        rs->cappedTruncateAfter(opCtx.get(), RecordId(1, 8), true);
 
         ASSERT_EQ(7, rs->numRecords(opCtx.get()));
         ASSERT_EQ(2350, rs->dataSize(opCtx.get()));
@@ -1336,7 +1336,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
 
-        rs->temp_cappedTruncateAfter(opCtx.get(), RecordId(1, 6), true);
+        rs->cappedTruncateAfter(opCtx.get(), RecordId(1, 6), true);
 
         ASSERT_EQ(5, rs->numRecords(opCtx.get()));
         ASSERT_EQ(1950, rs->dataSize(opCtx.get()));
@@ -1350,7 +1350,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
 
-        rs->temp_cappedTruncateAfter(opCtx.get(), RecordId(1, 3), false);
+        rs->cappedTruncateAfter(opCtx.get(), RecordId(1, 3), false);
 
         ASSERT_EQ(3, rs->numRecords(opCtx.get()));
         ASSERT_EQ(1400, rs->dataSize(opCtx.get()));
@@ -1364,7 +1364,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
 
-        rs->temp_cappedTruncateAfter(opCtx.get(), RecordId(1, 2), false);
+        rs->cappedTruncateAfter(opCtx.get(), RecordId(1, 2), false);
 
         ASSERT_EQ(2, rs->numRecords(opCtx.get()));
         ASSERT_EQ(1200, rs->dataSize(opCtx.get()));
@@ -1378,7 +1378,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
 
-        rs->temp_cappedTruncateAfter(opCtx.get(), RecordId(1, 1), false);
+        rs->cappedTruncateAfter(opCtx.get(), RecordId(1, 1), false);
 
         ASSERT_EQ(1, rs->numRecords(opCtx.get()));
         ASSERT_EQ(400, rs->dataSize(opCtx.get()));

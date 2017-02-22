@@ -402,7 +402,7 @@ namespace NamespaceDetailsTests {
                 ASSERT( first != last ) ;
             }
 
-            collection()->temp_cappedTruncateAfter(&txn, truncAt, false);
+            collection()->cappedTruncateAfter(&txn, truncAt, false);
             ASSERT_EQUALS( collection()->numRecords() , 28u );
 
             {

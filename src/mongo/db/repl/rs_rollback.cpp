@@ -690,7 +690,7 @@ void syncFixUp(OperationContext* txn,
                                 // RecordId loc = Helpers::findById(nsd, pattern);
                                 if (!loc.isNull()) {
                                     try {
-                                        collection->temp_cappedTruncateAfter(txn, loc, true);
+                                        collection->cappedTruncateAfter(txn, loc, true);
                                     } catch (const DBException& e) {
                                         if (e.getCode() == 13415) {
                                             // hack: need to just make cappedTruncate do this...
@@ -768,7 +768,7 @@ void syncFixUp(OperationContext* txn,
                                                   str::stream() << "Can't find " << rsOplogName));
         }
         // TODO: fatal error if this throws?
-        oplogCollection->temp_cappedTruncateAfter(txn, fixUpInfo.commonPointOurDiskloc, false);
+        oplogCollection->cappedTruncateAfter(txn, fixUpInfo.commonPointOurDiskloc, false);
     }
 
     Status status = getGlobalAuthorizationManager()->initialize(txn);
