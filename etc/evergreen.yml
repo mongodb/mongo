@@ -142,43 +142,67 @@ variables:
   - *run_jstestfuzz_tests
 
 # buildvariants in this list have debug symbols which are uploaded to s3.
+# Note this sorted list contains all buildvariants. A buildvariant that does not
+# create separate symbol files is commented out.
 - &debug_symbol_variants
+  - amazon
+  - debian71
+  - debian81
+  - enterprise-debian71-64
+  - enterprise-debian81-64
   - enterprise-linux-64-amazon-ami
   - enterprise-osx-107
   - enterprise-rhel-62-64-bit
   - enterprise-rhel-62-64-bit-coverage
+  - enterprise-rhel-62-64-bit-inmem
+  - enterprise-rhel-67-s390x
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-71-ppc64le
+  - enterprise-rhel-71-ppc64le-inmem
   - enterprise-rhel-72-s390x
+  - enterprise-rhel-72-s390x-inmem
   - enterprise-suse11-64
   - enterprise-suse11-s390x
   - enterprise-suse12-64
   - enterprise-suse12-s390x
+  # - enterprise-ubuntu-dynamic-1604-64-bit # Does not create separate symbol files.
   - enterprise-ubuntu1204-64
   - enterprise-ubuntu1404-64
   - enterprise-ubuntu1604-64
   - enterprise-ubuntu1604-arm64
+  # - enterprise-ubuntu1604-clang-3.7-libcxx # Does not create separate symbol files.
   - enterprise-ubuntu1604-ppc64le
   - enterprise-ubuntu1604-s390x
-  - enterprise-debian71-64
-  - enterprise-debian81-64
+  - enterprise-windows-64
+  - enterprise-windows-64-2k8-debug-unoptimized
+  - enterprise-windows-64-inmem
+  - initsync-3dot2-rhel-62
   - linux-64
   - linux-64-debug
-  - amazon
+  - linux-64-duroff
+  - linux-64-ephemeralForTest
+  - linux-64-lsm
+  - linux-64-repeated-execution
+  - osx-107
+  - osx-107-debug
+  - osx-107-ssl
   - rhel62
   - rhel70
+  - solaris-64-bit
   - suse11
   - suse12
   - ubuntu1204
   - ubuntu1404
+  - ubuntu1404-rocksdb
   - ubuntu1604
   - ubuntu1604-arm64
-  - ubuntu1404-rocksdb
-  - debian71
-  - debian81
-  - solaris-64-bit
-  - osx-107-ssl
-  - osx-107
+  - ubuntu1604-asan
+  - ubuntu1604-debug-asan
+  - ubuntu1604-debug-ubsan
+  - windows-64
+  - windows-64-2k8
+  - windows-64-2k8-debug
+  - windows-64-2k8-ssl
 
 
 #######################################
