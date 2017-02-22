@@ -102,7 +102,7 @@ public:
         return true;
     }  // can reindex on a secondary
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
+        return false;
     }
     virtual void help(stringstream& help) const {
         help << "re-index a collection";

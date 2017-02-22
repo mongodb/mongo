@@ -92,7 +92,6 @@
             "mergeAuthzCollections",
             "moveChunk",
             "movePrimary",
-            "reIndex",
             "remove",
             "renameCollection",
             "resvChunkStart",
