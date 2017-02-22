@@ -121,7 +121,9 @@ namespace boost {
         } obj_ref;
 
         // To relax aliasing constraints
-        mutable char data;
+        mutable char data[sizeof(bound_memfunc_ptr_t)];
+        static_assert(sizeof(bound_memfunc_ptr_t) >= sizeof(obj_ref_t),
+                      "sizeof(bound_memfunc_ptr_t) >= sizeof(obj_ref_t)");
       };
 
       /**
