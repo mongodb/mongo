@@ -552,6 +552,8 @@ void IndexAccessMethod::getKeys(const BSONObj& obj,
                                               16732,
                                               16733,
                                               16675,
+                                              17261,
+                                              17262,
                                               // Hash
                                               16766,
                                               // Haystack

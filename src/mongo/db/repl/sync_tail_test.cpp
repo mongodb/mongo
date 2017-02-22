@@ -1188,6 +1188,106 @@ TEST_F(IdempotencyTest, IndexWithDifferentOptions) {
     ASSERT_EQ(status.code(), ErrorCodes::IndexOptionsConflict);
 }
 
+TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageField) {
+    ReplicationCoordinator::get(_txn.get())->setFollowerMode(MemberState::RS_RECOVERING);
+
+    ASSERT_OK(runOp(createCollection()));
+    auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', language: 1}"));
+    auto updateOp = update(1, fromjson("{$unset: {language: 1}}"));
+    auto indexOp = buildIndex(fromjson("{x: 'text'}"), BSONObj());
+
+    auto ops = {insertOp, updateOp, indexOp};
+
+    ASSERT_OK(runOps(ops));
+    auto hash = validate();
+    ASSERT_OK(runOps(ops));
+    ASSERT_EQUALS(hash, validate());
+
+    ReplicationCoordinator::get(_txn.get())->setFollowerMode(MemberState::RS_PRIMARY);
+    auto status = runOps(ops);
+    ASSERT_EQ(status.code(), 17261);
+}
+
+TEST_F(IdempotencyTest, InsertDocumentWithNonStringLanguageFieldWhenTextIndexExists) {
+    ReplicationCoordinator::get(_txn.get())->setFollowerMode(MemberState::RS_RECOVERING);
+
+    ASSERT_OK(runOp(createCollection()));
+    auto indexOp = buildIndex(fromjson("{x: 'text'}"), BSONObj());
+    auto dropIndexOp = dropIndex("x_index");
+    auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', language: 1}"));
+
+    auto ops = {indexOp, dropIndexOp, insertOp};
+
+    ASSERT_OK(runOps(ops));
+    auto hash = validate();
+    ASSERT_OK(runOps(ops));
+    ASSERT_EQUALS(hash, validate());
+
+    ReplicationCoordinator::get(_txn.get())->setFollowerMode(MemberState::RS_PRIMARY);
+    auto status = runOps(ops);
+    ASSERT_EQ(status.code(), 17261);
+}
+
+TEST_F(IdempotencyTest, TextIndexDocumentHasNonStringLanguageOverrideField) {
+    ReplicationCoordinator::get(_txn.get())->setFollowerMode(MemberState::RS_RECOVERING);
+
+    ASSERT_OK(runOp(createCollection()));
+    auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', y: 1}"));
+    auto updateOp = update(1, fromjson("{$unset: {y: 1}}"));
+    auto indexOp = buildIndex(fromjson("{x: 'text'}"), fromjson("{language_override: 'y'}"));
+
+    auto ops = {insertOp, updateOp, indexOp};
+
+    ASSERT_OK(runOps(ops));
+    auto hash = validate();
+    ASSERT_OK(runOps(ops));
+    ASSERT_EQUALS(hash, validate());
+
+    ReplicationCoordinator::get(_txn.get())->setFollowerMode(MemberState::RS_PRIMARY);
+    auto status = runOps(ops);
+    ASSERT_EQ(status.code(), 17261);
+}
+
+TEST_F(IdempotencyTest, InsertDocumentWithNonStringLanguageOverrideFieldWhenTextIndexExists) {
+    ReplicationCoordinator::get(_txn.get())->setFollowerMode(MemberState::RS_RECOVERING);
+
+    ASSERT_OK(runOp(createCollection()));
+    auto indexOp = buildIndex(fromjson("{x: 'text'}"), fromjson("{language_override: 'y'}"));
+    auto dropIndexOp = dropIndex("x_index");
+    auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', y: 1}"));
+
+    auto ops = {indexOp, dropIndexOp, insertOp};
+
+    ASSERT_OK(runOps(ops));
+    auto hash = validate();
+    ASSERT_OK(runOps(ops));
+    ASSERT_EQUALS(hash, validate());
+
+    ReplicationCoordinator::get(_txn.get())->setFollowerMode(MemberState::RS_PRIMARY);
+    auto status = runOps(ops);
+    ASSERT_EQ(status.code(), 17261);
+}
+
+TEST_F(IdempotencyTest, TextIndexDocumentHasUnknownLanguage) {
+    ReplicationCoordinator::get(_txn.get())->setFollowerMode(MemberState::RS_RECOVERING);
+
+    ASSERT_OK(runOp(createCollection()));
+    auto insertOp = insert(fromjson("{_id: 1, x: 'words to index', language: 'bad'}"));
+    auto updateOp = update(1, fromjson("{$unset: {language: 1}}"));
+    auto indexOp = buildIndex(fromjson("{x: 'text'}"), BSONObj());
+
+    auto ops = {insertOp, updateOp, indexOp};
+
+    ASSERT_OK(runOps(ops));
+    auto hash = validate();
+    ASSERT_OK(runOps(ops));
+    ASSERT_EQUALS(hash, validate());
+
+    ReplicationCoordinator::get(_txn.get())->setFollowerMode(MemberState::RS_PRIMARY);
+    auto status = runOps(ops);
+    ASSERT_EQ(status.code(), 17262);
+}
+
 TEST_F(IdempotencyTest, CreateCollectionWithValidation) {
     getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING);
     auto options1 = fromjson("{'validator' : {'phone' : {'$type' : 'string' } } }");
