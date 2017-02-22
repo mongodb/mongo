@@ -71,6 +71,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"

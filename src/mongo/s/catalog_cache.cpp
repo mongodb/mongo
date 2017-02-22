@@ -49,7 +49,7 @@ StatusWith<std::shared_ptr<DBConfig>> CatalogCache::getDatabase(OperationContext
                                                                 StringData dbName) {
     stdx::lock_guard<stdx::mutex> guard(_mutex);
 
-    ShardedDatabasesMap::iterator it = _databases.find(dbName);
+    auto it = _databases.find(dbName);
     if (it != _databases.end()) {
         return it->second;
     }
@@ -64,14 +64,11 @@ StatusWith<std::shared_ptr<DBConfig>> CatalogCache::getDatabase(OperationContext
     auto db = std::make_shared<DBConfig>(dbOpTimePair.value, dbOpTimePair.opTime);
     try {
         db->load(txn);
-    } catch (const DBException& excep) {
-        return excep.toStatus();
+        auto emplaceResult = _databases.try_emplace(dbName, std::move(db));
+        return emplaceResult.first->second;
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
-
-    auto emplaceResult = _databases.try_emplace(dbName, std::move(db));
-    invariant(emplaceResult.second);
-
-    return emplaceResult.first->second;
 }
 
 void CatalogCache::invalidate(StringData dbName) {

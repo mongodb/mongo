@@ -906,8 +906,9 @@ public:
         double numObjects = 0;
         int millis = 0;
 
-        set<ShardId> shardIds;
-        cm->getShardIdsForRange(shardIds, min, max);
+        std::set<ShardId> shardIds;
+        cm->getShardIdsForRange(min, max, &shardIds);
+
         for (const ShardId& shardId : shardIds) {
             const auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, shardId);
             if (!shardStatus.isOK()) {
