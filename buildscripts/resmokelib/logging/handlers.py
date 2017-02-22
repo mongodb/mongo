@@ -7,13 +7,19 @@ from __future__ import absolute_import
 
 import json
 import logging
+import sys
 import threading
-import urllib2
+import warnings
+
+import requests
+import requests.auth
+import requests.packages.urllib3.exceptions
 
 from .. import utils
 from ..utils import timer
 
 _TIMEOUT_SECS = 10
+
 
 class BufferedHandler(logging.Handler):
     """
@@ -141,21 +147,15 @@ class HTTPHandler(object):
     A class which sends data to a web server using POST requests.
     """
 
-    def __init__(self, realm, url_root, username, password):
+    def __init__(self, url_root, username, password):
         """
-        Initializes the handler with the necessary authenticaton
+        Initializes the handler with the necessary authentication
         credentials.
         """
 
-        auth_handler = urllib2.HTTPBasicAuthHandler()
-        auth_handler.add_password(
-            realm=realm,
-            uri=url_root,
-            user=username,
-            passwd=password)
+        self.auth_handler = requests.auth.HTTPBasicAuth(username, password)
 
         self.url_root = url_root
-        self.url_opener = urllib2.build_opener(auth_handler, urllib2.HTTPErrorProcessor())
 
     def _make_url(self, endpoint):
         return "%s/%s/" % (self.url_root.rstrip("/"), endpoint.strip("/"))
@@ -176,14 +176,36 @@ class HTTPHandler(object):
         headers["Content-Type"] = "application/json; charset=utf-8"
 
         url = self._make_url(endpoint)
-        request = urllib2.Request(url=url, data=data, headers=headers)
 
-        response = self.url_opener.open(request, timeout=timeout_secs)
-        headers = response.info()
+        # Versions of Python earlier than 2.7.9 do not support certificate validation. So we
+        # disable certificate validation for older Python versions.
+        if sys.version_info < (2, 7, 9):
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore",
+                                      requests.packages.urllib3.exceptions.InsecurePlatformWarning)
+                warnings.simplefilter("ignore",
+                                      requests.packages.urllib3.exceptions.InsecureRequestWarning)
+                response = requests.post(url,
+                                         data=data,
+                                         headers=headers,
+                                         timeout=timeout_secs,
+                                         auth=self.auth_handler,
+                                         verify=False)
+        else:
+            response = requests.post(url,
+                                     data=data,
+                                     headers=headers,
+                                     timeout=timeout_secs,
+                                     auth=self.auth_handler)
 
-        content_type = headers.gettype()
-        if content_type == "application/json":
-            encoding = headers.getparam("charset") or "utf-8"
-            return json.load(response, encoding=encoding)
+        response.raise_for_status()
 
-        return response.read()
+        if not response.encoding:
+            response.encoding = "utf-8"
+
+        headers = response.headers
+
+        if headers["Content-Type"].startswith("application/json"):
+            return response.json()
+
+        return response.text
