@@ -921,7 +921,7 @@ __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session)
 #define	EVICT_TUNE_DATAPT_MIN	3	/* Data points needed before deciding
 					   if we should keep adding workers or
 					   settle on an earlier value. */
-#define	EVICT_TUNE_PERIOD	2	/* Tune period in seconds */
+#define	EVICT_TUNE_PERIOD	1	/* Tune period in seconds */
 
 /*
  * __evict_tune_workers --
