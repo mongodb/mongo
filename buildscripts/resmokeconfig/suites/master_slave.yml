@@ -1,10 +1,10 @@
 selector:
   js_test:
     roots:
-    - jstests/repl/*.js
+    - jstests/master_slave/*.js
     exclude_files:
     # Skip until SERVER-25618 is resolved.
-    - jstests/repl/block1.js
+    - jstests/master_slave/block1.js
 
 executor:
   js_test:
