@@ -71,14 +71,7 @@ Status ShardingEgressMetadataHook::writeRequestMetadata(bool shardedConnection,
 Status ShardingEgressMetadataHook::writeRequestMetadata(OperationContext* txn,
                                                         const HostAndPort& target,
                                                         BSONObjBuilder* metadataBob) {
-    try {
-        audit::writeImpersonatedUsersToMetadata(txn, metadataBob);
-        ClientMetadataIsMasterState::writeToMetadata(txn, metadataBob);
-        rpc::ConfigServerMetadata(_getConfigServerOpTime()).writeToMetadata(metadataBob);
-        return Status::OK();
-    } catch (...) {
-        return exceptionToStatus();
-    }
+    return writeRequestMetadata(true, txn, target.toString(), metadataBob);
 }
 
 Status ShardingEgressMetadataHook::readReplyMetadata(const StringData replySource,
@@ -93,12 +86,7 @@ Status ShardingEgressMetadataHook::readReplyMetadata(const StringData replySourc
 
 Status ShardingEgressMetadataHook::readReplyMetadata(const HostAndPort& replySource,
                                                      const BSONObj& metadataObj) {
-    try {
-        _saveGLEStats(metadataObj, replySource.toString());
-        return _advanceConfigOptimeFromShard(replySource.toString(), metadataObj);
-    } catch (...) {
-        return exceptionToStatus();
-    }
+    return readReplyMetadata(replySource.toString(), metadataObj);
 }
 
 Status ShardingEgressMetadataHook::_advanceConfigOptimeFromShard(ShardId shardId,
