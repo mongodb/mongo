@@ -234,7 +234,7 @@ functions:
             echo "Provisioning state updated on Evergreen host."
           else
             echo "Failed to provision resources. Cleaning up partial state."
-            cp src/dsi/dsi/bin/destroy_cluster.sh .
+            cp ../src/dsi/dsi/bin/destroy_cluster.sh .
             ./destroy_cluster.sh
             echo "Resource released."
             rm -r /data/infrastructure_provisioning
