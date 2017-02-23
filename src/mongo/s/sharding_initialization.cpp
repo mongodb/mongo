@@ -209,7 +209,7 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
         networkPtr);
 
     // must be started once the grid is initialized
-    grid.shardRegistry()->startup();
+    grid.shardRegistry()->startup(opCtx);
 
     auto status = rawCatalogClient->startup();
     if (!status.isOK()) {

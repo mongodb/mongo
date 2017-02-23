@@ -60,7 +60,8 @@ class ReplicationCoordinatorExternalStateImpl final : public ReplicationCoordina
     MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalStateImpl);
 
 public:
-    ReplicationCoordinatorExternalStateImpl(StorageInterface* storageInterface);
+    ReplicationCoordinatorExternalStateImpl(ServiceContext* service,
+                                            StorageInterface* storageInterface);
     virtual ~ReplicationCoordinatorExternalStateImpl();
     virtual void startThreads(const ReplSettings& settings) override;
     virtual void startInitialSync(OnInitialSyncFinishedFn finished) override;
@@ -147,6 +148,8 @@ private:
     * for "opCtx".
     */
     void _dropAllTempCollections(OperationContext* opCtx);
+
+    ServiceContext* _service;
 
     // Guards starting threads and setting _startedThreads
     stdx::mutex _threadMutex;

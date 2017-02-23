@@ -39,6 +39,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/client.h"
+#include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/executor/network_connection_hook.h"
@@ -188,12 +189,12 @@ void ShardRegistry::init() {
     _initConfigServerCS = ConnectionString();
 }
 
-void ShardRegistry::startup() {
+void ShardRegistry::startup(OperationContext* opCtx) {
     // startup() must be called only once
     invariant(!_executor);
 
     auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
-    // TODO SERVER-27750: add LogicalTimeMetadataHook
+    hookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(opCtx->getServiceContext()));
 
     // construct task executor
     auto net = executor::makeNetworkInterface("ShardRegistryUpdater", nullptr, std::move(hookList));

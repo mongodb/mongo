@@ -829,6 +829,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/bson/dotted_path_support",
+        '$BUILD_DIR/mongo/db/logical_time_metadata_hook',
         "$BUILD_DIR/mongo/executor/network_interface_factory",
         "$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl",
         "$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager_impl",
@@ -988,6 +989,17 @@ env.CppUnitTest(
         'service_context',
         'logical_clock',
         'signed_logical_time',
+    ],
+)
+
+env.Library(
+    target= 'logical_time_metadata_hook',
+    source= [
+        'logical_time_metadata_hook.cpp',
+    ],
+    LIBDEPS= [
+        'signed_logical_time',
+        '$BUILD_DIR/mongo/rpc/metadata',
     ],
 )
 

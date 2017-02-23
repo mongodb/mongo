@@ -45,12 +45,17 @@ const char kSignatureFieldName[] = "signature";
 
 
 LogicalTimeMetadata::LogicalTimeMetadata(SignedLogicalTime time) : _clusterTime(std::move(time)) {}
+
 StatusWith<LogicalTimeMetadata> LogicalTimeMetadata::readFromMetadata(const BSONObj& metadata) {
     return readFromMetadata(metadata.getField(fieldName()));
 }
 
 StatusWith<LogicalTimeMetadata> LogicalTimeMetadata::readFromMetadata(
     const BSONElement& metadataElem) {
+    if (metadataElem.eoo()) {
+        return LogicalTimeMetadata();
+    }
+
     const auto& obj = metadataElem.Obj();
 
     Timestamp ts;

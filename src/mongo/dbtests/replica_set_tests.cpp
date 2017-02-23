@@ -48,8 +48,8 @@ protected:
     void setUp() {
         auto opCtx = makeOpCtx();
         _storageInterface = stdx::make_unique<repl::StorageInterfaceMock>();
-        _replCoordExternalState.reset(
-            new repl::ReplicationCoordinatorExternalStateImpl(_storageInterface.get()));
+        _replCoordExternalState.reset(new repl::ReplicationCoordinatorExternalStateImpl(
+            opCtx->getServiceContext(), _storageInterface.get()));
     }
 
     void tearDown() {

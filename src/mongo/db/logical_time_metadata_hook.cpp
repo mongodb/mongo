@@ -26,48 +26,38 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/base/status_with.h"
-#include "mongo/db/signed_logical_time.h"
+#include "mongo/db/logical_time_metadata_hook.h"
+
+#include "mongo/db/logical_clock.h"
+#include "mongo/rpc/metadata/logical_time_metadata.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-class BSONElement;
-class BSONObjBuilder;
-
 namespace rpc {
 
-/**
- * Format:
- * logicalTime: {
- *     clusterTime: <Timestamp>,
- *     signature: <SHA1 hash of clusterTime as BinData>
- * }
- */
-class LogicalTimeMetadata {
-public:
-    LogicalTimeMetadata() = default;
-    explicit LogicalTimeMetadata(SignedLogicalTime time);
+LogicalTimeMetadataHook::LogicalTimeMetadataHook(ServiceContext* service) : _service(service) {}
 
-    /**
-     * Parses the metadata from BSON. Returns an empty LogicalTimeMetadata If the metadata is not
-     * present.
-     */
-    static StatusWith<LogicalTimeMetadata> readFromMetadata(const BSONObj& metadata);
-    static StatusWith<LogicalTimeMetadata> readFromMetadata(const BSONElement& metadataElem);
+Status LogicalTimeMetadataHook::writeRequestMetadata(OperationContext* opCtx,
+                                                     const HostAndPort& requestDestination,
+                                                     BSONObjBuilder* metadataBob) {
+    LogicalTimeMetadata metadata(LogicalClock::get(_service)->getClusterTime());
+    metadata.writeToMetadata(metadataBob);
+    return Status::OK();
+}
 
-    void writeToMetadata(BSONObjBuilder* metadataBuilder) const;
-
-    const SignedLogicalTime& getSignedTime() const;
-
-    static StringData fieldName() {
-        return "logicalTime";
+Status LogicalTimeMetadataHook::readReplyMetadata(const HostAndPort& replySource,
+                                                  const BSONObj& metadataObj) {
+    auto parseStatus = LogicalTimeMetadata::readFromMetadata(metadataObj);
+    if (!parseStatus.isOK()) {
+        return parseStatus.getStatus();
     }
 
-private:
-    SignedLogicalTime _clusterTime;
-};
+    auto& signedTime = parseStatus.getValue().getSignedTime();
+    return LogicalClock::get(_service)->advanceClusterTimeFromTrustedSource(signedTime);
+}
 
 }  // namespace rpc
 }  // namespace mongo

@@ -96,6 +96,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
+#include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
@@ -1300,9 +1301,9 @@ const std::array<StringData, 4> neededFieldNames{QueryRequest::cmdOptionMaxTimeM
                                                  QueryRequest::queryOptionMaxTimeMS};
 }  // namespace
 
-void appendOpTimeMetadata(OperationContext* opCtx,
-                          const rpc::RequestInterface& request,
-                          BSONObjBuilder* metadataBob) {
+void appendReplyMetadata(OperationContext* opCtx,
+                         const rpc::RequestInterface& request,
+                         BSONObjBuilder* metadataBob) {
     const bool isShardingAware = ShardingState::get(opCtx)->enabled();
     const bool isConfig = serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
     repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
@@ -1320,6 +1321,9 @@ void appendOpTimeMetadata(OperationContext* opCtx,
             rpc::ShardingMetadata(lastOpTimeFromClient, replCoord->getElectionId())
                 .writeToMetadata(metadataBob);
         }
+
+        rpc::LogicalTimeMetadata logicalTimeMetadata(LogicalClock::get(opCtx)->getClusterTime());
+        logicalTimeMetadata.writeToMetadata(metadataBob);
     }
 
     // If we're a shard other than the config shard, attach the last configOpTime we know about.
@@ -1479,7 +1483,7 @@ bool Command::run(OperationContext* opCtx,
     inPlaceReplyBob.doneFast();
 
     BSONObjBuilder metadataBob;
-    appendOpTimeMetadata(opCtx, request, &metadataBob);
+    appendReplyMetadata(opCtx, request, &metadataBob);
     replyBuilder->setMetadata(metadataBob.done());
 
     return result;
@@ -1651,7 +1655,7 @@ void mongo::execCommandDatabase(OperationContext* opCtx,
         }
 
         BSONObjBuilder metadataBob;
-        appendOpTimeMetadata(opCtx, request, &metadataBob);
+        appendReplyMetadata(opCtx, request, &metadataBob);
 
         auto operationTime = _getClientOperationTime(opCtx);
         Command::generateErrorResponse(

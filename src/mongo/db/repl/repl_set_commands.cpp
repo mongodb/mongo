@@ -356,7 +356,8 @@ public:
             result.append("info2", noConfigMessage);
             log() << "initiate : " << noConfigMessage;
 
-            ReplicationCoordinatorExternalStateImpl externalState(StorageInterface::get(opCtx));
+            ReplicationCoordinatorExternalStateImpl externalState(opCtx->getServiceContext(),
+                                                                  StorageInterface::get(opCtx));
             std::string name;
             std::vector<HostAndPort> seeds;
             parseReplSetSeedList(&externalState, replSetString, &name, &seeds);  // may throw...

@@ -55,6 +55,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -202,9 +203,10 @@ static Status initializeSharding(OperationContext* opCtx) {
         mongosGlobalParams.configdbs,
         generateDistLockProcessId(opCtx),
         std::move(shardFactory),
-        []() {
+        [opCtx]() {
             auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
-            // TODO SERVER-27750: add LogicalTimeMetadataHook
+            hookList->addHook(
+                stdx::make_unique<rpc::LogicalTimeMetadataHook>(opCtx->getServiceContext()));
             hookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>());
             return hookList;
         },
@@ -280,10 +282,8 @@ static ExitCode runMongosServer() {
     std::array<std::uint8_t, 20> tempKey = {};
     TimeProofService::Key key(std::move(tempKey));
     auto timeProofService = stdx::make_unique<TimeProofService>(std::move(key));
-    auto logicalClock = stdx::make_unique<LogicalClock>(
-        opCtx->getServiceContext(),
-        std::move(timeProofService),
-        serverGlobalParams.authState == ServerGlobalParams::AuthState::kEnabled);
+    auto logicalClock =
+        stdx::make_unique<LogicalClock>(opCtx->getServiceContext(), std::move(timeProofService));
     LogicalClock::set(opCtx->getServiceContext(), std::move(logicalClock));
 
     {

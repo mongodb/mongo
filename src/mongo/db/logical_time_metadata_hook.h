@@ -28,45 +28,34 @@
 
 #pragma once
 
-#include "mongo/base/status_with.h"
-#include "mongo/db/signed_logical_time.h"
+#include <vector>
+
+#include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
 
-class BSONElement;
+class BSONObj;
 class BSONObjBuilder;
+struct HostAndPort;
+class OperationContext;
+class ServiceContext;
+class Status;
 
 namespace rpc {
 
-/**
- * Format:
- * logicalTime: {
- *     clusterTime: <Timestamp>,
- *     signature: <SHA1 hash of clusterTime as BinData>
- * }
- */
-class LogicalTimeMetadata {
+class LogicalTimeMetadataHook : public EgressMetadataHook {
 public:
-    LogicalTimeMetadata() = default;
-    explicit LogicalTimeMetadata(SignedLogicalTime time);
+    explicit LogicalTimeMetadataHook(ServiceContext* service);
 
-    /**
-     * Parses the metadata from BSON. Returns an empty LogicalTimeMetadata If the metadata is not
-     * present.
-     */
-    static StatusWith<LogicalTimeMetadata> readFromMetadata(const BSONObj& metadata);
-    static StatusWith<LogicalTimeMetadata> readFromMetadata(const BSONElement& metadataElem);
+    Status writeRequestMetadata(OperationContext* opCtx,
+                                const HostAndPort& requestDestination,
+                                BSONObjBuilder* metadataBob) override;
 
-    void writeToMetadata(BSONObjBuilder* metadataBuilder) const;
-
-    const SignedLogicalTime& getSignedTime() const;
-
-    static StringData fieldName() {
-        return "logicalTime";
-    }
+    Status readReplyMetadata(const HostAndPort& replySource, const BSONObj& metadataObj) override;
 
 private:
-    SignedLogicalTime _clusterTime;
+    ServiceContext* _service;
 };
 
 }  // namespace rpc

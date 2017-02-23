@@ -50,7 +50,7 @@ protected:
         TimeProofService::Key key(std::move(tempKey));
         auto pTps = stdx::make_unique<TimeProofService>(std::move(key));
         _timeProofService = pTps.get();
-        _clock = stdx::make_unique<LogicalClock>(_serviceContext.get(), std::move(pTps), true);
+        _clock = stdx::make_unique<LogicalClock>(_serviceContext.get(), std::move(pTps));
     }
 
     void tearDown() {
@@ -82,7 +82,7 @@ TEST_F(LogicalClockTestBase, roundtrip) {
     auto pTps = stdx::make_unique<TimeProofService>(std::move(key));
     auto time = LogicalTime(tX);
 
-    LogicalClock logicalClock(&serviceContext, std::move(pTps), true);
+    LogicalClock logicalClock(&serviceContext, std::move(pTps));
     logicalClock.initClusterTimeFromTrustedSource(time);
     auto storedTime(logicalClock.getClusterTime());
 
@@ -113,7 +113,7 @@ TEST_F(LogicalClockTestBase, advanceClusterTime) {
     auto t1 = getClock()->reserveTicks(1);
     t1.addTicks(100);
     SignedLogicalTime l1 = makeSignedLogicalTime(t1);
-    ASSERT_OK(getClock()->advanceClusterTime(l1));
+    ASSERT_OK(getClock()->advanceClusterTimeFromTrustedSource(l1));
     auto l2(getClock()->getClusterTime());
     ASSERT_TRUE(l1.getTime() == l2.getTime());
 }

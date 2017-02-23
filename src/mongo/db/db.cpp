@@ -75,6 +75,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/operation_context.h"
@@ -898,16 +899,17 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
     TimeProofService::Key key(std::move(tempKey));
     auto timeProofService = stdx::make_unique<TimeProofService>(std::move(key));
     auto logicalClock =
-        stdx::make_unique<LogicalClock>(serviceContext, std::move(timeProofService), false);
+        stdx::make_unique<LogicalClock>(serviceContext, std::move(timeProofService));
     LogicalClock::set(serviceContext, std::move(logicalClock));
 
     auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
-    // TODO SERVER-27750: add LogicalTimeMetadataHook
+    hookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(serviceContext));
 
     auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorImpl>(
         serviceContext,
         getGlobalReplSettings(),
-        stdx::make_unique<repl::ReplicationCoordinatorExternalStateImpl>(storageInterface),
+        stdx::make_unique<repl::ReplicationCoordinatorExternalStateImpl>(serviceContext,
+                                                                         storageInterface),
         executor::makeNetworkInterface(
             "NetworkInterfaceASIO-Replication", nullptr, std::move(hookList)),
         stdx::make_unique<repl::TopologyCoordinatorImpl>(topoCoordOptions),

@@ -47,6 +47,7 @@ class BSONObjBuilder;
 struct HostAndPort;
 class NamespaceString;
 class OperationContext;
+class ServiceContext;
 class ShardFactory;
 class Shard;
 class ShardType;
@@ -152,7 +153,7 @@ public:
     /**
      *  Starts ReplicaSetMonitor by adding a config shard.
      */
-    void startup();
+    void startup(OperationContext* opCtx);
 
     /**
      * This is invalid to use on the config server and will hit an invariant if it is done.

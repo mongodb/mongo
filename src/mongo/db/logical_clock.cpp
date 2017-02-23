@@ -57,10 +57,8 @@ void LogicalClock::set(ServiceContext* service, std::unique_ptr<LogicalClock> cl
     clock = std::move(clockArg);
 }
 
-LogicalClock::LogicalClock(ServiceContext* service,
-                           std::unique_ptr<TimeProofService> tps,
-                           bool validateProof)
-    : _service(service), _timeProofService(std::move(tps)), _validateProof(validateProof) {}
+LogicalClock::LogicalClock(ServiceContext* service, std::unique_ptr<TimeProofService> tps)
+    : _service(service), _timeProofService(std::move(tps)) {}
 
 SignedLogicalTime LogicalClock::getClusterTime() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -72,16 +70,24 @@ SignedLogicalTime LogicalClock::_makeSignedLogicalTime(LogicalTime logicalTime) 
 }
 
 Status LogicalClock::advanceClusterTime(const SignedLogicalTime& newTime) {
-    if (_validateProof) {
-        invariant(_timeProofService);
-        auto res = _timeProofService->checkProof(newTime.getTime(), newTime.getProof());
-        if (res != Status::OK()) {
-            return res;
-        }
+    const auto& newLogicalTime = newTime.getTime();
+
+    // No need to check proof if no time was given.
+    if (newLogicalTime == LogicalTime::kUninitialized) {
+        return Status::OK();
+    }
+
+    invariant(_timeProofService);
+    auto res = _timeProofService->checkProof(newLogicalTime, newTime.getProof());
+    if (res != Status::OK()) {
+        return res;
     }
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    // TODO: rate check per SERVER-27721
+    return _advanceClusterTime_inlock(newTime);
+}
+
+Status LogicalClock::_advanceClusterTime_inlock(SignedLogicalTime newTime) {
     if (newTime.getTime() > _clusterTime.getTime()) {
         _clusterTime = newTime;
     }
@@ -89,14 +95,16 @@ Status LogicalClock::advanceClusterTime(const SignedLogicalTime& newTime) {
     return Status::OK();
 }
 
-Status LogicalClock::advanceClusterTimeFromTrustedSource(LogicalTime newTime) {
+Status LogicalClock::advanceClusterTimeFromTrustedSource(SignedLogicalTime newTime) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-    // TODO: rate check per SERVER-27721
-    if (newTime > _clusterTime.getTime()) {
-        _clusterTime = _makeSignedLogicalTime(newTime);
-    }
+    return _advanceClusterTime_inlock(std::move(newTime));
+}
 
-    return Status::OK();
+Status LogicalClock::signAndAdvanceClusterTime(LogicalTime newTime) {
+    auto newSignedTime = _makeSignedLogicalTime(newTime);
+
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    return _advanceClusterTime_inlock(std::move(newSignedTime));
 }
 
 LogicalTime LogicalClock::reserveTicks(uint64_t ticks) {

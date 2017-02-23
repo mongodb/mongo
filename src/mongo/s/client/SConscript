@@ -20,6 +20,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/authcore',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/lasterror',
+        '$BUILD_DIR/mongo/db/logical_time_metadata_hook',
         '$BUILD_DIR/mongo/executor/connection_pool_stats',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/rpc/metadata',

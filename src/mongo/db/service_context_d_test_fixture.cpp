@@ -58,7 +58,7 @@ void ServiceContextMongoDTest::setUp() {
     TimeProofService::Key key(std::move(tempKey));
     auto timeProofService = stdx::make_unique<TimeProofService>(std::move(key));
     auto logicalClock =
-        stdx::make_unique<LogicalClock>(serviceContext, std::move(timeProofService), false);
+        stdx::make_unique<LogicalClock>(serviceContext, std::move(timeProofService));
     LogicalClock::set(serviceContext, std::move(logicalClock));
 
     if (!serviceContext->getGlobalStorageEngine()) {

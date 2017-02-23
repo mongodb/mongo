@@ -354,6 +354,7 @@ env.Install(
         LIBDEPS=[
             'db/commands/core',
             'db/conn_pool_options',
+            'db/logical_time_metadata_hook',
             'db/mongodandmongos',
             'db/server_options',
             'db/stats/counters',
