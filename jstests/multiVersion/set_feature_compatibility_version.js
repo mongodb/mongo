@@ -208,7 +208,7 @@
     replSetConfig = rst.getReplSetConfig();
     replSetConfig.members[1].priority = 0;
     replSetConfig.members[1].votes = 0;
-    rst.initiate(replSetConfig);
+    rst.initiate(replSetConfig, 'replSetInitiate', false);
 
     primaryAdminDB = rst.getPrimary().getDB("admin");
     res = assert.commandWorked(

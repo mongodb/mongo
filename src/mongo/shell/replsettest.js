@@ -672,12 +672,14 @@ var ReplSetTest = function(opts) {
         this._updateConfigIfNotDurable(config);
     };
 
-    this.initiate = function(cfg, initCmd, timeout) {
+    this.initiate = function(cfg, initCmd, ensureNode0Primary) {
         var master = this.nodes[0].getDB("admin");
         var config = cfg || this.getReplSetConfig();
         var cmd = {};
         var cmdKey = initCmd || 'replSetInitiate';
-        timeout = timeout || self.kDefaultTimeoutMS;
+        if (ensureNode0Primary === undefined) {
+            ensureNode0Primary = true;
+        }
 
         // Throw an exception if nodes[0] is unelectable in the given config.
         if (!_isElectable(config.members[0])) {
@@ -733,7 +735,11 @@ var ReplSetTest = function(opts) {
                 return false;
             }, "replSetReconfig during initiate failed", 3, 5 * 1000);
 
-            this.awaitSecondaryNodes(timeout);
+            if (ensureNode0Primary) {
+                this.stepUp(this.nodes[0]);
+            } else {
+                this.awaitSecondaryNodes();
+            }
         }
 
         // Setup authentication if running test with authentication
@@ -741,6 +747,46 @@ var ReplSetTest = function(opts) {
             master = this.getPrimary();
             jsTest.authenticateNodes(this.nodes);
         }
+    };
+
+    this.stepUp = function(node) {
+        this.awaitSecondaryNodes();
+        this.awaitNodesAgreeOnPrimary();
+        if (this.getPrimary() === node) {
+            return;
+        }
+
+        if (this.protocolVersion === 0 || jsTestOptions().useLegacyReplicationProtocol) {
+            // Ensure the specified node is primary.
+            for (let i = 0; i < this.nodes.length; i++) {
+                let primary = this.getPrimary();
+                if (primary === node) {
+                    break;
+                }
+                try {
+                    // Make sure the nodes do not step back up for 10 minutes.
+                    assert.commandWorked(
+                        primary.adminCommand({replSetStepDown: 10 * 60, force: true}));
+                } catch (ex) {
+                    print("Caught exception while stepping down node '" + tojson(node.host) +
+                          "': " + tojson(ex));
+                }
+                this.awaitNodesAgreeOnPrimary();
+            }
+
+            // Reset the rest of the nodes so they can run for election during the test.
+            for (let i = 0; i < this.nodes.length; i++) {
+                // Cannot call replSetFreeze on the primary.
+                if (this.nodes[i] === node) {
+                    continue;
+                }
+                assert.commandWorked(this.nodes[i].adminCommand({replSetFreeze: 0}));
+            }
+        } else {
+            assert.commandWorked(node.adminCommand({replSetStepUp: 1}));
+            this.awaitNodesAgreeOnPrimary();
+        }
+        assert.eq(this.getPrimary(), node, node.host + " was not primary after stepUp");
     };
 
     /**
