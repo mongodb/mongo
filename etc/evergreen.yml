@@ -784,7 +784,7 @@ functions:
         set -o errexit
         set -o verbose
 
-        rm -rf src /data/db/* mongo-diskstats* mongo-coredumps.tgz ~/.aws
+        rm -rf src /data/db/* mongo-diskstats* mongo-*.tgz ~/.aws
 
   "kill processes" :
     command: shell.exec
@@ -1115,6 +1115,25 @@ post:
       display_name: Core Dumps - Execution ${execution}
       optional: true
 
+  # Gather and archive hang_analyzer debugger files.
+  - command: archive.targz_pack
+    params:
+      target: "src/mongo-hanganalyzer.tgz"
+      source_dir: "src"
+      include:
+        - "./debugger*.log"
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/mongo-hanganalyzer.tgz
+      remote_file: mongodb-mongo-master/${build_variant}/${revision}/hanganalyzer/mongo-hanganalyzer-${build_id}-${task_name}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/x-gzip}
+      display_name: Hang Analyzer Output - Execution ${execution}
+      optional: true
+
   # Gather and archive disk statistics.
   - command: archive.targz_pack
     params:
@@ -1158,9 +1177,9 @@ timeout:
       script: |
         set -o verbose
         ${set_sudo}
-        $sudo hang_analyzer_option="-p ${hang_analyzer_processes|dbtest,java,mongo,mongod,mongos,python,_test} -g bsondump,mongodump,mongoexport,mongofiles,mongoimport,mongooplog,mongoreplay,mongorestore,mongostat,mongotop"
-        echo "Calling the hang analyzer: python buildscripts/hang_analyzer.py $hang_analyzer_option"
-        PATH=/opt/mongodbtoolchain/gdb/bin:$PATH python buildscripts/hang_analyzer.py $hang_analyzer_option
+        hang_analyzer_option="-o file -o stdout -p ${hang_analyzer_processes|dbtest,java,mongo,mongod,mongos,python,_test} -g bsondump,mongodump,mongoexport,mongofiles,mongoimport,mongooplog,mongoreplay,mongorestore,mongostat,mongotop"
+        echo "Calling the hang analyzer: PATH=\"/opt/mongodbtoolchain/gdb/bin:$PATH\" $sudo python buildscripts/hang_analyzer.py $hang_analyzer_option"
+        PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" $sudo python buildscripts/hang_analyzer.py $hang_analyzer_option
 
 #######################################
 #               Tasks                 #
