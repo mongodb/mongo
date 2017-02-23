@@ -95,7 +95,7 @@ class TestGroupExecutor(object):
                 if interrupted:
                     raise errors.UserInterrupt("Received interrupt from user")
 
-                if teardown_flag.is_set():
+                if teardown_flag and teardown_flag.is_set():
                     return_code = 2
 
                 sb = []  # String builder.
