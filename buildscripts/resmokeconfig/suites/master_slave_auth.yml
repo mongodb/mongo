@@ -6,12 +6,12 @@ config_variables:
 selector:
   js_test:
     roots:
-    - jstests/repl/*.js
+    - jstests/master_slave/*.js
     exclude_files:
     # Skip any tests that run with auth explicitly.
-    - jstests/repl/*[aA]uth*.js
+    - jstests/master_slave/*[aA]uth*.js
     # Skip until SERVER-25618 is resolved.
-    - jstests/repl/block1.js
+    - jstests/master_slave/block1.js
 
 executor:
   js_test:
