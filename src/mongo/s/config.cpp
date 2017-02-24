@@ -359,16 +359,6 @@ bool DBConfig::_loadIfNeeded(OperationContext* txn, Counter reloadIteration) {
     return true;
 }
 
-void DBConfig::getAllShardIds(std::set<ShardId>* shardIds) {
-    stdx::lock_guard<stdx::mutex> lk(_lock);
-    shardIds->insert(_primaryId);
-
-    for (const auto& ciEntry : _collections) {
-        const auto& ci = ciEntry.second;
-        ci.cm->getAllShardIds(shardIds);
-    }
-}
-
 ShardId DBConfig::getPrimaryId() {
     stdx::lock_guard<stdx::mutex> lk(_lock);
     return _primaryId;

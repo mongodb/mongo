@@ -119,7 +119,6 @@ BSONObj fixForShards(const BSONObj& orig,
     return b.obj();
 }
 
-
 /**
  * Outline for sharded map reduce for sharded output, $out replace:
  *
@@ -282,6 +281,8 @@ public:
             invariant(maxChunkSizeBytes < std::numeric_limits<int>::max());
         }
 
+        const auto shardRegistry = Grid::get(txn)->shardRegistry();
+
         // modify command to run on shards with output to tmp collection
         string badShardedField;
         BSONObj shardedCommand =
@@ -290,8 +291,8 @@ public:
         if (!shardedInput && !shardedOutput && !customOutDB) {
             LOG(1) << "simple MR, just passthrough";
 
-            const auto shard = uassertStatusOK(
-                Grid::get(txn)->shardRegistry()->getShard(txn, confIn->getPrimaryId()));
+            const auto shard =
+                uassertStatusOK(shardRegistry->getShard(txn, confIn->getPrimaryId()));
 
             ShardConnection conn(shard->getConnString(), "");
 
@@ -350,8 +351,8 @@ public:
                 // Need to gather list of all servers even if an error happened
                 string server;
                 {
-                    const auto shard = uassertStatusOK(
-                        Grid::get(txn)->shardRegistry()->getShard(txn, mrResult.shardTargetId));
+                    const auto shard =
+                        uassertStatusOK(shardRegistry->getShard(txn, mrResult.shardTargetId));
                     server = shard->getConnString().toString();
                 }
                 servers.insert(server);
@@ -444,8 +445,8 @@ public:
         bool hasWCError = false;
 
         if (!shardedOutput) {
-            const auto shard = uassertStatusOK(
-                Grid::get(txn)->shardRegistry()->getShard(txn, confOut->getPrimaryId()));
+            const auto shard =
+                uassertStatusOK(shardRegistry->getShard(txn, confOut->getPrimaryId()));
 
             LOG(1) << "MR with single shard output, NS=" << outputCollNss.ns()
                    << " primary=" << shard->toString();
@@ -501,8 +502,18 @@ public:
                 //
                 // TODO: pre-split mapReduce output in a safer way.
 
-                set<ShardId> outShardIds;
-                confOut->getAllShardIds(&outShardIds);
+                const std::set<ShardId> outShardIds = [&]() {
+                    std::vector<ShardId> shardIds;
+                    shardRegistry->getAllShardIds(&shardIds);
+                    uassert(ErrorCodes::ShardNotFound,
+                            str::stream()
+                                << "Unable to find shards on which to place output collection "
+                                << outputCollNss.ns(),
+                            !shardIds.empty());
+
+                    return std::set<ShardId>(shardIds.begin(), shardIds.end());
+                }();
+
 
                 BSONObj sortKey = BSON("_id" << 1);
                 ShardKeyPattern sortKeyPattern(sortKey);
