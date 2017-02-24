@@ -534,7 +534,7 @@ void createOplog(OperationContext* txn, const std::string& oplogCollectionName, 
 
     /* sync here so we don't get any surprising lag later when we try to sync */
     StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-    storageEngine->flushAllFiles(true);
+    storageEngine->flushAllFiles(txn, true);
     log() << "******" << endl;
 }
 

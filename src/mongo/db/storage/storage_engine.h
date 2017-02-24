@@ -207,7 +207,7 @@ public:
     /**
      * @return number of files flushed
      */
-    virtual int flushAllFiles(bool sync) = 0;
+    virtual int flushAllFiles(OperationContext* txn, bool sync) = 0;
 
     /**
      * Transitions the storage engine into backup mode.

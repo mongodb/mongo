@@ -245,6 +245,4 @@ public:
 };
 
 bool writePidFile(const std::string& path);
-
-void printMemInfo(const char* whereContextStr = 0);
 }

@@ -79,9 +79,9 @@ class MmapV1RecordFetcher : public RecordFetcher {
 public:
     explicit MmapV1RecordFetcher(const MmapV1RecordHeader* record) : _record(record) {}
 
-    virtual void setup() {
+    virtual void setup(OperationContext* txn) {
         invariant(!_filesLock.get());
-        _filesLock.reset(new LockMongoFilesShared());
+        _filesLock.reset(new LockMongoFilesShared(txn));
     }
 
     virtual void fetch() {
@@ -172,10 +172,11 @@ Status MmapV1ExtentManager::init(OperationContext* txn) {
             }
         }
 
-        unique_ptr<DataFile> df(new DataFile(n));
+        unique_ptr<DataFile> df(new DataFile(txn, n));
 
-        Status s = df->openExisting(fullNameString.c_str());
+        Status s = df->openExisting(txn, fullNameString.c_str());
         if (!s.isOK()) {
+            df->close(txn);
             return s;
         }
 
@@ -240,12 +241,17 @@ DataFile* MmapV1ExtentManager::_addAFile(OperationContext* txn,
     }
 
     {
-        unique_ptr<DataFile> allocFile(new DataFile(allocFileId));
+        unique_ptr<DataFile> allocFile(new DataFile(txn, allocFileId));
         const string allocFileName = _fileName(allocFileId).string();
 
         Timer t;
 
-        allocFile->open(txn, allocFileName.c_str(), minSize, false);
+        try {
+            allocFile->open(txn, allocFileName.c_str(), minSize, false);
+        } catch (...) {
+            allocFile->close(txn);
+            throw;
+        }
         if (t.seconds() > 1) {
             log() << "MmapV1ExtentManager took " << t.seconds()
                   << " seconds to open: " << allocFileName;
@@ -257,10 +263,15 @@ DataFile* MmapV1ExtentManager::_addAFile(OperationContext* txn,
 
     // Preallocate is asynchronous
     if (preallocateNextFile) {
-        unique_ptr<DataFile> nextFile(new DataFile(allocFileId + 1));
+        unique_ptr<DataFile> nextFile(new DataFile(txn, allocFileId + 1));
         const string nextFileName = _fileName(allocFileId + 1).string();
 
-        nextFile->open(txn, nextFileName.c_str(), minSize, false);
+        try {
+            nextFile->open(txn, nextFileName.c_str(), minSize, false);
+        } catch (...) {
+            nextFile->close(txn);
+            throw;
+        }
     }
 
     // Returns the last file added
@@ -630,6 +641,12 @@ ExtentManager::CacheHint* MmapV1ExtentManager::cacheHint(const DiskLoc& extentLo
 MmapV1ExtentManager::FilesArray::~FilesArray() {
     for (int i = 0; i < size(); i++) {
         delete _files[i];
+    }
+}
+
+void MmapV1ExtentManager::FilesArray::close(OperationContext* txn) {
+    for (int i = 0; i < size(); i++) {
+        _files[i]->close(txn);
     }
 }
 

@@ -36,8 +36,10 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -67,16 +69,33 @@ map<string, MongoFile*> pathToFile;
 mongo::AtomicUInt64 mmfNextId(0);
 }  // namespace
 
-MemoryMappedFile::MemoryMappedFile(OptionSet options)
+MemoryMappedFile::MemoryMappedFile(OperationContext* txn, OptionSet options)
     : MongoFile(options), _uniqueId(mmfNextId.fetchAndAdd(1)) {
-    created();
+    created(txn);
 }
 
-void* MemoryMappedFile::create(const std::string& filename, unsigned long long len, bool zero) {
+MemoryMappedFile::~MemoryMappedFile() {
+    invariant(isClosed());
+
+    auto txn = cc().getOperationContext();
+    invariant(txn);
+
+    LockMongoFilesShared lock(txn);
+    for (std::set<MongoFile*>::const_iterator it = mmfiles.begin(); it != mmfiles.end(); it++) {
+        invariant(*it != this);
+    }
+}
+
+/*static*/ AtomicUInt64 MemoryMappedFile::totalMappedLength;
+
+void* MemoryMappedFile::create(OperationContext* txn,
+                               const std::string& filename,
+                               unsigned long long len,
+                               bool zero) {
     uassert(13468,
             string("can't create file already exists ") + filename,
             !boost::filesystem::exists(filename));
-    void* p = map(filename.c_str(), len);
+    void* p = map(txn, filename.c_str(), len);
     fassert(16331, p);
     if (zero) {
         size_t sz = (size_t)len;
@@ -94,7 +113,7 @@ void* MemoryMappedFile::create(const std::string& filename, unsigned long long l
     length = l;
 }
 
-void* MemoryMappedFile::map(const char* filename) {
+void* MemoryMappedFile::map(OperationContext* txn, const char* filename) {
     unsigned long long l;
     try {
         l = boost::filesystem::file_size(filename);
@@ -106,7 +125,7 @@ void* MemoryMappedFile::map(const char* filename) {
                                             << e.what());
     }
 
-    void* ret = map(filename, l);
+    void* ret = map(txn, filename, l);
     fassert(16334, ret);
     return ret;
 }
@@ -119,7 +138,7 @@ MongoFile::MongoFile(OptionSet options)
     : _options(storageGlobalParams.readOnly ? (options | READONLY) : options) {}
 
 
-RWLockRecursiveNongreedy LockMongoFilesShared::mmmutex("mmmutex", 10 * 60 * 1000 /* 10 minutes */);
+Lock::ResourceMutex LockMongoFilesShared::mmmutex("MMapMutex");
 unsigned LockMongoFilesShared::era = 99;  // note this rolls over
 
 set<MongoFile*>& MongoFile::getAllFiles() {
@@ -131,14 +150,14 @@ set<MongoFile*>& MongoFile::getAllFiles() {
     safe to call more than once, albeit might be wasted work
     ideal to call close to the close, if the close is well before object destruction
 */
-void MongoFile::destroyed() {
-    LockMongoFilesShared::assertExclusivelyLocked();
+void MongoFile::destroyed(OperationContext* txn) {
+    LockMongoFilesShared::assertExclusivelyLocked(txn);
     mmfiles.erase(this);
     pathToFile.erase(filename());
 }
 
 /*static*/
-void MongoFile::closeAllFiles(stringstream& message) {
+void MongoFile::closeAllFiles(OperationContext* txn, stringstream& message) {
     static int closingAllFiles = 0;
     if (closingAllFiles) {
         message << "warning closingAllFiles=" << closingAllFiles << endl;
@@ -146,37 +165,26 @@ void MongoFile::closeAllFiles(stringstream& message) {
     }
     ++closingAllFiles;
 
-    LockMongoFilesExclusive lk;
+    LockMongoFilesExclusive lk(txn);
 
     ProgressMeter pm(mmfiles.size(), 2, 1, "files", "File Closing Progress");
     set<MongoFile*> temp = mmfiles;
     for (set<MongoFile*>::iterator i = temp.begin(); i != temp.end(); i++) {
-        (*i)->close();  // close() now removes from mmfiles
+        (*i)->close(txn);  // close() now removes from mmfiles
         pm.hit();
     }
     message << "closeAllFiles() finished";
     --closingAllFiles;
 }
 
-/*static*/ long long MongoFile::totalMappedLength() {
-    unsigned long long total = 0;
-
-    LockMongoFilesShared lk;
-
-    for (set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++)
-        total += (*i)->length();
-
-    return total;
+/*static*/ int MongoFile::flushAll(OperationContext* txn, bool sync) {
+    return _flushAll(txn, sync);
 }
 
-/*static*/ int MongoFile::flushAll(bool sync) {
-    return _flushAll(sync);
-}
-
-/*static*/ int MongoFile::_flushAll(bool sync) {
+/*static*/ int MongoFile::_flushAll(OperationContext* txn, bool sync) {
     if (!sync) {
         int num = 0;
-        LockMongoFilesShared lk;
+        LockMongoFilesShared lk(txn);
         for (set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++) {
             num++;
             MongoFile* mmf = *i;
@@ -196,7 +204,7 @@ void MongoFile::closeAllFiles(stringstream& message) {
     OwnedPointerVector<Flushable> thingsToFlushWrapper;
     vector<Flushable*>& thingsToFlush = thingsToFlushWrapper.mutableVector();
     {
-        LockMongoFilesShared lk;
+        LockMongoFilesShared lk(txn);
         for (set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++) {
             MongoFile* mmf = *i;
             if (!mmf)
@@ -206,22 +214,22 @@ void MongoFile::closeAllFiles(stringstream& message) {
     }
 
     for (size_t i = 0; i < thingsToFlush.size(); i++) {
-        thingsToFlush[i]->flush();
+        thingsToFlush[i]->flush(txn);
     }
 
     return thingsToFlush.size();
 }
 
-void MongoFile::created() {
+void MongoFile::created(OperationContext* txn) {
     // If we're a READONLY mapping, we don't want to ever flush.
     if (!isOptionSet(READONLY)) {
-        LockMongoFilesExclusive lk;
+        LockMongoFilesExclusive lk(txn);
         mmfiles.insert(this);
     }
 }
 
-void MongoFile::setFilename(const std::string& fn) {
-    LockMongoFilesExclusive lk;
+void MongoFile::setFilename(OperationContext* txn, const std::string& fn) {
+    LockMongoFilesExclusive lk(txn);
     verify(_filename.empty());
     _filename = boost::filesystem::absolute(fn).generic_string();
     MongoFile*& ptf = pathToFile[_filename];
@@ -233,23 +241,6 @@ MongoFile* MongoFileFinder::findByPath(const std::string& path) const {
     return mapFindWithDefault(pathToFile,
                               boost::filesystem::absolute(path).generic_string(),
                               static_cast<MongoFile*>(NULL));
-}
-
-
-void printMemInfo(const char* where) {
-    LogstreamBuilder out = log();
-    out << "mem info: ";
-    if (where)
-        out << where << " ";
-
-    ProcessInfo pi;
-    if (!pi.supported()) {
-        out << " not supported";
-        return;
-    }
-
-    out << "vsize: " << pi.getVirtualMemorySize() << " resident: " << pi.getResidentSize()
-        << " mapped: " << (MemoryMappedFile::totalMappedLength() / (1024 * 1024));
 }
 
 void dataSyncFailedHandler() {

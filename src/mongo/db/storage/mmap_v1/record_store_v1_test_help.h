@@ -113,6 +113,8 @@ class DummyExtentManager : public ExtentManager {
 public:
     virtual ~DummyExtentManager();
 
+    virtual void close(OperationContext* txn);
+
     virtual Status init(OperationContext* txn);
 
     virtual int numFiles() const;

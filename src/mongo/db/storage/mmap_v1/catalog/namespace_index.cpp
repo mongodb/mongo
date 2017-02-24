@@ -51,8 +51,10 @@ using std::endl;
 using std::list;
 using std::string;
 
-NamespaceIndex::NamespaceIndex(const std::string& dir, const std::string& database)
-    : _dir(dir), _database(database), _ht(nullptr) {}
+NamespaceIndex::NamespaceIndex(OperationContext* txn,
+                               const std::string& dir,
+                               const std::string& database)
+    : _dir(dir), _database(database), _f(txn, MongoFile::Options::SEQUENTIAL), _ht(nullptr) {}
 
 NamespaceIndex::~NamespaceIndex() {}
 
@@ -156,7 +158,7 @@ void NamespaceIndex::init(OperationContext* txn) {
     void* p = 0;
 
     if (boost::filesystem::exists(nsPath)) {
-        if (_f.open(pathString)) {
+        if (_f.open(txn, pathString)) {
             len = _f.length();
 
             if (len % (1024 * 1024) != 0) {
@@ -215,7 +217,7 @@ void NamespaceIndex::init(OperationContext* txn) {
             massert(18826, str::stream() << "failure writing file " << pathString, !file.bad());
         }
 
-        if (_f.create(pathString, l)) {
+        if (_f.create(txn, pathString, l)) {
             // The writes done in this function must not be rolled back. This will leave the
             // file empty, but available for future use. That is why we go directly to the
             // global dur dirty list rather than going through the OperationContext.

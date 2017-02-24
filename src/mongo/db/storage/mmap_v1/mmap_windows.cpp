@@ -148,8 +148,8 @@ static void* getNextMemoryMappedFileLocation(unsigned long long mmfSize) {
     return reinterpret_cast<void*>(static_cast<uintptr_t>(thisMemoryMappedFileLocation));
 }
 
-void MemoryMappedFile::close() {
-    LockMongoFilesShared::assertExclusivelyLocked();
+void MemoryMappedFile::close(OperationContext* txn) {
+    LockMongoFilesShared::assertExclusivelyLocked(txn);
 
     // Prevent flush and close from concurrently running
     stdx::lock_guard<stdx::mutex> lk(_flushMutex);
@@ -163,20 +163,29 @@ void MemoryMappedFile::close() {
     }
 
     views.clear();
+    totalMappedLength.fetchAndSubtract(len);
+    len = 0;
+
     if (maphandle)
         CloseHandle(maphandle);
     maphandle = 0;
-    if (fd)
+    if (fd) {
         CloseHandle(fd);
-    fd = 0;
-    destroyed();  // cleans up from the master list of mmaps
+        fd = 0;
+    }
+
+    destroyed(txn);  // cleans up from the master list of mmaps
 }
 
-unsigned long long mapped = 0;
+bool MemoryMappedFile::isClosed() {
+    return !len && !fd && !views.size();
+}
 
-void* MemoryMappedFile::map(const char* filenameIn, unsigned long long& length) {
+void* MemoryMappedFile::map(OperationContext* txn,
+                            const char* filenameIn,
+                            unsigned long long& length) {
     verify(fd == 0 && len == 0);  // can't open more than once
-    setFilename(filenameIn);
+    setFilename(txn, filenameIn);
     FileAllocator::get()->allocateAsap(filenameIn, length);
     /* big hack here: Babble uses db names with colons.  doesn't seem to work on windows.  temporary
      * perhaps. */
@@ -222,8 +231,6 @@ void* MemoryMappedFile::map(const char* filenameIn, unsigned long long& length) 
         }
     }
 
-    mapped += length;
-
     {
         DWORD flProtect = readOnly ? PAGE_READONLY : PAGE_READWRITE;
         maphandle = CreateFileMappingW(fd,
@@ -237,7 +244,8 @@ void* MemoryMappedFile::map(const char* filenameIn, unsigned long long& length) 
             severe() << "CreateFileMappingW for " << filename << " failed with "
                      << errnoWithDescription(dosError) << " (file size is " << length << ")"
                      << " in MemoryMappedFile::map" << endl;
-            close();
+            LockMongoFilesExclusive lock(txn);
+            close(txn);
             fassertFailed(16225);
         }
     }
@@ -288,7 +296,8 @@ void* MemoryMappedFile::map(const char* filenameIn, unsigned long long& length) 
                          << length << ")"
                          << " in MemoryMappedFile::map" << endl;
 
-                close();
+                LockMongoFilesExclusive lock(txn);
+                close(txn);
                 fassertFailed(16166);
             }
 
@@ -296,8 +305,12 @@ void* MemoryMappedFile::map(const char* filenameIn, unsigned long long& length) 
         }
     }
 
-    views.push_back(view);
+    // MemoryMappedFile successfully created, now update state.
     len = length;
+    totalMappedLength.fetchAndAdd(len);
+
+    views.push_back(view);
+
     return view;
 }
 
@@ -346,8 +359,8 @@ void* MemoryMappedFile::createPrivateMap() {
     return privateMapAddress;
 }
 
-void* MemoryMappedFile::remapPrivateView(void* oldPrivateAddr) {
-    LockMongoFilesExclusive lockMongoFiles;
+void* MemoryMappedFile::remapPrivateView(OperationContext* txn, void* oldPrivateAddr) {
+    LockMongoFilesExclusive lockMongoFiles(txn);
 
     privateViews.clearWritableBits(oldPrivateAddr, len);
 
@@ -393,12 +406,12 @@ public:
           _filename(filename),
           _flushMutex(flushMutex) {}
 
-    void flush() {
+    void flush(OperationContext* txn) {
         if (!_view || !_fd)
             return;
 
         {
-            LockMongoFilesShared mmfilesLock;
+            LockMongoFilesShared mmfilesLock(txn);
 
             std::set<MongoFile*> mmfs = MongoFile::getAllFiles();
             std::set<MongoFile*>::const_iterator it = mmfs.find(_theFile);
@@ -462,7 +475,9 @@ void MemoryMappedFile::flush(bool sync) {
     uassert(13056, "Async flushing not supported on windows", sync);
     if (!views.empty()) {
         WindowsFlushable f(this, viewForFlushing(), fd, _uniqueId, filename(), _flushMutex);
-        f.flush();
+        auto txn = cc().getOperationContext();
+        invariant(txn);
+        f.flush(txn);
     }
 }
 

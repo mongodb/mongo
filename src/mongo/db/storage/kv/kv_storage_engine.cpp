@@ -251,8 +251,8 @@ Status KVStorageEngine::dropDatabase(OperationContext* txn, StringData db) {
     return Status::OK();
 }
 
-int KVStorageEngine::flushAllFiles(bool sync) {
-    return _engine->flushAllFiles(sync);
+int KVStorageEngine::flushAllFiles(OperationContext* txn, bool sync) {
+    return _engine->flushAllFiles(txn, sync);
 }
 
 Status KVStorageEngine::beginBackup(OperationContext* txn) {

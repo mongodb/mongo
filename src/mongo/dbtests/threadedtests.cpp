@@ -45,7 +45,6 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
-#include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
@@ -140,237 +139,6 @@ public:
     }
 };
 
-class RWLockTest1 {
-public:
-    void run() {
-        RWLock lk("eliot");
-        { rwlock r(lk, true, 1000); }
-    }
-};
-
-class RWLockTest2 {
-public:
-    static void worker1(RWLockRecursiveNongreedy* lk, AtomicUInt32* x) {
-        x->fetchAndAdd(1);  // 1
-        RWLockRecursiveNongreedy::Exclusive b(*lk);
-        x->fetchAndAdd(1);  // 2
-    }
-    static void worker2(RWLockRecursiveNongreedy* lk, AtomicUInt32* x) {
-        RWLockRecursiveNongreedy::Shared c(*lk);
-        x->fetchAndAdd(1);
-    }
-    void run() {
-        /**
-         * note: this test will deadlock if the code breaks
-         */
-        RWLockRecursiveNongreedy lk("eliot2", 120 * 1000);
-        cout << "RWLock impl: " << lk.implType() << endl;
-        unique_ptr<RWLockRecursiveNongreedy::Shared> a(new RWLockRecursiveNongreedy::Shared(lk));
-        AtomicUInt32 x1(0);
-        cout << "A : " << &x1 << endl;
-        stdx::thread t1(stdx::bind(worker1, &lk, &x1));
-        while (!x1.load())
-            ;
-        verify(x1.load() == 1);
-        sleepmillis(500);
-        verify(x1.load() == 1);
-        AtomicUInt32 x2(0);
-        stdx::thread t2(stdx::bind(worker2, &lk, &x2));
-        t2.join();
-        verify(x2.load() == 1);
-        a.reset();
-        for (int i = 0; i < 2000; i++) {
-            if (x1.load() == 2)
-                break;
-            sleepmillis(1);
-        }
-        verify(x1.load() == 2);
-        t1.join();
-    }
-};
-
-class RWLockTest3 {
-public:
-    static void worker2(RWLockRecursiveNongreedy* lk, AtomicUInt32* x) {
-        verify(!lk->__lock_try(0));
-        RWLockRecursiveNongreedy::Shared c(*lk);
-        x->fetchAndAdd(1);
-    }
-
-    void run() {
-        /**
-         * note: this test will deadlock if the code breaks
-         */
-
-        RWLockRecursiveNongreedy lk("eliot2", 120 * 1000);
-
-        unique_ptr<RWLockRecursiveNongreedy::Shared> a(new RWLockRecursiveNongreedy::Shared(lk));
-
-        AtomicUInt32 x2(0);
-
-        stdx::thread t2(stdx::bind(worker2, &lk, &x2));
-        t2.join();
-        verify(x2.load() == 1);
-
-        a.reset();
-    }
-};
-
-class RWLockTest4 {
-public:
-#if defined(__linux__) || defined(__APPLE__)
-    static void worker1(pthread_rwlock_t* lk, AtomicUInt32* x) {
-        x->fetchAndAdd(1);  // 1
-        cout << "lock b try" << endl;
-        while (1) {
-            if (pthread_rwlock_trywrlock(lk) == 0)
-                break;
-            sleepmillis(10);
-        }
-        cout << "lock b got" << endl;
-        x->fetchAndAdd(1);  // 2
-        pthread_rwlock_unlock(lk);
-    }
-
-    static void worker2(pthread_rwlock_t* lk, AtomicUInt32* x) {
-        cout << "lock c try" << endl;
-        pthread_rwlock_rdlock(lk);
-        x->fetchAndAdd(1);
-        cout << "lock c got" << endl;
-        pthread_rwlock_unlock(lk);
-    }
-#endif
-    void run() {
-/**
- * note: this test will deadlock if the code breaks
- */
-
-#if defined(__linux__) || defined(__APPLE__)
-
-        // create
-        pthread_rwlock_t lk;
-        verify(pthread_rwlock_init(&lk, 0) == 0);
-
-        // read lock
-        verify(pthread_rwlock_rdlock(&lk) == 0);
-
-        AtomicUInt32 x1(0);
-        stdx::thread t1(stdx::bind(worker1, &lk, &x1));
-        while (!x1.load())
-            ;
-        verify(x1.load() == 1);
-        sleepmillis(500);
-        verify(x1.load() == 1);
-
-        AtomicUInt32 x2(0);
-
-        stdx::thread t2(stdx::bind(worker2, &lk, &x2));
-        t2.join();
-        verify(x2.load() == 1);
-
-        pthread_rwlock_unlock(&lk);
-
-        for (int i = 0; i < 2000; i++) {
-            if (x1.load() == 2)
-                break;
-            sleepmillis(1);
-        }
-
-        verify(x1.load() == 2);
-        t1.join();
-#endif
-    }
-};
-
-// we don't use upgrade so that part is not important currently but the other aspects of this test
-// are interesting; it would be nice to do analogous tests for SimpleRWLock and QLock
-class UpgradableTest : public ThreadedTest<7> {
-    RWLock m;
-
-public:
-    UpgradableTest() : m("utest") {}
-
-private:
-    virtual void validate() {}
-    virtual void subthread(int x) {
-        Client::initThread("utest");
-
-        /* r = get a read lock
-           R = get a read lock and we expect it to be fast
-           u = get upgradable
-           U = get upgradable and we expect it to be fast
-           w = get a write lock
-        */
-        //                    /-- verify upgrade can be done instantly while in a read lock already
-        //                    |  /-- verify upgrade acquisition isn't greedy
-        //                    |  | /-- verify writes aren't greedy while in upgradable(or are they?)
-        //                    v  v v
-        const char* what = " RURuRwR";
-
-        sleepmillis(100 * x);
-
-        int Z = 1;
-        LOG(Z) << x << ' ' << what[x] << " request" << endl;
-        char ch = what[x];
-        switch (ch) {
-            case 'w': {
-                m.lock();
-                LOG(Z) << x << " w got" << endl;
-                sleepmillis(100);
-                LOG(Z) << x << " w unlock" << endl;
-                m.unlock();
-            } break;
-            case 'u':
-            case 'U': {
-                Timer t;
-                RWLock::Upgradable u(m);
-                LOG(Z) << x << ' ' << ch << " got" << endl;
-                if (ch == 'U') {
-#if defined(NTDDI_VERSION) && defined(NTDDI_WIN7) && (NTDDI_VERSION >= NTDDI_WIN7)
-                    // SRW locks are neither fair nor FIFO, as per docs
-                    if (t.millis() > 2000) {
-#else
-                    if (t.millis() > 20) {
-#endif
-                        DEV {
-                            // a debug buildbot might be slow, try to avoid false positives
-                            mongo::unittest::log() << "warning lock upgrade was slow " << t.millis()
-                                                   << endl;
-                        }
-                        else {
-                            mongo::unittest::log()
-                                << "assertion failure: lock upgrade was too slow: " << t.millis()
-                                << endl;
-                            ASSERT(false);
-                        }
-                    }
-                }
-                sleepsecs(1);
-                LOG(Z) << x << ' ' << ch << " unlock" << endl;
-            } break;
-            case 'r':
-            case 'R': {
-                Timer t;
-                m.lock_shared();
-                LOG(Z) << x << ' ' << ch << " got " << endl;
-                if (what[x] == 'R') {
-                    if (t.millis() > 15) {
-                        // commented out for less chatter, we aren't using upgradeable anyway right
-                        // now:
-                        // log() << x << " info: when in upgradable, write locks are still greedy "
-                        // "on this platform" << endl;
-                    }
-                }
-                sleepmillis(200);
-                LOG(Z) << x << ' ' << ch << " unlock" << endl;
-                m.unlock_shared();
-            } break;
-            default:
-                ASSERT(false);
-        }
-    }
-};
-
 void sleepalittle() {
     Timer t;
     while (1) {
@@ -451,44 +219,6 @@ private:
     }
 };
 
-const int WriteLocksAreGreedy_ThreadCount = 3;
-class WriteLocksAreGreedy : public ThreadedTest<WriteLocksAreGreedy_ThreadCount> {
-public:
-    WriteLocksAreGreedy() : m("gtest"), _barrier(WriteLocksAreGreedy_ThreadCount) {}
-
-private:
-    RWLock m;
-    boost::barrier _barrier;
-    virtual void validate() {}
-    virtual void subthread(int x) {
-        _barrier.wait();
-        int Z = 0;
-        Client::initThread("utest");
-        if (x == 1) {
-            LOG(Z) << mongo::curTimeMillis64() % 10000 << " 1" << endl;
-            rwlock_shared lk(m);
-            sleepmillis(400);
-            LOG(Z) << mongo::curTimeMillis64() % 10000 << " 1x" << endl;
-        }
-        if (x == 2) {
-            sleepmillis(100);
-            LOG(Z) << mongo::curTimeMillis64() % 10000 << " 2" << endl;
-            rwlock lk(m, true);
-            LOG(Z) << mongo::curTimeMillis64() % 10000 << " 2x" << endl;
-        }
-        if (x == 3) {
-            sleepmillis(200);
-            Timer t;
-            LOG(Z) << mongo::curTimeMillis64() % 10000 << " 3" << endl;
-            rwlock_shared lk(m);
-            LOG(Z) << mongo::curTimeMillis64() % 10000 << " 3x" << endl;
-            LOG(Z) << t.millis() << endl;
-            ASSERT(t.millis() > 50);
-        }
-    }
-};
-
-
 // Tests waiting on the TicketHolder by running many more threads than can fit into the "hotel", but
 // only max _nRooms threads should ever get in at once
 class TicketHolderWaits : public ThreadedTest<10> {
@@ -559,24 +289,14 @@ public:
     All() : Suite("threading") {}
 
     void setupTests() {
-        add<WriteLocksAreGreedy>();
-
         // Slack is a test to see how long it takes for another thread to pick up
         // and begin work after another relinquishes the lock.  e.g. a spin lock
         // would have very little slack.
         add<Slack<SimpleMutex, stdx::lock_guard<SimpleMutex>>>();
-        add<Slack<SimpleRWLock, SimpleRWLock::Exclusive>>();
-
-        add<UpgradableTest>();
 
         add<IsAtomicWordAtomic<AtomicUInt32>>();
         add<IsAtomicWordAtomic<AtomicUInt64>>();
         add<ThreadPoolTest>();
-
-        add<RWLockTest1>();
-        add<RWLockTest2>();
-        add<RWLockTest3>();
-        add<RWLockTest4>();
 
         add<TicketHolderWaits>();
     }

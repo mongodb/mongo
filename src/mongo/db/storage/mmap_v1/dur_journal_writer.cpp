@@ -56,12 +56,14 @@ namespace {
  * (2) TODO should we do this using N threads? Would be quite easy see Hackenberg paper table
  *  5 and 6. 2 threads might be a good balance.
  */
-void WRITETODATAFILES(const JSectHeader& h, const AlignedBuilder& uncompressed) {
+void WRITETODATAFILES(OperationContext* txn,
+                      const JSectHeader& h,
+                      const AlignedBuilder& uncompressed) {
     Timer t;
 
     LOG(4) << "WRITETODATAFILES BEGIN";
 
-    RecoveryJob::get().processSection(&h, uncompressed.buf(), uncompressed.len(), NULL);
+    RecoveryJob::get().processSection(txn, &h, uncompressed.buf(), uncompressed.len(), NULL);
 
     const long long m = t.micros();
     stats.curr()->_writeToDataFilesMicros += m;
@@ -244,7 +246,7 @@ void JournalWriter::_journalWriterThread() {
 
             // Apply the journal entries on top of the shared view so that when flush is
             // requested it would write the latest.
-            WRITETODATAFILES(buffer->_header, buffer->_builder);
+            WRITETODATAFILES(cc().makeOperationContext().get(), buffer->_header, buffer->_builder);
 
             // Data is now persisted on the shared view, so notify any potential journal file
             // cleanup waiters.
