@@ -43,7 +43,7 @@
         bulk.insert({_id: i});
     assert.writeOK(bulk.execute());
 
-    x = db.foo.stats();
+    x = assert.commandWorked(db.foo.stats());
     assert.eq(N, x.count, "coll total count expected");
     assert.eq(db.foo.count(), x.count, "coll total count match");
     assert.eq(2, x.nchunks, "coll chunk num");
@@ -64,7 +64,7 @@
     print("a_extras: " + a_extras);
     print("b_extras: " + b_extras);
 
-    x = db.stats();
+    x = assert.commandWorked(db.stats());
 
     // dbstats uses Future::CommandResult so raw output uses connection strings not shard names
     shards = Object.keySet(x.raw);
@@ -83,7 +83,10 @@
         /* Because of loss of floating point precision, do not check exact equality */
         if (stat == stat_scaled)
             return true;
-        assert(((stat_scaled - 2) <= (stat / scale)) && ((stat / scale) <= (stat_scaled + 2)));
+
+        var msg = 'scaled: ' + stat_scaled + ', stat: ' + stat + ', scale: ' + scale;
+        assert.lte((stat_scaled - 2), (stat / scale), msg);
+        assert.gte((stat_scaled + 2), (stat / scale), msg);
     }
 
     function dbStatComp(stat_obj, stat_obj_scaled, scale) {
@@ -107,9 +110,9 @@
     }
 
     /* db.stats() tests */
-    db_not_scaled = db.stats();
-    db_scaled_512 = db.stats(512);
-    db_scaled_1024 = db.stats(1024);
+    db_not_scaled = assert.commandWorked(db.stats());
+    db_scaled_512 = assert.commandWorked(db.stats(512));
+    db_scaled_1024 = assert.commandWorked(db.stats(1024));
 
     for (var shard in db_not_scaled.raw) {
         dbStatComp(db_not_scaled.raw[shard], db_scaled_512.raw[shard], 512);
@@ -120,9 +123,9 @@
     dbStatComp(db_not_scaled, db_scaled_1024, 1024);
 
     /* db.collection.stats() tests */
-    coll_not_scaled = db.foo.stats();
-    coll_scaled_512 = db.foo.stats(512);
-    coll_scaled_1024 = db.foo.stats(1024);
+    coll_not_scaled = assert.commandWorked(db.foo.stats());
+    coll_scaled_512 = assert.commandWorked(db.foo.stats(512));
+    coll_scaled_1024 = assert.commandWorked(db.foo.stats(1024));
 
     for (var shard in coll_not_scaled.shards) {
         collStatComp(coll_not_scaled.shards[shard], coll_scaled_512.shards[shard], 512, false);
