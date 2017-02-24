@@ -68,7 +68,7 @@ def sorted_by_str(iterable):
     across invocations of SCons.  Since dependency order changes force rebuilds,
     we use this sort to create stable dependency orders.
     """
-    return sorted(iterable, cmp=lambda lhs, rhs: cmp(str(lhs), str(rhs)))
+    return sorted(iterable, key=str)
 
 class DependencyCycleError(SCons.Errors.UserError):
     """Exception representing a cycle discovered in library dependencies."""
