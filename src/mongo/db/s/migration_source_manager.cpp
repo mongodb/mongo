@@ -235,16 +235,18 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* txn) {
         ScopedTransaction scopedXact(txn, MODE_IX);
         AutoGetCollection autoColl(txn, getNss(), MODE_IX, MODE_X);
 
+        // Check that the collection has not been dropped or recreated since the migration began.
         auto css = CollectionShardingState::get(txn, getNss().ns());
         auto metadata = css->getMetadata();
         if (!metadata ||
-            !metadata->getCollVersion().equals(_collectionMetadata->getCollVersion())) {
+            (metadata->getCollVersion().epoch() != _collectionMetadata->getCollVersion().epoch())) {
             return {ErrorCodes::IncompatibleShardingMetadata,
                     str::stream()
-                        << "Sharding metadata changed while holding distributed lock. Expected: "
-                        << _collectionMetadata->getCollVersion().toString()
+                        << "The collection was dropped or recreated since the migration began. "
+                        << "Expected collection epoch: "
+                        << _collectionMetadata->getCollVersion().epoch().toString()
                         << ", but found: "
-                        << (metadata ? metadata->getCollVersion().toString()
+                        << (metadata ? metadata->getCollVersion().epoch().toString()
                                      : "unsharded collection.")};
         }
 
