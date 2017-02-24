@@ -118,6 +118,7 @@
         assert.commandWorked(res);
     }
     rst.waitForState(nodes[0], ReplSetTest.State.SECONDARY);
+    reconnect(nodes[0]);
 
     // At this point the former primary will attempt to go into rollback, but the
     // 'rollbackHangBeforeStart' will prevent it from doing so.
