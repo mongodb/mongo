@@ -185,7 +185,7 @@ Status MigrationManager::executeManualMigration(
 
     const auto& scopedCM = scopedCMStatus.getValue();
 
-    auto chunk = scopedCM.cm()->findIntersectingChunkWithSimpleCollation(txn, migrateInfo.minKey);
+    auto chunk = scopedCM.cm()->findIntersectingChunkWithSimpleCollation(migrateInfo.minKey);
     invariant(chunk);
 
     Status commandStatus = _processRemoteCommandResponse(
@@ -330,7 +330,7 @@ void MigrationManager::finishRecovery(OperationContext* txn,
             migrateInfos.pop_front();
 
             auto chunk =
-                scopedCM.cm()->findIntersectingChunkWithSimpleCollation(txn, migrationInfo.minKey);
+                scopedCM.cm()->findIntersectingChunkWithSimpleCollation(migrationInfo.minKey);
             invariant(chunk);
 
             if (chunk->getShardId() != migrationInfo.from) {

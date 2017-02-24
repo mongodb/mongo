@@ -189,7 +189,7 @@ void splitIfNeeded(OperationContext* txn, const NamespaceString& nss, const Targ
     for (auto it = stats.chunkSizeDelta.cbegin(); it != stats.chunkSizeDelta.cend(); ++it) {
         std::shared_ptr<Chunk> chunk;
         try {
-            chunk = scopedCM.cm()->findIntersectingChunkWithSimpleCollation(txn, it->first);
+            chunk = scopedCM.cm()->findIntersectingChunkWithSimpleCollation(it->first);
         } catch (const AssertionException& ex) {
             warning() << "could not find chunk while checking for auto-split: "
                       << causedBy(redact(ex));
@@ -484,7 +484,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* txn,
         // up-to-date view of the chunk we are about to move
         auto scopedCM = uassertStatusOK(ScopedChunkManager::refreshAndGet(txn, nss));
         auto suggestedChunk = scopedCM.cm()->findIntersectingChunkWithSimpleCollation(
-            txn, suggestedMigrateChunk->getMin());
+            suggestedMigrateChunk->getMin());
 
         ChunkType chunkToMove;
         chunkToMove.setNS(nss.ns());

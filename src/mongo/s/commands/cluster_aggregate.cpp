@@ -122,21 +122,24 @@ Status ClusterAggregate::runAggregate(OperationContext* txn,
 
     pipeline.getValue()->optimizePipeline();
 
-    // If the first $match stage is an exact match on the shard key (with a simple collation or
-    // no string matching), we only have to send it to one shard, so send the command to that
-    // shard.
-    BSONObj firstMatchQuery = pipeline.getValue()->getInitialQuery();
-    BSONObj shardKeyMatches;
-    shardKeyMatches = uassertStatusOK(
-        chunkMgr->getShardKeyPattern().extractShardKeyFromQuery(txn, firstMatchQuery));
-    bool singleShard = false;
-    if (!shardKeyMatches.isEmpty()) {
-        auto chunk = chunkMgr->findIntersectingChunk(
-            txn, shardKeyMatches, request.getValue().getCollation());
-        if (chunk.isOK()) {
-            singleShard = true;
+    // If the first $match stage is an exact match on the shard key (with a simple collation or no
+    // string matching), we only have to send it to one shard, so send the command to that shard.
+    const bool singleShard = [&]() {
+        BSONObj firstMatchQuery = pipeline.getValue()->getInitialQuery();
+        BSONObj shardKeyMatches = uassertStatusOK(
+            chunkMgr->getShardKeyPattern().extractShardKeyFromQuery(txn, firstMatchQuery));
+
+        if (shardKeyMatches.isEmpty()) {
+            return false;
         }
-    }
+
+        try {
+            chunkMgr->findIntersectingChunk(shardKeyMatches, request.getValue().getCollation());
+            return true;
+        } catch (const DBException&) {
+            return false;
+        }
+    }();
 
     // Don't need to split pipeline if the first $match is an exact match on shard key, unless
     // there is a stage that needs to be run on the primary shard.

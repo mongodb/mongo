@@ -335,7 +335,7 @@ Status ChunkManagerTargeter::targetInsert(OperationContext* txn,
 
     // Target the shard key or database primary
     if (!shardKey.isEmpty()) {
-        return targetShardKey(txn, shardKey, CollationSpec::kSimpleSpec, doc.objsize(), endpoint);
+        *endpoint = targetShardKey(shardKey, CollationSpec::kSimpleSpec, doc.objsize()).release();
     } else {
         if (!_primary) {
             return Status(ErrorCodes::NamespaceNotFound,
@@ -344,8 +344,9 @@ Status ChunkManagerTargeter::targetInsert(OperationContext* txn,
         }
 
         *endpoint = new ShardEndpoint(_primary->getId(), ChunkVersion::UNSHARDED());
-        return Status::OK();
     }
+
+    return Status::OK();
 }
 
 Status ChunkManagerTargeter::targetUpdate(OperationContext* txn,
@@ -416,13 +417,13 @@ Status ChunkManagerTargeter::targetUpdate(OperationContext* txn,
 
     // Target the shard key, query, or replacement doc
     if (!shardKey.isEmpty()) {
-        // We can't rely on our query targeting to be exact
-        ShardEndpoint* endpoint = NULL;
-        Status result = targetShardKey(
-            txn, shardKey, collation, (query.objsize() + updateExpr.objsize()), &endpoint);
-        if (result.isOK()) {
-            endpoints->push_back(endpoint);
-            return result;
+        try {
+            endpoints->push_back(
+                targetShardKey(shardKey, collation, (query.objsize() + updateExpr.objsize()))
+                    .release());
+            return Status::OK();
+        } catch (const DBException&) {
+            // This update is potentially not constrained to a single shard
         }
     }
 
@@ -499,12 +500,11 @@ Status ChunkManagerTargeter::targetDelete(OperationContext* txn,
 
     // Target the shard key or delete query
     if (!shardKey.isEmpty()) {
-        // We can't rely on our query targeting to be exact
-        ShardEndpoint* endpoint = NULL;
-        Status result = targetShardKey(txn, shardKey, collation, 0, &endpoint);
-        if (result.isOK()) {
-            endpoints->push_back(endpoint);
-            return result;
+        try {
+            endpoints->push_back(targetShardKey(shardKey, collation, 0).release());
+            return Status::OK();
+        } catch (const DBException&) {
+            // This delete is potentially not constrained to a single shard
         }
     }
 
@@ -578,28 +578,19 @@ Status ChunkManagerTargeter::targetQuery(OperationContext* txn,
     return Status::OK();
 }
 
-Status ChunkManagerTargeter::targetShardKey(OperationContext* txn,
-                                            const BSONObj& shardKey,
-                                            const BSONObj& collation,
-                                            long long estDataSize,
-                                            ShardEndpoint** endpoint) const {
-    invariant(NULL != _manager);
-
-    auto chunk = _manager->findIntersectingChunk(txn, shardKey, collation);
-    if (!chunk.isOK()) {
-        return chunk.getStatus();
-    }
+std::unique_ptr<ShardEndpoint> ChunkManagerTargeter::targetShardKey(const BSONObj& shardKey,
+                                                                    const BSONObj& collation,
+                                                                    long long estDataSize) const {
+    auto chunk = _manager->findIntersectingChunk(shardKey, collation);
 
     // Track autosplit stats for sharded collections
     // Note: this is only best effort accounting and is not accurate.
     if (estDataSize > 0) {
-        _stats->chunkSizeDelta[chunk.getValue()->getMin()] += estDataSize;
+        _stats->chunkSizeDelta[chunk->getMin()] += estDataSize;
     }
 
-    *endpoint = new ShardEndpoint(chunk.getValue()->getShardId(),
-                                  _manager->getVersion(chunk.getValue()->getShardId()));
-
-    return Status::OK();
+    return stdx::make_unique<ShardEndpoint>(chunk->getShardId(),
+                                            _manager->getVersion(chunk->getShardId()));
 }
 
 Status ChunkManagerTargeter::targetCollection(vector<ShardEndpoint*>* endpoints) const {

@@ -203,7 +203,7 @@ public:
                 return false;
             }
 
-            chunk = cm->findIntersectingChunkWithSimpleCollation(txn, shardKey);
+            chunk = cm->findIntersectingChunkWithSimpleCollation(shardKey);
         } else if (!bounds.isEmpty()) {
             // bounds
             if (!cm->getShardKeyPattern().isShardKey(bounds[0].Obj()) ||
@@ -218,7 +218,7 @@ public:
             BSONObj minKey = cm->getShardKeyPattern().normalizeShardKey(bounds[0].Obj());
             BSONObj maxKey = cm->getShardKeyPattern().normalizeShardKey(bounds[1].Obj());
 
-            chunk = cm->findIntersectingChunkWithSimpleCollation(txn, minKey);
+            chunk = cm->findIntersectingChunkWithSimpleCollation(minKey);
 
             if (chunk->getMin().woCompare(minKey) != 0 || chunk->getMax().woCompare(maxKey) != 0) {
                 errmsg = str::stream() << "no chunk found with the shard key bounds "
@@ -239,7 +239,7 @@ public:
             // Check shard key size when manually provided
             uassertStatusOK(ShardKeyPattern::checkShardKeySize(middle));
 
-            chunk = cm->findIntersectingChunkWithSimpleCollation(txn, middle);
+            chunk = cm->findIntersectingChunkWithSimpleCollation(middle);
 
             if (chunk->getMin().woCompare(middle) == 0 || chunk->getMax().woCompare(middle) == 0) {
                 errmsg = str::stream() << "new split key " << middle

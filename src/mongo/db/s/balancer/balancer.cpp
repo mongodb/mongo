@@ -615,7 +615,7 @@ void Balancer::_splitOrMarkJumbo(OperationContext* txn,
     auto scopedCM = uassertStatusOK(ScopedChunkManager::refreshAndGet(txn, nss));
     const auto cm = scopedCM.cm().get();
 
-    auto chunk = cm->findIntersectingChunkWithSimpleCollation(txn, minKey);
+    auto chunk = cm->findIntersectingChunkWithSimpleCollation(minKey);
 
     try {
         const auto splitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(

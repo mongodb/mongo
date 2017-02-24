@@ -651,7 +651,7 @@ public:
             // 3. Subdivide the big chunks by splitting at each of the points in "allSplits"
             //    that we haven't already split by.
             auto currentChunk =
-                chunkManager->findIntersectingChunkWithSimpleCollation(txn, allSplits[0]);
+                chunkManager->findIntersectingChunkWithSimpleCollation(allSplits[0]);
 
             std::vector<BSONObj> subSplits;
             for (unsigned i = 0; i <= allSplits.size(); i++) {
@@ -675,8 +675,8 @@ public:
                     }
 
                     if (i < allSplits.size()) {
-                        currentChunk = chunkManager->findIntersectingChunkWithSimpleCollation(
-                            txn, allSplits[i]);
+                        currentChunk =
+                            chunkManager->findIntersectingChunkWithSimpleCollation(allSplits[i]);
                     }
                 } else {
                     BSONObj splitPoint(allSplits[i]);

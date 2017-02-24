@@ -154,11 +154,9 @@ private:
      *
      * If 'collation' is empty, we use the collection default collation for targeting.
      */
-    Status targetShardKey(OperationContext* txn,
-                          const BSONObj& doc,
-                          const BSONObj& collation,
-                          long long estDataSize,
-                          ShardEndpoint** endpoint) const;
+    std::unique_ptr<ShardEndpoint> targetShardKey(const BSONObj& doc,
+                                                  const BSONObj& collation,
+                                                  long long estDataSize) const;
 
     // Full namespace of the collection for this targeter
     const NamespaceString _nss;
