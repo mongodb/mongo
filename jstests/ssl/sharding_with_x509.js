@@ -32,10 +32,7 @@
 
     var coll = st.s.getCollection("test.foo");
 
-    st.shardColl(coll, {_id: 1}, false);
-
-    // Create an index so we can find by num later
-    coll.ensureIndex({insert: 1});
+    st.shardColl(coll, {insert: 1}, false);
 
     print("starting insertion phase");
 
@@ -64,7 +61,7 @@
     var toDelete = toInsert / 2;
     bulk = coll.initializeUnorderedBulkOp();
     for (var i = 0; i < toDelete; i++) {
-        bulk.find({insert: i}).remove();
+        bulk.find({insert: i}).removeOne();
     }
     assert.writeOK(bulk.execute());
 
