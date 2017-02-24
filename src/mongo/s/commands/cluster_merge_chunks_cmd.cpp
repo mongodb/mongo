@@ -151,7 +151,7 @@ public:
         minKey = cm->getShardKeyPattern().normalizeShardKey(minKey);
         maxKey = cm->getShardKeyPattern().normalizeShardKey(maxKey);
 
-        shared_ptr<Chunk> firstChunk = cm->findIntersectingChunkWithSimpleCollation(txn, minKey);
+        shared_ptr<Chunk> firstChunk = cm->findIntersectingChunkWithSimpleCollation(minKey);
 
         BSONObjBuilder remoteCmdObjB;
         remoteCmdObjB.append(cmdObj[ClusterMergeChunksCommand::nsField()]);

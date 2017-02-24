@@ -621,7 +621,7 @@ public:
                 invariant(size < std::numeric_limits<int>::max());
 
                 // key reported should be the chunk's minimum
-                shared_ptr<Chunk> c = cm->findIntersectingChunkWithSimpleCollation(txn, key);
+                shared_ptr<Chunk> c = cm->findIntersectingChunkWithSimpleCollation(key);
                 if (!c) {
                     warning() << "Mongod reported " << size << " bytes inserted for key " << key
                               << " but can't find chunk";

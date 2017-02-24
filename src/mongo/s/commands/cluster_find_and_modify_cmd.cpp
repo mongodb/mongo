@@ -124,16 +124,9 @@ public:
             }
 
             BSONObj shardKey = status.getValue();
-            auto chunk = chunkMgr->findIntersectingChunk(txn, shardKey, collation);
+            auto chunk = chunkMgr->findIntersectingChunk(shardKey, collation);
 
-            if (!chunk.isOK()) {
-                uasserted(ErrorCodes::ShardKeyNotFound,
-                          "findAndModify must target a single shard, but was not able to due "
-                          "to non-simple collation");
-            }
-
-            auto shardStatus =
-                Grid::get(txn)->shardRegistry()->getShard(txn, chunk.getValue()->getShardId());
+            auto shardStatus = Grid::get(txn)->shardRegistry()->getShard(txn, chunk->getShardId());
             if (!shardStatus.isOK()) {
                 return shardStatus.getStatus();
             }
@@ -208,14 +201,7 @@ public:
         }
 
         BSONObj shardKey = status.getValue();
-        auto chunkStatus = chunkMgr->findIntersectingChunk(txn, shardKey, collation);
-        if (!chunkStatus.isOK()) {
-            uasserted(ErrorCodes::ShardKeyNotFound,
-                      "findAndModify must target a single shard, but was not able to due to "
-                      "non-simple collation");
-        }
-
-        const auto& chunk = chunkStatus.getValue();
+        auto chunk = chunkMgr->findIntersectingChunk(shardKey, collation);
 
         const bool ok = _runCommand(txn, conf, chunkMgr, chunk->getShardId(), nss, cmdObj, result);
         if (ok) {

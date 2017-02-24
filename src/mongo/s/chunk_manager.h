@@ -110,27 +110,24 @@ public:
     //
 
     /**
-     * Given a key that has been extracted from a document, returns the
-     * chunk that contains that key.
+     * Given a shard key (or a prefix) that has been extracted from a document, returns the chunk
+     * that contains that key.
      *
-     * For instance, to locate the chunk for document {a : "foo" , b : "bar"}
-     * when the shard key is {a : "hashed"}, you can call
-     *  findIntersectingChunk() on {a : hash("foo") }
+     * Example: findIntersectingChunk({a : hash('foo')}) locates the chunk for document
+     *          {a: 'foo', b: 'bar'} if the shard key is {a : 'hashed'}.
      *
      * If 'collation' is empty, we use the collection default collation for targeting.
      *
-     * Returns the error status ShardKeyNotFound if unable to target a single shard due to the
-     * collation.
+     * Throws a DBException with the ShardKeyNotFound code if unable to target a single shard due to
+     * collation or due to the key not matching the shard key pattern.
      */
-    StatusWith<std::shared_ptr<Chunk>> findIntersectingChunk(OperationContext* txn,
-                                                             const BSONObj& shardKey,
-                                                             const BSONObj& collation) const;
+    std::shared_ptr<Chunk> findIntersectingChunk(const BSONObj& shardKey,
+                                                 const BSONObj& collation) const;
 
     /**
-     * Finds the intersecting chunk, assuming the simple collation.
+     * Same as findIntersectingChunk, but assumes the simple collation.
      */
-    std::shared_ptr<Chunk> findIntersectingChunkWithSimpleCollation(OperationContext* txn,
-                                                                    const BSONObj& shardKey) const;
+    std::shared_ptr<Chunk> findIntersectingChunkWithSimpleCollation(const BSONObj& shardKey) const;
 
     /**
      * Finds the shard IDs for a given filter and collation. If collation is empty, we use the
@@ -256,8 +253,6 @@ private:
     // index is the max key of the respective range and the union of all ranges in a such
     // constructed map must cover the complete space from [MinKey, MaxKey).
     ChunkRangeMap _chunkRangeMap;
-
-    std::set<ShardId> _shardIds;
 
     // Max known version per shard
     ShardVersionMap _shardVersions;

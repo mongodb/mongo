@@ -90,8 +90,7 @@ std::shared_ptr<ChunkManager> DBConfig::getChunkManagerIfExists(OperationContext
 
     try {
         return getChunkManager(txn, ns, shouldReload, forceReload);
-    } catch (AssertionException& e) {
-        warning() << "chunk manager not found for " << ns << causedBy(e);
+    } catch (const DBException&) {
         return nullptr;
     }
 }

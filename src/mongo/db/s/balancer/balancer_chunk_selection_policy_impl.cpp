@@ -390,7 +390,7 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidate
         const auto& tagRange = tagRangeEntry.second;
 
         shared_ptr<Chunk> chunkAtZoneMin =
-            cm->findIntersectingChunkWithSimpleCollation(txn, tagRange.min);
+            cm->findIntersectingChunkWithSimpleCollation(tagRange.min);
         invariant(chunkAtZoneMin->getMax().woCompare(tagRange.min) > 0);
 
         if (chunkAtZoneMin->getMin().woCompare(tagRange.min)) {
@@ -402,7 +402,7 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidate
             continue;
 
         shared_ptr<Chunk> chunkAtZoneMax =
-            cm->findIntersectingChunkWithSimpleCollation(txn, tagRange.max);
+            cm->findIntersectingChunkWithSimpleCollation(tagRange.max);
 
         // We need to check that both the chunk's minKey does not match the zone's max and also that
         // the max is not equal, which would only happen in the case of the zone ending in MaxKey.
@@ -441,7 +441,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
         const auto& tagRange = tagRangeEntry.second;
 
         shared_ptr<Chunk> chunkAtZoneMin =
-            cm->findIntersectingChunkWithSimpleCollation(txn, tagRange.min);
+            cm->findIntersectingChunkWithSimpleCollation(tagRange.min);
 
         if (chunkAtZoneMin->getMin().woCompare(tagRange.min)) {
             return {ErrorCodes::IllegalOperation,
@@ -460,7 +460,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
             continue;
 
         shared_ptr<Chunk> chunkAtZoneMax =
-            cm->findIntersectingChunkWithSimpleCollation(txn, tagRange.max);
+            cm->findIntersectingChunkWithSimpleCollation(tagRange.max);
 
         // We need to check that both the chunk's minKey does not match the zone's max and also that
         // the max is not equal, which would only happen in the case of the zone ending in MaxKey.

@@ -43,10 +43,8 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_diff.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
@@ -193,7 +191,6 @@ void ChunkManager::loadExistingRanges(OperationContext* txn, const ChunkManager*
             // TODO: Merge into diff code above, so we validate in one place
             if (isChunkMapValid(chunkMap)) {
                 _chunkMap = std::move(chunkMap);
-                _shardIds = std::move(shardIds);
                 _shardVersions = std::move(shardVersions);
                 _chunkRangeMap = _constructRanges(_chunkMap);
 
@@ -324,66 +321,30 @@ bool ChunkManager::_load(OperationContext* txn,
     }
 }
 
-StatusWith<shared_ptr<Chunk>> ChunkManager::findIntersectingChunk(OperationContext* txn,
-                                                                  const BSONObj& shardKey,
-                                                                  const BSONObj& collation) const {
+std::shared_ptr<Chunk> ChunkManager::findIntersectingChunk(const BSONObj& shardKey,
+                                                           const BSONObj& collation) const {
     const bool hasSimpleCollation = (collation.isEmpty() && !_defaultCollator) ||
         SimpleBSONObjComparator::kInstance.evaluate(collation == CollationSpec::kSimpleSpec);
     if (!hasSimpleCollation) {
         for (BSONElement elt : shardKey) {
-            if (CollationIndexKey::isCollatableType(elt.type())) {
-                return Status(ErrorCodes::ShardKeyNotFound,
-                              "cannot target single shard due to collation");
-            }
+            uassert(ErrorCodes::ShardKeyNotFound,
+                    str::stream() << "Cannot target single shard due to collation of key "
+                                  << elt.fieldNameStringData(),
+                    !CollationIndexKey::isCollatableType(elt.type()));
         }
     }
 
-    BSONObj chunkMin;
-    shared_ptr<Chunk> chunk;
-    {
-        ChunkMap::const_iterator it = _chunkMap.upper_bound(shardKey);
-        if (it != _chunkMap.end()) {
-            chunkMin = it->first;
-            chunk = it->second;
-        }
-    }
+    const auto it = _chunkMap.upper_bound(shardKey);
+    uassert(ErrorCodes::ShardKeyNotFound,
+            str::stream() << "Cannot target single shard using key " << shardKey,
+            it != _chunkMap.end() && it->second->containsKey(shardKey));
 
-    if (!chunk) {
-        // TODO: This should be an invariant
-        msgasserted(8070,
-                    str::stream() << "couldn't find a chunk intersecting: " << shardKey
-                                  << " for ns: "
-                                  << _nss.ns()
-                                  << " at version: "
-                                  << _version.toString()
-                                  << ", number of chunks: "
-                                  << _chunkMap.size());
-    }
-
-    if (chunk->containsKey(shardKey)) {
-        return chunk;
-    }
-
-    // TODO: This should be an invariant
-    log() << redact(chunkMin.toString());
-    log() << redact((*chunk).toString());
-    log() << redact(shardKey);
-
-    // Proactively force a reload on the chunk manager in case it somehow got inconsistent
-    auto config = uassertStatusOK(Grid::get(txn)->catalogCache()->getDatabase(txn, _nss.db()));
-    config->getChunkManagerIfExists(txn, _nss.ns(), true);
-
-    msgasserted(13141, "Chunk map pointed to incorrect chunk");
+    return it->second;
 }
 
-shared_ptr<Chunk> ChunkManager::findIntersectingChunkWithSimpleCollation(
-    OperationContext* txn, const BSONObj& shardKey) const {
-    auto chunk = findIntersectingChunk(txn, shardKey, CollationSpec::kSimpleSpec);
-
-    // findIntersectingChunk() should succeed in targeting a single shard, since we have the simple
-    // collation.
-    massertStatusOK(chunk.getStatus());
-    return chunk.getValue();
+std::shared_ptr<Chunk> ChunkManager::findIntersectingChunkWithSimpleCollation(
+    const BSONObj& shardKey) const {
+    return findIntersectingChunk(shardKey, CollationSpec::kSimpleSpec);
 }
 
 void ChunkManager::getShardIdsForQuery(OperationContext* txn,
@@ -410,10 +371,12 @@ void ChunkManager::getShardIdsForQuery(OperationContext* txn,
     // Fast path for targeting equalities on the shard key.
     auto shardKeyToFind = _keyPattern.extractShardKeyFromQuery(*cq);
     if (!shardKeyToFind.isEmpty()) {
-        auto chunk = findIntersectingChunk(txn, shardKeyToFind, collation);
-        if (chunk.isOK()) {
-            shardIds->insert(chunk.getValue()->getShardId());
+        try {
+            auto chunk = findIntersectingChunk(shardKeyToFind, collation);
+            shardIds->insert(chunk->getShardId());
             return;
+        } catch (const DBException&) {
+            // The query uses multiple shards
         }
     }
 
@@ -436,7 +399,7 @@ void ChunkManager::getShardIdsForQuery(OperationContext* txn,
         getShardIdsForRange(it->first /*min*/, it->second /*max*/, shardIds);
 
         // once we know we need to visit all shards no need to keep looping
-        if (shardIds->size() == _shardIds.size()) {
+        if (shardIds->size() == _shardVersions.size()) {
             break;
         }
     }
@@ -468,14 +431,17 @@ void ChunkManager::getShardIdsForRange(const BSONObj& min,
 
         // No need to iterate through the rest of the ranges, because we already know we need to use
         // all shards.
-        if (shardIds->size() == _shardIds.size()) {
+        if (shardIds->size() == _shardVersions.size()) {
             break;
         }
     }
 }
 
 void ChunkManager::getAllShardIds(set<ShardId>* all) const {
-    all->insert(_shardIds.begin(), _shardIds.end());
+    std::transform(_shardVersions.begin(),
+                   _shardVersions.end(),
+                   std::inserter(*all, all->begin()),
+                   [](const ShardVersionMap::value_type& pair) { return pair.first; });
 }
 
 IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,

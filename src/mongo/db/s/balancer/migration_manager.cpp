@@ -259,7 +259,7 @@ Status MigrationManager::executeManualMigration(
 
     const auto& scopedCM = scopedCMStatus.getValue();
 
-    auto chunk = scopedCM.cm()->findIntersectingChunkWithSimpleCollation(txn, migrateInfo.minKey);
+    auto chunk = scopedCM.cm()->findIntersectingChunkWithSimpleCollation(migrateInfo.minKey);
     invariant(chunk);
 
     Status commandStatus = _processRemoteCommandResponse(
@@ -416,7 +416,7 @@ void MigrationManager::finishRecovery(OperationContext* txn,
             migrateInfos.pop_front();
 
             auto chunk =
-                scopedCM.cm()->findIntersectingChunkWithSimpleCollation(txn, migrationInfo.minKey);
+                scopedCM.cm()->findIntersectingChunkWithSimpleCollation(migrationInfo.minKey);
             invariant(chunk);
 
             if (chunk->getShardId() != migrationInfo.from) {
@@ -536,7 +536,7 @@ shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule(
 
     auto const chunkManager = statusWithScopedChunkManager.getValue().cm();
 
-    auto chunk = chunkManager->findIntersectingChunkWithSimpleCollation(txn, migrateInfo.minKey);
+    auto chunk = chunkManager->findIntersectingChunkWithSimpleCollation(migrateInfo.minKey);
     invariant(chunk);
 
     // If the chunk is not found exactly as requested, the caller must have stale data
