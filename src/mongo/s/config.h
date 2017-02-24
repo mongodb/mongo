@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <set>
 #include <string>
 
 #include "mongo/db/repl/optime.h"
@@ -95,8 +94,6 @@ public:
      * and throws on all other errors.
      */
     bool load(OperationContext* txn);
-
-    void getAllShardIds(std::set<ShardId>* shardIds);
 
 protected:
     typedef std::map<std::string, CollectionInfo> CollectionInfoMap;
