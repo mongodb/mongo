@@ -32,7 +32,7 @@
 
 
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
-#include "mongo/db/storage/paths.h"
+#include "mongo/db/storage/mmap_v1/paths.h"
 #include "mongo/util/bufreader.h"
 
 namespace mongo {

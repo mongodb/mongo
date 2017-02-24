@@ -50,7 +50,7 @@
 #include <io.h>
 #endif
 
-#include "mongo/db/storage/paths.h"
+#include "mongo/db/storage/mmap_v1/paths.h"
 #include "mongo/platform/posix_fadvise.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/thread.h"

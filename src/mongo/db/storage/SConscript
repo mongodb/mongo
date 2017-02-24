@@ -70,16 +70,6 @@ env.Library(
     )
 
 env.Library(
-    target='paths',
-    source=[
-        'paths.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.Library(
     target='storage_options',
     source=[
         'storage_options.cpp',
@@ -166,9 +156,6 @@ env.Library(
     source=[
         'storage_engine_lock_file_${TARGET_OS_FAMILY}.cpp',
         ],
-    LIBDEPS=[
-        'paths',
-        ]
     )
 
 env.Library(

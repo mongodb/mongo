@@ -32,6 +32,7 @@ env.Library(
                "mmap_v1_engine.cpp",
                "mmap_v1_extent_manager.cpp",
                "mmap_v1_init.cpp" if mmapv1 else "mmap_v1_noinit.cpp",
+               "paths.cpp",
                "repair_database.cpp",
              ],
     LIBDEPS = [
@@ -49,7 +50,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/storage/journal_listener',
-        '$BUILD_DIR/mongo/db/storage/paths',
         '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
         # '$BUILD_DIR/mongo/db/index/index_access_methods', # CYCLE
         # '$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
@@ -69,7 +69,6 @@ compressEnv.Library(
         'compress.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/paths',
         '$BUILD_DIR/third_party/shim_snappy',
     ],
 )
@@ -91,7 +90,6 @@ env.Library(
         'file_allocator.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/paths',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/processinfo',
     ],
@@ -103,7 +101,6 @@ env.Library(
         'logfile.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/paths',
         'mmap',
     ],
 )
