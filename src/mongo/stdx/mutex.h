@@ -33,13 +33,8 @@
 namespace mongo {
 namespace stdx {
 
-using ::std::mutex;  // NOLINT
-
-// NOTE: The timed_mutex class is currently banned in our code due to
-// a buggy implementation in GCC older than 4.9.
-//
-// using ::std::timed_mutex;  // NOLINT
-
+using ::std::mutex;            // NOLINT
+using ::std::timed_mutex;      // NOLINT
 using ::std::recursive_mutex;  // NOLINT
 
 using ::std::adopt_lock_t;   // NOLINT

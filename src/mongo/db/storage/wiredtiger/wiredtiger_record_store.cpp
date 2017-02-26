@@ -629,7 +629,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(OperationContext* ctx, Params param
 
 WiredTigerRecordStore::~WiredTigerRecordStore() {
     {
-        stdx::lock_guard<boost::timed_mutex> lk(_cappedDeleterMutex);  // NOLINT
+        stdx::lock_guard<stdx::timed_mutex> lk(_cappedDeleterMutex);
         stdx::lock_guard<stdx::mutex> lk2(_uncommittedRecordIdsMutex);
         _shuttingDown = true;
     }
@@ -700,7 +700,7 @@ const char* WiredTigerRecordStore::name() const {
 }
 
 bool WiredTigerRecordStore::inShutdown() const {
-    stdx::lock_guard<boost::timed_mutex> lk(_cappedDeleterMutex);  // NOLINT
+    stdx::lock_guard<stdx::timed_mutex> lk(_cappedDeleterMutex);
     return _shuttingDown;
 }
 
@@ -838,7 +838,7 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* opCtx,
         return 0;
 
     // ensure only one thread at a time can do deletes, otherwise they'll conflict.
-    boost::unique_lock<boost::timed_mutex> lock(_cappedDeleterMutex, boost::defer_lock);  // NOLINT
+    stdx::unique_lock<stdx::timed_mutex> lock(_cappedDeleterMutex, stdx::defer_lock);
 
     if (_cappedMaxDocs != -1) {
         lock.lock();  // Max docs has to be exact, so have to check every time.
@@ -851,9 +851,9 @@ int64_t WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* opCtx,
 
             // Don't wait forever: we're in a transaction, we could block eviction.
             Date_t before = Date_t::now();
-            bool gotLock = lock.try_lock_for(boost::chrono::milliseconds(200));  // NOLINT
-            auto delay = boost::chrono::milliseconds(                            // NOLINT
-                durationCount<Milliseconds>(Date_t::now() - before));
+            bool gotLock = lock.try_lock_for(stdx::chrono::milliseconds(200));
+            auto delay =
+                stdx::chrono::milliseconds(durationCount<Milliseconds>(Date_t::now() - before));
             _cappedSleep.fetchAndAdd(1);
             _cappedSleepMS.fetchAndAdd(delay.count());
             if (!gotLock)

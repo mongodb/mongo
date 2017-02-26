@@ -43,7 +43,7 @@ cd $SRC
 ./b2 tools/bcp
 
 test -d $DEST_DIR || mkdir $DEST_DIR
-$SRC/dist/bin/bcp --boost=$SRC/ algorithm array asio bind chrono iostreams config container date_time filesystem function integer intrusive multi_index noncopyable optional program_options random smart_ptr static_assert thread unordered utility $DEST_DIR
+$SRC/dist/bin/bcp --boost=$SRC/ algorithm array asio bind iostreams config container date_time filesystem function integer intrusive multi_index noncopyable optional program_options random smart_ptr static_assert thread unordered utility $DEST_DIR
 
 # Trim files
 cd $DEST_DIR

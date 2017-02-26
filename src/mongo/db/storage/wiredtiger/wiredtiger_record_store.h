@@ -31,7 +31,6 @@
 
 #pragma once
 
-#include <boost/thread/mutex.hpp>
 #include <set>
 #include <string>
 #include <wiredtiger.h>
@@ -256,7 +255,7 @@ public:
 
     int64_t cappedDeleteAsNeeded_inlock(OperationContext* opCtx, const RecordId& justInserted);
 
-    boost::timed_mutex& cappedDeleterMutex() {  // NOLINT
+    stdx::timed_mutex& cappedDeleterMutex() {
         return _cappedDeleterMutex;
     }
 
@@ -329,7 +328,7 @@ private:
 
     // See comment in ::cappedDeleteAsNeeded
     int _cappedDeleteCheckCount;
-    mutable boost::timed_mutex _cappedDeleterMutex;  // NOLINT
+    mutable stdx::timed_mutex _cappedDeleterMutex;
 
     const bool _useOplogHack;
 
