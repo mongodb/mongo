@@ -167,9 +167,12 @@ namespace mongo {
         public:
             /** these called by the groupCommit code as it goes along */
             void commitingBegin();
-            /** the commit code calls this when data reaches the journal (on disk) */
+            /** the commit code calls this when data reaches the journal (on disk).
+             *  because all commit functions hold the durBuilder mutex during the full length of their
+             *  execution, it is guaranteed that the commit number doesn't change between the moment
+             *  that it is set by commitingBegin() and the subsequent call to this method.
+             */
             void committingNotifyCommitted() { 
-                groupCommitMutex.dassertLocked();
                 _notify.notifyAll(_commitNumber); 
             }
             /** we use the commitjob object over and over, calling reset() rather than reconstructing */

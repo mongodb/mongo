@@ -53,15 +53,17 @@
    mutexes:
 
      READLOCK dbMutex (big 'R')
+     LOCK durBuilder
      LOCK groupCommitMutex
        PREPLOGBUFFER()
      READLOCK mmmutex
        commitJob.reset()
+     UNLOCK groupCommitMutex
      UNLOCK dbMutex                      // now other threads can write
        WRITETOJOURNAL()
        WRITETODATAFILES()
      UNLOCK mmmutex
-     UNLOCK groupCommitMutex
+     UNLOCK durBuilder
 
    every Nth groupCommit, at the end, we REMAPPRIVATEVIEW() at the end of the work. because of
    that we are in W lock for that groupCommit, which is nonideal of course.
@@ -576,8 +578,13 @@ namespace mongo {
         // reallocate, and more importantly regrow it, on every single commit.
         static AlignedBuilder __theBuilder(4 * 1024 * 1024);
 
+        // this is a mutex to make sure that only one thread uses __theBuilder
+        // at the time. lock order: lock dbMutex before this.
+        static SimpleMutex __theBuilderMutex("durBuilder");
+
         static bool _groupCommitWithLimitedLocks() {
             unspoolWriteIntents(); // in case we were doing some writing ourself (likely impossible with limitedlocks version)
+
             AlignedBuilder &ab = __theBuilder;
 
             verify( ! Lock::isLocked() );
@@ -587,8 +594,8 @@ namespace mongo {
             // also needs to stop greed. our time to work before clearing lk1 is not too bad, so 
             // not super critical, but likely 'correct'.  todo.
             scoped_ptr<Lock::GlobalRead> lk1( new Lock::GlobalRead() );
-
-            SimpleMutex::scoped_lock lk2(commitJob.groupCommitMutex);
+            SimpleMutex::scoped_lock lk2(__theBuilderMutex);
+            scoped_ptr<SimpleMutex::scoped_lock> lk3( new SimpleMutex::scoped_lock( commitJob.groupCommitMutex ));
 
             commitJob.commitingBegin(); // increments the commit epoch for getlasterror j:true
 
@@ -605,13 +612,14 @@ namespace mongo {
             // that route...)
             PREPLOGBUFFER(h,ab); 
 
-            LockMongoFilesShared lk3;
+            LockMongoFilesShared lk4;
 
             unsigned abLen = ab.len();
             commitJob.committingReset(); // must be reset before allowing anyone to write
             DEV verify( !commitJob.hasWritten() );
 
-            // release the readlock -- allowing others to now write while we are writing to the journal (etc.)
+            // release locks -- allowing others to now write while we are writing to the journal (etc.)
+            lk3.reset();
             lk1.reset();
 
             // ****** now other threads can do writes ******
@@ -670,12 +678,13 @@ namespace mongo {
             unspoolWriteIntents(); // in case we were doing some writing ourself
 
             {
+                SimpleMutex::scoped_lock lk1(__theBuilderMutex);
                 AlignedBuilder &ab = __theBuilder;
 
                 // we need to make sure two group commits aren't running at the same time
                 // (and we are only read locked in the dbMutex, so it could happen -- while 
                 // there is only one dur thread, "early commits" can be done by other threads)
-                SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
+                SimpleMutex::scoped_lock lk2(commitJob.groupCommitMutex);
 
                 commitJob.commitingBegin();
 
