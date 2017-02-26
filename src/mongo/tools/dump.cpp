@@ -90,9 +90,9 @@ public:
     };
 
     void doCollection( const string coll , Query q, FILE* out , ProgressMeter *m,
-                       bool usingMongos ) {
+                       bool usingMongos , bool isOplog ) {
         int queryOptions = QueryOption_SlaveOk | QueryOption_NoCursorTimeout;
-        if (startsWith(coll.c_str(), "local.oplog.") && q.obj.hasField("ts"))
+        if (isOplog)
             queryOptions |= QueryOption_OplogReplay;
         else if (mongoDumpGlobalParams.snapShotQuery) {
             q.snapshot();
@@ -117,7 +117,7 @@ public:
     }
 
     void writeCollectionFile( const string coll , Query q, boost::filesystem::path outputFile,
-                              bool usingMongos ) {
+                              bool usingMongos, bool isOplog ) {
         toolInfoLog() << "\t" << coll << " to " << outputFile.string() << std::endl;
 
         FilePtr f (fopen(outputFile.string().c_str(), "wb"));
@@ -127,7 +127,7 @@ public:
         m.setName("Collection File Writing Progress");
         m.setUnits("documents");
 
-        doCollection(coll, q, f, &m, usingMongos);
+        doCollection(coll, q, f, &m, usingMongos, isOplog);
 
         toolInfoLog() << "\t\t " << m.done() << " documents" << std::endl;
     }
@@ -166,8 +166,8 @@ public:
 
 
 
-    void writeCollectionStdout( const string coll, const BSONObj& dumpQuery, bool usingMongos ) {
-        doCollection(coll, dumpQuery, stdout, NULL, usingMongos);
+    void writeCollectionStdout( const string coll, const BSONObj& dumpQuery, bool usingMongos, bool isOplog ) {
+        doCollection(coll, dumpQuery, stdout, NULL, usingMongos, isOplog);
     }
 
     void go(const string& db,
@@ -229,7 +229,7 @@ public:
               // Create system.indexes.bson for compatibility with pre 2.2 mongorestore
               const string filename = name.substr( db.size() + 1 );
               writeCollectionFile( name.c_str(), query, outdir / ( filename + ".bson" ),
-                                   usingMongos );
+                                   usingMongos, false );
               // Don't dump indexes as *.metadata.json
               continue;
             }
@@ -245,7 +245,7 @@ public:
         for (vector<string>::iterator it = collections.begin(); it != collections.end(); ++it) {
             string name = *it;
             const string filename = outFilename != "" ? outFilename : name.substr( db.size() + 1 );
-            writeCollectionFile( name , query, outdir / ( filename + ".bson" ), usingMongos );
+            writeCollectionFile( name , query, outdir / ( filename + ".bson" ), usingMongos, false );
             writeMetadataFile( name, outdir / (filename + ".metadata.json"), collectionOptions, indexes);
         }
 
@@ -491,7 +491,7 @@ public:
         if (mongoDumpGlobalParams.outputDirectory == "-") {
             if (toolGlobalParams.db != "" && toolGlobalParams.coll != "") {
                 writeCollectionStdout(toolGlobalParams.db + "." + toolGlobalParams.coll, dumpQuery,
-                                      usingMongos);
+                                      usingMongos, false);
                 return 0;
             }
             else {
@@ -558,12 +558,25 @@ public:
         }
 
         if (!opLogName.empty()) {
+            BSONObjBuilder queryBuilder;
+
             BSONObjBuilder b;
             b.appendTimestamp("$gt", opLogStart);
 
-            dumpQuery = BSON("ts" << b.obj());
+            queryBuilder.append("ts", b.obj());
 
-            writeCollectionFile( opLogName , dumpQuery, root / "oplog.bson", usingMongos );
+            if (toolGlobalParams.db != "") {
+                if (toolGlobalParams.coll != "") {
+                    string nsValue = toolGlobalParams.db + "." + toolGlobalParams.coll;
+                    queryBuilder.append("ns", nsValue);
+                } else {
+                    string nsRegex =  "^" + toolGlobalParams.db + "\\.";
+                    queryBuilder.append("ns", BSONRegEx(nsRegex));
+                }
+            }
+
+            dumpQuery = queryBuilder.obj();
+            writeCollectionFile( opLogName , dumpQuery, root / "oplog.bson", usingMongos, true );
         }
 
         return 0;

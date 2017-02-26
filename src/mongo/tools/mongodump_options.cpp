@@ -117,8 +117,8 @@ namespace mongo {
         mongoDumpGlobalParams.query = getParam("query");
         mongoDumpGlobalParams.useOplog = hasParam("oplog");
         if (mongoDumpGlobalParams.useOplog) {
-            if (hasParam("query") || hasParam("db") || hasParam("collection")) {
-                return Status(ErrorCodes::BadValue, "oplog mode is only supported on full dumps");
+            if (hasParam("query")) {
+                return Status(ErrorCodes::BadValue, "oplog mode is not supported when a query is provided");
             }
         }
         mongoDumpGlobalParams.outputDirectory = getParam("out");
