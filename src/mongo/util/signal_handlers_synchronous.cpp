@@ -48,7 +48,6 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/debugger.h"
 #include "mongo/util/exception_filter_win32.h"
@@ -156,12 +155,12 @@ public:
 
 private:
     static stdx::mutex _streamMutex;
-    static MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL int terminateDepth;
+    static thread_local int terminateDepth;
     stdx::unique_lock<stdx::mutex> _lk;
 };
+
 stdx::mutex MallocFreeOStreamGuard::_streamMutex;
-MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL
-int MallocFreeOStreamGuard::terminateDepth = 0;
+thread_local int MallocFreeOStreamGuard::terminateDepth = 0;
 
 // must hold MallocFreeOStreamGuard to call
 void writeMallocFreeStreamToLog() {

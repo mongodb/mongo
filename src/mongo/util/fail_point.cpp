@@ -32,8 +32,8 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/platform/random.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -43,8 +43,7 @@ namespace mongo {
 namespace {
 
 /**
- * Type representing the per-thread PRNG used by fail-points.  Required because TSP_* macros,
- * below, only let you create one thread-specific object per type.
+ * Type representing the per-thread PRNG used by fail-points.
  */
 class FailPointPRNG {
 public:
@@ -58,26 +57,23 @@ public:
         return _prng.nextInt32() & ~(1 << 31);
     }
 
+    static FailPointPRNG* current() {
+        if (!_failPointPrng)
+            _failPointPrng = stdx::make_unique<FailPointPRNG>();
+        return _failPointPrng.get();
+    }
+
 private:
     PseudoRandom _prng;
+    static thread_local std::unique_ptr<FailPointPRNG> _failPointPrng;
 };
 
-}  // namespace
-
-
-TSP_DECLARE(FailPointPRNG, failPointPrng);
-TSP_DEFINE(FailPointPRNG, failPointPrng);
-
-namespace {
-
-int32_t prngNextPositiveInt32() {
-    return failPointPrng.getMake()->nextPositiveInt32();
-}
+thread_local std::unique_ptr<FailPointPRNG> FailPointPRNG::_failPointPrng;
 
 }  // namespace
 
 void FailPoint::setThreadPRNGSeed(int32_t seed) {
-    failPointPrng.getMake()->resetSeed(seed);
+    FailPointPRNG::current()->resetSeed(seed);
 }
 
 FailPoint::FailPoint() : _fpInfo(0), _mode(off), _timesOrPeriod(0) {}
@@ -158,7 +154,7 @@ FailPoint::RetCode FailPoint::slowShouldFailOpenBlock() {
 
         case random: {
             const AtomicInt32::WordType maxActivationValue = _timesOrPeriod.load();
-            if (prngNextPositiveInt32() < maxActivationValue) {
+            if (FailPointPRNG::current()->nextPositiveInt32() < maxActivationValue) {
                 return slowOn;
             }
             return slowOff;

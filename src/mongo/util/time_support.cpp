@@ -29,7 +29,6 @@
 
 #include "mongo/util/time_support.h"
 
-#include <boost/thread/tss.hpp>
 #include <cstdint>
 #include <cstdio>
 #include <iostream>
@@ -82,7 +81,7 @@ bool Date_t::isFormattable() const {
 
 // jsTime_virtual_skew is just for testing. a test command manipulates it.
 long long jsTime_virtual_skew = 0;
-boost::thread_specific_ptr<long long> jsTime_virtual_thread_skew;
+thread_local long long jsTime_virtual_thread_skew = 0;
 
 using std::string;
 
@@ -770,9 +769,6 @@ int Backoff::getNextSleepMillis(int lastSleepMillis,
     return lastSleepMillis;
 }
 
-extern long long jsTime_virtual_skew;
-extern boost::thread_specific_ptr<long long> jsTime_virtual_thread_skew;
-
 // DO NOT TOUCH except for testing
 void jsTimeVirtualSkew(long long skew) {
     jsTime_virtual_skew = skew;
@@ -782,13 +778,11 @@ long long getJSTimeVirtualSkew() {
 }
 
 void jsTimeVirtualThreadSkew(long long skew) {
-    jsTime_virtual_thread_skew.reset(new long long(skew));
+    jsTime_virtual_thread_skew = skew;
 }
+
 long long getJSTimeVirtualThreadSkew() {
-    if (jsTime_virtual_thread_skew.get()) {
-        return *(jsTime_virtual_thread_skew.get());
-    } else
-        return 0;
+    return jsTime_virtual_thread_skew;
 }
 
 /** Date_t is milliseconds since epoch */

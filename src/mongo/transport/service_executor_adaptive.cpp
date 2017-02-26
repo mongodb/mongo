@@ -36,7 +36,6 @@
 
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
@@ -71,9 +70,9 @@ MONGO_EXPORT_SERVER_PARAMETER(adaptiveServiceExecutorMaxQueueLatencyMicros, int,
 // doing actual work.
 MONGO_EXPORT_SERVER_PARAMETER(adaptiveServiceExecutorIdlePctThreshold, int, 60);
 
-MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL TickSource::Tick ticksSpentExecuting = 0;
-MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL TickSource::Tick ticksSpentScheduled = 0;
-MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL int tasksExecuted = 0;
+thread_local TickSource::Tick ticksSpentExecuting = 0;
+thread_local TickSource::Tick ticksSpentScheduled = 0;
+thread_local int tasksExecuted = 0;
 
 constexpr auto kTotalScheduled = "totalScheduled"_sd;
 constexpr auto kTotalExecuted = "totalExecuted"_sd;

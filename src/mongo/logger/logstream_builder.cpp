@@ -37,7 +37,6 @@
 #include "mongo/logger/tee.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"  // TODO: remove apple dep for this in threadlocal.h
-#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -54,20 +53,17 @@ MONGO_INITIALIZER(LogstreamBuilder)(InitializerContext*) {
     return Status::OK();
 }
 
-}  // namespace
+thread_local std::unique_ptr<std::ostringstream> threadOstreamCache;
 
-TSP_DECLARE(std::unique_ptr<std::ostringstream>, threadOstreamCache);
-TSP_DEFINE(std::unique_ptr<std::ostringstream>, threadOstreamCache);
-
-namespace {
 // During unittests, where we don't use quickExit(), static finalization may destroy the
 // cache before its last use, so mark it as not initialized in that case.
-// This must be after the TSP_DEFINE so that it is destroyed first.
+// This must be after the definition of threadOstreamCache so that it is destroyed first.
 struct ThreadOstreamCacheFinalizer {
     ~ThreadOstreamCacheFinalizer() {
         isThreadOstreamCacheInitialized = false;
     }
 } threadOstreamCacheFinalizer;
+
 }  // namespace
 
 namespace logger {
@@ -112,9 +108,8 @@ LogstreamBuilder::~LogstreamBuilder() {
             _tee->write(_os->str());
         }
         _os->str("");
-        if (_shouldCache && isThreadOstreamCacheInitialized &&
-            !threadOstreamCache.getMake()->get()) {
-            *threadOstreamCache.get() = std::move(_os);
+        if (_shouldCache && isThreadOstreamCacheInitialized && !threadOstreamCache) {
+            threadOstreamCache = std::move(_os);
         }
     }
 }
@@ -127,9 +122,8 @@ void LogstreamBuilder::operator<<(Tee* tee) {
 
 void LogstreamBuilder::makeStream() {
     if (!_os) {
-        if (_shouldCache && isThreadOstreamCacheInitialized &&
-            threadOstreamCache.getMake()->get()) {
-            _os = std::move(*threadOstreamCache.get());
+        if (_shouldCache && isThreadOstreamCacheInitialized && threadOstreamCache) {
+            _os = std::move(threadOstreamCache);
         } else {
             _os = stdx::make_unique<std::ostringstream>();
         }

@@ -34,12 +34,6 @@
 // Define if building a debug build
 @mongo_config_debug_build@
 
-// Defined if __declspec(thread) is available
-@mongo_config_have___declspec_thread@
-
-// Defined if GCC thread-local storage is available
-@mongo_config_have___thread@
-
 // Defined if execinfo.h and backtrace are available
 @mongo_config_have_execinfo_backtrace@
 
@@ -63,9 +57,6 @@
 
 // Defined if strnlen is available
 @mongo_config_have_strnlen@
-
-// Defined if thread_local storage class is available
-@mongo_config_have_thread_local@
 
 // A number, if we have some extended alignment ability
 @mongo_config_max_extended_alignment@

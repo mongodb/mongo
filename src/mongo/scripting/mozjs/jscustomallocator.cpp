@@ -34,7 +34,6 @@
 
 #include "mongo/config.h"
 #include "mongo/scripting/mozjs/implscope.h"
-#include "mongo/util/concurrency/threadlocal.h"
 
 #ifdef __linux__
 #include <malloc.h>
@@ -72,8 +71,8 @@ namespace {
  * maximum number of bytes we will consider handing out. They are set by
  * MozJSImplScope on start up.
  */
-MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL size_t total_bytes;
-MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL size_t max_bytes;
+thread_local size_t total_bytes = 0;
+thread_local size_t max_bytes = 0;
 
 /**
  * When we don't have malloc_usable_size, we manage by adjusting our pointer by

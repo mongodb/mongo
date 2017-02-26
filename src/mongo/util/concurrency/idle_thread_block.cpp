@@ -29,12 +29,11 @@
 
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/concurrency/threadlocal.h"
 
 namespace mongo {
 namespace for_debuggers {
 // This needs external linkage to ensure that debuggers can use it.
-MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL const char* idleThreadLocation = nullptr;
+thread_local const char* idleThreadLocation = nullptr;
 }
 using for_debuggers::idleThreadLocation;
 

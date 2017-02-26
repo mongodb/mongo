@@ -43,7 +43,6 @@
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils_extended.h"
 #include "mongo/shell/shell_utils_launcher.h"
-#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
@@ -113,7 +112,7 @@ BSONObj JSGetMemInfo(const BSONObj& args, void* data) {
 }
 
 #if !defined(_WIN32)
-ThreadLocalValue<unsigned int> _randomSeed;
+thread_local unsigned int _randomSeed = 0;
 #endif
 
 BSONObj JSSrand(const BSONObj& a, void* data) {
@@ -127,7 +126,7 @@ BSONObj JSSrand(const BSONObj& a, void* data) {
         seed = static_cast<unsigned int>(rand->nextInt64());
     }
 #if !defined(_WIN32)
-    _randomSeed.set(seed);
+    _randomSeed = seed;
 #else
     srand(seed);
 #endif
@@ -138,7 +137,7 @@ BSONObj JSRand(const BSONObj& a, void* data) {
     uassert(12519, "rand accepts no arguments", a.nFields() == 0);
     unsigned r;
 #if !defined(_WIN32)
-    r = rand_r(&_randomSeed.getRef());
+    r = rand_r(&_randomSeed);
 #else
     r = rand();
 #endif

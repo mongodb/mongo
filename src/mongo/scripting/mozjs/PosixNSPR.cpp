@@ -27,7 +27,6 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/time_support.h"
 
 class nspr::Thread {
@@ -48,7 +47,7 @@ public:
 };
 
 namespace {
-MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL nspr::Thread* kCurrentThread;
+thread_local nspr::Thread* kCurrentThread = nullptr;
 }  // namespace
 
 void* nspr::Thread::ThreadRoutine(void* arg) {
@@ -136,10 +135,11 @@ PRStatus PR_SetCurrentThreadName(const char* name) {
     return PR_SUCCESS;
 }
 
-static const size_t MaxTLSKeyCount = 32;
-static size_t gTLSKeyCount;
 namespace {
-MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL std::array<void*, MaxTLSKeyCount> gTLSArray;
+
+const size_t MaxTLSKeyCount = 32;
+size_t gTLSKeyCount;
+thread_local std::array<void*, MaxTLSKeyCount> gTLSArray;
 
 }  // namespace
 

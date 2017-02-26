@@ -31,8 +31,6 @@
 
 #include "mongo/util/concurrency/thread_name.h"
 
-#include <boost/thread/tss.hpp>
-
 #if defined(__APPLE__) || defined(__linux__)
 #include <pthread.h>
 #endif
@@ -52,7 +50,6 @@
 #include "mongo/base/init.h"
 #include "mongo/config.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -110,13 +107,13 @@ MONGO_INITIALIZER(ThreadNameInitializer)(InitializerContext*) {
 // TODO consider making threadName std::string and removing the size limit once we get real
 // thread_local.
 constexpr size_t kMaxThreadNameSize = 63;
-MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL char threadNameStorage[kMaxThreadNameSize + 1];
+thread_local char threadNameStorage[kMaxThreadNameSize + 1];
 
 }  // namespace
 
 namespace for_debuggers {
 // This needs external linkage to ensure that debuggers can use it.
-MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL StringData threadName;
+thread_local StringData threadName;
 }
 using for_debuggers::threadName;
 

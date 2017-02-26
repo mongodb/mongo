@@ -33,8 +33,6 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/thread/recursive_mutex.hpp>
-#include <boost/thread/thread.hpp>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -48,7 +46,6 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -189,7 +186,20 @@ const STACK_OF(X509_EXTENSION) * X509_get0_extensions(const X509* peerCert) {
 class SSLThreadInfo {
 public:
     static unsigned long getID() {
-        enforceCleanupOnShutdown();
+        // NOTE: This logic is fully intentional. Because ERR_remove_state (called within
+        // the destructor of the kRemoveStateFromThread object) re-enters this function,
+        // we must have a two phase protection, otherwise we would access a thread local
+        // during its destruction.
+        static thread_local bool firstCall = false;
+        if (!firstCall) {
+            firstCall = true;
+
+            static const thread_local struct CallErrRemoveState {
+                ~CallErrRemoveState() {
+                    ERR_remove_state(0);
+                };
+            } kRemoveStateFromThread{};
+        }
 
 #ifdef _WIN32
         return GetCurrentThreadId();
@@ -220,15 +230,6 @@ public:
 
 private:
     SSLThreadInfo() = delete;
-
-    // When called, ensures that this thread will, on termination, call ERR_remove_state.
-    static void enforceCleanupOnShutdown() {
-        static MONGO_TRIVIALLY_CONSTRUCTIBLE_THREAD_LOCAL bool firstCall = true;
-        if (firstCall) {
-            boost::this_thread::at_thread_exit([] { ERR_remove_state(0); });
-            firstCall = false;
-        }
-    }
 
     // Note: see SERVER-8734 for why we are using a recursive mutex here.
     // Once the deadlock fix in OpenSSL is incorporated into most distros of

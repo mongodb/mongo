@@ -47,7 +47,6 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/concurrency/spin_lock.h"
-#include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/net/abstract_message_port.h"
 #include "mongo/util/net/hostandport.h"

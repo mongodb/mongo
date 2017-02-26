@@ -80,7 +80,6 @@ dbtest = env.Program(
         'namespacetests.cpp',
         'oplogstarttests.cpp',
         'pdfiletests.cpp',
-        'perftests.cpp',
         'plan_ranking.cpp',
         'query_stage_multiplan.cpp',
         'query_plan_executor.cpp',

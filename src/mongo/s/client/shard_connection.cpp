@@ -364,18 +364,17 @@ public:
 
     // -----
 
-    static thread_specific_ptr<ClientConnections> _perThread;
+    static thread_local std::unique_ptr<ClientConnections> _perThread;
 
     static ClientConnections* threadInstance() {
-        ClientConnections* cc = _perThread.get();
-        if (!cc) {
-            cc = new ClientConnections();
-            _perThread.reset(cc);
+        if (!_perThread) {
+            _perThread = stdx::make_unique<ClientConnections>();
         }
-        return cc;
+        return _perThread.get();
     }
 };
 
+thread_local std::unique_ptr<ClientConnections> ClientConnections::_perThread;
 
 void ActiveClientConnections::appendInfo(BSONObjBuilder& b) {
     BSONArrayBuilder arr(64 * 1024);  // There may be quite a few threads
@@ -393,8 +392,6 @@ void ActiveClientConnections::appendInfo(BSONObjBuilder& b) {
 
     b.appendArray("threads", arr.obj());
 }
-
-thread_specific_ptr<ClientConnections> ClientConnections::_perThread;
 
 }  // namespace
 
