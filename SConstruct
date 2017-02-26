@@ -12,10 +12,17 @@ import stat
 import sys
 import textwrap
 import uuid
-from buildscripts import utils
-from buildscripts import moduleconfig
 
 import SCons
+
+# This must be first, even before EnsureSConsVersion, if
+# we are to avoid bulk loading all tools in the DefaultEnvironment.
+DefaultEnvironment(tools=[])
+
+EnsureSConsVersion( 2, 3, 0 )
+
+from buildscripts import utils
+from buildscripts import moduleconfig
 
 from mongo_scons_utils import (
     default_buildinfo_environment_data,
@@ -24,8 +31,6 @@ from mongo_scons_utils import (
 )
 
 import libdeps
-
-EnsureSConsVersion( 2, 3, 0 )
 
 def print_build_failures():
     from SCons.Script import GetBuildFailures
@@ -584,7 +589,7 @@ def decide_platform_tools():
         return ['msvc', 'mslink', 'mslib', 'masm']
     elif is_running_os('linux', 'solaris'):
         return ['gcc', 'g++', 'gnulink', 'ar', 'gas']
-    elif is_running_os('osx'):
+    elif is_running_os('darwin'):
         return ['gcc', 'g++', 'applelink', 'ar', 'as']
     else:
         return ["default"]
@@ -750,6 +755,9 @@ env_vars.Add('SHCXXFLAGS',
     help='Sets flags for the C++ compiler when building shared libraries',
     converter=variable_shlex_converter)
 
+env_vars.Add('SHELL',
+    help='Pick the shell to use when spawning commands')
+
 env_vars.Add('SHLINKFLAGS',
     help='Sets flags for the linker when building shared libraries',
     converter=variable_shlex_converter)
@@ -906,8 +914,8 @@ envDict = dict(BUILD_ROOT=buildDir,
                UNITTEST_LIST='$BUILD_ROOT/unittests.txt',
                INTEGRATION_TEST_ALIAS='integration_tests',
                INTEGRATION_TEST_LIST='$BUILD_ROOT/integration_tests.txt',
-               CONFIGUREDIR=sconsDataDir.Dir('sconf_temp'),
-               CONFIGURELOG=sconsDataDir.File('config.log'),
+               CONFIGUREDIR='$BUILD_DIR/scons/sconf_temp',
+               CONFIGURELOG='$BUILD_ROOT/scons/config.log',
                INSTALL_DIR=installDir,
                CONFIG_HEADER_DEFINES={},
                LIBDEPS_TAG_EXPANSIONS=[],
