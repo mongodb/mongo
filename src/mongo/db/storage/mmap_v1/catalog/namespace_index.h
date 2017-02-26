@@ -51,16 +51,8 @@ class NamespaceIndex {
     MONGO_DISALLOW_COPYING(NamespaceIndex);
 
 public:
-    NamespaceIndex(OperationContext* txn, const std::string& dir, const std::string& database);
+    NamespaceIndex(const std::string& dir, const std::string& database);
     ~NamespaceIndex();
-
-    /**
-     * Must be called before destruction.
-     */
-    void close(OperationContext* txn) {
-        LockMongoFilesExclusive lock(txn);
-        _f.close(txn);
-    }
 
     /* returns true if the file represented by this file exists on disk */
     bool pathExists() const;
@@ -94,7 +86,7 @@ private:
     const std::string _dir;
     const std::string _database;
 
-    DurableMappedFile _f;
+    DurableMappedFile _f{MongoFile::Options::SEQUENTIAL};
     std::unique_ptr<NamespaceHashTable> _ht;
 };
 }

@@ -56,7 +56,6 @@
 #include "mongo/db/storage/mmap_v1/record_store_v1_simple.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/util/log.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -163,12 +162,8 @@ MMAPV1DatabaseCatalogEntry::MMAPV1DatabaseCatalogEntry(OperationContext* txn,
                                                        std::unique_ptr<ExtentManager> extentManager)
     : DatabaseCatalogEntry(name),
       _path(path.toString()),
-      _namespaceIndex(txn, _path, name.toString()),
+      _namespaceIndex(_path, name.toString()),
       _extentManager(std::move(extentManager)) {
-    ScopeGuard onErrorClose = MakeGuard([&] {
-        _namespaceIndex.close(txn);
-        _extentManager->close(txn);
-    });
     massert(34469,
             str::stream() << name << " is not a valid database name",
             NamespaceString::validDBName(name));
@@ -198,8 +193,6 @@ MMAPV1DatabaseCatalogEntry::MMAPV1DatabaseCatalogEntry(OperationContext* txn,
         warning() << "database " << path << " " << name << " could not be opened " << e.what();
         throw;
     }
-
-    onErrorClose.Dismiss();
 }
 
 MMAPV1DatabaseCatalogEntry::~MMAPV1DatabaseCatalogEntry() {

@@ -204,7 +204,7 @@ public:
         return false;
     }
     virtual void closingFileNotification() {}
-    virtual void commitAndStopDurThread(OperationContext* txn) {}
+    virtual void commitAndStopDurThread() {}
 };
 
 
@@ -226,7 +226,7 @@ public:
         return true;
     }
     virtual void closingFileNotification();
-    virtual void commitAndStopDurThread(OperationContext* txn);
+    virtual void commitAndStopDurThread();
 
     void start(ClockSource* cs, int64_t serverStartMs);
 
@@ -318,7 +318,7 @@ void debugValidateFileMapsMatch(const DurableMappedFile* mmf) {
 /**
  * Main code of the remap private view function.
  */
-void remapPrivateViewImpl(OperationContext* txn, double fraction) {
+void remapPrivateViewImpl(double fraction) {
     LOG(4) << "journal REMAPPRIVATEVIEW" << endl;
 
 // There is no way that the set of files can change while we are in this method, because
@@ -335,9 +335,9 @@ void remapPrivateViewImpl(OperationContext* txn, double fraction) {
 // See SERVER-5680 to see why this code is necessary on Windows.
 // See SERVER-8795 to see why this code is necessary on Solaris.
 #if defined(_WIN32) || defined(__sun)
-    LockMongoFilesExclusive lk(txn);
+    LockMongoFilesExclusive lk;
 #else
-    LockMongoFilesShared lk(txn);
+    LockMongoFilesShared lk;
 #endif
 
     std::set<MongoFile*>& files = MongoFile::getAllFiles();
@@ -381,7 +381,7 @@ void remapPrivateViewImpl(OperationContext* txn, double fraction) {
             }
 
             if (mmf->willNeedRemap()) {
-                mmf->remapThePrivateView(txn);
+                mmf->remapThePrivateView();
             }
 
             i++;
@@ -570,7 +570,7 @@ void DurableImpl::syncDataAndTruncateJournal(OperationContext* txn) {
     commitNow(txn);
 
     // Flush the shared view to disk.
-    MongoFile::flushAll(txn, true);
+    MongoFile::flushAll(true);
 
     // Once the shared view has been flushed, we do not need the journal files anymore.
     journalCleanup(true);
@@ -588,7 +588,7 @@ void DurableImpl::closingFileNotification() {
     }
 }
 
-void DurableImpl::commitAndStopDurThread(OperationContext* txn) {
+void DurableImpl::commitAndStopDurThread() {
     CommitNotifier::When when = commitNotify.now();
 
     // There is always just one waiting anyways
@@ -600,7 +600,7 @@ void DurableImpl::commitAndStopDurThread(OperationContext* txn) {
     applyToDataFilesNotify.waitFor(when);
 
     // Flush the shared view to disk.
-    MongoFile::flushAll(txn, true);
+    MongoFile::flushAll(true);
 
     // Once the shared view has been flushed, we do not need the journal files anymore.
     journalCleanup(true);
@@ -630,14 +630,14 @@ void DurableImpl::start(ClockSource* cs, int64_t serverStartMs) {
  * @param fraction Value between (0, 1] indicating what fraction of the memory to remap.
  *      Remapping too much or too frequently incurs copy-on-write page fault cost.
  */
-static void remapPrivateView(OperationContext* txn, double fraction) {
+static void remapPrivateView(double fraction) {
     // Remapping private views must occur after WRITETODATAFILES otherwise we wouldn't see any
     // newly written data on reads.
     invariant(!commitJob.hasWritten());
 
     try {
         Timer t;
-        remapPrivateViewImpl(txn, fraction);
+        remapPrivateViewImpl(fraction);
         stats.curr()->_remapPrivateViewMicros += t.micros();
 
         LOG(4) << "remapPrivateView end";
@@ -828,7 +828,7 @@ static void durThread(ClockSource* cs, int64_t serverStartMs) {
                     // accessing it. Technically this step could be avoided on systems, which
                     // support atomic remap.
                     autoFlushLock.upgradeFlushLockToExclusive();
-                    remapPrivateView(txnPtr.get(), remapFraction);
+                    remapPrivateView(remapFraction);
 
                     autoFlushLock.release();
 

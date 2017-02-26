@@ -57,7 +57,7 @@ public:
     RecoveryUnit* newRecoveryUnit();
     void listDatabases(std::vector<std::string>* out) const;
 
-    int flushAllFiles(OperationContext* txn, bool sync);
+    int flushAllFiles(bool sync);
     Status beginBackup(OperationContext* txn);
     void endBackup(OperationContext* txn);
 

@@ -61,7 +61,7 @@ using std::map;
 using std::pair;
 using std::string;
 
-void DurableMappedFile::remapThePrivateView(OperationContext* txn) {
+void DurableMappedFile::remapThePrivateView() {
     verify(storageGlobalParams.dur);
 
     _willNeedRemap = false;
@@ -70,7 +70,7 @@ void DurableMappedFile::remapThePrivateView(OperationContext* txn) {
     // so the remove / add isn't necessary and can be removed?
     void* old = _view_private;
     // privateViews.remove(_view_private);
-    _view_private = remapPrivateView(txn, _view_private);
+    _view_private = remapPrivateView(_view_private);
     // privateViews.add(_view_private, this);
     fassert(16112, _view_private == old);
 }
@@ -241,24 +241,22 @@ void DurableMappedFile::setPath(const std::string& f) {
     _p = RelativePath::fromFullPath(storageGlobalParams.dbpath, prefix);
 }
 
-bool DurableMappedFile::open(OperationContext* txn, const std::string& fname) {
+bool DurableMappedFile::open(const std::string& fname) {
     LOG(3) << "mmf open " << fname;
     invariant(!_view_write);
 
     setPath(fname);
-    _view_write = map(txn, fname.c_str());
+    _view_write = map(fname.c_str());
     fassert(16333, _view_write);
     return finishOpening();
 }
 
-bool DurableMappedFile::create(OperationContext* txn,
-                               const std::string& fname,
-                               unsigned long long& len) {
+bool DurableMappedFile::create(const std::string& fname, unsigned long long& len) {
     LOG(3) << "mmf create " << fname;
     invariant(!_view_write);
 
     setPath(fname);
-    _view_write = map(txn, fname.c_str(), len);
+    _view_write = map(fname.c_str(), len);
     fassert(16332, _view_write);
     return finishOpening();
 }
@@ -285,7 +283,12 @@ bool DurableMappedFile::finishOpening() {
     return false;
 }
 
-void DurableMappedFile::close(OperationContext* txn) {
+DurableMappedFile::DurableMappedFile(OptionSet options)
+    : MemoryMappedFile(options), _willNeedRemap(false) {
+    _view_write = _view_private = 0;
+}
+
+DurableMappedFile::~DurableMappedFile() {
     try {
         LOG(3) << "mmf close " << filename();
 
@@ -296,20 +299,12 @@ void DurableMappedFile::close(OperationContext* txn) {
             getDur().closingFileNotification();
         }
 
+        LockMongoFilesExclusive lk;
         privateViews.remove(_view_private, length());
 
-        MemoryMappedFile::close(txn);
+        MemoryMappedFile::close();
     } catch (...) {
-        error() << "exception in DurableMappedFile::close";
+        error() << "exception in ~DurableMappedFile";
     }
-}
-
-DurableMappedFile::DurableMappedFile(OperationContext* txn, OptionSet options)
-    : MemoryMappedFile(txn, options), _willNeedRemap(false) {
-    _view_write = _view_private = 0;
-}
-
-DurableMappedFile::~DurableMappedFile() {
-    invariant(isClosed());
 }
 }

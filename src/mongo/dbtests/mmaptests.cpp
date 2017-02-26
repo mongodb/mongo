@@ -44,7 +44,6 @@
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/timer.h"
 
 namespace MMapTests {
@@ -77,16 +76,11 @@ public:
 
         MMAPV1LockerImpl lockState;
         Lock::GlobalWrite lk(&lockState);
-        auto txn = cc().makeOperationContext();
 
         {
-            DurableMappedFile f(txn.get());
-            ON_BLOCK_EXIT([&f, &txn] {
-                LockMongoFilesExclusive lock(txn.get());
-                f.close(txn.get());
-            });
+            DurableMappedFile f;
             unsigned long long len = 256 * 1024 * 1024;
-            verify(f.create(txn.get(), fn, len));
+            verify(f.create(fn, len));
             {
                 char* p = (char*)f.getView();
                 verify(p);
@@ -99,12 +93,12 @@ public:
                 char* w = (char*)f.view_write();
                 strcpy(w + 6, "world");
             }
-            MongoFileFinder ff(txn.get());
+            MongoFileFinder ff;
             ASSERT(ff.findByPath(fn));
             ASSERT(ff.findByPath("asdf") == 0);
         }
         {
-            MongoFileFinder ff(txn.get());
+            MongoFileFinder ff;
             ASSERT(ff.findByPath(fn) == 0);
         }
 
@@ -118,13 +112,9 @@ public:
         Timer t;
         for (int i = 0; i < N; i++) {
             // Every 4 iterations we pass the sequential hint.
-            DurableMappedFile f{
-                txn.get(), i % 4 == 1 ? MongoFile::Options::SEQUENTIAL : MongoFile::Options::NONE};
-            ON_BLOCK_EXIT([&f, &txn] {
-                LockMongoFilesExclusive lock(txn.get());
-                f.close(txn.get());
-            });
-            verify(f.open(txn.get(), fn));
+            DurableMappedFile f{i % 4 == 1 ? MongoFile::Options::SEQUENTIAL
+                                           : MongoFile::Options::NONE};
+            verify(f.open(fn));
             {
                 char* p = (char*)f.getView();
                 verify(p);

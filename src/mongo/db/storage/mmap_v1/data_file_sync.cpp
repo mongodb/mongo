@@ -35,7 +35,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/diag_log.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/mmap.h"
@@ -81,12 +80,11 @@ void DataFileSync::run() {
             break;
         }
 
-        auto txn = cc().makeOperationContext();
         Date_t start = jsTime();
         StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
 
         dur::notifyPreDataFileFlush();
-        int numFiles = storageEngine->flushAllFiles(txn.get(), true);
+        int numFiles = storageEngine->flushAllFiles(true);
         dur::notifyPostDataFileFlush();
 
         time_flushing = durationCount<Milliseconds>(jsTime() - start);
@@ -127,7 +125,7 @@ class MemJournalServerStatusMetric : public ServerStatusMetric {
 public:
     MemJournalServerStatusMetric() : ServerStatusMetric(".mem.mapped") {}
     virtual void appendAtLeaf(BSONObjBuilder& b) const {
-        int m = MemoryMappedFile::totalMappedLengthInMB();
+        int m = static_cast<int>(MemoryMappedFile::totalMappedLength() / (1024 * 1024));
         b.appendNumber("mapped", m);
 
         if (storageGlobalParams.dur) {
@@ -135,5 +133,6 @@ public:
             b.appendNumber("mappedWithJournal", m);
         }
     }
+
 } memJournalServerStatusMetric;
 }

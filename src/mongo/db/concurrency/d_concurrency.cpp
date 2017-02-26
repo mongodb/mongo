@@ -127,14 +127,6 @@ std::string Lock::ResourceMutex::getName(ResourceId resourceId) {
     return ResourceIdFactory::nameForId(resourceId);
 }
 
-bool Lock::ResourceMutex::isExclusivelyLocked(Locker* locker) {
-    return locker->isLockHeldForMode(_rid, MODE_X);
-}
-
-bool Lock::ResourceMutex::isAtLeastReadLocked(Locker* locker) {
-    return locker->isLockHeldForMode(_rid, MODE_IS);
-}
-
 Lock::GlobalLock::GlobalLock(Locker* locker, LockMode lockMode, unsigned timeoutMs)
     : GlobalLock(locker, lockMode, EnqueueOnly()) {
     waitForLock(timeoutMs);

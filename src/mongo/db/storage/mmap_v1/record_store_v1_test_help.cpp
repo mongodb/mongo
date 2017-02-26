@@ -204,8 +204,6 @@ DummyExtentManager::~DummyExtentManager() {
     }
 }
 
-void DummyExtentManager::close(OperationContext* txn) {}
-
 Status DummyExtentManager::init(OperationContext* txn) {
     return Status::OK();
 }

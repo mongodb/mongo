@@ -52,7 +52,6 @@
 #include "mongo/util/allocator.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
@@ -173,13 +172,7 @@ void go() {
         recSizeKB = 4;
     verify(recSizeKB <= 64000 && recSizeKB > 0);
 
-    auto txn = cc().makeOperationContext();
-    MemoryMappedFile f(txn.get());
-    ON_BLOCK_EXIT([&f, &txn] {
-        LockMongoFilesExclusive lock(txn.get());
-        f.close(txn.get());
-    });
-
+    MemoryMappedFile f;
     cout << "creating test file size:";
     len = options["fileSizeMB"].numberLong();
     if (len == 0)
@@ -216,8 +209,8 @@ void go() {
     if (o["mmf"].trueValue()) {
         delete lf;
         lf = 0;
-        mmfFile = new MemoryMappedFile(txn.get());
-        mmf = (char*)mmfFile->map(txn.get(), fname);
+        mmfFile = new MemoryMappedFile();
+        mmf = (char*)mmfFile->map(fname);
         verify(mmf);
 
         syncDelaySecs = options["syncDelay"].numberInt();

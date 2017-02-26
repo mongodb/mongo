@@ -199,7 +199,7 @@ Status waitForWriteConcern(OperationContext* txn,
         case WriteConcernOptions::SyncMode::FSYNC: {
             StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
             if (!storageEngine->isDurable()) {
-                result->fsyncFiles = storageEngine->flushAllFiles(txn, true);
+                result->fsyncFiles = storageEngine->flushAllFiles(true);
             } else {
                 // We only need to commit the journal if we're durable
                 txn->recoveryUnit()->waitUntilDurable();

@@ -148,8 +148,8 @@ static void* getNextMemoryMappedFileLocation(unsigned long long mmfSize) {
     return reinterpret_cast<void*>(static_cast<uintptr_t>(thisMemoryMappedFileLocation));
 }
 
-void MemoryMappedFile::close(OperationContext* txn) {
-    LockMongoFilesShared::assertExclusivelyLocked(txn);
+void MemoryMappedFile::close() {
+    LockMongoFilesShared::assertExclusivelyLocked();
 
     // Prevent flush and close from concurrently running
     stdx::lock_guard<stdx::mutex> lk(_flushMutex);
@@ -163,29 +163,20 @@ void MemoryMappedFile::close(OperationContext* txn) {
     }
 
     views.clear();
-    totalMappedLength.fetchAndSubtract(len);
-    len = 0;
-
     if (maphandle)
         CloseHandle(maphandle);
     maphandle = 0;
-    if (fd) {
+    if (fd)
         CloseHandle(fd);
-        fd = 0;
-    }
-
-    destroyed(txn);  // cleans up from the master list of mmaps
+    fd = 0;
+    destroyed();  // cleans up from the master list of mmaps
 }
 
-bool MemoryMappedFile::isClosed() {
-    return !len && !fd && !views.size();
-}
+unsigned long long mapped = 0;
 
-void* MemoryMappedFile::map(OperationContext* txn,
-                            const char* filenameIn,
-                            unsigned long long& length) {
+void* MemoryMappedFile::map(const char* filenameIn, unsigned long long& length) {
     verify(fd == 0 && len == 0);  // can't open more than once
-    setFilename(txn, filenameIn);
+    setFilename(filenameIn);
     FileAllocator::get()->allocateAsap(filenameIn, length);
     /* big hack here: Babble uses db names with colons.  doesn't seem to work on windows.  temporary
      * perhaps. */
@@ -231,6 +222,8 @@ void* MemoryMappedFile::map(OperationContext* txn,
         }
     }
 
+    mapped += length;
+
     {
         DWORD flProtect = readOnly ? PAGE_READONLY : PAGE_READWRITE;
         maphandle = CreateFileMappingW(fd,
@@ -244,8 +237,7 @@ void* MemoryMappedFile::map(OperationContext* txn,
             severe() << "CreateFileMappingW for " << filename << " failed with "
                      << errnoWithDescription(dosError) << " (file size is " << length << ")"
                      << " in MemoryMappedFile::map" << endl;
-            LockMongoFilesExclusive lock(txn);
-            close(txn);
+            close();
             fassertFailed(16225);
         }
     }
@@ -296,8 +288,7 @@ void* MemoryMappedFile::map(OperationContext* txn,
                          << length << ")"
                          << " in MemoryMappedFile::map" << endl;
 
-                LockMongoFilesExclusive lock(txn);
-                close(txn);
+                close();
                 fassertFailed(16166);
             }
 
@@ -305,12 +296,8 @@ void* MemoryMappedFile::map(OperationContext* txn,
         }
     }
 
-    // MemoryMappedFile successfully created, now update state.
-    len = length;
-    totalMappedLength.fetchAndAdd(len);
-
     views.push_back(view);
-
+    len = length;
     return view;
 }
 
@@ -359,8 +346,8 @@ void* MemoryMappedFile::createPrivateMap() {
     return privateMapAddress;
 }
 
-void* MemoryMappedFile::remapPrivateView(OperationContext* txn, void* oldPrivateAddr) {
-    LockMongoFilesExclusive lockMongoFiles(txn);
+void* MemoryMappedFile::remapPrivateView(void* oldPrivateAddr) {
+    LockMongoFilesExclusive lockMongoFiles;
 
     privateViews.clearWritableBits(oldPrivateAddr, len);
 
@@ -406,12 +393,12 @@ public:
           _filename(filename),
           _flushMutex(flushMutex) {}
 
-    void flush(OperationContext* txn) {
+    void flush() {
         if (!_view || !_fd)
             return;
 
         {
-            LockMongoFilesShared mmfilesLock(txn);
+            LockMongoFilesShared mmfilesLock;
 
             std::set<MongoFile*> mmfs = MongoFile::getAllFiles();
             std::set<MongoFile*>::const_iterator it = mmfs.find(_theFile);
@@ -475,9 +462,7 @@ void MemoryMappedFile::flush(bool sync) {
     uassert(13056, "Async flushing not supported on windows", sync);
     if (!views.empty()) {
         WindowsFlushable f(this, viewForFlushing(), fd, _uniqueId, filename(), _flushMutex);
-        auto txn = cc().getOperationContext();
-        invariant(txn);
-        f.flush(txn);
+        f.flush();
     }
 }
 

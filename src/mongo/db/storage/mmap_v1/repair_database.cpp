@@ -253,7 +253,7 @@ public:
             getDur().syncDataAndTruncateJournal(_txn);
 
             // need both in case journaling is disabled
-            MongoFile::flushAll(_txn, true);
+            MongoFile::flushAll(true);
 
             MONGO_ASSERT_ON_EXCEPTION(boost::filesystem::remove_all(_path));
         } catch (DBException& e) {
@@ -320,7 +320,6 @@ Status MMAPV1Engine::repairDatabase(OperationContext* txn,
 
         // Must call this before MMAPV1DatabaseCatalogEntry's destructor closes the DB files
         ON_BLOCK_EXIT(&dur::DurableInterface::syncDataAndTruncateJournal, &getDur(), txn);
-        ON_BLOCK_EXIT([&dbEntry, &txn] { dbEntry->close(txn); });
 
         {
             dbEntry.reset(new MMAPV1DatabaseCatalogEntry(
@@ -432,7 +431,7 @@ Status MMAPV1Engine::repairDatabase(OperationContext* txn,
         getDur().syncDataAndTruncateJournal(txn);
 
         // need both in case journaling is disabled
-        MongoFile::flushAll(txn, true);
+        MongoFile::flushAll(true);
 
         txn->checkForInterrupt();
     }

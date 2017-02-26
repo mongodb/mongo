@@ -62,14 +62,6 @@ public:
 
     virtual ~MMAPV1DatabaseCatalogEntry();
 
-    /**
-     * Must be called before destruction.
-     */
-    virtual void close(OperationContext* txn) {
-        _extentManager->close(txn);
-        _namespaceIndex.close(txn);
-    }
-
     // these two seem the same and yet different
     // TODO(ERH): consolidate into one ideally
     virtual bool exists() const {

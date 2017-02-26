@@ -32,7 +32,6 @@
 #pragma once
 
 #include "mongo/base/static_assert.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/db/storage/paths.h"
 #include "mongo/stdx/mutex.h"
@@ -51,16 +50,11 @@ protected:
     }
 
 public:
-    explicit DurableMappedFile(OperationContext* txn, OptionSet options = NONE);
+    DurableMappedFile(OptionSet options = NONE);
     virtual ~DurableMappedFile();
 
-    /**
-     * Callers must be holding a `LockMongoFilesExclusive`.
-     */
-    virtual void close(OperationContext* txn);
-
     /** @return true if opened ok. */
-    bool open(OperationContext* txn, const std::string& fname);
+    bool open(const std::string& fname);
 
     /** @return file length */
     unsigned long long length() const {
@@ -79,7 +73,7 @@ public:
        passed length.
        @return true for ok
     */
-    bool create(OperationContext* txn, const std::string& fname, unsigned long long& len);
+    bool create(const std::string& fname, unsigned long long& len);
 
     /* Get the "standard" view (which is the private one).
        @return the private view.
@@ -123,7 +117,7 @@ public:
         _willNeedRemap = true;
     }
 
-    void remapThePrivateView(OperationContext* txn);
+    void remapThePrivateView();
 
     virtual bool isDurableMappedFile() {
         return true;

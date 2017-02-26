@@ -195,24 +195,16 @@ public:
 
 class DataFile {
 public:
-    DataFile(OperationContext* txn, int fn) : _fileNo(fn), mmf(txn), _mb(NULL) {}
+    DataFile(int fn) : _fileNo(fn), _mb(NULL) {}
 
     /** @return true if found and opened. if uninitialized (prealloc only) does not open. */
-    Status openExisting(OperationContext* txn, const char* filename);
+    Status openExisting(const char* filename);
 
     /** creates if DNE */
     void open(OperationContext* txn,
               const char* filename,
               int requestedDataSize = 0,
               bool preallocateOnly = false);
-
-    /**
-     * Must be called before destruction.
-     */
-    void close(OperationContext* txn) {
-        LockMongoFilesExclusive lock(txn);
-        mmf.close(txn);
-    }
 
     DiskLoc allocExtentArea(OperationContext* txn, int size);
 

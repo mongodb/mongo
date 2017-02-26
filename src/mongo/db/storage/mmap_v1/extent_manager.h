@@ -77,8 +77,6 @@ public:
 
     virtual ~ExtentManager() {}
 
-    virtual void close(OperationContext* txn) = 0;
-
     /**
      * opens all current files
      */

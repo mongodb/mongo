@@ -119,10 +119,6 @@ public:
 
         static std::string getName(ResourceId resourceId);
 
-        bool isExclusivelyLocked(Locker* locker);
-
-        bool isAtLeastReadLocked(Locker* locker);
-
     private:
         friend class Lock::SharedLock;
         friend class Lock::ExclusiveLock;

@@ -90,13 +90,6 @@ public:
     MmapV1ExtentManager(StringData dbname, StringData path, bool directoryPerDB);
 
     /**
-     * Must be called before destruction.
-     */
-    void close(OperationContext* txn) {
-        _files.close(txn);
-    }
-
-    /**
      * opens all current files, not thread safe
      */
     Status init(OperationContext* txn);
@@ -215,11 +208,6 @@ private:
     public:
         FilesArray() : _size(0) {}
         ~FilesArray();
-
-        /**
-         * Must be called before destruction.
-         */
-        void close(OperationContext* txn);
 
         /**
          * Returns file at location 'n' in the array, with 'n' less than number of files added.

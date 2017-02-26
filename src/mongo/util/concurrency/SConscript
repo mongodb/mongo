@@ -67,3 +67,13 @@ env.Library(
         '$BUILD_DIR/mongo/util/background_job',
     ],
 )
+
+env.Library(
+    target='rwlock',
+    source=[
+        'rwlockimpl.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/third_party/shim_boost',
+    ],
+)

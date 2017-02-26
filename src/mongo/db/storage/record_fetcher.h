@@ -30,8 +30,6 @@
 
 namespace mongo {
 
-class OperationContext;
-
 /**
  * Used for yielding while data is fetched from disk.
  *
@@ -44,7 +42,7 @@ public:
     /**
      * Performs any setup which is needed prior to yielding locks.
      */
-    virtual void setup(OperationContext* txn) = 0;
+    virtual void setup() = 0;
 
     /**
      * Called after locks are yielded in order to bring data into memory.

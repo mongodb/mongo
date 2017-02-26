@@ -93,7 +93,7 @@ public:
 
     virtual Status dropDatabase(OperationContext* txn, StringData db);
 
-    virtual int flushAllFiles(OperationContext* txn, bool sync);
+    virtual int flushAllFiles(bool sync);
 
     virtual Status beginBackup(OperationContext* txn);
 

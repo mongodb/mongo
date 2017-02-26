@@ -401,7 +401,7 @@ Status WiredTigerKVEngine::_salvageIfNeeded(const char* uri) {
     return wtRCToStatus(session->salvage(session, uri, NULL), "Salvage failed:");
 }
 
-int WiredTigerKVEngine::flushAllFiles(OperationContext* txn, bool sync) {
+int WiredTigerKVEngine::flushAllFiles(bool sync) {
     LOG(1) << "WiredTigerKVEngine::flushAllFiles";
     if (_ephemeral) {
         return 0;

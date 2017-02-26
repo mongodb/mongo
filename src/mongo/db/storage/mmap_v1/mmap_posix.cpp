@@ -54,23 +54,6 @@ using namespace mongoutils;
 
 
 namespace mongo {
-
-namespace {
-void printMemInfo() {
-    LogstreamBuilder out = log();
-    out << "mem info: ";
-
-    ProcessInfo pi;
-    if (!pi.supported()) {
-        out << " not supported";
-        return;
-    }
-
-    out << "vsize: " << pi.getVirtualMemorySize() << " resident: " << pi.getResidentSize()
-        << " mapped: " << MemoryMappedFile::totalMappedLengthInMB();
-}
-}  // namespace
-
 static size_t fetchMinOSPageSizeBytes() {
     size_t minOSPageSizeBytes = sysconf(_SC_PAGESIZE);
     minOSPageSizeBytesTest(minOSPageSizeBytes);
@@ -79,19 +62,17 @@ static size_t fetchMinOSPageSizeBytes() {
 const size_t g_minOSPageSizeBytes = fetchMinOSPageSizeBytes();
 
 
-void MemoryMappedFile::close(OperationContext* txn) {
+void MemoryMappedFile::close() {
+    LockMongoFilesShared::assertExclusivelyLocked();
     for (vector<void*>::iterator i = views.begin(); i != views.end(); i++) {
         munmap(*i, len);
     }
     views.clear();
-    totalMappedLength.fetchAndSubtract(len);
-    len = 0;
 
-    if (fd) {
+    if (fd)
         ::close(fd);
-        fd = 0;
-    }
-    destroyed(txn);  // cleans up from the master list of mmaps
+    fd = 0;
+    destroyed();  // cleans up from the master list of mmaps
 }
 
 #ifndef O_NOATIME
@@ -159,12 +140,11 @@ MAdvise::~MAdvise() {
 }
 #endif
 
-void* MemoryMappedFile::map(OperationContext* txn,
-                            const char* filename,
-                            unsigned long long& length) {
+void* MemoryMappedFile::map(const char* filename, unsigned long long& length) {
     // length may be updated by callee.
-    setFilename(txn, filename);
+    setFilename(filename);
     FileAllocator::get()->allocateAsap(filename, length);
+    len = length;
 
     const bool readOnly = isOptionSet(READONLY);
 
@@ -213,10 +193,6 @@ void* MemoryMappedFile::map(OperationContext* txn,
     }
 #endif
 
-    // MemoryMappedFile successfully created, now update state.
-    len = length;
-    MemoryMappedFile::totalMappedLength.fetchAndAdd(len);
-
     views.push_back(view);
 
     return view;
@@ -243,9 +219,9 @@ void* MemoryMappedFile::createPrivateMap() {
     return x;
 }
 
-void* MemoryMappedFile::remapPrivateView(OperationContext* txn, void* oldPrivateAddr) {
+void* MemoryMappedFile::remapPrivateView(void* oldPrivateAddr) {
 #if defined(__sun)  // SERVER-8795
-    LockMongoFilesExclusive lockMongoFiles(txn);
+    LockMongoFilesExclusive lockMongoFiles;
 #endif
 
     // don't unmap, just mmap over the old region
@@ -279,16 +255,12 @@ void MemoryMappedFile::flush(bool sync) {
     }
 }
 
-bool MemoryMappedFile::isClosed() {
-    return !len && !fd && !views.size();
-}
-
 class PosixFlushable : public MemoryMappedFile::Flushable {
 public:
     PosixFlushable(MemoryMappedFile* theFile, void* view, HANDLE fd, long len)
         : _theFile(theFile), _view(view), _fd(fd), _len(len), _id(_theFile->getUniqueId()) {}
 
-    void flush(OperationContext* txn) {
+    void flush() {
         if (_view == NULL || _fd == 0)
             return;
 
@@ -303,7 +275,7 @@ public:
         }
 
         // some error, lets see if we're supposed to exist
-        LockMongoFilesShared mmfilesLock(txn);
+        LockMongoFilesShared mmfilesLock;
         std::set<MongoFile*> mmfs = MongoFile::getAllFiles();
         std::set<MongoFile*>::const_iterator it = mmfs.find(_theFile);
         if ((it == mmfs.end()) || ((*it)->getUniqueId() != _id)) {
@@ -328,5 +300,6 @@ public:
 MemoryMappedFile::Flushable* MemoryMappedFile::prepareFlush() {
     return new PosixFlushable(this, viewForFlushing(), fd, len);
 }
+
 
 }  // namespace mongo
