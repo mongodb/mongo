@@ -38,6 +38,7 @@ namespace {
     SERVICE_STATUS_HANDLE _statusHandle = NULL;
     wstring _serviceName;
     ServiceCallback _serviceCallback = NULL;
+    bool _serviceShutdownRequested = false;
 }  // namespace
 
     static void installServiceOrDie(
@@ -470,7 +471,13 @@ namespace {
         reportStatus( SERVICE_START_PENDING, 1000 );
 
         _serviceCallback();
-        reportStatus( SERVICE_STOPPED );
+
+        if (_serviceShutdownRequested) {
+            log() << "service shutdown requested, reporting status SERVICE_STOPPED" << endl;
+            reportStatus( SERVICE_STOPPED );
+        } else {
+            log() << "service callback failed, don't report status to trigger service recovery (if configured)" << endl;
+        }
         ::_exit( EXIT_CLEAN );
     }
 
@@ -479,6 +486,7 @@ namespace {
         log() << "got " << controlCodeName << " request from Windows Service Control Manager, " <<
             ( inShutdown() ? "already in shutdown" : "will terminate after current cmd ends" ) << endl;
         reportStatus( SERVICE_STOP_PENDING );
+        _serviceShutdownRequested = true;
         if ( ! inShutdown() ) {
             // TODO: SERVER-5703, separate the "cleanup for shutdown" functionality from
             // the "terminate process" functionality in exitCleanly.
