@@ -10,7 +10,7 @@ COMPONENTS
 
 UTILITIES
 
-  bin/mongodump         - MongoDB dump tool - for backups, snapshots, etc..
+  bin/mongodump         - MongoDB dump tool - for backups, snapshots etc..
   bin/mongorestore      - MongoDB restore a dump
   bin/mongoexport       - Export a single collection to test (JSON, CSV)
   bin/mongoimport       - Import from JSON or CSV
