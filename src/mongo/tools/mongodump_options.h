@@ -40,6 +40,7 @@ namespace mongo {
     struct MongoDumpGlobalParams {
         std::string outputDirectory;
         std::string query;
+        std::string queryFile;
         bool useOplog;
         bool repair;
         bool snapShotQuery;

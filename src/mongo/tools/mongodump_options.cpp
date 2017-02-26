@@ -63,6 +63,8 @@ namespace mongo {
 
         options->addOptionChaining("query", "query,q", moe::String, "json query");
 
+        options->addOptionChaining("queryFile", "queryFile,f", moe::String, "file containing json query");
+
         options->addOptionChaining("oplog", "oplog", moe::Switch,
                 "Use oplog for point-in-time snapshotting");
 
@@ -115,6 +117,7 @@ namespace mongo {
             }
         }
         mongoDumpGlobalParams.query = getParam("query");
+        mongoDumpGlobalParams.queryFile = getParam("queryFile");
         mongoDumpGlobalParams.useOplog = hasParam("oplog");
         if (mongoDumpGlobalParams.useOplog) {
             if (hasParam("query") || hasParam("db") || hasParam("collection")) {
