@@ -503,14 +503,19 @@ def main():
 
     interesting_processes = ["mongo", "mongod", "mongos", "_test", "dbtest", "python", "java"]
     go_processes = []
+    process_ids = []
 
     parser = OptionParser(description=__doc__)
     parser.add_option('-p', '--process-names',
         dest='process_names',
-        help='List of process names to analyze')
+        help='Comma separated list of process names to analyze')
     parser.add_option('-g', '--go-process-names',
         dest='go_process_names',
-        help='List of go process names to analyze')
+        help='Comma separated list of go process names to analyze')
+    parser.add_option('-d', '--process-ids',
+        dest='process_ids',
+        default=None,
+        help='Comma separated list of process ids (PID) to analyze, overrides -p & -g')
     parser.add_option('-s', '--max-core-dumps-size',
         dest='max_core_dumps_size',
         default=10000,
@@ -533,6 +538,10 @@ def main():
     if options.debugger_output is None:
         options.debugger_output = ['stdout']
 
+    if options.process_ids is not None:
+        # process_ids is an int list of PIDs
+        process_ids = [int(pid) for pid in options.process_ids.split(',')]
+
     if options.process_names is not None:
         interesting_processes = options.process_names.split(',')
 
@@ -546,64 +555,65 @@ def main():
         root_logger.warning("hang_analyzer.py: Unsupported platform: %s" % (sys.platform))
         exit(1)
 
-    processes_orig = ps.dump_processes(root_logger)
+    all_processes = ps.dump_processes(root_logger)
 
-    # Find all running interesting processes by doing a substring match.
-    processes = [a for a in processes_orig
-                    if any([a[1].find(ip) >= 0 for ip in interesting_processes]) and a[0] != os.getpid()]
+    # Find all running interesting processes:
+    #   If a list of process_ids is supplied, match on that.
+    #   Otherwise, do a substring match on interesting_processes.
+    if process_ids:
+        processes = [(pid, pname) for (pid, pname) in all_processes
+                     if pid in process_ids and pid != os.getpid()]
 
-    root_logger.info("Found %d interesting processes" % len(processes))
+        running_pids = set([pid for (pid, pname) in all_processes])
+        missing_pids = set(process_ids) - running_pids
+        if missing_pids:
+            root_logger.warning("The following requested process ids are not running %s" %
+                                list(missing_pids))
+    else:
+        processes = [(pid, pname) for (pid, pname) in all_processes
+                     if any(pname.find(ip) >= 0 for ip in interesting_processes) and
+                     pid != os.getpid()]
+    root_logger.info("Found %d interesting processes %s" % (len(processes), processes))
 
     max_dump_size_bytes = int(options.max_core_dumps_size) * 1024 * 1024
 
-    if len(processes) == 0:
-        for process in processes_orig:
-            root_logger.warning("Ignoring process %d of %s" % (process[0], process[1]))
-    else:
-        # Dump all other processes including go programs, except python & java.
-        for process in [a for a in processes if not re.match("^(java|python)", a[1])]:
-            pid = process[0]
-            process_name = process[1]
-            root_logger.info("Dumping process %d of %s" % (pid, process_name))
-            process_logger = get_process_logger(options.debugger_output, pid, process_name)
-            dbg.dump_info(
-                root_logger,
-                process_logger,
-                pid,
-                process_name,
-                check_dump_quota(max_dump_size_bytes, dbg.get_dump_ext()))
+    # Dump all other processes including go programs, except python & java.
+    for (pid, process_name) in [(p, pn) for (p, pn) in processes
+                                if not re.match("^(java|python)", pn)]:
+        root_logger.info("Dumping process %d of %s" % (pid, process_name))
+        process_logger = get_process_logger(options.debugger_output, pid, process_name)
+        dbg.dump_info(
+            root_logger,
+            process_logger,
+            pid,
+            process_name,
+            check_dump_quota(max_dump_size_bytes, dbg.get_dump_ext()))
 
-        # Dump java processes using jstack.
-        for process in [a for a in processes if a[1].startswith("java")]:
-            pid = process[0]
-            process_name = process[1]
-            root_logger.info("Dumping process %d of %s" % (pid, process_name))
-            process_logger = get_process_logger(options.debugger_output, pid, process_name)
-            jstack.dump_info(root_logger, process_logger, pid, process_name)
+    # Dump java processes using jstack.
+    for (pid, process_name) in [(p, pn) for (p, pn) in processes if pn.startswith("java")]:
+        root_logger.info("Dumping process %d of %s" % (pid, process_name))
+        process_logger = get_process_logger(options.debugger_output, pid, process_name)
+        jstack.dump_info(root_logger, process_logger, pid, process_name)
 
-        # Signal go processes to ensure they print out stack traces, and die on POSIX OSes.
-        # On Windows, this will simply kill the process since python emulates SIGABRT as
-        # TerminateProcess.
-        # Note: The stacktrace output may be captured elsewhere (i.e. resmoke).
-        for process in [a for a in processes if a[1] in go_processes]:
-            pid = process[0]
-            process_name = process[1]
-            root_logger.info("Sending signal SIGABRT to go process %d of %s" % (pid, process_name))
-            signal_process(root_logger, pid, signal.SIGABRT)
+    # Signal go processes to ensure they print out stack traces, and die on POSIX OSes.
+    # On Windows, this will simply kill the process since python emulates SIGABRT as
+    # TerminateProcess.
+    # Note: The stacktrace output may be captured elsewhere (i.e. resmoke).
+    for (pid, process_name) in [(p, pn) for (p, pn) in processes if pn in go_processes]:
+        root_logger.info("Sending signal SIGABRT to go process %d of %s" % (pid, process_name))
+        signal_process(root_logger, pid, signal.SIGABRT)
 
-        # Dump python processes after signalling them.
-        for process in [a for a in processes if a[1].startswith("python")]:
-            pid = process[0]
-            process_name = process[1]
-            root_logger.info("Sending signal SIGUSR1 to python process %d of %s" % (pid, process_name))
-            signal_process(root_logger, pid, signal.SIGUSR1)
-            process_logger = get_process_logger(options.debugger_output, pid, process_name)
-            dbg.dump_info(
-                root_logger,
-                process_logger,
-                pid,
-                process_name,
-                check_dump_quota(max_dump_size_bytes, dbg.get_dump_ext()))
+    # Dump python processes after signalling them.
+    for (pid, process_name) in [(p, pn) for (p, pn) in processes if pn.startswith("python")]:
+        root_logger.info("Sending signal SIGUSR1 to python process %d of %s" % (pid, process_name))
+        signal_process(root_logger, pid, signal.SIGUSR1)
+        process_logger = get_process_logger(options.debugger_output, pid, process_name)
+        dbg.dump_info(
+            root_logger,
+            process_logger,
+            pid,
+            process_name,
+            check_dump_quota(max_dump_size_bytes, dbg.get_dump_ext()))
 
     root_logger.info("Done analyzing processes for hangs")
 
