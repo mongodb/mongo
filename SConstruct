@@ -685,6 +685,14 @@ env_vars.Add('LINKFLAGS',
     help='Sets flags for the linker',
     converter=variable_shlex_converter)
 
+env_vars.Add('MAXLINELENGTH',
+    help='Maximum line length before using temp files',
+    # This is very small, but appears to be the least upper bound
+    # across our platforms.
+    #
+    # See https://support.microsoft.com/en-us/help/830473/command-prompt-cmd.-exe-command-line-string-limitation
+    default=8191)
+
 # Note: This is only really meaningful when configured via a variables file. See the
 # default_buildinfo_environment_data() function for examples of how to use this.
 env_vars.Add('MONGO_BUILDINFO_ENVIRONMENT_DATA',
@@ -1369,6 +1377,22 @@ if not env.Verbose():
     env.Append( SHLINKCOMSTR = env["LINKCOMSTR"] )
     env.Append( ARCOMSTR = "Generating library $TARGET" )
 
+# Link tools other than mslink don't setup TEMPFILE in LINKCOM,
+# disabling SCons automatically falling back to a temp file when
+# running link commands that are over MAXLINELENGTH. With our object
+# file linking mode, we frequently hit even the large linux command
+# line length, so we want it everywhere. If we aren't using mslink,
+# add TEMPFILE in. For verbose builds when using a tempfile, we need
+# some trickery so that we print the command we are running, and not
+# just the invocation of the compiler being fed the command file.
+if not 'mslink' in env['TOOLS']:
+    if env.Verbose():
+        env["LINKCOM"] = "${{TEMPFILE('{0}', '')}}".format(env['LINKCOM'])
+        env["SHLINKCOM"] = "${{TEMPFILE('{0}', '')}}".format(env['SHLINKCOM'])
+    else:
+        env["LINKCOM"] = "${{TEMPFILE('{0}', 'LINKCOMSTR')}}".format(env['LINKCOM'])
+        env["SHLINKCOM"] = "${{TEMPFILE('{0}', 'SHLINKCOMSTR')}}".format(env['SHLINKCOM'])
+
 if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
     # The libraries we build in LIBDEPS_OBJS mode are just placeholders for tracking dependencies.
     # This avoids wasting time and disk IO on them.
@@ -1384,9 +1408,6 @@ if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
     env['ARCOMSTR'] = 'Generating placeholder library $TARGET'
     env['RANLIBCOM'] = noop_action
     env['RANLIBCOMSTR'] = 'Skipping ranlib for $TARGET'
-elif env['_LIBDEPS'] == '$_LIBDEPS_LIBS':
-    env.Tool('thin_archive')
-
 
 libdeps.setup_environment(env, emitting_shared=(link_model.startswith("dynamic")))
 
