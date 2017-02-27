@@ -18,15 +18,15 @@ env.Library(
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/client/fetcher',
         '$BUILD_DIR/mongo/client/remote_command_targeter',
+        '$BUILD_DIR/mongo/db/auth/authcore',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/lasterror',
         '$BUILD_DIR/mongo/executor/connection_pool_stats',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/s/cluster_last_error_info',
         '$BUILD_DIR/mongo/s/is_mongos',
         'shard_interface',
-        '$BUILD_DIR/mongo/db/lasterror',
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/auth/authcore',
         #'$BUILD_DIR/mongo/s/coreshard', # CYCLE
     ],
     LIBDEPS_TAGS=[
@@ -44,6 +44,20 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/s/coreshard',
+    ],
+)
+
+env.Library(
+    target='parallel',
+    source=[
+        'parallel.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/bson/dotted_path_support',
+        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/util/net/network',
+        'sharding_client',
     ],
 )
 
@@ -109,8 +123,8 @@ env.CppUnitTest(
         'shard_local_test.cpp',
     ],
     LIBDEPS=[
-        'shard_local',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        'shard_local',
     ],
 )

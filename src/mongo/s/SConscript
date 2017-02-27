@@ -299,7 +299,6 @@ env.Library(
         'version_mongos.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/parallel',
         '$BUILD_DIR/mongo/db/auth/authmongos',
         '$BUILD_DIR/mongo/db/fts/ftsmongos',
         '$BUILD_DIR/mongo/db/stats/counters',

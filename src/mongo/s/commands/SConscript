@@ -80,12 +80,12 @@ env.Library(
         'strategy.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/parallel',
         '$BUILD_DIR/mongo/db/commands/apply_ops_cmd_common',
         '$BUILD_DIR/mongo/db/commands/killcursors_common',
         '$BUILD_DIR/mongo/db/pipeline/aggregation',
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/rpc/client_metadata',
+        '$BUILD_DIR/mongo/s/client/parallel',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/mongoscore',
         '$BUILD_DIR/mongo/transport/transport_layer_common',

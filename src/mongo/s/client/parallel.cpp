@@ -1,5 +1,4 @@
-// parallel.cpp
-/*
+/**
  *    Copyright 2010 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -27,14 +26,12 @@
  *    then also delete it in the license file.
  */
 
-
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/parallel.h"
+#include "mongo/s/client/parallel.h"
 
-#include "mongo/client/connpool.h"
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/dbclientcursor.h"
@@ -42,6 +39,8 @@
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_raii.h"
@@ -52,60 +51,21 @@
 namespace mongo {
 
 using std::shared_ptr;
-using std::list;
 using std::map;
 using std::set;
 using std::string;
-using std::stringstream;
 using std::vector;
 
 namespace dps = ::mongo::dotted_path_support;
 
+namespace {
+
 LabeledLevel pc("pcursor", 2);
-
-void ParallelSortClusteredCursor::init(OperationContext* txn) {
-    if (_didInit)
-        return;
-    _didInit = true;
-
-    if (!_qSpec.isEmpty()) {
-        fullInit(txn);
-    } else {
-        // You can only get here by using the legacy constructor
-        // TODO: Eliminate this
-        _oldInit();
-    }
-}
-
-/**
- * Throws a RecvStaleConfigException wrapping the stale error document in this cursor when the
- * ShardConfigStale flag is set or a command returns a ErrorCodes::SendStaleConfig error code.
- */
-void throwCursorStale(DBClientCursor* cursor) {
-    verify(cursor);
-
-    if (cursor->hasResultFlag(ResultFlag_ShardConfigStale)) {
-        BSONObj error;
-        cursor->peekError(&error);
-        throw RecvStaleConfigException("query returned a stale config error", error);
-    }
-
-    if (NamespaceString(cursor->getns()).isCommand()) {
-        // Commands that care about versioning (like the count or geoNear command) sometimes
-        // return with the stale config error code, but don't set the ShardConfigStale result
-        // flag on the cursor.
-        // TODO: Standardize stale config reporting.
-        BSONObj res = cursor->peekFirst();
-        if (res.hasField("code") && res["code"].Number() == ErrorCodes::SendStaleConfig) {
-            throw RecvStaleConfigException("command returned a stale config error", res);
-        }
-    }
-}
 
 /**
  * Throws an exception wrapping the error document in this cursor when the error flag is set.
  */
-static void throwCursorError(DBClientCursor* cursor) {
+void throwCursorError(DBClientCursor* cursor) {
     verify(cursor);
 
     if (cursor->hasResultFlag(ResultFlag_ErrSet)) {
@@ -113,6 +73,89 @@ static void throwCursorError(DBClientCursor* cursor) {
         throw UserException(o["code"].numberInt(), o["$err"].str());
     }
 }
+
+}  // namespace
+
+struct ParallelConnectionState {
+    ParallelConnectionState() : count(0), done(false) {}
+
+    std::string toString() const;
+
+    BSONObj toBSON() const;
+
+    // Please do not reorder. cursor destructor can use conn.
+    // On a related note, never attempt to cleanup these pointers manually.
+    std::shared_ptr<ShardConnection> conn;
+    std::shared_ptr<DBClientCursor> cursor;
+
+    // Version information
+    std::shared_ptr<ChunkManager> manager;
+    std::shared_ptr<Shard> primary;
+
+    // Cursor status information
+    long long count;
+    bool done;
+};
+
+struct ParallelConnectionMetadata {
+    ParallelConnectionMetadata()
+        : retryNext(false), initialized(false), finished(false), completed(false), errored(false) {}
+
+    ~ParallelConnectionMetadata() {
+        cleanup(true);
+    }
+
+    void cleanup(bool full = true);
+
+    std::shared_ptr<ParallelConnectionState> pcState;
+
+    bool retryNext;
+
+    bool initialized;
+    bool finished;
+    bool completed;
+
+    bool errored;
+
+    BSONObj toBSON() const;
+
+    std::string toString() const {
+        return str::stream() << "PCMData : " << toBSON();
+    }
+};
+
+/**
+ * Helper class to manage ownership of opened cursors while merging results.
+ *
+ * TODO:  Choose one set of ownership semantics so that this isn't needed - merge sort via mapreduce
+ * is the main issue since it has no metadata and this holder owns the cursors.
+ */
+class DBClientCursorHolder {
+public:
+    DBClientCursorHolder() = default;
+
+    void reset(DBClientCursor* cursor, ParallelConnectionMetadata* pcmData) {
+        _cursor.reset(cursor);
+        _pcmData.reset(pcmData);
+    }
+
+    DBClientCursor* get() {
+        return _cursor.get();
+    }
+
+    ParallelConnectionMetadata* getMData() {
+        return _pcmData.get();
+    }
+
+    void release() {
+        _cursor.release();
+        _pcmData.release();
+    }
+
+private:
+    std::unique_ptr<DBClientCursor> _cursor;
+    std::unique_ptr<ParallelConnectionMetadata> _pcmData;
+};
 
 // --------  ParallelSortClusteredCursor -----------
 
@@ -125,7 +168,6 @@ ParallelSortClusteredCursor::ParallelSortClusteredCursor(const QuerySpec& qSpec,
     _finishCons();
 }
 
-// LEGACY Constructor
 ParallelSortClusteredCursor::ParallelSortClusteredCursor(const set<string>& servers,
                                                          const string& ns,
                                                          const Query& q,
@@ -146,6 +188,41 @@ ParallelSortClusteredCursor::ParallelSortClusteredCursor(const set<string>& serv
     _batchSize = 0;
 
     _finishCons();
+}
+
+ParallelSortClusteredCursor::~ParallelSortClusteredCursor() {
+    // WARNING: Commands (in particular M/R) connect via _oldInit() directly to shards
+    bool isDirectShardCursor = _cursorMap.empty();
+
+    // Non-direct shard cursors are owned by the _cursorMap, so we release
+    // them in the array here.  Direct shard cursors clean themselves.
+    if (!isDirectShardCursor) {
+        for (int i = 0; i < _numServers; i++)
+            _cursors[i].release();
+    }
+
+    delete[] _cursors;
+    _cursors = 0;
+
+    // Clear out our metadata after removing legacy cursor data
+    _cursorMap.clear();
+
+    // Just to be sure
+    _done = true;
+}
+
+void ParallelSortClusteredCursor::init(OperationContext* txn) {
+    if (_didInit)
+        return;
+    _didInit = true;
+
+    if (!_qSpec.isEmpty()) {
+        fullInit(txn);
+    } else {
+        // You can only get here by using the legacy constructor
+        // TODO: Eliminate this
+        _oldInit();
+    }
 }
 
 void ParallelSortClusteredCursor::_finishCons() {
@@ -239,93 +316,6 @@ void ParallelSortClusteredCursor::_finishCons() {
         17306, "have to have all text meta sort keys in projection", textMetaSortKeyFields.empty());
 }
 
-void ParallelConnectionMetadata::cleanup(bool full) {
-    if (full || errored)
-        retryNext = false;
-
-    if (!retryNext && pcState) {
-        if (initialized && !errored) {
-            verify(pcState->cursor);
-            verify(pcState->conn);
-
-            if (!finished && pcState->conn->ok()) {
-                try {
-                    // Complete the call if only halfway done
-                    bool retry = false;
-                    pcState->cursor->initLazyFinish(retry);
-                } catch (std::exception&) {
-                    warning() << "exception closing cursor";
-                } catch (...) {
-                    warning() << "unknown exception closing cursor";
-                }
-            }
-        }
-
-        // Double-check conn is closed
-        if (pcState->conn) {
-            pcState->conn->done();
-        }
-
-        pcState.reset();
-    } else
-        verify(finished || !initialized);
-
-    initialized = false;
-    finished = false;
-    completed = false;
-    errored = false;
-}
-
-
-BSONObj ParallelConnectionState::toBSON() const {
-    BSONObj cursorPeek = BSON("no cursor"
-                              << "");
-    if (cursor) {
-        vector<BSONObj> v;
-        cursor->peek(v, 1);
-        if (v.size() == 0)
-            cursorPeek = BSON("no data"
-                              << "");
-        else
-            cursorPeek = BSON("" << v[0]);
-    }
-
-    BSONObj stateObj =
-        BSON("conn" << (conn ? (conn->ok() ? conn->conn().toString() : "(done)") : "") << "vinfo"
-                    << (manager ? (str::stream() << manager->getns() << " @ "
-                                                 << manager->getVersion().toString())
-                                : primary->toString()));
-
-    // Append cursor data if exists
-    BSONObjBuilder stateB;
-    stateB.appendElements(stateObj);
-    if (!cursor)
-        stateB.append("cursor", "(none)");
-    else {
-        vector<BSONObj> v;
-        cursor->peek(v, 1);
-        if (v.size() == 0)
-            stateB.append("cursor", "(empty)");
-        else
-            stateB.append("cursor", v[0]);
-    }
-
-    stateB.append("count", count);
-    stateB.append("done", done);
-
-    return stateB.obj().getOwned();
-}
-
-BSONObj ParallelConnectionMetadata::toBSON() const {
-    return BSON("state" << (pcState ? pcState->toBSON() : BSONObj()) << "retryNext" << retryNext
-                        << "init"
-                        << initialized
-                        << "finish"
-                        << finished
-                        << "errored"
-                        << errored);
-}
-
 void ParallelSortClusteredCursor::fullInit(OperationContext* txn) {
     startInit(txn);
     finishInit(txn);
@@ -371,7 +361,7 @@ void ParallelSortClusteredCursor::_handleStaleNS(OperationContext* txn,
 
 void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
     OperationContext* txn,
-    PCStatePtr state,
+    std::shared_ptr<ParallelConnectionState> state,
     const ShardId& shardId,
     std::shared_ptr<Shard> primary,
     const NamespaceString& ns,
@@ -499,13 +489,14 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
     }
 
     // Close all cursors on extra shards first, as these will be invalid
-    for (map<ShardId, PCMData>::iterator i = _cursorMap.begin(), end = _cursorMap.end(); i != end;
-         ++i) {
-        if (shardIds.find(i->first) == shardIds.end()) {
-            LOG(pc) << "closing cursor on shard " << i->first
+    for (auto& cmEntry : _cursorMap) {
+        const auto& shardId = cmEntry.first;
+
+        if (shardIds.find(shardId) == shardIds.end()) {
+            LOG(pc) << "closing cursor on shard " << shardId
                     << " as the connection is no longer required by " << vinfo;
 
-            i->second.cleanup(true);
+            cmEntry.second.cleanup(true);
         }
     }
 
@@ -516,7 +507,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
     uassert(15986, "too many retries in total", _totalTries < 10);
 
     for (const ShardId& shardId : shardIds) {
-        PCMData& mdata = _cursorMap[shardId];
+        auto& mdata = _cursorMap[shardId];
 
         LOG(pc) << "initializing on shard " << shardId << ", current connection state is "
                 << mdata.toBSON();
@@ -526,7 +517,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
             if (mdata.initialized) {
                 invariant(mdata.pcState);
 
-                PCStatePtr state = mdata.pcState;
+                auto state = mdata.pcState;
 
                 bool compatiblePrimary = true;
                 bool compatibleManager = true;
@@ -557,8 +548,8 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
                 mdata.cleanup(false);
             }
 
-            mdata.pcState.reset(new PCState());
-            PCStatePtr state = mdata.pcState;
+            mdata.pcState = std::make_shared<ParallelConnectionState>();
+            auto state = mdata.pcState;
 
             setupVersionAndHandleSlaveOk(txn, state, shardId, primary, nss, vinfo, manager);
 
@@ -702,10 +693,9 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
     }
 
     // Sanity check final init'ed connections
-    for (map<ShardId, PCMData>::iterator i = _cursorMap.begin(), end = _cursorMap.end(); i != end;
-         ++i) {
-        const ShardId& shardId = i->first;
-        PCMData& mdata = i->second;
+    for (const auto& cmEntry : _cursorMap) {
+        const auto& shardId = cmEntry.first;
+        const auto& mdata = cmEntry.second;
 
         if (!mdata.pcState) {
             continue;
@@ -747,10 +737,9 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* txn) {
 
     LOG(pc) << "finishing over " << _cursorMap.size() << " shards";
 
-    for (map<ShardId, PCMData>::iterator i = _cursorMap.begin(), end = _cursorMap.end(); i != end;
-         ++i) {
-        const ShardId& shardId = i->first;
-        PCMData& mdata = i->second;
+    for (auto& cmEntry : _cursorMap) {
+        const auto& shardId = cmEntry.first;
+        auto& mdata = cmEntry.second;
 
         LOG(pc) << "finishing on shard " << shardId << ", current connection state is "
                 << mdata.toBSON();
@@ -759,7 +748,7 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* txn) {
         if (!mdata.pcState)
             continue;
 
-        PCStatePtr state = mdata.pcState;
+        auto state = mdata.pcState;
 
         try {
             // Sanity checks
@@ -900,17 +889,17 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* txn) {
     }
 
     // Sanity check and clean final connections
-    map<ShardId, PCMData>::iterator i = _cursorMap.begin();
-    while (i != _cursorMap.end()) {
-        PCMData& mdata = i->second;
+    for (auto i = _cursorMap.begin(); i != _cursorMap.end();) {
+        auto& mdata = i->second;
 
         // Erase empty stuff
         if (!mdata.pcState) {
             log() << "PCursor erasing empty state " << mdata.toBSON();
             _cursorMap.erase(i++);
             continue;
-        } else
+        } else {
             ++i;
+        }
 
         // Make sure all state is in shards
         verify(mdata.initialized == true);
@@ -929,17 +918,14 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* txn) {
 
     // Put the cursors in the legacy format
     int index = 0;
-    for (map<ShardId, PCMData>::iterator i = _cursorMap.begin(), end = _cursorMap.end(); i != end;
-         ++i) {
-        PCMData& mdata = i->second;
+    for (auto& cmEntry : _cursorMap) {
+        const auto& shardId = cmEntry.first;
+        auto& mdata = cmEntry.second;
 
         _cursors[index].reset(mdata.pcState->cursor.get(), &mdata);
 
-        {
-            const auto shard =
-                uassertStatusOK(Grid::get(txn)->shardRegistry()->getShard(txn, i->first));
-            _servers.insert(shard->getConnString().toString());
-        }
+        const auto shard = uassertStatusOK(Grid::get(txn)->shardRegistry()->getShard(txn, shardId));
+        _servers.insert(shard->getConnString().toString());
 
         index++;
     }
@@ -947,20 +933,21 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* txn) {
     _numServers = _cursorMap.size();
 }
 
-void ParallelSortClusteredCursor::getQueryShardIds(set<ShardId>& shardIds) {
-    for (map<ShardId, PCMData>::iterator i = _cursorMap.begin(), end = _cursorMap.end(); i != end;
-         ++i) {
-        shardIds.insert(i->first);
-    }
+void ParallelSortClusteredCursor::getQueryShardIds(set<ShardId>& shardIds) const {
+    std::transform(_cursorMap.begin(),
+                   _cursorMap.end(),
+                   std::inserter(shardIds, shardIds.end()),
+                   [](const ShardCursorsMap::value_type& pair) { return pair.first; });
 }
 
-DBClientCursorPtr ParallelSortClusteredCursor::getShardCursor(const ShardId& shardId) {
-    map<ShardId, PCMData>::iterator i = _cursorMap.find(shardId);
+std::shared_ptr<DBClientCursor> ParallelSortClusteredCursor::getShardCursor(
+    const ShardId& shardId) const {
+    auto it = _cursorMap.find(shardId);
+    if (it == _cursorMap.end()) {
+        return nullptr;
+    }
 
-    if (i == _cursorMap.end())
-        return DBClientCursorPtr();
-    else
-        return i->second.pcState->cursor;
+    return it->second.pcState->cursor;
 }
 
 // DEPRECATED (but still used by map/reduce)
@@ -1192,7 +1179,7 @@ void ParallelSortClusteredCursor::_oldInit() {
         errMsgs.insert(errMsgs.end(), otherExs.begin(), otherExs.end());
         errMsgs.insert(errMsgs.end(), socketExs.begin(), socketExs.end());
 
-        stringstream errMsg;
+        std::stringstream errMsg;
         errMsg << "could not initialize cursor across all shards because : ";
         for (vector<string>::iterator i = errMsgs.begin(); i != errMsgs.end(); i++) {
             if (i != errMsgs.begin())
@@ -1215,27 +1202,6 @@ void ParallelSortClusteredCursor::_oldInit() {
         log() << "successfully finished parallel query after " << retries << " retries";
 }
 
-ParallelSortClusteredCursor::~ParallelSortClusteredCursor() {
-    // WARNING: Commands (in particular M/R) connect via _oldInit() directly to shards
-    bool isDirectShardCursor = _cursorMap.empty();
-
-    // Non-direct shard cursors are owned by the _cursorMap, so we release
-    // them in the array here.  Direct shard cursors clean themselves.
-    if (!isDirectShardCursor) {
-        for (int i = 0; i < _numServers; i++)
-            _cursors[i].release();
-    }
-
-    delete[] _cursors;
-    _cursors = 0;
-
-    // Clear out our metadata after removing legacy cursor data
-    _cursorMap.clear();
-
-    // Just to be sure
-    _done = true;
-}
-
 bool ParallelSortClusteredCursor::more() {
     if (_needToSkip > 0) {
         int n = _needToSkip;
@@ -1253,6 +1219,7 @@ bool ParallelSortClusteredCursor::more() {
         if (_cursors[i].get() && _cursors[i].get()->more())
             return true;
     }
+
     return false;
 }
 
@@ -1308,6 +1275,118 @@ BSONObj ParallelSortClusteredCursor::next() {
         _cursors[bestFrom].getMData()->pcState->count++;
 
     return best;
+}
+
+void ParallelConnectionMetadata::cleanup(bool full) {
+    if (full || errored)
+        retryNext = false;
+
+    if (!retryNext && pcState) {
+        if (initialized && !errored) {
+            verify(pcState->cursor);
+            verify(pcState->conn);
+
+            if (!finished && pcState->conn->ok()) {
+                try {
+                    // Complete the call if only halfway done
+                    bool retry = false;
+                    pcState->cursor->initLazyFinish(retry);
+                } catch (std::exception&) {
+                    warning() << "exception closing cursor";
+                } catch (...) {
+                    warning() << "unknown exception closing cursor";
+                }
+            }
+        }
+
+        // Double-check conn is closed
+        if (pcState->conn) {
+            pcState->conn->done();
+        }
+
+        pcState.reset();
+    } else
+        verify(finished || !initialized);
+
+    initialized = false;
+    finished = false;
+    completed = false;
+    errored = false;
+}
+
+BSONObj ParallelConnectionMetadata::toBSON() const {
+    return BSON("state" << (pcState ? pcState->toBSON() : BSONObj()) << "retryNext" << retryNext
+                        << "init"
+                        << initialized
+                        << "finish"
+                        << finished
+                        << "errored"
+                        << errored);
+}
+
+std::string ParallelConnectionState::toString() const {
+    return str::stream() << "PCState : " << toBSON();
+}
+
+BSONObj ParallelConnectionState::toBSON() const {
+    BSONObj cursorPeek = BSON("no cursor"
+                              << "");
+    if (cursor) {
+        vector<BSONObj> v;
+        cursor->peek(v, 1);
+        if (v.size() == 0)
+            cursorPeek = BSON("no data"
+                              << "");
+        else
+            cursorPeek = BSON("" << v[0]);
+    }
+
+    BSONObj stateObj =
+        BSON("conn" << (conn ? (conn->ok() ? conn->conn().toString() : "(done)") : "") << "vinfo"
+                    << (manager ? (str::stream() << manager->getns() << " @ "
+                                                 << manager->getVersion().toString())
+                                : primary->toString()));
+
+    // Append cursor data if exists
+    BSONObjBuilder stateB;
+    stateB.appendElements(stateObj);
+    if (!cursor)
+        stateB.append("cursor", "(none)");
+    else {
+        vector<BSONObj> v;
+        cursor->peek(v, 1);
+        if (v.size() == 0)
+            stateB.append("cursor", "(empty)");
+        else
+            stateB.append("cursor", v[0]);
+    }
+
+    stateB.append("count", count);
+    stateB.append("done", done);
+
+    return stateB.obj().getOwned();
+}
+
+void throwCursorStale(DBClientCursor* cursor) {
+    invariant(cursor);
+
+    if (cursor->hasResultFlag(ResultFlag_ShardConfigStale)) {
+        BSONObj error;
+        cursor->peekError(&error);
+        throw RecvStaleConfigException("query returned a stale config error", error);
+    }
+
+    if (NamespaceString(cursor->getns()).isCommand()) {
+        // Commands that care about versioning (like the count or geoNear command) sometimes return
+        // with the stale config error code, but don't set the ShardConfigStale result flag on the
+        // cursor.
+        //
+        // TODO: Standardize stale config reporting.
+        BSONObj res = cursor->peekFirst();
+        if (res.hasField("code") && res["code"].Number() == ErrorCodes::SendStaleConfig) {
+            throw RecvStaleConfigException("command returned a stale config error", res);
+        }
+    }
 }
 
 }  // namespace mongo
