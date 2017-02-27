@@ -516,6 +516,7 @@ TEST_F(ReplCoordElectTest, StepsDownRemoteIfNodeHasHigherPriorityThanCurrentPrim
     auto&& request = noi->getRequest();
     log() << request.target << " processing " << request.cmdObj;
     ASSERT_EQUALS("replSetStepDown", request.cmdObj.firstElement().fieldNameStringData());
+    ASSERT_EQUALS(1LL, request.cmdObj["secondaryCatchUpPeriodSecs"].safeNumberLong());
     auto target = request.target;
     ASSERT_EQUALS(HostAndPort("node2", 12345), target);
     auto response = makeResponseStatus(BSON("ok" << 1));
