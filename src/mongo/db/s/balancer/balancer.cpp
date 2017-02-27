@@ -46,12 +46,11 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/client/shard.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
-#include "mongo/s/sharding_raii.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -534,18 +533,20 @@ Status Balancer::_enforceTagRanges(OperationContext* opCtx) {
     }
 
     for (const auto& splitInfo : chunksToSplitStatus.getValue()) {
-        auto scopedCMStatus = ScopedChunkManager::refreshAndGet(opCtx, splitInfo.nss);
-        if (!scopedCMStatus.isOK()) {
-            return scopedCMStatus.getStatus();
+        auto routingInfoStatus =
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+                opCtx, splitInfo.nss);
+        if (!routingInfoStatus.isOK()) {
+            return routingInfoStatus.getStatus();
         }
 
-        const auto& scopedCM = scopedCMStatus.getValue();
+        auto cm = routingInfoStatus.getValue().cm();
 
         auto splitStatus =
             shardutil::splitChunkAtMultiplePoints(opCtx,
                                                   splitInfo.shardId,
                                                   splitInfo.nss,
-                                                  scopedCM.cm()->getShardKeyPattern(),
+                                                  cm->getShardKeyPattern(),
                                                   splitInfo.collectionVersion,
                                                   ChunkRange(splitInfo.minKey, splitInfo.maxKey),
                                                   splitInfo.splitKeys);
@@ -613,8 +614,9 @@ int Balancer::_moveChunks(OperationContext* opCtx,
 void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
                                  const NamespaceString& nss,
                                  const BSONObj& minKey) {
-    auto scopedCM = uassertStatusOK(ScopedChunkManager::refreshAndGet(opCtx, nss));
-    const auto cm = scopedCM.cm().get();
+    auto routingInfo = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss));
+    const auto cm = routingInfo.cm().get();
 
     auto chunk = cm->findIntersectingChunkWithSimpleCollation(minKey);
 

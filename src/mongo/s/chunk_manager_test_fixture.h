@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2017 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,57 +26,37 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/commands.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/grid.h"
+#include <vector>
+
+#include "mongo/db/namespace_string.h"
+#include "mongo/s/catalog/sharding_catalog_test_fixture.h"
+#include "mongo/stdx/memory.h"
 
 namespace mongo {
-namespace {
 
-class FlushRouterConfigCmd : public Command {
-public:
-    FlushRouterConfigCmd() : Command("flushRouterConfig", false, "flushrouterconfig") {}
+class BSONObj;
+class ChunkManager;
+class CollatorInterface;
+class ShardKeyPattern;
 
-    virtual bool slaveOk() const {
-        return true;
-    }
+class ChunkManagerTestFixture : public ShardingCatalogTestFixture {
+protected:
+    void setUp() override;
 
-    virtual bool adminOnly() const {
-        return true;
-    }
+    /**
+     * Returns a chunk manager with chunks at the specified split points. Each individual chunk is
+     * placed on a separate shard with shard id being a single number ranging from "0" to the number
+     * of chunks.
+     */
+    std::shared_ptr<ChunkManager> makeChunkManager(
+        const ShardKeyPattern& shardKeyPattern,
+        std::unique_ptr<CollatorInterface> defaultCollator,
+        bool unique,
+        const std::vector<BSONObj>& splitPoints);
 
+    static const NamespaceString kNss;
+};
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    virtual void help(std::stringstream& help) const {
-        help << "flush all router config";
-    }
-
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        ActionSet actions;
-        actions.addAction(ActionType::flushRouterConfig);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-    }
-
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname,
-                     BSONObj& cmdObj,
-                     int options,
-                     std::string& errmsg,
-                     BSONObjBuilder& result) {
-        Grid::get(opCtx)->catalogCache()->purgeAllDatabases();
-
-        result.appendBool("flushed", true);
-        return true;
-    }
-
-} flushRouterConfigCmd;
-
-}  // namespace
 }  // namespace mongo

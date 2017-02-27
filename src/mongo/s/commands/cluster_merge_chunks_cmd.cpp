@@ -37,12 +37,10 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/config.h"
+#include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_raii.h"
 
 namespace mongo {
 
@@ -60,14 +58,14 @@ class ClusterMergeChunksCommand : public Command {
 public:
     ClusterMergeChunksCommand() : Command("mergeChunks") {}
 
-    virtual void help(stringstream& h) const {
+    void help(stringstream& h) const override {
         h << "Merge Chunks command\n"
           << "usage: { mergeChunks : <ns>, bounds : [ <min key>, <max key> ] }";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) override {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                 ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
                 ActionType::splitChunk)) {
@@ -76,17 +74,19 @@ public:
         return Status::OK();
     }
 
-    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
-    virtual bool slaveOk() const {
+
+    bool slaveOk() const override {
         return false;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -104,10 +104,13 @@ public:
              BSONObj& cmdObj,
              int,
              string& errmsg,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        auto scopedCM = uassertStatusOK(ScopedChunkManager::refreshAndGet(opCtx, nss));
+        auto routingInfo = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                         nss));
+        const auto cm = routingInfo.cm();
 
         vector<BSONObj> bounds;
         if (!FieldParser::extract(cmdObj, boundsField, &bounds, &errmsg)) {
@@ -136,8 +139,6 @@ public:
             errmsg = "no max key specified";
             return false;
         }
-
-        auto const cm = scopedCM.cm();
 
         if (!cm->getShardKeyPattern().isShardKey(minKey) ||
             !cm->getShardKeyPattern().isShardKey(maxKey)) {
@@ -178,6 +179,8 @@ public:
         ShardConnection conn(shardStatus.getValue()->getConnString(), "");
         bool ok = conn->runCommand("admin", remoteCmdObjB.obj(), remoteResult);
         conn.done();
+
+        Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
 
         result.appendElements(remoteResult);
         return ok;

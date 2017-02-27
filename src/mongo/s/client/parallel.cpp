@@ -39,11 +39,9 @@
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_raii.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_exception.h"
@@ -321,42 +319,20 @@ void ParallelSortClusteredCursor::fullInit(OperationContext* opCtx) {
     finishInit(opCtx);
 }
 
-void ParallelSortClusteredCursor::_markStaleNS(OperationContext* opCtx,
-                                               const NamespaceString& staleNS,
-                                               const StaleConfigException& e,
-                                               bool& forceReload) {
-    if (e.requiresFullReload()) {
-        Grid::get(opCtx)->catalogCache()->invalidate(staleNS.db());
+void ParallelSortClusteredCursor::_markStaleNS(const NamespaceString& staleNS,
+                                               const StaleConfigException& e) {
+    if (_staleNSMap.find(staleNS.ns()) == _staleNSMap.end()) {
+        _staleNSMap[staleNS.ns()] = 1;
     }
 
-    if (_staleNSMap.find(staleNS.ns()) == _staleNSMap.end())
-        _staleNSMap[staleNS.ns()] = 1;
-
-    int tries = ++_staleNSMap[staleNS.ns()];
+    const int tries = ++_staleNSMap[staleNS.ns()];
 
     if (tries >= 5) {
         throw SendStaleConfigException(staleNS.ns(),
-                                       str::stream() << "too many retries of stale version info",
+                                       "too many retries of stale version info",
                                        e.getVersionReceived(),
                                        e.getVersionWanted());
     }
-
-    forceReload = tries > 2;
-}
-
-void ParallelSortClusteredCursor::_handleStaleNS(OperationContext* opCtx,
-                                                 const NamespaceString& staleNS,
-                                                 bool forceReload) {
-    auto scopedCMStatus = ScopedChunkManager::get(opCtx, staleNS);
-    if (!scopedCMStatus.isOK()) {
-        log() << "cannot reload database info for stale namespace " << staleNS.ns();
-        return;
-    }
-
-    const auto& scopedCM = scopedCMStatus.getValue();
-
-    // Reload chunk manager, potentially forcing the namespace
-    scopedCM.db()->getChunkManagerIfExists(opCtx, staleNS.ns(), true, forceReload);
 }
 
 void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
@@ -459,12 +435,12 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
     shared_ptr<Shard> primary;
 
     {
-        auto scopedCMStatus = ScopedChunkManager::get(opCtx, nss);
-        if (scopedCMStatus != ErrorCodes::NamespaceNotFound) {
-            uassertStatusOK(scopedCMStatus.getStatus());
-            const auto& scopedCM = scopedCMStatus.getValue();
-            manager = scopedCM.cm();
-            primary = scopedCM.primary();
+        auto routingInfoStatus =
+            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss);
+        if (routingInfoStatus != ErrorCodes::NamespaceNotFound) {
+            auto routingInfo = uassertStatusOK(std::move(routingInfoStatus));
+            manager = routingInfo.cm();
+            primary = routingInfo.primary();
         }
     }
 
@@ -642,20 +618,17 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
             if (staleNS.size() == 0)
                 staleNS = nss;  // ns is the *versioned* namespace, be careful of this
 
-            // Probably need to retry fully
-            bool forceReload;
-            _markStaleNS(opCtx, staleNS, e, forceReload);
+            _markStaleNS(staleNS, e);
+            Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(staleNS);
 
-            LOG(1) << "stale config of ns " << staleNS
-                   << " during initialization, will retry with forced : " << forceReload
+            LOG(1) << "stale config of ns " << staleNS << " during initialization, will retry"
                    << causedBy(redact(e));
 
             // This is somewhat strange
-            if (staleNS != nss)
+            if (staleNS != nss) {
                 warning() << "versioned ns " << nss.ns() << " doesn't match stale config namespace "
                           << staleNS;
-
-            _handleStaleNS(opCtx, staleNS, forceReload);
+            }
 
             // Restart with new chunk manager
             startInit(opCtx);
@@ -860,26 +833,21 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* opCtx) {
     if (retry) {
         // Refresh stale namespaces
         if (staleNSExceptions.size()) {
-            for (map<string, StaleConfigException>::iterator i = staleNSExceptions.begin(),
-                                                             end = staleNSExceptions.end();
-                 i != end;
-                 ++i) {
-                NamespaceString staleNS(i->first);
-                const StaleConfigException& exception = i->second;
+            for (const auto& exEntry : staleNSExceptions) {
+                const NamespaceString staleNS(exEntry.first);
+                const StaleConfigException& ex = exEntry.second;
 
-                bool forceReload;
-                _markStaleNS(opCtx, staleNS, exception, forceReload);
+                _markStaleNS(staleNS, ex);
+                Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(staleNS);
 
-                LOG(1) << "stale config of ns " << staleNS
-                       << " on finishing query, will retry with forced : " << forceReload
-                       << causedBy(redact(exception));
+                LOG(1) << "stale config of ns " << staleNS << " on finishing query, will retry"
+                       << causedBy(redact(ex));
 
                 // This is somewhat strange
-                if (staleNS != ns)
+                if (staleNS != ns) {
                     warning() << "versioned ns " << ns << " doesn't match stale config namespace "
                               << staleNS;
-
-                _handleStaleNS(opCtx, staleNS, forceReload);
+                }
             }
         }
 

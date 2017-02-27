@@ -35,12 +35,12 @@
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/ns_targeter.h"
 
 namespace mongo {
 
 class ChunkManager;
-class CollatorInterface;
 class OperationContext;
 class Shard;
 struct ChunkVersion;
@@ -109,21 +109,12 @@ public:
     Status refreshIfNeeded(OperationContext* opCtx, bool* wasChanged);
 
 private:
-    // Different ways we can refresh metadata
-    enum RefreshType {
-        // The version has gone up, but the collection hasn't been dropped
-        RefreshType_RefreshChunkManager,
-        // The collection may have been dropped, so we need to reload the db
-        RefreshType_ReloadDatabase
-    };
-
-    typedef std::map<ShardId, ChunkVersion> ShardVersionMap;
-
+    using ShardVersionMap = std::map<ShardId, ChunkVersion>;
 
     /**
      * Performs an actual refresh from the config server.
      */
-    Status refreshNow(OperationContext* opCtx, RefreshType refreshType);
+    Status refreshNow(OperationContext* opCtx);
 
     /**
      * Returns a vector of ShardEndpoints where a document might need to be placed.
@@ -170,10 +161,8 @@ private:
     // Represents only the view and not really part of the targeter state. This is not owned here.
     TargeterStats* _stats;
 
-    // Zero or one of these are filled at all times
-    // If sharded, _manager, if unsharded, _primary, on error, neither
-    std::shared_ptr<ChunkManager> _manager;
-    std::shared_ptr<Shard> _primary;
+    // The latest loaded routing cache entry
+    boost::optional<CachedCollectionRoutingInfo> _routingInfo;
 
     // Map of shard->remote shard version reported from stale errors
     ShardVersionMap _remoteShardVersions;
