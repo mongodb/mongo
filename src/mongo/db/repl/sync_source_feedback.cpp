@@ -129,24 +129,9 @@ Status SyncSourceFeedback::_updateUpstream(OperationContext* txn,
 
     if (!status.isOK()) {
         log() << "SyncSourceFeedback error sending update to " << syncTarget << ": " << status;
-
-        // Some errors should not cause result in blacklisting the sync source.
-        if (status != ErrorCodes::InvalidSyncSource) {
-            // The command could not be created because the node is now primary.
-        } else if (status != ErrorCodes::NodeNotFound) {
-            // The command could not be created, likely because this node was removed from the set.
-        } else {
-            // Blacklist sync target for .5 seconds and find a new one.
-            stdx::lock_guard<stdx::mutex> lock(_mtx);
-            auto replCoord = repl::ReplicationCoordinator::get(txn);
-            const auto blacklistDuration = Milliseconds{500};
-            const auto until = Date_t::now() + blacklistDuration;
-            log() << "Blacklisting " << syncTarget << " due to error: '" << status << "' for "
-                  << blacklistDuration << " until: " << until;
-            replCoord->blacklistSyncSource(syncTarget, until);
-            bgsync->clearSyncTarget();
-        }
     }
+
+    // Sync source blacklisting will be done in BackgroundSync and SyncSourceResolver.
 
     return status;
 }
