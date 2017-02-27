@@ -172,17 +172,18 @@ Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* txn) {
     const bool unique = true;
     auto configShard = Grid::get(txn)->shardRegistry()->getConfigShard();
 
-    Status result = configShard->createIndex(txn,
-                                             NamespaceString(ChunkType::ConfigNS),
-                                             BSON(ChunkType::ns() << 1 << ChunkType::min() << 1),
-                                             unique);
+    Status result =
+        configShard->createIndexOnConfig(txn,
+                                         NamespaceString(ChunkType::ConfigNS),
+                                         BSON(ChunkType::ns() << 1 << ChunkType::min() << 1),
+                                         unique);
     if (!result.isOK()) {
         return Status(result.code(),
                       str::stream() << "couldn't create ns_1_min_1 index on config db"
                                     << causedBy(result));
     }
 
-    result = configShard->createIndex(
+    result = configShard->createIndexOnConfig(
         txn,
         NamespaceString(ChunkType::ConfigNS),
         BSON(ChunkType::ns() << 1 << ChunkType::shard() << 1 << ChunkType::min() << 1),
@@ -193,28 +194,29 @@ Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* txn) {
                                     << causedBy(result));
     }
 
-    result =
-        configShard->createIndex(txn,
-                                 NamespaceString(ChunkType::ConfigNS),
-                                 BSON(ChunkType::ns() << 1 << ChunkType::DEPRECATED_lastmod() << 1),
-                                 unique);
+    result = configShard->createIndexOnConfig(
+        txn,
+        NamespaceString(ChunkType::ConfigNS),
+        BSON(ChunkType::ns() << 1 << ChunkType::DEPRECATED_lastmod() << 1),
+        unique);
     if (!result.isOK()) {
         return Status(result.code(),
                       str::stream() << "couldn't create ns_1_lastmod_1 index on config db"
                                     << causedBy(result));
     }
 
-    result = configShard->createIndex(txn,
-                                      NamespaceString(MigrationType::ConfigNS),
-                                      BSON(MigrationType::ns() << 1 << MigrationType::min() << 1),
-                                      unique);
+    result = configShard->createIndexOnConfig(
+        txn,
+        NamespaceString(MigrationType::ConfigNS),
+        BSON(MigrationType::ns() << 1 << MigrationType::min() << 1),
+        unique);
     if (!result.isOK()) {
         return Status(result.code(),
                       str::stream() << "couldn't create ns_1_min_1 index on config.migrations"
                                     << causedBy(result));
     }
 
-    result = configShard->createIndex(
+    result = configShard->createIndexOnConfig(
         txn, NamespaceString(ShardType::ConfigNS), BSON(ShardType::host() << 1), unique);
     if (!result.isOK()) {
         return Status(result.code(),
@@ -222,7 +224,7 @@ Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* txn) {
                                     << causedBy(result));
     }
 
-    result = configShard->createIndex(
+    result = configShard->createIndexOnConfig(
         txn, NamespaceString(LocksType::ConfigNS), BSON(LocksType::lockID() << 1), !unique);
     if (!result.isOK()) {
         return Status(result.code(),
@@ -230,17 +232,18 @@ Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* txn) {
                                     << causedBy(result));
     }
 
-    result = configShard->createIndex(txn,
-                                      NamespaceString(LocksType::ConfigNS),
-                                      BSON(LocksType::state() << 1 << LocksType::process() << 1),
-                                      !unique);
+    result =
+        configShard->createIndexOnConfig(txn,
+                                         NamespaceString(LocksType::ConfigNS),
+                                         BSON(LocksType::state() << 1 << LocksType::process() << 1),
+                                         !unique);
     if (!result.isOK()) {
         return Status(result.code(),
                       str::stream() << "couldn't create state and process id index on config db"
                                     << causedBy(result));
     }
 
-    result = configShard->createIndex(
+    result = configShard->createIndexOnConfig(
         txn, NamespaceString(LockpingsType::ConfigNS), BSON(LockpingsType::ping() << 1), !unique);
     if (!result.isOK()) {
         return Status(result.code(),
@@ -248,20 +251,20 @@ Status ShardingCatalogManagerImpl::_initConfigIndexes(OperationContext* txn) {
                                     << causedBy(result));
     }
 
-    result = configShard->createIndex(txn,
-                                      NamespaceString(TagsType::ConfigNS),
-                                      BSON(TagsType::ns() << 1 << TagsType::min() << 1),
-                                      unique);
+    result = configShard->createIndexOnConfig(txn,
+                                              NamespaceString(TagsType::ConfigNS),
+                                              BSON(TagsType::ns() << 1 << TagsType::min() << 1),
+                                              unique);
     if (!result.isOK()) {
         return Status(result.code(),
                       str::stream() << "couldn't create ns_1_min_1 index on config db"
                                     << causedBy(result));
     }
 
-    result = configShard->createIndex(txn,
-                                      NamespaceString(TagsType::ConfigNS),
-                                      BSON(TagsType::ns() << 1 << TagsType::tag() << 1),
-                                      !unique);
+    result = configShard->createIndexOnConfig(txn,
+                                              NamespaceString(TagsType::ConfigNS),
+                                              BSON(TagsType::ns() << 1 << TagsType::tag() << 1),
+                                              !unique);
     if (!result.isOK()) {
         return Status(result.code(),
                       str::stream() << "couldn't create ns_1_tag_1 index on config db"

@@ -66,13 +66,13 @@ Status checkForOveralappedZonedKeyRange(OperationContext* txn,
                                         const KeyPattern& shardKeyPattern) {
     DistributionStatus chunkDist(ns, ShardToChunksMap{});
 
-    auto tagStatus = configServer->exhaustiveFind(txn,
-                                                  kConfigPrimarySelector,
-                                                  repl::ReadConcernLevel::kLocalReadConcern,
-                                                  NamespaceString(TagsType::ConfigNS),
-                                                  BSON(TagsType::ns(ns.ns())),
-                                                  BSONObj(),
-                                                  0);
+    auto tagStatus = configServer->exhaustiveFindOnConfig(txn,
+                                                          kConfigPrimarySelector,
+                                                          repl::ReadConcernLevel::kLocalReadConcern,
+                                                          NamespaceString(TagsType::ConfigNS),
+                                                          BSON(TagsType::ns(ns.ns())),
+                                                          BSONObj(),
+                                                          0);
     if (!tagStatus.isOK()) {
         return tagStatus.getStatus();
     }
@@ -117,13 +117,14 @@ StatusWith<ChunkRange> includeFullShardKey(OperationContext* txn,
                                            const NamespaceString& ns,
                                            const ChunkRange& range,
                                            KeyPattern* shardKeyPatternOut) {
-    auto findCollStatus = configServer->exhaustiveFind(txn,
-                                                       kConfigPrimarySelector,
-                                                       repl::ReadConcernLevel::kLocalReadConcern,
-                                                       NamespaceString(CollectionType::ConfigNS),
-                                                       BSON(CollectionType::fullNs(ns.ns())),
-                                                       BSONObj(),
-                                                       1);
+    auto findCollStatus =
+        configServer->exhaustiveFindOnConfig(txn,
+                                             kConfigPrimarySelector,
+                                             repl::ReadConcernLevel::kLocalReadConcern,
+                                             NamespaceString(CollectionType::ConfigNS),
+                                             BSON(CollectionType::fullNs(ns.ns())),
+                                             BSONObj(),
+                                             1);
 
     if (!findCollStatus.isOK()) {
         return findCollStatus.getStatus();
@@ -209,13 +210,13 @@ Status ShardingCatalogManagerImpl::removeShardFromZone(OperationContext* txn,
     //
 
     auto findShardExistsStatus =
-        configShard->exhaustiveFind(txn,
-                                    kConfigPrimarySelector,
-                                    repl::ReadConcernLevel::kLocalReadConcern,
-                                    shardNS,
-                                    BSON(ShardType::name() << shardName),
-                                    BSONObj(),
-                                    1);
+        configShard->exhaustiveFindOnConfig(txn,
+                                            kConfigPrimarySelector,
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            shardNS,
+                                            BSON(ShardType::name() << shardName),
+                                            BSONObj(),
+                                            1);
 
     if (!findShardExistsStatus.isOK()) {
         return findShardExistsStatus.getStatus();
@@ -230,13 +231,14 @@ Status ShardingCatalogManagerImpl::removeShardFromZone(OperationContext* txn,
     // Check how many shards belongs to this zone.
     //
 
-    auto findShardStatus = configShard->exhaustiveFind(txn,
-                                                       kConfigPrimarySelector,
-                                                       repl::ReadConcernLevel::kLocalReadConcern,
-                                                       shardNS,
-                                                       BSON(ShardType::tags() << zoneName),
-                                                       BSONObj(),
-                                                       2);
+    auto findShardStatus =
+        configShard->exhaustiveFindOnConfig(txn,
+                                            kConfigPrimarySelector,
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            shardNS,
+                                            BSON(ShardType::tags() << zoneName),
+                                            BSONObj(),
+                                            2);
 
     if (!findShardStatus.isOK()) {
         return findShardStatus.getStatus();
@@ -263,13 +265,13 @@ Status ShardingCatalogManagerImpl::removeShardFromZone(OperationContext* txn,
         }
 
         auto findChunkRangeStatus =
-            configShard->exhaustiveFind(txn,
-                                        kConfigPrimarySelector,
-                                        repl::ReadConcernLevel::kLocalReadConcern,
-                                        NamespaceString(TagsType::ConfigNS),
-                                        BSON(TagsType::tag() << zoneName),
-                                        BSONObj(),
-                                        1);
+            configShard->exhaustiveFindOnConfig(txn,
+                                                kConfigPrimarySelector,
+                                                repl::ReadConcernLevel::kLocalReadConcern,
+                                                NamespaceString(TagsType::ConfigNS),
+                                                BSON(TagsType::tag() << zoneName),
+                                                BSONObj(),
+                                                1);
 
         if (!findChunkRangeStatus.isOK()) {
             return findChunkRangeStatus.getStatus();
@@ -324,13 +326,14 @@ Status ShardingCatalogManagerImpl::assignKeyRangeToZone(OperationContext* txn,
 
     const auto& fullShardKeyRange = fullShardKeyStatus.getValue();
 
-    auto zoneExistStatus = configServer->exhaustiveFind(txn,
-                                                        kConfigPrimarySelector,
-                                                        repl::ReadConcernLevel::kLocalReadConcern,
-                                                        NamespaceString(ShardType::ConfigNS),
-                                                        BSON(ShardType::tags() << zoneName),
-                                                        BSONObj(),
-                                                        1);
+    auto zoneExistStatus =
+        configServer->exhaustiveFindOnConfig(txn,
+                                             kConfigPrimarySelector,
+                                             repl::ReadConcernLevel::kLocalReadConcern,
+                                             NamespaceString(ShardType::ConfigNS),
+                                             BSON(ShardType::tags() << zoneName),
+                                             BSONObj(),
+                                             1);
 
     if (!zoneExistStatus.isOK()) {
         return zoneExistStatus.getStatus();

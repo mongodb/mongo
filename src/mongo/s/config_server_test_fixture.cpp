@@ -192,7 +192,7 @@ Status ConfigServerTestFixture::insertToConfigCollection(OperationContext* txn,
                                              kReadPref,
                                              ns.db().toString(),
                                              request.toBSON(),
-                                             Shard::kDefaultCommandTimeout,
+                                             Shard::kDefaultConfigCommandTimeout,
                                              Shard::RetryPolicy::kNoRetry);
 
     BatchedCommandResponse batchResponse;
@@ -206,7 +206,7 @@ StatusWith<BSONObj> ConfigServerTestFixture::findOneOnConfigCollection(Operation
     auto config = getConfigShard();
     invariant(config);
 
-    auto findStatus = config->exhaustiveFind(
+    auto findStatus = config->exhaustiveFindOnConfig(
         txn, kReadPref, repl::ReadConcernLevel::kMajorityReadConcern, ns, filter, BSONObj(), 1);
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
@@ -278,7 +278,7 @@ StatusWith<std::vector<BSONObj>> ConfigServerTestFixture::getIndexes(OperationCo
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                             ns.db().toString(),
                                             BSON("listIndexes" << ns.coll().toString()),
-                                            Shard::kDefaultCommandTimeout,
+                                            Shard::kDefaultConfigCommandTimeout,
                                             Shard::RetryPolicy::kIdempotent);
     if (!response.isOK()) {
         return response.getStatus();

@@ -83,7 +83,7 @@ void ShardLocalTest::setUp() {
     Client::initThreadIfNotAlready();
     _txn = getGlobalServiceContext()->makeOperationContext(&cc());
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
-    _shardLocal = stdx::make_unique<ShardLocal>(ShardId("shardId"));
+    _shardLocal = stdx::make_unique<ShardLocal>(ShardId("config"));
     const repl::ReplSettings replSettings = {};
     repl::setGlobalReplicationCoordinator(
         new repl::ReplicationCoordinatorMock(_txn->getServiceContext(), replSettings));
@@ -148,13 +148,13 @@ StatusWith<Shard::QueryResponse> ShardLocalTest::runFindQuery(NamespaceString ns
                                                               BSONObj query,
                                                               BSONObj sort,
                                                               boost::optional<long long> limit) {
-    return _shardLocal->exhaustiveFind(_txn.get(),
-                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                       repl::ReadConcernLevel::kMajorityReadConcern,
-                                       nss,
-                                       query,
-                                       sort,
-                                       limit);
+    return _shardLocal->exhaustiveFindOnConfig(_txn.get(),
+                                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                               repl::ReadConcernLevel::kMajorityReadConcern,
+                                               nss,
+                                               query,
+                                               sort,
+                                               limit);
 }
 
 TEST_F(ShardLocalTest, RunCommand) {
@@ -246,7 +246,8 @@ TEST_F(ShardLocalTest, CreateIndex) {
 
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, getIndexes(nss).getStatus());
 
-    Status status = _shardLocal->createIndex(_txn.get(), nss, BSON("a" << 1 << "b" << 1), true);
+    Status status =
+        _shardLocal->createIndexOnConfig(_txn.get(), nss, BSON("a" << 1 << "b" << 1), true);
     // Creating the index should implicitly create the collection
     ASSERT_OK(status);
 
@@ -255,13 +256,13 @@ TEST_F(ShardLocalTest, CreateIndex) {
     ASSERT_EQ(2U, indexes.size());
 
     // Making an identical index should be a no-op.
-    status = _shardLocal->createIndex(_txn.get(), nss, BSON("a" << 1 << "b" << 1), true);
+    status = _shardLocal->createIndexOnConfig(_txn.get(), nss, BSON("a" << 1 << "b" << 1), true);
     ASSERT_OK(status);
     indexes = unittest::assertGet(getIndexes(nss));
     ASSERT_EQ(2U, indexes.size());
 
     // Trying to make the same index as non-unique should fail.
-    status = _shardLocal->createIndex(_txn.get(), nss, BSON("a" << 1 << "b" << 1), false);
+    status = _shardLocal->createIndexOnConfig(_txn.get(), nss, BSON("a" << 1 << "b" << 1), false);
     ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict, status);
     indexes = unittest::assertGet(getIndexes(nss));
     ASSERT_EQ(2U, indexes.size());

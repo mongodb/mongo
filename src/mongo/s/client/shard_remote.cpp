@@ -240,7 +240,7 @@ Shard::HostWithResponse ShardRemote::_runCommand(OperationContext* txn,
                                                    std::move(writeConcernStatus)));
 }
 
-StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFind(
+StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     OperationContext* txn,
     const ReadPreferenceSetting& readPref,
     const repl::ReadConcernLevel& readConcernLevel,
@@ -316,7 +316,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFind(
     }
 
     const Milliseconds maxTimeMS =
-        std::min(txn->getRemainingMaxTimeMillis(), kDefaultCommandTimeout);
+        std::min(txn->getRemainingMaxTimeMillis(), kDefaultConfigCommandTimeout);
 
     BSONObjBuilder findCmdBuilder;
 
@@ -360,10 +360,10 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFind(
     return response;
 }
 
-Status ShardRemote::createIndex(OperationContext* txn,
-                                const NamespaceString& ns,
-                                const BSONObj& keys,
-                                bool unique) {
+Status ShardRemote::createIndexOnConfig(OperationContext* txn,
+                                        const NamespaceString& ns,
+                                        const BSONObj& keys,
+                                        bool unique) {
     MONGO_UNREACHABLE;
 }
 

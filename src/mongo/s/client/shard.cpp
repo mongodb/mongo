@@ -91,7 +91,7 @@ Status Shard::CommandResponse::processBatchWriteResponse(
     return status;
 }
 
-const Milliseconds Shard::kDefaultCommandTimeout = Seconds{30};
+const Milliseconds Shard::kDefaultConfigCommandTimeout = Seconds{30};
 
 bool Shard::shouldErrorBePropagated(ErrorCodes::Error code) {
     return std::find(RemoteCommandRetryScheduler::kAllRetriableErrors.begin(),
@@ -185,9 +185,10 @@ StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
     MONGO_UNREACHABLE;
 }
 
-BatchedCommandResponse Shard::runBatchWriteCommand(OperationContext* txn,
-                                                   const BatchedCommandRequest& batchRequest,
-                                                   RetryPolicy retryPolicy) {
+BatchedCommandResponse Shard::runBatchWriteCommandOnConfig(
+    OperationContext* txn, const BatchedCommandRequest& batchRequest, RetryPolicy retryPolicy) {
+    invariant(isConfig());
+
     const std::string dbname = batchRequest.getNS().db().toString();
     invariant(batchRequest.sizeWriteOps() == 1);
 
@@ -197,7 +198,7 @@ BatchedCommandResponse Shard::runBatchWriteCommand(OperationContext* txn,
         auto response = _runCommand(txn,
                                     ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                     dbname,
-                                    kDefaultCommandTimeout,
+                                    kDefaultConfigCommandTimeout,
                                     cmdObj);
 
         BatchedCommandResponse batchResponse;
@@ -219,7 +220,7 @@ BatchedCommandResponse Shard::runBatchWriteCommand(OperationContext* txn,
     MONGO_UNREACHABLE;
 }
 
-StatusWith<Shard::QueryResponse> Shard::exhaustiveFind(
+StatusWith<Shard::QueryResponse> Shard::exhaustiveFindOnConfig(
     OperationContext* txn,
     const ReadPreferenceSetting& readPref,
     const repl::ReadConcernLevel& readConcernLevel,
@@ -227,8 +228,12 @@ StatusWith<Shard::QueryResponse> Shard::exhaustiveFind(
     const BSONObj& query,
     const BSONObj& sort,
     const boost::optional<long long> limit) {
+    // Do not allow exhaustive finds to be run against regular shards.
+    invariant(isConfig());
+
     for (int retry = 1; retry <= kOnErrorNumRetries; retry++) {
-        auto result = _exhaustiveFind(txn, readPref, readConcernLevel, nss, query, sort, limit);
+        auto result =
+            _exhaustiveFindOnConfig(txn, readPref, readConcernLevel, nss, query, sort, limit);
 
         if (retry < kOnErrorNumRetries &&
             isRetriableError(result.getStatus().code(), RetryPolicy::kIdempotent)) {

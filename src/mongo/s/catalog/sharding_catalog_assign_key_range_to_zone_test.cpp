@@ -87,13 +87,13 @@ public:
                         const ChunkRange& range,
                         const string& zoneName) {
         auto findStatus =
-            getConfigShard()->exhaustiveFind(operationContext(),
-                                             kReadPref,
-                                             repl::ReadConcernLevel::kMajorityReadConcern,
-                                             NamespaceString(TagsType::ConfigNS),
-                                             BSONObj(),
-                                             BSONObj(),
-                                             1);
+            getConfigShard()->exhaustiveFindOnConfig(operationContext(),
+                                                     kReadPref,
+                                                     repl::ReadConcernLevel::kMajorityReadConcern,
+                                                     NamespaceString(TagsType::ConfigNS),
+                                                     BSONObj(),
+                                                     BSONObj(),
+                                                     1);
         ASSERT_OK(findStatus.getStatus());
 
         auto findResult = findStatus.getValue();

@@ -204,7 +204,7 @@ Status DistLockCatalogImpl::ping(OperationContext* txn, StringData processID, Da
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         _locksNS.db().toString(),
         request.toBSON(),
-        Shard::kDefaultCommandTimeout,
+        Shard::kDefaultConfigCommandTimeout,
         Shard::RetryPolicy::kNotIdempotent);
 
     auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
@@ -241,7 +241,7 @@ StatusWith<LocksType> DistLockCatalogImpl::grabLock(OperationContext* txn,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         _locksNS.db().toString(),
         request.toBSON(),
-        Shard::kDefaultCommandTimeout,
+        Shard::kDefaultConfigCommandTimeout,
         Shard::RetryPolicy::kNoRetry);  // Dist lock manager is handling own retries
 
     auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
@@ -298,7 +298,7 @@ StatusWith<LocksType> DistLockCatalogImpl::overtakeLock(OperationContext* txn,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         _locksNS.db().toString(),
         request.toBSON(),
-        Shard::kDefaultCommandTimeout,
+        Shard::kDefaultConfigCommandTimeout,
         Shard::RetryPolicy::kNotIdempotent);
 
     auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
@@ -343,7 +343,7 @@ Status DistLockCatalogImpl::_unlock(OperationContext* txn, const FindAndModifyRe
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         _locksNS.db().toString(),
         request.toBSON(),
-        Shard::kDefaultCommandTimeout,
+        Shard::kDefaultConfigCommandTimeout,
         Shard::RetryPolicy::kIdempotent);
 
     auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
@@ -378,7 +378,7 @@ Status DistLockCatalogImpl::unlockAll(OperationContext* txn, const std::string& 
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         _locksNS.db().toString(),
         cmdObj,
-        Shard::kDefaultCommandTimeout,
+        Shard::kDefaultConfigCommandTimeout,
         Shard::RetryPolicy::kIdempotent);
 
     if (!response.isOK()) {
@@ -409,7 +409,7 @@ StatusWith<DistLockCatalog::ServerInfo> DistLockCatalogImpl::getServerInfo(Opera
         kReadPref,
         "admin",
         BSON("serverStatus" << 1),
-        Shard::kDefaultCommandTimeout,
+        Shard::kDefaultConfigCommandTimeout,
         Shard::RetryPolicy::kIdempotent);
 
     if (!resultStatus.isOK()) {
@@ -501,7 +501,7 @@ Status DistLockCatalogImpl::stopPing(OperationContext* txn, StringData processId
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         _locksNS.db().toString(),
         request.toBSON(),
-        Shard::kDefaultCommandTimeout,
+        Shard::kDefaultConfigCommandTimeout,
         Shard::RetryPolicy::kNotIdempotent);
 
     auto findAndModifyStatus = extractFindAndModifyNewObj(std::move(resultStatus));
@@ -515,7 +515,7 @@ StatusWith<vector<BSONObj>> DistLockCatalogImpl::_findOnConfig(
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<long long> limit) {
-    auto result = _client->getConfigShard()->exhaustiveFind(
+    auto result = _client->getConfigShard()->exhaustiveFindOnConfig(
         txn, readPref, repl::ReadConcernLevel::kMajorityReadConcern, nss, query, sort, limit);
     if (!result.isOK()) {
         return result.getStatus();

@@ -349,7 +349,7 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
 }
 
 TEST_F(ConfigInitializationTest, CompatibleIndexAlreadyExists) {
-    getConfigShard()->createIndex(
+    getConfigShard()->createIndexOnConfig(
         operationContext(), NamespaceString(ShardType::ConfigNS), BSON("host" << 1), true);
 
     ASSERT_OK(catalogManager()->initializeConfigDatabaseIfNeeded(operationContext()));
@@ -373,7 +373,7 @@ TEST_F(ConfigInitializationTest, CompatibleIndexAlreadyExists) {
 TEST_F(ConfigInitializationTest, IncompatibleIndexAlreadyExists) {
     // Make the index non-unique even though its supposed to be unique, make sure initialization
     // fails
-    getConfigShard()->createIndex(
+    getConfigShard()->createIndexOnConfig(
         operationContext(), NamespaceString(ShardType::ConfigNS), BSON("host" << 1), false);
 
     ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict,

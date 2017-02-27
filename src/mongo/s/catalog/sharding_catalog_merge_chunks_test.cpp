@@ -72,13 +72,13 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
                                                  "shard0000"));
 
     auto findResponse = uassertStatusOK(
-        getConfigShard()->exhaustiveFind(operationContext(),
-                                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                         repl::ReadConcernLevel::kLocalReadConcern,
-                                         NamespaceString(ChunkType::ConfigNS),
-                                         BSON(ChunkType::ns() << "TestDB.TestColl"),
-                                         BSON(ChunkType::DEPRECATED_lastmod << -1),
-                                         boost::none));
+        getConfigShard()->exhaustiveFindOnConfig(operationContext(),
+                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                                 NamespaceString(ChunkType::ConfigNS),
+                                                 BSON(ChunkType::ns() << "TestDB.TestColl"),
+                                                 BSON(ChunkType::DEPRECATED_lastmod << -1),
+                                                 boost::none));
 
     const auto& chunksVector = findResponse.docs;
 
@@ -135,13 +135,13 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
                                                  "shard0000"));
 
     auto findResponse = uassertStatusOK(
-        getConfigShard()->exhaustiveFind(operationContext(),
-                                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                         repl::ReadConcernLevel::kLocalReadConcern,
-                                         NamespaceString(ChunkType::ConfigNS),
-                                         BSON(ChunkType::ns() << "TestDB.TestColl"),
-                                         BSON(ChunkType::DEPRECATED_lastmod << -1),
-                                         boost::none));
+        getConfigShard()->exhaustiveFindOnConfig(operationContext(),
+                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                                 NamespaceString(ChunkType::ConfigNS),
+                                                 BSON(ChunkType::ns() << "TestDB.TestColl"),
+                                                 BSON(ChunkType::DEPRECATED_lastmod << -1),
+                                                 boost::none));
 
     const auto& chunksVector = findResponse.docs;
 
@@ -202,13 +202,13 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
                                                  "shard0000"));
 
     auto findResponse = uassertStatusOK(
-        getConfigShard()->exhaustiveFind(operationContext(),
-                                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                         repl::ReadConcernLevel::kLocalReadConcern,
-                                         NamespaceString(ChunkType::ConfigNS),
-                                         BSON(ChunkType::ns() << "TestDB.TestColl"),
-                                         BSON(ChunkType::DEPRECATED_lastmod << -1),
-                                         boost::none));
+        getConfigShard()->exhaustiveFindOnConfig(operationContext(),
+                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                                 NamespaceString(ChunkType::ConfigNS),
+                                                 BSON(ChunkType::ns() << "TestDB.TestColl"),
+                                                 BSON(ChunkType::DEPRECATED_lastmod << -1),
+                                                 boost::none));
 
     const auto& chunksVector = findResponse.docs;
 
@@ -265,13 +265,13 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
                                                  "shard0000"));
 
     auto findResponse = uassertStatusOK(
-        getConfigShard()->exhaustiveFind(operationContext(),
-                                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                         repl::ReadConcernLevel::kLocalReadConcern,
-                                         NamespaceString(ChunkType::ConfigNS),
-                                         BSON(ChunkType::ns() << "TestDB.TestColl"),
-                                         BSON(ChunkType::DEPRECATED_lastmod << -1),
-                                         boost::none));
+        getConfigShard()->exhaustiveFindOnConfig(operationContext(),
+                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                                 NamespaceString(ChunkType::ConfigNS),
+                                                 BSON(ChunkType::ns() << "TestDB.TestColl"),
+                                                 BSON(ChunkType::DEPRECATED_lastmod << -1),
+                                                 boost::none));
 
     const auto& chunksVector = findResponse.docs;
 
@@ -401,13 +401,13 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedFailsPrecondition) {
 
     // Verify that no change to config.chunks happened.
     auto findResponse = uassertStatusOK(
-        getConfigShard()->exhaustiveFind(operationContext(),
-                                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                         repl::ReadConcernLevel::kLocalReadConcern,
-                                         NamespaceString(ChunkType::ConfigNS),
-                                         BSON(ChunkType::ns() << "TestDB.TestColl"),
-                                         BSON(ChunkType::DEPRECATED_lastmod << -1),
-                                         boost::none));
+        getConfigShard()->exhaustiveFindOnConfig(operationContext(),
+                                                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                                 NamespaceString(ChunkType::ConfigNS),
+                                                 BSON(ChunkType::ns() << "TestDB.TestColl"),
+                                                 BSON(ChunkType::DEPRECATED_lastmod << -1),
+                                                 boost::none));
 
     const auto& chunksVector = findResponse.docs;
 

@@ -221,7 +221,7 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* txn) {
 
     // Load the active migrations from the config.migrations collection.
     auto statusWithMigrationsQueryResponse =
-        Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFind(
+        Grid::get(txn)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
             txn,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kLocalReadConcern,
