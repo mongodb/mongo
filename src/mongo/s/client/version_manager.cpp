@@ -40,7 +40,7 @@
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/mongos_options.h"
+#include "mongo/s/is_mongos.h"
 #include "mongo/s/set_shard_version_request.h"
 #include "mongo/s/sharding_raii.h"
 #include "mongo/s/stale_exception.h"

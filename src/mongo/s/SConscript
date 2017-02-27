@@ -112,16 +112,6 @@ env.Library(
 )
 
 env.Library(
-    target='config_server_test_fixture',
-    source=[
-        'config_server_test_fixture.cpp',
-    ],
-    LIBDEPS=[
-        'sharding_mongod_test_fixture',
-    ],
-)
-
-env.Library(
     target='shard_server_test_fixture',
     source=[
         'shard_server_test_fixture.cpp',
@@ -153,6 +143,16 @@ env.Library(
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         '$BUILD_DIR/mongo/util/net/message_port_mock',
+    ],
+)
+
+env.Library(
+    target='config_server_test_fixture',
+    source=[
+        'config_server_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        'sharding_mongod_test_fixture',
     ],
 )
 
@@ -289,27 +289,6 @@ env.Library(
         'is_mongos.cpp',
     ],
     LIBDEPS=[],
-)
-
-env.Library(
-    target='mongoscore',
-    source=[
-        'cluster_cursor_stats.cpp',
-        'mongos_options.cpp',
-        's_only.cpp',
-        's_sharding_server_status.cpp',
-        'sharding_uptime_reporter.cpp',
-        'version_mongos.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmongos',
-        '$BUILD_DIR/mongo/db/fts/ftsmongos',
-        '$BUILD_DIR/mongo/db/stats/counters',
-        '$BUILD_DIR/mongo/s/query/cluster_query',
-        '$BUILD_DIR/mongo/util/concurrency/task',
-        'sharding_egress_metadata_hook_for_mongos',
-        'is_mongos',
-    ],
 )
 
 env.CppUnitTest(

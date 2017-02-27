@@ -33,6 +33,7 @@
 #include "mongo/s/commands/strategy.h"
 
 #include "mongo/base/data_cursor.h"
+#include "mongo/base/init.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/bson_extract.h"
@@ -51,6 +52,7 @@
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
+#include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
@@ -67,6 +69,7 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -102,6 +105,40 @@ void runAgainstRegistered(OperationContext* txn,
     }
 
     execCommandClient(txn, c, queryOptions, ns, jsobj, anObjBuilder);
+}
+
+/**
+ * Called into by the web server. For now we just translate the parameters to their old style
+ * equivalents.
+ */
+void execCommandHandler(OperationContext* txn,
+                        Command* command,
+                        const rpc::RequestInterface& request,
+                        rpc::ReplyBuilderInterface* replyBuilder) {
+    int queryFlags = 0;
+    BSONObj cmdObj;
+
+    std::tie(cmdObj, queryFlags) = uassertStatusOK(
+        rpc::downconvertRequestMetadata(request.getCommandArgs(), request.getMetadata()));
+
+    std::string db = request.getDatabase().rawData();
+    BSONObjBuilder result;
+
+    execCommandClient(txn, command, queryFlags, request.getDatabase().rawData(), cmdObj, result);
+
+    replyBuilder->setCommandReply(result.done()).setMetadata(rpc::makeEmptyMetadata());
+}
+
+MONGO_INITIALIZER(InitializeCommandExecCommandHandler)(InitializerContext* const) {
+    Command::registerExecCommand(execCommandHandler);
+    return Status::OK();
+}
+
+void registerErrorImpl(OperationContext* txn, const DBException& exception) {}
+
+MONGO_INITIALIZER(InitializeRegisterErrorHandler)(InitializerContext* const) {
+    Command::registerRegisterError(registerErrorImpl);
+    return Status::OK();
 }
 
 }  // namespace
@@ -565,6 +602,94 @@ Status Strategy::explainFind(OperationContext* txn,
 
     return ClusterExplain::buildExplainResult(
         txn, shardResults, mongosStageName, millisElapsed, out);
+}
+
+/**
+ * Called into by the commands infrastructure.
+ */
+void execCommandClient(OperationContext* txn,
+                       Command* c,
+                       int queryOptions,
+                       const char* ns,
+                       BSONObj& cmdObj,
+                       BSONObjBuilder& result) {
+    const std::string dbname = nsToDatabase(ns);
+
+    if (cmdObj.getBoolField("help")) {
+        std::stringstream help;
+        help << "help for: " << c->getName() << " ";
+        c->help(help);
+        result.append("help", help.str());
+        Command::appendCommandStatus(result, true, "");
+        return;
+    }
+
+    Status status = Command::checkAuthorization(c, txn, dbname, cmdObj);
+    if (!status.isOK()) {
+        Command::appendCommandStatus(result, status);
+        return;
+    }
+
+    c->_commandsExecuted.increment();
+
+    if (c->shouldAffectCommandCounter()) {
+        globalOpCounters.gotCommand();
+    }
+
+    StatusWith<WriteConcernOptions> wcResult =
+        WriteConcernOptions::extractWCFromCommand(cmdObj, dbname);
+    if (!wcResult.isOK()) {
+        Command::appendCommandStatus(result, wcResult.getStatus());
+        return;
+    }
+
+    bool supportsWriteConcern = c->supportsWriteConcern(cmdObj);
+    if (!supportsWriteConcern && !wcResult.getValue().usedDefault) {
+        // This command doesn't do writes so it should not be passed a writeConcern.
+        // If we did not use the default writeConcern, one was provided when it shouldn't have
+        // been by the user.
+        Command::appendCommandStatus(
+            result, Status(ErrorCodes::InvalidOptions, "Command does not support writeConcern"));
+        return;
+    }
+
+
+    // attach tracking
+    rpc::TrackingMetadata trackingMetadata;
+    trackingMetadata.initWithOperName(c->getName());
+    rpc::TrackingMetadata::get(txn) = trackingMetadata;
+
+    std::string errmsg;
+    bool ok = false;
+    try {
+        if (!supportsWriteConcern) {
+            ok = c->run(txn, dbname, cmdObj, queryOptions, errmsg, result);
+        } else {
+            // Change the write concern while running the command.
+            const auto oldWC = txn->getWriteConcern();
+            ON_BLOCK_EXIT([&] { txn->setWriteConcern(oldWC); });
+            txn->setWriteConcern(wcResult.getValue());
+
+            ok = c->run(txn, dbname, cmdObj, queryOptions, errmsg, result);
+        }
+    } catch (const DBException& e) {
+        result.resetToEmpty();
+        const int code = e.getCode();
+
+        // Codes for StaleConfigException
+        if (code == ErrorCodes::RecvStaleConfig || code == ErrorCodes::SendStaleConfig) {
+            throw;
+        }
+
+        errmsg = e.what();
+        result.append("code", code);
+    }
+
+    if (!ok) {
+        c->_commandsFailed.increment();
+    }
+
+    Command::appendCommandStatus(result, ok, errmsg);
 }
 
 }  // namespace mongo

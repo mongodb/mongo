@@ -34,40 +34,31 @@
 #include "mongo/s/grid.h"
 
 namespace mongo {
-
 namespace {
 
-class ShardingServerStatus : public ServerStatusSection {
+class ShardingServerStatus final : public ServerStatusSection {
 public:
-    ShardingServerStatus();
+    ShardingServerStatus() : ServerStatusSection("sharding") {}
 
-    bool includeByDefault() const final;
+    bool includeByDefault() const override {
+        return true;
+    }
 
-    BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const final;
-};
+    BSONObj generateSection(OperationContext* txn,
+                            const BSONElement& configElement) const override {
+        auto shardRegistry = Grid::get(txn)->shardRegistry();
+        invariant(shardRegistry);
+
+        BSONObjBuilder result;
+        result.append("configsvrConnectionString",
+                      shardRegistry->getConfigServerConnectionString().toString());
+
+        Grid::get(txn)->configOpTime().append(&result, "lastSeenConfigServerOpTime");
+
+        return result.obj();
+    }
+
+} shardingServerStatus;
 
 }  // namespace
-
-ShardingServerStatus shardingServerStatus;
-
-ShardingServerStatus::ShardingServerStatus() : ServerStatusSection("sharding") {}
-
-bool ShardingServerStatus::includeByDefault() const {
-    return true;
-}
-
-// This implementation runs on mongoS.
-BSONObj ShardingServerStatus::generateSection(OperationContext* txn,
-                                              const BSONElement& configElement) const {
-    invariant(grid.shardRegistry());
-
-    BSONObjBuilder result;
-    result.append("configsvrConnectionString",
-                  grid.shardRegistry()->getConfigServerConnectionString().toString());
-
-    grid.configOpTime().append(&result, "lastSeenConfigServerOpTime");
-
-    return result.obj();
-}
-
 }  // namespace mongo

@@ -7,7 +7,6 @@ env = env.Clone()
 env.Library(
     target='sharding_client',
     source=[
-        'dbclient_multi_command.cpp',
         'shard_connection.cpp',
         'shard_factory.cpp',
         'shard_registry.cpp',
@@ -74,7 +73,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/dbtests/mocklib',
         '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/s/mongoscore',
         '$BUILD_DIR/mongo/util/net/network',
     ]
 )
@@ -86,7 +84,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/s/mongoscore',
         '$BUILD_DIR/mongo/s/sharding_test_fixture',
     ]
 )

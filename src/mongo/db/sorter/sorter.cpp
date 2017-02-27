@@ -58,7 +58,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/s/mongos_options.h"
+#include "mongo/s/is_mongos.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/destructor_guard.h"

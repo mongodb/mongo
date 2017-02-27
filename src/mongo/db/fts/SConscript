@@ -77,11 +77,6 @@ env.Library(
 env.Library('ftsmongod', [
         ], LIBDEPS=["base","$BUILD_DIR/mongo/base"])
 
-
-env.Library('ftsmongos', [
-        ], LIBDEPS=["$BUILD_DIR/mongo/base"])
-
-
 env.CppUnitTest( "fts_basic_phrase_matcher_test", "fts_basic_phrase_matcher_test.cpp",
                  LIBDEPS=["base"] )
 

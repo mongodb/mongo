@@ -59,6 +59,7 @@ public:
         }
         cursorBob.done();
     }
+
 } clusterCursorStats;
 
 }  // namespace

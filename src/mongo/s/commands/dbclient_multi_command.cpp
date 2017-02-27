@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/client/dbclient_multi_command.h"
+#include "mongo/s/commands/dbclient_multi_command.h"
 
 #include "mongo/db/audit.h"
 #include "mongo/db/client.h"

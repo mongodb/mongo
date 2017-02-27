@@ -54,7 +54,6 @@ env.CppUnitTest(
         'router_exec_stage',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
-        '$BUILD_DIR/mongo/s/mongoscore',
     ],
 )
 
@@ -119,7 +118,6 @@ env.CppUnitTest(
         'store_possible_cursor',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
-        '$BUILD_DIR/mongo/s/mongoscore',
         '$BUILD_DIR/mongo/util/clock_source_mock',
     ],
 )
@@ -166,6 +164,5 @@ env.CppUnitTest(
         'cluster_client_cursor',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
-        '$BUILD_DIR/mongo/s/mongoscore',
     ],
 )

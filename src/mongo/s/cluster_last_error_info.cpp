@@ -30,6 +30,7 @@
 
 #include "mongo/s/cluster_last_error_info.h"
 
+#include "mongo/client/connection_string.h"
 #include "mongo/db/lasterror.h"
 
 namespace mongo {

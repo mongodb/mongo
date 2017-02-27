@@ -28,6 +28,7 @@
 #pragma once
 
 #include <set>
+#include <string>
 
 #include "mongo/db/client.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
