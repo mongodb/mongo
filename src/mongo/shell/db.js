@@ -331,7 +331,7 @@ var DB;
         } catch (e) {
             // we expect the command to not return a response, as the server will shut down
             // immediately.
-            if (e.message.indexOf("error doing query: failed") >= 0) {
+            if (isNetworkError(e)) {
                 print('server should be down...');
                 return;
             }

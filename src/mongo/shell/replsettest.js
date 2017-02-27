@@ -747,9 +747,20 @@ var ReplSetTest = function(opts) {
             // if a heartbeat times out during the quorum check. We retry three times to reduce
             // the chance of failing this way.
             assert.retry(() => {
-                const res = master.runCommand(cmd);
-                if (res.ok === 1) {
-                    return true;
+                var res;
+                try {
+                    res = master.runCommand(cmd);
+                    if (res.ok === 1) {
+                        return true;
+                    }
+                } catch (e) {
+                    // reconfig can lead to a stepdown if the primary looks for a majority before
+                    // a majority of nodes have successfully joined the set. If there is a stepdown
+                    // then the reconfig request will be killed and respond with a network error.
+                    if (isNetworkError(e)) {
+                        return true;
+                    }
+                    throw e;
                 }
 
                 assert.commandFailedWithCode(
@@ -834,7 +845,7 @@ var ReplSetTest = function(opts) {
         try {
             assert.commandWorked(this.getPrimary().adminCommand({replSetReconfig: config}));
         } catch (e) {
-            if (tojson(e).indexOf("error doing query: failed") < 0) {
+            if (!isNetworkError(e)) {
                 throw e;
             }
         }

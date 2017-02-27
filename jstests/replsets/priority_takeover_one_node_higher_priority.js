@@ -33,9 +33,8 @@
         var result = primary.adminCommand({replSetStepDown: stepDownGuardMillis / 1000});
         print('replSetStepDown did not throw exception but returned: ' + tojson(result));
     });
-    assert.neq(-1,
-               tojson(stepDownException).indexOf('error doing query'),
-               'replSetStepDown did not disconnect client');
+    assert(isNetworkError(stepDownException),
+           'replSetStepDown did not disconnect client; failed with ' + tojson(stepDownException));
 
     // Step down primary and wait for node 1 to be promoted to primary.
     replSet.waitForState(replSet.nodes[1], ReplSetTest.State.PRIMARY, 60 * 1000);
