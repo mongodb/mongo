@@ -84,8 +84,7 @@ struct RemoteCommandResponse {
     Status status = Status::OK();
 };
 
+std::ostream& operator<<(std::ostream& os, const RemoteCommandResponse& request);
+
 }  // namespace executor
-
-std::ostream& operator<<(std::ostream& os, const executor::RemoteCommandResponse& request);
-
 }  // namespace mongo

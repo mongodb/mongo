@@ -106,10 +106,9 @@ bool RemoteCommandRequest::operator!=(const RemoteCommandRequest& rhs) const {
     return !(*this == rhs);
 }
 
-}  // namespace executor
-
-std::ostream& operator<<(std::ostream& os, const executor::RemoteCommandRequest& request) {
+std::ostream& operator<<(std::ostream& os, const RemoteCommandRequest& request) {
     return os << request.toString();
 }
 
+}  // namespace executor
 }  // namespace mongo

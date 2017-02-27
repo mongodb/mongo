@@ -117,8 +117,7 @@ struct RemoteCommandRequest {
     Date_t expirationDate = kNoExpirationDate;
 };
 
+std::ostream& operator<<(std::ostream& os, const RemoteCommandRequest& response);
+
 }  // namespace executor
-
-std::ostream& operator<<(std::ostream& os, const executor::RemoteCommandRequest& response);
-
 }  // namespace mongo
