@@ -26,6 +26,7 @@ env.Library(
         'cluster_apply_ops_cmd.cpp',
         'cluster_available_query_options_cmd.cpp',
         'cluster_commands_common.cpp',
+        'cluster_compact_cmd.cpp',
         'cluster_control_balancer_cmd.cpp',
         'cluster_count_cmd.cpp',
         'cluster_current_op.cpp',

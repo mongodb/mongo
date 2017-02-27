@@ -50,7 +50,6 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/chunk.h"
 #include "mongo/util/log.h"
 #include "mongo/util/timer.h"
 

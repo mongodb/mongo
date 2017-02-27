@@ -36,12 +36,12 @@
 #include <set>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/commands/sharded_command_processing.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_raii.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -64,14 +64,14 @@ BSONObj RunOnAllShardsCommand::specialErrorHandler(const std::string& server,
     return originalResult;
 }
 
-void RunOnAllShardsCommand::getShardIds(OperationContext* txn,
+void RunOnAllShardsCommand::getShardIds(OperationContext* opCtx,
                                         const std::string& db,
                                         BSONObj& cmdObj,
                                         std::vector<ShardId>& shardIds) {
     grid.shardRegistry()->getAllShardIds(&shardIds);
 }
 
-bool RunOnAllShardsCommand::run(OperationContext* txn,
+bool RunOnAllShardsCommand::run(OperationContext* opCtx,
                                 const std::string& dbName,
                                 BSONObj& cmdObj,
                                 int options,
@@ -80,15 +80,15 @@ bool RunOnAllShardsCommand::run(OperationContext* txn,
     LOG(1) << "RunOnAllShardsCommand db: " << dbName << " cmd:" << redact(cmdObj);
 
     if (_implicitCreateDb) {
-        uassertStatusOK(ScopedShardDatabase::getOrCreate(txn, dbName));
+        uassertStatusOK(createShardDatabase(opCtx, dbName));
     }
 
     std::vector<ShardId> shardIds;
-    getShardIds(txn, dbName, cmdObj, shardIds);
+    getShardIds(opCtx, dbName, cmdObj, shardIds);
 
     std::list<std::shared_ptr<Future::CommandResult>> futures;
     for (const ShardId& shardId : shardIds) {
-        const auto shardStatus = grid.shardRegistry()->getShard(txn, shardId);
+        const auto shardStatus = grid.shardRegistry()->getShard(opCtx, shardId);
         if (!shardStatus.isOK()) {
             continue;
         }
@@ -120,7 +120,7 @@ bool RunOnAllShardsCommand::run(OperationContext* txn,
          ++futuresit, ++shardIdsIt) {
         std::shared_ptr<Future::CommandResult> res = *futuresit;
 
-        if (res->join(txn)) {
+        if (res->join(opCtx)) {
             // success :)
             BSONObj result = res->result();
             results.emplace_back(shardIdsIt->toString(), result);

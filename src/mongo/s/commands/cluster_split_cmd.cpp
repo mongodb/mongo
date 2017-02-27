@@ -37,15 +37,13 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
-#include "mongo/s/sharding_raii.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -90,20 +88,19 @@ class SplitCollectionCmd : public Command {
 public:
     SplitCollectionCmd() : Command("split", false, "split") {}
 
-    virtual bool slaveOk() const {
+    bool slaveOk() const override {
         return true;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
 
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
-    virtual void help(std::stringstream& help) const {
+    void help(std::stringstream& help) const override {
         help << " example: - split the shard that contains give key\n"
              << "   { split : 'alleyinsider.blog.posts' , find : { ts : 1 } }\n"
              << " example: - split the shard that contains the key with this as the middle\n"
@@ -111,9 +108,9 @@ public:
              << " NOTE: this does not move the chunks, it just creates a logical separation.";
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) override {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                 ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
                 ActionType::splitChunk)) {
@@ -122,19 +119,22 @@ public:
         return Status::OK();
     }
 
-    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
-    virtual bool run(OperationContext* txn,
-                     const std::string& dbname,
-                     BSONObj& cmdObj,
-                     int options,
-                     std::string& errmsg,
-                     BSONObjBuilder& result) {
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             BSONObj& cmdObj,
+             int options,
+             std::string& errmsg,
+             BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        auto scopedCM = uassertStatusOK(ScopedChunkManager::refreshAndGet(txn, nss));
+        auto routingInfo = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                         nss));
+        const auto cm = routingInfo.cm();
 
         const BSONField<BSONObj> findField("find", BSONObj());
         const BSONField<BSONArray> boundsField("bounds", BSONArray());
@@ -190,14 +190,12 @@ public:
             return false;
         }
 
-        auto const cm = scopedCM.cm();
-
         std::shared_ptr<Chunk> chunk;
 
         if (!find.isEmpty()) {
             // find
             BSONObj shardKey =
-                uassertStatusOK(cm->getShardKeyPattern().extractShardKeyFromQuery(txn, find));
+                uassertStatusOK(cm->getShardKeyPattern().extractShardKeyFromQuery(opCtx, find));
             if (shardKey.isEmpty()) {
                 errmsg = stream() << "no shard key found in chunk query " << find;
                 return false;
@@ -255,7 +253,7 @@ public:
         // middle of the chunk.
         const BSONObj splitPoint = !middle.isEmpty()
             ? middle
-            : selectMedianKey(txn,
+            : selectMedianKey(opCtx,
                               chunk->getShardId(),
                               nss,
                               cm->getShardKeyPattern(),
@@ -267,7 +265,7 @@ public:
               << redact(splitPoint);
 
         uassertStatusOK(
-            shardutil::splitChunkAtMultiplePoints(txn,
+            shardutil::splitChunkAtMultiplePoints(opCtx,
                                                   chunk->getShardId(),
                                                   nss,
                                                   cm->getShardKeyPattern(),
@@ -275,9 +273,7 @@ public:
                                                   ChunkRange(chunk->getMin(), chunk->getMax()),
                                                   {splitPoint}));
 
-        // Proactively refresh the chunk manager. Not strictly necessary, but this way it's
-        // immediately up-to-date the next time it's used.
-        scopedCM.db()->getChunkManagerIfExists(txn, nss.ns(), true);
+        Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
 
         return true;
     }

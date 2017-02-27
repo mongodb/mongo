@@ -52,8 +52,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/chunk_manager.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/client/parallel.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
@@ -79,7 +77,7 @@ using std::stringstream;
 
 namespace {
 
-void runAgainstRegistered(OperationContext* txn,
+void runAgainstRegistered(OperationContext* opCtx,
                           const char* ns,
                           BSONObj& jsobj,
                           BSONObjBuilder& anObjBuilder,
@@ -101,17 +99,17 @@ void runAgainstRegistered(OperationContext* txn,
         return;
     }
 
-    Command::execCommandClient(txn, c, queryOptions, ns, jsobj, anObjBuilder);
+    Command::execCommandClient(opCtx, c, queryOptions, ns, jsobj, anObjBuilder);
 }
 
 }  // namespace
 
-void Strategy::queryOp(OperationContext* txn, const NamespaceString& nss, DbMessage* dbm) {
+void Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm) {
     globalOpCounters.gotQuery();
 
     const QueryMessage q(*dbm);
 
-    Client* const client = txn->getClient();
+    Client* const client = opCtx->getClient();
     AuthorizationSession* const authSession = AuthorizationSession::get(client);
 
     Status status = authSession->checkAuthForFind(nss, false);
@@ -146,7 +144,7 @@ void Strategy::queryOp(OperationContext* txn, const NamespaceString& nss, DbMess
     }();
 
     auto canonicalQuery =
-        uassertStatusOK(CanonicalQuery::canonicalize(txn, q, ExtensionsCallbackNoop()));
+        uassertStatusOK(CanonicalQuery::canonicalize(opCtx, q, ExtensionsCallbackNoop()));
 
     // If the $explain flag was set, we must run the operation on the shards as an explain command
     // rather than a find command.
@@ -162,7 +160,7 @@ void Strategy::queryOp(OperationContext* txn, const NamespaceString& nss, DbMess
 
         BSONObjBuilder explainBuilder;
         uassertStatusOK(Strategy::explainFind(
-            txn, findCommand, queryRequest, verbosity, metadata, &explainBuilder));
+            opCtx, findCommand, queryRequest, verbosity, metadata, &explainBuilder));
 
         BSONObj explainObj = explainBuilder.done();
         replyToQuery(0,  // query result flags
@@ -183,7 +181,7 @@ void Strategy::queryOp(OperationContext* txn, const NamespaceString& nss, DbMess
     // 0 means the cursor is exhausted. Otherwise we assume that a cursor with the returned id can
     // be retrieved via the ClusterCursorManager.
     auto cursorId =
-        ClusterFind::runQuery(txn,
+        ClusterFind::runQuery(opCtx,
                               *canonicalQuery,
                               readPreference,
                               &batch,
@@ -212,10 +210,12 @@ void Strategy::queryOp(OperationContext* txn, const NamespaceString& nss, DbMess
                cursorId.getValue());
 }
 
-void Strategy::clientCommandOp(OperationContext* txn, const NamespaceString& nss, DbMessage* dbm) {
+void Strategy::clientCommandOp(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               DbMessage* dbm) {
     const QueryMessage q(*dbm);
 
-    Client* const client = txn->getClient();
+    Client* const client = opCtx->getClient();
 
     LOG(3) << "command: " << q.ns << " " << redact(q.query) << " ntoreturn: " << q.ntoreturn
            << " options: " << q.queryOptions;
@@ -245,7 +245,7 @@ void Strategy::clientCommandOp(OperationContext* txn, const NamespaceString& nss
             const NamespaceString interposedNss("admin", "$cmd");
             BSONObjBuilder reply;
             runAgainstRegistered(
-                txn, interposedNss.ns().c_str(), interposedCmd, reply, q.queryOptions);
+                opCtx, interposedNss.ns().c_str(), interposedCmd, reply, q.queryOptions);
             replyToQuery(0, client->session(), dbm->msg(), reply.done());
         };
 
@@ -299,7 +299,7 @@ void Strategy::clientCommandOp(OperationContext* txn, const NamespaceString& nss
     const int maxTimeMS =
         uassertStatusOK(QueryRequest::parseMaxTimeMS(cmdObj[QueryRequest::cmdOptionMaxTimeMS]));
     if (maxTimeMS > 0) {
-        txn->setDeadlineAfterNowBy(Milliseconds{maxTimeMS});
+        opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS});
     }
 
     int loops = 5;
@@ -309,7 +309,7 @@ void Strategy::clientCommandOp(OperationContext* txn, const NamespaceString& nss
             OpQueryReplyBuilder reply;
             {
                 BSONObjBuilder builder(reply.bufBuilderForResults());
-                runAgainstRegistered(txn, q.ns, cmdObj, builder, q.queryOptions);
+                runAgainstRegistered(opCtx, q.ns, cmdObj, builder, q.queryOptions);
             }
             reply.sendCommandReply(client->session(), dbm->msg());
             return;
@@ -324,13 +324,12 @@ void Strategy::clientCommandOp(OperationContext* txn, const NamespaceString& nss
             // For legacy reasons, ns may not actually be set in the exception
             const std::string staleNS(e.getns().empty() ? std::string(q.ns) : e.getns());
 
-            ShardConnection::checkMyConnectionVersions(txn, staleNS);
+            ShardConnection::checkMyConnectionVersions(opCtx, staleNS);
             if (loops < 4) {
-                // This throws out the entire database cache entry in response to
-                // StaleConfigException instead of just the collection which encountered it. There
-                // is no good reason for it other than the lack of lower-granularity cache
-                // invalidation.
-                Grid::get(txn)->catalogCache()->invalidate(NamespaceString(staleNS).db());
+                const NamespaceString nss(staleNS);
+                if (nss.isValid()) {
+                    Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss);
+                }
             }
         } catch (const DBException& e) {
             OpQueryReplyBuilder reply;
@@ -344,7 +343,7 @@ void Strategy::clientCommandOp(OperationContext* txn, const NamespaceString& nss
     }
 }
 
-void Strategy::commandOp(OperationContext* txn,
+void Strategy::commandOp(OperationContext* opCtx,
                          const string& db,
                          const BSONObj& command,
                          int options,
@@ -358,7 +357,7 @@ void Strategy::commandOp(OperationContext* txn,
         qSpec, CommandInfo(versionedNS, targetingQuery, targetingCollation));
 
     // Initialize the cursor
-    cursor.init(txn);
+    cursor.init(opCtx);
 
     set<ShardId> shardIds;
     cursor.getQueryShardIds(shardIds);
@@ -374,7 +373,7 @@ void Strategy::commandOp(OperationContext* txn,
     }
 }
 
-void Strategy::getMore(OperationContext* txn, const NamespaceString& nss, DbMessage* dbm) {
+void Strategy::getMore(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm) {
     const int ntoreturn = dbm->pullInt();
     uassert(
         34424, str::stream() << "Invalid ntoreturn for OP_GET_MORE: " << ntoreturn, ntoreturn >= 0);
@@ -382,12 +381,12 @@ void Strategy::getMore(OperationContext* txn, const NamespaceString& nss, DbMess
 
     globalOpCounters.gotGetMore();
 
-    Client* const client = txn->getClient();
+    Client* const client = opCtx->getClient();
 
     // TODO: Handle stale config exceptions here from coll being dropped or sharded during op for
     // now has same semantics as legacy request.
 
-    auto statusGetDb = Grid::get(txn)->catalogCache()->getDatabase(txn, nss.db());
+    auto statusGetDb = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db());
     if (statusGetDb == ErrorCodes::NamespaceNotFound) {
         replyToQuery(ResultFlag_CursorNotFound, client->session(), dbm->msg(), 0, 0, 0);
         return;
@@ -401,7 +400,7 @@ void Strategy::getMore(OperationContext* txn, const NamespaceString& nss, DbMess
 
     GetMoreRequest getMoreRequest(nss, cursorId, batchSize, boost::none, boost::none, boost::none);
 
-    auto cursorResponse = ClusterFind::runGetMore(txn, getMoreRequest);
+    auto cursorResponse = ClusterFind::runGetMore(opCtx, getMoreRequest);
     if (cursorResponse == ErrorCodes::CursorNotFound) {
         replyToQuery(ResultFlag_CursorNotFound, client->session(), dbm->msg(), 0, 0, 0);
         return;
@@ -427,7 +426,7 @@ void Strategy::getMore(OperationContext* txn, const NamespaceString& nss, DbMess
                  cursorResponse.getValue().getCursorId());
 }
 
-void Strategy::killCursors(OperationContext* txn, DbMessage* dbm) {
+void Strategy::killCursors(OperationContext* opCtx, DbMessage* dbm) {
     const int numCursors = dbm->pullInt();
     massert(34425,
             str::stream() << "Invalid killCursors message. numCursors: " << numCursors
@@ -444,9 +443,9 @@ void Strategy::killCursors(OperationContext* txn, DbMessage* dbm) {
 
     ConstDataCursor cursors(dbm->getArray(numCursors));
 
-    Client* const client = txn->getClient();
+    Client* const client = opCtx->getClient();
     AuthorizationSession* const authSession = AuthorizationSession::get(client);
-    ClusterCursorManager* const manager = Grid::get(txn)->getCursorManager();
+    ClusterCursorManager* const manager = Grid::get(opCtx)->getCursorManager();
 
     for (int i = 0; i < numCursors; ++i) {
         const CursorId cursorId = cursors.readAndAdvance<LittleEndian<int64_t>>();
@@ -480,13 +479,13 @@ void Strategy::killCursors(OperationContext* txn, DbMessage* dbm) {
     }
 }
 
-void Strategy::writeOp(OperationContext* txn, DbMessage* dbm) {
+void Strategy::writeOp(OperationContext* opCtx, DbMessage* dbm) {
     OwnedPointerVector<BatchedCommandRequest> commandRequestsOwned;
     std::vector<BatchedCommandRequest*>& commandRequests = commandRequestsOwned.mutableVector();
 
     msgToBatchRequests(dbm->msg(), &commandRequests);
 
-    auto& clientLastError = LastError::get(txn->getClient());
+    auto& clientLastError = LastError::get(opCtx->getClient());
 
     for (auto it = commandRequests.begin(); it != commandRequests.end(); ++it) {
         // Multiple commands registered to last error as multiple requests
@@ -509,7 +508,7 @@ void Strategy::writeOp(OperationContext* txn, DbMessage* dbm) {
             BSONObj commandBSON = commandRequest->toBSON();
 
             BSONObjBuilder builder;
-            runAgainstRegistered(txn, cmdNS.c_str(), commandBSON, builder, 0);
+            runAgainstRegistered(opCtx, cmdNS.c_str(), commandBSON, builder, 0);
 
             bool parsed = commandResponse.parseBSON(builder.done(), nullptr);
             (void)parsed;  // for compile
@@ -529,7 +528,7 @@ void Strategy::writeOp(OperationContext* txn, DbMessage* dbm) {
     }
 }
 
-Status Strategy::explainFind(OperationContext* txn,
+Status Strategy::explainFind(OperationContext* opCtx,
                              const BSONObj& findCommand,
                              const QueryRequest& qr,
                              ExplainCommon::Verbosity verbosity,
@@ -544,7 +543,7 @@ Status Strategy::explainFind(OperationContext* txn,
     Timer timer;
 
     std::vector<Strategy::CommandResult> shardResults;
-    Strategy::commandOp(txn,
+    Strategy::commandOp(opCtx,
                         qr.nss().db().toString(),
                         explainCmdBob.obj(),
                         options,
@@ -564,7 +563,7 @@ Status Strategy::explainFind(OperationContext* txn,
     const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults, findCommand);
 
     return ClusterExplain::buildExplainResult(
-        txn, shardResults, mongosStageName, millisElapsed, out);
+        opCtx, shardResults, mongosStageName, millisElapsed, out);
 }
 
 }  // namespace mongo

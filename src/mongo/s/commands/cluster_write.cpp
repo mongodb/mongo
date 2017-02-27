@@ -39,14 +39,13 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
-#include "mongo/s/chunk.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/chunk_manager_targeter.h"
 #include "mongo/s/commands/dbclient_multi_command.h"
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
-#include "mongo/s/sharding_raii.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -64,11 +63,6 @@ void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->setErrMessage(status.reason());
     response->setOk(false);
     dassert(response->isValid(NULL));
-}
-
-void reloadChunkManager(OperationContext* txn, const NamespaceString& nss) {
-    auto config = uassertStatusOK(ScopedShardDatabase::getExisting(txn, nss.db()));
-    config.db()->getChunkManagerIfExists(txn, nss.ns(), true);
 }
 
 /**
@@ -104,7 +98,7 @@ uint64_t calculateDesiredChunkSize(uint64_t maxChunkSizeBytes, uint64_t numChunk
  * ordered list of ascending/descending field names. For example {a : 1, b : -1} is not special, but
  * {a : "hashed"} is.
  */
-BSONObj findExtremeKeyForShard(OperationContext* txn,
+BSONObj findExtremeKeyForShard(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const ShardId& shardId,
                                const ShardKeyPattern& shardKeyPattern,
@@ -130,7 +124,8 @@ BSONObj findExtremeKeyForShard(OperationContext* txn,
 
     // Find the extreme key
     const auto shardConnStr = [&]() {
-        const auto shard = uassertStatusOK(Grid::get(txn)->shardRegistry()->getShard(txn, shardId));
+        const auto shard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
         return shard->getConnString();
     }();
 
@@ -172,31 +167,34 @@ BSONObj findExtremeKeyForShard(OperationContext* txn,
 /**
  * Splits the chunks touched based from the targeter stats if needed.
  */
-void splitIfNeeded(OperationContext* txn, const NamespaceString& nss, const TargeterStats& stats) {
-    auto scopedCMStatus = ScopedChunkManager::get(txn, nss);
-    if (!scopedCMStatus.isOK()) {
-        warning() << "failed to get collection information for " << nss
-                  << " while checking for auto-split" << causedBy(scopedCMStatus.getStatus());
+void splitIfNeeded(OperationContext* opCtx,
+                   const NamespaceString& nss,
+                   const TargeterStats& stats) {
+    auto routingInfoStatus = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss);
+    if (!routingInfoStatus.isOK()) {
+        log() << "failed to get collection information for " << nss
+              << " while checking for auto-split" << causedBy(routingInfoStatus.getStatus());
         return;
     }
 
-    const auto& scopedCM = scopedCMStatus.getValue();
+    auto& routingInfo = routingInfoStatus.getValue();
 
-    if (!scopedCM.cm()) {
+    if (!routingInfo.cm()) {
         return;
     }
 
     for (auto it = stats.chunkSizeDelta.cbegin(); it != stats.chunkSizeDelta.cend(); ++it) {
         std::shared_ptr<Chunk> chunk;
         try {
-            chunk = scopedCM.cm()->findIntersectingChunkWithSimpleCollation(it->first);
+            chunk = routingInfo.cm()->findIntersectingChunkWithSimpleCollation(it->first);
         } catch (const AssertionException& ex) {
             warning() << "could not find chunk while checking for auto-split: "
                       << causedBy(redact(ex));
             return;
         }
 
-        updateChunkWriteStatsAndSplitIfNeeded(txn, scopedCM.cm().get(), chunk.get(), it->second);
+        updateChunkWriteStatsAndSplitIfNeeded(
+            opCtx, routingInfo.cm().get(), chunk.get(), it->second);
     }
 }
 
@@ -205,7 +203,7 @@ void splitIfNeeded(OperationContext* txn, const NamespaceString& nss, const Targ
 ClusterWriter::ClusterWriter(bool autoSplit, int timeoutMillis)
     : _autoSplit(autoSplit), _timeoutMillis(timeoutMillis) {}
 
-void ClusterWriter::write(OperationContext* txn,
+void ClusterWriter::write(OperationContext* opCtx,
                           const BatchedCommandRequest& origRequest,
                           BatchedCommandResponse* response) {
     // Add _ids to insert request if req'd
@@ -291,14 +289,14 @@ void ClusterWriter::write(OperationContext* txn,
             request = requestWithWriteConcern.get();
         }
 
-        Grid::get(txn)->catalogClient(txn)->writeConfigServerDirect(txn, *request, response);
+        Grid::get(opCtx)->catalogClient(opCtx)->writeConfigServerDirect(opCtx, *request, response);
     } else {
         TargeterStats targeterStats;
 
         {
             ChunkManagerTargeter targeter(request->getTargetingNSS(), &targeterStats);
 
-            Status targetInitStatus = targeter.init(txn);
+            Status targetInitStatus = targeter.init(opCtx);
             if (!targetInitStatus.isOK()) {
                 toBatchError(Status(targetInitStatus.code(),
                                     str::stream()
@@ -313,11 +311,11 @@ void ClusterWriter::write(OperationContext* txn,
 
             DBClientMultiCommand dispatcher;
             BatchWriteExec exec(&targeter, &dispatcher);
-            exec.executeBatch(txn, *request, response, &_stats);
+            exec.executeBatch(opCtx, *request, response, &_stats);
         }
 
         if (_autoSplit) {
-            splitIfNeeded(txn, request->getNS(), targeterStats);
+            splitIfNeeded(opCtx, request->getNS(), targeterStats);
         }
     }
 }
@@ -326,7 +324,7 @@ const BatchWriteExecStats& ClusterWriter::getStats() {
     return _stats;
 }
 
-void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* txn,
+void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
                                            ChunkManager* manager,
                                            Chunk* chunk,
                                            long dataWritten) {
@@ -334,7 +332,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* txn,
     // bubbled up on the client connection doing a write.
     LastError::Disabled d(&LastError::get(cc()));
 
-    const auto balancerConfig = Grid::get(txn)->getBalancerConfiguration();
+    const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
 
     const bool minIsInf =
         (0 == manager->getShardKeyPattern().getKeyPattern().globalMin().woCompare(chunk->getMin()));
@@ -370,7 +368,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* txn,
 
     try {
         // Ensure we have the most up-to-date balancer configuration
-        uassertStatusOK(balancerConfig->refreshAndCheck(txn));
+        uassertStatusOK(balancerConfig->refreshAndCheck(opCtx));
 
         if (!balancerConfig->getShouldAutoSplit()) {
             return;
@@ -393,7 +391,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* txn,
         }();
 
         auto splitPoints =
-            uassertStatusOK(shardutil::selectChunkSplitPoints(txn,
+            uassertStatusOK(shardutil::selectChunkSplitPoints(opCtx,
                                                               chunk->getShardId(),
                                                               nss,
                                                               manager->getShardKeyPattern(),
@@ -425,13 +423,13 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* txn,
         if (KeyPattern::isOrderedKeyPattern(manager->getShardKeyPattern().toBSON())) {
             if (minIsInf) {
                 BSONObj key = findExtremeKeyForShard(
-                    txn, nss, chunk->getShardId(), manager->getShardKeyPattern(), true);
+                    opCtx, nss, chunk->getShardId(), manager->getShardKeyPattern(), true);
                 if (!key.isEmpty()) {
                     splitPoints.front() = key.getOwned();
                 }
             } else if (maxIsInf) {
                 BSONObj key = findExtremeKeyForShard(
-                    txn, nss, chunk->getShardId(), manager->getShardKeyPattern(), false);
+                    opCtx, nss, chunk->getShardId(), manager->getShardKeyPattern(), false);
                 if (!key.isEmpty()) {
                     splitPoints.back() = key.getOwned();
                 }
@@ -439,7 +437,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* txn,
         }
 
         const auto suggestedMigrateChunk =
-            uassertStatusOK(shardutil::splitChunkAtMultiplePoints(txn,
+            uassertStatusOK(shardutil::splitChunkAtMultiplePoints(opCtx,
                                                                   chunk->getShardId(),
                                                                   nss,
                                                                   manager->getShardKeyPattern(),
@@ -454,7 +452,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* txn,
                 return false;
 
             auto collStatus =
-                Grid::get(txn)->catalogClient(txn)->getCollection(txn, manager->getns());
+                Grid::get(opCtx)->catalogClient(opCtx)->getCollection(opCtx, manager->getns());
             if (!collStatus.isOK()) {
                 log() << "Auto-split for " << nss << " failed to load collection metadata"
                       << causedBy(redact(collStatus.getStatus()));
@@ -469,21 +467,22 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* txn,
               << (suggestedMigrateChunk ? "" : (std::string) " (migrate suggested" +
                           (shouldBalance ? ")" : ", but no migrations allowed)"));
 
+        // Reload the chunk manager after the split
+        auto routingInfo = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
+                                                                                         nss));
+
         if (!shouldBalance || !suggestedMigrateChunk) {
-            reloadChunkManager(txn, nss);
             return;
         }
 
         // Top chunk optimization - try to move the top chunk out of this shard to prevent the hot
-        // spot
-        // from staying on a single shard. This is based on the assumption that succeeding inserts
-        // will
-        // fall on the top chunk.
+        // spot from staying on a single shard. This is based on the assumption that succeeding
+        // inserts will fall on the top chunk.
 
         // We need to use the latest chunk manager (after the split) in order to have the most
         // up-to-date view of the chunk we are about to move
-        auto scopedCM = uassertStatusOK(ScopedChunkManager::refreshAndGet(txn, nss));
-        auto suggestedChunk = scopedCM.cm()->findIntersectingChunkWithSimpleCollation(
+        auto suggestedChunk = routingInfo.cm()->findIntersectingChunkWithSimpleCollation(
             suggestedMigrateChunk->getMin());
 
         ChunkType chunkToMove;
@@ -493,9 +492,10 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* txn,
         chunkToMove.setMax(suggestedChunk->getMax());
         chunkToMove.setVersion(suggestedChunk->getLastmod());
 
-        uassertStatusOK(configsvr_client::rebalanceChunk(txn, chunkToMove));
+        uassertStatusOK(configsvr_client::rebalanceChunk(opCtx, chunkToMove));
 
-        reloadChunkManager(txn, nss);
+        // Ensure the collection gets reloaded because of the move
+        Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss);
     } catch (const DBException& ex) {
         chunk->randomizeBytesWritten();
 

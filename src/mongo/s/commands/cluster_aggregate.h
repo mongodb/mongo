@@ -37,11 +37,11 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_merge_cursors.h"
 #include "mongo/s/commands/strategy.h"
-#include "mongo/s/config.h"
 
 namespace mongo {
 
 class OperationContext;
+class ShardId;
 
 /**
  * Methods for running aggregation across a sharded cluster.
@@ -90,7 +90,7 @@ private:
 
     static Status aggPassthrough(OperationContext* txn,
                                  const Namespaces& namespaces,
-                                 DBConfig* conf,
+                                 const ShardId& shardId,
                                  BSONObj cmd,
                                  BSONObjBuilder* result,
                                  int queryOptions);

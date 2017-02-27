@@ -26,80 +26,47 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
-
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/s/catalog_cache.h"
-#include "mongo/s/commands/cluster_commands_common.h"
-#include "mongo/s/grid.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
 
-class GetShardVersion : public Command {
+class CompactCmd : public Command {
 public:
-    GetShardVersion() : Command("getShardVersion", false, "getshardversion") {}
+    CompactCmd() : Command("compact") {}
 
     bool slaveOk() const override {
         return true;
     }
 
     bool adminOnly() const override {
-        return true;
+        return false;
+    }
+
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) override {
+        ActionSet actions;
+        actions.addAction(ActionType::compact);
+        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
-    void help(std::stringstream& help) const override {
-        help << " example: { getShardVersion : 'alleyinsider.foo'  } ";
-    }
-
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) override {
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
-                ActionType::getShardVersion)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-
-        return Status::OK();
-    }
-
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return parseNsFullyQualified(dbname, cmdObj);
-    }
-
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const std::string& dbName,
              BSONObj& cmdObj,
              int options,
              std::string& errmsg,
              BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs(dbname, cmdObj));
-
-        auto routingInfo = getShardedCollection(opCtx, nss);
-        const auto cm = routingInfo.cm();
-
-        for (const auto& cmEntry : cm->chunkMap()) {
-            log() << redact(cmEntry.second->toString());
-        }
-
-        cm->getVersion().addToBSON(result, "version");
-
-        return true;
+        uasserted(ErrorCodes::CommandNotSupported, "compact not allowed through mongos");
     }
 
-} getShardVersionCmd;
+} compactCmd;
 
 }  // namespace
 }  // namespace mongo

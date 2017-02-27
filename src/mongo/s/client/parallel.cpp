@@ -39,11 +39,9 @@
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_raii.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_exception.h"
@@ -211,13 +209,13 @@ ParallelSortClusteredCursor::~ParallelSortClusteredCursor() {
     _done = true;
 }
 
-void ParallelSortClusteredCursor::init(OperationContext* txn) {
+void ParallelSortClusteredCursor::init(OperationContext* opCtx) {
     if (_didInit)
         return;
     _didInit = true;
 
     if (!_qSpec.isEmpty()) {
-        fullInit(txn);
+        fullInit(opCtx);
     } else {
         // You can only get here by using the legacy constructor
         // TODO: Eliminate this
@@ -316,51 +314,29 @@ void ParallelSortClusteredCursor::_finishCons() {
         17306, "have to have all text meta sort keys in projection", textMetaSortKeyFields.empty());
 }
 
-void ParallelSortClusteredCursor::fullInit(OperationContext* txn) {
-    startInit(txn);
-    finishInit(txn);
+void ParallelSortClusteredCursor::fullInit(OperationContext* opCtx) {
+    startInit(opCtx);
+    finishInit(opCtx);
 }
 
-void ParallelSortClusteredCursor::_markStaleNS(OperationContext* txn,
-                                               const NamespaceString& staleNS,
-                                               const StaleConfigException& e,
-                                               bool& forceReload) {
-    if (e.requiresFullReload()) {
-        Grid::get(txn)->catalogCache()->invalidate(staleNS.db());
+void ParallelSortClusteredCursor::_markStaleNS(const NamespaceString& staleNS,
+                                               const StaleConfigException& e) {
+    if (_staleNSMap.find(staleNS.ns()) == _staleNSMap.end()) {
+        _staleNSMap[staleNS.ns()] = 1;
     }
 
-    if (_staleNSMap.find(staleNS.ns()) == _staleNSMap.end())
-        _staleNSMap[staleNS.ns()] = 1;
-
-    int tries = ++_staleNSMap[staleNS.ns()];
+    const int tries = ++_staleNSMap[staleNS.ns()];
 
     if (tries >= 5) {
         throw SendStaleConfigException(staleNS.ns(),
-                                       str::stream() << "too many retries of stale version info",
+                                       "too many retries of stale version info",
                                        e.getVersionReceived(),
                                        e.getVersionWanted());
     }
-
-    forceReload = tries > 2;
-}
-
-void ParallelSortClusteredCursor::_handleStaleNS(OperationContext* txn,
-                                                 const NamespaceString& staleNS,
-                                                 bool forceReload) {
-    auto scopedCMStatus = ScopedChunkManager::get(txn, staleNS);
-    if (!scopedCMStatus.isOK()) {
-        log() << "cannot reload database info for stale namespace " << staleNS.ns();
-        return;
-    }
-
-    const auto& scopedCM = scopedCMStatus.getValue();
-
-    // Reload chunk manager, potentially forcing the namespace
-    scopedCM.db()->getChunkManagerIfExists(txn, staleNS.ns(), true, forceReload);
 }
 
 void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
-    OperationContext* txn,
+    OperationContext* opCtx,
     std::shared_ptr<ParallelConnectionState> state,
     const ShardId& shardId,
     std::shared_ptr<Shard> primary,
@@ -377,7 +353,8 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
 
     // Setup conn
     if (!state->conn) {
-        const auto shard = uassertStatusOK(Grid::get(txn)->shardRegistry()->getShard(txn, shardId));
+        const auto shard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
         state->conn.reset(new ShardConnection(shard->getConnString(), ns.ns(), manager));
     }
 
@@ -440,7 +417,7 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
     }
 }
 
-void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
+void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
     const bool returnPartial = (_qSpec.options() & QueryOption_PartialResults);
     const NamespaceString nss(!_cInfo.isEmpty() ? _cInfo.versionedNS : _qSpec.ns());
 
@@ -458,12 +435,12 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
     shared_ptr<Shard> primary;
 
     {
-        auto scopedCMStatus = ScopedChunkManager::get(txn, nss);
-        if (scopedCMStatus != ErrorCodes::NamespaceNotFound) {
-            uassertStatusOK(scopedCMStatus.getStatus());
-            const auto& scopedCM = scopedCMStatus.getValue();
-            manager = scopedCM.cm();
-            primary = scopedCM.primary();
+        auto routingInfoStatus =
+            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss);
+        if (routingInfoStatus != ErrorCodes::NamespaceNotFound) {
+            auto routingInfo = uassertStatusOK(std::move(routingInfoStatus));
+            manager = routingInfo.cm();
+            primary = routingInfo.primary();
         }
     }
 
@@ -476,7 +453,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
                                   << manager->getVersion().toString() << "]";
         }
 
-        manager->getShardIdsForQuery(txn,
+        manager->getShardIdsForQuery(opCtx,
                                      !_cInfo.isEmpty() ? _cInfo.cmdFilter : _qSpec.filter(),
                                      !_cInfo.isEmpty() ? _cInfo.cmdCollation : BSONObj(),
                                      &shardIds);
@@ -551,7 +528,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
             mdata.pcState = std::make_shared<ParallelConnectionState>();
             auto state = mdata.pcState;
 
-            setupVersionAndHandleSlaveOk(txn, state, shardId, primary, nss, vinfo, manager);
+            setupVersionAndHandleSlaveOk(opCtx, state, shardId, primary, nss, vinfo, manager);
 
             const string& ns = _qSpec.ns();
 
@@ -641,23 +618,20 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
             if (staleNS.size() == 0)
                 staleNS = nss;  // ns is the *versioned* namespace, be careful of this
 
-            // Probably need to retry fully
-            bool forceReload;
-            _markStaleNS(txn, staleNS, e, forceReload);
+            _markStaleNS(staleNS, e);
+            Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(staleNS);
 
-            LOG(1) << "stale config of ns " << staleNS
-                   << " during initialization, will retry with forced : " << forceReload
+            LOG(1) << "stale config of ns " << staleNS << " during initialization, will retry"
                    << causedBy(redact(e));
 
             // This is somewhat strange
-            if (staleNS != nss)
+            if (staleNS != nss) {
                 warning() << "versioned ns " << nss.ns() << " doesn't match stale config namespace "
                           << staleNS;
-
-            _handleStaleNS(txn, staleNS, forceReload);
+            }
 
             // Restart with new chunk manager
-            startInit(txn);
+            startInit(opCtx);
             return;
         } catch (SocketException& e) {
             warning() << "socket exception when initializing on " << shardId
@@ -727,7 +701,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* txn) {
     }
 }
 
-void ParallelSortClusteredCursor::finishInit(OperationContext* txn) {
+void ParallelSortClusteredCursor::finishInit(OperationContext* opCtx) {
     bool returnPartial = (_qSpec.options() & QueryOption_PartialResults);
     bool specialVersion = _cInfo.versionedNS.size() > 0;
     string ns = specialVersion ? _cInfo.versionedNS : _qSpec.ns();
@@ -859,32 +833,27 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* txn) {
     if (retry) {
         // Refresh stale namespaces
         if (staleNSExceptions.size()) {
-            for (map<string, StaleConfigException>::iterator i = staleNSExceptions.begin(),
-                                                             end = staleNSExceptions.end();
-                 i != end;
-                 ++i) {
-                NamespaceString staleNS(i->first);
-                const StaleConfigException& exception = i->second;
+            for (const auto& exEntry : staleNSExceptions) {
+                const NamespaceString staleNS(exEntry.first);
+                const StaleConfigException& ex = exEntry.second;
 
-                bool forceReload;
-                _markStaleNS(txn, staleNS, exception, forceReload);
+                _markStaleNS(staleNS, ex);
+                Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(staleNS);
 
-                LOG(1) << "stale config of ns " << staleNS
-                       << " on finishing query, will retry with forced : " << forceReload
-                       << causedBy(redact(exception));
+                LOG(1) << "stale config of ns " << staleNS << " on finishing query, will retry"
+                       << causedBy(redact(ex));
 
                 // This is somewhat strange
-                if (staleNS != ns)
+                if (staleNS != ns) {
                     warning() << "versioned ns " << ns << " doesn't match stale config namespace "
                               << staleNS;
-
-                _handleStaleNS(txn, staleNS, forceReload);
+                }
             }
         }
 
         // Re-establish connections we need to
-        startInit(txn);
-        finishInit(txn);
+        startInit(opCtx);
+        finishInit(opCtx);
         return;
     }
 
@@ -924,7 +893,8 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* txn) {
 
         _cursors[index].reset(mdata.pcState->cursor.get(), &mdata);
 
-        const auto shard = uassertStatusOK(Grid::get(txn)->shardRegistry()->getShard(txn, shardId));
+        const auto shard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
         _servers.insert(shard->getConnString().toString());
 
         index++;

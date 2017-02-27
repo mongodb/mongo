@@ -40,9 +40,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/commands/sharded_command_processing.h"
-#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_raii.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -72,7 +70,7 @@ public:
         out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
     }
 
-    bool run(OperationContext* txn,
+    bool run(OperationContext* opCtx,
              const std::string& dbname,
              BSONObj& cmdObj,
              int options,
@@ -86,55 +84,56 @@ public:
                 "have to pass 1 as db parameter",
                 cmdObj.firstElement().isNumber() && cmdObj.firstElement().number() == 1);
 
-        auto const catalogClient = Grid::get(txn)->catalogClient(txn);
+        auto const catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
 
         // Lock the database globally to prevent conflicts with simultaneous database
         // creation/modification.
         auto scopedDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
-            txn, dbname, "dropDatabase", DistLockManager::kDefaultLockTimeout));
+            opCtx, dbname, "dropDatabase", DistLockManager::kDefaultLockTimeout));
+
+        auto const catalogCache = Grid::get(opCtx)->catalogCache();
 
         // Refresh the database metadata so it kicks off a full reload
-        Grid::get(txn)->catalogCache()->invalidate(dbname);
+        catalogCache->purgeDatabase(dbname);
 
-        auto scopedDbStatus = ScopedShardDatabase::getExisting(txn, dbname);
+        auto dbInfoStatus = catalogCache->getDatabase(opCtx, dbname);
 
-        if (scopedDbStatus == ErrorCodes::NamespaceNotFound) {
+        if (dbInfoStatus == ErrorCodes::NamespaceNotFound) {
             result.append("info", "database does not exist");
             return true;
         }
 
-        uassertStatusOK(scopedDbStatus.getStatus());
+        uassertStatusOK(dbInfoStatus.getStatus());
 
-        catalogClient->logChange(txn,
+        catalogClient->logChange(opCtx,
                                  "dropDatabase.start",
                                  dbname,
                                  BSONObj(),
                                  ShardingCatalogClient::kMajorityWriteConcern);
 
-        auto const db = scopedDbStatus.getValue().db();
+        auto& dbInfo = dbInfoStatus.getValue();
 
         // Drop the database's collections from metadata
-        for (const auto& nss : getAllShardedCollectionsForDb(txn, dbname)) {
-            uassertStatusOK(catalogClient->dropCollection(txn, nss));
-            db->markNSNotSharded(nss.ns());
+        for (const auto& nss : getAllShardedCollectionsForDb(opCtx, dbname)) {
+            uassertStatusOK(catalogClient->dropCollection(opCtx, nss));
         }
 
         // Drop the database from the primary shard first
-        _dropDatabaseFromShard(txn, db->getPrimaryId(), dbname);
+        _dropDatabaseFromShard(opCtx, dbInfo.primaryId(), dbname);
 
         // Drop the database from each of the remaining shards
         {
             std::vector<ShardId> allShardIds;
-            Grid::get(txn)->shardRegistry()->getAllShardIds(&allShardIds);
+            Grid::get(opCtx)->shardRegistry()->getAllShardIds(&allShardIds);
 
             for (const ShardId& shardId : allShardIds) {
-                _dropDatabaseFromShard(txn, shardId, dbname);
+                _dropDatabaseFromShard(opCtx, shardId, dbname);
             }
         }
 
         // Remove the database entry from the metadata
         Status status =
-            catalogClient->removeConfigDocuments(txn,
+            catalogClient->removeConfigDocuments(opCtx,
                                                  DatabaseType::ConfigNS,
                                                  BSON(DatabaseType::name(dbname)),
                                                  ShardingCatalogClient::kMajorityWriteConcern);
@@ -146,10 +145,10 @@ public:
         }
 
         // Invalidate the database so the next access will do a full reload
-        Grid::get(txn)->catalogCache()->invalidate(dbname);
+        catalogCache->purgeDatabase(dbname);
 
         catalogClient->logChange(
-            txn, "dropDatabase", dbname, BSONObj(), ShardingCatalogClient::kMajorityWriteConcern);
+            opCtx, "dropDatabase", dbname, BSONObj(), ShardingCatalogClient::kMajorityWriteConcern);
 
         result.append("dropped", dbname);
         return true;
@@ -160,24 +159,25 @@ private:
      * Sends the 'dropDatabase' command for the specified database to the specified shard. Throws
      * DBException on failure.
      */
-    static void _dropDatabaseFromShard(OperationContext* txn,
+    static void _dropDatabaseFromShard(OperationContext* opCtx,
                                        const ShardId& shardId,
                                        const std::string& dbName) {
-        const auto dropDatabaseCommandBSON = [txn, &dbName] {
+        const auto dropDatabaseCommandBSON = [opCtx, &dbName] {
             BSONObjBuilder builder;
             builder.append("dropDatabase", 1);
 
-            if (!txn->getWriteConcern().usedDefault) {
+            if (!opCtx->getWriteConcern().usedDefault) {
                 builder.append(WriteConcernOptions::kWriteConcernField,
-                               txn->getWriteConcern().toBSON());
+                               opCtx->getWriteConcern().toBSON());
             }
 
             return builder.obj();
         }();
 
-        const auto shard = uassertStatusOK(Grid::get(txn)->shardRegistry()->getShard(txn, shardId));
+        const auto shard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
         auto cmdDropDatabaseResult = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
-            txn,
+            opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             dbName,
             dropDatabaseCommandBSON,

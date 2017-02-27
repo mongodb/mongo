@@ -122,6 +122,15 @@ bool ChunkRange::operator!=(const ChunkRange& other) const {
     return !(*this == other);
 }
 
+ChunkType::ChunkType() = default;
+
+ChunkType::ChunkType(NamespaceString nss, ChunkRange range, ChunkVersion version, ShardId shardId)
+    : _ns(nss.ns()),
+      _min(range.getMin()),
+      _max(range.getMax()),
+      _version(version),
+      _shard(std::move(shardId)) {}
+
 StatusWith<ChunkType> ChunkType::fromBSON(const BSONObj& source) {
     ChunkType chunk;
 

@@ -126,10 +126,11 @@
     // Test distinct fails with an invalid collection name.
     // TODO SERVER-24128: Currently, we massert() and print a stack trace. Instead, we should fail
     // gracefully with a user assertion.
-    assert.commandFailedWithCode(testDB.runCommand({distinct: "", key: "a"}), 28538);
+    assert.commandFailedWithCode(testDB.runCommand({distinct: "", key: "a"}),
+                                 ErrorCodes.InvalidNamespace);
     // TODO SERVER-24128: Currently, we massert() and print a stack trace. Instead, we should fail
     // gracefully with a user assertion.
-    assert.commandFailedWithCode(testDB.runCommand({distinct: "\0", key: "a"}), 28538);
+    assert.commandFailedWithCode(testDB.runCommand({distinct: "\0", key: "a"}), 17295);
     // TODO SERVER-24128: Make namespace parsing for distinct reject names with embedded null bytes.
     // assert.commandFailedWithCode(testDB.runCommand({distinct: "a\0b", key: "a"}),
     // ErrorCodes.InvalidNamespace);

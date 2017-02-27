@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_id.h"
 
@@ -106,6 +107,9 @@ public:
     static const BSONField<bool> jumbo;
     static const BSONField<Date_t> DEPRECATED_lastmod;
     static const BSONField<OID> DEPRECATED_epoch;
+
+    ChunkType();
+    ChunkType(NamespaceString nss, ChunkRange range, ChunkVersion version, ShardId shardId);
 
     /**
      * Constructs a new ChunkType object from BSON.

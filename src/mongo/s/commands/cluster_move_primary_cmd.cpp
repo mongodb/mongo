@@ -49,7 +49,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_common.h"
 #include "mongo/s/commands/sharded_command_processing.h"
-#include "mongo/s/config.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/set_shard_version_request.h"
 #include "mongo/util/log.h"
@@ -98,7 +97,7 @@ public:
         return cmdObj.firstElement().str();
     }
 
-    virtual bool run(OperationContext* txn,
+    virtual bool run(OperationContext* opCtx,
                      const std::string& dbname_unused,
                      BSONObj& cmdObj,
                      int options,
@@ -117,14 +116,14 @@ public:
             return false;
         }
 
-        auto const catalogClient = Grid::get(txn)->catalogClient(txn);
-        auto const catalogCache = Grid::get(txn)->catalogCache();
-        auto const shardRegistry = Grid::get(txn)->shardRegistry();
+        auto const catalogClient = Grid::get(opCtx)->catalogClient(opCtx);
+        auto const catalogCache = Grid::get(opCtx)->catalogCache();
+        auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
         // Flush all cached information. This can't be perfect, but it's better than nothing.
-        catalogCache->invalidate(dbname);
+        catalogCache->purgeDatabase(dbname);
 
-        auto config = uassertStatusOK(catalogCache->getDatabase(txn, dbname));
+        auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, dbname));
 
         const string to = cmdObj["to"].valuestrsafe();
         if (!to.size()) {
@@ -132,11 +131,9 @@ public:
             return false;
         }
 
-        const auto fromShard =
-            uassertStatusOK(shardRegistry->getShard(txn, config->getPrimaryId()));
-
+        const auto fromShard = uassertStatusOK(shardRegistry->getShard(opCtx, dbInfo.primaryId()));
         const auto toShard = [&]() {
-            auto toShardStatus = shardRegistry->getShard(txn, to);
+            auto toShardStatus = shardRegistry->getShard(opCtx, to);
             if (!toShardStatus.isOK()) {
                 const std::string msg(
                     str::stream() << "Could not move database '" << dbname << "' to shard '" << to
@@ -158,13 +155,13 @@ public:
 
         const std::string whyMessage(str::stream() << "Moving primary shard of " << dbname);
         auto scopedDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
-            txn, dbname + "-movePrimary", whyMessage, DistLockManager::kDefaultLockTimeout));
+            opCtx, dbname + "-movePrimary", whyMessage, DistLockManager::kDefaultLockTimeout));
 
-        const auto shardedColls = getAllShardedCollectionsForDb(txn, dbname);
+        const auto shardedColls = getAllShardedCollectionsForDb(opCtx, dbname);
 
         // Record start in changelog
         catalogClient->logChange(
-            txn,
+            opCtx,
             "movePrimary.start",
             dbname,
             _buildMoveLogEntry(dbname, fromShard->toString(), toShard->toString(), shardedColls),
@@ -203,7 +200,7 @@ public:
                              << bypassDocumentValidationCommandOption()
                              << true
                              << "writeConcern"
-                             << txn->getWriteConcern().toBSON()),
+                             << opCtx->getWriteConcern().toBSON()),
                 cloneRes);
             toconn.done();
 
@@ -221,15 +218,15 @@ public:
 
         // Update the new primary in the config server metadata
         {
-            auto dbt = uassertStatusOK(catalogClient->getDatabase(txn, dbname)).value;
+            auto dbt = uassertStatusOK(catalogClient->getDatabase(opCtx, dbname)).value;
             dbt.setPrimary(toShard->getId());
 
-            uassertStatusOK(catalogClient->updateDatabase(txn, dbname, dbt));
+            uassertStatusOK(catalogClient->updateDatabase(opCtx, dbname, dbt));
         }
 
         // Ensure the next attempt to retrieve the database or any of its collections will do a full
         // reload
-        catalogCache->invalidate(dbname);
+        catalogCache->purgeDatabase(dbname);
 
         const string oldPrimary = fromShard->getConnString().toString();
 
@@ -242,7 +239,7 @@ public:
 
             try {
                 BSONObj dropDBInfo;
-                fromconn->dropDatabase(dbname.c_str(), txn->getWriteConcern(), &dropDBInfo);
+                fromconn->dropDatabase(dbname.c_str(), opCtx->getWriteConcern(), &dropDBInfo);
                 if (!hasWCError) {
                     if (auto wcErrorElem = dropDBInfo["writeConcernError"]) {
                         appendWriteConcernErrorToCmdResponse(
@@ -275,7 +272,7 @@ public:
                               << oldPrimary;
                         BSONObj dropCollInfo;
                         fromconn->dropCollection(
-                            el.String(), txn->getWriteConcern(), &dropCollInfo);
+                            el.String(), opCtx->getWriteConcern(), &dropCollInfo);
                         if (!hasWCError) {
                             if (auto wcErrorElem = dropCollInfo["writeConcernError"]) {
                                 appendWriteConcernErrorToCmdResponse(
@@ -302,7 +299,7 @@ public:
 
         // Record finish in changelog
         catalogClient->logChange(
-            txn,
+            opCtx,
             "movePrimary",
             dbname,
             _buildMoveLogEntry(dbname, oldPrimary, toShard->toString(), shardedColls),
