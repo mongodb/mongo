@@ -1671,7 +1671,7 @@ if env.TargetOSIs('posix'):
 
     # Promote linker warnings into errors. We can't yet do this on OS X because its linker considers
     # noall_load obsolete and warns about it.
-    if not env.TargetOSIs('darwin'):
+    if not env.TargetOSIs('darwin') and not has_option("disable-warnings-as-errors"):
         env.Append(
             LINKFLAGS=[
                 "-Wl,--fatal-warnings",
