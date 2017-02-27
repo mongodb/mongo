@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include <cstdint>
 
 #include "mongo/base/disallow_copying.h"
