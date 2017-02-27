@@ -25,32 +25,34 @@
  *    then also delete it in the license file.
  */
 
-/**
-   tools for working in parallel/sharded/clustered environment
- */
-
 #pragma once
 
+#include <set>
+#include <string>
+
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/query.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/s/client/shard_connection.h"
 
 namespace mongo {
 
+class ChunkManager;
+class DBClientCursor;
 class DBClientCursorHolder;
 class OperationContext;
+struct ParallelConnectionMetadata;
+struct ParallelConnectionState;
 class StaleConfigException;
-class ParallelConnectionMetadata;
 
+struct CommandInfo {
+    CommandInfo() = default;
 
-class CommandInfo {
-public:
-    CommandInfo() {}
     CommandInfo(const std::string& vns, const BSONObj& filter, const BSONObj& collation)
         : versionedNS(vns), cmdFilter(filter), cmdCollation(collation) {}
 
-    bool isEmpty() {
-        return versionedNS.size() == 0;
+    bool isEmpty() const {
+        return versionedNS.empty();
     }
 
     std::string toString() const {
@@ -63,67 +65,6 @@ public:
     BSONObj cmdFilter;
     BSONObj cmdCollation;
 };
-
-class DBClientCursor;
-typedef std::shared_ptr<DBClientCursor> DBClientCursorPtr;
-
-class ParallelConnectionState {
-public:
-    ParallelConnectionState() : count(0), done(false) {}
-
-    // Please do not reorder. cursor destructor can use conn.
-    // On a related note, never attempt to cleanup these pointers manually.
-    std::shared_ptr<ShardConnection> conn;
-    DBClientCursorPtr cursor;
-
-    // Version information
-    std::shared_ptr<ChunkManager> manager;
-    std::shared_ptr<Shard> primary;
-
-    // Cursor status information
-    long long count;
-    bool done;
-
-    BSONObj toBSON() const;
-
-    std::string toString() const {
-        return str::stream() << "PCState : " << toBSON();
-    }
-};
-
-typedef ParallelConnectionState PCState;
-typedef std::shared_ptr<PCState> PCStatePtr;
-
-class ParallelConnectionMetadata {
-public:
-    ParallelConnectionMetadata()
-        : retryNext(false), initialized(false), finished(false), completed(false), errored(false) {}
-
-    ~ParallelConnectionMetadata() {
-        cleanup(true);
-    }
-
-    void cleanup(bool full = true);
-
-    PCStatePtr pcState;
-
-    bool retryNext;
-
-    bool initialized;
-    bool finished;
-    bool completed;
-
-    bool errored;
-
-    BSONObj toBSON() const;
-
-    std::string toString() const {
-        return str::stream() << "PCMData : " << toBSON();
-    }
-};
-
-typedef ParallelConnectionMetadata PCMData;
-typedef std::shared_ptr<PCMData> PCMDataPtr;
 
 /**
  * Runs a query in parallel across N servers, enforcing compatible chunk versions for queries
@@ -139,7 +80,7 @@ typedef std::shared_ptr<PCMData> PCMDataPtr;
  */
 class ParallelSortClusteredCursor {
 public:
-    ParallelSortClusteredCursor(const QuerySpec& qSpec, const CommandInfo& cInfo = CommandInfo());
+    ParallelSortClusteredCursor(const QuerySpec& qSpec, const CommandInfo& cInfo);
 
     // DEPRECATED legacy constructor for pure mergesort functionality - do not use
     ParallelSortClusteredCursor(const std::set<std::string>& servers,
@@ -150,20 +91,22 @@ public:
 
     ~ParallelSortClusteredCursor();
 
-    /** call before using */
     void init(OperationContext* txn);
 
     bool more();
+
     BSONObj next();
 
     /**
      * Returns the set of shards with open cursors.
      */
-    void getQueryShardIds(std::set<ShardId>& shardIds);
+    void getQueryShardIds(std::set<ShardId>& shardIds) const;
 
-    DBClientCursorPtr getShardCursor(const ShardId& shardId);
+    std::shared_ptr<DBClientCursor> getShardCursor(const ShardId& shardId) const;
 
 private:
+    using ShardCursorsMap = std::map<ShardId, ParallelConnectionMetadata>;
+
     void fullInit(OperationContext* txn);
     void startInit(OperationContext* txn);
     void finishInit(OperationContext* txn);
@@ -191,7 +134,7 @@ private:
 
     int _totalTries;
 
-    std::map<ShardId, PCMData> _cursorMap;
+    ShardCursorsMap _cursorMap;
 
     // LEGACY BELOW
     int _numServers;
@@ -208,7 +151,7 @@ private:
      * will not be set if the slaveOk flag is set.
      */
     void setupVersionAndHandleSlaveOk(OperationContext* txn,
-                                      PCStatePtr state /* in & out */,
+                                      std::shared_ptr<ParallelConnectionState> state /* in & out */,
                                       const ShardId& shardId,
                                       std::shared_ptr<Shard> primary /* in */,
                                       const NamespaceString& ns,
@@ -226,40 +169,10 @@ private:
     int _batchSize;
 };
 
-
 /**
- * Helper class to manage ownership of opened cursors while merging results.
- *
- * TODO:  Choose one set of ownership semantics so that this isn't needed - merge sort via
- * mapreduce is the main issue since it has no metadata and this holder owns the cursors.
+ * Throws a RecvStaleConfigException wrapping the stale error document in this cursor when the
+ * ShardConfigStale flag is set or a command returns a ErrorCodes::SendStaleConfig error code.
  */
-class DBClientCursorHolder {
-public:
-    DBClientCursorHolder() {}
-    ~DBClientCursorHolder() {}
-
-    void reset(DBClientCursor* cursor, ParallelConnectionMetadata* pcmData) {
-        _cursor.reset(cursor);
-        _pcmData.reset(pcmData);
-    }
-
-    DBClientCursor* get() {
-        return _cursor.get();
-    }
-    ParallelConnectionMetadata* getMData() {
-        return _pcmData.get();
-    }
-
-    void release() {
-        _cursor.release();
-        _pcmData.release();
-    }
-
-private:
-    std::unique_ptr<DBClientCursor> _cursor;
-    std::unique_ptr<ParallelConnectionMetadata> _pcmData;
-};
-
 void throwCursorStale(DBClientCursor* cursor);
 
 }  // namespace mongo

@@ -248,20 +248,6 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='parallel',
-    source=[
-        'parallel.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/bson/dotted_path_support',
-        '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/util/net/network',
-        'clientdriver',
-    ],
-)
-
-env.Library(
     target='fetcher',
     source=[
         'fetcher.cpp',

@@ -136,12 +136,8 @@ env.Library(
         "write_commands/write_commands.cpp",
     ],
     LIBDEPS=[
-        'apply_ops_cmd_common',
-        'core',
-        'killcursors_common',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/clientdriver',
-        '$BUILD_DIR/mongo/client/parallel',
         '$BUILD_DIR/mongo/db/auth/authmongod',
         '$BUILD_DIR/mongo/db/catalog/index_key_validate',
         '$BUILD_DIR/mongo/db/commands',
@@ -155,6 +151,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/stats/serveronly',
         '$BUILD_DIR/mongo/db/storage/mmap_v1/storage_mmapv1',
+        '$BUILD_DIR/mongo/s/client/parallel',
+        'apply_ops_cmd_common',
+        'core',
+        'killcursors_common',
     ],
     LIBDEPS_TAGS=[
         # TODO: There are many libraries missing from LIBDEPS

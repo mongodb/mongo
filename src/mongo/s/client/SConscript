@@ -40,6 +40,20 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='parallel',
+    source=[
+        'parallel.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/bson/dotted_path_support',
+        '$BUILD_DIR/mongo/s/coreshard',
+        '$BUILD_DIR/mongo/util/net/network',
+        'sharding_client',
+    ],
+)
+
 env.CppUnitTest(
     target='sharding_client_test',
     source=[
@@ -102,8 +116,8 @@ env.CppUnitTest(
         'shard_local_test.cpp',
     ],
     LIBDEPS=[
-        'shard_local',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        'shard_local',
     ],
 )

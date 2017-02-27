@@ -32,11 +32,11 @@
 
 #include "mongo/s/commands/cluster_commands_common.h"
 
-#include "mongo/client/parallel.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/client/parallel.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/version_manager.h"
 #include "mongo/s/grid.h"
