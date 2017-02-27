@@ -61,7 +61,7 @@
         try {
             assert.commandWorked(replTest.getPrimary().adminCommand({replSetReconfig: newConfig}));
         } catch (e) {
-            if (tojson(e).indexOf("error doing query: failed") < 0) {
+            if (!isNetworkError(e)) {
                 throw e;
             }
         }

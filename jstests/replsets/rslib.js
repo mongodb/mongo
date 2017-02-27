@@ -124,7 +124,7 @@ var getLastOpTime;
             assert.commandWorked(admin.runCommand(
                 {replSetReconfig: rs._updateConfigIfNotDurable(config), force: force}));
         } catch (e) {
-            if (tojson(e).indexOf("error doing query: failed") < 0) {
+            if (!isNetworkError(e)) {
                 throw e;
             }
         }
@@ -256,8 +256,7 @@ var getLastOpTime;
             // reInitiate can throw because it tries to run an ismaster command on
             // all secondaries, including the new one that may have already aborted
             const errMsg = tojson(e);
-            if (errMsg.indexOf("error doing query: failed") > -1 ||
-                errMsg.indexOf("socket exception") > -1) {
+            if (isNetworkError(e)) {
                 // Ignore these exceptions, which are indicative of an aborted node
             } else {
                 throw e;
