@@ -611,7 +611,6 @@ def main():
     # Dump all other processes including go programs, except python & java.
     for (pid, process_name) in [(p, pn) for (p, pn) in processes
                                 if not re.match("^(java|python)", pn)]:
-        root_logger.info("Dumping process %d of %s" % (pid, process_name))
         process_logger = get_process_logger(options.debugger_output, pid, process_name)
         dbg.dump_info(
             root_logger,
@@ -622,7 +621,6 @@ def main():
 
     # Dump java processes using jstack.
     for (pid, process_name) in [(p, pn) for (p, pn) in processes if pn.startswith("java")]:
-        root_logger.info("Dumping process %d of %s" % (pid, process_name))
         process_logger = get_process_logger(options.debugger_output, pid, process_name)
         jstack.dump_info(root_logger, process_logger, pid, process_name)
 
@@ -631,12 +629,12 @@ def main():
     # TerminateProcess.
     # Note: The stacktrace output may be captured elsewhere (i.e. resmoke).
     for (pid, process_name) in [(p, pn) for (p, pn) in processes if pn in go_processes]:
-        root_logger.info("Sending signal SIGABRT to go process %d of %s" % (pid, process_name))
+        root_logger.info("Sending signal SIGABRT to go process %s with PID %d" % (process_name, pid))
         signal_process(root_logger, pid, signal.SIGABRT)
 
     # Dump python processes after signalling them.
     for (pid, process_name) in [(p, pn) for (p, pn) in processes if pn.startswith("python")]:
-        root_logger.info("Sending signal SIGUSR1 to python process %d of %s" % (pid, process_name))
+        root_logger.info("Sending signal SIGUSR1 to python process %s with PID %d" % (process_name, pid))
         signal_process(root_logger, pid, signal.SIGUSR1)
         process_logger = get_process_logger(options.debugger_output, pid, process_name)
         dbg.dump_info(
