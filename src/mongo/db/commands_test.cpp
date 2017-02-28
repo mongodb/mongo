@@ -74,4 +74,15 @@ TEST(Commands, appendCommandStatusNoOverwrite) {
 
     ASSERT_BSONOBJ_EQ(actualResult.obj(), expectedResult.obj());
 }
+
+TEST(Commands, appendOperationTime) {
+    BSONObjBuilder actualResult;
+    LogicalTime testTime(Timestamp(1));
+    Command::appendOperationTime(actualResult, testTime);
+
+    BSONObjBuilder expectedResult;
+    expectedResult.append("operationTime", Timestamp(1));
+
+    ASSERT_BSONOBJ_EQ(actualResult.obj(), expectedResult.obj());
+}
 }  // namespace mongo

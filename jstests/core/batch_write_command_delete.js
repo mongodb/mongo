@@ -61,9 +61,8 @@ result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
 assert.eq(0, coll.count());
 
-for (var field in result) {
-    assert.eq('ok', field, 'unexpected field found in result: ' + field);
-}
+var fields = ['ok', 'operationTime'];
+assert.hasFields(result, fields, 'fields in result do not match: ' + tojson(fields));
 
 //
 // Single document remove, w:1 write concern specified, ordered:true
@@ -206,9 +205,7 @@ result = coll.runCommand(request);
 assert.commandWorked(result);
 assert.eq(0, coll.count());
 
-for (var field in result) {
-    assert.eq('ok', field, 'unexpected field found in result: ' + field);
-}
+assert.hasFields(result, fields, 'fields in result do not match: ' + tojson(fields));
 
 //
 // Cause remove error using ordered:true and w:0
@@ -225,9 +222,7 @@ result = coll.runCommand(request);
 assert.commandWorked(result);
 assert.eq(1, coll.count());
 
-for (var field in result) {
-    assert.eq('ok', field, 'unexpected field found in result: ' + field);
-}
+assert.hasFields(result, fields, 'fields in result do not match: ' + tojson(fields));
 
 //
 // When limit is not 0 and 1

@@ -53,7 +53,8 @@ load('jstests/aggregation/extras/utils.js');
 
     // Test buildinfo
     var buildinfo = db.runCommand("buildinfo");
-    delete buildinfo.ok;  // Delete extra meta info not in startup_log
+    delete buildinfo.ok;             // Delete extra meta info not in startup_log
+    delete buildinfo.operationTime;  // Delete extra meta info not in startup_log
     var isMaster = db._adminCommand("ismaster");
 
     // Test buildinfo has the expected keys

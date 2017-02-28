@@ -53,7 +53,8 @@ public:
     /**
      *  Creates an instance of LogicalClock. The TimeProofService must already be fully initialized.
      *  The validateProof indicates if the advanceClusterTime validates newTime. It should do so
-     *  only when LogicalClock installed on mongos and the auth is off.
+     *  only when LogicalClock installed on mongos and the auth is on. When the auth is off we
+     *  assume that the DBA uses other ways to validate authenticity of user messages.
      */
     LogicalClock(ServiceContext*, std::unique_ptr<TimeProofService>, bool validateProof);
 

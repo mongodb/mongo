@@ -131,6 +131,23 @@ assert.neq = function(a, b, msg) {
     doassert("[" + a + "] != [" + b + "] are equal : " + msg);
 };
 
+assert.hasFields = function(o, arr, msg) {
+    var count = 0;
+    if (!Array.isArray(arr)) {
+        throw new Error("The second argument to assert.hasFields must be an array.");
+    }
+
+    for (var field in result) {
+        if (arr.includes(field)) {
+            count += 1;
+        }
+    }
+
+    if (count != arr.length) {
+        doassert("None of values from " + tojson(arr) + " was in " + tojson(o) + " : " + msg);
+    }
+};
+
 assert.contains = function(o, arr, msg) {
     var wasIn = false;
     if (!Array.isArray(arr)) {

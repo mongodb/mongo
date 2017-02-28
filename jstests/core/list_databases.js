@@ -18,7 +18,7 @@
 
     function verifyNameOnly(listDatabasesOut) {
         for (let field in listDatabasesOut) {
-            assert(['databases', 'nameOnly', 'ok'].some((f) => f == field),
+            assert(['databases', 'nameOnly', 'ok', 'operationTime'].some((f) => f == field),
                    'unexpected field ' + field);
         }
         listDatabasesOut.databases.forEach((database) => {

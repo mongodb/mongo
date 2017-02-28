@@ -8,6 +8,8 @@ selector:
     - jstests/multiVersion/transitioning_to_and_from_WT.js
     # TODO: SERVER-21578
     - jstests/multiVersion/balancer_multiVersion_detect.js
+    # TODO: SERVER-28104
+    - jstests/multiVersion/minor_version_tags_new_old_new.js
 
 # Multiversion tests start their own mongod's.
 executor:

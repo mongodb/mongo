@@ -59,9 +59,8 @@ result = coll.runCommand(request);
 assert(resultOK(result), tojson(result));
 assert.eq(coll.count(), 1);
 
-for (var field in result) {
-    assert.eq('ok', field, 'unexpected field found in result: ' + field);
-}
+var fields = ['ok', 'operationTime'];
+assert.hasFields(result, fields, 'fields in result do not match: ' + tojson(fields));
 
 //
 // Single document insert, w:1 write concern specified, ordered:true

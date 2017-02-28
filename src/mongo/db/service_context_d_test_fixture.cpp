@@ -37,11 +37,13 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/op_observer_noop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/time_proof_service.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/scopeguard.h"
@@ -51,6 +53,12 @@ namespace mongo {
 void ServiceContextMongoDTest::setUp() {
     Client::initThread(getThreadName().c_str());
     ServiceContext* serviceContext = getServiceContext();
+
+    auto timeProofService = stdx::make_unique<TimeProofService>();
+    auto logicalClock =
+        stdx::make_unique<LogicalClock>(serviceContext, std::move(timeProofService), false);
+    LogicalClock::set(serviceContext, std::move(logicalClock));
+
     if (!serviceContext->getGlobalStorageEngine()) {
         // When using the "ephemeralForTest" storage engine, it is fine for the temporary directory
         // to go away after the global storage engine is initialized.

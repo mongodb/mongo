@@ -312,6 +312,7 @@
                     cursorsUnknown: [],
                     ok: 1
                 };
+                delete res.operationTime;
                 assert.eq(expectedRes, res, "unexpected result for: " + tojson(killCursorsCmd));
             }
         },

@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/bson/mutable/document.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
@@ -195,6 +196,10 @@ void Command::appendCommandWCStatus(BSONObjBuilder& result,
     }
 }
 
+void Command::appendOperationTime(BSONObjBuilder& result, LogicalTime operationTime) {
+    result.append("operationTime", operationTime.asTimestamp());
+}
+
 Status Command::checkAuthForOperation(OperationContext* txn,
                                       const std::string& dbname,
                                       const BSONObj& cmdObj) {
@@ -315,7 +320,53 @@ void _generateErrorResponse(OperationContext* txn,
     replyBuilder->setMetadata(metadata);
 }
 
+void _generateErrorResponse(OperationContext* txn,
+                            rpc::ReplyBuilderInterface* replyBuilder,
+                            const DBException& exception,
+                            const BSONObj& metadata,
+                            LogicalTime operationTime) {
+    Command::registerError(txn, exception);
+
+    // We could have thrown an exception after setting fields in the builder,
+    // so we need to reset it to a clean state just to be sure.
+    replyBuilder->reset();
+
+    // We need to include some extra information for SendStaleConfig.
+    if (exception.getCode() == ErrorCodes::SendStaleConfig) {
+        const SendStaleConfigException& scex =
+            static_cast<const SendStaleConfigException&>(exception);
+        replyBuilder->setCommandReply(scex.toStatus(),
+                                      BSON("ns" << scex.getns() << "vReceived"
+                                                << BSONArray(scex.getVersionReceived().toBSON())
+                                                << "vWanted"
+                                                << BSONArray(scex.getVersionWanted().toBSON())
+                                                << "operationTime"
+                                                << operationTime.asTimestamp()));
+    } else {
+        replyBuilder->setCommandReply(exception.toStatus(),
+                                      BSON("operationTime" << operationTime.asTimestamp()));
+    }
+
+    replyBuilder->setMetadata(metadata);
+}
+
 }  // namespace
+
+void Command::generateErrorResponse(OperationContext* txn,
+                                    rpc::ReplyBuilderInterface* replyBuilder,
+                                    const DBException& exception,
+                                    const rpc::RequestInterface& request,
+                                    Command* command,
+                                    const BSONObj& metadata,
+                                    LogicalTime operationTime) {
+    LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
+           << "on database '" << request.getDatabase() << "' "
+           << "with arguments '" << command->getRedactedCopyForLogging(request.getCommandArgs())
+           << "' metadata '" << request.getMetadata() << "' and operationTime '"
+           << operationTime.toString() << "': " << exception.toString();
+
+    _generateErrorResponse(txn, replyBuilder, exception, metadata, operationTime);
+}
 
 void Command::generateErrorResponse(OperationContext* txn,
                                     rpc::ReplyBuilderInterface* replyBuilder,

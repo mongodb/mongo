@@ -31,7 +31,6 @@
 #include "mongo/platform/basic.h"
 
 #include <array>
-#include <boost/optional.hpp>
 #include <time.h>
 
 #include "mongo/base/disallow_copying.h"
@@ -75,6 +74,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
@@ -128,6 +128,22 @@ void registerErrorImpl(OperationContext* txn, const DBException& exception) {
 MONGO_INITIALIZER(InitializeRegisterErrorHandler)(InitializerContext* const) {
     Command::registerRegisterError(registerErrorImpl);
     return Status::OK();
+}
+/**
+ * For replica set members it returns the last known op time from txn. Otherwise will return
+ * uninitialized logical time.
+ */
+LogicalTime _getClientOperationTime(OperationContext* txn) {
+    repl::ReplicationCoordinator* replCoord =
+        repl::ReplicationCoordinator::get(txn->getClient()->getServiceContext());
+    const bool isReplSet =
+        replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+    LogicalTime operationTime;
+    if (isReplSet) {
+        operationTime = LogicalTime(
+            repl::ReplClientInfo::forClient(txn->getClient()).getLastOp().getTimestamp());
+    }
+    return operationTime;
 }
 }  // namespace
 
@@ -1377,6 +1393,7 @@ bool Command::run(OperationContext* txn,
 
     std::string errmsg;
     bool result;
+    auto startOperationTime = _getClientOperationTime(txn);
     if (!supportsWriteConcern(cmd)) {
         if (commandSpecifiesWriteConcern(cmd)) {
             auto result = appendCommandStatus(
@@ -1445,6 +1462,19 @@ bool Command::run(OperationContext* txn,
     }
 
     appendCommandStatus(inPlaceReplyBob, result, errmsg);
+
+    auto finishOperationTime = _getClientOperationTime(txn);
+    auto operationTime = finishOperationTime;
+    invariant(finishOperationTime >= startOperationTime);
+
+    // this command did not write, so return current clusterTime.
+    if (finishOperationTime == startOperationTime) {
+        // TODO: SERVER-27786 to return the clusterTime of the read.
+        operationTime = LogicalClock::get(txn)->getClusterTime().getTime();
+    }
+
+    appendOperationTime(inPlaceReplyBob, operationTime);
+
     inPlaceReplyBob.doneFast();
 
     BSONObjBuilder metadataBob;
@@ -1622,6 +1652,8 @@ void mongo::execCommandDatabase(OperationContext* txn,
         BSONObjBuilder metadataBob;
         appendOpTimeMetadata(txn, request, &metadataBob);
 
-        Command::generateErrorResponse(txn, replyBuilder, e, request, command, metadataBob.done());
+        auto operationTime = _getClientOperationTime(txn);
+        Command::generateErrorResponse(
+            txn, replyBuilder, e, request, command, metadataBob.done(), operationTime);
     }
 }

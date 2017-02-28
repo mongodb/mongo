@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <string>
 #include <vector>
 
@@ -39,6 +40,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/rpc/reply_builder_interface.h"
@@ -331,6 +333,11 @@ public:
     static bool appendCommandStatus(BSONObjBuilder& result, const Status& status);
 
     /**
+     * Appends "operationTime" field to the command result object as a Timestamp type.
+     */
+    static void appendOperationTime(BSONObjBuilder& result, LogicalTime operationTime);
+
+    /**
      * Helper for setting a writeConcernError field in the command result object if
      * a writeConcern error occurs.
      *
@@ -400,6 +407,17 @@ public:
                                       Command* command,
                                       const BSONObj& metadata);
 
+    /**
+     * Generates a command error response. This overload of generateErrorResponse is intended
+     * to also add an operationTime.
+     */
+    static void generateErrorResponse(OperationContext* txn,
+                                      rpc::ReplyBuilderInterface* replyBuilder,
+                                      const DBException& exception,
+                                      const rpc::RequestInterface& request,
+                                      Command* command,
+                                      const BSONObj& metadata,
+                                      LogicalTime operationTime);
     /**
      * Generates a command error response. This overload of generateErrorResponse is intended
      * to be called if the command is successfully parsed, but there is an error before we have
