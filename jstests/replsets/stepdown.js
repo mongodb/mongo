@@ -28,40 +28,66 @@ print("\ndo a write");
 assert.writeOK(master.getDB("foo").bar.insert({x: 1}));
 replTest.awaitReplication();
 
-// lock secondaries
-print("\nlock secondaries");
-replTest.liveNodes.slaves.forEach(function(slave) {
-    printjson(assert.commandWorked(slave.getDB("admin").runCommand({fsync: 1, lock: 1})));
-});
-
-print("\nwaiting several seconds before stepdown");
-
-sleep(2000);
-
-for (var i = 0; i < 11; i++) {
-    // do another write
-    assert.writeOK(master.getDB("foo").bar.insert({x: i}));
-    sleep(1000);
+// In the event of any error, we have to unlock any nodes that we have fsyncLocked.
+function unlockNodes(nodes) {
+    jsTestLog('Unlocking nodes: ' + tojson(nodes));
+    nodes.forEach(function(node) {
+        try {
+            jsTestLog('Unlocking node: ' + node);
+            assert.commandWorked(node.getDB("admin").fsyncUnlock());
+        } catch (e) {
+            jsTestLog('Failed to unlock node: ' + node + ': ' + tojson(e) +
+                      '. Ignoring unlock error and moving on to next node.');
+        }
+    });
 }
 
-print("\n do stepdown that should not work");
+var lockedNodes = [];
+try {
+    // lock secondaries
+    jsTestLog('Locking nodes: ' + tojson(replTest.liveNodes.slaves));
+    replTest.liveNodes.slaves.forEach(function(node) {
+        jsTestLog('Locking node: ' + node);
+        jsTestLog(
+            'fsync lock ' + node + ' result: ' +
+            tojson(assert.commandWorked(node.getDB("admin").runCommand({fsync: 1, lock: 1}))));
+        lockedNodes.push(node);
+    });
 
-// this should fail, so we don't need to try/catch
-printjson(assert.commandFailed(master.getDB("admin").runCommand({replSetStepDown: 10})));
+    jsTestLog('Stepping down primary: ' + master);
 
-print("\n do stepdown that should work");
-assert.throws(function() {
-    assert.commandFailed(master.getDB("admin").runCommand({replSetStepDown: 50, force: true}));
-});
+    for (var i = 0; i < 11; i++) {
+        // do another write
+        assert.writeOK(master.getDB("foo").bar.insert({x: i}));
+    }
 
-var r2 = assert.commandWorked(master.getDB("admin").runCommand({ismaster: 1}));
-assert.eq(r2.ismaster, false);
-assert.eq(r2.secondary, true);
+    jsTestLog('Do stepdown of primary ' + master + ' that should not work');
 
-print("\nunlock");
-replTest.liveNodes.slaves.forEach(function(slave) {
-    printjson(assert.commandWorked(slave.getDB("admin").fsyncUnlock()));
-});
+    // this should fail, so we don't need to try/catch
+    jsTestLog(
+        'Step down ' + master + ' expected error: ' +
+        tojson(assert.commandFailed(master.getDB("admin").runCommand({replSetStepDown: 10}))));
+
+    // The server will disconnect the client on a successful forced stepdown so we use the
+    // presence of an exception to confirm the forced stepdown result.
+    jsTestLog('Do stepdown of primary ' + master + ' that should work');
+    var exceptionFromForcedStepDown = assert.throws(function() {
+        master.getDB("admin")
+            .runCommand({replSetStepDown: ReplSetTest.kDefaultTimeoutMS, force: true});
+    });
+    jsTestLog('Forced stepdown ' + master + ' expected failure: ' +
+              tojson(exceptionFromForcedStepDown));
+
+    jsTestLog('Checking isMaster on ' + master);
+    var r2 = assert.commandWorked(master.getDB("admin").runCommand({ismaster: 1}));
+    jsTestLog('Result from running isMaster on ' + master + ': ' + tojson(r2));
+    assert.eq(r2.ismaster, false);
+    assert.eq(r2.secondary, true);
+} catch (e) {
+    throw e;
+} finally {
+    unlockNodes(lockedNodes);
+}
 
 print("\nreset stepped down time");
 assert.commandWorked(master.getDB("admin").runCommand({replSetFreeze: 0}));
