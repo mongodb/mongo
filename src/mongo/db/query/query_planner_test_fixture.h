@@ -48,8 +48,6 @@ class QueryPlannerTest : public mongo::unittest::Test {
 protected:
     void setUp();
 
-    OperationContext* opCtx();
-
     //
     // Build up test.
     //

@@ -1405,7 +1405,7 @@ void pretouchN(vector<BSONObj>& v, unsigned a, unsigned b) {
     Client::initThreadIfNotAlready("pretouchN");
 
     const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
-    OperationContext& opCtx = *opCtxPtr;  // XXX
+    OperationContext& opCtx = *opCtxPtr;
     ScopedTransaction transaction(&opCtx, MODE_S);
     Lock::GlobalRead lk(opCtx.lockState());
 

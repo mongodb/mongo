@@ -4250,7 +4250,7 @@ TEST_F(QueryPlannerTest, CacheDataFromTaggedTreeFailsOnBadInput) {
     auto qr = stdx::make_unique<QueryRequest>(NamespaceString("test.collection"));
     qr->setFilter(BSON("a" << 3));
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
     scopedCq->root()->setTag(new IndexTag(1));
@@ -4266,7 +4266,7 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     auto qr = stdx::make_unique<QueryRequest>(nss);
     qr->setFilter(BSON("a" << 3));
     auto statusWithCQ = CanonicalQuery::canonicalize(
-        opCtx(), std::move(qr), ExtensionsCallbackDisallowExtensions());
+        opCtx.get(), std::move(qr), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
 
@@ -4296,7 +4296,7 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
     auto newQR = stdx::make_unique<QueryRequest>(nss);
     newQR->setFilter(BSON("a" << 3));
     statusWithCQ = CanonicalQuery::canonicalize(
-        opCtx(), std::move(newQR), ExtensionsCallbackDisallowExtensions());
+        opCtx.get(), std::move(newQR), ExtensionsCallbackDisallowExtensions());
     ASSERT_OK(statusWithCQ.getStatus());
     scopedCq = std::move(statusWithCQ.getValue());
 
