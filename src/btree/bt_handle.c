@@ -21,6 +21,7 @@ static int __btree_tree_open_empty(WT_SESSION_IMPL *, bool);
 static void
 __btree_initialize(WT_BTREE *btree, bool closing)
 {
+	WT_DATA_HANDLE *dhandle;
 	uint32_t mask;
 
 	/*
@@ -35,11 +36,16 @@ __btree_initialize(WT_BTREE *btree, bool closing)
 	 */
 	if (closing) {
 		/*
-		 * Closing: clear everything except cache/eviction information
-		 * and one LSM flag.
+		 * Closing: clear everything except cache/eviction information.
+		 * (The LSM flag is used during cache eviction as an accounting
+		 * modifier, eviction also uses the WT_DATA_HANDLE reference.)
 		 */
+		dhandle = btree->dhandle;
+
 		memset(btree, 0, WT_BTREE_CLEAR_SIZE);
 		F_CLR(btree, ~(WT_BTREE_LSM_PRIMARY | WT_BTREE_NO_EVICTION));
+
+		btree->dhandle = dhandle;
 	} else {
 		/* Opening: clear everything except the special flags. */
 		mask = F_MASK(btree, WT_BTREE_SPECIAL_FLAGS);
