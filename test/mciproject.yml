@@ -65,7 +65,7 @@ tasks:
               ./build_posix/reconf
               ${configure_env_vars|} ./configure --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-verbose
               ${make_command|make} ${smp_command|} 2>&1
-              ${make_command|make} VERBOSE=1 check 2>&1
+              TESTUTIL_ENABLE_LONG_TESTS=1 ${make_command|make} VERBOSE=1 check 2>&1
             fi
       - command: archive.targz_pack
         params:
