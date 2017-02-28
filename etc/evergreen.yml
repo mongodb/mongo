@@ -1176,7 +1176,7 @@ timeout:
       working_dir: src
       script: |
         set -o verbose
-        hang_analyzer_option="-o file -o stdout -p ${hang_analyzer_processes|dbtest,java,mongo,mongod,mongos,python,_test} -g bsondump,mongodump,mongoexport,mongofiles,mongoimport,mongooplog,mongoreplay,mongorestore,mongostat,mongotop"
+        hang_analyzer_option="-c -o file -o stdout -p ${hang_analyzer_processes|dbtest,java,mongo,mongod,mongos,python,_test} -g bsondump,mongodump,mongoexport,mongofiles,mongoimport,mongooplog,mongoreplay,mongorestore,mongostat,mongotop"
         echo "Calling the hang analyzer: PATH=\"/opt/mongodbtoolchain/gdb/bin:$PATH\" python buildscripts/hang_analyzer.py $hang_analyzer_option"
         PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" python buildscripts/hang_analyzer.py $hang_analyzer_option
 
