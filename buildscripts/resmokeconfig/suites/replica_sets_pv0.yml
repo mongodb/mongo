@@ -32,5 +32,5 @@ executor:
       shell_options:
         global_vars:
           TestData:
-            useLegacyReplicationProtocol: true
+            forceReplicationProtocolVersion: 0
         nodb: ''

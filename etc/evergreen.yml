@@ -2658,12 +2658,12 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: replica_sets_legacy
+  name: replica_sets_pv0
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=replica_sets_legacy
+      resmoke_args: --suites=replica_sets_pv0
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -3514,7 +3514,7 @@ buildvariants:
   - name: replica_sets
   - name: replica_sets_WT
   - name: replica_sets_auth
-  - name: replica_sets_legacy
+  - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_jscore_passthrough_WT
   - name: master_slave
@@ -3658,7 +3658,7 @@ buildvariants:
   - name: replica_sets
   - name: replica_sets_WT
   - name: replica_sets_auth
-  - name: replica_sets_legacy
+  - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_jscore_passthrough_WT
   - name: master_slave
@@ -4525,7 +4525,7 @@ buildvariants:
   - name: replica_sets_WT_ese
   - name: replica_sets_auth
   - name: replica_sets_compression
-  - name: replica_sets_legacy
+  - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough_WT
   - name: master_slave_WT
   - name: master_slave_auth
@@ -5867,7 +5867,7 @@ buildvariants:
   - name: replica_sets_compression
     distros:
     - rhel62-large
-  - name: replica_sets_legacy
+  - name: replica_sets_pv0
     distros:
     - rhel62-large
   - name: replica_sets_jscore_passthrough
@@ -6100,7 +6100,7 @@ buildvariants:
   - name: replica_sets_compression
     distros:
     - rhel62-large
-  - name: replica_sets_legacy
+  - name: replica_sets_pv0
     distros:
     - rhel62-large
   - name: replica_sets_jscore_passthrough
@@ -6614,7 +6614,7 @@ buildvariants:
   - name: replica_sets_WT
   - name: replica_sets_WT_ese
   - name: replica_sets_auth
-  - name: replica_sets_legacy
+  - name: replica_sets_pv0
   # - name: replica_sets_jscore_passthrough
   - name: replica_sets_jscore_passthrough_WT
   # - name: master_slave
@@ -6753,7 +6753,7 @@ buildvariants:
   - name: replica_sets_WT
   - name: replica_sets_WT_ese
   - name: replica_sets_auth
-  - name: replica_sets_legacy
+  - name: replica_sets_pv0
   # - name: replica_sets_jscore_passthrough
   - name: replica_sets_jscore_passthrough_WT
   # - name: master_slave
@@ -6892,7 +6892,7 @@ buildvariants:
   - name: replica_sets_WT
   - name: replica_sets_WT_ese
   - name: replica_sets_auth
-  - name: replica_sets_legacy
+  - name: replica_sets_pv0
   # - name: replica_sets_jscore_passthrough
   - name: replica_sets_jscore_passthrough_WT
   # - name: master_slave
@@ -7290,7 +7290,7 @@ buildvariants:
   - name: replica_sets_WT
   - name: replica_sets_WT_ese
   - name: replica_sets_auth
-  - name: replica_sets_legacy
+  - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough_WT
   - name: master_slave_WT
   - name: master_slave_auth
@@ -7566,7 +7566,7 @@ buildvariants:
   - name: replica_sets_WT
   - name: replica_sets_WT_ese
   - name: replica_sets_auth
-  - name: replica_sets_legacy
+  - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough_WT
   - name: master_slave_WT
   - name: master_slave_auth
@@ -8265,7 +8265,7 @@ buildvariants:
   - name: read_concern_majority_passthrough_WT
   - name: replica_sets_WT
   - name: replica_sets_auth
-  - name: replica_sets_legacy
+  - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
   - name: master_slave_WT
   - name: master_slave_auth
@@ -8349,7 +8349,7 @@ buildvariants:
   - name: read_concern_linearizable_passthrough
   - name: replica_sets_WT
   - name: replica_sets_auth
-  - name: replica_sets_legacy
+  - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
   - name: master_slave_WT
   - name: master_slave_auth
@@ -8423,7 +8423,7 @@ buildvariants:
   - name: read_concern_majority_passthrough_WT
   - name: replica_sets_WT
   - name: replica_sets_auth
-  - name: replica_sets_legacy
+  - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
   - name: master_slave_WT
   - name: master_slave_auth
@@ -8511,7 +8511,7 @@ buildvariants:
   - name: read_concern_majority_passthrough_WT
   - name: replica_sets_WT
   - name: replica_sets_auth
-  - name: replica_sets_legacy
+  - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
   - name: master_slave_WT
   - name: master_slave_auth
@@ -8712,7 +8712,7 @@ buildvariants:
   - name: replica_sets_WT_ese
   - name: replica_sets_auth
   - name: replica_sets_compression
-  - name: replica_sets_legacy
+  - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_jscore_passthrough_WT
   - name: replica_sets_initsync_jscore_passthrough
@@ -8894,7 +8894,7 @@ buildvariants:
   - name: replica_sets_WT_ese
   - name: replica_sets_auth
   - name: replica_sets_compression
-  - name: replica_sets_legacy
+  - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_jscore_passthrough_WT
   - name: replica_sets_initsync_jscore_passthrough
@@ -9011,7 +9011,7 @@ buildvariants:
   - name: replica_sets_auth
     distros:
     - rhel62-large
-  - name: replica_sets_legacy
+  - name: replica_sets_pv0
     distros:
     - rhel62-large
   - name: replica_sets_jscore_passthrough

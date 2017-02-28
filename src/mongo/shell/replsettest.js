@@ -450,8 +450,8 @@ var ReplSetTest = function(opts) {
             cfg.members.push(member);
         }
 
-        if (jsTestOptions().useLegacyReplicationProtocol) {
-            cfg.protocolVersion = 0;
+        if (jsTestOptions().forceReplicationProtocolVersion !== undefined) {
+            cfg.protocolVersion = jsTestOptions().forceReplicationProtocolVersion;
         }
 
         if (_configSettings) {
@@ -689,9 +689,9 @@ var ReplSetTest = function(opts) {
     };
 
     this._setDefaultConfigOptions = function(config) {
-        if (jsTestOptions().useLegacyReplicationProtocol &&
+        if (jsTestOptions().forceReplicationProtocolVersion !== undefined &&
             !config.hasOwnProperty("protocolVersion")) {
-            config.protocolVersion = 0;
+            config.protocolVersion = jsTestOptions().forceReplicationProtocolVersion;
         }
         // Update config for non journaling test variants
         this._updateConfigIfNotDurable(config);
@@ -785,7 +785,7 @@ var ReplSetTest = function(opts) {
             return;
         }
 
-        if (this.protocolVersion === 0 || jsTestOptions().useLegacyReplicationProtocol) {
+        if (this.protocolVersion === 0 || jsTestOptions().forceReplicationProtocolVersion === 0) {
             // Ensure the specified node is primary.
             for (let i = 0; i < this.nodes.length; i++) {
                 let primary = this.getPrimary();
