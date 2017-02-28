@@ -185,7 +185,7 @@ void *dstrdup(const void *);
 void *dstrndup(const char *, size_t);
 void  testutil_clean_work_dir(const char *);
 void  testutil_cleanup(TEST_OPTS *);
-bool  testutil_disable_long_tests(void);
+bool  testutil_enable_long_tests(void);
 void  testutil_make_work_dir(char *);
 int   testutil_parse_opts(int, char * const *, TEST_OPTS *);
 void  testutil_work_dir_from_path(char *, size_t, const char *);

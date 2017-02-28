@@ -101,9 +101,10 @@ main(int argc, char *argv[])
 	uint64_t i, id;
 	char buf[100];
 
+	if (!testutil_enable_long_tests())	/* Ignore unless requested */
+		return (EXIT_SUCCESS);
+
 	opts = &_opts;
-	if (testutil_disable_long_tests())
-		return (0);
 	memset(opts, 0, sizeof(*opts));
 	opts->table_type = TABLE_ROW;
 	opts->n_append_threads = N_APPEND_THREADS;

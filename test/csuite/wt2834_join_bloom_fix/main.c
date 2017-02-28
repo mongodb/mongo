@@ -59,11 +59,11 @@ main(int argc, char *argv[])
 	char flaguri[256];
 	char joinuri[256];
 
-	opts = &_opts;
-	if (testutil_disable_long_tests())
-		return (0);
-	memset(opts, 0, sizeof(*opts));
+	if (!testutil_enable_long_tests())	/* Ignore unless requested */
+		return (EXIT_SUCCESS);
 
+	opts = &_opts;
+	memset(opts, 0, sizeof(*opts));
 	testutil_check(testutil_parse_opts(argc, argv, opts));
 	testutil_make_work_dir(opts->home);
 

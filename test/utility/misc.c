@@ -166,20 +166,25 @@ testutil_cleanup(TEST_OPTS *opts)
 }
 
 /*
- * testutil_disable_long_tests --
- *	Return if TESTUTIL_DISABLE_LONG_TESTS is set.
+ * testutil_enable_long_tests --
+ *	Return if TESTUTIL_ENABLE_LONG_TESTS is set.
  */
 bool
-testutil_disable_long_tests(void)
+testutil_enable_long_tests(void)
 {
 	const char *res;
+	bool enable_long_tests;
 
 	if (__wt_getenv(NULL,
-	    "TESTUTIL_DISABLE_LONG_TESTS", &res) == WT_NOTFOUND)
+	    "TESTUTIL_ENABLE_LONG_TESTS", &res) == WT_NOTFOUND)
 		return (false);
 
+	/* Accept anything other than "TESTUTIL_ENABLE_LONG_TESTS=0". */
+	enable_long_tests = res[0] != '0';
+
 	free((void *)res);
-	return (true);
+
+	return (enable_long_tests);
 }
 
 /*
