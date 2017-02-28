@@ -50,6 +50,7 @@ public:
     static constexpr StringData k32IncompatibleIndexName = "incompatible_with_version_32"_sd;
     static constexpr StringData kCollection = "admin.system.version"_sd;
     static constexpr StringData kCommandName = "setFeatureCompatibilityVersion"_sd;
+    static constexpr StringData kDatabase = "admin"_sd;
     static constexpr StringData kParameterName = "featureCompatibilityVersion"_sd;
     static constexpr StringData kVersionField = "version"_sd;
 
@@ -85,6 +86,11 @@ public:
      * featureCompatibilityVersion document, resets the server parameter to its default value (3.2).
      */
     static void onDelete(const BSONObj& doc);
+
+    /**
+     * Resets the server parameter to its default value (3.2).
+     */
+    static void onDropCollection();
 };
 
 }  // namespace mongo

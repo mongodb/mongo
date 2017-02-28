@@ -220,6 +220,10 @@ void OpObserverImpl::onDropDatabase(OperationContext* txn, const std::string& db
 
     repl::logOp(txn, "c", dbName.c_str(), cmdObj, nullptr, false);
 
+    if (NamespaceString(dbName).db() == FeatureCompatibilityVersion::kDatabase) {
+        FeatureCompatibilityVersion::onDropCollection();
+    }
+
     getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), cmdObj, nullptr);
     logOpForDbHash(txn, dbName.c_str());
 }
@@ -236,6 +240,10 @@ void OpObserverImpl::onDropCollection(OperationContext* txn,
 
     if (collectionName.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(txn, collectionName);
+    }
+
+    if (collectionName.ns() == FeatureCompatibilityVersion::kCollection) {
+        FeatureCompatibilityVersion::onDropCollection();
     }
 
     getGlobalAuthorizationManager()->logOp(txn, "c", dbName.c_str(), cmdObj, nullptr);

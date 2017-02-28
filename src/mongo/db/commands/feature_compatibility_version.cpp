@@ -57,6 +57,7 @@ using repl::UnreplicatedWritesBlock;
 constexpr StringData FeatureCompatibilityVersion::k32IncompatibleIndexName;
 constexpr StringData FeatureCompatibilityVersion::kCollection;
 constexpr StringData FeatureCompatibilityVersion::kCommandName;
+constexpr StringData FeatureCompatibilityVersion::kDatabase;
 constexpr StringData FeatureCompatibilityVersion::kParameterName;
 constexpr StringData FeatureCompatibilityVersion::kVersionField;
 
@@ -346,6 +347,13 @@ void FeatureCompatibilityVersion::onDelete(const BSONObj& doc) {
         idElement.String() != FeatureCompatibilityVersion::kParameterName) {
         return;
     }
+    log() << "setting featureCompatibilityVersion to "
+          << FeatureCompatibilityVersionCommandParser::kVersion32;
+    serverGlobalParams.featureCompatibility.version.store(
+        ServerGlobalParams::FeatureCompatibility::Version::k32);
+}
+
+void FeatureCompatibilityVersion::onDropCollection() {
     log() << "setting featureCompatibilityVersion to "
           << FeatureCompatibilityVersionCommandParser::kVersion32;
     serverGlobalParams.featureCompatibility.version.store(
