@@ -89,14 +89,11 @@ void dassertCompIsSane(const Comparator& comp, const Data& lhs, const Data& rhs)
     // test reversed comparisons
     const int regular = comp(lhs, rhs);
     if (regular == 0) {
-        if (!(comp(rhs, lhs) == 0))
-            compIsntSane(comp, lhs, rhs);
+        invariant(comp(rhs, lhs) == 0);
     } else if (regular < 0) {
-        if (!(comp(rhs, lhs) > 0))
-            compIsntSane(comp, lhs, rhs);
-    } else /*regular > 0*/ {
-        if (!(comp(rhs, lhs) < 0))
-            compIsntSane(comp, lhs, rhs);
+        invariant(comp(rhs, lhs) > 0);
+    } else {
+        invariant(comp(rhs, lhs) < 0);
     }
 
     // test reflexivity
