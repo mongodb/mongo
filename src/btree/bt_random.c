@@ -178,6 +178,8 @@ __wt_random_descent(WT_SESSION_IMPL *session, WT_REF **refp, bool eviction)
 	WT_REF *current, *descent;
 	uint32_t flags, i, entries, retry;
 
+	*refp = NULL;
+
 	btree = S2BT(session);
 	current = NULL;
 	retry = 100;
@@ -201,16 +203,6 @@ restart:	/*
 	current = &btree->root;
 	for (;;) {
 		page = current->page;
-		/*
-		 * When walking a tree for eviction, an exclusive operation may
-		 * be in progress leaving the root page is not valid.  Just give
-		 * up in that case.
-		 */
-		if (page == NULL) {
-			WT_ASSERT(session, eviction);
-			break;
-		}
-
 		if (!WT_PAGE_IS_INTERNAL(page))
 			break;
 

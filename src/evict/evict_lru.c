@@ -1431,10 +1431,20 @@ retry:	while (slot < max_entries) {
 		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
 		    !__wt_spin_trylock(session, &cache->evict_walk_lock)) {
 			if (!F_ISSET(btree, WT_BTREE_NO_EVICTION)) {
+				/*
+				 * Assert the handle has a root page: eviction
+				 * should have been locked out if the tree is
+				 * being discarded or the root page is changing.
+				 * As this has not always been the case, assert
+				 * to debug that change.
+				 */
+				WT_ASSERT(session, btree->root.page != NULL);
+
 				cache->evict_file_next = dhandle;
-				WT_WITH_DHANDLE(session, dhandle, ret =
-				    __evict_walk_file(session, queue,
-				    max_entries, &slot));
+				WT_WITH_DHANDLE(session, dhandle,
+				    ret = __evict_walk_file(
+				    session, queue, max_entries, &slot));
+
 				WT_ASSERT(session, session->split_gen == 0);
 			}
 			__wt_spin_unlock(session, &cache->evict_walk_lock);

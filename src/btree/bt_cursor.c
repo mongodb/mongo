@@ -512,7 +512,7 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	 */
 	if (btree->bulk_load_ok) {
 		btree->bulk_load_ok = false;
-		__wt_btree_evictable(session, true);
+		__wt_evict_file_exclusive_off(session);
 	}
 
 retry:	WT_RET(__cursor_func_init(cbt, true));
@@ -766,7 +766,7 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 	 */
 	if (btree->bulk_load_ok) {
 		btree->bulk_load_ok = false;
-		__wt_btree_evictable(session, true);
+		__wt_evict_file_exclusive_off(session);
 	}
 
 retry:	WT_RET(__cursor_func_init(cbt, true));

@@ -118,10 +118,6 @@ struct __wt_btree {
 
 	uint64_t last_recno;		/* Column-store last record number */
 
-	WT_REF root;			/* Root page reference */
-	bool modified;			/* If the tree ever modified */
-	bool bulk_load_ok;		/* Bulk-load is a possibility */
-
 	WT_BM	*bm;			/* Block manager reference */
 	u_int	 block_header;		/* WT_PAGE_HEADER_BYTE_SIZE */
 
@@ -129,6 +125,28 @@ struct __wt_btree {
 	bool     include_checkpoint_txn;/* ID checks include checkpoint */
 	uint64_t rec_max_txn;		/* Maximum txn seen (clean trees) */
 	uint64_t write_gen;		/* Write generation */
+
+	enum {
+		WT_CKPT_OFF, WT_CKPT_PREPARE, WT_CKPT_RUNNING
+	} checkpointing;		/* Checkpoint in progress */
+
+	/*
+	 * We flush pages from the tree (in order to make checkpoint faster),
+	 * without a high-level lock.  To avoid multiple threads flushing at
+	 * the same time, lock the tree.
+	 */
+	WT_SPINLOCK	flush_lock;	/* Lock to flush the tree's pages */
+
+	bool modified;			/* If the tree ever modified */
+	bool bulk_load_ok;		/* Bulk-load is a possibility */
+
+	/*
+	 * The tree's cache and eviction information persist after the handle
+	 * is closed (clean cache pages may remain after the tree is closed).
+	 * Be careful clearing the WT_BTREE structure.
+	 */
+#define	WT_BTREE_CLEAR_SIZE	(offsetof(WT_BTREE, root))
+	WT_REF root;			/* Root page reference */
 
 	uint64_t bytes_inmem;		/* Cache bytes in memory. */
 	uint64_t bytes_dirty_intl;	/* Bytes in dirty internal pages. */
@@ -143,17 +161,6 @@ struct __wt_btree {
 	volatile uint32_t evict_busy;	/* Count of threads in eviction */
 	int      evict_start_type;	/* Start position for eviction walk
 					   (see WT_EVICT_WALK_START). */
-
-	enum {
-		WT_CKPT_OFF, WT_CKPT_PREPARE, WT_CKPT_RUNNING
-	} checkpointing;		/* Checkpoint in progress */
-
-	/*
-	 * We flush pages from the tree (in order to make checkpoint faster),
-	 * without a high-level lock.  To avoid multiple threads flushing at
-	 * the same time, lock the tree.
-	 */
-	WT_SPINLOCK	flush_lock;	/* Lock to flush the tree's pages */
 
 	/* Flags values up to 0xff are reserved for WT_DHANDLE_* */
 #define	WT_BTREE_BULK		0x000100 /* Bulk-load handle */

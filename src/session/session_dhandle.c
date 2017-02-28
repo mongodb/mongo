@@ -574,12 +574,13 @@ __wt_session_lock_checkpoint(WT_SESSION_IMPL *session, const char *checkpoint)
 	    checkpoint, NULL, WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
 
 	/*
-	 * Flush any pages in this checkpoint from the cache (we are about to
-	 * re-write the checkpoint which will mean cached pages no longer have
-	 * valid contents).  This is especially noticeable with memory mapped
-	 * files, since changes to the underlying file are visible to the in
-	 * memory pages.
+	 * Get exclusive access to the handle and then flush any pages in this
+	 * checkpoint from the cache (we are about to re-write the checkpoint
+	 * which will mean cached pages no longer have valid contents). This
+	 * is especially noticeable with memory mapped files, since changes to
+	 * the underlying file are visible to the in-memory pages.
 	 */
+	WT_ERR(__wt_evict_file_exclusive_on(session));
 	WT_ERR(__wt_cache_op(session, WT_SYNC_DISCARD));
 
 	/*
