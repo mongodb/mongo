@@ -1,3 +1,5 @@
+load("jstests/replsets/rslib.js");
+
 // Test for SERVER-8070: Flush buffer before changing sync targets to prevent unnecessary rollbacks
 // This test writes 50 ops to one secondary's data (member2) and 25 ops to the other secondary's
 // data (member3), then puts 50 more ops in member3's buffer and makes sure that member3 doesn't try
@@ -40,8 +42,9 @@ master.getDB("foo").bar.insert({x: 1});
 replSet.awaitReplication();
 
 jsTest.log("Make sure 2 & 3 are syncing from the primary");
-member2.adminCommand({replSetSyncFrom: getHostName() + ":" + replSet.ports[0]});
-member3.adminCommand({replSetSyncFrom: getHostName() + ":" + replSet.ports[0]});
+assert.eq(master, replSet.nodes[0]);
+syncFrom(replSet.nodes[1], master, replSet);
+syncFrom(replSet.nodes[2], master, replSet);
 
 jsTest.log("Stop 2's replication");
 member2.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
