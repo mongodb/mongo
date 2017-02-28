@@ -216,7 +216,7 @@ jsTestOptions = function() {
             adminUser: TestData.adminUser || "admin",
             adminPassword: TestData.adminPassword || "password",
             useLegacyConfigServers: TestData.useLegacyConfigServers || false,
-            useLegacyReplicationProtocol: TestData.useLegacyReplicationProtocol || false,
+            forceReplicationProtocolVersion: TestData.forceReplicationProtocolVersion,
             enableMajorityReadConcern: TestData.enableMajorityReadConcern,
             writeConcernMajorityShouldJournal: TestData.writeConcernMajorityShouldJournal,
             enableEncryption: TestData.enableEncryption,
