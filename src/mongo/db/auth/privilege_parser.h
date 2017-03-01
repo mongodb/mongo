@@ -33,7 +33,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/s/bson_serializable.h"
 
 namespace mongo {
 
@@ -43,7 +42,7 @@ class Privilege;
  * This class is used to parse documents describing resources as they are represented as part
  * of privileges granted to roles in the role management commands.
  */
-class ParsedResource : BSONSerializable {
+class ParsedResource {
     MONGO_DISALLOW_COPYING(ParsedResource);
 
 public:
@@ -74,7 +73,7 @@ public:
     BSONObj toBSON() const;
     bool parseBSON(const BSONObj& source, std::string* errMsg);
     void clear();
-    virtual std::string toString() const;
+    std::string toString() const;
 
     //
     // individual field accessors
@@ -123,7 +122,7 @@ private:
 /**
  * This class is used to parse documents describing privileges in the role managment commands.
  */
-class ParsedPrivilege : BSONSerializable {
+class ParsedPrivilege {
     MONGO_DISALLOW_COPYING(ParsedPrivilege);
 
 public:

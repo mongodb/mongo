@@ -31,7 +31,6 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
-#include "mongo/s/bson_serializable.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
