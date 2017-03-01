@@ -13,7 +13,12 @@ import warnings
 
 import requests
 import requests.auth
-import requests.packages.urllib3.exceptions
+
+try:
+    import requests.packages.urllib3.exceptions as urllib3_exceptions
+except ImportError:
+    # Versions of the requests package prior to 1.2.0 did not vendor the urllib3 package.
+    urllib3_exceptions = None
 
 from .. import utils
 from ..utils import timer
@@ -179,24 +184,31 @@ class HTTPHandler(object):
 
         # Versions of Python earlier than 2.7.9 do not support certificate validation. So we
         # disable certificate validation for older Python versions.
-        if sys.version_info < (2, 7, 9):
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore",
-                                      requests.packages.urllib3.exceptions.InsecurePlatformWarning)
-                warnings.simplefilter("ignore",
-                                      requests.packages.urllib3.exceptions.InsecureRequestWarning)
-                response = requests.post(url,
-                                         data=data,
-                                         headers=headers,
-                                         timeout=timeout_secs,
-                                         auth=self.auth_handler,
-                                         verify=False)
-        else:
+        should_validate_certificates = sys.version_info >= (2, 7, 9)
+        with warnings.catch_warnings():
+            if urllib3_exceptions is not None and not should_validate_certificates:
+                try:
+                    warnings.simplefilter("ignore", urllib3_exceptions.InsecurePlatformWarning)
+                except AttributeError:
+                    # Versions of urllib3 prior to 1.10.3 didn't define InsecurePlatformWarning.
+                    # Versions of requests prior to 2.6.0 didn't have a vendored copy of urllib3
+                    # that defined InsecurePlatformWarning.
+                    pass
+
+                try:
+                    warnings.simplefilter("ignore", urllib3_exceptions.InsecureRequestWarning)
+                except AttributeError:
+                    # Versions of urllib3 prior to 1.9 didn't define InsecureRequestWarning.
+                    # Versions of requests prior to 2.4.0 didn't have a vendored copy of urllib3
+                    # that defined InsecureRequestWarning.
+                    pass
+
             response = requests.post(url,
                                      data=data,
                                      headers=headers,
                                      timeout=timeout_secs,
-                                     auth=self.auth_handler)
+                                     auth=self.auth_handler,
+                                     verify=should_validate_certificates)
 
         response.raise_for_status()
 
