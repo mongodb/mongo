@@ -18,7 +18,7 @@ __conn_dhandle_destroy(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
 	__wt_rwlock_destroy(session, &dhandle->rwlock);
 	__wt_free(session, dhandle->name);
 	__wt_free(session, dhandle->checkpoint);
-	__wt_free(session, dhandle->handle);
+	__wt_btree_discard(session, &dhandle->handle);
 	__wt_spin_destroy(session, &dhandle->close_lock);
 	__wt_stat_dsrc_discard(session, dhandle);
 	__wt_overwrite_and_free(session, dhandle);
@@ -192,6 +192,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session, bool final, bool force)
 	}
 
 	WT_TRET(__wt_btree_close(session));
+	F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 
 	/*
 	 * If we marked a handle dead it will be closed by sweep, via

@@ -118,6 +118,10 @@ struct __wt_btree {
 
 	uint64_t last_recno;		/* Column-store last record number */
 
+	WT_REF root;			/* Root page reference */
+	bool modified;			/* If the tree ever modified */
+	bool bulk_load_ok;		/* Bulk-load is a possibility */
+
 	WT_BM	*bm;			/* Block manager reference */
 	u_int	 block_header;		/* WT_PAGE_HEADER_BYTE_SIZE */
 
@@ -126,6 +130,19 @@ struct __wt_btree {
 	uint64_t rec_max_txn;		/* Maximum txn seen (clean trees) */
 	uint64_t write_gen;		/* Write generation */
 
+	uint64_t    bytes_inmem;	/* Cache bytes in memory. */
+	uint64_t    bytes_dirty_intl;	/* Bytes in dirty internal pages. */
+	uint64_t    bytes_dirty_leaf;	/* Bytes in dirty leaf pages. */
+
+	WT_REF	   *evict_ref;		/* Eviction thread's location */
+	uint64_t    evict_priority;	/* Relative priority of cached pages */
+	u_int	    evict_walk_period;	/* Skip this many LRU walks */
+	u_int	    evict_walk_saved;	/* Saved walk skips for checkpoints */
+	u_int	    evict_walk_skips;	/* Number of walks skipped */
+	u_int	    evict_disabled;	/* Eviction disabled count */
+	volatile uint32_t evict_busy;	/* Count of threads in eviction */
+	int	    evict_start_type;	/* Start position for eviction walk
+					   (see WT_EVICT_WALK_START). */
 	enum {
 		WT_CKPT_OFF, WT_CKPT_PREPARE, WT_CKPT_RUNNING
 	} checkpointing;		/* Checkpoint in progress */
@@ -137,46 +154,22 @@ struct __wt_btree {
 	 */
 	WT_SPINLOCK	flush_lock;	/* Lock to flush the tree's pages */
 
-	bool modified;			/* If the tree ever modified */
-	bool bulk_load_ok;		/* Bulk-load is a possibility */
-
-	/*
-	 * The tree's cache and eviction information persist after the handle
-	 * is closed (clean cache pages may remain after the tree is closed).
-	 * Be careful clearing the WT_BTREE structure.
-	 */
-#define	WT_BTREE_CLEAR_SIZE	(offsetof(WT_BTREE, root))
-	WT_REF root;			/* Root page reference */
-
-	uint64_t bytes_inmem;		/* Cache bytes in memory. */
-	uint64_t bytes_dirty_intl;	/* Bytes in dirty internal pages. */
-	uint64_t bytes_dirty_leaf;	/* Bytes in dirty leaf pages. */
-
-	WT_REF	*evict_ref;		/* Eviction thread's location */
-	uint64_t evict_priority;	/* Relative priority of cached pages */
-	u_int	 evict_walk_period;	/* Skip this many LRU walks */
-	u_int	 evict_walk_saved;	/* Saved walk skips for checkpoints */
-	u_int	 evict_walk_skips;	/* Number of walks skipped */
-	u_int	 evict_disabled;	/* Eviction disabled count */
-	volatile uint32_t evict_busy;	/* Count of threads in eviction */
-	int      evict_start_type;	/* Start position for eviction walk
-					   (see WT_EVICT_WALK_START). */
-
 	/* Flags values up to 0xff are reserved for WT_DHANDLE_* */
 #define	WT_BTREE_BULK		0x000100 /* Bulk-load handle */
-#define	WT_BTREE_IGNORE_CACHE	0x000200 /* Cache-resident object */
-#define	WT_BTREE_IN_MEMORY	0x000400 /* Cache-resident object */
-#define	WT_BTREE_LOOKASIDE	0x000800 /* Look-aside table */
-#define	WT_BTREE_LSM_PRIMARY	0x001000 /* Handle is current LSM primary */
-#define	WT_BTREE_NO_CHECKPOINT	0x002000 /* Disable checkpoints */
-#define	WT_BTREE_NO_EVICTION	0x004000 /* Disable eviction */
-#define	WT_BTREE_NO_LOGGING	0x008000 /* Disable logging */
-#define	WT_BTREE_NO_RECONCILE	0x010000 /* Allow splits, even with no evict */
-#define	WT_BTREE_REBALANCE	0x020000 /* Handle is for rebalance */
-#define	WT_BTREE_SALVAGE	0x040000 /* Handle is for salvage */
-#define	WT_BTREE_SKIP_CKPT	0x080000 /* Handle skipped checkpoint */
-#define	WT_BTREE_UPGRADE	0x100000 /* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x200000 /* Handle is for verify */
+#define	WT_BTREE_CLOSED		0x000200 /* Handle closed */
+#define	WT_BTREE_IGNORE_CACHE	0x000400 /* Cache-resident object */
+#define	WT_BTREE_IN_MEMORY	0x000800 /* Cache-resident object */
+#define	WT_BTREE_LOOKASIDE	0x001000 /* Look-aside table */
+#define	WT_BTREE_LSM_PRIMARY	0x002000 /* Handle is current LSM primary */
+#define	WT_BTREE_NO_CHECKPOINT	0x004000 /* Disable checkpoints */
+#define	WT_BTREE_NO_EVICTION	0x008000 /* Disable eviction */
+#define	WT_BTREE_NO_LOGGING	0x010000 /* Disable logging */
+#define	WT_BTREE_NO_RECONCILE	0x020000 /* Allow splits, even with no evict */
+#define	WT_BTREE_REBALANCE	0x040000 /* Handle is for rebalance */
+#define	WT_BTREE_SALVAGE	0x080000 /* Handle is for salvage */
+#define	WT_BTREE_SKIP_CKPT	0x100000 /* Handle skipped checkpoint */
+#define	WT_BTREE_UPGRADE	0x200000 /* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x400000 /* Handle is for verify */
 	uint32_t flags;
 };
 

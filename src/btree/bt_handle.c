@@ -15,46 +15,6 @@ static int __btree_preload(WT_SESSION_IMPL *);
 static int __btree_tree_open_empty(WT_SESSION_IMPL *, bool);
 
 /*
- * __btree_initialize --
- *	Initialize the WT_BTREE structure.
- */
-static void
-__btree_initialize(WT_BTREE *btree, bool closing)
-{
-	WT_DATA_HANDLE *dhandle;
-	uint32_t mask;
-
-	/*
-	 * This function exists as a place to discuss how the WT_BTREE structure
-	 * is initialized (or re-initialized, when the object is re-opened). The
-	 * upper-level handle code sets/clears flags in the WT_BTREE structure,
-	 * plus the eviction/cache code reads/writes cache information. The
-	 * latter happens in-between a forced drop and sweep discarding the
-	 * tree (where the tree is still "open" and has pages being evicted from
-	 * the cache), but it's no longer part of the namespace. For all those
-	 * reasons, parts of the WT_BTREE object must persist after it's closed.
-	 */
-	if (closing) {
-		/*
-		 * Closing: clear everything except cache/eviction information.
-		 * (The LSM flag is used during cache eviction as an accounting
-		 * modifier, eviction also uses the WT_DATA_HANDLE reference.)
-		 */
-		dhandle = btree->dhandle;
-
-		memset(btree, 0, WT_BTREE_CLEAR_SIZE);
-		F_CLR(btree, ~(WT_BTREE_LSM_PRIMARY | WT_BTREE_NO_EVICTION));
-
-		btree->dhandle = dhandle;
-	} else {
-		/* Opening: clear everything except the special flags. */
-		mask = F_MASK(btree, WT_BTREE_SPECIAL_FLAGS);
-		memset(btree, 0, sizeof(*btree));
-		btree->flags = mask;
-	}
-}
-
-/*
  * __wt_btree_open --
  *	Open a Btree.
  */
@@ -68,15 +28,27 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	size_t root_addr_size;
+	uint32_t mask;
 	uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
 	const char *filename;
 	bool creation, forced_salvage, readonly;
 
-	dhandle = session->dhandle;
-
+	/*
+	 * This may be a re-open of an underlying object and we want to clear
+	 * everything. We can't clear the operation flags, however, they're
+	 * set by the connection handle software.
+	 */
 	btree = S2BT(session);
-	__btree_initialize(btree, false);
-	btree->dhandle = session->dhandle;
+	mask = F_MASK(btree, WT_BTREE_SPECIAL_FLAGS);
+	memset(btree, 0, sizeof(*btree));
+	btree->flags = mask;
+
+	/*
+	 * Set the data handle immediately, our called functions reasonably
+	 * use it.
+	 */
+	dhandle = session->dhandle;
+	btree->dhandle = dhandle;
 
 	/* Checkpoint files are readonly. */
 	readonly = dhandle->checkpoint != NULL ||
@@ -204,7 +176,24 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 
 	btree = S2BT(session);
 
+	/*
+	 * The close process isn't the same as discarding the handle: we might
+	 * re-open the handle, which isn't a big deal, but the backing blocks
+	 * for the handle may not yet have been discarded from the cache, and
+	 * eviction uses WT_BTREE structure elements. Free backing resources
+	 * but leave the rest alone, and we'll discard the structure when we
+	 * discard the data handle.
+	 *
+	 * Handles can be closed multiple times, ignore all but the first.
+	 */
+	if (F_ISSET(btree, WT_BTREE_CLOSED))
+		return (0);
+	F_SET(btree, WT_BTREE_CLOSED);
+
+	/* Discard any underlying block manager resources. */
 	if ((bm = btree->bm) != NULL) {
+		btree->bm = NULL;
+
 		/* Unload the checkpoint, unless it's a special command. */
 		if (!F_ISSET(btree,
 		    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
@@ -217,6 +206,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	/* Close the Huffman tree. */
 	__wt_btree_huffman_close(session);
 
+	/* Terminate any associated collator. */
 	if (btree->collator_owned && btree->collator->terminate != NULL)
 		WT_TRET(btree->collator->terminate(
 		    btree->collator, &session->iface));
@@ -229,9 +219,21 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_free(session, btree->key_format);
 	__wt_free(session, btree->value_format);
 
-	__btree_initialize(btree, true);
-
 	return (ret);
+}
+
+/*
+ * __wt_btree_discard --
+ *	Discard a Btree.
+ */
+void
+__wt_btree_discard(WT_SESSION_IMPL *session, void **handlep)
+{
+	WT_BTREE *btree;
+
+	btree = *handlep;
+	*handlep = NULL;
+	__wt_overwrite_and_free(session, btree);
 }
 
 /*
