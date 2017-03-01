@@ -6,6 +6,16 @@ Import("mmapv1")
 env = env.Clone()
 
 env.Library(
+    target='paths',
+    source=[
+        'paths.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
     target = 'storage_mmapv1',
     source = [ "aligned_builder.cpp",
                "catalog/hashtab.cpp",
@@ -41,6 +51,7 @@ env.Library(
         'file_allocator',
         'logfile',
         'compress',
+        'paths',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/commands/core',
@@ -49,7 +60,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/storage/journal_listener',
-        '$BUILD_DIR/mongo/db/storage/paths',
         '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
         # '$BUILD_DIR/mongo/db/index/index_access_methods', # CYCLE
         # '$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
@@ -69,7 +79,7 @@ compressEnv.Library(
         'compress.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/paths',
+        'paths',
         '$BUILD_DIR/third_party/shim_snappy',
     ],
 )
@@ -91,7 +101,7 @@ env.Library(
         'file_allocator.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/paths',
+        'paths',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/processinfo',
     ],
@@ -103,8 +113,8 @@ env.Library(
         'logfile.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/storage/paths',
         'mmap',
+        'paths',
     ],
 )
 
