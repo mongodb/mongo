@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/chunk_manager_targeter.h"
+#include "mongo/s/commands/chunk_manager_targeter.h"
 
 #include <boost/thread/tss.hpp>
 
