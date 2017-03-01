@@ -70,7 +70,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/set_shard_version_request.h"
-#include "mongo/s/sharding_egress_metadata_hook_for_mongod.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
@@ -86,7 +85,6 @@ using executor::RemoteCommandResponse;
 using repl::ReplicationCoordinator;
 using repl::ReplicationCoordinatorMock;
 using repl::ReplSettings;
-using rpc::ShardingEgressMetadataHookForMongod;
 using unittest::assertGet;
 
 using std::string;
@@ -140,8 +138,6 @@ std::unique_ptr<executor::TaskExecutorPool> ShardingMongodTestFixture::makeTaskE
     // threads, tasks in the NetworkInterfaceMock must be carried out synchronously by the (single)
     // thread the unit test is running on.
     auto netForFixedTaskExecutor = stdx::make_unique<executor::NetworkInterfaceMock>();
-    netForFixedTaskExecutor->setEgressMetadataHook(
-        stdx::make_unique<ShardingEgressMetadataHookForMongod>());
     _mockNetwork = netForFixedTaskExecutor.get();
 
     // Set up a ThreadPoolTaskExecutor. Note, for local tasks this TaskExecutor uses a
@@ -156,8 +152,6 @@ std::unique_ptr<executor::TaskExecutorPool> ShardingMongodTestFixture::makeTaskE
     // Set up a NetworkInterfaceMock for the (one) arbitrary TaskExecutor that will go in the set
     // of arbitrary TaskExecutors.
     auto netForArbitraryExecutor = stdx::make_unique<executor::NetworkInterfaceMock>();
-    netForArbitraryExecutor->setEgressMetadataHook(
-        stdx::make_unique<ShardingEgressMetadataHookForMongod>());
 
     // Set up (one) TaskExecutor for the set of arbitrary TaskExecutors.
     auto arbitraryExecutorForExecutorPool =

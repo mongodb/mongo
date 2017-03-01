@@ -42,13 +42,12 @@ class DBClientBase;
  */
 class ShardingConnectionHook : public DBConnectionHook {
 public:
+    ShardingConnectionHook(bool shardedConnections,
+                           std::unique_ptr<rpc::ShardingEgressMetadataHook> egressHook);
+
     void onCreate(DBClientBase* conn) override;
     void onDestroy(DBClientBase* conn) override;
     void onRelease(DBClientBase* conn) override;
-
-protected:
-    ShardingConnectionHook(bool shardedConnections,
-                           std::unique_ptr<rpc::ShardingEgressMetadataHook> egressHook);
 
 private:
     bool _shardedConnections;

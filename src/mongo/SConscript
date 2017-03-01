@@ -342,7 +342,6 @@ env.Install(
     env.Program(
         target='mongos',
         source=[
-            's/client/sharding_connection_hook_for_mongos.cpp',
             's/mongos_options_init.cpp',
             's/server.cpp',
             's/service_entry_point_mongos.cpp',

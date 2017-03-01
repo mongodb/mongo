@@ -30,16 +30,14 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/sharding_egress_metadata_hook_for_mongod.h"
+#include "mongo/db/s/sharding_egress_metadata_hook_for_mongod.h"
 
 #include "mongo/base/status.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_options.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
 
 namespace mongo {
-
 namespace rpc {
 
 void ShardingEgressMetadataHookForMongod::_saveGLEStats(const BSONObj& metadata,

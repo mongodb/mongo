@@ -48,4 +48,5 @@ protected:
 
     void expectFindOnConfigSendBSONObjVector(std::vector<BSONObj> obj);
 };
+
 }  // namespace mongo

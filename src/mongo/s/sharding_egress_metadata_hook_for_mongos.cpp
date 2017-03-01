@@ -39,7 +39,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
 namespace rpc {
 
 void ShardingEgressMetadataHookForMongos::_saveGLEStats(const BSONObj& metadata,

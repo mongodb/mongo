@@ -274,22 +274,19 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
                 return;
             }
 
-            auto& data = dataStatus.getValue();
+            const auto& data = dataStatus.getValue();
+
             if (data.otherFields.metadata.hasField(rpc::kReplSetMetadataFieldName)) {
                 auto replParseStatus =
                     rpc::ReplSetMetadata::readFromMetadata(data.otherFields.metadata);
-
                 if (!replParseStatus.isOK()) {
                     status = replParseStatus.getStatus();
                     response.docs.clear();
                     return;
                 }
 
-                response.opTime = replParseStatus.getValue().getLastOpCommitted();
-
-                // We return the config opTime that was returned for this particular request, but as
-                // a safeguard we ensure our global configOpTime is at least as large as it.
-                invariant(grid.configOpTime() >= response.opTime);
+                const auto& replSetMetadata = replParseStatus.getValue();
+                response.opTime = replSetMetadata.getLastOpCommitted();
             }
 
             for (const BSONObj& doc : data.documents) {

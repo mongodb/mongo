@@ -32,6 +32,7 @@
 
 #include "mongo/db/s/sharding_state.h"
 
+#include "mongo/base/init.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
@@ -62,6 +63,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/sharding_network_connection_hook.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/local_sharding_info.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -115,6 +117,30 @@ void updateShardIdentityConfigStringCB(const string& setName, const string& newC
         warning() << "error encountered while trying to update config connection string to "
                   << newConnectionString << causedBy(redact(status));
     }
+}
+
+bool haveLocalShardingInfo(OperationContext* txn, const string& ns) {
+    if (!ShardingState::get(txn)->enabled()) {
+        return false;
+    }
+
+    const auto& oss = OperationShardingState::get(txn);
+    if (oss.hasShardVersion()) {
+        return true;
+    }
+
+    const auto& sci = ShardedConnectionInfo::get(txn->getClient(), false);
+    if (sci && !sci->getVersion(ns).isStrictlyEqualTo(ChunkVersion::UNSHARDED())) {
+        return true;
+    }
+
+    return false;
+}
+
+MONGO_INITIALIZER_WITH_PREREQUISITES(MongoDLocalShardingInfo, ("SetGlobalEnvironment"))
+(InitializerContext* context) {
+    enableLocalShardingInfo(getGlobalServiceContext(), &haveLocalShardingInfo);
+    return Status::OK();
 }
 
 }  // namespace

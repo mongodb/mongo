@@ -32,7 +32,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/replset_dist_lock_manager',
         'client/sharding_connection_hook',
         'coreshard',
-        'cluster_last_error_info',
     ],
 )
 
@@ -102,14 +101,13 @@ env.Library(
         '$BUILD_DIR/mongo/executor/network_test_env',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
-        '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         '$BUILD_DIR/mongo/util/net/message_port_mock',
-        'mongoscore',
+        'sharding_egress_metadata_hook_for_mongos',
     ],
 )
 
@@ -153,7 +151,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager_impl',
         '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/s/serveronly',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         '$BUILD_DIR/mongo/util/net/message_port_mock',
     ],
@@ -270,10 +267,19 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/connection_string',
+        '$BUILD_DIR/mongo/util/decorable',
+    ]
+)
+
+env.Library(
+    target='sharding_egress_metadata_hook_for_mongos',
+    source=[
+        'sharding_egress_metadata_hook_for_mongos.cpp'
+    ],
+    LIBDEPS=[
         '$BUILD_DIR/mongo/rpc/metadata',
-        '$BUILD_DIR/mongo/db/commands/server_status_core',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/stats/timer_stats',
+        'cluster_last_error_info',
+        'coreshard',
     ]
 )
 
@@ -292,7 +298,6 @@ env.Library(
         'mongos_options.cpp',
         's_only.cpp',
         's_sharding_server_status.cpp',
-        'sharding_egress_metadata_hook_for_mongos.cpp',
         'sharding_uptime_reporter.cpp',
         'version_mongos.cpp',
     ],
@@ -302,7 +307,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/s/query/cluster_query',
         '$BUILD_DIR/mongo/util/concurrency/task',
-        'cluster_last_error_info',
+        'sharding_egress_metadata_hook_for_mongos',
         'is_mongos',
     ],
 )
@@ -336,25 +341,5 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context',
-    ],
-)
-
-env.Library(
-    target='serveronly',
-    source=[
-        'd_state.cpp',
-        'sharding_egress_metadata_hook_for_mongod.cpp',
-    ],
-    LIBDEPS=[
-        "coreshard",
-        "local_sharding_info",
-        "$BUILD_DIR/mongo/db/commands/core",
-        "$BUILD_DIR/mongo/db/concurrency/lock_manager",
-        "$BUILD_DIR/mongo/db/query/query",
-        "$BUILD_DIR/mongo/db/range_deleter",
-        "$BUILD_DIR/mongo/db/s/metadata",
-        "$BUILD_DIR/mongo/db/s/sharding",
-        "$BUILD_DIR/mongo/executor/network_interface_factory",
-        "$BUILD_DIR/mongo/s/client/shard_local",
     ],
 )
