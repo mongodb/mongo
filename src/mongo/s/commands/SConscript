@@ -21,6 +21,7 @@ env.Library(
 env.Library(
     target='cluster_commands',
     source=[
+        'chunk_manager_targeter.cpp',
         'cluster_add_shard_cmd.cpp',
         'cluster_add_shard_to_zone_cmd.cpp',
         'cluster_aggregate.cpp',
@@ -88,6 +89,8 @@ env.Library(
         '$BUILD_DIR/mongo/s/client/parallel',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/mongoscore',
+        '$BUILD_DIR/mongo/s/write_ops/cluster_write_op',
+        '$BUILD_DIR/mongo/s/write_ops/cluster_write_op_conversion',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
     ]
 )

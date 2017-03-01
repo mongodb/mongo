@@ -206,20 +206,6 @@ env.CppUnitTest(
     ]
 )
 
-env.CppUnitTest(
-    target='chunk_manager_targeter_test',
-    source=[
-        'chunk_manager_targeter_test.cpp',
-    ],
-    LIBDEPS=[
-        'coreshard',
-        'mongoscore',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
-    ]
-)
-
 env.CppUnitTest('request_types_test',
     source=[
         'request_types/add_shard_request_test.cpp',
@@ -267,7 +253,8 @@ env.Library(
 env.CppUnitTest(
     target='catalog_cache_test',
     source=[
-        'chunk_manager_test.cpp'
+        'chunk_manager_test.cpp',
+        'chunk_manager_index_bounds_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_test_fixture',
@@ -301,7 +288,6 @@ env.Library(
 env.Library(
     target='mongoscore',
     source=[
-        'chunk_manager_targeter.cpp',
         'cluster_cursor_stats.cpp',
         'mongos_options.cpp',
         's_only.cpp',
@@ -318,8 +304,6 @@ env.Library(
         '$BUILD_DIR/mongo/util/concurrency/task',
         'cluster_last_error_info',
         'is_mongos',
-        'write_ops/cluster_write_op',
-        'write_ops/cluster_write_op_conversion',
     ],
 )
 
