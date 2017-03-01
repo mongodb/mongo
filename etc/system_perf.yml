@@ -452,6 +452,7 @@ tasks:
   depends_on:
     - name: compile
       variant: linux-standalone
+  exec_timeout_secs: 36000 # 10 hours
   commands:
     - func: "prepare environment"
       vars:
@@ -473,6 +474,7 @@ tasks:
   depends_on:
     - name: compile
       variant: linux-standalone
+  exec_timeout_secs: 36000 # 10 hours
   commands:
     - func: "prepare environment"
       vars:
