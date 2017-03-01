@@ -1888,11 +1888,30 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* opCtx,
 
 bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* opCtx,
                                                            const NamespaceString& ns) {
-    if (_memberState.rollback() && ns.isOplog()) {
+    StringData dbName = ns.db();
+    bool canWriteToDB = canAcceptWritesForDatabase_UNSAFE(opCtx, dbName);
+    if (!canWriteToDB) {
         return false;
     }
-    StringData dbName = ns.db();
-    return canAcceptWritesForDatabase_UNSAFE(opCtx, dbName);
+
+    // Even if we think we can write to the database we need to make sure we're not trying
+    // to write to the oplog in ROLLBACK.
+    // If we can accept non local writes (ie we're PRIMARY) then we must not be in ROLLBACK.
+    // This check is redundant of the check of _memberState below, but since this can be checked
+    // without locking, we do it as an optimization.
+    if (_canAcceptNonLocalWrites) {
+        return true;
+    }
+
+    if (!ns.isOplog()) {
+        return true;
+    }
+
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+    if (_memberState.rollback()) {
+        return false;
+    }
+    return true;
 }
 
 Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* opCtx,
@@ -1906,27 +1925,31 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext
                                                                 const NamespaceString& ns,
                                                                 bool slaveOk) {
     auto client = opCtx->getClient();
+    bool isPrimaryOrSecondary = _canServeNonLocalReads.loadRelaxed();
+
     // Oplog reads are not allowed during STARTUP state, but we make an exception for internal
-    // reads and master-slave replication. Internel reads are required for cleaning up unfinished
-    // apply batches. Master-slave never sets the state so we make an exception for it as well.
-    if (((_memberState.startup() && client->isFromUserConnection() &&
-          getReplicationMode() == modeReplSet) ||
-         _memberState.startup2() || _memberState.rollback()) &&
-        ns.isOplog()) {
-        return {ErrorCodes::NotMasterOrSecondary,
-                "Oplog collection reads are not allowed while in the rollback or startup state."};
+    // reads. Internal reads are required for cleaning up unfinished apply batches.
+    if (!isPrimaryOrSecondary && getReplicationMode() == modeReplSet && ns.isOplog()) {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        if ((_memberState.startup() && client->isFromUserConnection()) || _memberState.startup2() ||
+            _memberState.rollback()) {
+            return Status{ErrorCodes::NotMasterOrSecondary,
+                          "Oplog collection reads are not allowed while in the rollback or "
+                          "startup state."};
+        }
     }
+
     if (client->isInDirectClient()) {
         return Status::OK();
     }
     if (canAcceptWritesFor_UNSAFE(opCtx, ns)) {
         return Status::OK();
     }
-    if (_settings.isSlave() || _settings.isMaster()) {
+    if (getReplicationMode() == modeMasterSlave) {
         return Status::OK();
     }
     if (slaveOk) {
-        if (_canServeNonLocalReads.loadRelaxed()) {
+        if (isPrimaryOrSecondary) {
             return Status::OK();
         }
         return Status(ErrorCodes::NotMasterOrSecondary,
