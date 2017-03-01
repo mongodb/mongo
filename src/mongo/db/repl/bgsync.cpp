@@ -389,13 +389,15 @@ void BackgroundSync::_produce(OperationContext* txn) {
     auto dbName = nsToDatabase(rsOplogName);
     auto cmdObj = cmdBob.obj();
     auto metadataObj = metadataBob.obj();
+    // 5 seconds more than the find command's 1 minute maxTimeMs
+    const Milliseconds oplogQueryNetworkTimeout = duration_cast<Milliseconds>(Seconds(65));
     Fetcher fetcher(&_threadPoolTaskExecutor,
                     source,
                     dbName,
                     cmdObj,
                     fetcherCallback,
                     metadataObj,
-                    _replCoord->getConfig().getElectionTimeoutPeriod());
+                    oplogQueryNetworkTimeout);
 
     LOG(1) << "scheduling fetcher to read remote oplog on " << source << " starting at "
            << cmdObj["filter"];
