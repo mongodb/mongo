@@ -32,6 +32,7 @@
 
 #include "mongo/s/chunk_diff.h"
 
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_version.h"
@@ -169,36 +170,26 @@ int ConfigDiffTracker<ValType>::calculateConfigDiff(OperationContext* txn,
     return _validDiffs;
 }
 
-template <class ValType>
-typename ConfigDiffTracker<ValType>::QueryAndSort ConfigDiffTracker<ValType>::configDiffQuery()
-    const {
+ConfigDiffTrackerBase::QueryAndSort ConfigDiffTrackerBase::createConfigDiffQuery(
+    const NamespaceString& nss, ChunkVersion collectionVersion) {
     // The query has to find all the chunks $gte the current max version. Currently, any splits and
     // merges will increment the current max version.
     BSONObjBuilder queryB;
-    queryB.append(ChunkType::ns(), _ns);
+    queryB.append(ChunkType::ns(), nss.ns());
 
     {
         BSONObjBuilder tsBuilder(queryB.subobjStart(ChunkType::DEPRECATED_lastmod()));
-        tsBuilder.appendTimestamp("$gte", _maxVersion->toLong());
+        tsBuilder.appendTimestamp("$gte", collectionVersion.toLong());
         tsBuilder.done();
     }
 
     // NOTE: IT IS IMPORTANT FOR CONSISTENCY THAT WE SORT BY ASC VERSION, IN ORDER TO HANDLE CURSOR
-    // YIELDING BETWEEN CHUNKS BEING MIGRATED.
+    // YIELDING BETWEEN CHUNKS BEING MIGRATED
     //
     // This ensures that changes to chunk version (which will always be higher) will always come
     // *after* our current position in the chunk cursor.
 
-    QueryAndSort queryObj(queryB.obj(), BSON(ChunkType::DEPRECATED_lastmod() << 1));
-
-    LOG(2) << "major version query from " << *_maxVersion << " and over "
-           << _maxShardVersions->size() << " shards is " << queryObj;
-
-    return queryObj;
-}
-
-std::string ConfigDiffTrackerBase::QueryAndSort::toString() const {
-    return str::stream() << "query: " << query << ", sort: " << sort;
+    return QueryAndSort{queryB.obj(), BSON(ChunkType::DEPRECATED_lastmod() << 1)};
 }
 
 // Ensures that these instances of the template are compiled

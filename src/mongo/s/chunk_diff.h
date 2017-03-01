@@ -46,13 +46,15 @@ public:
      * Structure repsenting the generated query and sort order for a chunk diffing operation.
      */
     struct QueryAndSort {
-        QueryAndSort(BSONObj inQuery, BSONObj inSort) : query(inQuery), sort(inSort) {}
-
-        std::string toString() const;
-
         const BSONObj query;
         const BSONObj sort;
     };
+
+    /**
+     * Returns the query needed to find incremental changes to a collection from the config server.
+     */
+    static QueryAndSort createConfigDiffQuery(const NamespaceString& nss,
+                                              ChunkVersion collectionVersion);
 };
 
 /**
@@ -102,10 +104,6 @@ public:
     // version changes for particular major-version chunks if explicitly specified.
     // Returns the number of diffs processed, or -1 if the diffs were inconsistent.
     int calculateConfigDiff(OperationContext* txn, const std::vector<ChunkType>& chunks);
-
-    // Returns the query needed to find new changes to a collection from the config server
-    // Needed only if a custom connection is required to the config server
-    QueryAndSort configDiffQuery() const;
 
 protected:
     /**
