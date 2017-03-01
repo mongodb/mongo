@@ -33,7 +33,7 @@
 
 #include "mongo/base/static_assert.h"
 #include "mongo/db/storage/mmap_v1/mmap.h"
-#include "mongo/db/storage/mmap_v1/paths.h"
+#include "mongo/db/storage/paths.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
