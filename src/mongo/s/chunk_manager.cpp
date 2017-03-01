@@ -243,13 +243,13 @@ bool ChunkManager::_load(OperationContext* txn,
                << oldChunkMap.size() << " chunks";
     }
 
+    // Get the diff query required
+    const auto diffQuery = CMConfigDiffTracker::createConfigDiffQuery(_nss, _version);
+
     // Attach a diff tracker for the versioned chunk data
     CMConfigDiffTracker differ(_nss.ns(), &chunkMap, &_version, shardVersions, this);
 
     // Diff tracker should *always* find at least one chunk if collection exists
-    // Get the diff query required
-    auto diffQuery = differ.configDiffQuery();
-
     repl::OpTime opTime;
     std::vector<ChunkType> chunks;
     uassertStatusOK(Grid::get(txn)->catalogClient(txn)->getChunks(

@@ -183,9 +183,9 @@ Status MetadataLoader::_initChunks(OperationContext* txn,
         ns, &metadata->_chunksMap, &metadata->_collVersion, &versionMap, shard);
 
     try {
-        // Get any new chunks.
+        const auto diffQuery = SCMConfigDiffTracker::createConfigDiffQuery(NamespaceString(ns),
+                                                                           metadata->_collVersion);
         std::vector<ChunkType> chunks;
-        const auto diffQuery = differ.configDiffQuery();
         Status status = catalogClient->getChunks(txn,
                                                  diffQuery.query,
                                                  diffQuery.sort,
