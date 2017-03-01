@@ -8,6 +8,10 @@ driver:
   aws_ssh_key_id: <%= ENV['KITCHEN_SSH_KEY_ID'] %>
   interface: dns
   associate_public_ip: true
+  tags:
+    name: "server package test"
+    owner: "build"
+    expire-on: "<%= ENV['KITCHEN_EXPIRE'] %>"
 
 verifier:
   name: inspec
