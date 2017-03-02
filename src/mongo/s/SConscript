@@ -47,6 +47,20 @@ env.Library(
 )
 
 env.Library(
+    target="async_requests_sender",
+    source=[
+        "async_requests_sender.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/query/command_request_response",
+        "$BUILD_DIR/mongo/executor/task_executor_interface",
+        "$BUILD_DIR/mongo/s/client/sharding_client",
+        "$BUILD_DIR/mongo/s/coreshard",
+        '$BUILD_DIR/mongo/s/client/shard_interface',
+    ],
+)
+
+env.Library(
     target='common',
     source=[
         'catalog/mongo_version_range.cpp',
