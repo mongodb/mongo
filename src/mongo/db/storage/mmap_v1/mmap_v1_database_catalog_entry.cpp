@@ -906,7 +906,8 @@ CollectionOptions MMAPV1DatabaseCatalogEntry::getCollectionOptions(OperationCont
     invariant(rs->findRecord(opCtx, rid, &data));
 
     if (data.releaseToBson()["options"].isABSONObj()) {
-        Status status = options.parse(data.releaseToBson()["options"].Obj());
+        Status status = options.parse(data.releaseToBson()["options"].Obj(),
+                                      CollectionOptions::parseForStorage);
         fassert(18523, status);
     }
     return options;

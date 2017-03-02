@@ -267,6 +267,7 @@ Status userCreateNS(OperationContext* opCtx,
                     Database* db,
                     StringData ns,
                     BSONObj options,
+                    CollectionOptions::ParseKind parseKind = CollectionOptions::parseForCommand,
                     bool createDefaultIndexes = true,
                     const BSONObj& idIndex = BSONObj());
 

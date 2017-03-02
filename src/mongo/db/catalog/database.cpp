@@ -640,6 +640,7 @@ Status userCreateNS(OperationContext* opCtx,
                     Database* db,
                     StringData ns,
                     BSONObj options,
+                    CollectionOptions::ParseKind parseKind,
                     bool createDefaultIndexes,
                     const BSONObj& idIndex) {
     invariant(db);
@@ -660,7 +661,7 @@ Status userCreateNS(OperationContext* opCtx,
                       str::stream() << "a view '" << ns.toString() << "' already exists");
 
     CollectionOptions collectionOptions;
-    Status status = collectionOptions.parse(options);
+    Status status = collectionOptions.parse(options, parseKind);
     if (!status.isOK())
         return status;
 
@@ -704,8 +705,11 @@ Status userCreateNS(OperationContext* opCtx,
     }
 
     if (collectionOptions.isView()) {
+        invariant(parseKind == CollectionOptions::parseForCommand);
         uassertStatusOK(db->createView(opCtx, ns, collectionOptions));
     } else {
+        if (enableCollectionUUIDs && !collectionOptions.uuid)
+            collectionOptions.uuid.emplace(CollectionUUID::generateSecureRandomUUID());
         invariant(
             db->createCollection(opCtx, ns, collectionOptions, createDefaultIndexes, idIndex));
     }

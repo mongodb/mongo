@@ -73,7 +73,7 @@ protected:
 
 void CollectionClonerTest::setUp() {
     BaseClonerTest::setUp();
-    options.reset();
+    options = {};
     collectionCloner.reset(nullptr);
     collectionCloner = stdx::make_unique<CollectionCloner>(
         &getExecutor(),
@@ -101,7 +101,7 @@ void CollectionClonerTest::tearDown() {
     BaseClonerTest::tearDown();
     // Executor may still invoke collection cloner's callback before shutting down.
     collectionCloner.reset(nullptr);
-    options.reset();
+    options = {};
 }
 
 BaseCloner* CollectionClonerTest::getCloner() const {
@@ -320,7 +320,7 @@ TEST_F(CollectionClonerTest,
 }
 
 TEST_F(CollectionClonerTest, DoNotCreateIDIndexIfAutoIndexIdUsed) {
-    options.reset();
+    options = {};
     options.autoIndexId = CollectionOptions::NO;
     collectionCloner.reset(new CollectionCloner(
         &getExecutor(),

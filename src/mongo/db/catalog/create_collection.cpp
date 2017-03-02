@@ -86,7 +86,13 @@ Status createCollection(OperationContext* opCtx,
 
         // Create collection.
         const bool createDefaultIndexes = true;
-        status = userCreateNS(opCtx, ctx.db(), nss.ns(), options, createDefaultIndexes, idIndex);
+        status = userCreateNS(opCtx,
+                              ctx.db(),
+                              nss.ns(),
+                              options,
+                              CollectionOptions::parseForCommand,
+                              createDefaultIndexes,
+                              idIndex);
         if (!status.isOK()) {
             return status;
         }

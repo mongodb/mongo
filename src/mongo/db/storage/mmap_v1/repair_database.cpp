@@ -361,7 +361,8 @@ Status MMAPV1Engine::repairDatabase(OperationContext* opCtx,
 
                     CollectionOptions options;
                     if (obj["options"].isABSONObj()) {
-                        Status status = options.parse(obj["options"].Obj());
+                        Status status =
+                            options.parse(obj["options"].Obj(), CollectionOptions::parseForCommand);
                         if (!status.isOK())
                             return status;
                     }

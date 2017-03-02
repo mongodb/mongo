@@ -260,7 +260,7 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
     ns = obj["ns"].valuestrsafe();
 
     if (obj["options"].isABSONObj()) {
-        options.parse(obj["options"].Obj());
+        options.parse(obj["options"].Obj(), CollectionOptions::parseForStorage);
     }
 
     BSONElement indexList = obj["indexes"];

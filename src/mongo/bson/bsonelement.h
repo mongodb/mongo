@@ -579,6 +579,17 @@ public:
         return Timestamp();
     }
 
+    const std::array<unsigned char, 16> uuid() const {
+        int len = 0;
+        const char* data = nullptr;
+        if (type() == BinData && binDataType() == BinDataType::newUUID)
+            data = binData(len);
+        uassert(00000, "uuid must be a 16-byte binary field with UUID (4) subtype", len == 16);
+        std::array<unsigned char, 16> result;
+        memcpy(&result, data, len);
+        return result;
+    }
+
     Date_t timestampTime() const {
         unsigned long long t = ConstDataView(value() + 4).read<LittleEndian<unsigned int>>();
         return Date_t::fromMillisSinceEpoch(t * 1000);

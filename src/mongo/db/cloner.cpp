@@ -170,11 +170,13 @@ struct Cloner::Fun {
                 opCtx->checkForInterrupt();
 
                 WriteUnitOfWork wunit(opCtx);
+                const bool createDefaultIndexes = true;
                 Status s = userCreateNS(opCtx,
                                         db,
                                         to_collection.toString(),
                                         from_options,
-                                        true,
+                                        CollectionOptions::parseForCommand,
+                                        createDefaultIndexes,
                                         fixIndexSpec(to_collection.db().toString(), from_id_index));
                 verify(s.isOK());
                 wunit.commit();
@@ -390,12 +392,14 @@ void Cloner::copyIndexes(OperationContext* opCtx,
             opCtx->checkForInterrupt();
 
             WriteUnitOfWork wunit(opCtx);
+            const bool createDefaultIndexes = true;
             Status s = userCreateNS(
                 opCtx,
                 db,
                 to_collection.toString(),
                 from_opts,
-                true,
+                CollectionOptions::parseForCommand,
+                createDefaultIndexes,
                 fixIndexSpec(to_collection.db().toString(), getIdIndexSpec(from_indexes)));
             invariant(s.isOK());
             collection = db->getCollection(to_collection);
@@ -490,7 +494,14 @@ bool Cloner::copyCollection(OperationContext* opCtx,
             opCtx->checkForInterrupt();
 
             WriteUnitOfWork wunit(opCtx);
-            Status status = userCreateNS(opCtx, db, ns, options, true, idIndexSpec);
+            const bool createDefaultIndexes = true;
+            Status status = userCreateNS(opCtx,
+                                         db,
+                                         ns,
+                                         options,
+                                         CollectionOptions::parseForCommand,
+                                         createDefaultIndexes,
+                                         idIndexSpec);
             if (!status.isOK()) {
                 errmsg = status.toString();
                 // abort write unit of work
@@ -528,7 +539,8 @@ StatusWith<std::vector<BSONObj>> Cloner::filterCollectionsForClone(
 
         BSONElement collectionOptions = collection["options"];
         if (collectionOptions.isABSONObj()) {
-            auto parseOptionsStatus = CollectionOptions().parse(collectionOptions.Obj());
+            auto parseOptionsStatus = CollectionOptions().parse(collectionOptions.Obj(),
+                                                                CollectionOptions::parseForCommand);
             if (!parseOptionsStatus.isOK()) {
                 return parseOptionsStatus;
             }
@@ -578,12 +590,14 @@ Status Cloner::createCollectionsForDb(
             opCtx->checkForInterrupt();
             WriteUnitOfWork wunit(opCtx);
 
+            const bool createDefaultIndexes = true;
             Status createStatus =
                 userCreateNS(opCtx,
                              db,
                              nss.ns(),
                              options,
-                             true,
+                             CollectionOptions::parseForCommand,
+                             createDefaultIndexes,
                              fixIndexSpec(nss.db().toString(), params.idIndexSpec));
             if (!createStatus.isOK()) {
                 return createStatus;

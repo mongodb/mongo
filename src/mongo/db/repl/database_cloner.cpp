@@ -58,6 +58,8 @@ using UniqueLock = stdx::unique_lock<stdx::mutex>;
 
 const char* kNameFieldName = "name";
 const char* kOptionsFieldName = "options";
+const char* kInfoFieldName = "info";
+const char* kUUIDFieldName = "uuid";
 
 // The number of attempts for the listCollections commands.
 MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncListCollectionsAttempts, int, 3);
@@ -341,11 +343,26 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
         }
         const BSONObj optionsObj = optionsElement.Obj();
         CollectionOptions options;
-        Status parseStatus = options.parse(optionsObj);
+        Status parseStatus = options.parse(optionsObj, CollectionOptions::parseForCommand);
         if (!parseStatus.isOK()) {
             _finishCallback_inlock(lk, parseStatus);
             return;
         }
+
+        BSONElement infoElement = info.getField(kInfoFieldName);
+        if (infoElement.isABSONObj()) {
+            BSONElement uuidElement = infoElement[kUUIDFieldName];
+            if (!uuidElement.eoo()) {
+                try {
+                    options.uuid.emplace(uuidElement);
+                } catch (const UserException& ex) {
+                    _finishCallback_inlock(lk, ex.toStatus());
+                    return;
+                }
+            }
+        }
+        // TODO(SERVER-27994): Ensure UUID present when FCV >= "3.6".
+
         seen.insert(collectionName);
 
         _collectionNamespaces.emplace_back(_dbname, collectionName);

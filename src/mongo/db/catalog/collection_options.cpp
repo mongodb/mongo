@@ -95,32 +95,6 @@ const std::set<StringData> collectionOptionsWhitelist{
 
 }  // namespace
 
-void CollectionOptions::reset() {
-    capped = false;
-    cappedSize = 0;
-    cappedMaxDocs = 0;
-    initialNumExtents = 0;
-    initialExtentSizes.clear();
-    autoIndexId = DEFAULT;
-    // For compatibility with previous versions if the user sets no flags,
-    // we set Flag_UsePowerOf2Sizes in case the user downgrades.
-    flags = Flag_UsePowerOf2Sizes;
-    flagsSet = false;
-    temp = false;
-    storageEngine = BSONObj();
-    indexOptionDefaults = BSONObj();
-    validator = BSONObj();
-    validationLevel = "";
-    validationAction = "";
-    collation = BSONObj();
-    viewOn = "";
-    pipeline = BSONObj();
-}
-
-bool CollectionOptions::isValid() const {
-    return validate().isOK();
-}
-
 bool CollectionOptions::isView() const {
     return !viewOn.empty();
 }
@@ -129,8 +103,8 @@ Status CollectionOptions::validate() const {
     return CollectionOptions().parse(toBSON());
 }
 
-Status CollectionOptions::parse(const BSONObj& options) {
-    reset();
+Status CollectionOptions::parse(const BSONObj& options, ParseKind kind) {
+    *this = {};
 
     // Versions 2.4 and earlier of the server store "create" inside the collection metadata when the
     // user issues an explicit collection creation command. These versions also wrote any
@@ -151,7 +125,13 @@ Status CollectionOptions::parse(const BSONObj& options) {
         BSONElement e = i.next();
         StringData fieldName = e.fieldName();
 
-        if (fieldName == "capped") {
+        if (fieldName == "uuid" && kind == parseForStorage) {
+            try {
+                uuid.emplace(e);
+            } catch (const UserException& ex) {
+                return ex.toStatus();
+            }
+        } else if (fieldName == "capped") {
             capped = e.trueValue();
         } else if (fieldName == "size") {
             if (!e.isNumber()) {
@@ -282,6 +262,11 @@ Status CollectionOptions::parse(const BSONObj& options) {
 
 BSONObj CollectionOptions::toBSON() const {
     BSONObjBuilder b;
+
+    if (uuid) {
+        b.appendElements(uuid->toBSON());
+    }
+
     if (capped) {
         b.appendBool("capped", true);
         b.appendNumber("size", cappedSize);

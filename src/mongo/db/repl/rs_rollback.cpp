@@ -480,12 +480,13 @@ void syncFixUp(OperationContext* opCtx,
                                                          << typeName(optionsField.type()));
                 }
 
-                auto status = options.parse(optionsField.Obj());
+                auto status = options.parse(optionsField.Obj(), CollectionOptions::parseForCommand);
                 if (!status.isOK()) {
                     throw RSFatalException(str::stream() << "Failed to parse options " << info
                                                          << ": "
                                                          << status.toString());
                 }
+                // TODO(SERVER-27992): Set options.uuid.
             } else {
                 // Use default options.
             }

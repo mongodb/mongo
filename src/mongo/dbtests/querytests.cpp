@@ -1318,6 +1318,7 @@ public:
                                 ctx.db(),
                                 ns(),
                                 fromjson("{ capped : true, size : 2000, max: 10000 }"),
+                                CollectionOptions::parseForCommand,
                                 false)
                        .isOK());
             wunit.commit();

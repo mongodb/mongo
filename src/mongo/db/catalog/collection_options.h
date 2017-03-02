@@ -30,27 +30,26 @@
 
 #include <string>
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/status.h"
+#include "mongo/db/catalog/collection_uuid.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
 
 struct CollectionOptions {
-    CollectionOptions() {
-        reset();
-    }
-
-    void reset();
-
-    /**
-     * Returns true if collection options validates successfully.
-     */
-    bool isValid() const;
-
     /**
      * Returns true if the options indicate the namespace is a view.
      */
     bool isView() const;
+
+    /**
+     * The 'uuid' member is a collection property stored in the catalog with user-settable options,
+     * but is not valid for the user to specify as collection option. So, parsing commands must
+     * reject the 'uuid' property, but parsing stored options must accept it.
+     */
+    enum ParseKind { parseForCommand, parseForStorage };
 
     /**
      * Confirms that collection options can be converted to BSON and back without errors.
@@ -60,7 +59,7 @@ struct CollectionOptions {
     /**
      * Parses the "options" subfield of the collection info object.
      */
-    Status parse(const BSONObj& obj);
+    Status parse(const BSONObj& obj, ParseKind kind = parseForCommand);
 
     BSONObj toBSON() const;
 
@@ -72,15 +71,18 @@ struct CollectionOptions {
 
     // ----
 
-    bool capped;
-    long long cappedSize;
-    long long cappedMaxDocs;
+    // Collection UUID. Will exist if featureCompatibilityVersion >= 3.6.
+    boost::optional<CollectionUUID> uuid;
 
-    // following 2 are mutually exclusive, can only have one set
-    long long initialNumExtents;
+    bool capped = false;
+    long long cappedSize = 0;
+    long long cappedMaxDocs = 0;
+
+    // (MMAPv1) The following 2 are mutually exclusive, can only have one set.
+    long long initialNumExtents = 0;
     std::vector<long long> initialExtentSizes;
 
-    // behavior of _id index creation when collection created
+    // The behavior of _id index creation when collection created
     void setNoIdIndex() {
         autoIndexId = NO;
     }
@@ -88,17 +90,17 @@ struct CollectionOptions {
         DEFAULT,  // currently yes for most collections, NO for some system ones
         YES,      // create _id index
         NO        // do not create _id index
-    } autoIndexId;
+    } autoIndexId = DEFAULT;
 
     // user flags
     enum UserFlags {
         Flag_UsePowerOf2Sizes = 1 << 0,
         Flag_NoPadding = 1 << 1,
     };
-    int flags;  // a bitvector of UserFlags
-    bool flagsSet;
+    int flags = Flag_UsePowerOf2Sizes;  // a bitvector of UserFlags
+    bool flagsSet = false;
 
-    bool temp;
+    bool temp = false;
 
     // Storage engine collection options. Always owned or empty.
     BSONObj storageEngine;

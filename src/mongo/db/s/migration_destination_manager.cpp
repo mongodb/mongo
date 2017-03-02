@@ -509,7 +509,14 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
             }
 
             WriteUnitOfWork wuow(opCtx);
-            Status status = userCreateNS(opCtx, db, _nss.ns(), options, true, idIndexSpec);
+            const bool createDefaultIndexes = true;
+            Status status = userCreateNS(opCtx,
+                                         db,
+                                         _nss.ns(),
+                                         options,
+                                         CollectionOptions::parseForCommand,
+                                         createDefaultIndexes,
+                                         idIndexSpec);
             if (!status.isOK()) {
                 warning() << "failed to create collection [" << _nss << "] "
                           << " with options " << options << ": " << redact(status);

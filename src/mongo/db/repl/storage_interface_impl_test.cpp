@@ -576,7 +576,7 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, CreateCollectionThatAlreadyExistsF
     NamespaceString nss("test.system.indexes");
     createCollection(opCtx, nss);
 
-    const CollectionOptions opts;
+    const CollectionOptions opts{};
     const std::vector<BSONObj> indexes;
     const auto status =
         storage.createCollectionForBulkLoading(nss, opts, makeIdIndexSpec(nss), indexes);
