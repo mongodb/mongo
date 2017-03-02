@@ -256,7 +256,7 @@ void BackgroundSync::_runProducer() {
     _produce(txn.get());
 }
 
-void BackgroundSync::_produce(OperationContext* txn) {
+void BackgroundSync::_produce(OperationContext* opCtx) {
     if (MONGO_FAIL_POINT(stopReplProducer)) {
         // This log output is used in js tests so please leave it.
         log() << "bgsync - stopReplProducer fail point "
@@ -294,12 +294,13 @@ void BackgroundSync::_produce(OperationContext* txn) {
         }
     }
 
+    auto storageInterface = StorageInterface::get(opCtx);
     // find a target to sync from the last optime fetched
     OpTime lastOpTimeFetched;
     HostAndPort source;
     SyncSourceResolverResponse syncSourceResp;
     {
-        const OpTime minValidSaved = StorageInterface::get(txn)->getMinValid(txn);
+        const OpTime minValidSaved = storageInterface->getMinValid(opCtx);
 
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         const auto requiredOpTime = (minValidSaved > _lastOpTimeFetched) ? minValidSaved : OpTime();
@@ -384,8 +385,8 @@ void BackgroundSync::_produce(OperationContext* txn) {
     // Set the applied point if unset. This is most likely the first time we've established a sync
     // source since stepping down or otherwise clearing the applied point. We need to set this here,
     // before the OplogWriter gets a chance to append to the oplog.
-    if (StorageInterface::get(txn)->getAppliedThrough(txn).isNull()) {
-        StorageInterface::get(txn)->setAppliedThrough(txn, _replCoord->getMyLastAppliedOpTime());
+    if (storageInterface->getAppliedThrough(opCtx).isNull()) {
+        storageInterface->setAppliedThrough(opCtx, _replCoord->getMyLastAppliedOpTime());
     }
 
     // "lastFetched" not used. Already set in _enqueueDocuments.
@@ -491,7 +492,11 @@ void BackgroundSync::_produce(OperationContext* txn) {
             }
         }
 
-        _rollback(txn, source, syncSourceResp.rbid, getConnection);
+        OplogInterfaceLocal localOplog(opCtx, rsOplogName);
+        RollbackSourceImpl rollbackSource(getConnection, source, rsOplogName);
+        _rollback(
+            opCtx, localOplog, rollbackSource, syncSourceResp.rbid, _replCoord, storageInterface);
+
         stop();
     } else if (fetcherReturnStatus == ErrorCodes::InvalidBSON) {
         Seconds blacklistDuration(60);
@@ -626,10 +631,12 @@ void BackgroundSync::consume(OperationContext* txn) {
     }
 }
 
-void BackgroundSync::_rollback(OperationContext* txn,
-                               const HostAndPort& source,
+void BackgroundSync::_rollback(OperationContext* opCtx,
+                               const OplogInterface& localOplog,
+                               const RollbackSource& rollbackSource,
                                boost::optional<int> requiredRBID,
-                               stdx::function<DBClientBase*()> getConnection) {
+                               ReplicationCoordinator* replCoord,
+                               StorageInterface* storageInterface) {
     if (MONGO_FAIL_POINT(rollbackHangBeforeStart)) {
         // This log output is used in js tests so please leave it.
         log() << "rollback - rollbackHangBeforeStart fail point "
@@ -652,20 +659,17 @@ void BackgroundSync::_rollback(OperationContext* txn,
     // then.
     {
         log() << "rollback 0";
-        Lock::GlobalWrite globalWrite(txn->lockState());
-        if (!_replCoord->setFollowerMode(MemberState::RS_ROLLBACK)) {
-            log() << "Cannot transition from " << _replCoord->getMemberState().toString() << " to "
+        Lock::GlobalWrite globalWrite(opCtx->lockState());
+        if (!replCoord->setFollowerMode(MemberState::RS_ROLLBACK)) {
+            log() << "Cannot transition from " << replCoord->getMemberState().toString() << " to "
                   << MemberState(MemberState::RS_ROLLBACK).toString();
             return;
         }
     }
 
     try {
-        auto status = syncRollback(txn,
-                                   OplogInterfaceLocal(txn, rsOplogName),
-                                   RollbackSourceImpl(getConnection, source, rsOplogName),
-                                   requiredRBID,
-                                   _replCoord);
+        auto status = syncRollback(
+            opCtx, localOplog, rollbackSource, requiredRBID, replCoord, storageInterface);
 
         // Abort only when syncRollback detects we are in a unrecoverable state.
         // WARNING: these statuses sometimes have location codes which are lost with uassertStatusOK
@@ -684,8 +688,8 @@ void BackgroundSync::_rollback(OperationContext* txn,
         invariant(ex.getCode() != ErrorCodes::UnrecoverableRollbackError);
 
         warning() << "rollback cannot complete at this time (retrying later): " << redact(ex)
-                  << " appliedThrough=" << _replCoord->getMyLastAppliedOpTime()
-                  << " minvalid=" << StorageInterface::get(txn)->getMinValid(txn);
+                  << " appliedThrough=" << replCoord->getMyLastAppliedOpTime()
+                  << " minvalid=" << storageInterface->getMinValid(opCtx);
 
         // Sleep a bit to allow upstream node to coalesce, if that was the cause of the failure. If
         // we failed in a way that will keep failing, but wasn't flagged as a fatal failure, this
@@ -701,22 +705,22 @@ void BackgroundSync::_rollback(OperationContext* txn,
     // so that if we wind up shutting down uncleanly in response to something we rolled back
     // we know that we won't wind up right back in the same situation when we start back up
     // because the rollback wasn't durable.
-    txn->recoveryUnit()->waitUntilDurable();
+    opCtx->recoveryUnit()->waitUntilDurable();
 
     // If we detected that we rolled back the shardIdentity document as part of this rollback
     // then we must shut down to clear the in-memory ShardingState associated with the
     // shardIdentity document.
-    if (ShardIdentityRollbackNotifier::get(txn)->didRollbackHappen()) {
+    if (ShardIdentityRollbackNotifier::get(opCtx)->didRollbackHappen()) {
         severe() << "shardIdentity document rollback detected.  Shutting down to clear "
                     "in-memory sharding state.  Restarting this process should safely return it "
                     "to a healthy state";
         fassertFailedNoTrace(40276);
     }
 
-    if (!_replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
+    if (!replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
         severe() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING)
                  << "; expected to be in state " << MemberState(MemberState::RS_ROLLBACK)
-                 << " but found self in " << _replCoord->getMemberState();
+                 << " but found self in " << replCoord->getMemberState();
         fassertFailedNoTrace(40364);
     }
 }

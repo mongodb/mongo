@@ -51,8 +51,11 @@ class OperationContext;
 
 namespace repl {
 
+class OplogInterface;
 class ReplicationCoordinator;
 class ReplicationCoordinatorExternalState;
+class RollbackSource;
+class StorageInterface;
 
 class BackgroundSync {
     MONGO_DISALLOW_COPYING(BackgroundSync);
@@ -157,12 +160,13 @@ private:
 
     /**
      * Executes a rollback.
-     * 'getConnection' returns a connection to the sync source.
      */
-    void _rollback(OperationContext* txn,
-                   const HostAndPort& source,
+    void _rollback(OperationContext* opCtx,
+                   const OplogInterface& localOplog,
+                   const RollbackSource& rollbackSource,
                    boost::optional<int> requiredRBID,
-                   stdx::function<DBClientBase*()> getConnection);
+                   ReplicationCoordinator* replCoord,
+                   StorageInterface* storageInterface);
 
     // restart syncing
     void start(OperationContext* txn);
