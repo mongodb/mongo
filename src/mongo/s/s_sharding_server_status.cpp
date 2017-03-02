@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/s/client/shard_registry.h"
@@ -57,8 +58,13 @@ public:
 
         return result.obj();
     }
+};
 
-} shardingServerStatus;
+MONGO_INITIALIZER(ShardingServerStatusSection)(InitializerContext* context) {
+    new ShardingServerStatus();
+
+    return Status::OK();
+}
 
 }  // namespace
 }  // namespace mongo
