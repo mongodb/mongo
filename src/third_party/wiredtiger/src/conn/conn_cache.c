@@ -143,7 +143,8 @@ __wt_cache_config(WT_SESSION_IMPL *session, bool reconfigure, const char *cfg[])
 	if (reconfigure)
 		WT_RET(__wt_thread_group_resize(
 		    session, &conn->evict_threads,
-		    conn->evict_threads_min, conn->evict_threads_max,
+		    conn->evict_threads_min,
+		    conn->evict_threads_max,
 		    WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL));
 
 	return (0);
@@ -186,8 +187,8 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_RET_MSG(session, EINVAL,
 		    "eviction target must be lower than the eviction trigger");
 
-	WT_RET(__wt_cond_auto_alloc(session, "cache eviction server",
-	    false, 10000, WT_MILLION, &cache->evict_cond));
+	WT_RET(__wt_cond_auto_alloc(session,
+	    "cache eviction server", 10000, WT_MILLION, &cache->evict_cond));
 	WT_RET(__wt_spin_init(session, &cache->evict_pass_lock, "evict pass"));
 	WT_RET(__wt_spin_init(session,
 	    &cache->evict_queue_lock, "cache eviction queue"));
@@ -311,7 +312,7 @@ __wt_cache_destroy(WT_SESSION_IMPL *session)
 		    cache->bytes_dirty_intl + cache->bytes_dirty_leaf,
 		    cache->pages_dirty_intl + cache->pages_dirty_leaf);
 
-	WT_TRET(__wt_cond_auto_destroy(session, &cache->evict_cond));
+	WT_TRET(__wt_cond_destroy(session, &cache->evict_cond));
 	__wt_spin_destroy(session, &cache->evict_pass_lock);
 	__wt_spin_destroy(session, &cache->evict_queue_lock);
 	__wt_spin_destroy(session, &cache->evict_walk_lock);

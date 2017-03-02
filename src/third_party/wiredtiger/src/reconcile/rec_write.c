@@ -4069,7 +4069,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
 
 	/* Copy the original, disk-image bytes into place. */
 	memcpy(r->first_free, page->pg_fix_bitf,
-	    __bitstr_size((size_t)page->pg_fix_entries * btree->bitcnt));
+	    __bitstr_size((size_t)page->entries * btree->bitcnt));
 
 	/* Update any changes to the original on-page data items. */
 	WT_SKIP_FOREACH(ins, WT_COL_UPDATE_SINGLE(page)) {
@@ -4081,9 +4081,8 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
 	}
 
 	/* Calculate the number of entries per page remainder. */
-	entry = page->pg_fix_entries;
-	nrecs = WT_FIX_BYTES_TO_ENTRIES(
-	    btree, r->space_avail) - page->pg_fix_entries;
+	entry = page->entries;
+	nrecs = WT_FIX_BYTES_TO_ENTRIES(btree, r->space_avail) - page->entries;
 	r->recno += entry;
 
 	/* Walk any append list. */
@@ -4206,7 +4205,7 @@ __rec_col_fix_slvg(WT_SESSION_IMPL *session,
 	    session, r, page, pageref->ref_recno, btree->maxleafpage));
 
 	/* We may not be taking all of the entries on the original page. */
-	page_take = salvage->take == 0 ? page->pg_fix_entries : salvage->take;
+	page_take = salvage->take == 0 ? page->entries : salvage->take;
 	page_start = salvage->skip == 0 ? 0 : salvage->skip;
 
 	/* Calculate the number of entries per page. */

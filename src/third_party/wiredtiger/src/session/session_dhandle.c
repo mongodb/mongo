@@ -44,8 +44,7 @@ __session_discard_dhandle(
 	TAILQ_REMOVE(&session->dhandles, dhandle_cache, q);
 	TAILQ_REMOVE(&session->dhhash[bucket], dhandle_cache, hashq);
 
-	(void)__wt_atomic_sub32(&dhandle_cache->dhandle->session_ref, 1);
-
+	WT_DHANDLE_RELEASE(dhandle_cache->dhandle);
 	__wt_overwrite_and_free(session, dhandle_cache);
 }
 
@@ -181,17 +180,17 @@ __wt_session_lock_dhandle(
 		 */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    (!want_exclusive || lock_busy)) {
-			__wt_readlock(session, dhandle->rwlock);
+			__wt_readlock(session, &dhandle->rwlock);
 			if (F_ISSET(dhandle, WT_DHANDLE_DEAD)) {
 				*is_deadp = 1;
-				__wt_readunlock(session, dhandle->rwlock);
+				__wt_readunlock(session, &dhandle->rwlock);
 				return (0);
 			}
 
 			is_open = F_ISSET(dhandle, WT_DHANDLE_OPEN);
 			if (is_open && !want_exclusive)
 				return (0);
-			__wt_readunlock(session, dhandle->rwlock);
+			__wt_readunlock(session, &dhandle->rwlock);
 		} else
 			is_open = false;
 
@@ -201,10 +200,11 @@ __wt_session_lock_dhandle(
 		 * with another thread that successfully opens the file, we
 		 * don't want to block waiting to get exclusive access.
 		 */
-		if ((ret = __wt_try_writelock(session, dhandle->rwlock)) == 0) {
+		if ((ret =
+		    __wt_try_writelock(session, &dhandle->rwlock)) == 0) {
 			if (F_ISSET(dhandle, WT_DHANDLE_DEAD)) {
 				*is_deadp = 1;
-				__wt_writeunlock(session, dhandle->rwlock);
+				__wt_writeunlock(session, &dhandle->rwlock);
 				return (0);
 			}
 
@@ -215,7 +215,7 @@ __wt_session_lock_dhandle(
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 			    !want_exclusive) {
 				lock_busy = false;
-				__wt_writeunlock(session, dhandle->rwlock);
+				__wt_writeunlock(session, &dhandle->rwlock);
 				continue;
 			}
 
@@ -286,9 +286,9 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	if (locked) {
 		if (write_locked) {
 			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-			__wt_writeunlock(session, dhandle->rwlock);
+			__wt_writeunlock(session, &dhandle->rwlock);
 		} else
-			__wt_readunlock(session, dhandle->rwlock);
+			__wt_readunlock(session, &dhandle->rwlock);
 	}
 
 	session->dhandle = NULL;
@@ -411,17 +411,27 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 /*
  * __session_find_shared_dhandle --
  *	Search for a data handle in the connection and add it to a session's
- *	cache.  Since the data handle isn't locked, this must be called holding
- *	the handle list lock, and we must increment the handle's reference
- *	count before releasing it.
+ *	cache.  We must increment the handle's reference count while holding
+ *	the handle list lock.
  */
 static int
 __session_find_shared_dhandle(
     WT_SESSION_IMPL *session, const char *uri, const char *checkpoint)
 {
-	WT_RET(__wt_conn_dhandle_find(session, uri, checkpoint));
-	(void)__wt_atomic_add32(&session->dhandle->session_ref, 1);
-	return (0);
+	WT_DECL_RET;
+
+	WT_WITH_HANDLE_LIST_READ_LOCK(session,
+	    if ((ret = __wt_conn_dhandle_find(session, uri, checkpoint)) == 0)
+		    WT_DHANDLE_ACQUIRE(session->dhandle));
+
+	if (ret != WT_NOTFOUND)
+		return (ret);
+
+	WT_WITH_HANDLE_LIST_WRITE_LOCK(session,
+	    if ((ret = __wt_conn_dhandle_alloc(session, uri, checkpoint)) == 0)
+		    WT_DHANDLE_ACQUIRE(session->dhandle));
+
+	return (ret);
 }
 
 /*
@@ -449,16 +459,16 @@ __session_get_dhandle(
 	 * We didn't find a match in the session cache, search the shared
 	 * handle list and cache the handle we find.
 	 */
-	WT_WITH_HANDLE_LIST_LOCK(session,
-	    ret = __session_find_shared_dhandle(session, uri, checkpoint));
-	WT_RET(ret);
+	WT_RET(__session_find_shared_dhandle(session, uri, checkpoint));
 
 	/*
 	 * Fixup the reference count on failure (we incremented the reference
 	 * count while holding the handle-list lock).
 	 */
-	if ((ret = __session_add_dhandle(session)) != 0)
-		(void)__wt_atomic_sub32(&session->dhandle->session_ref, 1);
+	if ((ret = __session_add_dhandle(session)) != 0) {
+		WT_DHANDLE_RELEASE(session->dhandle);
+		session->dhandle = NULL;
+	}
 
 	return (ret);
 }
@@ -504,17 +514,15 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		 * reopen handles in the meantime.  A combination of the schema
 		 * and handle list locks are used to enforce this.
 		 */
-		if (!F_ISSET(session, WT_SESSION_LOCKED_SCHEMA) ||
-		    !F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST)) {
+		if (!F_ISSET(session, WT_SESSION_LOCKED_SCHEMA)) {
 			dhandle->excl_session = NULL;
 			dhandle->excl_ref = 0;
 			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-			__wt_writeunlock(session, dhandle->rwlock);
+			__wt_writeunlock(session, &dhandle->rwlock);
 
 			WT_WITH_SCHEMA_LOCK(session,
-			    WT_WITH_HANDLE_LIST_LOCK(session,
-				ret = __wt_session_get_btree(
-				session, uri, checkpoint, cfg, flags)));
+			    ret = __wt_session_get_btree(
+				session, uri, checkpoint, cfg, flags));
 
 			return (ret);
 		}
@@ -531,7 +539,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		dhandle->excl_session = NULL;
 		dhandle->excl_ref = 0;
 		F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-		__wt_writeunlock(session, dhandle->rwlock);
+		__wt_writeunlock(session, &dhandle->rwlock);
 		WT_RET(ret);
 	}
 

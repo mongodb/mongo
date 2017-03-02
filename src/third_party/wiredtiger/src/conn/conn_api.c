@@ -1798,6 +1798,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "checkpoint",		WT_VERB_CHECKPOINT },
 		{ "compact",		WT_VERB_COMPACT },
 		{ "evict",		WT_VERB_EVICT },
+		{ "evict_stuck",	WT_VERB_EVICT_STUCK },
 		{ "evictserver",	WT_VERB_EVICTSERVER },
 		{ "fileops",		WT_VERB_FILEOPS },
 		{ "handleops",		WT_VERB_HANDLEOPS },
@@ -1811,6 +1812,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "rebalance",		WT_VERB_REBALANCE },
 		{ "reconcile",		WT_VERB_RECONCILE },
 		{ "recovery",		WT_VERB_RECOVERY },
+		{ "recovery_progress",	WT_VERB_RECOVERY_PROGRESS },
 		{ "salvage",		WT_VERB_SALVAGE },
 		{ "shared_cache",	WT_VERB_SHARED_CACHE },
 		{ "split",		WT_VERB_SPLIT },
@@ -1985,6 +1987,16 @@ __conn_set_file_system(
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, set_file_system, config, cfg);
 	WT_UNUSED(cfg);
+
+	/*
+	 * You can only configure a file system once, and attempting to do it
+	 * again probably means the extension argument didn't have early-load
+	 * set and we've already configured the default file system.
+	 */
+	if (conn->file_system != NULL)
+		WT_ERR_MSG(session, EPERM,
+		    "filesystem already configured; custom filesystems should "
+		    "enable \"early_load\" configuration");
 
 	conn->file_system = file_system;
 
@@ -2174,6 +2186,15 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	if (cval.val)
 		F_SET(conn, WT_CONN_READONLY);
 
+	/* Configure error messages so we get them right early. */
+	WT_ERR(__wt_config_gets(session, cfg, "error_prefix", &cval));
+	if (cval.len != 0)
+		WT_ERR(__wt_strndup(
+		    session, cval.str, cval.len, &conn->error_prefix));
+
+	/* Set the database home so extensions have access to it. */
+	WT_ERR(__conn_home(session, home, cfg));
+
 	/*
 	 * Load early extensions before doing further initialization (one early
 	 * extension is to configure a file system).
@@ -2197,6 +2218,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(
 	    __conn_chk_file_system(session, F_ISSET(conn, WT_CONN_READONLY)));
 
+	/* Make sure no other thread of control already owns this database. */
+	WT_ERR(__conn_single(session, cfg));
+
 	/*
 	 * Capture the config_base setting file for later use. Again, if the
 	 * application doesn't want us to read the base configuration file,
@@ -2205,18 +2229,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 */
 	WT_ERR(__wt_config_gets(session, cfg, "config_base", &cval));
 	config_base_set = cval.val != 0;
-
-	/* Configure error messages so we get them right early. */
-	WT_ERR(__wt_config_gets(session, cfg, "error_prefix", &cval));
-	if (cval.len != 0)
-		WT_ERR(__wt_strndup(
-		    session, cval.str, cval.len, &conn->error_prefix));
-
-	/* Get the database home. */
-	WT_ERR(__conn_home(session, home, cfg));
-
-	/* Make sure no other thread of control already owns this database. */
-	WT_ERR(__conn_single(session, cfg));
 
 	/*
 	 * Build the real configuration stack, in the following order (where

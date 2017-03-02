@@ -71,7 +71,7 @@ class test_config03(test_base03.test_base03):
         cache_size_scenarios, create_scenarios, error_prefix_scenarios,
         eviction_target_scenarios, eviction_trigger_scenarios,
         multiprocess_scenarios, session_max_scenarios,
-        transactional_scenarios, verbose_scenarios, prune=1000)
+        transactional_scenarios, verbose_scenarios, prune=100, prunelong=1000)
 
     #wttest.WiredTigerTestCase.printVerbose(2, 'test_config03: running ' + \
     #                      str(len(scenarios)) + ' of ' + \

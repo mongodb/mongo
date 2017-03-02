@@ -71,6 +71,47 @@ __wt_btree_bytes_inuse(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_btree_bytes_evictable --
+ *	Return the number of bytes that can be evicted (i.e. bytes apart from
+ *	the pinned root page).
+ */
+static inline uint64_t
+__wt_btree_bytes_evictable(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_CACHE *cache;
+	WT_PAGE *root_page;
+	uint64_t bytes_inmem, bytes_root;
+
+	btree = S2BT(session);
+	cache = S2C(session)->cache;
+	root_page = btree->root.page;
+
+	bytes_inmem = btree->bytes_inmem;
+	bytes_root = root_page == NULL ? 0 : root_page->memory_footprint;
+
+	return (bytes_inmem <= bytes_root ? 0 :
+	    __wt_cache_bytes_plus_overhead(cache, bytes_inmem - bytes_root));
+}
+
+/*
+ * __wt_btree_dirty_inuse --
+ *	Return the number of dirty bytes in use.
+ */
+static inline uint64_t
+__wt_btree_dirty_inuse(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_CACHE *cache;
+
+	btree = S2BT(session);
+	cache = S2C(session)->cache;
+
+	return (__wt_cache_bytes_plus_overhead(cache,
+	    btree->bytes_dirty_intl + btree->bytes_dirty_leaf));
+}
+
+/*
  * __wt_btree_dirty_leaf_inuse --
  *	Return the number of bytes in use by dirty leaf pages.
  */
@@ -105,11 +146,12 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 	(void)__wt_atomic_addsize(&page->memory_footprint, size);
 	if (__wt_page_is_modified(page)) {
 		(void)__wt_atomic_addsize(&page->modify->bytes_dirty, size);
-		if (WT_PAGE_IS_INTERNAL(page))
+		if (WT_PAGE_IS_INTERNAL(page)) {
+			(void)__wt_atomic_add64(&btree->bytes_dirty_intl, size);
 			(void)__wt_atomic_add64(&cache->bytes_dirty_intl, size);
-		else if (!F_ISSET(btree, WT_BTREE_LSM_PRIMARY)) {
-			(void)__wt_atomic_add64(&cache->bytes_dirty_leaf, size);
+		} else if (!F_ISSET(btree, WT_BTREE_LSM_PRIMARY)) {
 			(void)__wt_atomic_add64(&btree->bytes_dirty_leaf, size);
+			(void)__wt_atomic_add64(&cache->bytes_dirty_leaf, size);
 		}
 	}
 	/* Track internal size in cache. */
@@ -238,10 +280,12 @@ __wt_cache_page_byte_dirty_decr(
 	if (i == 5)
 		return;
 
-	if (WT_PAGE_IS_INTERNAL(page))
+	if (WT_PAGE_IS_INTERNAL(page)) {
+		__wt_cache_decr_check_uint64(session, &btree->bytes_dirty_intl,
+		    decr, "WT_BTREE.bytes_dirty_intl");
 		__wt_cache_decr_check_uint64(session, &cache->bytes_dirty_intl,
 		    decr, "WT_CACHE.bytes_dirty_intl");
-	else if (!F_ISSET(btree, WT_BTREE_LSM_PRIMARY)) {
+	} else if (!F_ISSET(btree, WT_BTREE_LSM_PRIMARY)) {
 		__wt_cache_decr_check_uint64(session, &btree->bytes_dirty_leaf,
 		    decr, "WT_BTREE.bytes_dirty_leaf");
 		__wt_cache_decr_check_uint64(session, &cache->bytes_dirty_leaf,
@@ -297,6 +341,7 @@ __wt_cache_dirty_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	size = page->memory_footprint;
 	if (WT_PAGE_IS_INTERNAL(page)) {
+		(void)__wt_atomic_add64(&btree->bytes_dirty_intl, size);
 		(void)__wt_atomic_add64(&cache->bytes_dirty_intl, size);
 		(void)__wt_atomic_add64(&cache->pages_dirty_intl, 1);
 	} else {
@@ -392,17 +437,20 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Update the cache's dirty-byte count. */
 	if (modify != NULL && modify->bytes_dirty != 0) {
-		if (WT_PAGE_IS_INTERNAL(page))
+		if (WT_PAGE_IS_INTERNAL(page)) {
+			__wt_cache_decr_zero_uint64(session,
+			    &btree->bytes_dirty_intl,
+			    modify->bytes_dirty, "WT_BTREE.bytes_dirty_intl");
 			__wt_cache_decr_zero_uint64(session,
 			    &cache->bytes_dirty_intl,
 			    modify->bytes_dirty, "WT_CACHE.bytes_dirty_intl");
-		else if (!F_ISSET(btree, WT_BTREE_LSM_PRIMARY)) {
-			__wt_cache_decr_zero_uint64(session,
-			    &cache->bytes_dirty_leaf,
-			    modify->bytes_dirty, "WT_CACHE.bytes_dirty_leaf");
+		} else if (!F_ISSET(btree, WT_BTREE_LSM_PRIMARY)) {
 			__wt_cache_decr_zero_uint64(session,
 			    &btree->bytes_dirty_leaf,
 			    modify->bytes_dirty, "WT_BTREE.bytes_dirty_leaf");
+			__wt_cache_decr_zero_uint64(session,
+			    &cache->bytes_dirty_leaf,
+			    modify->bytes_dirty, "WT_CACHE.bytes_dirty_leaf");
 		}
 	}
 
@@ -984,7 +1032,7 @@ __wt_cursor_row_leaf_key(WT_CURSOR_BTREE *cbt, WT_ITEM *key)
 	if (cbt->ins == NULL) {
 		session = (WT_SESSION_IMPL *)cbt->iface.session;
 		page = cbt->ref->page;
-		rip = &page->u.row.d[cbt->slot];
+		rip = &page->pg_row[cbt->slot];
 		WT_RET(__wt_row_leaf_key(session, page, rip, key, false));
 	} else {
 		key->data = WT_INSERT_KEY(cbt->ins);
@@ -1183,9 +1231,9 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 
 	ins_head = page->type == WT_PAGE_ROW_LEAF ?
-	    (page->pg_row_entries == 0 ?
+	    (page->entries == 0 ?
 	    WT_ROW_INSERT_SMALLEST(page) :
-	    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1)) :
+	    WT_ROW_INSERT_SLOT(page, page->entries - 1)) :
 	    WT_COL_APPEND(page);
 	if (ins_head == NULL)
 		return (false);
@@ -1300,8 +1348,8 @@ __wt_page_can_evict(
 	 * discards its WT_REF array, and a thread traversing the original
 	 * parent page index might see a freed WT_REF.
 	 */
-	if (WT_PAGE_IS_INTERNAL(page) &&
-	    F_ISSET_ATOMIC(page, WT_PAGE_SPLIT_BLOCK))
+	if (WT_PAGE_IS_INTERNAL(page) && !__wt_split_obsolete(
+	    session, page->pg_intl_split_gen))
 		return (false);
 
 	/*

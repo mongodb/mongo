@@ -126,7 +126,7 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	n = 0;
 
 	/* We're going to scan the table: wait for the lock. */
-	__wt_readlock_spin(session, txn_global->scan_rwlock);
+	__wt_readlock_spin(session, &txn_global->scan_rwlock);
 
 	current_id = pinned_id = txn_global->current;
 	prev_oldest_id = txn_global->oldest_id;
@@ -180,7 +180,7 @@ __wt_txn_get_snapshot(WT_SESSION_IMPL *session)
 	WT_ASSERT(session, prev_oldest_id == txn_global->oldest_id);
 	txn_state->pinned_id = pinned_id;
 
-done:	__wt_readunlock(session, txn_global->scan_rwlock);
+done:	__wt_readunlock(session, &txn_global->scan_rwlock);
 	__txn_sort_snapshot(session, n, current_id);
 }
 
@@ -293,13 +293,13 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 
 	/* First do a read-only scan. */
 	if (wait)
-		__wt_readlock_spin(session, txn_global->scan_rwlock);
+		__wt_readlock_spin(session, &txn_global->scan_rwlock);
 	else if ((ret =
-	    __wt_try_readlock(session, txn_global->scan_rwlock)) != 0)
+	    __wt_try_readlock(session, &txn_global->scan_rwlock)) != 0)
 		return (ret == EBUSY ? 0 : ret);
 	__txn_oldest_scan(session,
 	    &oldest_id, &last_running, &metadata_pinned, &oldest_session);
-	__wt_readunlock(session, txn_global->scan_rwlock);
+	__wt_readunlock(session, &txn_global->scan_rwlock);
 
 	/*
 	 * If the state hasn't changed (or hasn't moved far enough for
@@ -314,9 +314,9 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 
 	/* It looks like an update is necessary, wait for exclusive access. */
 	if (wait)
-		__wt_writelock(session, txn_global->scan_rwlock);
+		__wt_writelock(session, &txn_global->scan_rwlock);
 	else if ((ret =
-	    __wt_try_writelock(session, txn_global->scan_rwlock)) != 0)
+	    __wt_try_writelock(session, &txn_global->scan_rwlock)) != 0)
 		return (ret == EBUSY ? 0 : ret);
 
 	/*
@@ -375,7 +375,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 #endif
 	}
 
-done:	__wt_writeunlock(session, txn_global->scan_rwlock);
+done:	__wt_writeunlock(session, &txn_global->scan_rwlock);
 	return (ret);
 }
 
@@ -768,10 +768,8 @@ __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 
 	WT_RET(__wt_spin_init(session,
 	    &txn_global->id_lock, "transaction id lock"));
-	WT_RET(__wt_rwlock_alloc(session,
-	    &txn_global->scan_rwlock, "transaction scan lock"));
-	WT_RET(__wt_rwlock_alloc(session,
-	    &txn_global->nsnap_rwlock, "named snapshot lock"));
+	__wt_rwlock_init(session, &txn_global->scan_rwlock);
+	__wt_rwlock_init(session, &txn_global->nsnap_rwlock);
 	txn_global->nsnap_oldest_id = WT_TXN_NONE;
 	TAILQ_INIT(&txn_global->nsnaph);
 
@@ -805,3 +803,98 @@ __wt_txn_global_destroy(WT_SESSION_IMPL *session)
 	__wt_rwlock_destroy(session, &txn_global->nsnap_rwlock);
 	__wt_free(session, txn_global->states);
 }
+
+#if defined(HAVE_DIAGNOSTIC) || defined(HAVE_VERBOSE)
+/*
+ * __wt_verbose_dump_txn --
+ *	Output diagnostic information about the global transaction state.
+ */
+int
+__wt_verbose_dump_txn(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_TXN_GLOBAL *txn_global;
+	WT_TXN *txn;
+	WT_TXN_STATE *s;
+	const char *iso_tag;
+	uint64_t id;
+	uint32_t i, session_cnt;
+
+	conn = S2C(session);
+	txn_global = &conn->txn_global;
+
+	WT_RET(__wt_msg(session, "%s", WT_DIVIDER));
+	WT_RET(__wt_msg(session, "transaction state dump"));
+
+	WT_RET(__wt_msg(session, "current ID: %" PRIu64, txn_global->current));
+	WT_RET(__wt_msg(session,
+	    "last running ID: %" PRIu64, txn_global->last_running));
+	WT_RET(__wt_msg(session, "oldest ID: %" PRIu64, txn_global->oldest_id));
+	WT_RET(__wt_msg(session,
+	    "oldest named snapshot ID: %" PRIu64, txn_global->nsnap_oldest_id));
+
+	WT_RET(__wt_msg(session, "checkpoint running? %s",
+	    txn_global->checkpoint_running ? "yes" : "no"));
+	WT_RET(__wt_msg(session,
+	    "checkpoint generation: %" PRIu64, txn_global->checkpoint_gen));
+	WT_RET(__wt_msg(session,
+	    "checkpoint pinned ID: %" PRIu64, txn_global->checkpoint_pinned));
+	WT_RET(__wt_msg(session,
+	    "checkpoint txn ID: %" PRIu64, txn_global->checkpoint_txnid));
+
+	WT_ORDERED_READ(session_cnt, conn->session_cnt);
+	WT_RET(__wt_msg(session, "session count: %" PRIu32, session_cnt));
+
+	WT_RET(__wt_msg(session, "Transaction state of active sessions:"));
+
+	/*
+	 * Walk each session transaction state and dump information. Accessing
+	 * the content of session handles is not thread safe, so some
+	 * information may change while traversing if other threads are active
+	 * at the same time, which is OK since this is diagnostic code.
+	 */
+	for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
+		/* Skip sessions with no active transaction */
+		if ((id = s->id) == WT_TXN_NONE && s->pinned_id == WT_TXN_NONE)
+			continue;
+
+		txn = &conn->sessions[i].txn;
+		iso_tag = "INVALID";
+		switch (txn->isolation) {
+		case WT_ISO_READ_COMMITTED:
+			iso_tag = "WT_ISO_READ_COMMITTED";
+			break;
+		case WT_ISO_READ_UNCOMMITTED:
+			iso_tag = "WT_ISO_READ_UNCOMMITTED";
+			break;
+		case WT_ISO_SNAPSHOT:
+			iso_tag = "WT_ISO_SNAPSHOT";
+			break;
+		}
+
+		WT_RET(__wt_msg(session,
+		    "ID: %6" PRIu64
+		    ", mod count: %u"
+		    ", pinned ID: %" PRIu64
+		    ", snap min: %" PRIu64
+		    ", snap max: %" PRIu64
+		    ", metadata pinned ID: %" PRIu64
+		    ", flags: 0x%08" PRIx32
+		    ", name: %s"
+		    ", isolation: %s",
+		    id,
+		    txn->mod_count,
+		    s->pinned_id,
+		    txn->snap_min,
+		    txn->snap_max,
+		    s->metadata_pinned,
+		    txn->flags,
+		    conn->sessions[i].name == NULL ?
+		    "EMPTY" : conn->sessions[i].name,
+		    iso_tag));
+	}
+	WT_RET(__wt_msg(session, "%s", WT_DIVIDER));
+
+	return (0);
+}
+#endif

@@ -189,7 +189,7 @@ struct __wt_lsm_tree {
 
 #define	LSM_TREE_MAX_QUEUE	100
 	uint32_t queue_ref;
-	WT_RWLOCK *rwlock;
+	WT_RWLOCK rwlock;
 	TAILQ_ENTRY(__wt_lsm_tree) q;
 
 	uint64_t dsk_gen;

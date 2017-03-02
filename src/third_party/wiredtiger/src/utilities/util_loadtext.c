@@ -15,9 +15,11 @@ static int usage(void);
 int
 util_loadtext(WT_SESSION *session, int argc, char *argv[])
 {
+	WT_DECL_RET;
 	int ch;
-	const char *uri;
+	char *uri;
 
+	uri = NULL;
 	while ((ch = __wt_getopt(progname, argc, argv, "f:")) != EOF)
 		switch (ch) {
 		case 'f':	/* input file */
@@ -35,10 +37,13 @@ util_loadtext(WT_SESSION *session, int argc, char *argv[])
 	/* The remaining argument is the uri. */
 	if (argc != 1)
 		return (usage());
-	if ((uri = util_name(session, *argv, "table")) == NULL)
+	if ((uri = util_uri(session, *argv, "table")) == NULL)
 		return (1);
 
-	return (text(session, uri));
+	ret = text(session, uri);
+
+	free(uri);
+	return (ret);
 }
 
 /*
@@ -61,7 +66,7 @@ text(WT_SESSION *session, const char *uri)
 	 */
 	if ((ret = session->open_cursor(
 	    session, uri, NULL, "append,overwrite", &cursor)) != 0)
-		return (util_err(session, ret, "%s: session.open", uri));
+		return (util_err(session, ret, "%s: session.open_cursor", uri));
 
 	/*
 	 * We're about to load strings, make sure the formats match.

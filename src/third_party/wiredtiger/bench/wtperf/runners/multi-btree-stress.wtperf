@@ -1,7 +1,7 @@
 # wtperf options file: multi-database configuration attempting to
 # trigger slow operations by overloading CPU and disk.
 # References Jira WT-2131
-conn_config="cache_size=2GB,eviction=(threads_min=2,threads_max=2),log=(enabled=false),direct_io=(data,checkpoint),buffer_alignment=4096,checkpoint_sync=true,checkpoint=(wait=60)"
+conn_config="cache_size=2GB,eviction=(threads_min=2,threads_max=8),log=(enabled=false),direct_io=(data,checkpoint),buffer_alignment=4096,checkpoint_sync=true,checkpoint=(wait=60)"
 table_config="allocation_size=4k,prefix_compression=false,split_pct=75,leaf_page_max=4k,internal_page_max=16k,leaf_item_max=1433,internal_item_max=3100,type=file"
 # Divide original icount by database_count.
 database_count=5

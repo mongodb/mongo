@@ -44,6 +44,7 @@ static void	   config_map_compression(const char *, u_int *);
 static void	   config_map_encryption(const char *, u_int *);
 static void	   config_map_file_type(const char *, u_int *);
 static void	   config_map_isolation(const char *, u_int *);
+static void	   config_pct(void);
 static void	   config_reset(void);
 
 /*
@@ -159,30 +160,18 @@ config_setup(void)
 	config_encryption();
 	config_isolation();
 	config_lrt();
+	config_pct();
 
 	/*
-	 * Periodically, set the delete percentage to 0 so salvage gets run,
-	 * as long as the delete percentage isn't nailed down.
-	 * Don't do it on the first run, all our smoke tests would hit it.
+	 * If this is an LSM run, ensure cache size sanity.
+	 * Ensure there is at least 1MB of cache per thread.
 	 */
-	if (!g.replay && g.run_cnt % 10 == 9 && !config_is_perm("delete_pct"))
-		config_single("delete_pct=0", 0);
-
-	/*
-	 * If this is an LSM run, set the cache size and crank up the insert
-	 * percentage.
-	 */
-	if (DATASOURCE("lsm")) {
-		if (!config_is_perm("cache"))
+	if (!config_is_perm("cache")) {
+		if (DATASOURCE("lsm"))
 			g.c_cache = 30 * g.c_chunk_size;
-
-		if (!config_is_perm("insert_pct"))
-			g.c_insert_pct = mmrand(NULL, 50, 85);
+		if (g.c_cache < g.c_threads)
+			g.c_cache = g.c_threads;
 	}
-
-	/* Ensure there is at least 1MB of cache per thread. */
-	if (!config_is_perm("cache") && g.c_cache < g.c_threads)
-		g.c_cache = g.c_threads;
 
 	/* Give in-memory configuration a final review. */
 	config_in_memory_check();
@@ -479,6 +468,83 @@ config_lrt(void)
 			    "column store");
 		config_single("long_running_txn=off", 0);
 	}
+}
+
+/*
+ * config_pct --
+ *	Configure operation percentages.
+ */
+static void
+config_pct(void)
+{
+	static struct {
+		const char *name;		/* Operation */
+		uint32_t  *vp;			/* Value store */
+		u_int	   order;		/* Order of assignment */
+	} list[] = {
+#define	CONFIG_DELETE_ENTRY	0
+		{ "delete_pct", &g.c_delete_pct, 0 },
+		{ "insert_pct", &g.c_insert_pct, 0 },
+		{ "read_pct", &g.c_read_pct, 0 },
+		{ "write_pct", &g.c_write_pct, 0 },
+	};
+	u_int i, max_order, max_slot, n, pct;
+
+	/*
+	 * Walk the list of operations, checking for an illegal configuration
+	 * and creating a random order in the list.
+	 */
+	pct = 0;
+	for (i = 0; i < WT_ELEMENTS(list); ++i)
+		if (config_is_perm(list[i].name))
+			pct += *list[i].vp;
+		else
+			list[i].order = mmrand(NULL, 1, 1000);
+	if (pct > 100)
+		testutil_die(EINVAL,
+		    "operation percentages total to more than 100%%");
+
+	/*
+	 * If the delete percentage isn't nailed down, periodically set it to
+	 * 0 so salvage gets run. Don't do it on the first run, all our smoke
+	 * tests would hit it.
+	 */
+	if (!config_is_perm("delete_pct") && !g.replay && g.run_cnt % 10 == 9) {
+		list[CONFIG_DELETE_ENTRY].order = 0;
+		*list[CONFIG_DELETE_ENTRY].vp = 0;
+	}
+
+	/*
+	 * Walk the list, allocating random numbers of operations in a random
+	 * order.
+	 *
+	 * If the "order" field is non-zero, we need to create a value for this
+	 * operation. Find the largest order field in the array; if one non-zero
+	 * order field is found, it's the last entry and gets the remainder of
+	 * the operations.
+	 */
+	for (pct = 100 - pct;;) {
+		for (i = n =
+		    max_order = max_slot = 0; i < WT_ELEMENTS(list); ++i) {
+			if (list[i].order != 0)
+				++n;
+			if (list[i].order > max_order) {
+				max_order = list[i].order;
+				max_slot = i;
+			}
+		}
+		if (n == 0)
+			break;
+		if (n == 1) {
+			*list[max_slot].vp = pct;
+			break;
+		}
+		*list[max_slot].vp = mmrand(NULL, 0, pct);
+		list[max_slot].order = 0;
+		pct -= *list[max_slot].vp;
+	}
+	testutil_assert(g.c_delete_pct +
+	    g.c_insert_pct + g.c_read_pct + g.c_write_pct == 100);
 }
 
 /*

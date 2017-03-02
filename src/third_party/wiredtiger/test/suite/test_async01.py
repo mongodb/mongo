@@ -132,7 +132,7 @@ class test_async01(wttest.WiredTigerTestCase, suite_subprocess):
     ])
 
     # Enable async for this test.
-    def conn_config(self, dir):
+    def conn_config(self):
         return 'async=(enabled=true,ops_max=%s,' % self.async_ops + \
             'threads=%s)' % self.async_threads
 

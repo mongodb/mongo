@@ -96,7 +96,8 @@ spellchk()
 	type aspell > /dev/null 2>&1 || return
 
 	(cd ../src/docs &&
-	cat *.dox | aspell --lang=en --personal=./spell.ok list) |
+	cat *.dox |
+	aspell --encoding=iso-8859-1 --lang=en --personal=./spell.ok list) |
 	sort -u > $t
 	test -s $t && {
 		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="

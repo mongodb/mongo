@@ -114,7 +114,7 @@ struct __wt_btree {
 	int   split_pct;		/* Split page percent */
 	WT_COMPRESSOR *compressor;	/* Page compressor */
 	WT_KEYED_ENCRYPTOR *kencryptor;	/* Page encryptor */
-	WT_RWLOCK *ovfl_lock;		/* Overflow lock */
+	WT_RWLOCK ovfl_lock;		/* Overflow lock */
 
 	uint64_t last_recno;		/* Column-store last record number */
 
@@ -131,6 +131,7 @@ struct __wt_btree {
 	uint64_t write_gen;		/* Write generation */
 
 	uint64_t    bytes_inmem;	/* Cache bytes in memory. */
+	uint64_t    bytes_dirty_intl;	/* Bytes in dirty internal pages. */
 	uint64_t    bytes_dirty_leaf;	/* Bytes in dirty leaf pages. */
 
 	WT_REF	   *evict_ref;		/* Eviction thread's location */
@@ -140,7 +141,11 @@ struct __wt_btree {
 	u_int	    evict_walk_skips;	/* Number of walks skipped */
 	u_int	    evict_disabled;	/* Eviction disabled count */
 	volatile uint32_t evict_busy;	/* Count of threads in eviction */
-	bool	    evict_walk_reverse;	/* Walk direction */
+	enum {
+	    WT_EVICT_WALK_NEXT, WT_EVICT_WALK_PREV,
+	    WT_EVICT_WALK_RAND_NEXT, WT_EVICT_WALK_RAND_PREV
+	} evict_walk_state;		/* Eviction walk state */
+#define	WT_EVICT_WALK_MAX_LEGAL_VALUE	WT_EVICT_WALK_RAND_PREV + 1
 
 	enum {
 		WT_CKPT_OFF, WT_CKPT_PREPARE, WT_CKPT_RUNNING

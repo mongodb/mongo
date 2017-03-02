@@ -364,7 +364,7 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool *didworkp)
 	 * block eviction), we don't want to highjack the thread for eviction.
 	 */
 	if (F_ISSET(session, WT_SESSION_NO_EVICTION |
-	    WT_SESSION_LOCKED_HANDLE_LIST | WT_SESSION_LOCKED_SCHEMA))
+	    WT_SESSION_LOCKED_HANDLE_LIST_WRITE | WT_SESSION_LOCKED_SCHEMA))
 		return (0);
 
 	/* In memory configurations don't block when the cache is full. */

@@ -458,13 +458,13 @@ __cursor_row_prev(WT_CURSOR_BTREE *cbt, bool newpage)
 		if (!F_ISSET_ATOMIC(page, WT_PAGE_BUILD_KEYS))
 			WT_RET(__wt_row_leaf_keys(session, page));
 
-		if (page->pg_row_entries == 0)
+		if (page->entries == 0)
 			cbt->ins_head = WT_ROW_INSERT_SMALLEST(page);
 		else
 			cbt->ins_head =
-			    WT_ROW_INSERT_SLOT(page, page->pg_row_entries - 1);
+			    WT_ROW_INSERT_SLOT(page, page->entries - 1);
 		cbt->ins = WT_SKIP_LAST(cbt->ins_head);
-		cbt->row_iteration_slot = page->pg_row_entries * 2 + 1;
+		cbt->row_iteration_slot = page->entries * 2 + 1;
 		cbt->rip_saved = NULL;
 		goto new_insert;
 	}
@@ -515,7 +515,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		cbt->ins = NULL;
 
 		cbt->slot = cbt->row_iteration_slot / 2 - 1;
-		rip = &page->pg_row_d[cbt->slot];
+		rip = &page->pg_row[cbt->slot];
 		upd = __wt_txn_read(session, WT_ROW_UPDATE(page, rip));
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd)) {
 			if (__wt_txn_visible_all(session, upd->txnid))

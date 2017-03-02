@@ -21,6 +21,7 @@ Alakuijala
 Alexandrescu's
 Alloc
 Async
+AsyncOp
 Athanassoulis
 Athlon
 BBBBB
@@ -276,6 +277,7 @@ PRNG
 PTHREAD
 PTR
 PackInputStream
+PackOutputStream
 Pandis
 Phong
 PlatformSDK
@@ -339,6 +341,7 @@ Split's
 Stoica
 StoreLoad
 StoreStore
+Syscall
 TAILQ
 TCMalloc
 TESTUTIL
@@ -767,6 +770,7 @@ idx
 ifdef
 ifdef's
 iiSii
+iiiS
 iiii
 iiu
 ikey
@@ -1135,6 +1139,7 @@ subgetraw
 subgets
 subinit
 sublicense
+subtest
 subtree
 sunique
 superset
@@ -1179,6 +1184,7 @@ txt
 typedef
 uB
 uS
+ui
 uint
 uintmax
 unbare
@@ -1214,6 +1220,7 @@ upg
 uri
 uri's
 uris
+usec
 usecs
 usedp
 userbad
@@ -1244,6 +1251,9 @@ vunpack
 vw
 vxr
 waitpid
+waker
+wakeup
+wakeups
 walk's
 warmup
 wb

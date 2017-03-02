@@ -175,6 +175,10 @@ main(int argc, char *argv[])
 			config = "statistics=(all)";
 		}
 		break;
+	case 't' :
+		if (strcmp(command, "truncate") == 0)
+			func = util_truncate;
+		break;
 	case 'u':
 		if (strcmp(command, "upgrade") == 0)
 			func = util_upgrade;
@@ -272,6 +276,7 @@ usage(void)
 	    "\t" "rename\t  rename an object\n"
 	    "\t" "salvage\t  salvage a file\n"
 	    "\t" "stat\t  display statistics for an object\n"
+	    "\t" "truncate  truncate an object, removing all content\n"
 	    "\t" "upgrade\t  upgrade an object\n"
 	    "\t" "verify\t  verify an object\n"
 	    "\t" "write\t  write values to an object\n");
@@ -280,11 +285,11 @@ usage(void)
 }
 
 /*
- * util_name --
+ * util_uri --
  *	Build a name.
  */
 char *
-util_name(WT_SESSION *session, const char *s, const char *type)
+util_uri(WT_SESSION *session, const char *s, const char *type)
 {
 	size_t len;
 	char *name;

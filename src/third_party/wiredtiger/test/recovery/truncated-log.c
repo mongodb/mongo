@@ -35,7 +35,7 @@
 #define	snprintf _snprintf
 #endif
 
-static char home[512];			/* Program working dir */
+static char home[1024];			/* Program working dir */
 static const char *progname;		/* Program name */
 static const char * const uri = "table:main";
 
@@ -290,7 +290,7 @@ main(int argc, char *argv[])
 	if (argc != 0)
 		usage();
 
-	testutil_work_dir_from_path(home, 512, working_dir);
+	testutil_work_dir_from_path(home, sizeof(home), working_dir);
 	testutil_make_work_dir(home);
 
 	/*

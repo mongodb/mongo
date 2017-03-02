@@ -304,7 +304,7 @@ __clsm_leave(WT_CURSOR_LSM *clsm)
  * byte, if the application uses two leading DC4 byte for some reason, we'll do
  * a wasted data copy each time a new value is inserted into the object.
  */
-static const WT_ITEM __tombstone = { "\x14\x14", 2, 0, NULL, 0 };
+static const WT_ITEM __tombstone = { "\x14\x14", 2, NULL, 0, 0 };
 
 /*
  * __clsm_deleted --
@@ -1692,8 +1692,8 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	bulk = cval.val != 0;
 
 	/* Get the LSM tree. */
-	WT_WITH_HANDLE_LIST_LOCK(session,
-	    ret = __wt_lsm_tree_get(session, uri, bulk, &lsm_tree));
+	ret = __wt_lsm_tree_get(session, uri, bulk, &lsm_tree);
+
 	/*
 	 * Check whether the exclusive open for a bulk load succeeded, and
 	 * if it did ensure that it's safe to bulk load into the tree.

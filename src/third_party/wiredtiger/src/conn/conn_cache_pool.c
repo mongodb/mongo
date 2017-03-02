@@ -32,7 +32,7 @@
  */
 #define	WT_CACHE_POOL_APP_EVICT_MULTIPLIER	3
 #define	WT_CACHE_POOL_APP_WAIT_MULTIPLIER	6
-#define	WT_CACHE_POOL_READ_MULTIPLIER	1
+#define	WT_CACHE_POOL_READ_MULTIPLIER		1
 
 static void __cache_pool_adjust(
     WT_SESSION_IMPL *, uint64_t, uint64_t, bool, bool *);
@@ -104,8 +104,8 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		TAILQ_INIT(&cp->cache_pool_qh);
 		WT_ERR(__wt_spin_init(
 		    session, &cp->cache_pool_lock, "cache shared pool"));
-		WT_ERR(__wt_cond_alloc(session,
-		    "cache pool server", false, &cp->cache_pool_cond));
+		WT_ERR(__wt_cond_alloc(
+		    session, "cache pool server", &cp->cache_pool_cond));
 
 		__wt_process.cache_pool = cp;
 		__wt_verbose(session,
@@ -418,8 +418,9 @@ static void
 __cache_pool_balance(WT_SESSION_IMPL *session, bool forward)
 {
 	WT_CACHE_POOL *cp;
-	bool adjusted;
 	uint64_t bump_threshold, highest;
+	int i;
+	bool adjusted;
 
 	cp = __wt_process.cache_pool;
 	adjusted = false;
@@ -438,11 +439,17 @@ __cache_pool_balance(WT_SESSION_IMPL *session, bool forward)
 
 	/*
 	 * Actively attempt to:
-	 * - Reduce the amount allocated, if we are over the budget
+	 * - Reduce the amount allocated, if we are over the budget.
 	 * - Increase the amount used if there is capacity and any pressure.
+	 * Don't keep trying indefinitely, if we aren't succeeding in reducing
+	 * the cache in use re-assessing the participants' states is necessary.
+	 * We are also holding a lock across this process, which can slow
+	 * participant shutdown if we spend a long time balancing.
 	 */
-	while (F_ISSET(cp, WT_CACHE_POOL_ACTIVE) &&
-	    F_ISSET(S2C(session)->cache, WT_CACHE_POOL_RUN)) {
+	for (i = 0;
+	    i < 2 * WT_CACHE_POOL_BUMP_THRESHOLD &&
+	    F_ISSET(cp, WT_CACHE_POOL_ACTIVE) &&
+	    F_ISSET(S2C(session)->cache, WT_CACHE_POOL_RUN); i++) {
 		__cache_pool_adjust(
 		    session, highest, bump_threshold, forward, &adjusted);
 		/*
@@ -565,7 +572,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 	WT_CONNECTION_IMPL *entry;
 	uint64_t adjustment, highest_percentile, pressure, reserved, smallest;
 	u_int pct_full;
-	bool busy, pool_full, grow;
+	bool busy, decrease_ok, grow, pool_full;
 
 	*adjustedp = false;
 	cp = __wt_process.cache_pool;
@@ -612,6 +619,34 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 			continue;
 
 		/*
+		 * The bump threshold decreases as we try longer to balance
+		 * the pool. Adjust how aggressively we free space from
+		 * participants depending on how long we have been trying.
+		 */
+		decrease_ok = false;
+		/*
+		 * Any participant is a candidate if we have been trying
+		 * for long enough.
+		 */
+		if (bump_threshold == 0)
+			decrease_ok = true;
+		/*
+		 * Participants that aren't doing application eviction and
+		 * are showing a reasonable amount of usage are excluded
+		 * even if we have been trying for a while.
+		 */
+		else if (bump_threshold < WT_CACHE_POOL_BUMP_THRESHOLD / 3 &&
+		    (!busy && highest > 1))
+			decrease_ok = true;
+		/*
+		 * Any participant that is proportionally less busy is a
+		 * candidate from the first attempt.
+		 */
+		else if (highest > 1 &&
+		    pressure < WT_CACHE_POOL_REDUCE_THRESHOLD)
+			decrease_ok = true;
+
+		/*
 		 * If the entry is currently allocated less than the reserved
 		 * size, increase its allocation. This should only happen if:
 		 *  - it's the first time we've seen this member, or
@@ -624,17 +659,12 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		 * Conditions for reducing the amount of resources for an
 		 * entry:
 		 *  - the pool is full,
-		 *  - application threads are not busy doing eviction already,
 		 *  - this entry has more than the minimum amount of space in
 		 *    use,
-		 *  - the read pressure in this entry is below the threshold,
-		 *    other entries need more cache, the entry has more than
-		 *    the minimum space and there is no available space in the
-		 *    pool.
+		 *  - it was determined that this slot is a good candidate
 		 */
-		} else if (pool_full && !busy &&
-		    entry->cache_size > reserved &&
-		    pressure < WT_CACHE_POOL_REDUCE_THRESHOLD && highest > 1) {
+		} else if (pool_full &&
+		    entry->cache_size > reserved && decrease_ok) {
 			grow = false;
 			/*
 			 * Don't drop the size down too much - or it can
@@ -733,7 +763,7 @@ __wt_cache_pool_server(void *arg)
 	    F_ISSET(cache, WT_CACHE_POOL_RUN)) {
 		if (cp->currently_used <= cp->size)
 			__wt_cond_wait(
-			    session, cp->cache_pool_cond, WT_MILLION);
+			    session, cp->cache_pool_cond, WT_MILLION, NULL);
 
 		/*
 		 * Re-check pool run flag - since we want to avoid getting the

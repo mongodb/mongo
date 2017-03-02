@@ -16,7 +16,7 @@
 # - Config + "-C "checkpoint=(wait=0)": no checkpoints
 # - Config + "-C "log=(enabled,prealloc=false,file_max=1M)": no pre-allocation
 #
-conn_config="cache_size=5G,log=(enabled=true),checkpoint=(log_size=500M),eviction=(threads_max=4)"
+conn_config="cache_size=5G,log=(enabled=true),checkpoint=(log_size=500M),eviction=(threads_max=8)"
 table_config="type=file"
 icount=1000000
 report_interval=5

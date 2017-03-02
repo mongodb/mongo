@@ -240,8 +240,7 @@ __async_start(WT_SESSION_IMPL *session)
 	async = conn->async;
 	TAILQ_INIT(&async->formatqh);
 	WT_RET(__wt_spin_init(session, &async->ops_lock, "ops"));
-	WT_RET(__wt_cond_alloc(
-	    session, "async flush", false, &async->flush_cond));
+	WT_RET(__wt_cond_alloc(session, "async flush", &async->flush_cond));
 	WT_RET(__wt_async_op_init(session));
 
 	/*
@@ -541,7 +540,7 @@ retry:
 	async->flush_op.state = WT_ASYNCOP_READY;
 	WT_RET(__wt_async_op_enqueue(session, &async->flush_op));
 	while (async->flush_state != WT_ASYNC_FLUSH_COMPLETE)
-		__wt_cond_wait(session, async->flush_cond, 100000);
+		__wt_cond_wait(session, async->flush_cond, 100000, NULL);
 	/*
 	 * Flush is done.  Clear the flags.
 	 */

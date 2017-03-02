@@ -33,8 +33,7 @@ import wiredtiger, wttest
 class test_schema07(wttest.WiredTigerTestCase):
     tablename = 'table:test_schema07'
 
-    def conn_config(self, dir):
-        return 'cache_size=10MB'
+    conn_config = 'cache_size=10MB'
 
     @wttest.longtest("Creating many tables shouldn't fill the cache")
     def test_many_tables(self):

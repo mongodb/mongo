@@ -1,19 +1,39 @@
 /*! @page upgrading Upgrading WiredTiger applications
-@section version_291 Upgrading to Version 2.9.1
-<dl>
-<dt>WiredTiger now requires Python 2.7 at minimum</dt>
-<dd>
-The minimum version of Python supported by WiredTiger is now 2.7 up from the
-previous version of 2.6. This is due to extra unit tests added in this release
-that depend on 2.7. This is not due to a change in the Python API.
-</dd>
 
+@section version_292 Upgrading to Version 2.9.2
+<dl>
+<dt>WiredTiger Utility now supports truncate</dt>
+<dd>
+The WiredTiger Utility can now \c truncate an object. Removing all contents
+from the specified object.
+</dd>
+<dt>Handle list lock statistics</dt>
+<dd>
+In the 2.9.1 release we added statistics tracking handle list lock timing, we
+have switched that lock from a spin lock to a read-write lock, and consequently
+changed the statistics tracking lock related wait time.
+</dd>
+</dl>
+
+@section version_291 Upgrading to Version 2.9.1
+
+<dl>
 <dt>Changes to hazard pointer configuration</dt>
 <dd>
 The \c hazard_max parameter to ::wiredtiger_open is now ignored.  Memory is
 allocated for hazard pointers as required by each session.
 </dd>
-</dl><hr>
+
+<dt>Change to the default fadvise behavior for data files</dt>
+<dd>
+The old default behavior was to advise the file system that access would be
+random for data files, and there was no way to alter that. We no longer
+call advise the file system of expected access patterns by default, and
+have added a new \c access_pattern_hint configuration option available for
+WT_SESSION::create that can be used to restore the old default by setting
+the value to "random".
+</dd>
+</dl>
 
 @section version_290 Upgrading to Version 2.9.0
 <dl>
@@ -314,7 +334,7 @@ be updated.
 The WT_SESSION::create \c internal_item_max and \c leaf_item_max
 configuration strings are now deprecated in favor of the
 \c internal_key_max, \c leaf_key_max, and \c leaf_value_max
-configuration strings. See @ref tune_page_sizes for more information.
+configuration strings. See @ref tune_page_size_and_comp for more information.
 </dd>
 
 </dl><hr>

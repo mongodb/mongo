@@ -74,7 +74,7 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
         ('backup_9', dict(big=3,list=[])),         # Backup everything
     ]
 
-    scenarios = make_scenarios(list)
+    scenarios = make_scenarios(list, prune=3, prunelong=1000)
     # Create a large cache, otherwise this test runs quite slowly.
     conn_config = 'cache_size=1G'
 

@@ -110,7 +110,7 @@ considered.  (See @subpage_single huffman for details.)
 compressing blocks of the backing object's file.  The cost is additional
 CPU and memory use when reading and writing pages to disk.  Note the
 additional CPU cost of block compression can be high, and should be
-considered.   (See @x_ref compression_formats for details.)
+considered.   (See @x_ref compression_considerations for details.)
 
   Block compression is disabled by default.
 
@@ -146,7 +146,7 @@ Huffman encoding can be high, and should be considered.
 compressing blocks of the backing object's file.  The cost is additional
 CPU and memory use when reading and writing pages to disk.  Note the
 additional CPU cost of block compression can be high, and should be
-considered.   (See @x_ref compression_formats for details.)
+considered.   (See @x_ref compression_considerations for details.)
 
   Block compression is disabled by default.
 
@@ -157,7 +157,7 @@ compression: block compression.
 compressing blocks of the backing object's file.  The cost is additional
 CPU and memory use when reading and writing pages to disk.  Note the
 additional CPU cost of block compression can be high, and should be
-considered.   (See @x_ref compression_formats for details.)
+considered.   (See @x_ref compression_considerations for details.)
 
   Block compression is disabled by default.
 

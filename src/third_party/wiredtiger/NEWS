@@ -1,3 +1,53 @@
+WiredTiger release 2.9.1, 2016-12-22
+------------------------------------
+
+New features and API changes; refer to the API documentation for full details:
+
+* SERVER-26545	Remove fixed-size limitation on WiredTiger hazard pointers. See the upgrading documentation for details
+* WT-283	Add a new WT_SESSION::alter method that can be used to reconfigure table metadata
+* WT-2670	Change the default file system access pattern advice for data files from random to no advice. Add access_pattern_hint configuration option for WT_SESSION::create API that can be used to advise the file system of expected access semantics. See the upgrading documentation for details.
+* WT-3034	Add support for including updates when reading from named snapshots
+
+Significant changes and bug fixes:
+
+* WT-2960	Reduce likelihood of using the lookaside file, especially when inserting multi-megabyte values
+* WT-3056	Allow projected table and join cursors to use primary keys
+* WT-3070	Fix a bug in search_near on indexes
+
+Other noteworthy changes since the previous release:
+
+* WT-2336	Add a test validating schema operations via file system call monitoring
+* WT-2402	Pad structures to avoid cache line sharing
+* WT-2771	Add a statistic to track per-btree dirty cache usage
+* WT-2833	Add projections to wt dump utility
+* WT-2969	Possible snapshot corruption during compaction
+* WT-3014	Add GCC/clang support for ELF symbol visibility
+* WT-3021	Fixes for java log example, raw mode in java, and raw mode in log cursors
+* WT-3025	Fix error path in log_force_sync
+* WT-3028	Don't check for blocked eviction with in-memory workloads
+* WT-3030	Fix a race between scans and splits reading the index hint
+* WT-3037	Clean up some log slot comments
+* WT-3048	WiredTiger maximum size warning uses the wrong format
+* WT-3051	Remove external __wt_hex symbol
+* WT-3052	Improve search if index hint is wrong
+* WT-3053	Make Python use internal memory allocation again
+* WT-3054	Make a PackOutputStream constructor that is compatible with the previous interface.
+* WT-3055	When an AsyncOp is created, cache the whether the cursor is "raw"
+* WT-3057	WiredTiger hazard pointers should use the WT_REF, not the WT_PAGE
+* WT-3061	Syscall testing should support pwrite64 on Linux
+* WT-3064	Minor tree cleanups: .gitignore, NEWS misspelling
+* WT-3066	Minor code cleanups
+* WT-3068	Copy artifacts of test runs in wtperf_run script
+* WT-3068	Have Jenkins include specific files for copy rather than exclude
+* WT-3069	Fix LevelDB APIs build failures
+* WT-3071	Fixed sign-conversion compiler errors in Java and Python SWIG code
+* WT-3075	Document and enforce that WiredTiger now depends on Python 2.7
+* WT-3078	Test reconfiguration hang in the statlog server
+* WT-3080	Python test suite: add elapsed time for tests
+* WT-3082	Python test suite: shorten default run to avoid timeouts
+* WT-3084	Fix Coverity resource leak complaint
+* WT-3091	Add stats to test_perf001 test, so we can investigate what happened when it failed
+
 WiredTiger release 2.9.0, 2016-09-06
 ------------------------------------
 

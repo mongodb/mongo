@@ -769,7 +769,7 @@ __curtable_complete(WT_SESSION_IMPL *session, WT_TABLE *table)
 		return (0);
 
 	/* If the table is incomplete, wait on the table lock and recheck. */
-	WT_WITH_TABLE_LOCK(session, complete = table->cg_complete);
+	WT_WITH_TABLE_READ_LOCK(session, complete = table->cg_complete);
 	if (!complete)
 		WT_RET_MSG(session, EINVAL,
 		    "'%s' not available until all column groups are created",
@@ -951,7 +951,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 
 	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
 		__wt_json_column_init(
-		    cursor, table->key_format, NULL, &table->colconf);
+		    cursor, uri, table->key_format, NULL, &table->colconf);
 
 	/*
 	 * Open the colgroup cursors immediately: we're going to need them for

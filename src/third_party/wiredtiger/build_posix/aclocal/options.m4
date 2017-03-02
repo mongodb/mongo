@@ -57,7 +57,7 @@ AH_TEMPLATE(
     HAVE_CRC32_HARDWARE, [Define to 1 to configure CRC32 hardware support.])
 AC_MSG_CHECKING(if --enable-crc32-hardware option specified)
 AC_ARG_ENABLE(crc32-hardware,
-	AC_HELP_STRING([--enable-crc32-hardware],
+	AS_HELP_STRING([--enable-crc32-hardware],
 	    [Enable CRC32 hardware support.]), r=$enableval, r=yes)
 case "$r" in
 no)	wt_cv_enable_crc32_hardware=no;;

@@ -21,8 +21,8 @@ struct __wt_condvar {
 	int waiters;			/* Numbers of waiters, or
 					   -1 if signalled with no waiters. */
 	/*
-	 * The following fields are only used for automatically adjusting
-	 * condition variables. They could be in a separate structure.
+	 * The following fields are used for automatically adjusting condition
+	 * variable wait times.
 	 */
 	uint64_t	min_wait;	/* Minimum wait duration */
 	uint64_t	max_wait;	/* Maximum wait duration */
@@ -30,11 +30,14 @@ struct __wt_condvar {
 };
 
 /*
+ * Read/write locks:
+ *
+ * WiredTiger uses read/write locks for shared/exclusive access to resources.
  * !!!
  * Don't modify this structure without understanding the read/write locking
  * functions.
  */
-typedef union {				/* Read/write lock */
+union __wt_rwlock {			/* Read/write lock */
 	uint64_t u;
 	struct {
 		uint32_t wr;		/* Writers and readers */
@@ -45,19 +48,6 @@ typedef union {				/* Read/write lock */
 		uint16_t next;		/* Next available ticket number */
 		uint16_t writers_active;/* Count of active writers */
 	} s;
-} wt_rwlock_t;
-
-/*
- * Read/write locks:
- *
- * WiredTiger uses read/write locks for shared/exclusive access to resources.
- */
-struct __wt_rwlock {
-	WT_CACHE_LINE_PAD_BEGIN
-	const char *name;		/* Lock name for debugging */
-
-	wt_rwlock_t rwlock;		/* Read/write lock */
-	WT_CACHE_LINE_PAD_END
 };
 
 /*

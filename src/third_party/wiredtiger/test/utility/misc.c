@@ -78,7 +78,7 @@ testutil_work_dir_from_path(char *buffer, size_t len, const char *dir)
  *	Remove the work directory.
  */
 void
-testutil_clean_work_dir(char *dir)
+testutil_clean_work_dir(const char *dir)
 {
 	size_t len;
 	int ret;
