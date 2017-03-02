@@ -43,6 +43,7 @@ selector:
     - jstests/core/mr_undef.js
     - jstests/core/opcounters_active.js
     - jstests/core/or4.js
+    # This test is blacklisted due to both map-reduce and getLatestProfilerEntry().
     - jstests/core/profile_mapreduce.js
     - jstests/core/recursion.js
     - jstests/core/system_profile.js
@@ -55,6 +56,18 @@ selector:
     - jstests/core/geo_s2cursorlimitskip.js 
     # The downstream syncing node affects the top output.
     - jstests/core/top.js
+    # These tests run getLatestProfilerEntry(). The downstream syncing node affects the profiler.
+    - jstests/core/profile_agg.js
+    - jstests/core/profile_count.js
+    - jstests/core/profile_delete.js
+    - jstests/core/profile_distinct.js
+    - jstests/core/profile_find.js
+    - jstests/core/profile_findandmodify.js
+    - jstests/core/profile_geonear.js
+    - jstests/core/profile_getmore.js
+    - jstests/core/profile_group.js
+    - jstests/core/profile_insert.js
+    - jstests/core/profile_update.js
 
 run_hook_interval: &run_hook_interval 20
 executor:
