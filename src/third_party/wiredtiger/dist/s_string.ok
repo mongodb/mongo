@@ -222,7 +222,7 @@ MEM
 MEMALIGN
 MERCHANTABILITY
 METADATA
-MONGODB
+BONGODB
 MRXB
 MRXBOPC
 MSVC
@@ -237,7 +237,7 @@ Memrata
 Metadata
 Mewhort
 Mitzenmacher
-MongoDB
+BongoDB
 MoveFile
 MoveFileW
 Multi

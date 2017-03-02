@@ -18,15 +18,15 @@ executor:
             authMechanism: SCRAM-SHA-1
             keyFile: *keyFile
             keyFileData: *keyFileData
-        eval: jsTest.authenticate(db.getMongo())
+        eval: jsTest.authenticate(db.getBongo())
         authenticationDatabase: local
         authenticationMechanism: SCRAM-SHA-1
         password: *keyFileData
         username: __system
         readMode: commands
     fixture:
-      class: MongoDFixture
-      mongod_options:
+      class: BongoDFixture
+      bongod_options:
         auth: ''
         keyFile: *keyFile
         set_parameters:

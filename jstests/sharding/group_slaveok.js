@@ -4,12 +4,12 @@
     load("jstests/replsets/rslib.js");
 
     var st = new ShardingTest(
-        {name: "groupSlaveOk", shards: 1, mongos: 1, other: {rs: true, rs0: {nodes: 2}}});
+        {name: "groupSlaveOk", shards: 1, bongos: 1, other: {rs: true, rs0: {nodes: 2}}});
 
     var rst = st._rs[0].test;
 
     // Insert data into replica set
-    var conn = new Mongo(st.s.host);
+    var conn = new Bongo(st.s.host);
     conn.setLogLevel(3);
 
     var coll = conn.getCollection("test.groupSlaveOk");
@@ -31,7 +31,7 @@
     rst.stop(rst.getPrimary());
     printjson(rst.status());
 
-    // Wait for the mongos to recognize the slave
+    // Wait for the bongos to recognize the slave
     awaitRSClientHosts(conn, sec, {ok: true, secondary: true});
 
     // Need to check slaveOk=true first, since slaveOk=false will destroy conn in pool when

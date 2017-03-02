@@ -1,6 +1,6 @@
 env:
   es6: true
-  mongo: true
+  bongo: true
 
 rules:
   # Rules are documented at http://eslint.org/docs/rules/

@@ -1,6 +1,6 @@
 /**
  * Performs basic checks on the configureFailPoint command. Also check
- * mongo/util/fail_point_test.cpp for unit tests.
+ * bongo/util/fail_point_test.cpp for unit tests.
  *
  * @param adminDB {DB} the admin database database object
  */
@@ -67,12 +67,12 @@ var runTest = function(adminDB) {
     expectFailPointState(res["failpoint.dummy"], 1, {x: 1});
 };
 
-var conn = MongoRunner.runMongod();
+var conn = BongoRunner.runBongod();
 runTest(conn.getDB('admin'));
-MongoRunner.stopMongod(conn.port);
+BongoRunner.stopBongod(conn.port);
 
 ///////////////////////////////////////////////////////////
-// Test mongos
+// Test bongos
 var st = new ShardingTest({shards: 1});
 runTest(st.s.getDB('admin'));
 st.stop();

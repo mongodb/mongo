@@ -23,7 +23,7 @@ executor:
             skipValidationOnInvalidViewDefinitions: true
     fixture:
       class: ReplicaSetFixture
-      mongod_options:
+      bongod_options:
         set_parameters:
           enableTestCommands: 1
           numInitialSyncAttempts: 1

@@ -4,7 +4,7 @@ t = new ToolTest("files1");
 
 db = t.startDB();
 
-filename = 'mongod';
+filename = 'bongod';
 if (_isWindows())
     filename += '.exe';
 

@@ -6,7 +6,7 @@
  * collection, ensuring that the storage size of the
  * collection is still a multiple of 256.
  *
- * MongoDB raises the storage size of a capped collection
+ * BongoDB raises the storage size of a capped collection
  * to an integer multiple of 256.
  */
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');

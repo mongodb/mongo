@@ -18,7 +18,7 @@ var $config = extendWorkload($config, function($config, $super) {
         assertAlways.eq(0, res.nUpserted, tojson(res));
         // documents can't move during an update, because we use $isolated
         assertWhenOwnColl.eq(this.numDocs, res.nMatched, tojson(res));
-        if (db.getMongo().writeMode() === 'commands') {
+        if (db.getBongo().writeMode() === 'commands') {
             assertWhenOwnColl.eq(this.numDocs, res.nModified, tojson(res));
         }
 

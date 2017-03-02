@@ -17,39 +17,39 @@ load("jstests/replsets/rslib.js");
     // This keyFile has its permissions set to 644 later in the test.
     var key1_644 = path + "key1_644";
 
-    print("try starting mongod with auth");
-    var m = MongoRunner.runMongod(
-        {auth: "", port: port[4], dbpath: MongoRunner.dataDir + "/wrong-auth"});
+    print("try starting bongod with auth");
+    var m = BongoRunner.runBongod(
+        {auth: "", port: port[4], dbpath: BongoRunner.dataDir + "/wrong-auth"});
 
     assert.eq(m.getDB("local").auth("__system", ""), 0);
 
-    MongoRunner.stopMongod(m);
+    BongoRunner.stopBongod(m);
 
     print("reset permissions");
     run("chmod", "644", key1_644);
 
-    print("try starting mongod");
-    m = runMongoProgram("mongod",
+    print("try starting bongod");
+    m = runBongoProgram("bongod",
                         "--keyFile",
                         key1_644,
                         "--port",
                         port[0],
                         "--dbpath",
-                        MongoRunner.dataPath + name);
+                        BongoRunner.dataPath + name);
 
     print("should fail with wrong permissions");
     assert.eq(
-        m, _isWindows() ? 100 : 1, "mongod should exit w/ 1 (EXIT_FAILURE): permissions too open");
-    MongoRunner.stopMongod(port[0]);
+        m, _isWindows() ? 100 : 1, "bongod should exit w/ 1 (EXIT_FAILURE): permissions too open");
+    BongoRunner.stopBongod(port[0]);
 
     // Pre-populate the data directory for the first replica set node, to be started later, with
     // a user's credentials.
     print("add a user to server0: foo");
-    m = MongoRunner.runMongod({dbpath: MongoRunner.dataPath + name + "-0"});
+    m = BongoRunner.runBongod({dbpath: BongoRunner.dataPath + name + "-0"});
     m.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles});
     m.getDB("test").createUser({user: "bar", pwd: "baz", roles: jsTest.basicUserRoles});
     print("make sure user is written before shutting down");
-    MongoRunner.stopMongod(m);
+    BongoRunner.stopBongod(m);
 
     print("start up rs");
     var rs = new ReplSetTest({"name": name, "nodes": 3});
@@ -144,8 +144,8 @@ load("jstests/replsets/rslib.js");
     bulk.execute({w: 3, wtimeout: 60000});
 
     print("add member with wrong key");
-    var conn = MongoRunner.runMongod({
-        dbpath: MongoRunner.dataPath + name + "-3",
+    var conn = BongoRunner.runBongod({
+        dbpath: BongoRunner.dataPath + name + "-3",
         port: port[3],
         replSet: "rs_auth1",
         oplogSize: 2,
@@ -174,11 +174,11 @@ load("jstests/replsets/rslib.js");
     }
 
     print("stop member");
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
 
     print("start back up with correct key");
-    var conn = MongoRunner.runMongod({
-        dbpath: MongoRunner.dataPath + name + "-3",
+    var conn = BongoRunner.runBongod({
+        dbpath: BongoRunner.dataPath + name + "-3",
         port: port[3],
         replSet: "rs_auth1",
         oplogSize: 2,

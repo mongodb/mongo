@@ -6,7 +6,7 @@ selector:
     # SERVER-19124 closeall.js causes the task to time out in Evergreen.
     - jstests/dur/closeall.js
 
-# Durability tests start their own mongod's.
+# Durability tests start their own bongod's.
 executor:
   js_test:
     config:

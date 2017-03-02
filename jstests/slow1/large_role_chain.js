@@ -23,11 +23,11 @@ function runTest(conn) {
 }
 
 // run all tests standalone
-var conn = MongoRunner.runMongod();
+var conn = BongoRunner.runBongod();
 runTest(conn);
-MongoRunner.stopMongod(conn);
+BongoRunner.stopBongod(conn);
 
 // run all tests sharded
-conn = new ShardingTest({shards: 2, mongos: 1, config: 3});
+conn = new ShardingTest({shards: 2, bongos: 1, config: 3});
 runTest(conn);
 conn.stop();

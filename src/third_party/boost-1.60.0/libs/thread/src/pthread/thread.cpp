@@ -116,7 +116,7 @@ namespace boost
             }
 
 #if defined BOOST_THREAD_PATCH
-// MONGODB Modification - revert to Boost 1.59 behavior, and do not delete TLS keys.
+// BONGODB Modification - revert to Boost 1.59 behavior, and do not delete TLS keys.
 // This prevents ASAN leaks in unit tests by giving us a chance to free the TLS slots on the main
 // thread.
 //

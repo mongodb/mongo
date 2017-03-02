@@ -21,7 +21,7 @@ function runAllUserManagementCommandsTests(conn, writeConcern) {
                                    writeConcern);
     conn.getDB('admin').logout();
 
-    var userAdminConn = new Mongo(conn.host);
+    var userAdminConn = new Bongo(conn.host);
     userAdminConn.getDB('admin').auth('userAdmin', 'pwd');
     var testUserAdmin = userAdminConn.getDB('test');
     testUserAdmin.createRole({

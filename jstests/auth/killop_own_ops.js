@@ -149,9 +149,9 @@
         assert.lt(diff, 30000, "Start: " + start + "; end: " + end + "; diff: " + diff);
     }
 
-    var m = MongoRunner.runMongod({auth: ""});
+    var m = BongoRunner.runBongod({auth: ""});
     runTest(m);
-    MongoRunner.stopMongod(m);
+    BongoRunner.stopBongod(m);
 
     // TODO: This feature is currently not supported on sharded clusters.
     /*var st =

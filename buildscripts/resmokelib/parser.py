@@ -29,11 +29,11 @@ DEST_TO_CONFIG = {
     "include_with_all_tags": "includeWithAllTags",
     "include_with_any_tags": "includeWithAnyTags",
     "jobs": "jobs",
-    "mongo_executable": "mongo",
-    "mongod_executable": "mongod",
-    "mongod_parameters": "mongodSetParameters",
-    "mongos_executable": "mongos",
-    "mongos_parameters": "mongosSetParameters",
+    "bongo_executable": "bongo",
+    "bongod_executable": "bongod",
+    "bongod_parameters": "bongodSetParameters",
+    "bongos_executable": "bongos",
+    "bongos_parameters": "bongosSetParameters",
     "no_journal": "nojournal",
     "num_clients_per_fixture": "numClientsPerFixture",
     "prealloc_journal": "preallocJournal",
@@ -81,7 +81,7 @@ def parse_command_line():
                       help="A YAML file that specifies global options to resmoke.py.")
 
     parser.add_option("--basePort", dest="base_port", metavar="PORT",
-                      help=("The starting port number to use for mongod and mongos processes"
+                      help=("The starting port number to use for bongod and bongos processes"
                             " spawned by resmoke.py or the tests themselves. Each fixture and Job"
                             " allocates a contiguous range of ports."))
 
@@ -92,7 +92,7 @@ def parse_command_line():
                       help="Executes all tests in all suites, even if some of them fail.")
 
     parser.add_option("--dbpathPrefix", dest="dbpath_prefix", metavar="PATH",
-                      help=("The directory which will contain the dbpaths of any mongod's started"
+                      help=("The directory which will contain the dbpaths of any bongod's started"
                             " by resmoke.py or the tests themselves."))
 
     parser.add_option("--dbtest", dest="dbtest_executable", metavar="PATH",
@@ -133,44 +133,44 @@ def parse_command_line():
 
     parser.add_option("-j", "--jobs", type="int", dest="jobs", metavar="JOBS",
                       help=("The number of Job instances to use. Each instance will receive its own"
-                            " MongoDB deployment to dispatch tests to."))
+                            " BongoDB deployment to dispatch tests to."))
 
     parser.add_option("-l", "--listSuites", action="store_true", dest="list_suites",
                       help="List the names of the suites available to execute.")
 
-    parser.add_option("--mongo", dest="mongo_executable", metavar="PATH",
-                      help="The path to the mongo shell executable for resmoke.py to use.")
+    parser.add_option("--bongo", dest="bongo_executable", metavar="PATH",
+                      help="The path to the bongo shell executable for resmoke.py to use.")
 
-    parser.add_option("--mongod", dest="mongod_executable", metavar="PATH",
-                      help="The path to the mongod executable for resmoke.py to use.")
+    parser.add_option("--bongod", dest="bongod_executable", metavar="PATH",
+                      help="The path to the bongod executable for resmoke.py to use.")
 
-    parser.add_option("--mongodSetParameters", dest="mongod_parameters",
+    parser.add_option("--bongodSetParameters", dest="bongod_parameters",
                       metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
-                      help=("Pass one or more --setParameter options to all mongod processes"
+                      help=("Pass one or more --setParameter options to all bongod processes"
                             " started by resmoke.py. The argument is specified as bracketed YAML -"
                             " i.e. JSON with support for single quoted and unquoted keys."))
 
-    parser.add_option("--mongos", dest="mongos_executable", metavar="PATH",
-                      help="The path to the mongos executable for resmoke.py to use.")
+    parser.add_option("--bongos", dest="bongos_executable", metavar="PATH",
+                      help="The path to the bongos executable for resmoke.py to use.")
 
-    parser.add_option("--mongosSetParameters", dest="mongos_parameters",
+    parser.add_option("--bongosSetParameters", dest="bongos_parameters",
                       metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
-                      help=("Pass one or more --setParameter options to all mongos processes"
+                      help=("Pass one or more --setParameter options to all bongos processes"
                             " started by resmoke.py. The argument is specified as bracketed YAML -"
                             " i.e. JSON with support for single quoted and unquoted keys."))
 
     parser.add_option("--nojournal", action="store_true", dest="no_journal",
-                      help="Disable journaling for all mongod's.")
+                      help="Disable journaling for all bongod's.")
 
     parser.add_option("--nopreallocj", action="store_const", const="off", dest="prealloc_journal",
-                      help="Disable preallocation of journal files for all mongod processes.")
+                      help="Disable preallocation of journal files for all bongod processes.")
 
     parser.add_option("--numClientsPerFixture", type="int", dest="num_clients_per_fixture",
                       help="Number of clients running tests per fixture")
 
     parser.add_option("--preallocJournal", type="choice", action="store", dest="prealloc_journal",
                       choices=("on", "off"), metavar="ON|OFF",
-                      help=("Enable or disable preallocation of journal files for all mongod"
+                      help=("Enable or disable preallocation of journal files for all bongod"
                             " processes. Defaults to %default."))
 
     parser.add_option("--repeat", type="int", dest="repeat", metavar="N",
@@ -185,11 +185,11 @@ def parse_command_line():
 
     parser.add_option("--shellReadMode", type="choice", action="store", dest="shell_read_mode",
                       choices=("commands", "compatibility", "legacy"), metavar="READ_MODE",
-                      help="The read mode used by the mongo shell.")
+                      help="The read mode used by the bongo shell.")
 
     parser.add_option("--shellWriteMode", type="choice", action="store", dest="shell_write_mode",
                       choices=("commands", "compatibility", "legacy"), metavar="WRITE_MODE",
-                      help="The write mode used by the mongo shell.")
+                      help="The write mode used by the bongo shell.")
 
     parser.add_option("--shuffle", action="store_true", dest="shuffle",
                       help="Randomize the order in which tests are executed.")
@@ -199,19 +199,19 @@ def parse_command_line():
 
     parser.add_option("--storageEngineCacheSizeGB", dest="storage_engine_cache_size",
                       metavar="CONFIG", help="Set the storage engine cache size configuration"
-                      " setting for all mongod's.")
+                      " setting for all bongod's.")
 
     parser.add_option("--taskId", dest="task_id", metavar="TASK_ID",
                       help="Set the Id of the Evergreen task running the tests.")
 
     parser.add_option("--wiredTigerCollectionConfigString", dest="wt_coll_config", metavar="CONFIG",
-                      help="Set the WiredTiger collection configuration setting for all mongod's.")
+                      help="Set the WiredTiger collection configuration setting for all bongod's.")
 
     parser.add_option("--wiredTigerEngineConfigString", dest="wt_engine_config", metavar="CONFIG",
-                      help="Set the WiredTiger engine configuration setting for all mongod's.")
+                      help="Set the WiredTiger engine configuration setting for all bongod's.")
 
     parser.add_option("--wiredTigerIndexConfigString", dest="wt_index_config", metavar="CONFIG",
-                      help="Set the WiredTiger index configuration setting for all mongod's.")
+                      help="Set the WiredTiger index configuration setting for all bongod's.")
 
     parser.set_defaults(executor_file="with_server",
                         logger_file="console",
@@ -252,11 +252,11 @@ def update_config_vars(values):
     _config.INCLUDE_WITH_ALL_TAGS = config.pop("includeWithAllTags")
     _config.INCLUDE_WITH_ANY_TAGS = config.pop("includeWithAnyTags")
     _config.JOBS = config.pop("jobs")
-    _config.MONGO_EXECUTABLE = _expand_user(config.pop("mongo"))
-    _config.MONGOD_EXECUTABLE = _expand_user(config.pop("mongod"))
-    _config.MONGOD_SET_PARAMETERS = config.pop("mongodSetParameters")
-    _config.MONGOS_EXECUTABLE = _expand_user(config.pop("mongos"))
-    _config.MONGOS_SET_PARAMETERS = config.pop("mongosSetParameters")
+    _config.BONGO_EXECUTABLE = _expand_user(config.pop("bongo"))
+    _config.BONGOD_EXECUTABLE = _expand_user(config.pop("bongod"))
+    _config.BONGOD_SET_PARAMETERS = config.pop("bongodSetParameters")
+    _config.BONGOS_EXECUTABLE = _expand_user(config.pop("bongos"))
+    _config.BONGOS_SET_PARAMETERS = config.pop("bongosSetParameters")
     _config.NO_JOURNAL = config.pop("nojournal")
     _config.NO_PREALLOC_JOURNAL = config.pop("preallocJournal") == "off"
     _config.NUM_CLIENTS_PER_FIXTURE = config.pop("numClientsPerFixture")

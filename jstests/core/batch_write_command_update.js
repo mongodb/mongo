@@ -1,11 +1,11 @@
 //
-// Ensures that mongod respects the batch write protocols for updates
+// Ensures that bongod respects the batch write protocols for updates
 //
 
 var coll = db.getCollection("batch_write_update");
 coll.drop();
 
-assert(coll.getDB().getMongo().useWriteCommands(), "test is not running with write commands");
+assert(coll.getDB().getBongo().useWriteCommands(), "test is not running with write commands");
 
 var request;
 var result;

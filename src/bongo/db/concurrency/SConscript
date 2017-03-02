@@ -1,0 +1,50 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone()
+
+env.Library(
+    target='write_conflict_exception',
+    source=[
+        'write_conflict_exception.cpp'
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/db/server_parameters'
+        ]
+)
+
+env.Library(
+    target='lock_manager',
+    source=[
+        'd_concurrency.cpp',
+        'lock_manager.cpp',
+        'lock_state.cpp',
+        'lock_stats.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/util/background_job',
+        '$BUILD_DIR/bongo/base',
+        # Temporary crutch since the ssl cleanup is hard coded in background.cpp
+        '$BUILD_DIR/bongo/util/net/network',
+        '$BUILD_DIR/bongo/db/server_parameters',
+        '$BUILD_DIR/bongo/db/service_context',
+        '$BUILD_DIR/bongo/util/concurrency/spin_lock',
+        '$BUILD_DIR/third_party/shim_boost',
+    ],
+)
+
+env.CppUnitTest(
+    target='lock_manager_test',
+    source=['d_concurrency_test.cpp',
+            'deadlock_detection_test.cpp',
+            'fast_map_noalloc_test.cpp',
+            'lock_manager_test.cpp',
+            'lock_state_test.cpp',
+            'lock_stats_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/util/progress_meter',
+        'lock_manager',
+    ]
+)

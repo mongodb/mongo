@@ -11,7 +11,7 @@
 
     // This will return a $err style error message if we use OP_INSERT, but a
     // {ok: 0, errmsg: "...", code: ...} style response if we use write commands.
-    if (db.getMongo().writeMode() == "compatibility") {
+    if (db.getBongo().writeMode() == "compatibility") {
         assert.throws(doWrite);
     } else {
         assert.writeError(doWrite());

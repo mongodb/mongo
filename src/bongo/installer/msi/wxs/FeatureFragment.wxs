@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Fragment>
+    <?if $(var.Edition) = Enterprise ?>
+      <WixVariable Id="MiscToolsDesc" Value="Miscellaneous BongoDB tools (bsondump, bongodecrypt, bongofiles, bongoldap, bongooplog, bongoperf)" />
+    <?else?>
+      <WixVariable Id="MiscToolsDesc" Value="Miscellaneous BongoDB tools (bsondump, bongofiles, bongooplog, bongoperf)" />
+    <?endif?>
+    <FeatureGroup Id="fg_BongoDBAll">
+      <Feature Id="ProductFeature"
+               Title="!(wix.ProductName)"
+               Description="!(wix.ProductName)"
+               Level="1"
+               ConfigurableDirectory="INSTALLLOCATION">
+        <?if $(var.Edition) = Enterprise or $(var.Edition) = SSL ?>
+          <MergeRef Id="m_vcredist"/>
+        <?endif?>
+        <ComponentGroupRef Id="cg_License" />
+        <Feature Id="Server"
+                 Title ="Server"
+                 Description="The BongoDB server (bongod)"
+                 Level ="1">
+          <ComponentRef Id="c_bongod"/>
+          <ComponentRef Id="c_bongodPdb"/>
+          <?if $(var.Edition) = Enterprise ?>
+            <ComponentGroupRef Id="cg_EnterpriseServer" />
+          <?endif ?>
+          <?if $(var.Edition) = SSL ?>
+            <ComponentGroupRef Id="cg_SSLBase" />
+          <?endif ?>
+        </Feature>
+        <Feature Id="Client"
+                 Title ="Client"
+                 Description="The BongoDB client/shell (bongo)"
+                 Level ="1">
+          <ComponentRef Id="c_bongo"/>
+          <?if $(var.Edition) = Enterprise ?>
+            <ComponentGroupRef Id="cg_EnterpriseBase" />
+          <?endif ?>
+          <?if $(var.Edition) = SSL ?>
+            <ComponentGroupRef Id="cg_SSLBase" />
+          <?endif ?>
+        </Feature>
+        <Feature Id="MonitoringTools"
+                 Title ="Monitoring Tools"
+                 Description="BongoDB monitoring tools (bongostat, bongotop)"
+                 Level ="1">
+          <ComponentRef Id="c_bongostat"/>
+          <ComponentRef Id="c_bongotop"/>
+          <?if $(var.Edition) = Enterprise ?>
+            <ComponentGroupRef Id="cg_EnterpriseBase" />
+          <?endif ?>
+          <?if $(var.Edition) = SSL ?>
+            <ComponentGroupRef Id="cg_SSLBase" />
+          <?endif ?>
+        </Feature>
+        <Feature Id="ImportExportTools"
+                 Title ="Import/Export Tools"
+                 Description="BongoDB import/export tools (bongodump/bongorestore and bongoexport/bongoimport)"
+                 Level ="1">
+          <ComponentRef Id="c_bongodump"/>
+          <ComponentRef Id="c_bongorestore"/>
+          <ComponentRef Id="c_bongoexport"/>
+          <ComponentRef Id="c_bongoimport"/>
+          <?if $(var.Edition) = Enterprise ?>
+            <ComponentGroupRef Id="cg_EnterpriseBase" />
+          <?endif ?>
+          <?if $(var.Edition) = SSL ?>
+            <ComponentGroupRef Id="cg_SSLBase" />
+          <?endif ?>
+        </Feature>
+        <Feature Id="Router"
+                 Title ="Router"
+                 Description="The BongoDB Router (bongos)"
+                 Level ="1">
+          <ComponentRef Id="c_bongos"/>
+          <ComponentRef Id="c_bongosPdb"/>
+          <?if $(var.Edition) = Enterprise ?>
+            <ComponentGroupRef Id="cg_EnterpriseBase" />
+          <?endif ?>
+          <?if $(var.Edition) = SSL ?>
+            <ComponentGroupRef Id="cg_SSLBase" />
+          <?endif ?>
+        </Feature>     
+        <Feature Id="MiscellaneousTools"
+                Title ="Miscellaneous Tools"
+                Description="!(wix.MiscToolsDesc)"
+                Level ="1">
+          <ComponentRef Id="c_bsondump"/>
+          <ComponentRef Id="c_bongofiles"/>
+          <ComponentRef Id="c_bongooplog"/>
+          <ComponentRef Id="c_bongoperf"/>
+          <?if $(var.Edition) = Enterprise ?>
+            <ComponentGroupRef Id="cg_EnterpriseBase" />
+            <ComponentRef Id="c_bongodecrypt"/>
+            <ComponentRef Id="c_bongoldap"/>
+          <?endif ?>
+          <?if $(var.Edition) = SSL ?>
+            <ComponentGroupRef Id="cg_SSLBase" />
+          <?endif ?>
+        </Feature>
+      </Feature>
+    </FeatureGroup>
+  </Fragment>
+</Wix>
+

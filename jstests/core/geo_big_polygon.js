@@ -7,9 +7,9 @@ coll.drop();
 
 // coll.ensureIndex({ loc : "2dsphere" });
 
-coll.getMongo().getDB("admin").runCommand({setParameter: 1, verboseQueryLogging: true});
+coll.getBongo().getDB("admin").runCommand({setParameter: 1, verboseQueryLogging: true});
 
-var bigCRS = {type: "name", properties: {name: "urn:x-mongodb:crs:strictwinding:EPSG:4326"}};
+var bigCRS = {type: "name", properties: {name: "urn:x-bongodb:crs:strictwinding:EPSG:4326"}};
 
 var bigPoly20 = {
     type: "Polygon",

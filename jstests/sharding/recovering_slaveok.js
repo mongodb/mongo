@@ -6,19 +6,19 @@
     load("jstests/replsets/rslib.js");
 
     var shardTest =
-        new ShardingTest({name: "recovering_slaveok", shards: 2, mongos: 2, other: {rs: true}});
+        new ShardingTest({name: "recovering_slaveok", shards: 2, bongos: 2, other: {rs: true}});
 
-    var mongos = shardTest.s0;
-    var mongosSOK = shardTest.s1;
-    mongosSOK.setSlaveOk();
+    var bongos = shardTest.s0;
+    var bongosSOK = shardTest.s1;
+    bongosSOK.setSlaveOk();
 
-    var admin = mongos.getDB("admin");
-    var config = mongos.getDB("config");
+    var admin = bongos.getDB("admin");
+    var config = bongos.getDB("config");
 
-    var dbase = mongos.getDB("test");
+    var dbase = bongos.getDB("test");
     var coll = dbase.getCollection("foo");
-    var dbaseSOk = mongosSOK.getDB("" + dbase);
-    var collSOk = mongosSOK.getCollection("" + coll);
+    var dbaseSOk = bongosSOK.getDB("" + dbase);
+    var collSOk = bongosSOK.getCollection("" + coll);
 
     var rsA = shardTest._rs[0].test;
     var rsB = shardTest._rs[1].test;
@@ -90,15 +90,15 @@
 
     print("10: check our regular and slaveOk query");
 
-    // We need to make sure our nodes are considered accessible from mongos - otherwise we fail
+    // We need to make sure our nodes are considered accessible from bongos - otherwise we fail
     // See SERVER-7274
-    awaitRSClientHosts(coll.getMongo(), rsA.nodes, {ok: true});
-    awaitRSClientHosts(coll.getMongo(), rsB.nodes, {ok: true});
+    awaitRSClientHosts(coll.getBongo(), rsA.nodes, {ok: true});
+    awaitRSClientHosts(coll.getBongo(), rsB.nodes, {ok: true});
 
-    // We need to make sure at least one secondary is accessible from mongos - otherwise we fail
+    // We need to make sure at least one secondary is accessible from bongos - otherwise we fail
     // See SERVER-7699
-    awaitRSClientHosts(collSOk.getMongo(), [rsA.getSecondaries()[0]], {secondary: true, ok: true});
-    awaitRSClientHosts(collSOk.getMongo(), [rsB.getSecondaries()[0]], {secondary: true, ok: true});
+    awaitRSClientHosts(collSOk.getBongo(), [rsA.getSecondaries()[0]], {secondary: true, ok: true});
+    awaitRSClientHosts(collSOk.getBongo(), [rsB.getSecondaries()[0]], {secondary: true, ok: true});
 
     print("SlaveOK Query...");
     var sOKCount = collSOk.find().itcount();

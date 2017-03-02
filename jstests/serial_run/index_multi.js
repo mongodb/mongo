@@ -33,7 +33,7 @@ var specs = [];
 var multikey = [];
 
 var setupDBStr = "var conn = null;" + "assert.soon(function() {" + "  try {" +
-    "    conn = new Mongo(\"" + db.getMongo().host + "\");" + "    return conn;" +
+    "    conn = new Bongo(\"" + db.getBongo().host + "\");" + "    return conn;" +
     "  } catch (x) {" + "    return false;" + "  }" +
     "}, 'Timed out waiting for temporary connection to connect', 30000, 5000);" +
     "var db = conn.getDB('" + db.getName() + "');";

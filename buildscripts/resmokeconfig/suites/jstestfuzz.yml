@@ -16,8 +16,8 @@ executor:
             skipValidationOnInvalidViewDefinitions: true
             forceValidationWithFeatureCompatibilityVersion: "3.4"
     fixture:
-      class: MongoDFixture
-      mongod_options:
+      class: BongoDFixture
+      bongod_options:
         noprealloc: ''
         set_parameters:
           enableTestCommands: 1

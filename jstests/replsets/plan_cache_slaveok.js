@@ -64,9 +64,9 @@ assertPlanCacheCommandsSucceed(primary.getDB("test"));
 
 // With slave ok false, the commands should fail on the secondary.
 var secondary = replTest.getSecondary();
-secondary.getDB("test").getMongo().setSlaveOk(false);
+secondary.getDB("test").getBongo().setSlaveOk(false);
 assertPlanCacheCommandsFail(secondary.getDB("test"));
 
 // With slave ok true, the commands should succeed on the secondary.
-secondary.getDB("test").getMongo().setSlaveOk(true);
+secondary.getDB("test").getBongo().setSlaveOk(true);
 assertPlanCacheCommandsSucceed(secondary.getDB("test"));

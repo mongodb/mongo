@@ -3,10 +3,10 @@
 // that option enabled.
 (function() {
     "use strict";
-    var testServer = MongoRunner.runMongod();
+    var testServer = BongoRunner.runBongod();
     if (!testServer.getDB('admin').serverStatus().storageEngine.supportsCommittedReads) {
         jsTest.log("skipping test since storage engine doesn't support committed reads");
-        MongoRunner.stopMongod(testServer);
+        BongoRunner.stopBongod(testServer);
         return;
     }
     var coll = testServer.getDB("test").readMajority;
@@ -25,8 +25,8 @@
         coll.find({_id: "foo"}).readConcern("majority").count();
     });
 
-    MongoRunner.stopMongod(testServer);
-    testServer = MongoRunner.runMongod({
+    BongoRunner.stopBongod(testServer);
+    testServer = BongoRunner.runBongod({
         restart: true,
         port: testServer.port,
         enableMajorityReadConcern: "",
@@ -46,5 +46,5 @@
         coll.find({_id: "foo"}).readConcern("majority").count();
     });
 
-    MongoRunner.stopMongod(testServer);
+    BongoRunner.stopBongod(testServer);
 }());

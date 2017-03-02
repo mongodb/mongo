@@ -374,9 +374,9 @@ function runTest(conn) {
 }
 
 jsTest.log('Test standalone');
-var conn = MongoRunner.runMongod({auth: ''});
+var conn = BongoRunner.runBongod({auth: ''});
 runTest(conn);
-MongoRunner.stopMongod(conn.port);
+BongoRunner.stopBongod(conn.port);
 
 jsTest.log('Test sharding');
 var st = new ShardingTest({shards: 2, config: 3, keyFile: 'jstests/libs/key1'});

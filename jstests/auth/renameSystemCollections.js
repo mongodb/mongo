@@ -1,5 +1,5 @@
 // SERVER-8623: Test that renameCollection can't be used to bypass auth checks on system namespaces
-var conn = MongoRunner.runMongod({auth: ""});
+var conn = BongoRunner.runBongod({auth: ""});
 
 var adminDB = conn.getDB("admin");
 var testDB = conn.getDB("testdb");

@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Represents a MongoDB cluster.
+ * Represents a BongoDB cluster.
  */
 load('jstests/hooks/validate_collections.js');  // Loads the validateCollections function.
 
@@ -42,7 +42,7 @@ var Cluster = function(options) {
             'sharded.enabled',
             'sharded.enableAutoSplit',
             'sharded.enableBalancer',
-            'sharded.numMongos',
+            'sharded.numBongos',
             'sharded.numShards',
             'teardownFunctions'
         ];
@@ -99,13 +99,13 @@ var Cluster = function(options) {
         options.sharded.enableBalancer = options.sharded.enableBalancer || false;
         assert.eq('boolean', typeof options.sharded.enableBalancer);
 
-        if (typeof options.sharded.numMongos !== 'undefined') {
+        if (typeof options.sharded.numBongos !== 'undefined') {
             assert(options.sharded.enabled,
-                   "Must have sharded.enabled be true if 'sharded.numMongos' is specified");
+                   "Must have sharded.enabled be true if 'sharded.numBongos' is specified");
         }
 
-        options.sharded.numMongos = options.sharded.numMongos || 2;
-        assert.eq('number', typeof options.sharded.numMongos);
+        options.sharded.numBongos = options.sharded.numBongos || 2;
+        assert.eq('number', typeof options.sharded.numBongos);
 
         if (typeof options.sharded.numShards !== 'undefined') {
             assert(options.sharded.enabled,
@@ -118,42 +118,42 @@ var Cluster = function(options) {
         options.setupFunctions = options.setupFunctions || {};
         assert.eq('object', typeof options.setupFunctions);
 
-        options.setupFunctions.mongod = options.setupFunctions.mongod || [];
-        assert(Array.isArray(options.setupFunctions.mongod),
-               'Expected setupFunctions.mongod to be an array');
-        assert(options.setupFunctions.mongod.every(f => (typeof f === 'function')),
-               'Expected setupFunctions.mongod to be an array of functions');
+        options.setupFunctions.bongod = options.setupFunctions.bongod || [];
+        assert(Array.isArray(options.setupFunctions.bongod),
+               'Expected setupFunctions.bongod to be an array');
+        assert(options.setupFunctions.bongod.every(f => (typeof f === 'function')),
+               'Expected setupFunctions.bongod to be an array of functions');
 
-        if (typeof options.setupFunctions.mongos !== 'undefined') {
+        if (typeof options.setupFunctions.bongos !== 'undefined') {
             assert(options.sharded.enabled,
-                   "Must have sharded.enabled be true if 'setupFunctions.mongos' is specified");
+                   "Must have sharded.enabled be true if 'setupFunctions.bongos' is specified");
         }
 
-        options.setupFunctions.mongos = options.setupFunctions.mongos || [];
-        assert(Array.isArray(options.setupFunctions.mongos),
-               'Expected setupFunctions.mongos to be an array');
-        assert(options.setupFunctions.mongos.every(f => (typeof f === 'function')),
-               'Expected setupFunctions.mongos to be an array of functions');
+        options.setupFunctions.bongos = options.setupFunctions.bongos || [];
+        assert(Array.isArray(options.setupFunctions.bongos),
+               'Expected setupFunctions.bongos to be an array');
+        assert(options.setupFunctions.bongos.every(f => (typeof f === 'function')),
+               'Expected setupFunctions.bongos to be an array of functions');
 
         options.teardownFunctions = options.teardownFunctions || {};
         assert.eq('object', typeof options.teardownFunctions);
 
-        options.teardownFunctions.mongod = options.teardownFunctions.mongod || [];
-        assert(Array.isArray(options.teardownFunctions.mongod),
-               'Expected teardownFunctions.mongod to be an array');
-        assert(options.teardownFunctions.mongod.every(f => (typeof f === 'function')),
-               'Expected teardownFunctions.mongod to be an array of functions');
+        options.teardownFunctions.bongod = options.teardownFunctions.bongod || [];
+        assert(Array.isArray(options.teardownFunctions.bongod),
+               'Expected teardownFunctions.bongod to be an array');
+        assert(options.teardownFunctions.bongod.every(f => (typeof f === 'function')),
+               'Expected teardownFunctions.bongod to be an array of functions');
 
-        if (typeof options.teardownFunctions.mongos !== 'undefined') {
+        if (typeof options.teardownFunctions.bongos !== 'undefined') {
             assert(options.sharded.enabled,
-                   "Must have sharded.enabled be true if 'teardownFunctions.mongos' is specified");
+                   "Must have sharded.enabled be true if 'teardownFunctions.bongos' is specified");
         }
 
-        options.teardownFunctions.mongos = options.teardownFunctions.mongos || [];
-        assert(Array.isArray(options.teardownFunctions.mongos),
-               'Expected teardownFunctions.mongos to be an array');
-        assert(options.teardownFunctions.mongos.every(f => (typeof f === 'function')),
-               'Expected teardownFunctions.mongos to be an array of functions');
+        options.teardownFunctions.bongos = options.teardownFunctions.bongos || [];
+        assert(Array.isArray(options.teardownFunctions.bongos),
+               'Expected teardownFunctions.bongos to be an array');
+        assert(options.teardownFunctions.bongos.every(f => (typeof f === 'function')),
+               'Expected teardownFunctions.bongos to be an array of functions');
 
         assert(!options.masterSlave || !options.replication.enabled,
                "Both 'masterSlave' and " + "'replication.enabled' cannot be true");
@@ -181,7 +181,7 @@ var Cluster = function(options) {
     var initialized = false;
     var clusterStartTime;
 
-    var _conns = {mongos: [], mongod: []};
+    var _conns = {bongos: [], bongod: []};
     var nextConn = 0;
     var replSets = [];
 
@@ -197,10 +197,10 @@ var Cluster = function(options) {
         }
 
         if (options.sharded.enabled) {
-            // TODO: allow 'options' to specify the number of shards and mongos processes
+            // TODO: allow 'options' to specify the number of shards and bongos processes
             var shardConfig = {
                 shards: options.sharded.numShards,
-                mongos: options.sharded.numMongos,
+                bongos: options.sharded.numBongos,
                 verbose: verbosityLevel,
                 other: {
                     enableAutoSplit: options.sharded.enableAutoSplit,
@@ -226,23 +226,23 @@ var Cluster = function(options) {
 
             st = new ShardingTest(shardConfig);
 
-            conn = st.s;  // mongos
+            conn = st.s;  // bongos
 
             this.teardown = function teardown() {
-                options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
-                options.teardownFunctions.mongos.forEach(this.executeOnMongosNodes);
+                options.teardownFunctions.bongod.forEach(this.executeOnBongodNodes);
+                options.teardownFunctions.bongos.forEach(this.executeOnBongosNodes);
 
                 st.stop();
             };
 
-            // Save all mongos and mongod connections
+            // Save all bongos and bongod connections
             var i = 0;
-            var mongos = st.s0;
-            var mongod = st.d0;
-            while (mongos) {
-                _conns.mongos.push(mongos);
+            var bongos = st.s0;
+            var bongod = st.d0;
+            while (bongos) {
+                _conns.bongos.push(bongos);
                 ++i;
-                mongos = st['s' + i];
+                bongos = st['s' + i];
             }
             if (options.replication) {
                 var rsTest = st.rs0;
@@ -256,10 +256,10 @@ var Cluster = function(options) {
                 }
             }
             i = 0;
-            while (mongod) {
-                _conns.mongod.push(mongod);
+            while (bongod) {
+                _conns.bongod.push(bongod);
                 ++i;
-                mongod = st['d' + i];
+                bongod = st['d' + i];
             }
         } else if (options.replication.enabled) {
             var replSetConfig = {
@@ -282,7 +282,7 @@ var Cluster = function(options) {
             replSets = [rst];
 
             this.teardown = function teardown() {
-                options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
+                options.teardownFunctions.bongod.forEach(this.executeOnBongodNodes);
 
                 rst.stopSet();
             };
@@ -300,61 +300,61 @@ var Cluster = function(options) {
             slave.adminCommand({setParameter: 1, logLevel: verbosityLevel});
 
             this.teardown = function teardown() {
-                options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
+                options.teardownFunctions.bongod.forEach(this.executeOnBongodNodes);
 
                 rt.stop();
             };
 
-            _conns.mongod = [master, slave];
+            _conns.bongod = [master, slave];
 
         } else {  // standalone server
-            conn = db.getMongo();
+            conn = db.getBongo();
             db.adminCommand({setParameter: 1, logLevel: verbosityLevel});
 
-            _conns.mongod = [conn];
+            _conns.bongod = [conn];
         }
 
         initialized = true;
         clusterStartTime = new Date();
 
-        options.setupFunctions.mongod.forEach(this.executeOnMongodNodes);
+        options.setupFunctions.bongod.forEach(this.executeOnBongodNodes);
         if (options.sharded) {
-            options.setupFunctions.mongos.forEach(this.executeOnMongosNodes);
+            options.setupFunctions.bongos.forEach(this.executeOnBongosNodes);
         }
     };
 
     this._addReplicaSetConns = function _addReplicaSetConns(rsTest) {
-        _conns.mongod.push(rsTest.getPrimary());
+        _conns.bongod.push(rsTest.getPrimary());
         rsTest.getSecondaries().forEach(function(secondaryConn) {
-            _conns.mongod.push(secondaryConn);
+            _conns.bongod.push(secondaryConn);
         });
     };
 
-    this.executeOnMongodNodes = function executeOnMongodNodes(fn) {
+    this.executeOnBongodNodes = function executeOnBongodNodes(fn) {
         assert(initialized, 'cluster must be initialized first');
 
         if (!fn || typeof(fn) !== 'function' || fn.length !== 1) {
-            throw new Error('mongod function must be a function that takes a db as an argument');
+            throw new Error('bongod function must be a function that takes a db as an argument');
         }
-        _conns.mongod.forEach(function(mongodConn) {
-            fn(mongodConn.getDB('admin'));
+        _conns.bongod.forEach(function(bongodConn) {
+            fn(bongodConn.getDB('admin'));
         });
     };
 
-    this.executeOnMongosNodes = function executeOnMongosNodes(fn) {
+    this.executeOnBongosNodes = function executeOnBongosNodes(fn) {
         assert(initialized, 'cluster must be initialized first');
 
         if (!fn || typeof(fn) !== 'function' || fn.length !== 1) {
-            throw new Error('mongos function must be a function that takes a db as an argument');
+            throw new Error('bongos function must be a function that takes a db as an argument');
         }
-        _conns.mongos.forEach(function(mongosConn) {
-            fn(mongosConn.getDB('admin'));
+        _conns.bongos.forEach(function(bongosConn) {
+            fn(bongosConn.getDB('admin'));
         });
     };
 
     this.teardown = function teardown() {
         assert(initialized, 'cluster must be initialized first');
-        options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
+        options.teardownFunctions.bongod.forEach(this.executeOnBongodNodes);
     };
 
     this.getDB = function getDB(dbName) {
@@ -365,9 +365,9 @@ var Cluster = function(options) {
     this.getHost = function getHost() {
         assert(initialized, 'cluster must be initialized first');
 
-        // Alternate mongos connections for sharded clusters
+        // Alternate bongos connections for sharded clusters
         if (this.isSharded()) {
-            return _conns.mongos[nextConn++ % _conns.mongos.length].host;
+            return _conns.bongos[nextConn++ % _conns.bongos.length].host;
         }
         return conn.host;
     };
@@ -387,12 +387,12 @@ var Cluster = function(options) {
     };
 
     // Provide a serializable form of the cluster for use in workload states. This
-    // method is required because we don't currently support the serialization of Mongo
+    // method is required because we don't currently support the serialization of Bongo
     // connection objects.
     //
     // Serialized format:
     // {
-    //      mongos: [
+    //      bongos: [
     //          "localhost:30998",
     //          "localhost:30999"
     //      ],
@@ -422,14 +422,14 @@ var Cluster = function(options) {
             return '';
         }
 
-        var cluster = {mongos: [], config: [], shards: {}};
+        var cluster = {bongos: [], config: [], shards: {}};
 
         var i = 0;
-        var mongos = st.s0;
-        while (mongos) {
-            cluster.mongos.push(mongos.name);
+        var bongos = st.s0;
+        while (bongos) {
+            cluster.bongos.push(bongos.name);
             ++i;
-            mongos = st['s' + i];
+            bongos = st['s' + i];
         }
 
         i = 0;
@@ -449,7 +449,7 @@ var Cluster = function(options) {
                 var [setName, shards] = shard.name.split('/');
                 cluster.shards[setName] = shards.split(',');
             } else {
-                // If the shard is a standalone mongod, the format of st.shard0.name in ShardingTest
+                // If the shard is a standalone bongod, the format of st.shard0.name in ShardingTest
                 // is "localhost:20006".
                 cluster.shards[shard.shardName] = [shard.name];
             }
@@ -495,8 +495,8 @@ var Cluster = function(options) {
 
         var startTime = Date.now();
         jsTest.log('Starting to validate collections ' + phase);
-        this.executeOnMongodNodes(_validateCollections);
-        this.executeOnMongosNodes(_validateCollections);
+        this.executeOnBongodNodes(_validateCollections);
+        this.executeOnBongosNodes(_validateCollections);
         var totalTime = Date.now() - startTime;
         jsTest.log('Finished validating collections in ' + totalTime + ' ms, ' + phase);
     };
@@ -587,7 +587,7 @@ var Cluster = function(options) {
 
         if (this.isSharded()) {
             // Get the storage engine the sharded cluster is configured to use from one of the
-            // shards since mongos won't report it.
+            // shards since bongos won't report it.
             adminDB = st.shard0.getDB('admin');
         }
 
@@ -603,7 +603,7 @@ var Cluster = function(options) {
 };
 
 /**
- * Returns true if 'clusterOptions' represents a standalone mongod,
+ * Returns true if 'clusterOptions' represents a standalone bongod,
  * and false otherwise.
  */
 Cluster.isStandalone = function isStandalone(clusterOptions) {

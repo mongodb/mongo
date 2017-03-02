@@ -67,11 +67,11 @@ options = {
 assert.writeOK(a_conn.getDB(name).foo.insert({x: 2}, options));
 
 // restart B, which should attempt to rollback but then fassert.
-clearRawMongoProgramOutput();
+clearRawBongoProgramOutput();
 replTest.restart(BID);
 var msg = RegExp("can't rollback this command yet: ");
 assert.soon(function() {
-    return rawMongoProgramOutput().match(msg);
+    return rawBongoProgramOutput().match(msg);
 }, "Did not see a log entry about skipping the nonrollbackable command during rollback");
 
-replTest.stopSet(undefined, undefined, {allowedExitCodes: [MongoRunner.EXIT_ABRUPT]});
+replTest.stopSet(undefined, undefined, {allowedExitCodes: [BongoRunner.EXIT_ABRUPT]});

@@ -1,28 +1,28 @@
 // Basic integration tests for the background job that periodically kills idle cursors, in both
-// mongod and mongos.  This test creates the following four cursors:
+// bongod and bongos.  This test creates the following four cursors:
 //
-// 1. A no-timeout cursor through mongos.
-// 2. A no-timeout cursor through mongod.
-// 3. A normal cursor through mongos.
-// 4. A normal cursor through mongod.
+// 1. A no-timeout cursor through bongos.
+// 2. A no-timeout cursor through bongod.
+// 3. A normal cursor through bongos.
+// 4. A normal cursor through bongod.
 //
 // After a period of inactivity, the test asserts that cursors #1 and #2 are still alive, and that
 // #3 and #4 have been killed.
 (function() {
     'use strict';
 
-    // Cursor timeout on mongod is handled by a single thread/timer that will sleep for
+    // Cursor timeout on bongod is handled by a single thread/timer that will sleep for
     // "clientCursorMonitorFrequencySecs" and add the sleep value to each operation's duration when
     // it wakes up, timing out those whose "now() - last accessed since" time exceeds. A cursor
     // timeout of 2 seconds with a monitor frequency of 1 second means an effective timeout period
     // of 1 to 2 seconds.
-    const mongodCursorTimeoutMs = 2000;
+    const bongodCursorTimeoutMs = 2000;
 
-    // Cursor timeout on mongos is handled by checking whether the "last accessed" cursor time stamp
+    // Cursor timeout on bongos is handled by checking whether the "last accessed" cursor time stamp
     // is older than "now() - cursorTimeoutMillis" and is checked every
     // "clientCursorMonitorFrequencySecs" by a global thread/timer. A timeout of 1 second with a
     // monitor frequency of 1 second means an effective timeout period of 1 to 2 seconds.
-    const mongosCursorTimeoutMs = 1000;
+    const bongosCursorTimeoutMs = 1000;
 
     const cursorMonitorFrequencySecs = 1;
 
@@ -33,14 +33,14 @@
             shardOptions: {
                 verbose: 1,
                 setParameter: {
-                    cursorTimeoutMillis: mongodCursorTimeoutMs,
+                    cursorTimeoutMillis: bongodCursorTimeoutMs,
                     clientCursorMonitorFrequencySecs: cursorMonitorFrequencySecs
                 }
             },
-            mongosOptions: {
+            bongosOptions: {
                 verbose: 1,
                 setParameter: {
-                    cursorTimeoutMillis: mongosCursorTimeoutMs,
+                    cursorTimeoutMillis: bongosCursorTimeoutMs,
                     clientCursorMonitorFrequencySecs: cursorMonitorFrequencySecs
                 }
             }
@@ -77,10 +77,10 @@
     var shardedCursorWithNoTimeout = coll.find();
     shardedCursorWithNoTimeout.addOption(DBQuery.Option.noTimeout);
 
-    // Query directly to mongod
+    // Query directly to bongod
     var shardHost = configDB.shards.findOne({_id: chunkOwner}).host;
-    var mongod = new Mongo(shardHost);
-    var shardColl = mongod.getCollection(coll.getFullName());
+    var bongod = new Bongo(shardHost);
+    var shardColl = bongod.getCollection(coll.getFullName());
 
     var cursorWithTimeout = shardColl.find();
     var cursorWithNoTimeout = shardColl.find();
@@ -103,7 +103,7 @@
     // cursorWithNoTimeout).
     // We cannot reliably use metrics.cursor.timedOut here, because this will be 2 if
     // shardedCursorWithTimeout is killed for timing out on the shard, and 1 if
-    // shardedCursorWithTimeout is killed by a killCursors command from the mongos.
+    // shardedCursorWithTimeout is killed by a killCursors command from the bongos.
     assert.soon(function() {
         return shardColl.getDB().serverStatus().metrics.cursor.open.total == 2;
     }, "cursor failed to time out");

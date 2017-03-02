@@ -1,0 +1,8 @@
+#!/bin/sh
+
+. ../.env
+
+exec bongod $COMMONDOPTS \
+	--shardsvr \
+	--replSet rs1 \
+	--port 40013

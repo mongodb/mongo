@@ -5,10 +5,10 @@
 (function() {
     "use strict";
 
-    jsTestLog("Setting up initial data set with the last stable version of mongod");
+    jsTestLog("Setting up initial data set with the last stable version of bongod");
 
     var toolTest = new ToolTest('transitioning_to_and_from_WT', {
-        binVersion: MongoRunner.getBinVersionFor("last-stable"),
+        binVersion: BongoRunner.getBinVersionFor("last-stable"),
         storageEngine: "mmapv1",
     });
 
@@ -120,15 +120,15 @@
         var ret = toolTest.runTool('dump', '--out', dumpTarget);
         assert.eq(0, ret);
 
-        // stop previous mongod
-        MongoRunner.stopMongod(toolTest.port);
+        // stop previous bongod
+        BongoRunner.stopBongod(toolTest.port);
 
         // clear old node configuration info
         toolTest.m = null;
         toolTest.db = null;
 
         // set up new node configuration info
-        toolTest.options.binVersion = MongoRunner.getBinVersionFor(entry.binVersion);
+        toolTest.options.binVersion = BongoRunner.getBinVersionFor(entry.binVersion);
         toolTest.dbpath =
             toolTest.root + "/" + idx + "-" + entry.binVersion + "-" + entry.storageEngine + "/";
 
@@ -140,7 +140,7 @@
             toolTest.options.directoryperdb = entry.directoryperdb;
         }
 
-        // create the unique dbpath for this instance and start the mongod
+        // create the unique dbpath for this instance and start the bongod
         resetDbpath(toolTest.dbpath);
         assert(mkdir(toolTest.dbpath));
         toolTest.startDB('foo');
@@ -152,7 +152,7 @@
         longDB = toolTest.db.getSiblingDB(longName);
         longColl = longDB.collection_name_is_lengthed_to_reach_namespace_max_of_123;
 
-        // ensure the new mongod was started with an empty data dir
+        // ensure the new bongod was started with an empty data dir
         assert.eq(0, testColl.count());
         assert.eq(0, testCapped.count());
         assert.eq(0, longColl.count());

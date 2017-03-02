@@ -222,9 +222,9 @@ function run_tests(granter, verifier) {
 var keyfile = "jstests/libs/key1";
 
 print('--- standalone node test ---');
-var conn = MongoRunner.runMongod({auth: null, keyFile: keyfile});
+var conn = BongoRunner.runBongod({auth: null, keyFile: keyfile});
 run_tests(conn.getDB('test'), conn.getDB('test'));
-MongoRunner.stopMongod(conn);
+BongoRunner.stopBongod(conn);
 print('--- done standalone node test ---');
 
 print('--- replica set test ---');
@@ -246,11 +246,11 @@ print('--- done with the rs tests ---');
 
 print('--- sharding test ---');
 var st = new ShardingTest({
-    mongos: 2,
+    bongos: 2,
     shard: 1,
     keyFile: keyfile,
     other: {
-        mongosOptions: {'auth': null, 'httpinterface': null},
+        bongosOptions: {'auth': null, 'httpinterface': null},
         configOptions: {'auth': null, 'httpinterface': null},
         shardOptions: {'auth': null, 'httpinterface': null}
     }

@@ -227,6 +227,6 @@ cp extract/mfbt/XorShift128PlusRNG.h include/mozilla
 
 # Apply a local patch
 git apply \
-    mongo_patches/SERVER-23358.patch \
-    mongo_patches/SERVER-24400.patch \
-    mongo_patches/SERVER-22927-x86_64.patch
+    bongo_patches/SERVER-23358.patch \
+    bongo_patches/SERVER-24400.patch \
+    bongo_patches/SERVER-22927-x86_64.patch

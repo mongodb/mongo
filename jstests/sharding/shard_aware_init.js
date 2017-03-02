@@ -1,7 +1,7 @@
 /**
  * Tests for shard aware initialization during process startup (for standalone) and transition
  * to primary (for replica set nodes).
- * Note: test will deliberately cause a mongod instance to terminate abruptly and mongod instance
+ * Note: test will deliberately cause a bongod instance to terminate abruptly and bongod instance
  * without journaling will complain about unclean shutdown.
  * @tags: [requires_persistence, requires_journaling]
  */
@@ -17,11 +17,11 @@
     };
 
     /**
-     * Runs a series of test on the mongod instance mongodConn is pointing to. Notes that the
-     * test can restart the mongod instance several times so mongodConn can end up with a broken
+     * Runs a series of test on the bongod instance bongodConn is pointing to. Notes that the
+     * test can restart the bongod instance several times so bongodConn can end up with a broken
      * connection after.
      */
-    var runTest = function(mongodConn, configConnStr) {
+    var runTest = function(bongodConn, configConnStr) {
         var shardIdentityDoc = {
             _id: 'shardIdentity',
             configsvrConnectionString: configConnStr,
@@ -37,27 +37,27 @@
         var restartAndFixShardIdentityDoc = function(startOptions) {
             var options = Object.extend({}, startOptions);
             delete options.shardsvr;
-            mongodConn = MongoRunner.runMongod(options);
-            waitForMaster(mongodConn);
+            bongodConn = BongoRunner.runBongod(options);
+            waitForMaster(bongodConn);
 
-            var res = mongodConn.getDB('admin').system.version.update({_id: 'shardIdentity'},
+            var res = bongodConn.getDB('admin').system.version.update({_id: 'shardIdentity'},
                                                                       shardIdentityDoc);
             assert.eq(1, res.nModified);
 
-            MongoRunner.stopMongod(mongodConn.port);
+            BongoRunner.stopBongod(bongodConn.port);
 
-            newMongodOptions.shardsvr = '';
-            mongodConn = MongoRunner.runMongod(newMongodOptions);
-            waitForMaster(mongodConn);
+            newBongodOptions.shardsvr = '';
+            bongodConn = BongoRunner.runBongod(newBongodOptions);
+            waitForMaster(bongodConn);
 
-            res = mongodConn.getDB('admin').runCommand({shardingState: 1});
+            res = bongodConn.getDB('admin').runCommand({shardingState: 1});
 
             assert(res.enabled);
             assert.eq(shardIdentityDoc.configsvrConnectionString, res.configServer);
             assert.eq(shardIdentityDoc.shardName, res.shardName);
             assert.eq(shardIdentityDoc.clusterId, res.clusterId);
 
-            return mongodConn;
+            return bongodConn;
         };
 
         // Simulate the upsert that is performed by a config server on addShard.
@@ -69,10 +69,10 @@
         var shardIdentityUpdate = {
             $set: {configsvrConnectionString: shardIdentityDoc.configsvrConnectionString}
         };
-        assert.writeOK(mongodConn.getDB('admin').system.version.update(
+        assert.writeOK(bongodConn.getDB('admin').system.version.update(
             shardIdentityQuery, shardIdentityUpdate, {upsert: true}));
 
-        var res = mongodConn.getDB('admin').runCommand({shardingState: 1});
+        var res = bongodConn.getDB('admin').runCommand({shardingState: 1});
 
         assert(res.enabled);
         assert.eq(shardIdentityDoc.configsvrConnectionString, res.configServer);
@@ -80,19 +80,19 @@
         assert.eq(shardIdentityDoc.clusterId, res.clusterId);
         // Should not be allowed to remove the shardIdentity document
         assert.writeErrorWithCode(
-            mongodConn.getDB('admin').system.version.remove({_id: 'shardIdentity'}), 40070);
+            bongodConn.getDB('admin').system.version.remove({_id: 'shardIdentity'}), 40070);
 
         //
         // Test normal startup
         //
 
-        var newMongodOptions = Object.extend(mongodConn.savedOptions, {restart: true});
+        var newBongodOptions = Object.extend(bongodConn.savedOptions, {restart: true});
 
-        MongoRunner.stopMongod(mongodConn.port);
-        mongodConn = MongoRunner.runMongod(newMongodOptions);
-        waitForMaster(mongodConn);
+        BongoRunner.stopBongod(bongodConn.port);
+        bongodConn = BongoRunner.runBongod(newBongodOptions);
+        waitForMaster(bongodConn);
 
-        res = mongodConn.getDB('admin').runCommand({shardingState: 1});
+        res = bongodConn.getDB('admin').runCommand({shardingState: 1});
 
         assert(res.enabled);
         assert.eq(shardIdentityDoc.configsvrConnectionString, res.configServer);
@@ -104,20 +104,20 @@
         //
 
         // Note: modification of the shardIdentity is allowed only when not running with --shardsvr
-        MongoRunner.stopMongod(mongodConn.port);
-        delete newMongodOptions.shardsvr;
-        mongodConn = MongoRunner.runMongod(newMongodOptions);
-        waitForMaster(mongodConn);
+        BongoRunner.stopBongod(bongodConn.port);
+        delete newBongodOptions.shardsvr;
+        bongodConn = BongoRunner.runBongod(newBongodOptions);
+        waitForMaster(bongodConn);
 
-        assert.writeOK(mongodConn.getDB('admin').system.version.update(
+        assert.writeOK(bongodConn.getDB('admin').system.version.update(
             {_id: 'shardIdentity'}, {_id: 'shardIdentity', shardName: 'x', clusterId: ObjectId()}));
 
-        MongoRunner.stopMongod(mongodConn.port);
+        BongoRunner.stopBongod(bongodConn.port);
 
-        newMongodOptions.shardsvr = '';
+        newBongodOptions.shardsvr = '';
         assert.throws(function() {
-            mongodConn = MongoRunner.runMongod(newMongodOptions);
-            waitForMaster(mongodConn);
+            bongodConn = BongoRunner.runBongod(newBongodOptions);
+            waitForMaster(bongodConn);
         });
 
         //
@@ -125,27 +125,27 @@
         //
 
         try {
-            // The server was terminated not by calling stopMongod earlier, this will cleanup
+            // The server was terminated not by calling stopBongod earlier, this will cleanup
             // the process from registry in shell_utils_launcher.
-            MongoRunner.stopMongod(newMongodOptions.port);
+            BongoRunner.stopBongod(newBongodOptions.port);
         } catch (ex) {
-            if (!(ex instanceof (MongoRunner.StopError))) {
+            if (!(ex instanceof (BongoRunner.StopError))) {
                 throw ex;
             }
         }
 
-        mongodConn = restartAndFixShardIdentityDoc(newMongodOptions);
-        res = mongodConn.getDB('admin').runCommand({shardingState: 1});
+        bongodConn = restartAndFixShardIdentityDoc(newBongodOptions);
+        res = bongodConn.getDB('admin').runCommand({shardingState: 1});
         assert(res.enabled);
     };
 
     var st = new ShardingTest({shards: 1});
 
-    var mongod = MongoRunner.runMongod({shardsvr: ''});
+    var bongod = BongoRunner.runBongod({shardsvr: ''});
 
-    runTest(mongod, st.configRS.getURL());
+    runTest(bongod, st.configRS.getURL());
 
-    MongoRunner.stopMongod(mongod.port);
+    BongoRunner.stopBongod(bongod.port);
 
     var replTest = new ReplSetTest({nodes: 1});
     replTest.startSet({shardsvr: ''});

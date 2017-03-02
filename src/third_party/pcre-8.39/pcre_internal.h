@@ -991,7 +991,7 @@ other. NOTE: The values also appear in pcre_jit_compile.c. */
 
 #define HSPACE_MULTIBYTE_CASES \
   case 0x1680:  /* OGHAM SPACE MARK */ \
-  case 0x180e:  /* MONGOLIAN VOWEL SEPARATOR */ \
+  case 0x180e:  /* BONGOLIAN VOWEL SEPARATOR */ \
   case 0x2000:  /* EN QUAD */ \
   case 0x2001:  /* EM QUAD */ \
   case 0x2002:  /* EN SPACE */ \

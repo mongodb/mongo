@@ -5,7 +5,7 @@
 var coll = db.write_result;
 coll.drop();
 
-assert(coll.getDB().getMongo().useWriteCommands(), "test is not running with write commands");
+assert(coll.getDB().getBongo().useWriteCommands(), "test is not running with write commands");
 
 var result = null;
 
@@ -16,7 +16,7 @@ printjson(result = coll.insert({foo: "bar"}));
 assert.eq(result.nInserted, 1);
 assert.eq(result.nUpserted, 0);
 assert.eq(result.nMatched, 0);
-if (coll.getMongo().writeMode() == "commands")
+if (coll.getBongo().writeMode() == "commands")
     assert.eq(result.nModified, 0);
 assert.eq(result.nRemoved, 0);
 assert(!result.getWriteError());
@@ -32,7 +32,7 @@ printjson(result = coll.save({_id: id, foo: "bar"}));
 assert.eq(result.nInserted, 0);
 assert.eq(result.nUpserted, 1);
 assert.eq(result.nMatched, 0);
-if (coll.getMongo().writeMode() == "commands")
+if (coll.getBongo().writeMode() == "commands")
     assert.eq(result.nModified, 0);
 assert.eq(result.nRemoved, 0);
 assert(!result.getWriteError());
@@ -48,7 +48,7 @@ printjson(result = coll.update({foo: "bar"}, {$set: {foo: "baz"}}));
 assert.eq(result.nInserted, 0);
 assert.eq(result.nUpserted, 0);
 assert.eq(result.nMatched, 1);
-if (coll.getMongo().writeMode() == "commands")
+if (coll.getBongo().writeMode() == "commands")
     assert.eq(result.nModified, 1);
 assert.eq(result.nRemoved, 0);
 assert(!result.getWriteError());
@@ -65,7 +65,7 @@ printjson(result = coll.update({foo: "bar"}, {$addToSet: {set: 'value'}}, {multi
 assert.eq(result.nInserted, 0);
 assert.eq(result.nUpserted, 0);
 assert.eq(result.nMatched, 2);
-if (coll.getMongo().writeMode() == "commands")
+if (coll.getBongo().writeMode() == "commands")
     assert.eq(result.nModified, 1);
 assert.eq(result.nRemoved, 0);
 assert(!result.getWriteError());
@@ -81,7 +81,7 @@ printjson(result = coll.remove({}));
 assert.eq(result.nInserted, 0);
 assert.eq(result.nUpserted, 0);
 assert.eq(result.nMatched, 0);
-if (coll.getMongo().writeMode() == "commands")
+if (coll.getBongo().writeMode() == "commands")
     assert.eq(result.nModified, 0);
 assert.eq(result.nRemoved, 1);
 assert(!result.getWriteError());
@@ -108,7 +108,7 @@ coll.insert({foo: "bar"});
 printjson(result = coll.update({foo: "bar"}, {$invalid: "expr"}));
 assert.eq(result.nUpserted, 0);
 assert.eq(result.nMatched, 0);
-if (coll.getMongo().writeMode() == "commands")
+if (coll.getBongo().writeMode() == "commands")
     assert.eq(0, result.nModified, result);
 assert(result.getWriteError());
 assert(result.getWriteError().errmsg);
@@ -127,7 +127,7 @@ coll.insert({value: "not a number"});
 printjson(result = coll.update({}, {$bit: {value: {and: NumberInt(0)}}}, {multi: true}));
 assert.eq(result.nUpserted, 0);
 assert.eq(result.nMatched, 0);
-if (coll.getMongo().writeMode() == "commands")
+if (coll.getBongo().writeMode() == "commands")
     assert.eq(0, result.nModified, result);
 assert(result.getWriteError());
 assert(result.getWriteError().errmsg);
@@ -173,7 +173,7 @@ coll.remove({});
 var wRes = assert.writeError(coll.insert({foo: "bar"}, {writeConcern: {w: "invalid"}}));
 var res = assert.commandWorked(db.isMaster());
 var replSet = res.hasOwnProperty("setName");
-if (!replSet && coll.getMongo().writeMode() == "commands")
+if (!replSet && coll.getBongo().writeMode() == "commands")
     assert.eq(coll.count(), 0, "not-replset || command mode");
 else  // compatibility,
     assert.eq(coll.count(), 1, "replset || non-command mode");

@@ -7,7 +7,7 @@
 //
 //       These transitions are tested for dbEval, $where, MapReduce and $group
 
-var conn = MongoRunner.runMongod({smallfiles: ""});
+var conn = BongoRunner.runBongod({smallfiles: ""});
 var test = conn.getDB("test");
 
 // insert a single document and add two test users

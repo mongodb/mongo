@@ -1,5 +1,5 @@
 load("jstests/libs/slow_weekly_util.js");
-testServer = new SlowWeeklyMongod("update_server-5552");
+testServer = new SlowWeeklyBongod("update_server-5552");
 db = testServer.getDB("test");
 
 t = db.foo;

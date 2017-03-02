@@ -1,5 +1,5 @@
 /build
-/src/mongo/db/modules
+/src/bongo/db/modules
 /.jsdbshell
 /.dbshell
 /perf.data
@@ -39,16 +39,16 @@
 *#
 .#*
 
-/src/mongo/*/*Debug*/
-/src/mongo/*/*/*Debug*/
-/src/mongo/*/*Release*/
-/src/mongo/*/*/*Release*/
+/src/bongo/*/*Debug*/
+/src/bongo/*/*/*Debug*/
+/src/bongo/*/*Release*/
+/src/bongo/*/*/*Release*/
 /src/ipch
-/src/mongo/*/ipch
-/src/mongo/*/*/ipch
-/src/mongo/db/.gdb*
-/src/mongo/db/makefile.local
-/src/mongo/db/_ReSharper.db
+/src/bongo/*/ipch
+/src/bongo/*/*/ipch
+/src/bongo/db/.gdb*
+/src/bongo/db/makefile.local
+/src/bongo/db/_ReSharper.db
 /src/third_party/*/*.cache
 /src/third_party/*/*.tlog
 /src/third_party/*/*.lastbuildstate
@@ -72,23 +72,23 @@ scratch
 # binaries
 /docgen
 /loadgen
-/mongo
-/mongobridge
-/mongod
-/mongogrid
-/mongoperf
-/mongos
-/mongoshim
-/mongosniff
+/bongo
+/bongobridge
+/bongod
+/bongogrid
+/bongoperf
+/bongos
+/bongoshim
+/bongosniff
 
 *.tgz
 *.zip
 *.tar.gz
 
 #libs
-/libmongoclient.*
-/libmongotestfiles.*
-/libmongoshellfiles.*
+/libbongoclient.*
+/libbongotestfiles.*
+/libbongoshellfiles.*
 /sharedclient
 
 /emr.jar
@@ -112,7 +112,7 @@ scratch
 #debian
 build-stamp
 configure-stamp
-debian/mongodb
+debian/bongodb
 
 # OSX files
 .DS_Store

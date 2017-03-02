@@ -1,5 +1,5 @@
 """
-Utility functions to create MongoDB processes.
+Utility functions to create BongoDB processes.
 
 Handles all the nitty-gritty parameter conversion.
 """
@@ -16,21 +16,21 @@ from .. import utils
 from .. import config
 
 
-def mongod_program(logger, executable=None, process_kwargs=None, **kwargs):
+def bongod_program(logger, executable=None, process_kwargs=None, **kwargs):
     """
-    Returns a Process instance that starts a mongod executable with
+    Returns a Process instance that starts a bongod executable with
     arguments constructed from 'kwargs'.
     """
 
-    executable = utils.default_if_none(executable, config.DEFAULT_MONGOD_EXECUTABLE)
+    executable = utils.default_if_none(executable, config.DEFAULT_BONGOD_EXECUTABLE)
     args = [executable]
 
     # Apply the --setParameter command line argument. Command line options to resmoke.py override
     # the YAML configuration.
     suite_set_parameters = kwargs.pop("set_parameters", {})
 
-    if config.MONGOD_SET_PARAMETERS is not None:
-        suite_set_parameters.update(utils.load_yaml(config.MONGOD_SET_PARAMETERS))
+    if config.BONGOD_SET_PARAMETERS is not None:
+        suite_set_parameters.update(utils.load_yaml(config.BONGOD_SET_PARAMETERS))
 
     _apply_set_parameters(args, suite_set_parameters)
 
@@ -88,21 +88,21 @@ def mongod_program(logger, executable=None, process_kwargs=None, **kwargs):
     return _process.Process(logger, args, **process_kwargs)
 
 
-def mongos_program(logger, executable=None, process_kwargs=None, **kwargs):
+def bongos_program(logger, executable=None, process_kwargs=None, **kwargs):
     """
-    Returns a Process instance that starts a mongos executable with
+    Returns a Process instance that starts a bongos executable with
     arguments constructed from 'kwargs'.
     """
 
-    executable = utils.default_if_none(executable, config.DEFAULT_MONGOS_EXECUTABLE)
+    executable = utils.default_if_none(executable, config.DEFAULT_BONGOS_EXECUTABLE)
     args = [executable]
 
     # Apply the --setParameter command line argument. Command line options to resmoke.py override
     # the YAML configuration.
     suite_set_parameters = kwargs.pop("set_parameters", {})
 
-    if config.MONGOS_SET_PARAMETERS is not None:
-        suite_set_parameters.update(utils.load_yaml(config.MONGOS_SET_PARAMETERS))
+    if config.BONGOS_SET_PARAMETERS is not None:
+        suite_set_parameters.update(utils.load_yaml(config.BONGOS_SET_PARAMETERS))
 
     _apply_set_parameters(args, suite_set_parameters)
 
@@ -115,14 +115,14 @@ def mongos_program(logger, executable=None, process_kwargs=None, **kwargs):
     return _process.Process(logger, args, **process_kwargs)
 
 
-def mongo_shell_program(logger, executable=None, filename=None, process_kwargs=None,
+def bongo_shell_program(logger, executable=None, filename=None, process_kwargs=None,
                         isMainTest=True, **kwargs):
     """
-    Returns a Process instance that starts a mongo shell with arguments
+    Returns a Process instance that starts a bongo shell with arguments
     constructed from 'kwargs'.
     """
 
-    executable = utils.default_if_none(executable, config.DEFAULT_MONGO_EXECUTABLE)
+    executable = utils.default_if_none(executable, config.DEFAULT_BONGO_EXECUTABLE)
     args = [executable]
 
     eval_sb = []  # String builder.
@@ -151,22 +151,22 @@ def mongo_shell_program(logger, executable=None, filename=None, process_kwargs=N
     test_data["isMainTest"] = isMainTest
     global_vars["TestData"] = test_data
 
-    # Pass setParameters for mongos and mongod through TestData. The setParameter parsing in
+    # Pass setParameters for bongos and bongod through TestData. The setParameter parsing in
     # servers.js is very primitive (just splits on commas), so this may break for non-scalar
     # setParameter values.
-    if config.MONGOD_SET_PARAMETERS is not None:
+    if config.BONGOD_SET_PARAMETERS is not None:
         if "setParameters" in test_data:
             raise ValueError("setParameters passed via TestData can only be set from either the"
                              " command line or the suite YAML, not both")
-        mongod_set_parameters = utils.load_yaml(config.MONGOD_SET_PARAMETERS)
-        test_data["setParameters"] = _format_test_data_set_parameters(mongod_set_parameters)
+        bongod_set_parameters = utils.load_yaml(config.BONGOD_SET_PARAMETERS)
+        test_data["setParameters"] = _format_test_data_set_parameters(bongod_set_parameters)
 
-    if config.MONGOS_SET_PARAMETERS is not None:
-        if "setParametersMongos" in test_data:
-            raise ValueError("setParametersMongos passed via TestData can only be set from either"
+    if config.BONGOS_SET_PARAMETERS is not None:
+        if "setParametersBongos" in test_data:
+            raise ValueError("setParametersBongos passed via TestData can only be set from either"
                              " the command line or the suite YAML, not both")
-        mongos_set_parameters = utils.load_yaml(config.MONGOS_SET_PARAMETERS)
-        test_data["setParametersMongos"] = _format_test_data_set_parameters(mongos_set_parameters)
+        bongos_set_parameters = utils.load_yaml(config.BONGOS_SET_PARAMETERS)
+        test_data["setParametersBongos"] = _format_test_data_set_parameters(bongos_set_parameters)
 
     for var_name in global_vars:
         _format_shell_vars(eval_sb, var_name, global_vars[var_name])
@@ -187,7 +187,7 @@ def mongo_shell_program(logger, executable=None, filename=None, process_kwargs=N
     # Apply the rest of the command line arguments.
     _apply_kwargs(args, kwargs)
 
-    # Have the mongos shell run the specified file.
+    # Have the bongos shell run the specified file.
     args.append(filename)
 
     _set_keyfile_permissions(test_data)
@@ -305,7 +305,7 @@ def _set_keyfile_permissions(opts):
     Change the permissions of keyfiles in 'opts' to 600, i.e. only the
     user can read and write the file.
 
-    This necessary to avoid having the mongod/mongos fail to start up
+    This necessary to avoid having the bongod/bongos fail to start up
     because "permissions on the keyfiles are too open".
 
     We can't permanently set the keyfile permissions because git is not

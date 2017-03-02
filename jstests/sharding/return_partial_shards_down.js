@@ -2,22 +2,22 @@
 // Tests that zero results are correctly returned with returnPartial and shards down
 //
 
-var st = new ShardingTest({shards: 3, mongos: 1, other: {mongosOptions: {verbose: 2}}});
+var st = new ShardingTest({shards: 3, bongos: 1, other: {bongosOptions: {verbose: 2}}});
 
 // Stop balancer, we're doing our own manual chunk distribution
 st.stopBalancer();
 
-var mongos = st.s;
-var config = mongos.getDB("config");
-var admin = mongos.getDB("admin");
+var bongos = st.s;
+var config = bongos.getDB("config");
+var admin = bongos.getDB("admin");
 var shards = config.shards.find().toArray();
 
 for (var i = 0; i < shards.length; i++) {
-    shards[i].conn = new Mongo(shards[i].host);
+    shards[i].conn = new Bongo(shards[i].host);
 }
 
-var collOneShard = mongos.getCollection("foo.collOneShard");
-var collAllShards = mongos.getCollection("foo.collAllShards");
+var collOneShard = bongos.getCollection("foo.collOneShard");
+var collAllShards = bongos.getCollection("foo.collAllShards");
 
 printjson(admin.runCommand({enableSharding: collOneShard.getDB() + ""}));
 printjson(admin.runCommand({movePrimary: collOneShard.getDB() + "", to: shards[0]._id}));
@@ -53,7 +53,7 @@ assert.eq(3, collAllShards.find({}, {}, 0, 0, 0, returnPartialFlag).itcount());
 
 jsTest.log("One shard down!");
 
-MongoRunner.stopMongod(st.shard2);
+BongoRunner.stopBongod(st.shard2);
 
 jsTest.log("done.");
 
@@ -62,7 +62,7 @@ assert.eq(2, collAllShards.find({}, {}, 0, 0, 0, returnPartialFlag).itcount());
 
 jsTest.log("Two shards down!");
 
-MongoRunner.stopMongod(st.shard1);
+BongoRunner.stopBongod(st.shard1);
 
 jsTest.log("done.");
 
@@ -71,7 +71,7 @@ assert.eq(1, collAllShards.find({}, {}, 0, 0, 0, returnPartialFlag).itcount());
 
 jsTest.log("All shards down!");
 
-MongoRunner.stopMongod(st.shard0);
+BongoRunner.stopBongod(st.shard0);
 
 jsTest.log("done.");
 

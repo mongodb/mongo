@@ -105,12 +105,12 @@ function expectState(rst, state) {
         options.noCleanData = true;
         options.waitForConnect = false;
 
-        MongoRunner.stopMongod(node);
+        BongoRunner.stopBongod(node);
 
-        var mongod = MongoRunner.runMongod(options);
-        var exitCode = waitProgram(mongod.pid);
+        var bongod = BongoRunner.runBongod(options);
+        var exitCode = waitProgram(bongod.pid);
         assert.eq(
-            MongoRunner.EXIT_ABRUPT, exitCode, "Mongod should have failed to start, but didn't");
+            BongoRunner.EXIT_ABRUPT, exitCode, "Bongod should have failed to start, but didn't");
 
         rst.stopSet();
     })();
@@ -139,12 +139,12 @@ function expectState(rst, state) {
         options.noCleanData = true;
         options.waitForConnect = false;
 
-        MongoRunner.stopMongod(node);
+        BongoRunner.stopBongod(node);
 
-        var mongod = MongoRunner.runMongod(options);
-        var exitCode = waitProgram(mongod.pid);
+        var bongod = BongoRunner.runBongod(options);
+        var exitCode = waitProgram(bongod.pid);
         assert.eq(
-            MongoRunner.EXIT_ABRUPT, exitCode, "Mongod should have failed to start, but didn't");
+            BongoRunner.EXIT_ABRUPT, exitCode, "Bongod should have failed to start, but didn't");
 
         rst.stopSet();
     })();

@@ -27,9 +27,9 @@
     lastHistogram = assertHistogramDiffEq(view, lastHistogram, 0, 1, 0);
 
     let isMasterResponse = assert.commandWorked(viewsDB.runCommand("isMaster"));
-    const isMongos = (isMasterResponse.msg === "isdbgrid");
-    if (isMongos) {
-        jsTest.log("Tests are being run on a mongos; skipping top tests.");
+    const isBongos = (isMasterResponse.msg === "isdbgrid");
+    if (isBongos) {
+        jsTest.log("Tests are being run on a bongos; skipping top tests.");
         return;
     }
 

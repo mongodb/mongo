@@ -5,7 +5,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 (function() {
     "use strict";
 
-    var st = new ShardingTest({name: "aggregation_graph_lookup", shards: 2, mongos: 1});
+    var st = new ShardingTest({name: "aggregation_graph_lookup", shards: 2, bongos: 1});
 
     st.adminCommand({enableSharding: "graphLookup"});
     st.ensurePrimaryShard("graphLookup", "shard0001");

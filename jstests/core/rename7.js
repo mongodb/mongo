@@ -4,9 +4,9 @@
 // ***************************************************************
 
 // Set up namespaces a and b.
-var admin = db.getMongo().getDB("admin");
-var db_a = db.getMongo().getDB("db_a");
-var db_b = db.getMongo().getDB("db_b");
+var admin = db.getBongo().getDB("admin");
+var db_a = db.getBongo().getDB("db_a");
+var db_b = db.getBongo().getDB("db_b");
 
 var a = db_a.rename7;
 var b = db_b.rename7;

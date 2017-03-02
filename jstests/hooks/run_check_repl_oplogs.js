@@ -9,7 +9,7 @@
     };
 
     var startTime = Date.now();
-    assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a mongod?');
+    assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a bongod?');
 
     var primaryInfo = db.isMaster();
 
@@ -20,7 +20,7 @@
     assert.commandWorked(cmdLineOpts);
     var isMasterSlave = cmdLineOpts.parsed.master === true;
     var testFixture =
-        isMasterSlave ? new MasterSlaveOplogTest() : new ReplSetTest(db.getMongo().host);
+        isMasterSlave ? new MasterSlaveOplogTest() : new ReplSetTest(db.getBongo().host);
     testFixture.checkOplogs();
 
     var totalTime = Date.now() - startTime;

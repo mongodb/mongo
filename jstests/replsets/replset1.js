@@ -17,7 +17,7 @@ var doTest = function(signal) {
         nodes: {n0: ssl_options1, n1: ssl_options1, n2: ssl_options2}
     });
 
-    // call startSet() to start each mongod in the replica set
+    // call startSet() to start each bongod in the replica set
     // this returns a list of nodes
     var nodes = replTest.startSet();
 
@@ -48,14 +48,14 @@ var doTest = function(signal) {
     // and slaves in the set and wait until the change has replicated.
     replTest.awaitReplication();
 
-    var cppconn = new Mongo(replTest.getURL()).getDB("foo");
+    var cppconn = new Bongo(replTest.getURL()).getDB("foo");
     assert.eq(1000, cppconn.foo.findOne().a, "cppconn 1");
 
     {
         // check c++ finding other servers
         var temp = replTest.getURL();
         temp = temp.substring(0, temp.lastIndexOf(","));
-        temp = new Mongo(temp).getDB("foo");
+        temp = new Bongo(temp).getDB("foo");
         assert.eq(1000, temp.foo.findOne().a, "cppconn 1");
     }
 
@@ -141,14 +141,14 @@ var doTest = function(signal) {
     }
 
     ts.forEach(function(z) {
-        assert.eq(2, z.getIndexKeys().length, "A " + z.getMongo());
+        assert.eq(2, z.getIndexKeys().length, "A " + z.getBongo());
     });
 
     t.reIndex();
 
     db.getLastError(3, 30000);
     ts.forEach(function(z) {
-        assert.eq(2, z.getIndexKeys().length, "A " + z.getMongo());
+        assert.eq(2, z.getIndexKeys().length, "A " + z.getBongo());
     });
 
     // Shut down the set and finish the test.

@@ -4,7 +4,7 @@
 // @tags: [requires_mmapv1]
 
 var baseName = "jstests_disk_newcollection";
-var m = MongoRunner.runMongod({noprealloc: "", smallfiles: ""});
+var m = BongoRunner.runBongod({noprealloc: "", smallfiles: ""});
 db = m.getDB("test");
 
 var t = db[baseName];

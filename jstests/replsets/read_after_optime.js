@@ -42,7 +42,7 @@
 
         var msg = 'Command on database ' + testDB.getName() +
             ' timed out waiting for read concern to be satisfied. Command:';
-        checkLog.containsWithCount(testDB.getMongo(), msg, 1);
+        checkLog.containsWithCount(testDB.getBongo(), msg, 1);
 
         // Read concern timed out message should not be logged.
         runTimeoutTest();
@@ -51,7 +51,7 @@
         runTimeoutTest();
         testDB.setLogLevel(0, 'command');
 
-        checkLog.containsWithCount(testDB.getMongo(), msg, 2);
+        checkLog.containsWithCount(testDB.getBongo(), msg, 2);
 
         // Test read on future afterOpTime that will eventually occur.
         primaryConn.getDB(dbName).parallelShellStarted.drop();

@@ -79,7 +79,7 @@
     assert.eq(t.find().itcount(), 1, "Explaining an upsert should not insert any documents.");
 
     // 5. The reported stats should reflect how it would execute and what it would modify.
-    var isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
+    var isBongos = db.runCommand({isdbgrid: 1}).isdbgrid;
 
     // List out the command to be explained, and the expected results of that explain.
     var testCases = [
@@ -215,11 +215,11 @@
     /**
      * Helper to make this test work in the sharding passthrough suite.
      *
-     * Transforms the explain output so that if it came from a mongos, it will be modified
-     * to have the same format as though it had come from a mongod.
+     * Transforms the explain output so that if it came from a bongos, it will be modified
+     * to have the same format as though it had come from a bongod.
      */
     function transformIfSharded(explainOut) {
-        if (!isMongos) {
+        if (!isBongos) {
             return explainOut;
         }
 
@@ -295,7 +295,7 @@
     }
 
     function assertDBDoesNotExist(db, msg) {
-        assert.eq(db.getMongo().getDBNames().indexOf(db.getName()),
+        assert.eq(db.getBongo().getDBNames().indexOf(db.getName()),
                   -1,
                   msg + "db " + db.getName() + " exists.");
     }

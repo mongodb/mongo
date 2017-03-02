@@ -19,18 +19,18 @@ load('./jstests/libs/chunk_manipulation_util.js');
 (function() {
     "use strict";
 
-    var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+    var staticBongod = BongoRunner.runBongod({});  // For startParallelOps.
 
     /**
      * Start up new sharded cluster, stop balancer that would interfere in manual chunk management.
      */
 
-    var st = new ShardingTest({shards: 2, mongos: 1, rs: {nodes: 3}});
+    var st = new ShardingTest({shards: 2, bongos: 1, rs: {nodes: 3}});
     st.stopBalancer();
 
-    var mongos = st.s0, admin = mongos.getDB('admin'),
-        shards = mongos.getCollection('config.shards').find().toArray(), dbName = "testDB",
-        ns = dbName + ".foo", coll = mongos.getCollection(ns), donor = st.shard0,
+    var bongos = st.s0, admin = bongos.getDB('admin'),
+        shards = bongos.getCollection('config.shards').find().toArray(), dbName = "testDB",
+        ns = dbName + ".foo", coll = bongos.getCollection(ns), donor = st.shard0,
         recipient = st.shard1, donorColl = donor.getCollection(ns),
         recipientColl = recipient.getCollection(ns), donorLocal = donor.getDB('local'),
         recipientLocal = recipient.getDB('local');
@@ -76,7 +76,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     jsTest.log('Starting chunk migration, pause after cloning...');
 
     var joinMoveChunk = moveChunkParallel(
-        staticMongod, st.s0.host, {_id: 2}, null, coll.getFullName(), shards[1]._id);
+        staticBongod, st.s0.host, {_id: 2}, null, coll.getFullName(), shards[1]._id);
 
     /**
      * Wait for recipient to finish cloning.

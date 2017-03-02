@@ -19,7 +19,7 @@
     primaryDB.adminCommand(
         {configureFailPoint: "skipIndexCreateFieldNameValidation", mode: "alwaysOn"});
 
-    clearRawMongoProgramOutput();
+    clearRawBongoProgramOutput();
 
     // Create a V1 index with invalid spec field. Expected to replicate without error or server
     // abort.
@@ -34,12 +34,12 @@
     const msg2 = "InvalidIndexSpecificationOption: The field 'invalidOption2'";
 
     const assertFn = function() {
-        return rawMongoProgramOutput().match(msg1) && rawMongoProgramOutput().match(msg2);
+        return rawBongoProgramOutput().match(msg1) && rawBongoProgramOutput().match(msg2);
     };
     assert.soon(assertFn, "Replication should have aborted on invalid index specification", 60000);
 
     replTest.stopSet(undefined,
                      undefined,
-                     {allowedExitCodes: [MongoRunner.EXIT_ABRUPT, MongoRunner.EXIT_ABORT]});
+                     {allowedExitCodes: [BongoRunner.EXIT_ABRUPT, BongoRunner.EXIT_ABORT]});
 
 })();

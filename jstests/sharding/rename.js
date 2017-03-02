@@ -3,7 +3,7 @@
     'use strict';
     load("jstests/replsets/rslib.js");
 
-    var s = new ShardingTest({name: "rename", shards: 2, mongos: 1, rs: {oplogSize: 10}});
+    var s = new ShardingTest({name: "rename", shards: 2, bongos: 1, rs: {oplogSize: 10}});
 
     var db = s.getDB("test");
     var replTest = s.rs0;

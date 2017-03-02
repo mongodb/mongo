@@ -65,7 +65,7 @@
     // When using read commands, a limit of 1 with the tailable option is allowed. In legacy
     // readMode, an ntoreturn of 1 means the same thing as ntoreturn -1 and is disallowed with
     // tailable.
-    if (db.getMongo().useReadCommands()) {
+    if (db.getBongo().useReadCommands()) {
         assert.eq(1, t.find().addOption(2).limit(1).itcount());
     } else {
         assert.throws(function() {
@@ -74,7 +74,7 @@
     }
 
     // Tests that a tailable cursor over an empty capped collection produces a dead cursor, intended
-    // to be run on both mongod and mongos. For SERVER-20720.
+    // to be run on both bongod and bongos. For SERVER-20720.
     t.drop();
     db.createCollection(t.getName(), {capped: true, size: 1024});
 

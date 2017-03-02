@@ -43,7 +43,7 @@
 058A          ; Dash # Pd       ARMENIAN HYPHEN
 05BE          ; Dash # Pd       HEBREW PUNCTUATION MAQAF
 1400          ; Dash # Pd       CANADIAN SYLLABICS HYPHEN
-1806          ; Dash # Pd       MONGOLIAN TODO SOFT HYPHEN
+1806          ; Dash # Pd       BONGOLIAN TODO SOFT HYPHEN
 2010..2015    ; Dash # Pd   [6] HYPHEN..HORIZONTAL BAR
 2053          ; Dash # Po       SWUNG DASH
 207B          ; Dash # Sm       SUPERSCRIPT MINUS
@@ -68,7 +68,7 @@ FF0D          ; Dash # Pd       FULLWIDTH HYPHEN-MINUS
 002D          ; Hyphen # Pd       HYPHEN-MINUS
 00AD          ; Hyphen # Cf       SOFT HYPHEN
 058A          ; Hyphen # Pd       ARMENIAN HYPHEN
-1806          ; Hyphen # Pd       MONGOLIAN TODO SOFT HYPHEN
+1806          ; Hyphen # Pd       BONGOLIAN TODO SOFT HYPHEN
 2010..2011    ; Hyphen # Pd   [2] HYPHEN..NON-BREAKING HYPHEN
 2E17          ; Hyphen # Pd       DOUBLE OBLIQUE HYPHEN
 30FB          ; Hyphen # Po       KATAKANA MIDDLE DOT
@@ -142,8 +142,8 @@ FF63          ; Quotation_Mark # Pe       HALFWIDTH RIGHT CORNER BRACKET
 1735..1736    ; Terminal_Punctuation # Po   [2] PHILIPPINE SINGLE PUNCTUATION..PHILIPPINE DOUBLE PUNCTUATION
 17D4..17D6    ; Terminal_Punctuation # Po   [3] KHMER SIGN KHAN..KHMER SIGN CAMNUC PII KUUH
 17DA          ; Terminal_Punctuation # Po       KHMER SIGN KOOMUUT
-1802..1805    ; Terminal_Punctuation # Po   [4] MONGOLIAN COMMA..MONGOLIAN FOUR DOTS
-1808..1809    ; Terminal_Punctuation # Po   [2] MONGOLIAN MANCHU COMMA..MONGOLIAN MANCHU FULL STOP
+1802..1805    ; Terminal_Punctuation # Po   [4] BONGOLIAN COMMA..BONGOLIAN FOUR DOTS
+1808..1809    ; Terminal_Punctuation # Po   [2] BONGOLIAN MANCHU COMMA..BONGOLIAN MANCHU FULL STOP
 1944..1945    ; Terminal_Punctuation # Po   [2] LIMBU EXCLAMATION MARK..LIMBU QUESTION MARK
 1AA8..1AAB    ; Terminal_Punctuation # Po   [4] TAI THAM SIGN KAAN..TAI THAM SIGN SATKAANKUU
 1B5A..1B5B    ; Terminal_Punctuation # Po   [2] BALINESE PANTI..BALINESE PAMADA
@@ -556,7 +556,7 @@ FF41..FF46    ; Hex_Digit # L&   [6] FULLWIDTH LATIN SMALL LETTER A..FULLWIDTH L
 17BE..17C5    ; Other_Alphabetic # Mc   [8] KHMER VOWEL SIGN OE..KHMER VOWEL SIGN AU
 17C6          ; Other_Alphabetic # Mn       KHMER SIGN NIKAHIT
 17C7..17C8    ; Other_Alphabetic # Mc   [2] KHMER SIGN REAHMUK..KHMER SIGN YUUKALEAPINTU
-18A9          ; Other_Alphabetic # Mn       MONGOLIAN LETTER ALI GALI DAGALGA
+18A9          ; Other_Alphabetic # Mn       BONGOLIAN LETTER ALI GALI DAGALGA
 1920..1922    ; Other_Alphabetic # Mn   [3] LIMBU VOWEL SIGN A..LIMBU VOWEL SIGN U
 1923..1926    ; Other_Alphabetic # Mc   [4] LIMBU VOWEL SIGN EE..LIMBU VOWEL SIGN AU
 1927..1928    ; Other_Alphabetic # Mn   [2] LIMBU VOWEL SIGN E..LIMBU VOWEL SIGN O
@@ -932,8 +932,8 @@ FFE3          ; Diacritic # Sk       FULLWIDTH MACRON
 07FA          ; Extender # Lm       NKO LAJANYALAN
 0E46          ; Extender # Lm       THAI CHARACTER MAIYAMOK
 0EC6          ; Extender # Lm       LAO KO LA
-180A          ; Extender # Po       MONGOLIAN NIRUGU
-1843          ; Extender # Lm       MONGOLIAN LETTER TODO LONG VOWEL SIGN
+180A          ; Extender # Po       BONGOLIAN NIRUGU
+1843          ; Extender # Lm       BONGOLIAN LETTER TODO LONG VOWEL SIGN
 1AA7          ; Extender # Lm       TAI THAM SIGN MAI YAMOK
 1C36          ; Extender # Mn       LEPCHA SIGN RAN
 1C7B          ; Extender # Lm       OL CHIKI RELAA
@@ -1191,8 +1191,8 @@ AABB..AABC    ; Logical_Order_Exception # Lo   [2] TAI VIET VOWEL AUE..TAI VIET 
 1367..1368    ; STerm # Po   [2] ETHIOPIC QUESTION MARK..ETHIOPIC PARAGRAPH SEPARATOR
 166E          ; STerm # Po       CANADIAN SYLLABICS FULL STOP
 1735..1736    ; STerm # Po   [2] PHILIPPINE SINGLE PUNCTUATION..PHILIPPINE DOUBLE PUNCTUATION
-1803          ; STerm # Po       MONGOLIAN FULL STOP
-1809          ; STerm # Po       MONGOLIAN MANCHU FULL STOP
+1803          ; STerm # Po       BONGOLIAN FULL STOP
+1809          ; STerm # Po       BONGOLIAN MANCHU FULL STOP
 1944..1945    ; STerm # Po   [2] LIMBU EXCLAMATION MARK..LIMBU QUESTION MARK
 1AA8..1AAB    ; STerm # Po   [4] TAI THAM SIGN KAAN..TAI THAM SIGN SATKAANKUU
 1B5A..1B5B    ; STerm # Po   [2] BALINESE PANTI..BALINESE PAMADA
@@ -1246,7 +1246,7 @@ FF61          ; STerm # Po       HALFWIDTH IDEOGRAPHIC FULL STOP
 
 # ================================================
 
-180B..180D    ; Variation_Selector # Mn   [3] MONGOLIAN FREE VARIATION SELECTOR ONE..MONGOLIAN FREE VARIATION SELECTOR THREE
+180B..180D    ; Variation_Selector # Mn   [3] BONGOLIAN FREE VARIATION SELECTOR ONE..BONGOLIAN FREE VARIATION SELECTOR THREE
 FE00..FE0F    ; Variation_Selector # Mn  [16] VARIATION SELECTOR-1..VARIATION SELECTOR-16
 E0100..E01EF  ; Variation_Selector # Mn [240] VARIATION SELECTOR-17..VARIATION SELECTOR-256
 

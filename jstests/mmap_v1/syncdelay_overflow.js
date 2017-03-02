@@ -4,10 +4,10 @@
  * line `--syncdelay` parameter and calling `setParameter`.
  */
 (function() {
-    var conn = MongoRunner.runMongod({storageEngine: 'mmapv1', syncdelay: 18446744073709552000});
+    var conn = BongoRunner.runBongod({storageEngine: 'mmapv1', syncdelay: 18446744073709552000});
     assert.eq(conn, null);
 
-    conn = MongoRunner.runMongod({storageEngine: 'mmapv1'});
+    conn = BongoRunner.runBongod({storageEngine: 'mmapv1'});
     assert.neq(conn, null);
     var res = conn.adminCommand({setParameter: 1, 'syncdelay': 18446744073709552000});
     assert.commandFailedWithCode(res, 2);

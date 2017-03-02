@@ -7,9 +7,9 @@
 
 var crs84CRS = {type: "name", properties: {name: "urn:ogc:def:crs:OGC:1.3:CRS84"}};
 var epsg4326CRS = {type: "name", properties: {name: "EPSG:4326"}};
-var strictCRS = {type: "name", properties: {name: "urn:x-mongodb:crs:strictwinding:EPSG:4326"}};
+var strictCRS = {type: "name", properties: {name: "urn:x-bongodb:crs:strictwinding:EPSG:4326"}};
 // invalid CRS name
-var badCRS = {type: "name", properties: {name: "urn:x-mongodb:crs:invalid:EPSG:4326"}};
+var badCRS = {type: "name", properties: {name: "urn:x-bongodb:crs:invalid:EPSG:4326"}};
 
 // helper to generate a line along a longitudinal
 function genLonLine(lon, startLat, endLat, latStep) {
@@ -610,7 +610,7 @@ indexes.forEach(function(index) {
         // Update on matching docs
         var result = coll.update(q, {$set: {stored: ObjectId()}}, {multi: true});
         // only check nModified if write commands are enabled
-        if (coll.getMongo().writeMode() == "commands") {
+        if (coll.getBongo().writeMode() == "commands") {
             assert.eq(p.nI, result.nModified, "update " + p.name);
         }
         // Remove & restore matching docs

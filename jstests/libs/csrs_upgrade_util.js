@@ -43,16 +43,16 @@ var CSRSUpgradeCoordinator = function() {
     };
 
     /**
-     * Returns a copy of the options used for starting a mongos in the coordinator's cluster.
+     * Returns a copy of the options used for starting a bongos in the coordinator's cluster.
      */
-    this.getMongosConfig = function() {
+    this.getBongosConfig = function() {
         var sconfig = Object.extend({}, st.s0.fullOptions, /* deep */ true);
         delete sconfig.port;
         return sconfig;
     };
 
-    this.getMongos = function(n) {
-        return st._mongos[n];
+    this.getBongos = function(n) {
+        return st._bongos[n];
     };
 
     this.getShardName = function(n) {
@@ -98,8 +98,8 @@ var CSRSUpgradeCoordinator = function() {
         csrs0Opts.restart = true;  // Don't clean the data files from the old c0.
         csrs0Opts.replSet = csrsName;
         csrs0Opts.configsvrMode = "sccc";
-        MongoRunner.stopMongod(st.c0);
-        csrs.push(MongoRunner.runMongod(csrs0Opts));
+        BongoRunner.stopBongod(st.c0);
+        csrs.push(BongoRunner.runBongod(csrs0Opts));
         _waitUntilMaster(csrs[0]);
     };
 
@@ -110,7 +110,7 @@ var CSRSUpgradeCoordinator = function() {
     this.startNewCSRSNodes = function() {
         jsTest.log("Starting new CSRS nodes");
         for (var i = 1; i < numCsrsMembers; ++i) {
-            csrs.push(MongoRunner.runMongod(
+            csrs.push(BongoRunner.runBongod(
                 {replSet: csrsName, configsvr: "", storageEngine: "wiredTiger"}));
             csrsConfig.members.push({_id: i, host: csrs[i].name, votes: 0, priority: 0});
         }
@@ -133,7 +133,7 @@ var CSRSUpgradeCoordinator = function() {
         // servers
         // online.
         jsTest.log("Shutting down third SCCC config server node");
-        MongoRunner.stopMongod(st.c2);
+        BongoRunner.stopBongod(st.c2);
     };
 
     /**
@@ -162,8 +162,8 @@ var CSRSUpgradeCoordinator = function() {
             csrs[0].adminCommand({replSetStepDown: 60});
         } catch (e) {
         }  // Expected
-        MongoRunner.stopMongod(csrs[0]);
-        csrs[0] = MongoRunner.runMongod(csrs0Opts);
+        BongoRunner.stopBongod(csrs[0]);
+        csrs[0] = BongoRunner.runBongod(csrs0Opts);
         var csrsStatus;
         assert.soon(
             function() {
@@ -171,7 +171,7 @@ var CSRSUpgradeCoordinator = function() {
                 if (csrsStatus.members[0].stateStr == "STARTUP" ||
                     csrsStatus.members[0].stateStr == "STARTUP2" ||
                     csrsStatus.members[0].stateStr == "RECOVERING") {
-                    // Make sure first node is fully online or else mongoses still in SCCC mode
+                    // Make sure first node is fully online or else bongoses still in SCCC mode
                     // might not
                     // find any node online to talk to.
                     return false;
@@ -205,7 +205,7 @@ var CSRSUpgradeCoordinator = function() {
             });
 
         jsTest.log("Shutting down final SCCC config server now that upgrade is complete");
-        MongoRunner.stopMongod(st.c1);
+        BongoRunner.stopBongod(st.c1);
     };
 
 };

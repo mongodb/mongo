@@ -1,4 +1,4 @@
-admin = db.getMongo().getDB("admin");
+admin = db.getBongo().getDB("admin");
 
 a = db.jstests_rename_a;
 b = db.jstests_rename_b;

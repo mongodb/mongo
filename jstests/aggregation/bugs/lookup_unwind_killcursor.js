@@ -8,12 +8,12 @@
     'use strict';
 
     const options = {setParameter: 'internalDocumentSourceCursorBatchSizeBytes=1'};
-    const conn = MongoRunner.runMongod(options);
-    assert.neq(null, conn, 'mongod was unable to start up with options: ' + tojson(options));
+    const conn = BongoRunner.runBongod(options);
+    assert.neq(null, conn, 'bongod was unable to start up with options: ' + tojson(options));
 
     const testDB = conn.getDB('test');
 
-    // We use a batch size of 2 to ensure that the mongo shell does not exhaust the cursor on its
+    // We use a batch size of 2 to ensure that the bongo shell does not exhaust the cursor on its
     // first batch.
     const batchSize = 2;
     const numMatches = 5;
@@ -51,5 +51,5 @@
     const serverStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));
     assert.eq(0, serverStatus.metrics.cursor.open.total, tojson(serverStatus));
 
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
 })();

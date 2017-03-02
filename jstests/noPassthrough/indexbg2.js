@@ -2,7 +2,7 @@
 
 load("jstests/libs/slow_weekly_util.js");
 
-var testServer = new SlowWeeklyMongod("indexbg2");
+var testServer = new SlowWeeklyBongod("indexbg2");
 var db = testServer.getDB("test");
 var baseName = "jstests_index12";
 
@@ -17,11 +17,11 @@ var resetParallel = function() {
 // Return the PID to call `waitpid` on for clean shutdown.
 var doParallel = function(work) {
     resetParallel();
-    return startMongoProgramNoConnect(
-        "mongo",
+    return startBongoProgramNoConnect(
+        "bongo",
         "--eval",
         work + "; db." + baseName + "_parallelStatus.save( {done:1} );",
-        db.getMongo().host);
+        db.getBongo().host);
 };
 
 var doneParallel = function() {

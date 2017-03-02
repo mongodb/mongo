@@ -1,7 +1,7 @@
-Building MongoDB
+Building BongoDB
 ================
 
-To build MongoDB, you will need:
+To build BongoDB, you will need:
 
 * A modern C++ compiler. One of the following is required.
     * GCC 4.8.2 or newer
@@ -12,20 +12,20 @@ To build MongoDB, you will need:
 
 for the target x86, or x86-64 platform. More detailed platform instructions can be found below.
 
-MongoDB Tools
+BongoDB Tools
 --------------
 
-The MongoDB command line tools (mongodump, mongorestore, mongoimport, mongoexport, etc)
+The BongoDB command line tools (bongodump, bongorestore, bongoimport, bongoexport, etc)
 have been rewritten in [Go](http://golang.org/) and are no longer included in this repository.
 
-The source for the tools is now available at [mongodb/mongo-tools](https://github.com/mongodb/mongo-tools).
+The source for the tools is now available at [bongodb/bongo-tools](https://github.com/bongodb/bongo-tools).
 
 SCons
 ---------------
 
-For detail information about building, please see [the build manual](http://www.mongodb.org/about/contributors/tutorial/build-mongodb-from-source/)
+For detail information about building, please see [the build manual](http://www.bongodb.org/about/contributors/tutorial/build-bongodb-from-source/)
 
-If you want to build everything (mongod, mongo, tests, etc):
+If you want to build everything (bongod, bongo, tests, etc):
 
     $ scons all
 
@@ -35,30 +35,30 @@ If you only want to build the database:
 
 To install
 
-    $ scons --prefix=/opt/mongo install
+    $ scons --prefix=/opt/bongo install
 
-Please note that prebuilt binaries are available on [mongodb.org](http://www.mongodb.org/downloads) and may be the easiest way to get started.
+Please note that prebuilt binaries are available on [bongodb.org](http://www.bongodb.org/downloads) and may be the easiest way to get started.
 
 SCons Targets
 --------------
 
-* mongod
-* mongos
-* mongo
-* core (includes mongod, mongos, mongo)
+* bongod
+* bongos
+* bongo
+* core (includes bongod, bongos, bongo)
 * all
 
 Windows
 --------------
 
-See [the windows build manual](http://www.mongodb.org/about/contributors/tutorial/build-mongodb-from-source/#windows-specific-instructions)
+See [the windows build manual](http://www.bongodb.org/about/contributors/tutorial/build-bongodb-from-source/#windows-specific-instructions)
 
 Build requirements:
 * Visual Studio 2013 Update 2 or newer
 * Python 2.7, ActiveState ActivePython 2.7.x Community Edition for Windows is recommended
 * SCons
 
-Or download a prebuilt binary for Windows at www.mongodb.org.
+Or download a prebuilt binary for Windows at www.bongodb.org.
 
 Debian/Ubuntu
 --------------
@@ -68,9 +68,9 @@ To install dependencies on Debian or Ubuntu systems:
     # aptitude install scons build-essential
     # aptitude install libboost-filesystem-dev libboost-program-options-dev libboost-system-dev libboost-thread-dev
 
-To run tests as well, you will need PyMongo:
+To run tests as well, you will need PyBongo:
 
-    # aptitude install python-pymongo
+    # aptitude install python-pybongo
 
 Then build as usual with `scons`:
 
@@ -81,11 +81,11 @@ OS X
 
 Using [Homebrew](http://brew.sh):
 
-    $ brew install mongodb
+    $ brew install bongodb
 
 Using [MacPorts](http://www.macports.org):
 
-    $ sudo port install mongodb
+    $ sudo port install bongodb
 
 FreeBSD
 --------------
@@ -97,7 +97,7 @@ Install the following ports:
   * lang/gcc
   * lang/python
 
-Optional Components if you want to use system libraries instead of the libraries included with MongoDB
+Optional Components if you want to use system libraries instead of the libraries included with BongoDB
 
   * archivers/snappy
   * lang/v8

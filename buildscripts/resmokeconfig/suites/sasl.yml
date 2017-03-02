@@ -1,9 +1,9 @@
 selector:
   js_test:
     roots:
-    - src/mongo/db/modules/*/jstests/sasl/*.js
+    - src/bongo/db/modules/*/jstests/sasl/*.js
 
-# sasl tests start their own mongod's.
+# sasl tests start their own bongod's.
 executor:
   js_test:
     config:

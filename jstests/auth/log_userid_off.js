@@ -1,12 +1,12 @@
 /**
  * Tests that logged users will not show up in the log.
  *
- * @param mongo {Mongo} connection object.
+ * @param bongo {Bongo} connection object.
  */
-var doTest = function(mongo, callSetParam) {
+var doTest = function(bongo, callSetParam) {
     var TEST_USER = 'foo';
     var TEST_PWD = 'bar';
-    var testDB = mongo.getDB('test');
+    var testDB = bongo.getDB('test');
 
     testDB.createUser({user: TEST_USER, pwd: TEST_PWD, roles: jsTest.basicUserRoles});
     testDB.auth(TEST_USER, TEST_PWD);
@@ -30,9 +30,9 @@ var doTest = function(mongo, callSetParam) {
     });
 };
 
-var mongo = MongoRunner.runMongod({verbose: 5});
-doTest(mongo);
-MongoRunner.stopMongod(mongo.port);
+var bongo = BongoRunner.runBongod({verbose: 5});
+doTest(bongo);
+BongoRunner.stopBongod(bongo.port);
 
 var st = new ShardingTest({shards: 1, verbose: 5});
 doTest(st.s);

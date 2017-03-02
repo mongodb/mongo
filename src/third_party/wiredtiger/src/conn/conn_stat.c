@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2016 MongoDB, Inc.
+ * Copyright (c) 2014-2016 BongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -187,7 +187,7 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, bool *runp)
 	}
 
 	/*
-	 * When using JSON format, use the same timestamp format as MongoDB by
+	 * When using JSON format, use the same timestamp format as BongoDB by
 	 * default. This requires caution: the user might have set the timestamp
 	 * in a previous reconfigure call and we don't want to override that, so
 	 * compare the retrieved value with the default value to decide if we

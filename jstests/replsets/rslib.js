@@ -63,7 +63,7 @@ var getLastOpTime;
                 db.bar.stats();
                 if (jsTest.options().keyFile) {  // SERVER-4241: Shell connections don't
                                                  // re-authenticate on reconnect
-                    return jsTest.authenticate(db.getMongo());
+                    return jsTest.authenticate(db.getBongo());
                 }
                 return true;
             } catch (e) {
@@ -74,7 +74,7 @@ var getLastOpTime;
     };
 
     getLatestOp = function(server) {
-        server.getDB("admin").getMongo().setSlaveOk();
+        server.getDB("admin").getBongo().setSlaveOk();
         var log = server.getDB("local")['oplog.rs'];
         var cursor = log.find({}).sort({'$natural': -1}).limit(1);
         if (cursor.hasNext()) {
@@ -235,9 +235,9 @@ var getLastOpTime;
         try {
             replSetTest.startSet(options);
         } catch (e) {
-            var conn = MongoRunner.runMongod();
+            var conn = BongoRunner.runBongod();
             if (!conn.getDB("admin").serverStatus().storageEngine.supportsCommittedReads) {
-                MongoRunner.stopMongod(conn);
+                BongoRunner.stopBongod(conn);
                 return false;
             }
             throw e;

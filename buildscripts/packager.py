@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# This program makes Debian and RPM repositories for MongoDB, by
+# This program makes Debian and RPM repositories for BongoDB, by
 # downloading our tarballs of statically linked executables and
 # insinuating them into Linux packages.  It must be run on a
 # Debianoid, since Debian provides tools to make RPMs, but RPM-based
@@ -37,7 +37,7 @@ import sys
 import tempfile
 import time
 
-# The MongoDB names for the architectures we support.
+# The BongoDB names for the architectures we support.
 ARCH_CHOICES=["x86_64", "arm64"]
 
 # Made up names for the flavors of distribution we package for.
@@ -125,7 +125,7 @@ class Distro(object):
         return self.n
 
     def pkgbase(self):
-        return "mongodb"
+        return "bongodb"
 
     def archname(self, arch):
         """Return the packaging system's architecture name.
@@ -163,20 +163,20 @@ class Distro(object):
 
         Examples:
 
-        repo/apt/ubuntu/dists/precise/mongodb-org/2.5/multiverse/binary-amd64
-        repo/apt/ubuntu/dists/precise/mongodb-org/2.5/multiverse/binary-i386
+        repo/apt/ubuntu/dists/precise/bongodb-org/2.5/multiverse/binary-amd64
+        repo/apt/ubuntu/dists/precise/bongodb-org/2.5/multiverse/binary-i386
 
-        repo/apt/ubuntu/dists/trusty/mongodb-org/2.5/multiverse/binary-amd64
-        repo/apt/ubuntu/dists/trusty/mongodb-org/2.5/multiverse/binary-i386
+        repo/apt/ubuntu/dists/trusty/bongodb-org/2.5/multiverse/binary-amd64
+        repo/apt/ubuntu/dists/trusty/bongodb-org/2.5/multiverse/binary-i386
 
-        repo/apt/debian/dists/wheezy/mongodb-org/2.5/main/binary-amd64
-        repo/apt/debian/dists/wheezy/mongodb-org/2.5/main/binary-i386
+        repo/apt/debian/dists/wheezy/bongodb-org/2.5/main/binary-amd64
+        repo/apt/debian/dists/wheezy/bongodb-org/2.5/main/binary-i386
 
-        repo/yum/redhat/6/mongodb-org/2.5/x86_64
-        yum/redhat/6/mongodb-org/2.5/i386
+        repo/yum/redhat/6/bongodb-org/2.5/x86_64
+        yum/redhat/6/bongodb-org/2.5/i386
 
-        repo/zypper/suse/11/mongodb-org/2.5/x86_64
-        zypper/suse/11/mongodb-org/2.5/i386
+        repo/zypper/suse/11/bongodb-org/2.5/x86_64
+        zypper/suse/11/bongodb-org/2.5/i386
 
         """
 
@@ -188,11 +188,11 @@ class Distro(object):
           repo_directory = spec.branch()
 
         if re.search("^(debian|ubuntu)", self.n):
-            return "repo/apt/%s/dists/%s/mongodb-org/%s/%s/binary-%s/" % (self.n, self.repo_os_version(build_os), repo_directory, self.repo_component(), self.archname(arch))
+            return "repo/apt/%s/dists/%s/bongodb-org/%s/%s/binary-%s/" % (self.n, self.repo_os_version(build_os), repo_directory, self.repo_component(), self.archname(arch))
         elif re.search("(redhat|fedora|centos|amazon)", self.n):
-            return "repo/yum/%s/%s/mongodb-org/%s/%s/RPMS/" % (self.n, self.repo_os_version(build_os), repo_directory, self.archname(arch))
+            return "repo/yum/%s/%s/bongodb-org/%s/%s/RPMS/" % (self.n, self.repo_os_version(build_os), repo_directory, self.archname(arch))
         elif re.search("(suse)", self.n):
-            return "repo/zypper/%s/%s/mongodb-org/%s/%s/RPMS/" % (self.n, self.repo_os_version(build_os), repo_directory, self.archname(arch))
+            return "repo/zypper/%s/%s/bongodb-org/%s/%s/RPMS/" % (self.n, self.repo_os_version(build_os), repo_directory, self.archname(arch))
         else:
             raise Exception("BUG: unsupported platform?")
 
@@ -279,7 +279,7 @@ def get_args(distros, arch_choices):
         for arch in arch_choices:
           distro_choices.extend(distro.build_os(arch))
 
-    parser = argparse.ArgumentParser(description='Build MongoDB Packages')
+    parser = argparse.ArgumentParser(description='Build BongoDB Packages')
     parser.add_argument("-s", "--server-version", help="Server version to build (e.g. 2.7.8-rc0)", required=True)
     parser.add_argument("-m", "--metadata-gitspec", help="Gitspec to use for package metadata files", required=False)
     parser.add_argument("-r", "--release-number", help="RPM release number base", type=int, required=False)
@@ -365,15 +365,15 @@ def backtick(argv):
 def tarfile(build_os, arch, spec):
     """Return the location where we store the downloaded tarball for
     this package"""
-    return "dl/mongodb-linux-%s-%s-%s.tar.gz" % (spec.version(), build_os, arch)
+    return "dl/bongodb-linux-%s-%s-%s.tar.gz" % (spec.version(), build_os, arch)
 
 def setupdir(distro, build_os, arch, spec):
     # The setupdir will be a directory containing all inputs to the
     # distro's packaging tools (e.g., package metadata files, init
     # scripts, etc), along with the already-built binaries).  In case
     # the following format string is unclear, an example setupdir
-    # would be dst/x86_64/debian-sysvinit/wheezy/mongodb-org-unstable/
-    # or dst/x86_64/redhat/rhel55/mongodb-org-unstable/
+    # would be dst/x86_64/debian-sysvinit/wheezy/bongodb-org-unstable/
+    # or dst/x86_64/redhat/rhel55/bongodb-org-unstable/
     return "dst/%s/%s/%s/%s%s-%s/" % (arch, distro.name(), build_os, distro.pkgbase(), spec.suffix(), spec.pversion(distro))
 
 def unpack_binaries_into(build_os, arch, spec, where):
@@ -387,7 +387,7 @@ def unpack_binaries_into(build_os, arch, spec, where):
     os.chdir(where)
     try:
         sysassert(["tar", "xvzf", rootdir+"/"+tarfile(build_os, arch, spec)])
-        release_dir = glob('mongodb-linux-*')[0]
+        release_dir = glob('bongodb-linux-*')[0]
         for releasefile in "bin", "GNU-AGPL-3.0", "README", "THIRD-PARTY-NOTICES", "MPL-2":
             print "moving file: %s/%s" % (release_dir, releasefile)
             os.rename("%s/%s" % (release_dir, releasefile), releasefile)
@@ -416,10 +416,10 @@ def make_package(distro, build_os, arch, spec, srcdir):
     # packaging infrastructure will move the files to wherever they
     # need to go.
     unpack_binaries_into(build_os, arch, spec, sdir)
-    # Remove the mongoreplay binary due to libpcap dynamic
+    # Remove the bongoreplay binary due to libpcap dynamic
     # linkage.
-    if os.path.exists(sdir + "bin/mongoreplay"):
-      os.unlink(sdir + "bin/mongoreplay")
+    if os.path.exists(sdir + "bin/bongoreplay"):
+      os.unlink(sdir + "bin/bongoreplay")
     return distro.make_pkg(build_os, arch, spec, srcdir)
 
 def make_repo(repodir, distro, build_os, spec):
@@ -438,21 +438,21 @@ def make_deb(distro, build_os, arch, spec, srcdir):
     suffix=spec.suffix()
     sdir=setupdir(distro, build_os, arch, spec)
     if re.search("debian", distro.name()):
-        os.unlink(sdir+"debian/mongod.upstart")
+        os.unlink(sdir+"debian/bongod.upstart")
         if build_os == "debian71":
-            os.link(sdir+"debian/init.d", sdir+"debian/%s%s-server.mongod.init" % (distro.pkgbase(), suffix))
-            os.unlink(sdir+"debian/mongod.service")
+            os.link(sdir+"debian/init.d", sdir+"debian/%s%s-server.bongod.init" % (distro.pkgbase(), suffix))
+            os.unlink(sdir+"debian/bongod.service")
         else:
-            os.link(sdir+"debian/mongod.service", sdir+"debian/%s%s-server.mongod.service" % (distro.pkgbase(), suffix))
+            os.link(sdir+"debian/bongod.service", sdir+"debian/%s%s-server.bongod.service" % (distro.pkgbase(), suffix))
             os.unlink(sdir+"debian/init.d")
     elif re.search("ubuntu", distro.name()):
         os.unlink(sdir+"debian/init.d")
         if build_os in ("ubuntu1204", "ubuntu1404", "ubuntu1410"):
-            os.link(sdir+"debian/mongod.upstart", sdir+"debian/%s%s-server.mongod.upstart" % (distro.pkgbase(), suffix))
-            os.unlink(sdir+"debian/mongod.service")
+            os.link(sdir+"debian/bongod.upstart", sdir+"debian/%s%s-server.bongod.upstart" % (distro.pkgbase(), suffix))
+            os.unlink(sdir+"debian/bongod.service")
         else:
-            os.link(sdir+"debian/mongod.service", sdir+"debian/%s%s-server.mongod.service" % (distro.pkgbase(), suffix))
-            os.unlink(sdir+"debian/mongod.upstart")
+            os.link(sdir+"debian/bongod.service", sdir+"debian/%s%s-server.bongod.service" % (distro.pkgbase(), suffix))
+            os.unlink(sdir+"debian/bongod.upstart")
     else:
         raise Exception("unknown debianoid flavor: not debian or ubuntu?")
     # Rewrite the control and rules files
@@ -504,13 +504,13 @@ def make_deb_repo(repo, distro, build_os, spec):
     # Notes: the Release{,.gpg} files must live in a special place,
     # and must be created after all the Packages.gz files have been
     # done.
-    s="""Origin: mongodb
-Label: mongodb
+    s="""Origin: bongodb
+Label: bongodb
 Suite: %s
-Codename: %s/mongodb-org
+Codename: %s/bongodb-org
 Architectures: amd64 arm64
 Components: %s
-Description: MongoDB packages
+Description: BongoDB packages
 """ % (distro.repo_os_version(build_os), distro.repo_os_version(build_os), distro.repo_component())
     if os.path.exists(repo+"../../Release"):
         os.unlink(repo+"../../Release")
@@ -600,11 +600,11 @@ def write_debian_changelog(path, spec, srcdir):
     finally:
         os.chdir(oldcwd)
     lines=s.split("\n")
-    # If the first line starts with "mongodb", it's not a revision
+    # If the first line starts with "bongodb", it's not a revision
     # preamble, and so frob the version number.
-    lines[0]=re.sub("^mongodb \\(.*\\)", "mongodb (%s)" % (spec.pversion(Distro("debian"))), lines[0])
-    # Rewrite every changelog entry starting in mongodb<space>
-    lines=[re.sub("^mongodb ", "mongodb%s " % (spec.suffix()), l) for l in lines]
+    lines[0]=re.sub("^bongodb \\(.*\\)", "bongodb (%s)" % (spec.pversion(Distro("debian"))), lines[0])
+    # Rewrite every changelog entry starting in bongodb<space>
+    lines=[re.sub("^bongodb ", "bongodb%s " % (spec.suffix()), l) for l in lines]
     lines=[re.sub("^  --", " --", l) for l in lines]
     s="\n".join(lines)
     with open(path, 'w') as f:
@@ -615,12 +615,12 @@ def make_rpm(distro, build_os, arch, spec, srcdir):
     suffix=spec.suffix()
     sdir=setupdir(distro, build_os, arch, spec)
 
-    specfile = srcdir + "rpm/mongodb%s.spec" % suffix
+    specfile = srcdir + "rpm/bongodb%s.spec" % suffix
     init_spec = specfile.replace(".spec", "-init.spec")
 
     # The Debian directory is here for the manpages so we we need to remove the service file
     # from it so that RPM packages don't end up with the Debian file.
-    os.unlink(sdir + "debian/mongod.service")
+    os.unlink(sdir + "debian/bongod.service")
 
     # Swap out systemd files, different systemd spec files, and init scripts as needed based on
     # underlying os version. Arranged so that new distros moving forward automatically use
@@ -628,8 +628,8 @@ def make_rpm(distro, build_os, arch, spec, srcdir):
     # distros.
     #
     if distro.name() == "suse" and distro.repo_os_version(build_os) in ("10", "11"):
-        os.unlink(sdir+"rpm/init.d-mongod")
-        os.link(sdir+"rpm/init.d-mongod.suse", sdir+"rpm/init.d-mongod")
+        os.unlink(sdir+"rpm/init.d-bongod")
+        os.link(sdir+"rpm/init.d-bongod.suse", sdir+"rpm/init.d-bongod")
 
         os.unlink(specfile)
         os.link(init_spec, specfile)
@@ -693,13 +693,13 @@ def make_rpm(distro, build_os, arch, spec, srcdir):
     oldcwd=os.getcwd()
     os.chdir(sdir+"/../")
     try:
-        sysassert(["tar", "-cpzf", topdir+"SOURCES/mongodb%s-%s.tar.gz" % (suffix, spec.pversion(distro)), os.path.basename(os.path.dirname(sdir))])
+        sysassert(["tar", "-cpzf", topdir+"SOURCES/bongodb%s-%s.tar.gz" % (suffix, spec.pversion(distro)), os.path.basename(os.path.dirname(sdir))])
     finally:
         os.chdir(oldcwd)
     # Do the build.
 
     flags.extend(["-D", "dynamic_version " + spec.pversion(distro), "-D", "dynamic_release " + spec.prelease(), "-D", "_topdir " + topdir])
-    sysassert(["rpmbuild", "-ba", "--target", distro_arch] + flags + ["%s/SPECS/mongodb%s.spec" % (topdir, suffix)])
+    sysassert(["rpmbuild", "-ba", "--target", distro_arch] + flags + ["%s/SPECS/bongodb%s.spec" % (topdir, suffix)])
     r=distro.repodir(arch, build_os, spec)
     ensure_dir(r)
     # FIXME: see if some combination of shutil.copy<hoohah> and glob

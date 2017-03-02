@@ -27,8 +27,8 @@
         return indexesFilteredByName[0];
     }
 
-    const conn = MongoRunner.runMongod({});
-    assert.neq(null, conn, "mongod was unable to start up");
+    const conn = BongoRunner.runBongod({});
+    assert.neq(null, conn, "bongod was unable to start up");
     assert.eq("3.4", getFeatureCompatibilityVersion(conn));
 
     const testDB = conn.getDB("test");

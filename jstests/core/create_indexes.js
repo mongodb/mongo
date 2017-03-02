@@ -1,13 +1,13 @@
 (function() {
     'use strict';
 
-    var isMongos = ("isdbgrid" == db.runCommand("ismaster").msg);
+    var isBongos = ("isdbgrid" == db.runCommand("ismaster").msg);
 
     var extractResult = function(obj) {
-        if (!isMongos)
+        if (!isBongos)
             return obj;
 
-        // Sample mongos format:
+        // Sample bongos format:
         // {
         //   raw: {
         //     "localhost:30000": {

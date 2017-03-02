@@ -7,7 +7,7 @@
  * occurs once the collection reaches a certain size.
  */
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');    // for dropCollections
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod and isMMAPv1
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isBongod and isMMAPv1
 
 var $config = (function() {
 
@@ -65,7 +65,7 @@ var $config = (function() {
             var largeDocSize = Math.floor(options.size / 2) - 1;
 
             // Truncation in MMAPv1 has well defined behavior.
-            if (isMongod(db) && isMMAPv1(db)) {
+            if (isBongod(db) && isMMAPv1(db)) {
                 ids.push(this.insert(db, myCollName, largeDocSize));
 
                 // Insert a large document and verify that a truncation has occurred.

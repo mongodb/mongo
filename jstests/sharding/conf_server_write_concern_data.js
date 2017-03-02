@@ -10,7 +10,7 @@
     var confDBOnConfigPrimary = st.configRS.getPrimary().getDB('config');
     var localDBOnConfigPrimary = st.configRS.getPrimary().getDB('local');
 
-    // w:majority should work both through mongos and directly against the config server for both
+    // w:majority should work both through bongos and directly against the config server for both
     // local and non-local database
     assert.writeOK(confDB.settings.update(
         {_id: 'balancer'}, {$set: {stopped: true}}, {writeConcern: {w: 'majority'}}));

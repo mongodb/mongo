@@ -29,8 +29,8 @@ using std::vector;
 #include "s2polygonbuilder.h"
 #include "s2polyline.h"
 
-#include "mongo/util/mongoutils/str.h"
-using mongoutils::str::stream;
+#include "bongo/util/bongoutils/str.h"
+using bongoutils::str::stream;
 
 static const unsigned char kCurrentEncodingVersionNumber = 1;
 

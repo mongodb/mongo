@@ -19,14 +19,14 @@ load('jstests/multiVersion/libs/auth_helpers.js');
             rs1: {nodes: 3, settings: {chainingAllowed: false}}
         },
         configReplSetTestOptions: {settings: {chainingAllowed: false}},
-        mongos: 1
+        bongos: 1
     });
 
-    var mongos = st.s;
+    var bongos = st.s;
     var dbName = "wc-test-configRS";
-    var db = mongos.getDB(dbName);
-    var adminDB = mongos.getDB('admin');
-    // A database connection on a local shard, rather than through the mongos.
+    var db = bongos.getDB(dbName);
+    var adminDB = bongos.getDB('admin');
+    // A database connection on a local shard, rather than through the bongos.
     var localDB = st.shard0.getDB('localWCTest');
     var collName = 'leaves';
     var coll = db[collName];
@@ -45,7 +45,7 @@ load('jstests/multiVersion/libs/auth_helpers.js');
     // command fails after only the database metadata is dropped from the config servers, but the
     // data on the shards still remains. This makes future operations, such as moveChunk, fail.
     function getNewDB() {
-        db = mongos.getDB(dbName + counter);
+        db = bongos.getDB(dbName + counter);
         counter++;
         coll = db[collName];
     }
@@ -62,11 +62,11 @@ load('jstests/multiVersion/libs/auth_helpers.js');
                 {_id: "authSchema"}, {"currentVersion": 3}, {upsert: true});
 
             db.createUser({user: 'user1', pwd: 'pass', roles: jsTest.basicUserRoles});
-            assert(db.auth({mechanism: 'MONGODB-CR', user: 'user1', pwd: 'pass'}));
+            assert(db.auth({mechanism: 'BONGODB-CR', user: 'user1', pwd: 'pass'}));
             db.logout();
 
             localDB.createUser({user: 'user2', pwd: 'pass', roles: jsTest.basicUserRoles});
-            assert(localDB.auth({mechanism: 'MONGODB-CR', user: 'user2', pwd: 'pass'}));
+            assert(localDB.auth({mechanism: 'BONGODB-CR', user: 'user2', pwd: 'pass'}));
             localDB.logout();
         },
         confirmFunc: function() {
@@ -74,7 +74,7 @@ load('jstests/multiVersion/libs/auth_helpers.js');
             verifyUserDoc(db, 'user1', false, true);
             verifyUserDoc(localDB, 'user2', false, true);
 
-            // After authSchemaUpgrade MONGODB-CR no longer works.
+            // After authSchemaUpgrade BONGODB-CR no longer works.
             verifyAuth(db, 'user1', 'pass', false, true);
             verifyAuth(localDB, 'user2', 'pass', false, true);
         },

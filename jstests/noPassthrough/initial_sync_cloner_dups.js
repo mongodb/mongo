@@ -55,7 +55,7 @@
     jsTestLog("Start remove/insert on primary");
     var insertAndRemove = function(host) {
         jsTestLog("starting bg writes on " + host);
-        var m = new Mongo(host);
+        var m = new Bongo(host);
         var db = m.getDB('test');
         var coll = db.cloner;
         var numDocs = coll.count();

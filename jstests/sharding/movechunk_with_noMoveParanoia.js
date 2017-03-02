@@ -3,7 +3,7 @@
  */
 var st = new ShardingTest({
     shards: 2,
-    mongos: 1,
+    bongos: 1,
     other: {chunkSize: 1, enableAutoSplit: true, shardOptions: {noMoveParanoia: ""}}
 });
 

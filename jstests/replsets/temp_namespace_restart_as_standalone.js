@@ -1,6 +1,6 @@
 /**
  * Tests that temporary collections are not dropped when a member of a replica set is started up as
- * a stand-alone mongod, i.e. without the --replSet parameter.
+ * a stand-alone bongod, i.e. without the --replSet parameter.
  *
  * @tags: [requires_persistence]
  */
@@ -51,12 +51,12 @@
               "'temp_collection' wasn't created as temporary on the secondary: " +
                   tojson(secondaryCollectionInfos[0].options));
 
-    // Shut down the secondary and restart it as a stand-alone mongod.
-    var secondaryNodeId = rst.getNodeId(secondaryDB.getMongo());
+    // Shut down the secondary and restart it as a stand-alone bongod.
+    var secondaryNodeId = rst.getNodeId(secondaryDB.getBongo());
     rst.stop(secondaryNodeId);
 
-    secondaryConn = MongoRunner.runMongod({dbpath: secondaryConn.dbpath, noCleanData: true});
-    assert.neq(null, secondaryConn, "secondary failed to start up as a stand-alone mongod");
+    secondaryConn = BongoRunner.runBongod({dbpath: secondaryConn.dbpath, noCleanData: true});
+    assert.neq(null, secondaryConn, "secondary failed to start up as a stand-alone bongod");
     secondaryDB = secondaryConn.getDB("test");
 
     // Verify that the temporary collection still exists on the secondary and has temp=true.
@@ -73,7 +73,7 @@
                   " stand-alone: " + tojson(secondaryCollectionInfos[0].options));
 
     // Shut down the secondary and restart it as a member of the replica set.
-    MongoRunner.stopMongod(secondaryConn);
+    BongoRunner.stopBongod(secondaryConn);
 
     var restart = true;
     rst.start(secondaryNodeId, {}, restart);

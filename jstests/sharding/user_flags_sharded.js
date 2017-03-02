@@ -8,8 +8,8 @@
         var coll = "userFlagsColl";
         var ns = dbname + "." + coll;
 
-        // First create fresh collection on a new standalone mongod that will become a shard.
-        var newShardConn = MongoRunner.runMongod({"shardsvr": ""});
+        // First create fresh collection on a new standalone bongod that will become a shard.
+        var newShardConn = BongoRunner.runBongod({"shardsvr": ""});
         var db1 = newShardConn.getDB(dbname);
         var t = db1.getCollection(coll);
         print(t);
@@ -38,7 +38,7 @@
         printjson(collstats);
         assert.eq(collstats.userFlags, 0, "modified collection should have userFlags = 0 ");
 
-        // start up a new sharded cluster, and add previous mongod
+        // start up a new sharded cluster, and add previous bongod
         var s = new ShardingTest({name: "user_flags", shards: 1});
         assert(s.admin.runCommand({addshard: newShardConn.host, name: "myShard"}).ok,
                "did not accept new shard");
@@ -57,7 +57,7 @@
         assert.eq(shard2stats.count, numdocs, "moveChunk didn't succeed");
         assert.eq(shard2stats.userFlags, 0, "new shard should also have userFlags = 0 ");
 
-        MongoRunner.stopMongod(newShardConn);
+        BongoRunner.stopBongod(newShardConn);
         s.stop();
     }
 

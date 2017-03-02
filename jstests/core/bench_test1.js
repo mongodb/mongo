@@ -16,7 +16,7 @@ benchArgs = {
     ops: ops,
     parallel: 2,
     seconds: seconds,
-    host: db.getMongo().host
+    host: db.getBongo().host
 };
 
 if (jsTest.options().auth) {

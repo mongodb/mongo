@@ -1,4 +1,4 @@
-// Test handling of clock skew and optimes across mongod instances
+// Test handling of clock skew and optimes across bongod instances
 //
 // There is no automatic fail-over in a master/slave deployment, so if the master goes down, no new
 // master will be elected. Therefore if the master is using an ephemeral storage engine, it cannot

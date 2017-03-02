@@ -9,8 +9,8 @@
     // Setting internalDocumentSourceCursorBatchSizeBytes=1 ensures that multiple batches pass
     // through DocumentSourceCursor.
     const options = {setParameter: "internalDocumentSourceCursorBatchSizeBytes=1"};
-    const conn = MongoRunner.runMongod(options);
-    assert.neq(null, conn, "mongod was unable to start up with options: " + tojson(options));
+    const conn = BongoRunner.runBongod(options);
+    assert.neq(null, conn, "bongod was unable to start up with options: " + tojson(options));
 
     const testDB = conn.getDB("test");
     const coll = testDB.getCollection("coll");
@@ -30,5 +30,5 @@
     assert.eq(profileObj.keysExamined, 8, tojson(profileObj));
     assert.eq(profileObj.docsExamined, 8, tojson(profileObj));
 
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
 })();

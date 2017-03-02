@@ -10,7 +10,7 @@
 // Create a new replica set test with name 'testSet' and 3 members
 var replTest = new ReplSetTest({name: 'testSet', nodes: 3});
 
-// call startSet() to start each mongod in the replica set
+// call startSet() to start each bongod in the replica set
 // this returns a list of nodes
 var nodes = replTest.startSet();
 

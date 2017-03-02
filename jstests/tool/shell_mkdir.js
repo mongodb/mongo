@@ -3,7 +3,7 @@
 (function() {
     "use strict";
 
-    var dir = MongoRunner.dataPath + "ShellMkdirTestDirectory";
+    var dir = BongoRunner.dataPath + "ShellMkdirTestDirectory";
     removeFile(dir);
 
     // Make a new directory

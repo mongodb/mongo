@@ -1,10 +1,10 @@
 /*
   In order to run this, you need to have a local copy of the usage data.
 
-  One way to do this is to dump and restore it using mongodump and mongorestore
+  One way to do this is to dump and restore it using bongodump and bongorestore
   */
 
-db = db.getSiblingDB("mongousage");
+db = db.getSiblingDB("bongousage");
 
 function rollupMap() {
     emit(this._id.t, {total: this.value, unique: 1});

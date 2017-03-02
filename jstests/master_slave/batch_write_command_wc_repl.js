@@ -12,8 +12,8 @@ jsTest.log("Starting legacy repl tests...");
 
 // Start a master node
 // Allows testing legacy repl failures
-var mongod = MongoRunner.runMongod({master: "", oplogSize: 40, smallfiles: ""});
-var coll = mongod.getCollection("test.batch_write_command_wc_repl");
+var bongod = BongoRunner.runBongod({master: "", oplogSize: 40, smallfiles: ""});
+var coll = bongod.getCollection("test.batch_write_command_wc_repl");
 
 //
 // Basic insert, default WC
@@ -68,4 +68,4 @@ assert(result.writeConcernError.errInfo.wtimeout);
 assert.eq(1, coll.count());
 
 jsTest.log("DONE legacy repl tests");
-MongoRunner.stopMongod(mongod);
+BongoRunner.stopBongod(bongod);

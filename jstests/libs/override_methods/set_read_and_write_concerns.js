@@ -17,7 +17,7 @@
 
     var originalDBQuery = DBQuery;
 
-    DBQuery = function(mongo, db, collection, ns, query, fields, limit, skip, batchSize, options) {
+    DBQuery = function(bongo, db, collection, ns, query, fields, limit, skip, batchSize, options) {
         if (ns.endsWith("$cmd")) {
             if (query.hasOwnProperty("writeConcern") &&
                 bsonWoCompare(query.writeConcern, defaultWriteConcern) !== 0) {
@@ -168,7 +168,7 @@
             }
         }
 
-        var res = this.getMongo().runCommand(dbName, obj, options);
+        var res = this.getBongo().runCommand(dbName, obj, options);
 
         return res;
     };

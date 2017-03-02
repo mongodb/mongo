@@ -16,10 +16,10 @@
 
 #include <iosfwd>
 
-#include "mongo/logger/log_severity.h"
-#include "mongo/logger/logger.h"
-#include "mongo/logger/logstream_builder.h"
-#include "mongo/util/concurrency/thread_name.h"
+#include "bongo/logger/log_severity.h"
+#include "bongo/logger/logger.h"
+#include "bongo/logger/logstream_builder.h"
+#include "bongo/util/concurrency/thread_name.h"
 
 #include "macros.h"
 
@@ -33,7 +33,7 @@
 #define CHECK_NE(x, y)	CHECK((x) != (y))
 #define CHECK_NOTNULL(x) CHECK((x) != NULL)
 
-#ifdef MONGO_CONFIG_DEBUG_BUILD
+#ifdef BONGO_CONFIG_DEBUG_BUILD
 // Checking which is only fatal in debug mode
 #define DCHECK(condition) CHECK(condition)
 #define DCHECK_EQ(val1, val2) CHECK_EQ(val1, val2)
@@ -60,20 +60,20 @@
 
 // VLOG messages will be logged at debug level 5 with the S2 log component.
 #define S2LOG(x) x
-// Expansion of MONGO_LOG_COMPONENT defined in mongo/util/log.h
+// Expansion of BONGO_LOG_COMPONENT defined in bongo/util/log.h
 #define VLOG(x) \
-    if (!(::mongo::logger::globalLogDomain())->shouldLog(::mongo::logger::LogComponent::kGeo, ::mongo::logger::LogSeverity::Debug(5))) {} \
-    else ::mongo::logger::LogstreamBuilder(::mongo::logger::globalLogDomain(), ::mongo::getThreadName(), ::mongo::logger::LogSeverity::Debug(5), ::mongo::logger::LogComponent::kGeo)
+    if (!(::bongo::logger::globalLogDomain())->shouldLog(::bongo::logger::LogComponent::kGeo, ::bongo::logger::LogSeverity::Debug(5))) {} \
+    else ::bongo::logger::LogstreamBuilder(::bongo::logger::globalLogDomain(), ::bongo::getThreadName(), ::bongo::logger::LogSeverity::Debug(5), ::bongo::logger::LogComponent::kGeo)
 
 class LogMessageBase {
 public:
-    LogMessageBase(::mongo::logger::LogstreamBuilder builder);
-    LogMessageBase(::mongo::logger::LogstreamBuilder builder, const char* file, int line);
+    LogMessageBase(::bongo::logger::LogstreamBuilder builder);
+    LogMessageBase(::bongo::logger::LogstreamBuilder builder, const char* file, int line);
     virtual ~LogMessageBase() { };
     std::ostream& stream() { return _lsb.stream(); }
 protected:
     // Fatal message will deconstruct it before abort to flush final message.
-    mongo::logger::LogstreamBuilder _lsb;
+    bongo::logger::LogstreamBuilder _lsb;
 private:
     DISALLOW_COPY_AND_ASSIGN(LogMessageBase);
 };

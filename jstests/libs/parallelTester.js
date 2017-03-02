@@ -56,7 +56,7 @@ if (typeof _threadInject != "undefined") {
     EventGenerator = function(me, collectionName, mean, host) {
         this.mean = mean;
         if (host == undefined)
-            host = db.getMongo().host;
+            host = db.getBongo().host;
         this.events = new Array(me, collectionName, host);
     };
 
@@ -100,7 +100,7 @@ if (typeof _threadInject != "undefined") {
         var me = args.shift();
         var collectionName = args.shift();
         var host = args.shift();
-        var m = new Mongo(host);
+        var m = new Bongo(host);
         var t = m.getDB("test")[collectionName];
         for (var i in args) {
             sleep(args[i][0]);
@@ -111,7 +111,7 @@ if (typeof _threadInject != "undefined") {
     // Helper class for running tests in parallel.  It assembles a set of tests
     // and then calls assert.parallelests to run them.
     ParallelTester = function() {
-        assert.neq(db.getMongo().writeMode(), "legacy", "wrong shell write mode");
+        assert.neq(db.getBongo().writeMode(), "legacy", "wrong shell write mode");
         this.params = new Array();
     };
 
@@ -190,7 +190,7 @@ if (typeof _threadInject != "undefined") {
         ]);
 
         // The following tests cannot run when shell readMode is legacy.
-        if (db.getMongo().readMode() === "legacy") {
+        if (db.getBongo().readMode() === "legacy") {
             var requires_find_command = [
                 "views/views_aggregation.js",
                 "views/views_change.js",

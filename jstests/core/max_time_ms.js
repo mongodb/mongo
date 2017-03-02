@@ -393,7 +393,7 @@ assert(res.ok == 1,
 //
 res = t.runCommand({parallelCollectionScan: t.getName(), numCursors: 1, maxTimeMS: 60 * 1000});
 assert.commandWorked(res);
-var cursor = new DBCommandCursor(t.getDB().getMongo(), res.cursors[0], 5);
+var cursor = new DBCommandCursor(t.getDB().getBongo(), res.cursors[0], 5);
 assert.commandWorked(
     t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "alwaysOn"}));
 assert.throws(function() {

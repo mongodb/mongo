@@ -11,7 +11,7 @@ function checkNoJournalFiles(path, pass) {
             return f.name.indexOf("prealloc") < 0;
         })) {
         if (pass == null) {
-            // wait a bit longer for mongod to potentially finish if it is still running.
+            // wait a bit longer for bongod to potentially finish if it is still running.
             sleep(10000);
             return checkNoJournalFiles(path, 1);
         }
@@ -89,10 +89,10 @@ function work() {
 }
 
 if (debugging) {
-    // mongod already running in debugger
+    // bongod already running in debugger
     print(
-        "DOING DEBUG MODE BEHAVIOR AS 'db' IS DEFINED -- RUN mongo --nodb FOR REGULAR TEST BEHAVIOR");
-    conn = db.getMongo();
+        "DOING DEBUG MODE BEHAVIOR AS 'db' IS DEFINED -- RUN bongo --nodb FOR REGULAR TEST BEHAVIOR");
+    conn = db.getBongo();
     work();
     sleep(30000);
     quit();
@@ -101,19 +101,19 @@ if (debugging) {
 log();
 
 // directories
-var path1 = MongoRunner.dataPath + testname + "nodur";
-var path2 = MongoRunner.dataPath + testname + "dur";
+var path1 = BongoRunner.dataPath + testname + "nodur";
+var path2 = BongoRunner.dataPath + testname + "dur";
 
 // non-durable version
 log();
-conn = MongoRunner.runMongod(
+conn = BongoRunner.runBongod(
     {dbpath: path1, nojournal: "", smallfiles: "", master: "", oplogSize: 64});
 work();
-MongoRunner.stopMongod(conn);
+BongoRunner.stopBongod(conn);
 
 // durable version
 log();
-conn = MongoRunner.runMongod({
+conn = BongoRunner.runBongod({
     dbpath: path2,
     journal: "",
     smallfiles: "",
@@ -127,13 +127,13 @@ work();
 printjson(conn.getDB('admin').runCommand({getlasterror: 1, fsync: 1}));
 
 // kill the process hard
-MongoRunner.stopMongod(conn, /*signal*/ 9);
+BongoRunner.stopBongod(conn, /*signal*/ 9);
 
 // journal file should be present, and non-empty as we killed hard
 
 // restart and recover
 log();
-conn = MongoRunner.runMongod({
+conn = BongoRunner.runBongod({
     restart: true,
     cleanData: false,
     dbpath: path2,
@@ -146,9 +146,9 @@ conn = MongoRunner.runMongod({
 verify();
 
 log("stop");
-MongoRunner.stopMongod(conn);
+BongoRunner.stopBongod(conn);
 
-// stopMongod seems to be asynchronous (hmmm) so we sleep here.
+// stopBongod seems to be asynchronous (hmmm) so we sleep here.
 sleep(5000);
 
 // at this point, after clean shutdown, there should be no journal files

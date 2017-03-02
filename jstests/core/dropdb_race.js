@@ -1,6 +1,6 @@
 // test dropping a db with simultaneous commits
 
-m = db.getMongo();
+m = db.getBongo();
 baseName = "jstests_dur_droprace";
 d = db.getSisterDB(baseName);
 t = d.foo;

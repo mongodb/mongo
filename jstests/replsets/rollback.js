@@ -148,7 +148,7 @@ load("jstests/replsets/rslib.js");
     conns[0].reconnect(conns[1]);
     conns[1].reconnect(conns[2]);
 
-    awaitOpTime(b.getMongo(), getLatestOp(a_conn).ts);
+    awaitOpTime(b.getBongo(), getLatestOp(a_conn).ts);
     replTest.awaitSecondaryNodes();
     replTest.awaitReplication();
     checkFinalResults(a);

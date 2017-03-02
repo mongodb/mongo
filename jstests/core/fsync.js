@@ -80,7 +80,7 @@
 
     // Check that the fsyncUnlock pseudo-command (a lookup on cmd.$sys.unlock)
     // still has the same effect as a legitimate 'fsyncUnlock' command.
-    // TODO: remove this in in the release following MongoDB 3.2 when pseudo-commands
+    // TODO: remove this in in the release following BongoDB 3.2 when pseudo-commands
     // are removed.
     var fsyncCommandRes = db.fsyncLock();
     assert(fsyncLockRes.ok, "fsyncLock command failed against admin DB");

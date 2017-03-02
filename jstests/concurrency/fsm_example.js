@@ -47,7 +47,7 @@ var $config = (function() {
     // 'setup' is run once by the parent thread after the cluster has
     // been initialized, but before the worker threads have been spawned.
     // The 'this' argument is bound as '$config.data'. 'cluster' is provided
-    // to allow execution against all mongos and mongod nodes.
+    // to allow execution against all bongos and bongod nodes.
     function setup(db, collName, cluster) {
         // Workloads should NOT drop the collection db[collName], as
         // doing so is handled by runner.js before 'setup' is called.
@@ -55,11 +55,11 @@ var $config = (function() {
             db[collName].insert({_id: i});
         }
 
-        cluster.executeOnMongodNodes(function(db) {
+        cluster.executeOnBongodNodes(function(db) {
             printjson(db.serverCmdLineOpts());
         });
 
-        cluster.executeOnMongosNodes(function(db) {
+        cluster.executeOnBongosNodes(function(db) {
             printjson(db.serverCmdLineOpts());
         });
     }
@@ -67,7 +67,7 @@ var $config = (function() {
     // 'teardown' is run once by the parent thread before the cluster
     // is destroyed, but after the worker threads have been reaped.
     // The 'this' argument is bound as '$config.data'. 'cluster' is provided
-    // to allow execution against all mongos and mongod nodes.
+    // to allow execution against all bongos and bongod nodes.
     function teardown(db, collName, cluster) {
     }
 

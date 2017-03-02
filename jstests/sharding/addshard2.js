@@ -53,11 +53,11 @@
 
     var st = new ShardingTest({
         shards: 0,
-        mongos: 1,
+        bongos: 1,
     });
 
     // Add one shard since the last shard cannot be removed.
-    var normalShard = MongoRunner.runMongod({shardsvr: ''});
+    var normalShard = BongoRunner.runBongod({shardsvr: ''});
     st.s.adminCommand({addShard: normalShard.name, name: 'normalShard'});
 
     // Allocate a port that can be used to test adding invalid hosts.
@@ -74,7 +74,7 @@
 
     // 1.a. with or without specifying the shardName.
 
-    var standalone = MongoRunner.runMongod({shardsvr: ''});
+    var standalone = BongoRunner.runBongod({shardsvr: ''});
 
     jsTest.log("Adding a standalone *without* a specified shardName should succeed.");
     addShardRes = st.s.adminCommand({addshard: standalone.name});
@@ -86,7 +86,7 @@
     assertAddShardSucceeded(addShardRes, "shardName");
     removeShardWithName(addShardRes.shardAdded);
 
-    MongoRunner.stopMongod(standalone);
+    BongoRunner.stopBongod(standalone);
 
     // 1.b. with an invalid hostname.
 
@@ -167,7 +167,7 @@
 
     // 4. Test that a replica set whose *set name* is "admin" can be written to (SERVER-17232).
 
-    // Turn off the dontUpsertShardIdentityOnNewShards failpoint, since mongos will send
+    // Turn off the dontUpsertShardIdentityOnNewShards failpoint, since bongos will send
     // setShardVersion when trying to do the write, and the setShardVersion will fail if the
     // sharding state will not be enabled.
     assert.commandWorked(st.configRS.getPrimary().adminCommand(

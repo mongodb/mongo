@@ -17,8 +17,8 @@ executor:
     - class: CleanEveryN
       n: 20
     fixture:
-      class: MongoDFixture
-      mongod_options:
+      class: BongoDFixture
+      bongod_options:
         networkMessageCompressors: snappy
         set_parameters:
           enableTestCommands: 1

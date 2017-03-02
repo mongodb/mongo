@@ -22,7 +22,7 @@ executor:
             forceValidationWithFeatureCompatibilityVersion: "3.4"
     fixture:
       class: ReplicaSetFixture
-      mongod_options:
+      bongod_options:
         oplogSize: 511
         verbose: ''
         set_parameters:

@@ -1,0 +1,299 @@
+# -*- mode: python -*-
+
+Import('env')
+
+env = env.Clone()
+
+# Contains only the core ConnectionString functionality, *not* the ability to call connect()
+# and return a DBClientBase* back. For that you need to link against the 'clientdriver' library.
+env.Library(
+    target='connection_string',
+    source=[
+        'connection_string.cpp',
+        'bongo_uri.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/util/net/hostandport',
+    ]
+)
+
+env.CppUnitTest(
+    target='connection_string_test',
+    source=[
+        'connection_string_test.cpp',
+        'bongo_uri_test.cpp',
+    ],
+    LIBDEPS=[
+        'clientdriver',
+    ]
+)
+
+env.Library(
+    target=[
+        'read_preference',
+    ],
+    source=[
+        'read_preference.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/bson/util/bson_extract',
+    ],
+)
+
+env.CppUnitTest(
+    target=[
+        'read_preference_test',
+    ],
+    source=[
+        'read_preference_test.cpp',
+    ],
+    LIBDEPS=[
+        'read_preference',
+    ]
+)
+
+saslClientEnv = env.Clone()
+saslLibs = []
+saslClientSource = [
+    'native_sasl_client_session.cpp',
+    'sasl_client_authenticate.cpp',
+    'sasl_client_authenticate_impl.cpp',
+    'sasl_client_conversation.cpp',
+    'sasl_client_session.cpp',
+    'sasl_plain_client_conversation.cpp',
+    'sasl_scramsha1_client_conversation.cpp',
+    'scram_sha1_client_cache.cpp',
+]
+
+# Add in actual sasl dependencies if sasl is enabled, otherwise
+# leave library empty so other targets can link to it unconditionally
+# without needing to first test BONGO_BUILD_SASL_CLIENT.
+if env['BONGO_BUILD_SASL_CLIENT']:
+    saslClientSource.extend([
+        'cyrus_sasl_client_session.cpp',
+        'sasl_sspi.cpp',
+        'sasl_sspi_options.cpp',
+    ])
+
+    saslLibs.extend(['sasl2'])
+    if env.TargetOSIs('windows'):
+        saslLibs.extend(['secur32'])
+
+saslClientEnv.Library(
+    target='sasl_client',
+    source=saslClientSource,
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/bson/util/bson_extract',
+        '$BUILD_DIR/bongo/crypto/scramauth',
+        '$BUILD_DIR/bongo/executor/remote_command',
+        '$BUILD_DIR/bongo/rpc/command_status',
+        '$BUILD_DIR/bongo/rpc/metadata',
+        '$BUILD_DIR/bongo/util/md5',
+        '$BUILD_DIR/bongo/util/net/network',
+    ],
+    SYSLIBDEPS=saslLibs
+)
+
+env.Library(
+    target='authentication',
+    source=[
+        'authenticate.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/bson/util/bson_extract',
+        '$BUILD_DIR/bongo/executor/remote_command',
+        'sasl_client'
+    ]
+)
+
+env.CppUnitTest(
+    target=[
+        'authenticate_test',
+    ],
+    source=[
+        'authenticate_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/rpc/command_status',
+        '$BUILD_DIR/bongo/util/net/hostandport',
+        '$BUILD_DIR/bongo/util/md5',
+        'authentication',
+    ]
+)
+
+env.Library(
+    target='client_query',
+    source=[
+        'query.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+        'read_preference',
+    ],
+)
+
+clientDriverEnv = env.Clone()
+clientDriverEnv.InjectThirdPartyIncludePaths('asio')
+
+clientDriverEnv.Library(
+    target='clientdriver',
+    source=[
+        'connection_string_connect.cpp',
+        'bongo_uri_connect.cpp',
+        'connpool.cpp',
+        'dbclient.cpp',
+        'dbclient_rs.cpp',
+        'dbclientcursor.cpp',
+        'index_spec.cpp',
+        'global_conn_pool.cpp',
+        'replica_set_monitor.cpp',
+        'replica_set_monitor_manager.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/db/auth/authcommon',
+        '$BUILD_DIR/bongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/bongo/db/dbmessage',
+        '$BUILD_DIR/bongo/db/wire_version',
+        '$BUILD_DIR/bongo/db/write_concern_options',
+        '$BUILD_DIR/bongo/executor/connection_pool_stats',
+        '$BUILD_DIR/bongo/executor/network_interface_factory',
+        '$BUILD_DIR/bongo/executor/network_interface_thread_pool',
+        '$BUILD_DIR/bongo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/bongo/rpc/command_status',
+        '$BUILD_DIR/bongo/rpc/rpc',
+        '$BUILD_DIR/bongo/util/md5',
+        '$BUILD_DIR/bongo/util/net/network',
+        'authentication',
+        'connection_string',
+        'read_preference',
+    ],
+)
+
+env.Library(
+    target='connection_pool',
+    source=[
+        'connection_pool.cpp',
+    ],
+    LIBDEPS=[
+        'clientdriver',
+        '$BUILD_DIR/bongo/db/auth/authcommon',
+        '$BUILD_DIR/bongo/db/auth/authorization_manager_global',
+    ]
+)
+
+env.Library(
+    target='remote_command_targeter',
+    source=[
+        'remote_command_targeter_factory_impl.cpp',
+        'remote_command_targeter_rs.cpp',
+        'remote_command_targeter_standalone.cpp',
+    ],
+    LIBDEPS=[
+        'clientdriver',
+        '$BUILD_DIR/bongo/db/service_context',
+    ]
+)
+
+env.Library(
+    target='remote_command_targeter_mock',
+    source=[
+        'remote_command_targeter_mock.cpp',
+        'remote_command_targeter_factory_mock.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/util/net/hostandport',
+        '$BUILD_DIR/bongo/s/coreshard',
+    ]
+)
+
+env.CppUnitTest(
+    target='replica_set_monitor_test',
+    source=[
+        'replica_set_monitor_node_test.cpp',
+        'replica_set_monitor_read_preference_test.cpp',
+        'replica_set_monitor_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/db/write_concern_options',
+        'clientdriver',
+    ]
+)
+
+env.CppUnitTest('dbclient_rs_test',
+                ['dbclient_rs_test.cpp'],
+                LIBDEPS=[
+                    'clientdriver',
+                    '$BUILD_DIR/bongo/dbtests/mocklib',
+                ]
+)
+
+env.CppUnitTest(
+    target='index_spec_test',
+    source=[
+        'index_spec_test.cpp',
+    ],
+    LIBDEPS=[
+        'clientdriver',
+    ],
+)
+
+env.CppUnitTest(
+    target='scoped_db_conn_test',
+    source=[
+        'scoped_db_conn_test.cpp',
+    ],
+    LIBDEPS=[
+        'clientdriver',
+        '$BUILD_DIR/bongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/bongo/db/service_context_noop_init',
+        '$BUILD_DIR/bongo/transport/transport_layer_legacy',
+        '$BUILD_DIR/bongo/util/net/network',
+        '$BUILD_DIR/bongo/util/version_impl',
+    ],
+)
+
+env.Library(
+    target='fetcher',
+    source=[
+        'fetcher.cpp',
+    ],
+    LIBDEPS=[
+        'remote_command_retry_scheduler',
+        '$BUILD_DIR/bongo/executor/task_executor_interface',
+        '$BUILD_DIR/bongo/base',
+        '$BUILD_DIR/bongo/db/namespace_string',
+        '$BUILD_DIR/bongo/rpc/command_status',
+    ],
+)
+
+env.CppUnitTest(
+    target='fetcher_test',
+    source='fetcher_test.cpp',
+    LIBDEPS=[
+        'fetcher',
+        '$BUILD_DIR/bongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/bongo/db/service_context_noop_init',
+        '$BUILD_DIR/bongo/executor/thread_pool_task_executor_test_fixture',
+    ],
+)
+
+env.Library(
+    target='remote_command_retry_scheduler',
+    source=[
+        'remote_command_retry_scheduler.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/executor/task_executor_interface',
+        '$BUILD_DIR/bongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target='remote_command_retry_scheduler_test',
+    source='remote_command_retry_scheduler_test.cpp',
+    LIBDEPS=[
+        'remote_command_retry_scheduler',
+        '$BUILD_DIR/bongo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/bongo/unittest/task_executor_proxy',
+    ],
+)

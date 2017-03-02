@@ -1,6 +1,6 @@
 (function() {
 
-    var s = new ShardingTest({name: "auto2", shards: 2, mongos: 2, other: {enableAutoSplit: true}});
+    var s = new ShardingTest({name: "auto2", shards: 2, bongos: 2, other: {enableAutoSplit: true}});
 
     s.adminCommand({enablesharding: "test"});
     s.ensurePrimaryShard('test', 'shard0001');
@@ -31,7 +31,7 @@
     assert.eq(i, j * 100, "setup");
 
     // Until SERVER-9715 is fixed, the sync command must be run on a diff connection
-    new Mongo(s.s.host).adminCommand("connpoolsync");
+    new Bongo(s.s.host).adminCommand("connpoolsync");
 
     print("done inserting data");
 
@@ -125,7 +125,7 @@
     assert(t.findOne(), "check close 0");
 
     for (i = 0; i < 20; i++) {
-        var conn = new Mongo(db.getMongo().host);
+        var conn = new Bongo(db.getBongo().host);
         temp2 = conn.getDB("test2").foobar;
         assert.eq(conn._fullNameSpace, t._fullNameSpace, "check close 1");
         assert(temp2.findOne(), "check close 2");

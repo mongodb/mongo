@@ -371,7 +371,7 @@ assert.docEq(p10.cursor.firstBatch, p10result, 'p10 failed');
 db.p11.drop();
 db.p11.save({
     _id: 5,
-    name: 'MongoDB',
+    name: 'BongoDB',
     items: {authors: ['jay', 'vivek', 'bjornar'], dbg: [17, 42]},
     favorites: ['pickles', 'ice cream', 'kettle chips']
 });
@@ -386,9 +386,9 @@ var p11 = db.runCommand({
 });
 
 p11result = [
-    {"_id": 5, "name": "MongoDB", "author": "jay"},
-    {"_id": 5, "name": "MongoDB", "author": "vivek"},
-    {"_id": 5, "name": "MongoDB", "author": "bjornar"}
+    {"_id": 5, "name": "BongoDB", "author": "jay"},
+    {"_id": 5, "name": "BongoDB", "author": "vivek"},
+    {"_id": 5, "name": "BongoDB", "author": "bjornar"}
 ];
 
 assert.docEq(p11.cursor.firstBatch, p11result, 'p11 failed');

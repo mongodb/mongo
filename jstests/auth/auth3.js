@@ -2,7 +2,7 @@
 
     'use strict';
 
-    var conn = MongoRunner.runMongod({auth: ""});
+    var conn = BongoRunner.runBongod({auth: ""});
 
     var admin = conn.getDB("admin");
     var errorCodeUnauthorized = 13;

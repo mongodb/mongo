@@ -1,15 +1,15 @@
 /**
- * Test that verifies mongod can start using paths that contain UTF-8 characters that are not ASCII.
+ * Test that verifies bongod can start using paths that contain UTF-8 characters that are not ASCII.
  */
 (function() {
     'use strict';
     var db_name = "ελληνικά";
-    var path = MongoRunner.dataPath + "Росси́я";
+    var path = BongoRunner.dataPath + "Росси́я";
 
     mkdir(path);
 
-    // Test MongoD
-    let testMongoD = function() {
+    // Test BongoD
+    let testBongoD = function() {
         let options = {
             dbpath: path,
             useLogFiles: true,
@@ -22,17 +22,17 @@
             options["directoryperdb"] = "";
         }
 
-        let conn = MongoRunner.runMongod(options);
-        assert.neq(null, conn, 'mongod was unable to start up');
+        let conn = BongoRunner.runBongod(options);
+        assert.neq(null, conn, 'bongod was unable to start up');
 
         let coll = conn.getCollection(db_name + ".foo");
         assert.writeOK(coll.insert({_id: 1}));
 
-        MongoRunner.stopMongod(conn);
+        BongoRunner.stopBongod(conn);
     };
 
-    testMongoD();
+    testBongoD();
 
     // Start a second time to test things like log rotation.
-    testMongoD();
+    testBongoD();
 })();

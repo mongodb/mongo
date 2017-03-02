@@ -17,7 +17,7 @@ class Suite(object):
     A suite of tests.
     """
 
-    TESTS_ORDER = ("cpp_unit_test", "cpp_integration_test", "db_test", "js_test", "mongos_test")
+    TESTS_ORDER = ("cpp_unit_test", "cpp_integration_test", "db_test", "js_test", "bongos_test")
 
     def __init__(self, suite_name, suite_config):
         """
@@ -48,13 +48,13 @@ class Suite(object):
 
         test_info = self.get_selector_config()[test_kind]
 
-        # The mongos_test doesn't have to filter anything, the test_info is just the arguments to
-        # the mongos program to be used as the test case.
-        if test_kind == "mongos_test":
-            mongos_options = test_info  # Just for easier reading.
-            if not isinstance(mongos_options, dict):
-                raise TypeError("Expected dictionary of arguments to mongos")
-            return [mongos_options]
+        # The bongos_test doesn't have to filter anything, the test_info is just the arguments to
+        # the bongos program to be used as the test case.
+        if test_kind == "bongos_test":
+            bongos_options = test_info  # Just for easier reading.
+            if not isinstance(bongos_options, dict):
+                raise TypeError("Expected dictionary of arguments to bongos")
+            return [bongos_options]
         elif test_kind == "cpp_integration_test":
             tests = _selector.filter_cpp_integration_tests(**test_info)
         elif test_kind == "cpp_unit_test":

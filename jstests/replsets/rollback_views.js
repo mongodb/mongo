@@ -119,7 +119,7 @@ load("jstests/replsets/rslib.js");
     nodeB.reconnect(arbiter);
     nodeA.reconnect(nodeB);
 
-    awaitOpTime(b1.getMongo(), getLatestOp(nodeA).ts);
+    awaitOpTime(b1.getBongo(), getLatestOp(nodeA).ts);
 
     // Await steady state and ensure the two nodes have the same contents.
     replTest.awaitSecondaryNodes();

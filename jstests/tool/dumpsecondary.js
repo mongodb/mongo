@@ -22,30 +22,30 @@ if (jsTest.options().keyFile) {
 }
 
 var exitCode =
-    MongoRunner.runMongoTool("mongodump",
+    BongoRunner.runBongoTool("bongodump",
                              Object.extend({
                                  host: slave.host,
-                                 out: MongoRunner.dataDir + "/jstests_tool_dumpsecondary_external/",
+                                 out: BongoRunner.dataDir + "/jstests_tool_dumpsecondary_external/",
                              },
                                            commonOptions));
-assert.eq(0, exitCode, "mongodump failed to dump data from the secondary");
+assert.eq(0, exitCode, "bongodump failed to dump data from the secondary");
 
 db.foo.drop();
 assert.eq(0, db.foo.count(), "after drop");
 
 exitCode =
-    MongoRunner.runMongoTool("mongorestore",
+    BongoRunner.runBongoTool("bongorestore",
                              Object.extend({
                                  host: master.host,
-                                 dir: MongoRunner.dataDir + "/jstests_tool_dumpsecondary_external/",
+                                 dir: BongoRunner.dataDir + "/jstests_tool_dumpsecondary_external/",
                              },
                                            commonOptions));
-assert.eq(0, exitCode, "mongorestore failed to restore data to the primary");
+assert.eq(0, exitCode, "bongorestore failed to restore data to the primary");
 
 assert.soon("db.foo.findOne()", "no data after sleep");
 assert.eq(1, db.foo.count(), "after restore");
 assert.eq(1000, db.foo.findOne().a, "after restore 2");
 
-resetDbpath(MongoRunner.dataDir + '/jstests_tool_dumpsecondary_external');
+resetDbpath(BongoRunner.dataDir + '/jstests_tool_dumpsecondary_external');
 
 replTest.stopSet(15);

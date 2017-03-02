@@ -2,10 +2,10 @@
  * This file tests that "user:<username>@<db>" shows up in the logs.
  */
 
-// TODO(schwerin) Re-enable this test after resolving corresponding TODO in mongo/util/log.cpp.
+// TODO(schwerin) Re-enable this test after resolving corresponding TODO in bongo/util/log.cpp.
 if (0) {
     /**
-     * Extracts information from a mongod/mongos log entry.
+     * Extracts information from a bongod/bongos log entry.
      *
      * @param line {string} a single line of log.
      *
@@ -51,17 +51,17 @@ if (0) {
     /**
      * Performs a series of test on user id logging.
      *
-     * @param conn1 {Mongo} the connection object to use for logging in users.
-     * @param conn2 {Mongo} another connection object different from conn1.
+     * @param conn1 {Bongo} the connection object to use for logging in users.
+     * @param conn2 {Bongo} another connection object different from conn1.
      */
     var doTest = function(conn1, conn2) {
         var connInfo1 = {
             id: null,      // thread id of this connection
-            mongo: conn1,  // connection object
+            bongo: conn1,  // connection object
             users: {}      // contains authenticated users represented as a map of db to user names.
         };
 
-        var connInfo2 = {id: null, mongo: conn2, users: {}};
+        var connInfo2 = {id: null, bongo: conn2, users: {}};
 
         var conn1Auth =
             [{user: 'foo', pwd: 'bar', db: 'test'}, {user: 'chun', pwd: 'li', db: 'sf'}];
@@ -70,14 +70,14 @@ if (0) {
             [{user: 'root', pwd: 'ugat', db: 'admin'}, {user: 'elbow', pwd: 'freeze', db: 'bboy'}];
 
         var loginUser = function(connInfo, connAuth) {
-            var db = connInfo.mongo.getDB(connAuth.db);
+            var db = connInfo.bongo.getDB(connAuth.db);
             db.createUser({user: connAuth.user, pwd: connAuth.pwd, roles: jsTest.adminUserRoles});
             db.auth(connAuth.user, connAuth.pwd);
             connInfo.users[connAuth.db] = connAuth.user;
         };
 
         var logoutUser = function(connInfo, connAuth) {
-            var db = connInfo.mongo.getDB(connAuth.db);
+            var db = connInfo.bongo.getDB(connAuth.db);
             db.runCommand({logout: 1});
             delete connInfo.users[connAuth.db];
         };
@@ -150,8 +150,8 @@ if (0) {
             assert(foundOne, 'User log not found in: ' + tojson(log));
         };
 
-        var testDB1 = connInfo1.mongo.getDB('test');
-        var testDB2 = connInfo2.mongo.getDB('test');
+        var testDB1 = connInfo1.bongo.getDB('test');
+        var testDB2 = connInfo2.bongo.getDB('test');
 
         // Note: The succeeding tests should not be re-ordered.
         (function() {
@@ -248,12 +248,12 @@ if (0) {
         })();
     };
 
-    var mongo = MongoRunner.runMongod({verbose: 5, setParameter: 'logUserIds=1'});
-    doTest(mongo, new Mongo(mongo.host));
-    MongoRunner.stopMongod(mongo.port);
+    var bongo = BongoRunner.runBongod({verbose: 5, setParameter: 'logUserIds=1'});
+    doTest(bongo, new Bongo(bongo.host));
+    BongoRunner.stopBongod(bongo.port);
 
     var st = new ShardingTest(
-        {shards: 1, verbose: 5, other: {mongosOptions: {setParameter: 'logUserIds=1'}}});
-    doTest(st.s, new Mongo(st.s.host));
+        {shards: 1, verbose: 5, other: {bongosOptions: {setParameter: 'logUserIds=1'}}});
+    doTest(st.s, new Bongo(st.s.host));
     st.stop();
 }

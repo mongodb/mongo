@@ -23,8 +23,8 @@
                'cluster id: ' + tojson(clusterId) + ' != ' + tojson(res.clusterId));
     };
 
-    var checkShardMarkedAsShardAware = function(mongosConn, shardName) {
-        var res = mongosConn.getDB('config').getCollection('shards').findOne({_id: shardName});
+    var checkShardMarkedAsShardAware = function(bongosConn, shardName) {
+        var res = bongosConn.getDB('config').getCollection('shards').findOne({_id: shardName});
         assert.neq(null, res, "Could not find new shard " + shardName + " in config.shards");
         assert.eq(1, res.state);
     };
@@ -33,9 +33,9 @@
     var st = new ShardingTest({shards: 1});
     var clusterId = st.s.getDB('config').getCollection('version').findOne().clusterId;
 
-    // Add a shard that is a standalone mongod.
+    // Add a shard that is a standalone bongod.
 
-    var standaloneConn = MongoRunner.runMongod({shardsvr: ''});
+    var standaloneConn = BongoRunner.runBongod({shardsvr: ''});
     waitForIsMaster(standaloneConn);
 
     jsTest.log("Going to add standalone as shard: " + standaloneConn);
@@ -44,7 +44,7 @@
     checkShardingStateInitialized(standaloneConn, st.configRS.getURL(), newShardName, clusterId);
     checkShardMarkedAsShardAware(st.s, newShardName);
 
-    MongoRunner.stopMongod(standaloneConn.port);
+    BongoRunner.stopBongod(standaloneConn.port);
 
     // Add a shard that is a replica set.
 

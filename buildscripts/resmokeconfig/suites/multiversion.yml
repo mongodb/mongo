@@ -11,7 +11,7 @@ selector:
     # TODO: SERVER-28104
     - jstests/multiVersion/minor_version_tags_new_old_new.js
 
-# Multiversion tests start their own mongod's.
+# Multiversion tests start their own bongod's.
 executor:
   js_test:
     config:

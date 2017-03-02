@@ -6,7 +6,7 @@ from __future__ import absolute_import
 
 import time
 
-import pymongo
+import pybongo
 
 from ... import errors
 from ... import logging
@@ -33,7 +33,7 @@ class Fixture(object):
         self.logger = logger
         self.job_num = job_num
 
-        self.port = None  # Port that the mongo shell should connect to.
+        self.port = None  # Port that the bongo shell should connect to.
 
     def setup(self):
         """
@@ -64,7 +64,7 @@ class Fixture(object):
         """
         Returns the connection string for this fixture. This is NOT a
         driver connection string, but a connection string of the format
-        expected by the mongo::ConnectionString class.
+        expected by the bongo::ConnectionString class.
         """
         raise NotImplementedError("get_connection_string must be implemented by Fixture subclasses")
 
@@ -114,7 +114,7 @@ class ReplFixture(Fixture):
                 remaining = deadline - time.time()
                 insert_fn(remaining)
                 break
-            except pymongo.errors.ConnectionFailure:
+            except pybongo.errors.ConnectionFailure:
                 remaining = deadline - time.time()
                 if remaining <= 0.0:
                     raise errors.ServerFailure("Failed to connect to the primary on port %d" %

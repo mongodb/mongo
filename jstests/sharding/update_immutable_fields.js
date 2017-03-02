@@ -2,11 +2,11 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 2, mongos: 1});
+    var st = new ShardingTest({shards: 2, bongos: 1});
 
-    var mongos = st.s;
-    var config = mongos.getDB("config");
-    var coll = mongos.getCollection(jsTestName() + ".coll1");
+    var bongos = st.s;
+    var config = bongos.getDB("config");
+    var coll = bongos.getCollection(jsTestName() + ".coll1");
     var shard0 = st.shard0;
 
     assert.commandWorked(config.adminCommand({enableSharding: coll.getDB() + ""}));
@@ -15,7 +15,7 @@
 
     var getDirectShardedConn = function(st, collName) {
 
-        var shardConnWithVersion = new Mongo(st.shard0.host);
+        var shardConnWithVersion = new Bongo(st.shard0.host);
 
         var configConnStr = st._configDB;
 

@@ -50,8 +50,8 @@
     assert.eq(shardIdentityDoc.shardName, res.shardName);
     assert.eq(shardIdentityDoc.clusterId, res.clusterId);
 
-    var newMongodOptions = Object.extend(secConn.savedOptions, {restart: true});
-    replTest.restart(replTest.getNodeId(secConn), newMongodOptions);
+    var newBongodOptions = Object.extend(secConn.savedOptions, {restart: true});
+    replTest.restart(replTest.getNodeId(secConn), newBongodOptions);
     replTest.waitForMaster();
     replTest.awaitSecondaryNodes();
 

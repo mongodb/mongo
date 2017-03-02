@@ -52,7 +52,7 @@ functions:
           cd ./clusters/${cluster}
           # stage aws credential for terraform
           cp ../../terraform/* .
-          ../../bin/make_terraform_env.sh ${terraform_key} ${terraform_secret} https://s3.amazonaws.com/mciuploads/dsi/${version_id}/${revision}/mongod-${version_id}.tar.gz
+          ../../bin/make_terraform_env.sh ${terraform_key} ${terraform_secret} https://s3.amazonaws.com/mciuploads/dsi/${version_id}/${revision}/bongod-${version_id}.tar.gz
           # generate aws private key file
           echo "${ec2_pem}" > ../../keys/aws.pem
           chmod 400 ../../keys/aws.pem
@@ -64,7 +64,7 @@ functions:
         working_dir: src/dsi/dsi
         silent: true
         script: |
-          # to create a mongod EC2 cluster
+          # to create a bongod EC2 cluster
           set -e
           set -v
           cd ./clusters/${cluster}
@@ -102,9 +102,9 @@ functions:
           cd ./clusters/${cluster}
           tar -xf cluster_config.tgz
 
-  "configure mongodb cluster":
+  "configure bongodb cluster":
     - command: shell.exec
-      # bring up the mongod
+      # bring up the bongod
       params:
         working_dir: src/dsi/dsi
         script: |
@@ -112,9 +112,9 @@ functions:
           set -v
           source ./venv/bin/activate
           cd ./clusters/${cluster}
-          cp mongodb_setup.${setup}.${storageEngine}.yml mongodb_setup.yml
-          ../../bin/mongodb_setup.py --config
-          echo "${cluster} MongoDB Cluster STARTED."
+          cp bongodb_setup.${setup}.${storageEngine}.yml bongodb_setup.yml
+          ../../bin/bongodb_setup.py --config
+          echo "${cluster} BongoDB Cluster STARTED."
 
   "run test":
     - command: shell.exec
@@ -230,16 +230,16 @@ tasks:
           set -o verbose
 
           # We get the raw version string (r1.2.3-45-gabcdef) from git
-          MONGO_VERSION=$(git describe)
+          BONGO_VERSION=$(git describe)
           # If this is a patch build, we add the patch version id to the version string so we know
           # this build was a patch, and which evergreen task it came from
           if [ "${is_patch|}" = "true" ]; then
-            MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+            BONGO_VERSION="$BONGO_VERSION-patch-${version_id}"
           fi
 
           # This script converts the generated version string into a sanitized version string for
           # use by scons and uploading artifacts as well as information about for the scons cache.
-          echo $MONGO_VERSION | USE_SCONS_CACHE=${use_scons_cache|false} ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
+          echo $BONGO_VERSION | USE_SCONS_CACHE=${use_scons_cache|false} ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
     # Then we load the generated version data into the agent so we can use it in task definitions
     - command: expansions.update
       params:
@@ -253,25 +253,25 @@ tasks:
 
           ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} core
 
-          mkdir -p mongodb/bin
-          strip mongo
-          strip mongod
-          strip mongos
-          mv mongo mongodb/bin
-          mv mongod mongodb/bin
-          mv mongos mongodb/bin
-          tar cvf mongodb.tar mongodb
-          gzip mongodb.tar
+          mkdir -p bongodb/bin
+          strip bongo
+          strip bongod
+          strip bongos
+          mv bongo bongodb/bin
+          mv bongod bongodb/bin
+          mv bongos bongodb/bin
+          tar cvf bongodb.tar bongodb
+          gzip bongodb.tar
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/mongodb.tar.gz
-        remote_file: dsi/${version_id}/${revision}/mongod-${version_id}.tar.gz
+        local_file: src/bongodb.tar.gz
+        remote_file: dsi/${version_id}/${revision}/bongod-${version_id}.tar.gz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
-        display_name: mongodb.tar.gz
+        display_name: bongodb.tar.gz
 
 # The distributed_correctness_suite_1 task runs the "bring up cluster" task and is
 # the only one to do so - all other tasks run "restore cluster".  As such,
@@ -287,7 +287,7 @@ tasks:
   commands:
     - func: "prepare environment"
     - func: "bring up cluster"
-    - func: "configure mongodb cluster"
+    - func: "configure bongodb cluster"
       vars:
         storageEngine: "wiredTiger"
 
@@ -309,7 +309,7 @@ tasks:
   commands:
     - func: "prepare environment"
     - func: "restore cluster"
-    - func: "configure mongodb cluster"
+    - func: "configure bongodb cluster"
       vars:
         storageEngine: "mmapv1"
 
@@ -355,7 +355,7 @@ buildvariants:
     - dsi
     - workloads
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/bongodbtoolchain/v2/bin/gcc CXX=/opt/bongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/bongodbtoolchain/v2/bin/objcopy
     setup: standalone
     cluster: single-correctness
     use_scons_cache: true

@@ -3,9 +3,9 @@
 
 port = "27017";
 
-if (db.getMongo().host.indexOf(":") >= 0) {
-    var idx = db.getMongo().host.indexOf(":");
-    port = db.getMongo().host.substring(idx + 1);
+if (db.getBongo().host.indexOf(":") >= 0) {
+    var idx = db.getBongo().host.indexOf(":");
+    port = db.getBongo().host.substring(idx + 1);
 }
 
 var goodStrings = [
@@ -17,7 +17,7 @@ var goodStrings = [
 var missingConnString = /^Missing connection string$/;
 var incorrectType = /^Incorrect type/;
 var emptyConnString = /^Empty connection string$/;
-var badHost = /^Failed to parse mongodb/;
+var badHost = /^Failed to parse bongodb/;
 var emptyHost = /^Empty host component/;
 var noPort = /^No digits/;
 var badPort = /^Bad digit/;
@@ -35,25 +35,25 @@ var badStrings = [
     {s: "/test", r: badHost},
     {s: ":/", r: emptyHost},
     {s: ":/test", r: emptyHost},
-    {s: "mongodb://:" + port + "/", r: emptyHost},
-    {s: "mongodb://:" + port + "/test", r: emptyHost},
-    {s: "mongodb://localhost:/test", r: noPort},
-    {s: "mongodb://127.0.0.1:/test", r: noPort},
-    {s: "mongodb://127.0.0.1:cat/test", r: badPort},
-    {s: "mongodb://127.0.0.1:1cat/test", r: badPort},
-    {s: "mongodb://127.0.0.1:123456/test", r: invalidPort},
-    {s: "mongodb://127.0.0.1:65536/test", r: invalidPort},
-    {s: "mongodb://::1:65536/test", r: multipleColon},
-    {s: "mongodb://::1:" + port + "/", r: multipleColon}
+    {s: "bongodb://:" + port + "/", r: emptyHost},
+    {s: "bongodb://:" + port + "/test", r: emptyHost},
+    {s: "bongodb://localhost:/test", r: noPort},
+    {s: "bongodb://127.0.0.1:/test", r: noPort},
+    {s: "bongodb://127.0.0.1:cat/test", r: badPort},
+    {s: "bongodb://127.0.0.1:1cat/test", r: badPort},
+    {s: "bongodb://127.0.0.1:123456/test", r: invalidPort},
+    {s: "bongodb://127.0.0.1:65536/test", r: invalidPort},
+    {s: "bongodb://::1:65536/test", r: multipleColon},
+    {s: "bongodb://::1:" + port + "/", r: multipleColon}
 ];
 
 function testGoodAsURI(i, uri) {
-    uri = "mongodb://" + uri;
+    uri = "bongodb://" + uri;
     print("\nTesting good uri " + i + " (\"" + uri + "\") ...");
     var gotException = false;
     var exception;
     try {
-        var m_uri = MongoURI(uri);
+        var m_uri = BongoURI(uri);
         var connectDB = connect(uri);
         connectDB = null;
     } catch (e) {

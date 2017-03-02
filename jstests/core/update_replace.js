@@ -2,8 +2,8 @@
 
 // Create a new connection object so it won't affect the global connection when we modify
 // it's settings.
-var conn = new Mongo(db.getMongo().host);
-conn.forceWriteMode(db.getMongo().writeMode());
+var conn = new Bongo(db.getBongo().host);
+conn.forceWriteMode(db.getBongo().writeMode());
 t = conn.getDB(db.getName()).jstests_update_replace;
 t.drop();
 

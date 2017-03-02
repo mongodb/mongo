@@ -5,7 +5,7 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({name: "write_commands", mongos: 2, shards: 2});
+    var st = new ShardingTest({name: "write_commands", bongos: 2, shards: 2});
 
     var dbTestName = 'WriteCommandsTestDB';
     var collName = dbTestName + '.TestColl';
@@ -54,13 +54,13 @@
     printjson(st.d0.getDB(dbTestName).TestColl.find({}).toArray());
     printjson(st.d1.getDB(dbTestName).TestColl.find({}).toArray());
 
-    // Now restart all mongod instances, so they don't know yet that they are sharded
-    st.restartMongod(0);
-    st.restartMongod(1);
+    // Now restart all bongod instances, so they don't know yet that they are sharded
+    st.restartBongod(0);
+    st.restartBongod(1);
 
-    // Now that both mongod shards are restarted, they don't know yet that they are part of a
+    // Now that both bongod shards are restarted, they don't know yet that they are part of a
     // sharded
-    // cluster until they get a setShardVerion command. Mongos instance s1 has stale metadata and
+    // cluster until they get a setShardVerion command. Bongos instance s1 has stale metadata and
     // doesn't know that chunk with key 19 has moved to shard0000 so it will send it to shard0001 at
     // first.
     //

@@ -3,13 +3,13 @@
 (function() {
     "use strict";
 
-    function serverIsMongos() {
+    function serverIsBongos() {
         const res = db.runCommand("ismaster");
         assert.commandWorked(res);
         return res.msg === "isdbgrid";
     }
 
-    const isMongoS = serverIsMongos();
+    const isBongoS = serverIsBongos();
     const isMMAPv1 = jsTest.options().storageEngine === "mmapv1";
 
     let testDB = db.getSiblingDB("dbstats_js");
@@ -24,8 +24,8 @@
     assert.commandWorked(dbStats);
 
     if (isMMAPv1) {
-        if (isMongoS) {
-            // When this test is run against mongoS with the mmapV1 storage engine the 'objects' and
+        if (isBongoS) {
+            // When this test is run against bongoS with the mmapV1 storage engine the 'objects' and
             // 'indexes' counts will vary depending on whether 'testColl' is sharded and on the # of
             // shards (due to inclusion of system.indexes & system.namespaces counts).
             assert(dbStats.hasOwnProperty("objects"), tojson(dbStats));
@@ -45,8 +45,8 @@
         assert.eq(dataSize, dbStats.avgObjSize, tojson(dbStats));
         assert.eq(dataSize, dbStats.dataSize, tojson(dbStats));
 
-        // Index count will vary on mongoS if an additional index is needed to support sharding.
-        if (isMongoS) {
+        // Index count will vary on bongoS if an additional index is needed to support sharding.
+        if (isBongoS) {
             assert(dbStats.hasOwnProperty("indexes"), tojson(dbStats));
         } else {
             assert.eq(2, dbStats.indexes, tojson(dbStats));
@@ -57,16 +57,16 @@
     assert(dbStats.hasOwnProperty("numExtents"), tojson(dbStats));
     assert(dbStats.hasOwnProperty("indexSize"), tojson(dbStats));
 
-    // Confirm extentFreeList field existence. Displayed for mongoD running MMAPv1 and for mongoS
+    // Confirm extentFreeList field existence. Displayed for bongoD running MMAPv1 and for bongoS
     // regardless of storage engine.
-    if (isMMAPv1 || isMongoS) {
+    if (isMMAPv1 || isBongoS) {
         assert(dbStats.hasOwnProperty("extentFreeList"), tojson(dbStats));
         assert(dbStats.extentFreeList.hasOwnProperty("num"), tojson(dbStats));
         assert(dbStats.extentFreeList.hasOwnProperty("totalSize"), tojson(dbStats));
     }
 
-    // Confirm collection and view counts on mongoD
-    if (!isMongoS) {
+    // Confirm collection and view counts on bongoD
+    if (!isBongoS) {
         assert.eq(testDB.getName(), dbStats.db, tojson(dbStats));
 
         // We wait to add a view until this point as it allows more exact testing of avgObjSize for

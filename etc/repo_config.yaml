@@ -4,21 +4,21 @@ services:
 templates:
   deb:
     org: |
-      Origin: mongodb
-      Label: mongodb
+      Origin: bongodb
+      Label: bongodb
       Suite: {{ .CodeName }}
-      Codename: {{ .CodeName }}/mongodb-org
+      Codename: {{ .CodeName }}/bongodb-org
       Architectures: {{ .Architectures }}
       Components: {{ .Component }}
-      Description: MongoDB packages
+      Description: BongoDB packages
     enterprise: |
-      Origin: mongodb
-      Label: mongodb
+      Origin: bongodb
+      Label: bongodb
       Suite: {{ .CodeName }}
-      Codename: {{ .CodeName }}/mongodb-enterprise
+      Codename: {{ .CodeName }}/bongodb-enterprise
       Architectures: {{ .Architectures }}
       Components: {{ .Component }}
-      Description: MongoDB packages
+      Description: BongoDB packages
   index_page: |
     <!DOCTYPE html>
     <html>
@@ -69,100 +69,100 @@ repos:
   - name: rhel62
     type: rpm
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.bongodb.org
     repos:
-      - yum/redhat/6/mongodb-org
-      - yum/redhat/6Server/mongodb-org
+      - yum/redhat/6/bongodb-org
+      - yum/redhat/6Server/bongodb-org
 
   - name: rhel70
     type: rpm
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.bongodb.org
     repos:
-      - yum/redhat/7/mongodb-org
-      - yum/redhat/7Server/mongodb-org
+      - yum/redhat/7/bongodb-org
+      - yum/redhat/7Server/bongodb-org
 
   - name: amazon
     type: rpm
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.bongodb.org
     repos:
-      - yum/amazon/2013.03/mongodb-org
+      - yum/amazon/2013.03/bongodb-org
 
   - name: suse11
     type: rpm
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.bongodb.org
     repos:
-      - zypper/suse/11/mongodb-org
+      - zypper/suse/11/bongodb-org
 
   - name: suse12
     type: rpm
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.bongodb.org
     repos:
-      - zypper/suse/12/mongodb-org
+      - zypper/suse/12/bongodb-org
 
   - name: debian81
     type: deb
     code_name: "jessie"
-    bucket: repo.mongodb.org
+    bucket: repo.bongodb.org
     edition: org
     component: main
     architectures:
       - amd64
       - i386
     repos:
-      - apt/debian/dists/jessie/mongodb-org
+      - apt/debian/dists/jessie/bongodb-org
 
   - name: debian71
     type: deb
     code_name: "wheezy"
-    bucket: repo.mongodb.org
+    bucket: repo.bongodb.org
     edition: org
     component: main
     architectures:
       - amd64
       - i386
     repos:
-      - apt/debian/dists/wheezy/mongodb-org
+      - apt/debian/dists/wheezy/bongodb-org
 
   - name: ubuntu1204
     type: deb
     code_name: "precise"
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.bongodb.org
     component: multiverse
     architectures:
       - amd64
       - i386
     repos:
-      - apt/ubuntu/dists/precise/mongodb-org
+      - apt/ubuntu/dists/precise/bongodb-org
 
   - name: ubuntu1404
     type: deb
     code_name: "trusty"
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.bongodb.org
     component: multiverse
     architectures:
       - amd64
       - i386
     repos:
-      - apt/ubuntu/dists/trusty/mongodb-org
+      - apt/ubuntu/dists/trusty/bongodb-org
 
   - name: ubuntu1604
     type: deb
     code_name: "xenial"
     edition: org
-    bucket: repo.mongodb.org
+    bucket: repo.bongodb.org
     component: multiverse
     architectures:
       - amd64
       - arm64
       - i386
     repos:
-      - apt/ubuntu/dists/xenial/mongodb-org
+      - apt/ubuntu/dists/xenial/bongodb-org
 
 ####################
 #
@@ -173,61 +173,61 @@ repos:
   - name: rhel62
     type: rpm
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.bongodb.com
     repos:
-      - yum/redhat/6/mongodb-enterprise
-      - yum/redhat/6Server/mongodb-enterprise
+      - yum/redhat/6/bongodb-enterprise
+      - yum/redhat/6Server/bongodb-enterprise
 
   - name: rhel70
     type: rpm
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.bongodb.com
     repos:
-      - yum/redhat/7/mongodb-enterprise
-      - yum/redhat/7Server/mongodb-enterprise
+      - yum/redhat/7/bongodb-enterprise
+      - yum/redhat/7Server/bongodb-enterprise
 
   - name: rhel71
     type: rpm
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.bongodb.com
     repos:
-      - yum/redhat/7/mongodb-enterprise
-      - yum/redhat/7Server/mongodb-enterprise
+      - yum/redhat/7/bongodb-enterprise
+      - yum/redhat/7Server/bongodb-enterprise
 
   - name: rhel72
     type: rpm
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.bongodb.com
     repos:
-      - yum/redhat/7/mongodb-enterprise
-      - yum/redhat/7Server/mongodb-enterprise
+      - yum/redhat/7/bongodb-enterprise
+      - yum/redhat/7Server/bongodb-enterprise
 
   - name: amazon
     type: rpm
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.bongodb.com
     repos:
-      - yum/amazon/2013.03/mongodb-enterprise
+      - yum/amazon/2013.03/bongodb-enterprise
 
   - name: suse11
     type: rpm
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.bongodb.com
     repos:
-      - zypper/suse/11/mongodb-enterprise
+      - zypper/suse/11/bongodb-enterprise
 
   - name: suse12
     type: rpm
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.bongodb.com
     repos:
-      - zypper/suse/12/mongodb-enterprise
+      - zypper/suse/12/bongodb-enterprise
 
   - name: debian81
     type: deb
     edition: enterprise
     code_name: "jessie"
-    bucket: repo.mongodb.com
+    bucket: repo.bongodb.com
     component: main
     architectures:
       - amd64
@@ -235,13 +235,13 @@ repos:
       - s390x
       - i386
     repos:
-      - apt/debian/dists/jessie/mongodb-enterprise
+      - apt/debian/dists/jessie/bongodb-enterprise
 
   - name: debian71
     type: deb
     code_name: "wheezy"
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.bongodb.com
     component: main
     architectures:
       - amd64
@@ -249,13 +249,13 @@ repos:
       - s390x
       - i386
     repos:
-      - apt/debian/dists/wheezy/mongodb-enterprise
+      - apt/debian/dists/wheezy/bongodb-enterprise
 
   - name: ubuntu1204
     type: deb
     code_name: "precise"
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.bongodb.com
     component: multiverse
     architectures:
       - amd64
@@ -263,13 +263,13 @@ repos:
       - s390x
       - i386
     repos:
-      - apt/ubuntu/dists/precise/mongodb-enterprise
+      - apt/ubuntu/dists/precise/bongodb-enterprise
 
   - name: ubuntu1404
     type: deb
     code_name: "trusty"
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.bongodb.com
     component: multiverse
     architectures:
       - amd64
@@ -277,13 +277,13 @@ repos:
       - s390x
       - i386
     repos:
-      - apt/ubuntu/dists/trusty/mongodb-enterprise
+      - apt/ubuntu/dists/trusty/bongodb-enterprise
 
   - name: ubuntu1604
     type: deb
     code_name: "xenial"
     edition: enterprise
-    bucket: repo.mongodb.com
+    bucket: repo.bongodb.com
     component: multiverse
     architectures:
       - amd64
@@ -292,4 +292,4 @@ repos:
       - arm64
       - i386
     repos:
-      - apt/ubuntu/dists/xenial/mongodb-enterprise
+      - apt/ubuntu/dists/xenial/bongodb-enterprise

@@ -14,7 +14,7 @@
 
     // Note: Adding new replica set member by hand because of SERVER-24011.
 
-    var newNode = MongoRunner.runMongod(
+    var newNode = BongoRunner.runBongod(
         {configsvr: '', replSet: st.configRS.name, storageEngine: 'wiredTiger'});
 
     var replConfig = st.configRS.getReplSetConfigFromNode();
@@ -73,7 +73,7 @@
     st.rs0.stop(0);
     st.rs0.stop(1);
 
-    MongoRunner.stopMongod(newNode.port);
+    BongoRunner.stopBongod(newNode.port);
 
     replConfig = st.configRS.getReplSetConfigFromNode();
     replConfig.version += 1;

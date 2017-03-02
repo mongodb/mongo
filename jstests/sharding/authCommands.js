@@ -12,10 +12,10 @@
             {keyFile: 'jstests/libs/key1', useHostname: false, chunkSize: 2, enableAutoSplit: true},
     });
 
-    var mongos = st.s;
-    var adminDB = mongos.getDB('admin');
-    var configDB = mongos.getDB('config');
-    var testDB = mongos.getDB('test');
+    var bongos = st.s;
+    var adminDB = bongos.getDB('admin');
+    var configDB = bongos.getDB('config');
+    var testDB = bongos.getDB('test');
 
     jsTestLog('Setting up initial users');
     var rwUser = 'rwUser';
@@ -28,14 +28,14 @@
     assert(adminDB.auth(rwUser, password));
 
     // Secondaries should be up here, since we awaitReplication in the ShardingTest, but we *don't*
-    // wait for the mongos to explicitly detect them.
-    awaitRSClientHosts(mongos, st.rs0.getSecondaries(), {ok: true, secondary: true});
-    awaitRSClientHosts(mongos, st.rs1.getSecondaries(), {ok: true, secondary: true});
+    // wait for the bongos to explicitly detect them.
+    awaitRSClientHosts(bongos, st.rs0.getSecondaries(), {ok: true, secondary: true});
+    awaitRSClientHosts(bongos, st.rs1.getSecondaries(), {ok: true, secondary: true});
 
     testDB.createUser({user: rwUser, pwd: password, roles: jsTest.basicUserRoles});
     testDB.createUser({user: roUser, pwd: password, roles: jsTest.readOnlyUserRoles});
 
-    var authenticatedConn = new Mongo(mongos.host);
+    var authenticatedConn = new Bongo(bongos.host);
     authenticatedConn.getDB('admin').auth(rwUser, password);
 
     // Add user to shards to prevent localhost connections from having automatic full access

@@ -5,7 +5,7 @@ var CA_CERT = "jstests/libs/ca.pem";
 
 function testSSLTransition(oldMode, newMode, shouldSucceed) {
     var conn =
-        MongoRunner.runMongod({sslMode: oldMode, sslPEMKeyFile: SERVER_CERT, sslCAFile: CA_CERT});
+        BongoRunner.runBongod({sslMode: oldMode, sslPEMKeyFile: SERVER_CERT, sslCAFile: CA_CERT});
 
     var adminDB = conn.getDB("admin");
     adminDB.createUser({user: "root", pwd: "pwd", roles: ['root']});
@@ -13,11 +13,11 @@ function testSSLTransition(oldMode, newMode, shouldSucceed) {
     var res = adminDB.runCommand({"setParameter": 1, "sslMode": newMode});
 
     assert(res["ok"] == shouldSucceed, tojson(res));
-    MongoRunner.stopMongod(conn.port);
+    BongoRunner.stopBongod(conn.port);
 }
 
 function testAuthModeTransition(oldMode, newMode, sslMode, shouldSucceed) {
-    var conn = MongoRunner.runMongod({
+    var conn = BongoRunner.runBongod({
         sslMode: sslMode,
         sslPEMKeyFile: SERVER_CERT,
         sslCAFile: CA_CERT,
@@ -30,7 +30,7 @@ function testAuthModeTransition(oldMode, newMode, sslMode, shouldSucceed) {
     var res = adminDB.runCommand({"setParameter": 1, "clusterAuthMode": newMode});
 
     assert(res["ok"] == shouldSucceed, tojson(res));
-    MongoRunner.stopMongod(conn.port);
+    BongoRunner.stopBongod(conn.port);
 }
 
 testSSLTransition("allowSSL", "invalid", false);

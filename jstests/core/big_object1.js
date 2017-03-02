@@ -36,7 +36,7 @@ if (db.adminCommand("buildinfo").bits == 64) {
     for (i = 0; i < x; i++) {
         o = t.findOne({_id: i});
         try {
-            // test large mongo -> js conversion
+            // test large bongo -> js conversion
             var a = o.a;
         } catch (e) {
             assert(false, "Caught exception trying to insert during iteration " + i + ": " + e);

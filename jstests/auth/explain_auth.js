@@ -1,6 +1,6 @@
 // Test auth of the explain command.
 
-var conn = MongoRunner.runMongod({auth: ""});
+var conn = BongoRunner.runBongod({auth: ""});
 var authzErrorCode = 13;
 
 var admin = conn.getDB("admin");

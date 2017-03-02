@@ -105,7 +105,7 @@
 
     // Test against the standalone started by resmoke.py.
     const nDocs = 1000 * 10;
-    const conn = db.getMongo();
+    const conn = db.getBongo();
     populateData(conn, nDocs);
     doExecutionTest(conn);
 

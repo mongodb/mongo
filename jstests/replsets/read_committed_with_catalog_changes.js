@@ -219,7 +219,7 @@ load("jstests/replsets/rslib.js");       // For startSetIfSupportsReadMajority.
             coll.runCommand('find', {"readConcern": {"level": "majority"}, "maxTimeMS": timeoutMs});
         assert.commandWorked(res, 'reading from ' + coll.getFullName());
         // Exhaust the cursor to avoid leaking cursors on the server.
-        new DBCommandCursor(coll.getMongo(), res).itcount();
+        new DBCommandCursor(coll.getBongo(), res).itcount();
     }
 
     // Set up a set and grab things for later.
@@ -309,7 +309,7 @@ load("jstests/replsets/rslib.js");       // For startSetIfSupportsReadMajority.
             function bgThread(host, collection, assertReadsSucceed) {
                 // Use a longer timeout since we expect to block for a little while (at least 2
                 // seconds).
-                assertReadsSucceed(new Mongo(host).getCollection(collection), 30 * 1000);
+                assertReadsSucceed(new Bongo(host).getCollection(collection), 30 * 1000);
             }
             var thread = new ScopedThread(
                 bgThread, primary.host, mainDB[name].getFullName(), assertReadsSucceed);

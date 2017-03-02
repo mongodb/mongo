@@ -85,7 +85,7 @@
             oplogDeleteFromPoint: ts(deletePoint),
         };
 
-        // This weird mechanism is the only way to bypass mongod's attempt to fill in null
+        // This weird mechanism is the only way to bypass bongod's attempt to fill in null
         // Timestamps.
         assert.writeOK(minValidColl.remove({}));
         assert.writeOK(minValidColl.update({}, {$set: injectedMinValidDoc}, {upsert: true}));

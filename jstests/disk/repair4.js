@@ -4,11 +4,11 @@
 // @tags: [requires_mmapv1]
 
 var baseName = "jstests_disk_repair4";
-var smallbase = MongoRunner.dataDir + "/repairpartitiontest";
+var smallbase = BongoRunner.dataDir + "/repairpartitiontest";
 var smallpath = smallbase + "/dir";
 
 doIt = false;
-files = listFiles(MongoRunner.dataDir);
+files = listFiles(BongoRunner.dataDir);
 for (i in files) {
     if (files[i].name == smallbase) {
         doIt = true;
@@ -21,12 +21,12 @@ if (!doIt) {
 }
 
 if (doIt) {
-    var repairpath = MongoRunner.dataPath + baseName + "/";
+    var repairpath = BongoRunner.dataPath + baseName + "/";
 
     resetDbpath(smallpath);
     resetDbpath(repairpath);
 
-    var m = MongoRunner.runMongod({
+    var m = BongoRunner.runBongod({
         nssize: "8",
         noprealloc: "",
         smallfiles: "",
@@ -50,5 +50,5 @@ if (doIt) {
     }
 
     check();
-    MongoRunner.stopMongod(port);
+    BongoRunner.stopBongod(port);
 }

@@ -1,0 +1,1083 @@
+# -*- mode: python -*-
+
+Import("env")
+Import("has_option")
+Import("wiredtiger")
+
+env = env.Clone()
+
+# Ideally 's2' would be scoped narrowly but it is spammed in all over the place by
+# db/geo unfortunately.
+env.InjectThirdPartyIncludePaths(libraries=[
+    's2',
+])
+
+env.SConscript(
+    dirs=[
+        'auth',
+        'bson',
+        'catalog',
+        'commands',
+        'concurrency',
+        'exec',
+        'fts',
+        'ftdc',
+        'geo',
+        'index',
+        'matcher',
+        'ops',
+        'pipeline',
+        'query',
+        'repl',
+        's',
+        'sorter',
+        'stats',
+        'storage',
+        'views',
+    ],
+    exports=[
+        'env',
+    ],
+)
+
+#
+# The db/'common' lib has the abstractions that are shared by components of the
+# server. Ideally, many of the object in 'coredb' should be moved here when their dependencies
+# get resolved.
+#
+
+env.Library(
+    target= 'common',
+    source= [
+        'field_ref.cpp',
+        'field_ref_set.cpp',
+        'field_parser.cpp',
+        'keypattern.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+        '$BUILD_DIR/bongo/db/index_names',
+        '$BUILD_DIR/bongo/db/write_concern_options',
+    ]
+)
+
+env.Library(
+    target='initialize_snmp',
+    source= [
+        'initialize_snmp.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target= 'field_ref_test',
+    source= 'field_ref_test.cpp',
+    LIBDEPS=[
+        'common',
+    ],
+)
+
+env.CppUnitTest(
+    target= 'field_ref_set_test',
+    source = 'field_ref_set_test.cpp',
+    LIBDEPS=[
+        'common',
+    ],
+)
+
+env.CppUnitTest(
+    target= 'field_parser_test',
+    source= 'field_parser_test.cpp',
+    LIBDEPS=[
+        'common',
+    ],
+)
+
+env.CppUnitTest(
+    target= 'hasher_test',
+    source= [
+        'hasher_test.cpp',
+    ],
+    LIBDEPS=[
+        'common',
+        '$BUILD_DIR/bongo/db/bongohasher',
+    ],
+)
+
+env.CppUnitTest(
+    target= 'keypattern_test',
+    source= 'keypattern_test.cpp',
+    LIBDEPS=[
+        'common'
+    ],
+)
+
+env.Library(
+    target="dbmessage",
+    source=[
+        "dbmessage.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/transport/transport_layer_common',
+        '$BUILD_DIR/bongo/util/net/network',
+    ]
+)
+
+env.CppUnitTest(
+    target="dbmessage_test",
+    source=[
+        "dbmessage_test.cpp"
+    ],
+    LIBDEPS=[
+        "dbmessage",
+    ],
+)
+env.CppUnitTest('record_id_test', 'record_id_test.cpp', LIBDEPS=[])
+
+env.Library(
+    target='startup_warnings_common',
+    source=[
+        'startup_warnings_common.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+        '$BUILD_DIR/bongo/util/net/network',
+    ]
+)
+
+env.Library(
+    target='startup_warnings_bongod',
+    source=[
+        'startup_warnings_bongod.cpp',
+    ],
+    LIBDEPS=[
+        'startup_warnings_common',
+        '$BUILD_DIR/bongo/util/processinfo',
+    ]
+)
+
+env.CppUnitTest(
+    target='startup_warnings_bongod_test',
+    source=[
+        'startup_warnings_bongod_test.cpp',
+    ],
+    LIBDEPS=[
+        'startup_warnings_bongod',
+    ],
+)
+
+env.Library(
+    target='curop',
+    source=[
+        'curop.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/bongo/db/commands',
+        '$BUILD_DIR/bongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/bongo/db/service_context',
+        '$BUILD_DIR/bongo/db/query/command_request_response',
+        '$BUILD_DIR/bongo/rpc/client_metadata',
+        '$BUILD_DIR/bongo/util/fail_point',
+        '$BUILD_DIR/bongo/util/net/network',
+        '$BUILD_DIR/bongo/util/progress_meter',
+    ],
+)
+
+env.CppUnitTest(
+    target='operation_context_test',
+    source=[
+        'operation_context_test.cpp',
+    ],
+    LIBDEPS=[
+        'service_context',
+        '$BUILD_DIR/bongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/bongo/db/service_context_noop_init',
+        '$BUILD_DIR/bongo/unittest/concurrency',
+        '$BUILD_DIR/bongo/util/clock_source_mock',
+    ],
+)
+
+env.Library(
+    target='index_names',
+    source=[
+        "index_names.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+    ]
+)
+
+env.Library(
+    target='bongohasher',
+    source=[
+        "hasher.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+        '$BUILD_DIR/bongo/util/md5',
+    ]
+)
+
+# Range arithmetic library, used by both bongod and bongos
+env.Library(
+    target='range_arithmetic',
+    source=[
+        'range_arithmetic.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target='range_arithmetic_test',
+    source=[
+        'range_arithmetic_test.cpp',
+    ],
+    LIBDEPS=[
+        'range_arithmetic',
+    ],
+)
+
+env.Library(
+    target='namespace_string',
+    source=[
+        'namespace_string.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target='namespace_string_test',
+    source=[
+        'namespace_string_test.cpp',
+    ],
+    LIBDEPS=[
+        'namespace_string',
+    ],
+)
+
+env.Library(
+    target="server_parameters",
+    source=[
+        "server_parameters.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/bongo/base",
+    ],
+)
+
+env.CppUnitTest(
+    target="server_parameters_test",
+    source=[
+        "server_parameters_test.cpp",
+    ],
+    LIBDEPS=[
+        "server_parameters",
+        '$BUILD_DIR/bongo/db/service_context',
+    ],
+)
+
+env.Library(
+    target='update_index_data',
+    source=[
+        'update_index_data.cpp'
+    ],
+    LIBDEPS=[
+        'common',
+    ],
+)
+
+env.CppUnitTest(
+    target='update_index_data_test',
+    source=[
+        'update_index_data_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+        'common',
+        'update_index_data',
+    ],
+)
+
+env.Library(
+    target='collection_index_usage_tracker',
+    source=[
+        'collection_index_usage_tracker.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+    ],
+)
+
+env.CppUnitTest(
+    target='collection_index_usage_tracker_test',
+    source=[
+        'collection_index_usage_tracker_test.cpp',
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/bongo/util/clock_source_mock",
+        'collection_index_usage_tracker',
+    ],
+)
+
+# This library exists because some libraries, such as our networking library, need access to server
+# options, but not to the helpers to set them from the command line.  libserver_options_core.a just
+# has the structure for storing the server options, while libserver_options.a has the code to set
+# them via the command line.
+env.Library(
+    target="server_options_core",
+    source=[
+        "server_options.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+    ],
+)
+
+env.Clone().InjectModule("enterprise").Library(
+    target="server_options",
+    source=[
+        "server_options_helpers.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+        '$BUILD_DIR/bongo/util/cmdline_utils/cmdline_utils',
+        '$BUILD_DIR/bongo/transport/message_compressor',
+        # The dependency on network is a temporary crutch that should go away once the
+        # networking library has separate options
+        '$BUILD_DIR/bongo/util/net/network',
+        '$BUILD_DIR/bongo/util/options_parser/options_parser',
+        'server_options_core',
+        'server_parameters',
+    ],
+)
+
+env.CppUnitTest(
+    target='server_options_test',
+    source=[
+        'server_options_test.cpp',
+    ],
+    LIBDEPS=[
+        'server_options',
+    ],
+)
+
+env.Library(
+    target='range_deleter',
+    source=[
+        'range_deleter.cpp',
+        'range_deleter_mock_env.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+        '$BUILD_DIR/bongo/db/common',
+        '$BUILD_DIR/bongo/db/repl/repl_coordinator_global',
+        '$BUILD_DIR/bongo/db/service_context',
+        'range_arithmetic',
+    ],
+)
+
+env.CppUnitTest(
+    target='range_deleter_test',
+    source=[
+        'range_deleter_test.cpp',
+    ],
+    LIBDEPS=[
+        'common',
+        'range_deleter',
+        '$BUILD_DIR/bongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/bongo/db/repl/replmocks',
+        '$BUILD_DIR/bongo/db/service_context_noop_init',
+    ],
+)
+
+# This library is linked into bongos and bongod only, not into the shell or any tools.
+env.Library(
+    target="bongodandbongos",
+    source=[
+        "dbwebserver.cpp",
+        "initialize_server_global_state.cpp",
+        "server_extra_log_context.cpp",
+        "server_options_init.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/bongo/client/clientdriver",
+        "$BUILD_DIR/bongo/db/auth/authservercommon",
+        "$BUILD_DIR/bongo/logger/max_log_size",
+        "$BUILD_DIR/bongo/rpc/command_reply",
+        "$BUILD_DIR/bongo/rpc/command_request",
+        "$BUILD_DIR/bongo/rpc/metadata",
+        "$BUILD_DIR/bongo/util/net/miniwebserver",
+        "$BUILD_DIR/bongo/util/processinfo",
+        "$BUILD_DIR/bongo/util/signal_handlers",
+        "auth/authorization_manager_global",
+    ],
+)
+
+env.Library(
+    target="bongodwebserver",
+    source=[
+        "clientlistplugin.cpp",
+        "restapi.cpp",
+        "stats/snapshots_webplugins.cpp",
+        "repl/replset_web_handler.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/db/background',
+        "$BUILD_DIR/bongo/db/curop",
+        '$BUILD_DIR/bongo/db/clientcursor',
+        "$BUILD_DIR/bongo/db/dbdirectclient",
+        '$BUILD_DIR/bongo/db/stats/fill_locker_info',
+        '$BUILD_DIR/bongo/db/stats/serveronly',
+        "$BUILD_DIR/bongo/util/net/miniwebserver",
+        "bongodandbongos",
+        'repl/repl_coordinator_global',
+    ],
+)
+
+# bongod options
+env.Library(
+    target="bongod_options",
+    source=[
+        "bongod_options.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/util/options_parser/options_parser_init',
+        'diag_log',
+        'repl/repl_settings',
+        'server_options',
+        "storage/mmap_v1/storage_mmapv1",
+        'storage/storage_options',
+    ],
+)
+
+env.Library(
+    target="write_concern_options",
+    source=[
+        "write_concern_options.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/bson/util/bson_extract',
+    ],
+)
+
+env.CppUnitTest(
+    target= 'write_concern_options_test',
+    source= 'write_concern_options_test.cpp',
+    LIBDEPS=[
+        'write_concern_options',
+    ],
+)
+
+env.Library(
+    target='service_context',
+    source=[
+        'client.cpp',
+        'operation_context.cpp',
+        'service_context.cpp',
+        'service_context_noop.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/util/clock_sources',
+        '$BUILD_DIR/bongo/util/concurrency/spin_lock',
+        '$BUILD_DIR/bongo/util/decorable',
+        '$BUILD_DIR/bongo/util/fail_point',
+        '$BUILD_DIR/bongo/util/net/hostandport',
+        '$BUILD_DIR/bongo/transport/transport_layer_common',
+        '$BUILD_DIR/bongo/transport/transport_layer_manager',
+    ],
+)
+
+env.Library(
+    target='service_context_noop_init',
+    source=[
+        'service_context_noop_init.cpp'
+    ],
+    LIBDEPS=[
+        'service_context',
+    ],
+)
+
+env.Library(
+    target='lasterror',
+    source=[
+        "lasterror.cpp",
+    ],
+    LIBDEPS=[
+        'service_context',
+    ],
+)
+
+env.Clone().InjectModule("enterprise").Library(
+    target="audit",
+    source=[
+        "audit.cpp",
+    ],
+    LIBDEPS=[
+    ],
+)
+
+env.Library(
+    target="commands",
+    source=[
+        'commands.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+        '$BUILD_DIR/bongo/bson/mutable/mutable_bson',
+        '$BUILD_DIR/bongo/db/auth/authcore',
+        '$BUILD_DIR/bongo/db/wire_version',
+        '$BUILD_DIR/bongo/rpc/command_status',
+        '$BUILD_DIR/bongo/rpc/rpc',
+        '$BUILD_DIR/bongo/s/write_ops/batch_write_types',
+        'audit',
+        'auth/authorization_manager_global',
+        'commands/server_status_core',
+        'commands/test_commands_enabled',
+        'service_context',
+    ],
+)
+
+env.CppUnitTest(
+    target="commands_test",
+    source=[
+        "commands_test.cpp",
+    ],
+    LIBDEPS=[
+        "commands",
+        "service_context_noop_init",
+        "auth/authorization_manager_mock_init",
+        "repl/replmocks",
+    ],
+)
+
+# TODO: This library should probably be folded into catalog/catalog,
+# with which it is currently circular.
+env.Library(
+    target='db_raii',
+    source=[
+        'db_raii.cpp',
+    ],
+    LIBDEPS=[
+        'catalog/catalog',
+        'stats/top',
+        'views/views',
+    ],
+)
+
+env.Library(
+    target='run_commands',
+    source=[
+        'run_commands.cpp',
+    ],
+    LIBDEPS=[
+        "commands",
+        "curop",
+    ],
+)
+
+env.Library(
+    target='dbdirectclient',
+    source=[
+        'dbdirectclient.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/client/clientdriver',
+        'curop',
+        'lasterror',
+        # 'assemble_response', # CYCLE
+    ],
+    LIBDEPS_TAGS=[
+        # TODO(ADAM, 2017-01-09): See `CYCLE` tags above
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+    ],
+)
+
+env.Library(
+    target='dbhelpers',
+    source=[
+        'dbhelpers.cpp',
+    ],
+    LIBDEPS=[
+        'db_raii',
+        'index/index_access_methods',
+        'ops/write_ops',
+    ],
+)
+
+env.Library(
+    target="service_context_d",
+    source=[
+        "operation_context_impl.cpp",
+        "service_context_d.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+        'concurrency/lock_manager',
+        'curop',
+        'storage/storage_engine_lock_file',
+        'storage/storage_engine_metadata',
+        'storage/storage_options',
+    ],
+)
+
+env.Library(
+    target="op_observer_d",
+    source=[
+        "op_observer_impl.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+        'commands/dcommands',
+        'repl/serveronly',
+        'views/views_bongod',
+    ],
+)
+
+env.Library(
+    target="background",
+    source=[
+        "background.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/bongo/base",
+    ],
+)
+
+env.Library(
+    target="clientcursor",
+    source=[
+        "clientcursor.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/bongo/base",
+        "$BUILD_DIR/bongo/util/background_job",
+        "catalog/catalog",
+        "query/query",
+    ],
+)
+
+env.Library(
+    target="cloner",
+    source=[
+        "cloner.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/bongo/base",
+        "catalog/catalog",
+        "dbdirectclient",
+        "ops/write_ops",
+        "repl/isself",
+    ],
+)
+
+env.Library(
+    target="curop_metrics",
+    source=[
+        "curop_metrics.cpp",
+    ],
+    LIBDEPS=[
+        "commands/server_status_core",
+        "curop",
+    ],
+)
+
+env.Library(
+    target="index_d",
+    source=[
+        "index_builder.cpp",
+        "index_legacy.cpp",
+        "index_rebuilder.cpp",
+    ],
+    LIBDEPS=[
+        "catalog/catalog",
+        "db_raii",
+        "index/index_access_methods",
+    ],
+)
+
+env.Library(
+    target="introspect",
+    source=[
+        "introspect.cpp",
+    ],
+    LIBDEPS=[
+        "catalog/catalog",
+        "db_raii",
+    ],
+)
+
+env.Library(
+    target="prefetch",
+    source=[
+        "prefetch.cpp",
+    ],
+    LIBDEPS=[
+        "catalog/catalog",
+        "dbhelpers",
+        "index/index_access_methods",
+    ],
+)
+
+env.Library(
+    target="range_deleter_d",
+    source=[
+        "range_deleter_db_env.cpp",
+        "range_deleter_service.cpp",
+    ],
+    LIBDEPS=[
+        "catalog/catalog",
+        "dbhelpers",
+        "db_raii",
+        "range_deleter",
+    ],
+)
+
+env.Library(
+    target="rw_concern_d",
+    source=[
+        "read_concern.cpp",
+        "write_concern.cpp",
+    ],
+    LIBDEPS=[
+        "concurrency/lock_manager",
+        "curop",
+        "repl/read_concern_args",
+        "repl/repl_coordinator_impl",
+        "repl/repl_coordinator_interface",
+        "stats/timer_stats",
+        "storage/storage_options",
+    ],
+)
+
+env.Library(
+    target="repair_database",
+    source=[
+        "repair_database.cpp",
+    ],
+    LIBDEPS=[
+        "background",
+        "catalog/catalog",
+        "catalog/index_key_validate",
+    ],
+)
+
+env.Library(
+    target="ttl_d",
+    source=[
+        "ttl.cpp",
+    ],
+    LIBDEPS=[
+        "catalog/catalog",
+        "commands/dcommands",
+        "db_raii",
+        "ttl_collection_cache",
+    ],
+)
+
+env.Library(
+    target="diag_log",
+    source=[
+        "diag_log.cpp",
+    ],
+    LIBDEPS=[
+        "storage/storage_options",
+    ],
+)
+
+env.Library(
+    target="assemble_response",
+    source=[
+        "assemble_response.cpp",
+    ],
+    LIBDEPS=[
+        "commands/dcommands",
+        "curop",
+        "curop_metrics",
+        "diag_log",
+        "introspect",
+        "lasterror",
+        "ops/write_ops",
+        "ops/write_ops_parsers",
+        "run_commands",
+        "storage/storage_options",
+    ],
+)
+
+env.Library(
+    target="authz_manager_external_state_factory_d",
+    source=[
+        "authz_manager_external_state_factory_d.cpp",
+    ],
+    LIBDEPS=[
+        'auth/authbongod',
+    ],
+)
+
+env.Library(
+    target="serveronly",
+    source=[
+        # DO NOT ADD ADDITIONAL FILES TO THIS LIST.
+        # See the additional comments in instance.cpp for details.
+        'instance.cpp'
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/bongo/db/bson/dotted_path_support",
+        "$BUILD_DIR/bongo/executor/network_interface_factory",
+        "$BUILD_DIR/bongo/s/catalog/sharding_catalog_client_impl",
+        "$BUILD_DIR/bongo/s/catalog/sharding_catalog_manager_impl",
+        "$BUILD_DIR/bongo/s/client/sharding_connection_hook",
+        "$BUILD_DIR/bongo/s/coreshard",
+        "$BUILD_DIR/bongo/s/shard_id",
+        "$BUILD_DIR/bongo/scripting/scripting_server",
+        "$BUILD_DIR/bongo/util/clock_sources",
+        "$BUILD_DIR/bongo/util/elapsed_tracker",
+        "$BUILD_DIR/bongo/util/net/network",
+        "$BUILD_DIR/bongo/db/storage/mmap_v1/file_allocator",
+        "$BUILD_DIR/third_party/shim_snappy",
+        '$BUILD_DIR/bongo/db/ttl_collection_cache',
+        "assemble_response",
+        "auth/authbongod",
+        "authz_manager_external_state_factory_d",
+        "background",
+        "catalog/catalog",
+        "catalog/collection_options",
+        "catalog/document_validation",
+        "catalog/index_key_validate",
+        "clientcursor",
+        "cloner",
+        "commands/killcursors_common",
+        "commands/dcommands",
+        "collection_index_usage_tracker",
+        "common",
+        "concurrency/lock_manager",
+        "concurrency/write_conflict_exception",
+        "curop",
+        "curop_metrics",
+        "dbdirectclient",
+        "dbhelpers",
+        "db_raii",
+        "diag_log",
+        "exec/exec",
+        "exec/working_set",
+        "fts/ftsbongod",
+        "ftdc/ftdc_bongod",
+        "index/index_descriptor",
+        "index/index_access_methods",
+        "index_d",
+        "introspect",
+        "matcher/expressions_bongod_only",
+        "op_observer_d",
+        "ops/write_ops",
+        "ops/update_driver",
+        "ops/write_ops_parsers",
+        "pipeline/aggregation",
+        "pipeline/serveronly",
+        "prefetch",
+        "query/query",
+        "range_deleter",
+        "range_deleter_d",
+        "repair_database",
+        "repl/bgsync",
+        "repl/initial_sync_common",
+        "repl/oplog_buffer_collection",
+        "repl/oplog_buffer_blocking_queue",
+        "repl/oplog_buffer_proxy",
+        "repl/repl_coordinator_global",
+        "repl/repl_coordinator_impl",
+        "repl/repl_settings",
+        "repl/rs_rollback",
+        "repl/rslog",
+        "repl/serveronly",
+        "repl/storage_interface",
+        "repl/sync_tail",
+        "repl/topology_coordinator_impl",
+        "run_commands",
+        "rw_concern_d",
+        "s/commands",
+        "s/metadata",
+        "s/sharding",
+        "service_context_d",
+        "startup_warnings_bongod",
+        "stats/counters",
+        "stats/serveronly",
+        "stats/top",
+        "storage/devnull/storage_devnull",
+        "storage/ephemeral_for_test/storage_ephemeral_for_test",
+        "storage/mmap_v1/mmap",
+        "storage/mmap_v1/storage_mmapv1",
+        "storage/storage_engine_lock_file",
+        "storage/storage_engine_metadata",
+        "storage/storage_init_d",
+        "storage/storage_options",
+        "storage/wiredtiger/storage_wiredtiger" if wiredtiger else [],
+        "ttl_d",
+        "update_index_data",
+        "views/views_bongod",
+    ],
+)
+
+env.Library(
+    target='logical_time',
+    source=[
+        'logical_time.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+    ],
+)
+
+env.Library(
+    target='signed_logical_time',
+    source=[
+        'signed_logical_time.cpp',
+    ],
+    LIBDEPS=[
+        'logical_time',
+        '$BUILD_DIR/bongo/crypto/sha1_block',
+    ],
+)
+
+env.Library(
+    target='time_proof_service',
+    source=[
+        'time_proof_service.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/crypto/sha1_block_${BONGO_CRYPTO}',
+        'logical_time',
+    ],
+)
+
+env.Library(
+    target='logical_clock',
+    source=[
+        'logical_clock.cpp',
+    ],
+    LIBDEPS=[
+        'service_context',
+        'signed_logical_time',
+        'time_proof_service',
+    ],
+)
+
+env.CppUnitTest(
+    target='logical_time_test',
+    source=[
+        'logical_time_test.cpp',
+    ],
+    LIBDEPS=[
+        'logical_time',
+        'signed_logical_time',
+        'time_proof_service',
+    ],
+)
+
+env.CppUnitTest(
+    target='logical_clock_test',
+    source=[
+        'logical_clock_test.cpp',
+    ],
+    LIBDEPS=[
+        'service_context',
+        'logical_clock',
+        'signed_logical_time',
+    ],
+)
+
+env.Library(
+    target= 'logical_clock_test_fixture',
+    source= [
+        'logical_clock_test_fixture.cpp',
+    ],
+    LIBDEPS= [
+        'service_context',
+        'logical_clock',
+        'signed_logical_time',
+        '$BUILD_DIR/bongo/unittest/unittest',
+    ],
+)
+
+env.CppUnitTest(
+    target='time_proof_service_test',
+    source=[
+        'time_proof_service_test.cpp',
+    ],
+    LIBDEPS=[
+        'time_proof_service',
+    ],
+)
+
+env.Library(
+    target= 'op_observer_noop',
+    source= [
+        'op_observer_noop.cpp',
+    ],
+    LIBDEPS= [
+    ],
+)
+
+env.Library(
+    target= 'service_context_d_test_fixture',
+    source= [
+        'service_context_d_test_fixture.cpp',
+    ],
+    LIBDEPS= [
+        'op_observer_noop',
+        '$BUILD_DIR/bongo/db/serveronly',
+        '$BUILD_DIR/bongo/db/storage/storage_options',
+        '$BUILD_DIR/bongo/unittest/unittest',
+    ],
+)
+
+env.Library(
+    target='log_process_details',
+    source=[
+        'log_process_details.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+        '$BUILD_DIR/bongo/util/net/network',
+        'server_options',
+    ],
+)
+
+env.Library(
+    target='conn_pool_options',
+    source=[
+        'conn_pool_options.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+        '$BUILD_DIR/bongo/client/clientdriver',
+        '$BUILD_DIR/bongo/db/server_parameters',
+        '$BUILD_DIR/bongo/s/client/sharding_client',
+    ],
+)
+
+env.Library(
+    target='ttl_collection_cache',
+    source=[
+        'ttl_collection_cache.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+        '$BUILD_DIR/bongo/db/service_context',
+    ],
+)
+
+env.Library(
+    target='wire_version',
+    source=[
+        'wire_version.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+    ],
+)

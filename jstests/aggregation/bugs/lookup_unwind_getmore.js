@@ -8,12 +8,12 @@
     'use strict';
 
     const options = {setParameter: 'internalDocumentSourceCursorBatchSizeBytes=1'};
-    const conn = MongoRunner.runMongod(options);
-    assert.neq(null, conn, 'mongod was unable to start up with options: ' + tojson(options));
+    const conn = BongoRunner.runBongod(options);
+    assert.neq(null, conn, 'bongod was unable to start up with options: ' + tojson(options));
 
     const testDB = conn.getDB('test');
 
-    // We use a batch size of 2 to ensure that the mongo shell issues a getMore when unwinding the
+    // We use a batch size of 2 to ensure that the bongo shell issues a getMore when unwinding the
     // results from the 'dest' collection for the same document in the 'source' collection under a
     // different OperationContext.
     const batchSize = 2;
@@ -49,5 +49,5 @@
     const cursor = new DBCommandCursor(conn, res, batchSize);
     assert.eq(numMatches, cursor.itcount());
 
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
 })();

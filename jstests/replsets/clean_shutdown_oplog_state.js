@@ -54,7 +54,7 @@
     var options = slave.savedOptions;
     options.noCleanData = true;
     delete options.replSet;
-    var conn = MongoRunner.runMongod(options);
+    var conn = BongoRunner.runBongod(options);
     assert.neq(null, conn, "secondary failed to start");
 
     // Following clean shutdown of a node, the oplog must exactly match the applied operations.

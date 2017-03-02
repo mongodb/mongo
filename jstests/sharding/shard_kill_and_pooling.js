@@ -11,13 +11,13 @@
 for (var test = 0; test < 2; test++) {
     var killWith = (test == 0 ? 15 : 9);
 
-    var st = new ShardingTest({shards: 2, mongos: 1});
+    var st = new ShardingTest({shards: 2, bongos: 1});
 
     // Stop balancer to eliminate weird conn stuff
     st.stopBalancer();
 
-    var mongos = st.s0;
-    var coll = mongos.getCollection("foo.bar");
+    var bongos = st.s0;
+    var coll = bongos.getCollection("foo.bar");
     var db = coll.getDB();
 
     // Test is not valid for Win32
@@ -33,11 +33,11 @@ for (var test = 0; test < 2; test++) {
 
         jsTest.log("Creating new connections...");
 
-        // Create a bunch of connections to the primary node through mongos.
-        // jstest ->(x10)-> mongos ->(x10)-> primary
+        // Create a bunch of connections to the primary node through bongos.
+        // jstest ->(x10)-> bongos ->(x10)-> primary
         var conns = [];
         for (var i = 0; i < 50; i++) {
-            conns.push(new Mongo(mongos.host));
+            conns.push(new Bongo(bongos.host));
             assert.neq(null, conns[i].getCollection(coll + "").findOne());
         }
 
@@ -49,19 +49,19 @@ for (var test = 0; test < 2; test++) {
 
         // Don't make test fragile by linking to format of shardConnPoolStats, but this is useful if
         // something goes wrong.
-        var connPoolStats = mongos.getDB("admin").runCommand({shardConnPoolStats: 1});
+        var connPoolStats = bongos.getDB("admin").runCommand({shardConnPoolStats: 1});
         printjson(connPoolStats);
 
         jsTest.log("Shutdown shard " + (killWith == 9 ? "uncleanly" : "") + "...");
 
         // Flush writes to disk, since sometimes we're killing uncleanly
-        assert(mongos.getDB("admin").runCommand({fsync: 1}).ok);
+        assert(bongos.getDB("admin").runCommand({fsync: 1}).ok);
 
-        MongoRunner.stopMongod(st.shard0, killWith);
+        BongoRunner.stopBongod(st.shard0, killWith);
 
         jsTest.log("Restart shard...");
 
-        st.shard0 = MongoRunner.runMongod({restart: st.shard0, forceLock: true});
+        st.shard0 = BongoRunner.runBongod({restart: st.shard0, forceLock: true});
 
         jsTest.log("Waiting for socket timeout time...");
 
@@ -72,7 +72,7 @@ for (var test = 0; test < 2; test++) {
 
         var numErrors = 0;
         for (var i = 0; i < conns.length; i++) {
-            var newConn = new Mongo(mongos.host);
+            var newConn = new Bongo(bongos.host);
             try {
                 assert.neq(null, newConn.getCollection("foo.bar").findOne());
             } catch (e) {

@@ -2,7 +2,7 @@
 
 (function() {
     'use strict';
-    var m = MongoRunner.runMongod({setParameter: "diagnosticDataCollectionPeriodMillis=101"});
+    var m = BongoRunner.runBongod({setParameter: "diagnosticDataCollectionPeriodMillis=101"});
 
     // Check the defaults are correct
     //

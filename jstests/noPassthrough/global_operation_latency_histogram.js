@@ -4,8 +4,8 @@
     "use strict";
     var name = "operationalLatencyHistogramTest";
 
-    var mongo = MongoRunner.runMongod({master: ""});
-    var testDB = mongo.getDB("test");
+    var bongo = BongoRunner.runBongod({master: ""});
+    var testDB = bongo.getDB("test");
     var testColl = testDB[name + "coll"];
 
     testColl.drop();

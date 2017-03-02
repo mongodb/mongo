@@ -29,7 +29,7 @@ for (var i = 0; i < 10; i++) {
 }
 
 function insertDocuments(rsURL, coll) {
-    var coll = new Mongo(rsURL).getCollection(coll);
+    var coll = new Bongo(rsURL).getCollection(coll);
     var count = 10;
     while (!isFinished()) {
         assert.writeOK(coll.insert({_id: count, str: "hello world"}));

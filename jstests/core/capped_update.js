@@ -15,7 +15,7 @@
         assert.writeOK(t.insert({_id: j, s: "Hello, World!"}));
     }
 
-    assert.writeOK(t.update({_id: 3}, {s: "Hello, Mongo!"}));  // Mongo is same length as World
+    assert.writeOK(t.update({_id: 3}, {s: "Hello, Bongo!"}));  // Bongo is same length as World
     assert.writeError(t.update({_id: 3}, {$set: {s: "Hello!"}}));
     assert.writeError(t.update({_id: 10}, {}));
     assert.writeError(t.update({_id: 10}, {s: "Hello, World!!!"}));

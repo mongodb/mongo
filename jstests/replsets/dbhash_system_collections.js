@@ -21,9 +21,9 @@
 
     rst.awaitReplication();
 
-    function checkDbHash(mongo) {
-        var testDB = mongo.getDB('test');
-        var adminDB = mongo.getDB('admin');
+    function checkDbHash(bongo) {
+        var testDB = bongo.getDB('test');
+        var adminDB = bongo.getDB('admin');
 
         var replicatedSystemCollections = [
             'system.js',

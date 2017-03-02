@@ -3,8 +3,8 @@
 (function() {
     "use strict";
 
-    const conn = MongoRunner.runMongod({});
-    assert.neq(null, conn, "mongod was unable to start up");
+    const conn = BongoRunner.runBongod({});
+    assert.neq(null, conn, "bongod was unable to start up");
 
     const decimalDB = conn.getDB("decimal_feature_compatibility_version");
     assert.commandWorked(decimalDB.dropDatabase());
@@ -49,5 +49,5 @@
     assert.commandWorked(res);
     assert.eq(false, res.valid, tojson(res));
 
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
 }());

@@ -9,7 +9,7 @@
 load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
 load('jstests/concurrency/fsm_workloads/update_multifield.js');  // for $config
 
-// For isMongod and recordIdCanChangeOnUpdate.
+// For isBongod and recordIdCanChangeOnUpdate.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = extendWorkload($config, function($config, $super) {
@@ -19,7 +19,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.data.assertResult = function(res, db, collName, query) {
         assertAlways.eq(0, res.nUpserted, tojson(res));
 
-        if (isMongod(db)) {
+        if (isBongod(db)) {
             if (!recordIdCanChangeOnUpdate(db)) {
                 // If a document's RecordId cannot change, then we should not
                 // have updated any document more than once, since the update
@@ -30,11 +30,11 @@ var $config = extendWorkload($config, function($config, $super) {
                 // many documents were updated.
                 assertAlways.gte(res.nMatched, 0, tojson(res));
             }
-        } else {  // mongos
+        } else {  // bongos
             assertAlways.gte(res.nMatched, 0, tojson(res));
         }
 
-        if (db.getMongo().writeMode() === 'commands') {
+        if (db.getBongo().writeMode() === 'commands') {
             assertWhenOwnColl.eq(res.nMatched, res.nModified, tojson(res));
         }
 

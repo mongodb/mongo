@@ -21,7 +21,7 @@
     }
 
     // Skip this test when 'xxxIndexConfigString' is already set in TestData.
-    // TODO: This test can be enabled when MongoRunner supports combining WT config strings with
+    // TODO: This test can be enabled when BongoRunner supports combining WT config strings with
     // commas.
     if (jsTest.options()[engine + 'IndexConfigString']) {
         jsTest.log('Skipping test because system-wide defaults for index options are already set');
@@ -35,13 +35,13 @@
     var collectionWideConfigString = 'split_pct=30,';
     var indexSpecificConfigString = 'split_pct=35,';
 
-    // Start up a mongod with system-wide defaults for index options and create a collection without
+    // Start up a bongod with system-wide defaults for index options and create a collection without
     // any additional options. Tests than an index without any additional options should take on the
     // system-wide defaults, whereas an index with additional options should override the
     // system-wide defaults.
     runTest({});
 
-    // Start up a mongod with system-wide defaults for index options and create a collection with
+    // Start up a bongod with system-wide defaults for index options and create a collection with
     // additional options. Tests than an index without any additional options should take on the
     // collection-wide defaults, whereas an index with additional options should override the
     // collection-wide defaults.
@@ -50,16 +50,16 @@
     function runTest(collOptions) {
         var hasIndexOptionDefaults = collOptions.hasOwnProperty('indexOptionDefaults');
 
-        var dbpath = MongoRunner.dataPath + 'wt_index_option_defaults';
+        var dbpath = BongoRunner.dataPath + 'wt_index_option_defaults';
         resetDbpath(dbpath);
 
-        // Start a mongod with system-wide defaults for engine-specific index options.
-        var conn = MongoRunner.runMongod({
+        // Start a bongod with system-wide defaults for engine-specific index options.
+        var conn = BongoRunner.runBongod({
             dbpath: dbpath,
             noCleanData: true,
             [engine + 'IndexConfigString']: systemWideConfigString,
         });
-        assert.neq(null, conn, 'mongod was unable to start up');
+        assert.neq(null, conn, 'bongod was unable to start up');
 
         var testDB = conn.getDB('test');
         var cmdObj = {create: 'coll'};
@@ -88,7 +88,7 @@
         checkIndexWithoutOptions(collStats.indexDetails);
         checkIndexWithOptions(collStats.indexDetails);
 
-        MongoRunner.stopMongod(conn);
+        BongoRunner.stopBongod(conn);
 
         function checkIndexWithoutOptions(indexDetails) {
             var indexSpec = getIndexSpecByName(testDB.coll, 'without_options');

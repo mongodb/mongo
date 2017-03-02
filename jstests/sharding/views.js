@@ -7,9 +7,9 @@
 
     let st = new ShardingTest({name: "views_sharded", shards: 2, other: {enableBalancer: false}});
 
-    let mongos = st.s;
-    let config = mongos.getDB("config");
-    let db = mongos.getDB(jsTestName());
+    let bongos = st.s;
+    let config = bongos.getDB("config");
+    let db = bongos.getDB(jsTestName());
     db.dropDatabase();
 
     let coll = db.getCollection("coll");
@@ -18,7 +18,7 @@
     st.ensurePrimaryShard(db.getName(), "shard0000");
     assert.commandWorked(config.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
 
-    assert.commandWorked(mongos.adminCommand({split: coll.getFullName(), middle: {a: 6}}));
+    assert.commandWorked(bongos.adminCommand({split: coll.getFullName(), middle: {a: 6}}));
     assert.commandWorked(
         db.adminCommand({moveChunk: coll.getFullName(), find: {a: 25}, to: "shard0001"}));
 

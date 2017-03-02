@@ -1,8 +1,8 @@
-MongoDB Server Documentation
+BongoDB Server Documentation
 ============
 
 This is just some internal documentation.
 
-For the full MongoDB docs, please see [mongodb.org](http://www.mongodb.org/)
+For the full BongoDB docs, please see [bongodb.org](http://www.bongodb.org/)
 
 * [building](building.md)

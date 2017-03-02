@@ -3,7 +3,7 @@ selector:
     roots:
     - jstests/ssl/*.js
 
-# ssl tests start their own mongod's.
+# ssl tests start their own bongod's.
 executor:
   js_test:
     config:

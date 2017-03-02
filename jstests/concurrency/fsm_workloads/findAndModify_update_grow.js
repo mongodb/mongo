@@ -8,7 +8,7 @@
  * a document move by growing the size of the inserted document using
  * the $set and $mul update operators.
  */
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod and isMMAPv1
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isBongod and isMMAPv1
 
 var $config = (function() {
 
@@ -95,7 +95,7 @@ var $config = (function() {
             // Get the DiskLoc of the document after its potential move
             var after = db[collName].find({_id: before._id}).showDiskLoc().next();
 
-            if (isMongod(db) && isMMAPv1(db)) {
+            if (isBongod(db) && isMMAPv1(db)) {
                 // Since the document has at least doubled in size, and the default
                 // allocation strategy of mmapv1 is to use power of two sizes, the
                 // document will have always moved

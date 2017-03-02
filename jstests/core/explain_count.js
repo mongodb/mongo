@@ -15,7 +15,7 @@ function checkCountExplain(explain, nCounted) {
     printjson(explain);
     var execStages = explain.executionStats.executionStages;
 
-    // If passed through mongos, then the root stage should be the mongos SINGLE_SHARD stage,
+    // If passed through bongos, then the root stage should be the bongos SINGLE_SHARD stage,
     // with COUNT as its child. If explaining directly on the shard, then COUNT is the root
     // stage.
     if ("SINGLE_SHARD" == execStages.stage) {

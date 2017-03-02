@@ -11,29 +11,29 @@
  *  - geoNear
  *  - geoSearch
  *
- * Each operation is tested on a single node, and (if supported) through mongos on both sharded and
- * unsharded collections. Mongos doesn't directly handle readConcern majority, but these tests
+ * Each operation is tested on a single node, and (if supported) through bongos on both sharded and
+ * unsharded collections. Bongos doesn't directly handle readConcern majority, but these tests
  * should ensure that it correctly propagates the setting to the shards when running commands.
  */
 
 (function() {
     'use strict';
 
-    function makeCursor(mongo, result) {
-        return new DBCommandCursor(mongo, result);
+    function makeCursor(bongo, result) {
+        return new DBCommandCursor(bongo, result);
     }
 
     // These test cases are functions that return a cursor of the documents in collections without
     // fetching them yet.
     var cursorTestCases = {
         find: function(coll) {
-            return makeCursor(coll.getMongo(),
+            return makeCursor(coll.getBongo(),
                               assert.commandWorked(coll.runCommand(
                                   'find', {readConcern: {level: 'majority'}, batchSize: 0})));
         },
         aggregate: function(coll) {
             return makeCursor(
-                coll.getMongo(),
+                coll.getBongo(),
                 assert.commandWorked(coll.runCommand(
                     'aggregate',
                     {readConcern: {level: 'majority'}, cursor: {batchSize: 0}, pipeline: []})));
@@ -43,7 +43,7 @@
                                       {readConcern: {level: 'majority'}, numCursors: 1});
             assert.commandWorked(res);
             assert.eq(res.cursors.length, 1, tojson(res));
-            return makeCursor(coll.getMongo(), res.cursors[0]);
+            return makeCursor(coll.getBongo(), res.cursors[0]);
         },
     };
 
@@ -135,12 +135,12 @@
         },
     };
 
-    function runTests(coll, mongodConnection) {
+    function runTests(coll, bongodConnection) {
         function makeSnapshot() {
-            return assert.commandWorked(mongodConnection.adminCommand("makeSnapshot")).name;
+            return assert.commandWorked(bongodConnection.adminCommand("makeSnapshot")).name;
         }
         function setCommittedSnapshot(snapshot) {
-            assert.commandWorked(mongodConnection.adminCommand({"setCommittedSnapshot": snapshot}));
+            assert.commandWorked(bongodConnection.adminCommand({"setCommittedSnapshot": snapshot}));
         }
 
         for (var testName in cursorTestCases) {
@@ -206,30 +206,30 @@
         }
     }
 
-    var mongod = MongoRunner.runMongod(
+    var bongod = BongoRunner.runBongod(
         {setParameter: 'testingSnapshotBehaviorInIsolation=true', shardsvr: ""});
     assert.neq(
         null,
-        mongod,
-        'mongod was unable to start with the testingSnapshotBehaviorInIsolation parameter enabled');
+        bongod,
+        'bongod was unable to start with the testingSnapshotBehaviorInIsolation parameter enabled');
 
-    if (!mongod.adminCommand('serverStatus').storageEngine.supportsCommittedReads) {
+    if (!bongod.adminCommand('serverStatus').storageEngine.supportsCommittedReads) {
         print("Skipping read_majority_reads.js since storageEngine doesn't support it.");
         return;
     }
 
     (function testSingleNode() {
-        var db = mongod.getDB("singleNode");
-        runTests(db.collection, mongod);
+        var db = bongod.getDB("singleNode");
+        runTests(db.collection, bongod);
     })();
 
     var shardingTest = new ShardingTest({
-        shards: 0,  // We use the existing mongod.
-        mongos: 1,
+        shards: 0,  // We use the existing bongod.
+        bongos: 1,
     });
-    shardingTest.adminCommand({addShard: mongod.host});
+    shardingTest.adminCommand({addShard: bongod.host});
 
-    // Remove tests of commands that aren't supported at all through mongos, even on unsharded
+    // Remove tests of commands that aren't supported at all through bongos, even on unsharded
     // collections.
     ['parallelCollectionScan', 'geoSearch'].forEach(function(cmd) {
         // Make sure it really isn't supported.
@@ -238,20 +238,20 @@
         delete nonCursorTestCases[cmd];
     });
 
-    (function testUnshardedDBThroughMongos() {
-        var db = shardingTest.getDB("throughMongos");
-        runTests(db.unshardedDB, mongod);
+    (function testUnshardedDBThroughBongos() {
+        var db = shardingTest.getDB("throughBongos");
+        runTests(db.unshardedDB, bongod);
     })();
 
-    shardingTest.adminCommand({enableSharding: 'throughMongos'});
+    shardingTest.adminCommand({enableSharding: 'throughBongos'});
 
-    (function testUnshardedCollectionThroughMongos() {
-        var db = shardingTest.getDB("throughMongos");
-        runTests(db.unshardedCollection, mongod);
+    (function testUnshardedCollectionThroughBongos() {
+        var db = shardingTest.getDB("throughBongos");
+        runTests(db.unshardedCollection, bongod);
     })();
 
-    (function testShardedCollectionThroughMongos() {
-        var db = shardingTest.getDB("throughMongos");
+    (function testShardedCollectionThroughBongos() {
+        var db = shardingTest.getDB("throughBongos");
         var collection = db.shardedCollection;
         shardingTest.adminCommand({shardCollection: collection.getFullName(), key: {_id: 1}});
 
@@ -261,9 +261,9 @@
                   ErrorCodes.IllegalOperation);
         delete nonCursorTestCases.group;
 
-        runTests(collection, mongod);
+        runTests(collection, bongod);
     })();
 
     shardingTest.stop();
-    MongoRunner.stopMongod(mongod);
+    BongoRunner.stopBongod(bongod);
 })();

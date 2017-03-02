@@ -1,5 +1,5 @@
 // Check $match pipeline stage.
-// - Filtering behavior equivalent to a mongo query.
+// - Filtering behavior equivalent to a bongo query.
 // - $where and geo operators are not allowed
 load('jstests/aggregation/extras/utils.js');
 

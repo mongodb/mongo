@@ -17,7 +17,7 @@
 #include "jswin.h"
 #include <psapi.h>
 
-// MONGODB Modification: See SERVER-22927
+// BONGODB Modification: See SERVER-22927
 #elif 0 && defined(SOLARIS)
 
 #include <sys/mman.h>
@@ -347,7 +347,7 @@ DeallocateMappedContent(void* p, size_t length)
     // TODO: Bug 988813 - Support memory mapped array buffer for Windows platform.
 }
 
-// MONGODB Modification: See SERVER-22927
+// BONGODB Modification: See SERVER-22927
 #elif 0 && defined(SOLARIS)
 
 #ifndef MAP_NOSYNC

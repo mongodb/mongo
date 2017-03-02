@@ -1,5 +1,5 @@
 """
-Class used to allocate ports for use by various mongod and mongos
+Class used to allocate ports for use by various bongod and bongos
 processes involved in running the tests.
 """
 
@@ -44,7 +44,7 @@ class PortAllocator(object):
 
     It reserves a range of ports for each job with the first part of
     that range used for the fixture started by that job, and the second
-    part of the range used for mongod and mongos processes started by
+    part of the range used for bongod and bongos processes started by
     tests run by that job.
     """
 

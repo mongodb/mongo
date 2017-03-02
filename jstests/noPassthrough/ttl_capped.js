@@ -5,15 +5,15 @@
 (function() {
     "use strict";
 
-    var dbpath = MongoRunner.dataPath + "ttl_capped";
+    var dbpath = BongoRunner.dataPath + "ttl_capped";
     resetDbpath(dbpath);
 
-    var conn = MongoRunner.runMongod({
+    var conn = BongoRunner.runBongod({
         dbpath: dbpath,
         noCleanData: true,
         setParameter: "ttlMonitorSleepSecs=1",
     });
-    assert.neq(null, conn, "mongod was unable to start up");
+    assert.neq(null, conn, "bongod was unable to start up");
 
     var testDB = conn.getDB("test");
 
@@ -81,5 +81,5 @@
         }
     }
 
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
 })();

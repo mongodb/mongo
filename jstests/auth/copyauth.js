@@ -7,7 +7,7 @@ DB.prototype._defaultAuthenticationMechanism = "SCRAM-SHA-1";  // SERVER-11428
 var baseName = "jstests_clone_copyauth";
 
 /*
- * Helper to spawn a replica set, sharded cluster, or a single mongod and hide it all behind the
+ * Helper to spawn a replica set, sharded cluster, or a single bongod and hide it all behind the
  * same interface.
  *
  * Arguments:
@@ -19,8 +19,8 @@ var baseName = "jstests_clone_copyauth";
  *
  * Member variables:
  *
- * conn - a connection to the node used to access this cluster, whether it's the mongod, a primary
- * mongod in a replica set, or a mongos.
+ * conn - a connection to the node used to access this cluster, whether it's the bongod, a primary
+ * bongod in a replica set, or a bongos.
  * connString - the full connection string used to connect to this cluster.  For a replica set this
  * is the full connection string including the replica set name.
  *
@@ -40,7 +40,7 @@ function ClusterSpawnHelper(clusterType, startWithAuth, startWithTransitionToAut
         var shardingTestConfig = {
             name: baseName + "_source",
             keyFile: singleNodeConfig.keyFile,
-            mongos: [singleNodeConfig],
+            bongos: [singleNodeConfig],
             shards: [singleNodeConfig],
             config: [singleNodeConfig]
         };
@@ -68,7 +68,7 @@ function ClusterSpawnHelper(clusterType, startWithAuth, startWithTransitionToAut
         this.conn = replSetTest.getPrimary();
         this.connString = replSetTest.getURL();
     } else {
-        this.conn = MongoRunner.runMongod(singleNodeConfig);
+        this.conn = BongoRunner.runBongod(singleNodeConfig);
         this.connString = this.conn.host;
     }
 
@@ -78,7 +78,7 @@ function ClusterSpawnHelper(clusterType, startWithAuth, startWithTransitionToAut
         } else if (clusterType === "repl") {
             replSetTest.stopSet();
         } else {
-            MongoRunner.stopMongod(this.conn.port);
+            BongoRunner.stopBongod(this.conn.port);
         }
     };
 }

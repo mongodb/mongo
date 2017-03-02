@@ -14,7 +14,7 @@
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
 load('jstests/concurrency/fsm_workloads/agg_base.js');             // for $config
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isBongos
 
 var $config = extendWorkload($config, function($config, $super) {
 
@@ -67,7 +67,7 @@ var $config = extendWorkload($config, function($config, $super) {
             cursor: {}
         });
         if (res.ok) {
-            const cursor = new DBCommandCursor(db.getMongo(), res);
+            const cursor = new DBCommandCursor(db.getBongo(), res);
             assertAlways.eq(0, cursor.itcount());  // No matter how many documents were in the
                                                    // original input stream, $out should never
                                                    // return any results.
@@ -120,8 +120,8 @@ var $config = extendWorkload($config, function($config, $super) {
      */
     $config.states.convertToCapped = function convertToCapped(unusedDB, unusedCollName) {
         const db = unusedDB.getSiblingDB(this.dbName);
-        if (isMongos(db)) {
-            return;  // convertToCapped can't be run against a mongos.
+        if (isBongos(db)) {
+            return;  // convertToCapped can't be run against a bongos.
         }
 
         assertWhenOwnDB.commandWorked(
@@ -129,12 +129,12 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     /**
-     * If being run against a mongos, shards '$config.data.outputCollName'. This is never undone,
+     * If being run against a bongos, shards '$config.data.outputCollName'. This is never undone,
      * and all subsequent $out's to this collection should fail.
      */
     $config.states.shardCollection = function shardCollection(unusedDB, unusedCollName) {
         const db = unusedDB.getSiblingDB(this.dbName);
-        if (isMongos(db)) {
+        if (isBongos(db)) {
             db.adminCommand({enableSharding: db.getName()});
             db.adminCommand(
                 {shardCollection: db[this.outputCollName].getFullName(), key: {_id: 'hashed'}});

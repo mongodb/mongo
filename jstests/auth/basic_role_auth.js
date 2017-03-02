@@ -153,7 +153,7 @@ var testOps = function(db, allowedActions) {
 
     // Test for kill cursor
     (function() {
-        var newConn = new Mongo(db.getMongo().host);
+        var newConn = new Bongo(db.getBongo().host);
         var dbName = db.getName();
         var db2 = newConn.getDB(dbName);
 
@@ -174,7 +174,7 @@ var testOps = function(db, allowedActions) {
             while (cursor.hasNext()) {
                 var next = cursor.next();
 
-                // This is a failure in mongos case. Standalone case will fail
+                // This is a failure in bongos case. Standalone case will fail
                 // when next() was called.
                 if (next.code == 16336) {
                     // could not find cursor in cache for id
@@ -184,9 +184,9 @@ var testOps = function(db, allowedActions) {
         });
     });  // TODO: enable test after SERVER-5813 is fixed.
 
-    var isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
-    // Note: fsyncUnlock is not supported in mongos.
-    if (!isMongos) {
+    var isBongos = db.runCommand({isdbgrid: 1}).isdbgrid;
+    // Note: fsyncUnlock is not supported in bongos.
+    if (!isBongos) {
         checkErr(allowedActions.hasOwnProperty('fsync_unlock'), function() {
             var res = db.fsyncUnlock();
             var errorCodeUnauthorized = 13;
@@ -202,7 +202,7 @@ var testOps = function(db, allowedActions) {
 //
 // {
 //   name: {String} description of the test
-//   test: {function(Mongo)} the test function to run which accepts a Mongo connection
+//   test: {function(Bongo)} the test function to run which accepts a Bongo connection
 //                           object.
 // }
 var TESTS = [
@@ -212,7 +212,7 @@ var TESTS = [
           var testDB = conn.getDB('test');
           assert.eq(1, testDB.auth('ro', AUTH_INFO.test.ro.pwd));
 
-          var conn2 = new Mongo(conn.host);
+          var conn2 = new Bongo(conn.host);
           var testDB2 = conn2.getDB('test');
           assert.eq(1, testDB2.auth('uadmin', AUTH_INFO.test.uadmin.pwd));
 
@@ -382,7 +382,7 @@ var TESTS = [
           var testDB = conn.getDB('test');
           assert.eq(1, testDB.auth('rw', AUTH_INFO.test.rw.pwd));
 
-          var newConn = new Mongo(conn.host);
+          var newConn = new Bongo(conn.host);
           assert.eq(1, newConn.getDB('admin').auth('any_uadmin', AUTH_INFO.admin.any_uadmin.pwd));
           newConn.getDB('test').updateUser('rw', {roles: ['read']});
           var origSpec = newConn.getDB("test").getUser("rw");
@@ -396,7 +396,7 @@ var TESTS = [
           testOps(testDB, READ_PERM);
 
           // role change should also affect new connections.
-          var newConn3 = new Mongo(conn.host);
+          var newConn3 = new Bongo(conn.host);
           var testDB3 = newConn3.getDB('test');
           assert.eq(1, testDB3.auth('rw', AUTH_INFO.test.rw.pwd));
           testOps(testDB3, READ_PERM);
@@ -423,7 +423,7 @@ var TESTS = [
  * Driver method for setting up the test environment, running them, cleanup
  * after every test and keeping track of test failures.
  *
- * @param conn {Mongo} a connection to a mongod or mongos to test.
+ * @param conn {Bongo} a connection to a bongod or bongos to test.
  */
 var runTests = function(conn) {
     var setup = function() {
@@ -469,7 +469,7 @@ var runTests = function(conn) {
         try {
             jsTest.log(testFunc.name);
 
-            var newConn = new Mongo(conn.host);
+            var newConn = new Bongo(conn.host);
             newConn.host = conn.host;
             testFunc.test(newConn);
         } catch (x) {
@@ -489,9 +489,9 @@ var runTests = function(conn) {
     }
 };
 
-var conn = MongoRunner.runMongod({auth: ''});
+var conn = BongoRunner.runBongod({auth: ''});
 runTests(conn);
-MongoRunner.stopMongod(conn.port);
+BongoRunner.stopBongod(conn.port);
 
 jsTest.log('Test sharding');
 var st = new ShardingTest({shards: 1, keyFile: 'jstests/libs/key1'});

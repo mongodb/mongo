@@ -19,7 +19,7 @@
     // Spin up a sharded cluster, but do not add the shards
     var shardingTestConfig = {
         name: baseName,
-        mongos: 1,
+        bongos: 1,
         shards: 1,
         rs: {nodes: replNodes},
         other: {manualAddShard: true}
@@ -37,17 +37,17 @@
     }
     assert.writeOK(bulk.execute());
 
-    // Get connection to mongos for the cluster
-    var mongosConn = shardingTest.s;
-    var testDB = mongosConn.getDB(testDBName);
+    // Get connection to bongos for the cluster
+    var bongosConn = shardingTest.s;
+    var testDB = bongosConn.getDB(testDBName);
 
     // Add replSet1 as only shard
-    mongosConn.adminCommand({addshard: replSet1.getURL()});
+    bongosConn.adminCommand({addshard: replSet1.getURL()});
 
     // Enable sharding on test db and its collection foo
-    assert.commandWorked(mongosConn.getDB('admin').runCommand({enablesharding: testDBName}));
+    assert.commandWorked(bongosConn.getDB('admin').runCommand({enablesharding: testDBName}));
     testDB[testCollName].ensureIndex({x: 1});
-    assert.commandWorked(mongosConn.getDB('admin').runCommand(
+    assert.commandWorked(bongosConn.getDB('admin').runCommand(
         {shardcollection: testDBName + '.' + testCollName, key: {x: 1}}));
 
     // Test case where GLE should return an error
@@ -64,8 +64,8 @@
     // Take down two nodes and make sure slaveOk reads still work
     replSet1.stop(1);
     replSet1.stop(2);
-    testDB.getMongo().adminCommand({setParameter: 1, logLevel: 1});
-    testDB.getMongo().setSlaveOk();
+    testDB.getBongo().adminCommand({setParameter: 1, logLevel: 1});
+    testDB.getBongo().setSlaveOk();
     print("trying some queries");
     assert.soon(function() {
         try {

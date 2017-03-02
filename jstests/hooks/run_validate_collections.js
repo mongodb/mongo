@@ -1,13 +1,13 @@
 // Runner for validateCollections that runs full validation on all collections when loaded into
-// the mongo shell.
+// the bongo shell.
 'use strict';
 
 (function() {
-    assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a mongod?');
+    assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a bongod?');
     load('jstests/hooks/validate_collections.js');  // For validateCollections
 
     var serverList = [];
-    serverList.push(db.getMongo());
+    serverList.push(db.getBongo());
 
     var addSecondaryNodes = function() {
         var cmdLineOpts = db.adminCommand('getCmdLineOpts');
@@ -15,7 +15,7 @@
 
         if (cmdLineOpts.parsed.hasOwnProperty('replication') &&
             cmdLineOpts.parsed.replication.hasOwnProperty('replSet')) {
-            var rst = new ReplSetTest(db.getMongo().host);
+            var rst = new ReplSetTest(db.getBongo().host);
             // Call getPrimary to populate rst with information about the nodes.
             var primary = rst.getPrimary();
             assert(primary, 'calling getPrimary() failed');

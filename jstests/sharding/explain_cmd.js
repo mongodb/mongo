@@ -1,4 +1,4 @@
-// Tests for the mongos explain command.
+// Tests for the bongos explain command.
 (function() {
     'use strict';
 
@@ -10,7 +10,7 @@
 
     // Setup a collection that will be sharded. The shard key will be 'a'. There's also an index on
     // 'b'.
-    var collSharded = db.getCollection("mongos_explain_cmd");
+    var collSharded = db.getCollection("bongos_explain_cmd");
     collSharded.drop();
     collSharded.ensureIndex({a: 1});
     collSharded.ensureIndex({b: 1});
@@ -63,7 +63,7 @@
     // -------
 
     // Setup a collection that is not sharded.
-    var collUnsharded = db.getCollection("mongos_explain_cmd_unsharded");
+    var collUnsharded = db.getCollection("bongos_explain_cmd_unsharded");
     collUnsharded.drop();
     collUnsharded.ensureIndex({a: 1});
     collUnsharded.ensureIndex({b: 1});
@@ -87,7 +87,7 @@
     });
 
     // Basic validation: a group command can only be passed through to an unsharded collection,
-    // so we should confirm that the mongos stage is always SINGLE_SHARD.
+    // so we should confirm that the bongos stage is always SINGLE_SHARD.
     printjson(explain);
     assert.commandWorked(explain);
     assert("queryPlanner" in explain);

@@ -4,13 +4,13 @@
 // @tags: [requires_mmapv1]
 
 var baseName = "jstests_disk_repair";
-var dbpath = MongoRunner.dataPath + baseName + "/";
+var dbpath = BongoRunner.dataPath + baseName + "/";
 var repairpath = dbpath + "repairDir/";
 
 resetDbpath(dbpath);
 resetDbpath(repairpath);
 
-var m = MongoRunner.runMongod({
+var m = BongoRunner.runBongod({
     dbpath: dbpath,
     repairpath: repairpath,
     noCleanData: true,
@@ -27,10 +27,10 @@ function check() {
     assert.eq.automsg("1", "db[ baseName ].count()");
 }
 check();
-MongoRunner.stopMongod(m.port);
+BongoRunner.stopBongod(m.port);
 
 resetDbpath(repairpath);
-m = MongoRunner.runMongod({
+m = BongoRunner.runBongod({
     port: m.port,
     dbpath: dbpath,
     noCleanData: true,
@@ -38,25 +38,25 @@ m = MongoRunner.runMongod({
 db = m.getDB(baseName);
 assert.commandWorked(db.runCommand({repairDatabase: 1}));
 check();
-MongoRunner.stopMongod(m.port);
+BongoRunner.stopBongod(m.port);
 
 resetDbpath(repairpath);
-rc = runMongoProgram(
-    "mongod", "--repair", "--port", m.port, "--dbpath", dbpath, "--repairpath", repairpath);
+rc = runBongoProgram(
+    "bongod", "--repair", "--port", m.port, "--dbpath", dbpath, "--repairpath", repairpath);
 assert.eq.automsg("0", "rc");
-m = MongoRunner.runMongod({
+m = BongoRunner.runBongod({
     port: m.port,
     dbpath: dbpath,
     noCleanData: true,
 });
 db = m.getDB(baseName);
 check();
-MongoRunner.stopMongod(m.port);
+BongoRunner.stopBongod(m.port);
 
 resetDbpath(repairpath);
-rc = runMongoProgram("mongod", "--repair", "--port", m.port, "--dbpath", dbpath);
+rc = runBongoProgram("bongod", "--repair", "--port", m.port, "--dbpath", dbpath);
 assert.eq.automsg("0", "rc");
-m = MongoRunner.runMongod({
+m = BongoRunner.runBongod({
     port: m.port,
     dbpath: dbpath,
     noCleanData: true,

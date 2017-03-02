@@ -16,7 +16,7 @@
     assert.writeOK(coll.insert({_id: 2}));
     assert.commandWorked(myDb.runCommand({collMod: collName, validator: {a: {$exists: true}}}));
 
-    // Test applyOps with a simple insert if not on mongos.
+    // Test applyOps with a simple insert if not on bongos.
     if (!db.runCommand({isdbgrid: 1}).isdbgrid) {
         var op = [{ts: Timestamp(0, 0), h: 1, v: 2, op: 'i', ns: coll.getFullName(), o: {_id: 9}}];
         assert.commandFailedWithCode(

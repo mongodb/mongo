@@ -10,7 +10,7 @@ s = rt.start(false);
 
 // tests need to run against master server
 db = m.getDB("test");
-host = db.getMongo().host;
+host = db.getBongo().host;
 
 Random.setRandomSeed();
 

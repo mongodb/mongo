@@ -45,14 +45,14 @@
     testInvalidCount();
 
     // Test with the first config server down
-    MongoRunner.stopMongod(st.c0);
+    BongoRunner.stopBongod(st.c0);
 
     testNormalCount();
     testCountWithQuery();
     testInvalidCount();
 
     // Test with the first and second config server down
-    MongoRunner.stopMongod(st.c1);
+    BongoRunner.stopBongod(st.c1);
     jsTest.log('Second server is down');
 
     testNormalCount();

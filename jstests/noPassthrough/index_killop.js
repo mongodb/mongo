@@ -4,8 +4,8 @@
 (function() {
     "use strict";
 
-    const conn = MongoRunner.runMongod({smallfiles: "", nojournal: ""});
-    assert.neq(null, conn, "mongod was unable to start up");
+    const conn = BongoRunner.runBongod({smallfiles: "", nojournal: ""});
+    assert.neq(null, conn, "bongod was unable to start up");
 
     const testDB = conn.getDB("test");
     assert.commandWorked(testDB.dropDatabase());

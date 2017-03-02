@@ -10,7 +10,7 @@ import sys
 import time
 
 import bson
-import pymongo
+import pybongo
 import random
 
 from . import fixtures
@@ -90,7 +90,7 @@ class CustomBehavior(object):
 class CleanEveryN(CustomBehavior):
     """
     Restarts the fixture after it has ran 'n' tests.
-    On mongod-related fixtures, this will clear the dbpath.
+    On bongod-related fixtures, this will clear the dbpath.
     """
 
     DEFAULT_N = 20
@@ -166,7 +166,7 @@ class JsCustomBehavior(CustomBehavior):
 
         try:
             self._after_test_impl(test, test_report, description)
-        except pymongo.errors.OperationFailure as err:
+        except pybongo.errors.OperationFailure as err:
             self.hook_test_case.logger.exception("{0} failed".format(description))
             self.hook_test_case.return_code = 1
             test_report.addFailure(self.hook_test_case, sys.exc_info())
@@ -228,7 +228,7 @@ class BackgroundInitialSync(JsCustomBehavior):
     def _after_test_impl(self, test, test_report, description):
         self.tests_run += 1
         sync_node = self.fixture.get_initial_sync_node()
-        sync_node_conn = utils.new_mongo_client(port=sync_node.port)
+        sync_node_conn = utils.new_bongo_client(port=sync_node.port)
 
         # If it's been 'n' tests so far, wait for the initial sync node to finish syncing.
         if self.tests_run >= self.n:
@@ -269,7 +269,7 @@ class BackgroundInitialSync(JsCustomBehavior):
                     self.__restart_init_sync(test_report, sync_node, sync_node_conn)
                     self.random_restarts += 1
                 return
-        except pymongo.errors.OperationFailure:
+        except pybongo.errors.OperationFailure:
             # replSetGetStatus can fail if the node is in STARTUP state. The node will soon go into
             # STARTUP2 state and replSetGetStatus will succeed after the next test.
             self.hook_test_case.logger.info(
@@ -318,7 +318,7 @@ class IntermediateInitialSync(JsCustomBehavior):
 
     def _after_test_impl(self, test, test_report, description):
         sync_node = self.fixture.get_initial_sync_node()
-        sync_node_conn = utils.new_mongo_client(port=sync_node.port)
+        sync_node_conn = utils.new_bongo_client(port=sync_node.port)
 
         if self.use_resync:
             self.hook_test_case.logger.info("Calling resync on initial sync node...")
@@ -431,16 +431,16 @@ class PeriodicKillSecondaries(CustomBehavior):
         # Enable the "rsSyncApplyStop" failpoint on each of the secondaries to prevent them from
         # applying any oplog entries while the test is running.
         for secondary in self.fixture.get_secondaries():
-            client = utils.new_mongo_client(port=secondary.port)
+            client = utils.new_bongo_client(port=secondary.port)
             try:
                 client.admin.command(bson.SON([
                     ("configureFailPoint", "rsSyncApplyStop"),
                     ("mode", "alwaysOn")]))
-            except pymongo.errors.OperationFailure as err:
+            except pybongo.errors.OperationFailure as err:
                 self.logger.exception(
-                    "Unable to disable oplog application on the mongod on port %d", secondary.port)
+                    "Unable to disable oplog application on the bongod on port %d", secondary.port)
                 raise errors.ServerFailure(
-                    "Unable to disable oplog application on the mongod on port %d: %s"
+                    "Unable to disable oplog application on the bongod on port %d: %s"
                     % (secondary.port, err.args[0]))
 
         self._start_time = time.time()
@@ -497,34 +497,34 @@ class PeriodicKillSecondaries(CustomBehavior):
             # Disable the "rsSyncApplyStop" failpoint on the secondary to have it resume applying
             # oplog entries.
             for secondary in self.fixture.get_secondaries():
-                client = utils.new_mongo_client(port=secondary.port)
+                client = utils.new_bongo_client(port=secondary.port)
                 try:
                     client.admin.command(bson.SON([
                         ("configureFailPoint", "rsSyncApplyStop"),
                         ("mode", "off")]))
-                except pymongo.errors.OperationFailure as err:
+                except pybongo.errors.OperationFailure as err:
                     self.logger.exception(
-                        "Unable to re-enable oplog application on the mongod on port %d",
+                        "Unable to re-enable oplog application on the bongod on port %d",
                         secondary.port)
                     raise errors.ServerFailure(
-                        "Unable to re-enable oplog application on the mongod on port %d: %s"
+                        "Unable to re-enable oplog application on the bongod on port %d: %s"
                         % (secondary.port, err.args[0]))
 
             # Wait a little bit for the secondary to start apply oplog entries so that we are more
-            # likely to kill the mongod process while it is partway into applying a batch.
+            # likely to kill the bongod process while it is partway into applying a batch.
             time.sleep(0.1)
 
             # Check that the secondary is still running before forcibly terminating it. This ensures
             # we still detect some cases in which the secondary has already crashed.
             if not secondary.is_running():
                 raise errors.ServerFailure(
-                    "mongod on port %d was expected to be running in"
+                    "bongod on port %d was expected to be running in"
                     " PeriodicKillSecondaries.after_test(), but wasn't."
                     % (secondary.port))
 
             self.hook_test_case.logger.info(
                 "Killing the secondary on port %d..." % (secondary.port))
-            secondary.mongod.stop(kill=True)
+            secondary.bongod.stop(kill=True)
 
         # Teardown may or may not be considered a success as a result of killing a secondary, so we
         # ignore the return value of Fixture.teardown().
@@ -539,7 +539,7 @@ class PeriodicKillSecondaries(CustomBehavior):
         for secondary in self.fixture.get_secondaries():
             self._check_invariants_as_standalone(secondary)
 
-            # Start the 'secondary' mongod back up as part of the replica set and wait for it to
+            # Start the 'secondary' bongod back up as part of the replica set and wait for it to
             # reach state SECONDARY.
             secondary.setup()
             secondary.await_ready()
@@ -595,17 +595,17 @@ class PeriodicKillSecondaries(CustomBehavior):
 
     def _check_invariants_as_standalone(self, secondary):
         # We remove the --replSet option in order to start the node as a standalone.
-        replset_name = secondary.mongod_options.pop("replSet")
+        replset_name = secondary.bongod_options.pop("replSet")
 
         try:
             secondary.setup()
             secondary.await_ready()
 
-            client = utils.new_mongo_client(port=secondary.port)
+            client = utils.new_bongo_client(port=secondary.port)
             minvalid_doc = client.local["replset.minvalid"].find_one()
 
             latest_oplog_doc = client.local["oplog.rs"].find_one(
-                sort=[("$natural", pymongo.DESCENDING)])
+                sort=[("$natural", pybongo.DESCENDING)])
 
             if minvalid_doc is not None:
                 # Check the invariants 'begin <= minValid', 'minValid <= oplogDeletePoint', and
@@ -650,33 +650,33 @@ class PeriodicKillSecondaries(CustomBehavior):
             if not teardown_success:
                 raise errors.ServerFailure(
                     "%s did not exit cleanly after being started up as a standalone" % (secondary))
-        except pymongo.errors.OperationFailure as err:
+        except pybongo.errors.OperationFailure as err:
             self.hook_test_case.logger.exception(
-                "Failed to read the minValid document or the latest oplog entry from the mongod on"
+                "Failed to read the minValid document or the latest oplog entry from the bongod on"
                 " port %d",
                 secondary.port)
             raise errors.ServerFailure(
-                "Failed to read the minValid document or the latest oplog entry from the mongod on"
+                "Failed to read the minValid document or the latest oplog entry from the bongod on"
                 " port %d: %s"
                 % (secondary.port, err.args[0]))
         finally:
             # Set the secondary's options back to their original values.
-            secondary.mongod_options["replSet"] = replset_name
+            secondary.bongod_options["replSet"] = replset_name
 
     def _await_secondary_state(self, secondary):
-        client = utils.new_mongo_client(port=secondary.port)
+        client = utils.new_bongo_client(port=secondary.port)
         try:
             client.admin.command(bson.SON([
                 ("replSetTest", 1),
                 ("waitForMemberState", 2),  # 2 = SECONDARY
                 ("timeoutMillis", fixtures.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000)]))
-        except pymongo.errors.OperationFailure as err:
+        except pybongo.errors.OperationFailure as err:
             self.hook_test_case.logger.exception(
-                "mongod on port %d failed to reach state SECONDARY after %d seconds",
+                "bongod on port %d failed to reach state SECONDARY after %d seconds",
                 secondary.port,
                 fixtures.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60)
             raise errors.ServerFailure(
-                "mongod on port %d failed to reach state SECONDARY after %d seconds: %s"
+                "bongod on port %d failed to reach state SECONDARY after %d seconds: %s"
                 % (secondary.port, fixtures.ReplFixture.AWAIT_REPL_TIMEOUT_MINS * 60, err.args[0]))
 
 

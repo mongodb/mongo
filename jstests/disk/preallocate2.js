@@ -5,7 +5,7 @@
 
 var baseName = "jstests_preallocate2";
 
-var m = MongoRunner.runMongod({});
+var m = BongoRunner.runBongod({});
 
 m.getDB(baseName)[baseName].save({i: 1});
 

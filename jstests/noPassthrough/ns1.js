@@ -1,7 +1,7 @@
 
 load("jstests/libs/slow_weekly_util.js");
 
-testServer = new SlowWeeklyMongod("ns1");
+testServer = new SlowWeeklyBongod("ns1");
 mydb = testServer.getDB("test_ns1");
 
 check = function(n, isNew) {

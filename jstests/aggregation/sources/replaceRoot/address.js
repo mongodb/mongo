@@ -88,7 +88,7 @@
     }
 
     // Test against the standalone started by resmoke.py.
-    let conn = db.getMongo();
+    let conn = db.getBongo();
     doExecutionTest(conn);
     print("Success! Standalone execution test for $replaceRoot passed.");
 

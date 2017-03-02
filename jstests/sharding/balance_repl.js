@@ -5,7 +5,7 @@
 (function() {
     'use strict';
 
-    // The mongod secondaries are set to priority 0 and votes 0 to prevent the primaries
+    // The bongod secondaries are set to priority 0 and votes 0 to prevent the primaries
     // from stepping down during migrations on slow evergreen builders.
     var s = new ShardingTest({
         shards: 2,
@@ -40,10 +40,10 @@
         assert.commandWorked(s.s0.adminCommand({split: 'TestDB.TestColl', middle: {_id: i * 100}}));
     }
 
-    var collPrimary = (new Mongo(s.s0.host)).getDB('TestDB').TestColl;
+    var collPrimary = (new Bongo(s.s0.host)).getDB('TestDB').TestColl;
     assert.eq(2100, collPrimary.find().itcount());
 
-    var collSlaveOk = (new Mongo(s.s0.host)).getDB('TestDB').TestColl;
+    var collSlaveOk = (new Bongo(s.s0.host)).getDB('TestDB').TestColl;
     collSlaveOk.setSlaveOk();
     assert.eq(2100, collSlaveOk.find().itcount());
 

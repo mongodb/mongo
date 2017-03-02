@@ -69,17 +69,17 @@ load('jstests/multiVersion/libs/auth_helpers.js');
                 {_id: "authSchema"}, {"currentVersion": 3}, {upsert: true});
 
             db.createUser({user: 'user1', pwd: 'pass', roles: jsTest.basicUserRoles});
-            assert(db.auth({mechanism: 'MONGODB-CR', user: 'user1', pwd: 'pass'}));
+            assert(db.auth({mechanism: 'BONGODB-CR', user: 'user1', pwd: 'pass'}));
 
             db.createUser({user: 'user2', pwd: 'pass', roles: jsTest.basicUserRoles});
-            assert(db.auth({mechanism: 'MONGODB-CR', user: 'user2', pwd: 'pass'}));
+            assert(db.auth({mechanism: 'BONGODB-CR', user: 'user2', pwd: 'pass'}));
         },
         confirmFunc: function() {
             // All users should only have SCRAM credentials.
             verifyUserDoc(db, 'user1', false, true);
             verifyUserDoc(db, 'user2', false, true);
 
-            // After authSchemaUpgrade MONGODB-CR no longer works.
+            // After authSchemaUpgrade BONGODB-CR no longer works.
             verifyAuth(db, 'user1', 'pass', false, true);
             verifyAuth(db, 'user2', 'pass', false, true);
         },

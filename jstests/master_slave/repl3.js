@@ -32,7 +32,7 @@ doTest = function(signal) {
 
     s = rt.start(false, {autoresync: null}, true);
 
-    // after SyncException, mongod waits 10 secs.
+    // after SyncException, bongod waits 10 secs.
     sleep(15000);
 
     // Need the 2 additional seconds timeout, since commands don't work on an 'allDead' node.

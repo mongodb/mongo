@@ -10,16 +10,16 @@ load("jstests/replsets/rslib.js");
     var NODE_COUNT = 3;
     var st = new ShardingTest({shards: {rs0: {nodes: NODE_COUNT, oplogSize: 10}}});
     var replTest = st.rs0;
-    var mongos = st.s;
+    var bongos = st.s;
 
-    var shardDoc = mongos.getDB('config').shards.findOne();
+    var shardDoc = bongos.getDB('config').shards.findOne();
     assert.eq(NODE_COUNT, shardDoc.host.split(',').length);  // seed list should contain all nodes
 
     /* Make sure that the first node is not the primary (by making the second one primary).
      * We need to do this since the ReplicaSetMonitor iterates over the nodes one
      * by one and you can't remove a node that is currently the primary.
      */
-    var connPoolStats = mongos.getDB('admin').runCommand({connPoolStats: 1});
+    var connPoolStats = bongos.getDB('admin').runCommand({connPoolStats: 1});
     var targetHostName = connPoolStats['replicaSets'][replTest.name].hosts[1].addr;
 
     var priConn = replTest.getPrimary();
@@ -39,7 +39,7 @@ load("jstests/replsets/rslib.js");
 
     reconfig(replTest, confDoc);
 
-    awaitRSClientHosts(mongos, {host: targetHostName}, {ok: true, ismaster: true});
+    awaitRSClientHosts(bongos, {host: targetHostName}, {ok: true, ismaster: true});
 
     // Remove first node from set
     confDoc.members.shift();
@@ -47,11 +47,11 @@ load("jstests/replsets/rslib.js");
 
     reconfig(replTest, confDoc);
 
-    jsTest.log("Waiting for mongos to reflect change in shard replica set membership.");
+    jsTest.log("Waiting for bongos to reflect change in shard replica set membership.");
     var replView;
     assert.soon(
         function() {
-            var connPoolStats = mongos.getDB('admin').runCommand('connPoolStats');
+            var connPoolStats = bongos.getDB('admin').runCommand('connPoolStats');
             replView = connPoolStats.replicaSets[replTest.name].hosts;
             return replView.length == confDoc.members.length;
         },
@@ -63,7 +63,7 @@ load("jstests/replsets/rslib.js");
     jsTest.log("Waiting for config.shards to reflect change in shard replica set membership.");
     assert.soon(
         function() {
-            shardDoc = mongos.getDB('config').shards.findOne();
+            shardDoc = bongos.getDB('config').shards.findOne();
             // seed list should contain one less node
             return shardDoc.host.split(',').length == confDoc.members.length;
         },

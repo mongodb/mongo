@@ -1,6 +1,6 @@
 // Tests write-concern-related bulk api functionality
 //
-// This test asserts that a journaled write to a mongod running with --nojournal should be rejected,
+// This test asserts that a journaled write to a bongod running with --nojournal should be rejected,
 // so cannot be run on the ephemeralForTest storage engine, as it accepts all journaled writes.
 // @tags: [SERVER-21420]
 
@@ -11,8 +11,8 @@ jsTest.log("Starting bulk api write concern tests...");
 var rst = new ReplSetTest({nodes: 2});
 rst.startSet({nojournal: ""});
 rst.initiate();
-var mongod = rst.getPrimary();
-var coll = mongod.getCollection("test.bulk_api_wc");
+var bongod = rst.getPrimary();
+var coll = bongod.getCollection("test.bulk_api_wc");
 
 var executeTests = function() {
 
@@ -119,14 +119,14 @@ var executeTests = function() {
 };
 
 // Use write commands
-coll.getMongo().useWriteCommands = function() {
+coll.getBongo().useWriteCommands = function() {
     return true;
 };
 executeTests();
 
 // FAILING currently due to incorrect batch api reading of GLE
 // Use legacy opcodes
-coll.getMongo().useWriteCommands = function() {
+coll.getBongo().useWriteCommands = function() {
     return false;
 };
 executeTests();

@@ -1,14 +1,14 @@
 // shard4.js
 
-s = new ShardingTest({name: "shard4", shards: 2, mongos: 2});
+s = new ShardingTest({name: "shard4", shards: 2, bongos: 2});
 
-s2 = s._mongos[1];
+s2 = s._bongos[1];
 
 s.adminCommand({enablesharding: "test"});
 s.ensurePrimaryShard('test', 'shard0001');
 s.adminCommand({shardcollection: "test.foo", key: {num: 1}});
 if (s.configRS) {
-    // Ensure that the second mongos will see the movePrimary
+    // Ensure that the second bongos will see the movePrimary
     s.configRS.awaitLastOpCommitted();
 }
 

@@ -1,6 +1,6 @@
-var conn1 = MongoRunner.runMongod(
+var conn1 = BongoRunner.runBongod(
     {auth: "", smallfiles: "", setParameter: "enableLocalhostAuthBypass=true"});
-var conn2 = MongoRunner.runMongod(
+var conn2 = BongoRunner.runBongod(
     {auth: "", smallfiles: "", setParameter: "enableLocalhostAuthBypass=false"});
 
 // Should fail because of localhost exception narrowed (SERVER-12621).

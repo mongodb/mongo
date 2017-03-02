@@ -6,7 +6,7 @@
 
     // login method to login into the database
     function login(userObj) {
-        var authResult = mongos.getDB(userObj.db).auth(userObj.username, userObj.password);
+        var authResult = bongos.getDB(userObj.db).auth(userObj.username, userObj.password);
         printjson(authResult);
     }
 
@@ -14,16 +14,16 @@
     var adminUser = {db: "admin", username: "foo", password: "bar"};
 
     // set up a 2 shard cluster with keyfile
-    var st = new ShardingTest({shards: 1, mongos: 1, other: {keyFile: 'jstests/libs/key1'}});
+    var st = new ShardingTest({shards: 1, bongos: 1, other: {keyFile: 'jstests/libs/key1'}});
 
-    var mongos = st.s0;
-    var admin = mongos.getDB("admin");
+    var bongos = st.s0;
+    var admin = bongos.getDB("admin");
 
     print("1 shard system setup");
 
     // add the admin user
     print("adding user");
-    mongos.getDB(adminUser.db).createUser({
+    bongos.getDB(adminUser.db).createUser({
         user: adminUser.username,
         pwd: adminUser.password,
         roles: jsTest.adminUserRoles
@@ -34,26 +34,26 @@
 
     assert.eq(1, st.config.shards.count(), "initial server count wrong");
 
-    // start a mongod with NO keyfile
-    var conn = MongoRunner.runMongod({shardsvr: ""});
+    // start a bongod with NO keyfile
+    var conn = BongoRunner.runBongod({shardsvr: ""});
     print(conn);
 
     // --------------- Test 1 --------------------
     // Add shard to the existing cluster (should fail because it was added without a keyfile)
     printjson(assert.commandFailed(admin.runCommand({addShard: conn.host})));
 
-    // stop mongod
-    MongoRunner.stopMongod(conn);
+    // stop bongod
+    BongoRunner.stopBongod(conn);
 
     //--------------- Test 2 --------------------
-    // start mongod again, this time with keyfile
-    var conn = MongoRunner.runMongod({keyFile: "jstests/libs/key1", shardsvr: ""});
+    // start bongod again, this time with keyfile
+    var conn = BongoRunner.runBongod({keyFile: "jstests/libs/key1", shardsvr: ""});
     // try adding the new shard
     assert.commandWorked(admin.runCommand({addShard: conn.host}));
 
     // Add some data
-    var db = mongos.getDB("foo");
-    var collA = mongos.getCollection("foo.bar");
+    var db = bongos.getDB("foo");
+    var collA = bongos.getCollection("foo.bar");
 
     // enable sharding on a collection
     assert.commandWorked(admin.runCommand({enableSharding: "" + collA.getDB()}));
@@ -73,7 +73,7 @@
     // verify the chunk was moved
     admin.runCommand({flushRouterConfig: 1});
 
-    var config = mongos.getDB("config");
+    var config = bongos.getDB("config");
     st.printShardingStatus(true);
 
     // start balancer before removing the shard
@@ -93,7 +93,7 @@
 
     assert.eq(1, st.config.shards.count(), "removed server still appears in count");
 
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
 
     st.stop();
 })();

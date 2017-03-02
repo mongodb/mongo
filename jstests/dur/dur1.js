@@ -13,7 +13,7 @@ function checkNoJournalFiles(path, pass) {
             return f.name.indexOf("prealloc") < 0;
         })) {
         if (pass == null) {
-            // wait a bit longer for mongod to potentially finish if it is still running.
+            // wait a bit longer for bongod to potentially finish if it is still running.
             sleep(10000);
             return checkNoJournalFiles(path, 1);
         }
@@ -82,8 +82,8 @@ function verify() {
 }
 
 if (debugging) {
-    // mongod already running in debugger
-    conn = db.getMongo();
+    // bongod already running in debugger
+    conn = db.getBongo();
     work();
     sleep(30000);
     quit();
@@ -92,18 +92,18 @@ if (debugging) {
 log();
 
 // directories
-var path1 = MongoRunner.dataPath + testname + "nodur";
-var path2 = MongoRunner.dataPath + testname + "dur";
+var path1 = BongoRunner.dataPath + testname + "nodur";
+var path2 = BongoRunner.dataPath + testname + "dur";
 
 // non-durable version
-log("run mongod without journaling");
-conn = MongoRunner.runMongod({dbpath: path1, nodur: "", smallfiles: ""});
+log("run bongod without journaling");
+conn = BongoRunner.runBongod({dbpath: path1, nodur: "", smallfiles: ""});
 work();
-MongoRunner.stopMongod(conn);
+BongoRunner.stopBongod(conn);
 
 // durable version
-log("run mongod with --journal");
-conn = MongoRunner.runMongod({dbpath: path2, journal: "", smallfiles: "", journalOptions: 8});
+log("run bongod with --journal");
+conn = BongoRunner.runBongod({dbpath: path2, journal: "", smallfiles: "", journalOptions: 8});
 work();
 
 // wait for group commit.
@@ -111,13 +111,13 @@ printjson(conn.getDB('admin').runCommand({getlasterror: 1, fsync: 1}));
 
 // kill the process hard
 log("kill 9");
-MongoRunner.stopMongod(conn.port, /*signal*/ 9);
+BongoRunner.stopBongod(conn.port, /*signal*/ 9);
 
 // journal file should be present, and non-empty as we killed hard
 
 // restart and recover
-log("restart mongod --journal and recover");
-conn = MongoRunner.runMongod({
+log("restart bongod --journal and recover");
+conn = BongoRunner.runBongod({
     restart: true,
     cleanData: false,
     dbpath: path2,
@@ -127,10 +127,10 @@ conn = MongoRunner.runMongod({
 });
 verify();
 
-log("stop mongod");
-MongoRunner.stopMongod(conn);
+log("stop bongod");
+BongoRunner.stopBongod(conn);
 
-// stopMongod seems to be asynchronous (hmmm) so we sleep here.
+// stopBongod seems to be asynchronous (hmmm) so we sleep here.
 // sleep(5000);
 
 // at this point, after clean shutdown, there should be no journal files

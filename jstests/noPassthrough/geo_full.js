@@ -19,7 +19,7 @@
 //
 
 load("jstests/libs/slow_weekly_util.js");
-testServer = new SlowWeeklyMongod("geo_full");
+testServer = new SlowWeeklyBongod("geo_full");
 db = testServer.getDB("test");
 
 var randEnvironment = function() {

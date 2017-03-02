@@ -5,7 +5,7 @@ load('jstests/concurrency/fsm_libs/runner.js');
 var dir = 'jstests/concurrency/fsm_workloads';
 
 var blacklist = [
-    // Disabled due to MongoDB restrictions and/or workload restrictions
+    // Disabled due to BongoDB restrictions and/or workload restrictions
 
     // These workloads take too long when composed because eval takes a
     // global lock and the composer doesn't honor iteration counts:

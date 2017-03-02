@@ -1,5 +1,5 @@
 /* test durability, specifically last sequence number function
-   runs mongod, kill -9's, recovers
+   runs bongod, kill -9's, recovers
    then writes more data and verifies with DurParanoid that it matches
 */
 
@@ -65,21 +65,21 @@ function work() {
 }
 
 if (debugging) {
-    // mongod already running in debugger
+    // bongod already running in debugger
     print(
-        "DOING DEBUG MODE BEHAVIOR AS 'db' IS DEFINED -- RUN mongo --nodb FOR REGULAR TEST BEHAVIOR");
-    conn = db.getMongo();
+        "DOING DEBUG MODE BEHAVIOR AS 'db' IS DEFINED -- RUN bongo --nodb FOR REGULAR TEST BEHAVIOR");
+    conn = db.getBongo();
     work();
     sleep(30000);
     quit();
 }
 
 // directories
-var path2 = MongoRunner.dataPath + testname + "dur";
+var path2 = BongoRunner.dataPath + testname + "dur";
 
-// run mongod with a short --syncdelay to make LSN writing sooner
-log("run mongod --journal and a short --syncdelay");
-conn = MongoRunner.runMongod({
+// run bongod with a short --syncdelay to make LSN writing sooner
+log("run bongod --journal and a short --syncdelay");
+conn = BongoRunner.runBongod({
     dbpath: path2,
     syncdelay: 2,
     journal: "",
@@ -93,8 +93,8 @@ work();
 log("wait a while for a sync and an lsn write");
 sleep(14);  // wait for lsn write
 
-log("kill mongod -9");
-MongoRunner.stopMongod(conn, /*signal*/ 9);
+log("kill bongod -9");
+BongoRunner.stopBongod(conn, /*signal*/ 9);
 
 // journal file should be present, and non-empty as we killed hard
 
@@ -115,8 +115,8 @@ MongoRunner.stopMongod(conn, /*signal*/ 9);
 );*/
 
 // restart and recover
-log("restart mongod, recover, verify");
-conn = MongoRunner.runMongod({
+log("restart bongod, recover, verify");
+conn = BongoRunner.runBongod({
     restart: true,
     cleanData: false,
     dbpath: path2,
@@ -143,7 +143,7 @@ log("add data after recovery");
     d.xyz.insert({x: 1});
 }
 
-log("stop mongod " + conn.port);
-MongoRunner.stopMongod(conn);
+log("stop bongod " + conn.port);
+BongoRunner.stopBongod(conn);
 
 print(testname + " SUCCESS");

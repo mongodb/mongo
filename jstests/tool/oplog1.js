@@ -1,6 +1,6 @@
 // oplog1.js
 
-// very basic test for mongooplog
+// very basic test for bongooplog
 // need a lot more, but test that it functions at all
 
 t = new ToolTest("oplog1");

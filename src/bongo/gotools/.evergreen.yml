@@ -1,0 +1,367 @@
+functions:
+  "fetch source" :
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+
+  "build tool" :
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        echo "Building ${tool}..."
+        . ./set_gopath.sh
+        go build ${args} -o bin/${tool} cmd/${tool}/main.go
+
+  "upload archive" :
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/${filename}
+      remote_file: bongotape/archive/${build_id}/${filename}
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/gzip
+      display_name: ${filename}
+
+  "create timeseries" :
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        git clone git@github.com:10gen/support-tools
+        sudo pip install argparse python-dateutil pytz
+        python support-tools/timeseries/timeseries.py /data/bongotape/diagnostic.data --html timeseries.html
+
+  "upload timeseries" :
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/timeseries.html
+      remote_file: bongotape/timeseries/${build_id}/timeseries.html
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/html
+      display_name: timeseries.html
+
+  "upload tool" :
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/bin/${tool}
+      remote_file: bongotape/binaries/${build_id}/${tool}
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/octet-stream
+      display_name: ${tool} binary
+
+  "fetch tool" :
+    command: s3.get
+    params:
+      bucket: mciuploads
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/${tool}
+      remote_file: bongotape/binaries/${build_id}/${tool}
+
+  "fetch pcap" :
+      command: s3.get
+      params:
+        bucket: boxes.10gen.com
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/testPcap/${pcapFname}
+        remote_file: build/bongotape/${pcapFname}
+
+  "fetch ftdc" :
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        . ./set_gopath.sh
+        go get github.com/10gen/ftdc-utils/cmd/ftdc
+
+  "start bongod" :
+    - command: shell.exec
+      params:
+        background: true
+        script: |
+          set -e
+          set -o verbose
+          cd bongodb
+          echo "starting bongodb"
+          mkdir -p ./bongotape_test
+          ./bongod --dbpath ./bongotape_test --port=${bongod_port} ${additional_args} &
+    - command: shell.exec
+      params:
+        script: |
+          set -e
+          set -o verbose
+          cd bongodb
+          ./bongo --nodb --eval 'assert.soon(function(x){try{var d = new Bongo("localhost:${bongod_port}"); return true}catch(e){return false}}, "timed out connecting")'
+
+  "fetch bongodb" :
+  - command: shell.exec
+    params:
+      script: |
+        rm -rf bongodb
+        mkdir bongodb
+        cd bongodb
+        curl ${bongo_url} -o bongodb.tgz
+        ${decompress} bongodb.tgz
+        chmod +x ./bongodb-*/bin/*
+        mv ./bongodb-*/bin/* .
+        rm -rf db_files
+        rm -rf db_logs
+        mkdir db_files
+        mkdir db_logs
+
+  "create auth_user" :
+  - command: shell.exec
+    params:
+      script: |
+              set -e
+              set -o verbose
+              cd bongodb
+              ./bongo --port ${bongod_port} admin --eval "db.createUser({user:\"authorizedUser\", pwd: \"authorizedPwd\", roles:[\"readWriteAnyDatabase\", \"clusterManager\"]});"
+
+  "create sharded_cluster" :
+    - command: shell.exec
+      params:
+        background: true
+        script: |
+          set -e
+          set -o verbose
+          cd bongodb
+          echo "starting bongodb"
+          mkdir -p /data/db/
+          ./bongo --nodb --eval 'var d = new ShardingTest({shards:3, bongos:[{port:${bongod_port}}]}); while(true){sleep(1000)}'
+    - command: shell.exec
+      params:
+        script: |
+          set -e
+          set -o verbose
+          cd bongodb
+          ./bongo --nodb --eval 'var d; assert.soon(function(x){try{d = new Bongo("localhost:${bongod_port}"); return true} catch(e){return false}}, "timed out connection");d.setLogLevel(5, "write");'
+
+  "create repl_set" :
+    - command: shell.exec
+      params:
+        background: true
+        script: |
+          set -e
+          set -o verbose
+          cd bongodb
+          echo "starting bongodb"
+          mkdir -p /data/db/
+          ./bongo --nodb --eval 'var repl = new ReplSetTest({nodes:3, startPort:${bongod_port}});repl.startSet();repl.initiate();repl.awaitSecondaryNodes();while(true){sleep(1000);}'
+    - command: shell.exec
+      params:
+        script: |
+          set -e
+          set -o verbose
+          cd bongodb
+          ./bongo --nodb --eval 'assert.soon(function(x){try{var d = new Bongo("localhost:${bongod_port}"); return true} catch(e){return false}}, "timed out connection")'
+
+  "run go_test" :
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        . ./set_gopath.sh
+        ${environment_vars} go test ${additional_args} -v > ${filename}.suite
+
+pre:
+  - command: shell.track
+
+post:
+  - command: shell.exec
+  - command: gotest.parse_files
+    params:
+      files: ["src/*.suite"]
+  - command: shell.cleanup
+
+tasks:
+- name: replay-dist
+  commands:
+  - func: "fetch source"
+  - func: "build tool"
+    vars:
+      tool: bongotape
+  - func: "upload tool"
+    vars:
+      tool: bongotape
+  - func: "build tool"
+
+- name: replay-sanity_check
+  depends_on:
+  - name: replay-dist
+  commands:
+  - func: "fetch source"
+  - func: "fetch tool"
+    vars:
+      tool: bongotape
+  - func: "fetch bongodb"
+  - func: "start bongod"
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -e
+        chmod +x bongotape
+        PATH=$PATH:`pwd`:`pwd`/../bongodb
+        echo "Running sanity check"
+        ./sanity_check.sh -p ${bongod_port}
+
+- name: replay-go_test
+  depends_on:
+  - name: replay-dist
+  commands:
+  - func: "fetch source"
+  - func: "fetch tool"
+    vars:
+      tool: bongotape
+  - func: "fetch pcap"
+    vars:
+      pcapFname: getmore_multi_channel.pcap
+  - func: "fetch pcap"
+    vars:
+      pcapFname: getmore_single_channel.pcap
+  - func: "fetch bongodb"
+  - func: "start bongod"
+    vars:
+        bongod_port: 20000
+  - func: "run go_test"
+    vars:
+        filename: playtest
+
+- name: replay-sharded_test
+  depends_on:
+  - name: replay-dist
+  commands:
+  - func: "fetch source"
+  - func: "fetch tool"
+    vars:
+      tool: bongotape
+  - func: "fetch pcap"
+    vars:
+      pcapFname: getmore_multi_channel.pcap
+  - func: "fetch pcap"
+    vars:
+      pcapFname: getmore_single_channel.pcap
+  - func: "fetch bongodb"
+  - func: "create sharded_cluster"
+    vars:
+        bongod_port: 20010
+  - func: "run go_test"
+    vars:
+        filename: sharded
+        environment_vars: DB_PORT=20010
+        additional_args: --run "LiveDB"
+
+- name: replay-auth_test
+  depends_on:
+  - name: replay-dist
+  commands:
+  - func: "fetch source"
+  - func: "fetch tool"
+    vars:
+      tool: bongotape
+  - func: "fetch pcap"
+    vars:
+      pcapFname: getmore_multi_channel.pcap
+  - func: "fetch pcap"
+    vars:
+      pcapFname: getmore_single_channel.pcap
+  - func: "fetch bongodb"
+  - func: "start bongod"
+    vars:
+        bongod_port: 20000
+        additional_args: --auth
+  - func: "create auth_user"
+    vars:
+        bongod_port: 20000
+  - func: "run go_test"
+    vars:
+        environment_vars: AUTH=1
+        filename: authtest
+        additional_args: --run "(LiveDB)|(Authed)"
+
+- name: replay-repl_test
+  depends_on:
+  - name: replay-dist
+  commands:
+  - func: "fetch source"
+  - func: "fetch tool"
+    vars:
+      tool: bongotape
+  - func: "fetch pcap"
+    vars:
+      pcapFname: getmore_multi_channel.pcap
+  - func: "fetch pcap"
+    vars:
+      pcapFname: getmore_single_channel.pcap
+  - func: "fetch bongodb"
+  - func: "create repl_set"
+    vars:
+      bongod_port: 20000
+  - func: "run go_test"
+    vars:
+        filename: repltest
+        additional_args: --run "LiveDB"
+
+- name: replay-replay_test
+  depends_on:
+  - name: replay-dist
+  commands:
+  - func: "fetch source"
+  - func: "fetch tool"
+    vars:
+      tool: bongotape
+  - func: "fetch bongodb"
+  - func: "fetch ftdc"
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -e
+        . ./set_gopath.sh
+        PATH=$PATH:`pwd`:`pwd`/vendor/bin:`pwd`/../bongodb
+        chmod +x bongotape
+        echo "Running replay test"
+        ./replay_test.sh --verbose --explicit --keep
+  - command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        tar czf replay.tar.gz tmp.*
+  - func: "upload archive"
+    vars:
+      filename: replay.tar.gz
+  - func: "create timeseries"
+  - func: "upload timeseries"
+
+buildvariants:
+- name: ubuntu
+  display_name: Ubuntu
+  expansions:
+    bongod_port: 27017
+    bongo_url: http://fastdl.bongodb.org/linux/bongodb-linux-x86_64-3.2.4.tgz
+  run_on:
+  - ubuntu1404-test
+  tasks:
+  - name: replay-dist
+  - name: replay-sanity_check
+  - name: replay-go_test
+  - name: replay-auth_test
+  - name: replay-sharded_test
+  - name: replay-repl_test
+  - name: replay-replay_test

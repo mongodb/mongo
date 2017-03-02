@@ -1,10 +1,10 @@
 'use strict';
 
 /**
- * Returns true if the process is a mongos, and false otherwise.
+ * Returns true if the process is a bongos, and false otherwise.
  *
  */
-function isMongos(db) {
+function isBongos(db) {
     var res = db.runCommand('ismaster');
     assert.commandWorked(res);
 
@@ -12,19 +12,19 @@ function isMongos(db) {
 }
 
 /**
- * Returns true if the process is a mongod, and false otherwise.
+ * Returns true if the process is a bongod, and false otherwise.
  *
  */
-function isMongod(db) {
-    return !isMongos(db);
+function isBongod(db) {
+    return !isBongos(db);
 }
 
 /**
- * Returns true if the process is a mongod configsvr, and false otherwise.
+ * Returns true if the process is a bongod configsvr, and false otherwise.
  *
  */
-function isMongodConfigsvr(db) {
-    if (!isMongod(db)) {
+function isBongodConfigsvr(db) {
+    if (!isBongod(db)) {
         return false;
     }
     var res = db.adminCommand('getCmdLineOpts');
@@ -36,13 +36,13 @@ function isMongodConfigsvr(db) {
 /**
  * Returns the name of the current storage engine.
  *
- * Throws an error if db is connected to a mongos, or if there is no reported storage engine.
+ * Throws an error if db is connected to a bongos, or if there is no reported storage engine.
  */
 function getStorageEngineName(db) {
     var status = db.serverStatus();
     assert.commandWorked(status);
 
-    assert(isMongod(db), 'no storage engine is reported when connected to mongos');
+    assert(isBongod(db), 'no storage engine is reported when connected to bongos');
     assert.neq(
         'undefined', typeof status.storageEngine, 'missing storage engine info in server status');
 

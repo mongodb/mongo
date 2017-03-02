@@ -1,8 +1,8 @@
 // The SSLTest class is used to check if a shell with a certain SSL configuration
 // can be used to connect to a server with a given SSL configuration.
-// This is necessary because SSL settings are currently process global - so if the mongo shell
+// This is necessary because SSL settings are currently process global - so if the bongo shell
 // started by resmoke.py has an SSL configuration that's incompatible with a server created with
-// MongoRunner, it will not be able to connect to it.
+// BongoRunner, it will not be able to connect to it.
 
 /**
  * A utility for checking if a shell configured with the specified command line options can
@@ -35,7 +35,7 @@ function SSLTest(serverOpts, clientOpts) {
         return canonical;
     };
 
-    this.serverOpts = MongoRunner.mongodOptions(canonicalServerOpts(serverOpts));
+    this.serverOpts = BongoRunner.bongodOptions(canonicalServerOpts(serverOpts));
     this.port = this.serverOpts.port;
     resetDbpath(this.serverOpts.dbpath);
 
@@ -68,18 +68,18 @@ SSLTest.prototype.noSSLClientOptions = {
 SSLTest.prototype.connectWorked = function() {
     var connectTimeoutMillis = 30000;
 
-    var serverArgv = MongoRunner.arrOptions("mongod", this.serverOpts);
-    var clientArgv = MongoRunner.arrOptions("mongo", this.clientOpts);
+    var serverArgv = BongoRunner.arrOptions("bongod", this.serverOpts);
+    var clientArgv = BongoRunner.arrOptions("bongo", this.clientOpts);
 
-    var serverPID = _startMongoProgram.apply(null, serverArgv);
+    var serverPID = _startBongoProgram.apply(null, serverArgv);
     try {
         assert.soon(function() {
-            return checkProgram(serverPID) && (0 === _runMongoProgram.apply(null, clientArgv));
+            return checkProgram(serverPID) && (0 === _runBongoProgram.apply(null, clientArgv));
         }, "connect failed", connectTimeoutMillis);
     } catch (ex) {
         return false;
     } finally {
-        _stopMongoProgram(this.port);
+        _stopBongoProgram(this.port);
     }
     return true;
 };

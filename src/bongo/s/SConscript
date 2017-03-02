@@ -1,0 +1,338 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone()
+
+env.SConscript(
+    dirs=[
+        'catalog',
+        'client',
+        'commands',
+        'query',
+        'write_ops',
+    ],
+    exports=[
+        'env',
+    ],
+)
+
+# Functionality for initializing global sharding state
+env.Library(
+    target='sharding_initialization',
+    source=[
+        'sharding_initialization.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/executor/network_interface_factory',
+        '$BUILD_DIR/bongo/executor/network_interface_thread_pool',
+        '$BUILD_DIR/bongo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/bongo/s/catalog/sharding_catalog_client_impl',
+        '$BUILD_DIR/bongo/s/catalog/dist_lock_catalog_impl',
+        '$BUILD_DIR/bongo/s/catalog/replset_dist_lock_manager',
+        'client/sharding_connection_hook',
+        'coreshard',
+    ],
+)
+
+# Functionality shared between bongod and bongos
+env.Library(
+    target='shard_id',
+    source=[
+        'shard_id.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+    ]
+)
+
+env.Library(
+    target="async_requests_sender",
+    source=[
+        "async_requests_sender.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/bongo/db/query/command_request_response",
+        "$BUILD_DIR/bongo/executor/task_executor_interface",
+        "$BUILD_DIR/bongo/s/client/sharding_client",
+        "$BUILD_DIR/bongo/s/coreshard",
+        '$BUILD_DIR/bongo/s/client/shard_interface',
+    ],
+)
+
+env.Library(
+    target='common',
+    source=[
+        'catalog/bongo_version_range.cpp',
+        'catalog/type_changelog.cpp',
+        'catalog/type_chunk.cpp',
+        'catalog/type_collection.cpp',
+        'catalog/type_config_version.cpp',
+        'catalog/type_database.cpp',
+        'catalog/type_lockpings.cpp',
+        'catalog/type_locks.cpp',
+        'catalog/type_bongos.cpp',
+        'catalog/type_shard.cpp',
+        'catalog/type_tags.cpp',
+        'request_types/add_shard_request_type.cpp',
+        'request_types/add_shard_to_zone_request_type.cpp',
+        'request_types/balance_chunk_request_type.cpp',
+        'request_types/commit_chunk_migration_request_type.cpp',
+        'request_types/remove_shard_from_zone_request_type.cpp',
+        'request_types/split_chunk_request_type.cpp',
+        'request_types/merge_chunk_request_type.cpp',
+        'request_types/update_zone_key_range_request_type.cpp',
+        'chunk_diff.cpp',
+        'chunk_version.cpp',
+        'migration_secondary_throttle_options.cpp',
+        'move_chunk_request.cpp',
+        'set_shard_version_request.cpp',
+        'shard_key_pattern.cpp',
+    ],
+    LIBDEPS=[
+        'shard_id',
+        '$BUILD_DIR/bongo/client/connection_string',
+        '$BUILD_DIR/bongo/db/common',
+        '$BUILD_DIR/bongo/db/matcher/expressions',
+        '$BUILD_DIR/bongo/db/ops/update_common',
+        '$BUILD_DIR/bongo/db/query/query_planner',
+        '$BUILD_DIR/bongo/db/query/query_request',
+        '$BUILD_DIR/bongo/db/repl/optime',
+        '$BUILD_DIR/bongo/rpc/metadata',
+    ]
+)
+
+env.Library(
+    target='sharding_test_fixture',
+    source=[
+        'sharding_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/client/remote_command_targeter_mock',
+        '$BUILD_DIR/bongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/bongo/db/query/collation/collator_factory_mock',
+        '$BUILD_DIR/bongo/db/service_context_noop_init',
+        '$BUILD_DIR/bongo/executor/network_test_env',
+        '$BUILD_DIR/bongo/executor/task_executor_pool',
+        '$BUILD_DIR/bongo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/bongo/s/catalog/dist_lock_manager_mock',
+        '$BUILD_DIR/bongo/s/catalog/sharding_catalog_client_impl',
+        '$BUILD_DIR/bongo/s/coreshard',
+        '$BUILD_DIR/bongo/transport/transport_layer_mock',
+        '$BUILD_DIR/bongo/util/clock_source_mock',
+        '$BUILD_DIR/bongo/util/net/message_port_mock',
+        'sharding_egress_metadata_hook_for_bongos',
+    ],
+)
+
+env.Library(
+    target='shard_server_test_fixture',
+    source=[
+        'shard_server_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        'sharding_bongod_test_fixture',
+        '$BUILD_DIR/bongo/s/catalog/dist_lock_catalog_mock',
+        '$BUILD_DIR/bongo/s/catalog/dist_lock_manager_mock',
+    ],
+)
+
+env.Library(
+    target='sharding_bongod_test_fixture',
+    source=[
+        'sharding_bongod_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/client/remote_command_targeter_mock',
+        '$BUILD_DIR/bongo/db/op_observer_d',
+        '$BUILD_DIR/bongo/db/repl/replmocks',
+        '$BUILD_DIR/bongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/bongo/executor/network_test_env',
+        '$BUILD_DIR/bongo/executor/task_executor_pool',
+        '$BUILD_DIR/bongo/executor/thread_pool_task_executor_test_fixture',
+        '$BUILD_DIR/bongo/rpc/metadata',
+        '$BUILD_DIR/bongo/s/catalog/dist_lock_manager_mock',
+        '$BUILD_DIR/bongo/s/catalog/sharding_catalog_client_impl',
+        '$BUILD_DIR/bongo/s/catalog/sharding_catalog_manager_impl',
+        '$BUILD_DIR/bongo/s/coreshard',
+        '$BUILD_DIR/bongo/util/clock_source_mock',
+        '$BUILD_DIR/bongo/util/net/message_port_mock',
+    ],
+)
+
+env.Library(
+    target='config_server_test_fixture',
+    source=[
+        'config_server_test_fixture.cpp',
+    ],
+    LIBDEPS=[
+        'sharding_bongod_test_fixture',
+    ],
+)
+
+env.CppUnitTest(
+    target='shard_id_test',
+    source=[
+        'shard_id_test.cpp',
+    ],
+    LIBDEPS=[
+        'common',
+    ]
+)
+
+env.CppUnitTest(
+    target='sharding_common_test',
+    source=[
+        'catalog/type_changelog_test.cpp',
+        'catalog/type_chunk_test.cpp',
+        'catalog/type_collection_test.cpp',
+        'catalog/type_config_version_test.cpp',
+        'catalog/type_database_test.cpp',
+        'catalog/type_lockpings_test.cpp',
+        'catalog/type_locks_test.cpp',
+        'catalog/type_bongos_test.cpp',
+        'catalog/type_shard_test.cpp',
+        'catalog/type_tags_test.cpp',
+        'chunk_version_test.cpp',
+        'migration_secondary_throttle_options_test.cpp',
+        'move_chunk_request_test.cpp',
+        'set_shard_version_request_test.cpp',
+        'shard_key_pattern_test.cpp',
+#        'shard_id_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/db/query/query_test_service_context',
+        'common',
+    ]
+)
+
+# This test is very slow in debug mode, so it is put in a separate binary by itself
+env.CppUnitTest(
+    target='chunk_diff_test',
+    source=[
+        'chunk_diff_test.cpp',
+    ],
+    LIBDEPS=[
+        'common',
+    ]
+)
+
+env.CppUnitTest('request_types_test',
+    source=[
+        'request_types/add_shard_request_test.cpp',
+        'request_types/add_shard_to_zone_request_test.cpp',
+        'request_types/balance_chunk_request_test.cpp',
+        'request_types/commit_chunk_migration_request_test.cpp',
+        'request_types/remove_shard_from_zone_request_test.cpp',
+        'request_types/split_chunk_request_test.cpp',
+        'request_types/merge_chunk_request_test.cpp',
+        'request_types/update_zone_key_range_request_test.cpp',
+    ],
+    LIBDEPS=[
+        'common',
+    ],
+)
+
+# This library contains sharding functionality used by both bongod and bongos
+env.Library(
+    target='coreshard',
+    source=[
+        'balancer_configuration.cpp',
+        'catalog_cache.cpp',
+        'chunk.cpp',
+        'chunk_manager.cpp',
+        'cluster_identity_loader.cpp',
+        'config.cpp',
+        'config_server_client.cpp',
+        'grid.cpp',
+        'shard_util.cpp',
+        'sharding_egress_metadata_hook.cpp',
+        'sharding_raii.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/db/audit',
+        '$BUILD_DIR/bongo/db/lasterror',
+        '$BUILD_DIR/bongo/db/repl/repl_coordinator_global',
+        '$BUILD_DIR/bongo/executor/task_executor_pool',
+        '$BUILD_DIR/bongo/s/catalog/sharding_catalog_client',
+        '$BUILD_DIR/bongo/s/query/cluster_cursor_manager',
+        'client/sharding_client',
+        'common',
+    ],
+)
+
+env.CppUnitTest(
+    target='catalog_cache_test',
+    source=[
+        'chunk_manager_test.cpp',
+        'chunk_manager_index_bounds_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/s/catalog/sharding_catalog_test_fixture',
+        'coreshard',
+    ]
+)
+
+env.Library(
+    target='cluster_last_error_info',
+    source=[
+        'cluster_last_error_info.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+        '$BUILD_DIR/bongo/client/connection_string',
+        '$BUILD_DIR/bongo/util/decorable',
+    ]
+)
+
+env.Library(
+    target='sharding_egress_metadata_hook_for_bongos',
+    source=[
+        'sharding_egress_metadata_hook_for_bongos.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/rpc/metadata',
+        'cluster_last_error_info',
+        'coreshard',
+    ]
+)
+
+env.Library(
+    target='is_bongos',
+    source=[
+        'is_bongos.cpp',
+    ],
+    LIBDEPS=[],
+)
+
+env.CppUnitTest(
+    target='balancer_configuration_test',
+    source=[
+        'balancer_configuration_test.cpp',
+    ],
+    LIBDEPS=[
+        'coreshard',
+        'sharding_test_fixture',
+    ]
+)
+
+env.CppUnitTest(
+    target='cluster_identity_loader_test',
+    source=[
+        'cluster_identity_loader_test.cpp',
+    ],
+    LIBDEPS=[
+        'coreshard',
+        'sharding_test_fixture',
+    ]
+)
+
+env.Library(
+    target='local_sharding_info',
+    source=[
+        'local_sharding_info.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/db/service_context',
+    ],
+)

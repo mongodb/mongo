@@ -1,5 +1,5 @@
 // SERVER-23129 Write commands should reject unknown fields. This is run in passthrough tests to
-// ensure that both mongos and mongod reject these commands.
+// ensure that both bongos and bongod reject these commands.
 (function() {
     var coll = db.write_commands_reject_unknown_fields;
 

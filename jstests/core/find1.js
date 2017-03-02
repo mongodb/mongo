@@ -14,7 +14,7 @@ if (db.serverStatus().metrics) {
 print("lookAtDocumentMetrics: " + lookAtDocumentMetrics);
 
 if (lookAtDocumentMetrics) {
-    // ignore mongos
+    // ignore bongos
     nscannedStart = db.serverStatus().metrics.queryExecutor.scanned;
 }
 
@@ -48,7 +48,7 @@ assert(!t.findOne(id, {a: 1}).b, "I");
 assert(t.validate().valid, "not valid");
 
 if (lookAtDocumentMetrics) {
-    // ignore mongos
+    // ignore bongos
     nscannedEnd = db.serverStatus().metrics.queryExecutor.scanned;
     assert.lte(nscannedStart + 16, nscannedEnd);
 }

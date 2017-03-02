@@ -3,7 +3,7 @@ selector:
     roots:
     - jstests/fail_point/*.js
 
-# Failpoint tests start their own mongod's.
+# Failpoint tests start their own bongod's.
 executor:
   js_test:
     config:

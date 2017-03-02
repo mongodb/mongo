@@ -2,7 +2,7 @@
     load("jstests/replsets/rslib.js");
 
     var s = new ShardingTest(
-        {name: "Sharding multiple ns", shards: 1, mongos: 1, other: {rs: true, chunkSize: 1}});
+        {name: "Sharding multiple ns", shards: 1, bongos: 1, other: {rs: true, chunkSize: 1}});
 
     s.adminCommand({enablesharding: "test"});
     s.adminCommand({shardcollection: "test.foo", key: {_id: 1}});
@@ -20,7 +20,7 @@
 
     sh.splitAt("test.foo", {_id: 50});
 
-    other = new Mongo(s.s.name);
+    other = new Bongo(s.s.name);
     dbother = other.getDB("test");
 
     assert.eq(5, db.foo.findOne({_id: 5}).x);
@@ -35,8 +35,8 @@
     // Wait for the primary to come back online...
     var primary = s._rs[0].test.getPrimary();
 
-    // Wait for the mongos to recognize the new primary...
-    awaitRSClientHosts(db.getMongo(), primary, {ismaster: true});
+    // Wait for the bongos to recognize the new primary...
+    awaitRSClientHosts(db.getBongo(), primary, {ismaster: true});
 
     assert.eq(5, db.foo.findOne({_id: 5}).x);
     assert.eq(5, db.bar.findOne({_id: 5}).x);
@@ -44,7 +44,7 @@
     s.adminCommand({shardcollection: "test.bar", key: {_id: 1}});
     sh.splitAt("test.bar", {_id: 50});
 
-    yetagain = new Mongo(s.s.name);
+    yetagain = new Bongo(s.s.name);
     assert.eq(5, yetagain.getDB("test").bar.findOne({_id: 5}).x);
     assert.eq(5, yetagain.getDB("test").foo.findOne({_id: 5}).x);
 

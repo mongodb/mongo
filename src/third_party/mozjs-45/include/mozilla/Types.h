@@ -37,9 +37,9 @@
  * These macros are designed for use by library interfaces -- not for normal
  * methods or data used cross-file.
  */
-// MONGOD MODIFICATION - SERVER-20311
+// BONGOD MODIFICATION - SERVER-20311
 // Disable all visibility hints since we are statically linking on Windows.
-// This prevents mongod.exe and other binaries from exporting these functions.
+// This prevents bongod.exe and other binaries from exporting these functions.
 #if 0 //defined(WIN32)
 #  define MOZ_EXPORT   __declspec(dllexport)
 #else /* Unix */

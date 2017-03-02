@@ -137,13 +137,13 @@
     }
 
     // Run the test on a standalone.
-    let mongod = MongoRunner.runMongod({auth: "", bind_ip: "127.0.0.1"});
-    runTest(mongod);
-    MongoRunner.stopMongod(mongod);
+    let bongod = BongoRunner.runBongod({auth: "", bind_ip: "127.0.0.1"});
+    runTest(bongod);
+    BongoRunner.stopBongod(bongod);
 
     // Run the test on a sharded cluster.
     let cluster = new ShardingTest(
-        {shards: 1, mongos: 1, keyFile: "jstests/libs/key1", other: {shardOptions: {auth: ""}}});
+        {shards: 1, bongos: 1, keyFile: "jstests/libs/key1", other: {shardOptions: {auth: ""}}});
     runTest(cluster);
     cluster.stop();
 }());

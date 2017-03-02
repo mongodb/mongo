@@ -1,5 +1,5 @@
 /**
- * Test that mongos times out when the config server replica set only contains nodes that
+ * Test that bongos times out when the config server replica set only contains nodes that
  * are behind the majority opTime.
  */
 (function() {
@@ -22,13 +22,13 @@
 
     assert.writeOK(testDB.user.insert({_id: 1}));
 
-    // Do one metadata write in order to bump the optime on mongos
+    // Do one metadata write in order to bump the optime on bongos
     assert.writeOK(st.getDB('config').TestConfigColl.insert({TestKey: 'Test value'}));
 
     st.configRS.stopMaster();
-    MongoRunner.stopMongod(configSecondaryToKill.port);
+    BongoRunner.stopBongod(configSecondaryToKill.port);
 
-    // Clears all cached info so mongos will be forced to query from the config.
+    // Clears all cached info so bongos will be forced to query from the config.
     st.s.adminCommand({flushRouterConfig: 1});
 
     print('Attempting read on a sharded collection...');

@@ -6,7 +6,7 @@ from __future__ import absolute_import
 
 import os.path
 
-import pymongo
+import pybongo
 import yaml
 
 
@@ -71,18 +71,18 @@ def load_yaml(value):
         raise ValueError("Attempted to parse invalid YAML value '%s': %s" % (value, err))
 
 
-def new_mongo_client(port, read_preference=pymongo.ReadPreference.PRIMARY, timeout_millis=30000):
+def new_bongo_client(port, read_preference=pybongo.ReadPreference.PRIMARY, timeout_millis=30000):
     """
-    Returns a pymongo.MongoClient connected on 'port' with a read
+    Returns a pybongo.BongoClient connected on 'port' with a read
     preference of 'read_preference'.
 
-    The PyMongo driver will wait up to 'timeout_millis' milliseconds
+    The PyBongo driver will wait up to 'timeout_millis' milliseconds
     before concluding that the server is unavailable.
     """
 
     kwargs = {"connectTimeoutMS": timeout_millis}
-    if pymongo.version_tuple[0] >= 3:
+    if pybongo.version_tuple[0] >= 3:
         kwargs["serverSelectionTimeoutMS"] = timeout_millis
         kwargs["connect"] = True
 
-    return pymongo.MongoClient(port=port, read_preference=read_preference, **kwargs)
+    return pybongo.BongoClient(port=port, read_preference=read_preference, **kwargs)

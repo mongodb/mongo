@@ -17,11 +17,11 @@
 
     // Kill all secondaries, forcing the current primary to step down.
     st.configRS.getSecondaries().forEach(function(secondaryConn) {
-        MongoRunner.stopMongod(secondaryConn.port);
+        BongoRunner.stopBongod(secondaryConn.port);
     });
 
     // Test authenticate through a fresh connection.
-    var newConn = new Mongo(st.s.host);
+    var newConn = new Bongo(st.s.host);
 
     assert.commandFailedWithCode(newConn.getDB('test').runCommand({find: 'user'}),
                                  ErrorCodes.Unauthorized);
@@ -32,16 +32,16 @@
     assert.neq(null, res);
     assert.eq('world', res.hello);
 
-    // Test authenticate through new mongos.
-    var otherMongos =
-        MongoRunner.runMongos({keyFile: "jstests/libs/key1", configdb: st.s.savedOptions.configdb});
+    // Test authenticate through new bongos.
+    var otherBongos =
+        BongoRunner.runBongos({keyFile: "jstests/libs/key1", configdb: st.s.savedOptions.configdb});
 
-    assert.commandFailedWithCode(otherMongos.getDB('test').runCommand({find: 'user'}),
+    assert.commandFailedWithCode(otherBongos.getDB('test').runCommand({find: 'user'}),
                                  ErrorCodes.Unauthorized);
 
-    otherMongos.getDB('admin').auth('root', 'pass');
+    otherBongos.getDB('admin').auth('root', 'pass');
 
-    var res = otherMongos.getDB('test').user.findOne();
+    var res = otherBongos.getDB('test').user.findOne();
     assert.neq(null, res);
     assert.eq('world', res.hello);
 

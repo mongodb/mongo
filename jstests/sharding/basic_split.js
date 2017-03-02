@@ -1,10 +1,10 @@
 /**
- * Perform basic tests for the split command against mongos.
+ * Perform basic tests for the split command against bongos.
  */
 (function() {
     'use strict';
 
-    var st = new ShardingTest({mongos: 2, shards: 2, other: {chunkSize: 1}});
+    var st = new ShardingTest({bongos: 2, shards: 2, other: {chunkSize: 1}});
     var configDB = st.s0.getDB('config');
 
     var shard0 = st.shard0.shardName;
@@ -63,7 +63,7 @@
     assert.commandWorked(configDB.adminCommand({split: 'test.user', middle: {_id: -600}}));
     assert.gt(configDB.chunks.find({ns: 'test.user', min: {$lt: {_id: 0}}}).itcount(), 1);
 
-    // Mongos must refresh metadata if the chunk version does not match
+    // Bongos must refresh metadata if the chunk version does not match
     assert.commandWorked(st.s0.adminCommand(
         {moveChunk: 'test.user', find: {_id: -900}, to: shard1, _waitForDelete: true}));
     assert.commandWorked(st.s1.adminCommand({split: 'test.user', middle: {_id: -900}}));

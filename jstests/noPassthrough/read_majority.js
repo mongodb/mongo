@@ -19,11 +19,11 @@ load("jstests/libs/analyze_plan.js");
 (function() {
     "use strict";
 
-    // This test needs its own mongod since the snapshot names must be in increasing order and once
+    // This test needs its own bongod since the snapshot names must be in increasing order and once
     // you
     // have a majority commit point it is impossible to go back to not having one.
     var testServer =
-        MongoRunner.runMongod({setParameter: 'testingSnapshotBehaviorInIsolation=true'});
+        BongoRunner.runBongod({setParameter: 'testingSnapshotBehaviorInIsolation=true'});
     var db = testServer.getDB("test");
     var t = db.readMajority;
 
@@ -37,14 +37,14 @@ load("jstests/libs/analyze_plan.js");
     function getReadMajorityCursor() {
         var res = t.runCommand('find', {batchSize: 2, readConcern: {level: "majority"}});
         assert.commandWorked(res);
-        return new DBCommandCursor(db.getMongo(), res, 2);
+        return new DBCommandCursor(db.getBongo(), res, 2);
     }
 
     function getReadMajorityAggCursor() {
         var res = t.runCommand(
             'aggregate', {pipeline: [], cursor: {batchSize: 2}, readConcern: {level: "majority"}});
         assert.commandWorked(res);
-        return new DBCommandCursor(db.getMongo(), res, 2);
+        return new DBCommandCursor(db.getBongo(), res, 2);
     }
 
     function getExplainPlan(query) {
@@ -203,5 +203,5 @@ load("jstests/libs/analyze_plan.js");
         'aggregate', {pipeline: [{$out: 'out'}], cursor: {}, readConcern: {level: 'majority'}}));
     assert.eq(res.code, ErrorCodes.InvalidOptions);
 
-    MongoRunner.stopMongod(testServer);
+    BongoRunner.stopBongod(testServer);
 }());

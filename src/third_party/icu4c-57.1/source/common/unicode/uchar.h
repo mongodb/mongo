@@ -1011,7 +1011,7 @@ enum UBlockCode {
     UBLOCK_KHMER =36, /*[1780]*/
 
     /** @stable ICU 2.0 */
-    UBLOCK_MONGOLIAN =37, /*[1800]*/
+    UBLOCK_BONGOLIAN =37, /*[1800]*/
 
     /** @stable ICU 2.0 */
     UBLOCK_LATIN_EXTENDED_ADDITIONAL =38, /*[1E00]*/

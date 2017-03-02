@@ -3,7 +3,7 @@
 baseName = "jstests_repair2";
 
 load("jstests/libs/slow_weekly_util.js");
-testServer = new SlowWeeklyMongod(baseName);
+testServer = new SlowWeeklyBongod(baseName);
 
 t = testServer.getDB(baseName)[baseName];
 t.drop();

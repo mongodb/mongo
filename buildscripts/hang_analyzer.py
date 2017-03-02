@@ -309,7 +309,7 @@ class GDBDumper(object):
 
     def __find_debugger(self, debugger):
         """Finds the installed debugger"""
-        return find_program(debugger, ['/opt/mongodbtoolchain/gdb/bin', '/usr/bin'])
+        return find_program(debugger, ['/opt/bongodbtoolchain/gdb/bin', '/usr/bin'])
 
     def dump_info(self, root_logger, logger, pid, process_name, take_dump):
         debugger = "gdb"
@@ -335,7 +335,7 @@ class GDBDumper(object):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         root_logger.info("dir %s" % script_dir)
         gdb_dir = os.path.join(script_dir, "gdb")
-        printers_script = os.path.join(gdb_dir, "mongo.py")
+        printers_script = os.path.join(gdb_dir, "bongo.py")
 
         cmds = [
             "set pagination off",
@@ -346,7 +346,7 @@ class GDBDumper(object):
             "source " + printers_script,
             "thread apply all bt",
             dump_command,
-            "mongodb-analyze",
+            "bongodb-analyze",
             "set confirm off",
             "quit",
             ]
@@ -527,7 +527,7 @@ def main():
     except AttributeError:
         root_logger.warning("Cannot determine Unix Current Login, not supported on Windows")
 
-    interesting_processes = ["mongo", "mongod", "mongos", "_test", "dbtest", "python", "java"]
+    interesting_processes = ["bongo", "bongod", "bongos", "_test", "dbtest", "python", "java"]
     go_processes = []
     process_ids = []
 

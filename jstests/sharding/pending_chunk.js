@@ -5,12 +5,12 @@
 (function() {
     "use strict";
 
-    var st = new ShardingTest({shards: 2, mongos: 2, other: {separateConfig: true}});
+    var st = new ShardingTest({shards: 2, bongos: 2, other: {separateConfig: true}});
 
-    var mongos = st.s0;
-    var admin = mongos.getDB('admin');
-    var shards = mongos.getCollection('config.shards').find().toArray();
-    var coll = mongos.getCollection('foo.bar');
+    var bongos = st.s0;
+    var admin = bongos.getDB('admin');
+    var shards = bongos.getCollection('config.shards').find().toArray();
+    var coll = bongos.getCollection('foo.bar');
     var ns = coll.getFullName();
     var dbName = coll.getDB().getName();
     var shard0 = st.shard0, shard1 = st.shard1;

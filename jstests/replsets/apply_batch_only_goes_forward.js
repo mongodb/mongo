@@ -64,7 +64,7 @@
         {upsert: true, writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}})));
 
     jsTest.log("restart primary");
-    clearRawMongoProgramOutput();
+    clearRawBongoProgramOutput();
     replTest.restart(master);
     printjson(sLocal.adminCommand("isMaster"));
     replTest.waitForState(master, ReplSetTest.State.RECOVERING);
@@ -78,7 +78,7 @@
     // Sync source selection will log this message if it does not detect min valid in the sync
     // source candidate's oplog.
     assert.soon(function() {
-        return rawMongoProgramOutput().match(
+        return rawBongoProgramOutput().match(
             'it does not contain the necessary operations for us to reach a consistent state');
     });
 

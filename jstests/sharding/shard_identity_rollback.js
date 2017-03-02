@@ -82,7 +82,7 @@
     assert.soon(
         function() {
             try {
-                var newConn = new Mongo(priConn.host);
+                var newConn = new Bongo(priConn.host);
                 return false;
             } catch (x) {
                 return true;
@@ -103,8 +103,8 @@
         "Restarting original primary a second time and waiting for it to successfully become " +
         "secondary");
     try {
-        // Join() with the crashed mongod and ignore its bad exit status.
-        MongoRunner.stopMongod(priConn);
+        // Join() with the crashed bongod and ignore its bad exit status.
+        BongoRunner.stopBongod(priConn);
     } catch (e) {
         // expected
     }

@@ -5,19 +5,19 @@
     var commandsRan = [];
 
     // Create a new DB object backed by a mock connection.
-    function MockMongo() {
+    function MockBongo() {
     }
-    MockMongo.prototype = Mongo.prototype;
-    MockMongo.prototype.runCommand = function(db, cmd, opts) {
+    MockBongo.prototype = Bongo.prototype;
+    MockBongo.prototype.runCommand = function(db, cmd, opts) {
         commandsRan.push({db: db, cmd: cmd, opts: opts});
         return {ok: 1, n: 100};
     };
-    var db = new DB(new MockMongo(), "test");
+    var db = new DB(new MockBongo(), "test");
 
     assert.eq(commandsRan.length, 0);
 
     // Run a count with no readPref.
-    db.getMongo().setReadPref(null);
+    db.getBongo().setReadPref(null);
     db.foo.count();
 
     // Check that there is no readPref on the command document.
@@ -27,7 +27,7 @@
     commandsRan = [];
 
     // Run with readPref secondary.
-    db.getMongo().setReadPref("secondary");
+    db.getBongo().setReadPref("secondary");
     db.foo.count();
 
     // Check that we have wrapped the command and attached the read preference.

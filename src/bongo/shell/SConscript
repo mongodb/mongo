@@ -1,0 +1,61 @@
+# -*- mode: python; -*-
+
+Import("env")
+
+env = env.Clone()
+
+generateJSErrorCodes = env.Command(
+    target=['error_codes.js'],
+    source=['$BUILD_DIR/bongo/base/generate_error_codes.py', '$BUILD_DIR/bongo/base/error_codes.err'],
+    action=['$PYTHON ${SOURCES[0]} js ${SOURCES[1]} --js-source=${TARGETS[0]}'])
+env.Alias('generated-sources', generateJSErrorCodes)
+
+# Files added here need to be added in scripting/engine.cpp and buildscripts/vcxproj.header as well.
+js_header = env.JSHeader(
+    target="bongo.cpp",
+    source=[
+        "assert.js",
+        "bulk_api.js",
+        "collection.js",
+        "crud_api.js",
+        "db.js",
+        "explain_query.js",
+        "explainable.js",
+        "error_codes.js",
+        "bongo.js",
+        "mr.js",
+        "query.js",
+        "types.js",
+        "upgrade_check.js",
+        "utils.js",
+        "utils_sh.js",
+        "utils_auth.js",
+    ]
+)
+
+env.Alias('generated-sources', js_header)
+
+# Files added here need to be added in shell/shell_utils.cpp and buildscripts/vcxproj.header as
+# well.
+env.JSHeader(
+    target="bongo-server.cpp",
+    source=[
+        "servers.js",
+        "shardingtest.js",
+        "servers_misc.js",
+        "replsettest.js",
+        "bridge.js"
+    ],
+)
+
+env.Alias('generated-sources', "bongo-server.cpp")
+
+env.Library(
+    target='bongojs',
+    source=[
+        'bongo.cpp',
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/bongo/base"
+    ],
+)

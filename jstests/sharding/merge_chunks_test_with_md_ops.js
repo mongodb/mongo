@@ -5,10 +5,10 @@
 
     var st = new ShardingTest({shards: 2});
 
-    var mongos = st.s0;
-    var admin = mongos.getDB("admin");
-    var shards = mongos.getCollection("config.shards").find().toArray();
-    var coll = mongos.getCollection("foo.bar");
+    var bongos = st.s0;
+    var admin = bongos.getDB("admin");
+    var shards = bongos.getCollection("config.shards").find().toArray();
+    var coll = bongos.getCollection("foo.bar");
 
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
     st.ensurePrimaryShard(coll.getDB() + "", shards[0]._id);
@@ -23,7 +23,7 @@
         assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: i}}));
         assert.commandWorked(
             admin.runCommand({mergeChunks: coll + "", bounds: [{_id: MinKey}, {_id: MaxKey}]}));
-        printjson(mongos.getDB("config").chunks.find().toArray());
+        printjson(bongos.getDB("config").chunks.find().toArray());
     }
 
     // Move the first chunk to the other shard
@@ -39,7 +39,7 @@
         assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: i}}));
         assert.commandWorked(
             admin.runCommand({mergeChunks: coll + "", bounds: [{_id: MinKey}, {_id: MaxKey}]}));
-        printjson(mongos.getDB("config").chunks.find().toArray());
+        printjson(bongos.getDB("config").chunks.find().toArray());
     }
 
     // Move the chunk back to the original shard

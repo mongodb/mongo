@@ -7,7 +7,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
 (function() {
     'use strict';
 
-    var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+    var staticBongod = BongoRunner.runBongod({});  // For startParallelOps.
 
     var st = new ShardingTest({shards: 3});
 
@@ -52,12 +52,12 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // (but after the migration of the documents has been committed on the recipient)
     pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
     var joinMoveChunk0 = moveChunkParallel(
-        staticMongod, st.s0.host, {Key: 0}, null, 'TestDB.TestColl', st.shard1.shardName);
+        staticBongod, st.s0.host, {Key: 0}, null, 'TestDB.TestColl', st.shard1.shardName);
     waitForMoveChunkStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
 
     pauseMoveChunkAtStep(st.shard1, moveChunkStepNames.chunkDataCommitted);
     var joinMoveChunk1 = moveChunkParallel(
-        staticMongod, st.s0.host, {Key: 100}, null, 'TestDB.TestColl', st.shard2.shardName);
+        staticBongod, st.s0.host, {Key: 100}, null, 'TestDB.TestColl', st.shard2.shardName);
     waitForMoveChunkStep(st.shard1, moveChunkStepNames.chunkDataCommitted);
 
     unpauseMoveChunkAtStep(st.shard0, moveChunkStepNames.chunkDataCommitted);

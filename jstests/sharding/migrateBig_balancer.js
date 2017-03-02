@@ -3,10 +3,10 @@
 
     var st =
         new ShardingTest({name: 'migrateBig_balancer', shards: 2, other: {enableBalancer: true}});
-    var mongos = st.s;
+    var bongos = st.s;
 
-    var admin = mongos.getDB("admin");
-    var db = mongos.getDB("test");
+    var admin = bongos.getDB("admin");
+    var db = bongos.getDB("test");
     var coll = db.getCollection("stuff");
 
     assert.commandWorked(admin.runCommand({enablesharding: coll.getDB().getName()}));
@@ -38,10 +38,10 @@
     admin.runCommand({shardcollection: "" + coll, key: {_id: 1}});
 
     assert.lt(
-        5, mongos.getDB("config").chunks.find({ns: "test.stuff"}).count(), "not enough chunks");
+        5, bongos.getDB("config").chunks.find({ns: "test.stuff"}).count(), "not enough chunks");
 
     assert.soon(function() {
-        var res = mongos.getDB("config").chunks.group({
+        var res = bongos.getDB("config").chunks.group({
             cond: {ns: "test.stuff"},
             key: {shard: 1},
             reduce: function(doc, out) {

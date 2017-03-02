@@ -75,7 +75,7 @@ Other notable changes:
    unambiguous.
 
 .  In UCP mode, \s was not matching two of the characters that Perl matches,
-   namely NEL (U+0085) and MONGOLIAN VOWEL SEPARATOR (U+180E), though they
+   namely NEL (U+0085) and BONGOLIAN VOWEL SEPARATOR (U+180E), though they
    were matched by \h.
 
 .  Add JIT support for the 64 bit TileGX architecture.

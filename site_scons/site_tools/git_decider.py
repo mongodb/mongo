@@ -1,4 +1,4 @@
-# Copyright 2016 MongoDB Inc.
+# Copyright 2016 BongoDB Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -53,12 +53,12 @@ def generate(env, **kwargs):
         result = gitInfoForDep == prev_ni.csig
         return result
 
-    def MongoGitDecider(dependency, target, prev_ni):
+    def BongoGitDecider(dependency, target, prev_ni):
         if not is_known_to_git(dependency):
             return base_decider(dependency, target, prev_ni)
         return not git_says_file_is_up_to_date(dependency, prev_ni)
 
-    env.Decider(MongoGitDecider)
+    env.Decider(BongoGitDecider)
 
 def exists(env):
     try:

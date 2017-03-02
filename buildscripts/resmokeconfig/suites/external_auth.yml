@@ -1,7 +1,7 @@
 selector:
   js_test:
     roots:
-    - src/mongo/db/modules/enterprise/jstests/external_auth/*.js
+    - src/bongo/db/modules/enterprise/jstests/external_auth/*.js
 
 executor:
   js_test:
@@ -13,4 +13,4 @@ executor:
         process_kwargs:
             env_vars:
                 KRB5_TRACE: /dev/stdout
-                KRB5_CONFIG: src/mongo/db/modules/enterprise/jstests/external_auth/assets/krb5.conf
+                KRB5_CONFIG: src/bongo/db/modules/enterprise/jstests/external_auth/assets/krb5.conf

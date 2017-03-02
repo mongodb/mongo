@@ -15,7 +15,7 @@ function check() {
     assert.eq.automsg("1", "db[ baseName ].count()");
 }
 
-var dbpath = MongoRunner.dataPath + baseName + "/";
+var dbpath = BongoRunner.dataPath + baseName + "/";
 var repairpath = dbpath + "repairDir/";
 var longDBName = Array(61).join('a');
 var longRepairPath = dbpath + Array(61).join('b') + '/';
@@ -23,7 +23,7 @@ var longRepairPath = dbpath + Array(61).join('b') + '/';
 resetDbpath(dbpath);
 resetDbpath(repairpath);
 
-var m = MongoRunner.runMongod({
+var m = BongoRunner.runBongod({
     directoryperdb: "",
     dbpath: dbpath,
     repairpath: repairpath,
@@ -48,10 +48,10 @@ for (f in files) {
 assert(fileCount > 0, "Expected more than zero nondirectory files in the database directory");
 
 check();
-MongoRunner.stopMongod(m.port);
+BongoRunner.stopBongod(m.port);
 
 resetDbpath(repairpath);
-m = MongoRunner.runMongod({
+m = BongoRunner.runBongod({
     port: m.port,
     directoryperdb: "",
     dbpath: dbpath,
@@ -60,11 +60,11 @@ m = MongoRunner.runMongod({
 db = m.getDB(baseName);
 assert.commandWorked(db.runCommand({repairDatabase: 1}));
 check();
-MongoRunner.stopMongod(m.port);
+BongoRunner.stopBongod(m.port);
 
 // Test long database names
 resetDbpath(repairpath);
-m = MongoRunner.runMongod({
+m = BongoRunner.runBongod({
     port: m.port,
     directoryperdb: "",
     dbpath: dbpath,
@@ -73,11 +73,11 @@ m = MongoRunner.runMongod({
 db = m.getDB(longDBName);
 assert.writeOK(db[baseName].save({}));
 assert.commandWorked(db.runCommand({repairDatabase: 1}));
-MongoRunner.stopMongod(m.port);
+BongoRunner.stopBongod(m.port);
 
 // Test long repairPath
 resetDbpath(longRepairPath);
-m = MongoRunner.runMongod({
+m = BongoRunner.runBongod({
     port: m.port,
     directoryperdb: "",
     dbpath: dbpath,
@@ -87,11 +87,11 @@ m = MongoRunner.runMongod({
 db = m.getDB(longDBName);
 assert.commandWorked(db.runCommand({repairDatabase: 1, backupOriginalFiles: true}));
 check();
-MongoRunner.stopMongod(m.port);
+BongoRunner.stopBongod(m.port);
 
 // Test database name and repairPath with --repair
 resetDbpath(longRepairPath);
-var returnCode = runMongoProgram("mongod",
+var returnCode = runBongoProgram("bongod",
                                  "--port",
                                  m.port,
                                  "--repair",
@@ -101,7 +101,7 @@ var returnCode = runMongoProgram("mongod",
                                  "--repairpath",
                                  longRepairPath);
 assert.eq(returnCode, 0);
-m = MongoRunner.runMongod({
+m = BongoRunner.runBongod({
     port: m.port,
     directoryperdb: "",
     dbpath: dbpath,
@@ -109,10 +109,10 @@ m = MongoRunner.runMongod({
 });
 db = m.getDB(longDBName);
 check();
-MongoRunner.stopMongod(m.port);
+BongoRunner.stopBongod(m.port);
 
 resetDbpath(repairpath);
-returnCode = runMongoProgram("mongod",
+returnCode = runBongoProgram("bongod",
                              "--port",
                              m.port,
                              "--repair",
@@ -122,7 +122,7 @@ returnCode = runMongoProgram("mongod",
                              "--repairpath",
                              repairpath);
 assert.eq(returnCode, 0);
-m = MongoRunner.runMongod({
+m = BongoRunner.runBongod({
     port: m.port,
     directoryperdb: "",
     dbpath: dbpath,
@@ -131,13 +131,13 @@ m = MongoRunner.runMongod({
 });
 db = m.getDB(baseName);
 check();
-MongoRunner.stopMongod(m.port);
+BongoRunner.stopBongod(m.port);
 
 resetDbpath(repairpath);
 returnCode =
-    runMongoProgram("mongod", "--port", m.port, "--repair", "--directoryperdb", "--dbpath", dbpath);
+    runBongoProgram("bongod", "--port", m.port, "--repair", "--directoryperdb", "--dbpath", dbpath);
 assert.eq(returnCode, 0);
-m = MongoRunner.runMongod({
+m = BongoRunner.runBongod({
     port: m.port,
     directoryperdb: "",
     dbpath: dbpath,

@@ -159,7 +159,7 @@
         s.adminCommand({
             movechunk: longName,
             find: makeObjectDotted(curT.values[2]),
-            to: secondary.getMongo().name,
+            to: secondary.getBongo().name,
             _waitForDelete: true
         });
 

@@ -8,15 +8,15 @@
     // DEPRECATED: this wrapper only supports nodes started through resmoke's masterslave.py
     // fixture. Please do not use it with other master/slave clusters.
     var MasterSlaveDBHashTest = function(primaryHost) {
-        var master = new Mongo(primaryHost);
+        var master = new Bongo(primaryHost);
         var resolvedHost = getHostName();
         var masterPort = master.host.split(':')[1];
         // The 'host' property is modified manually because 'localhost' is used by default in a new
-        // Mongo() connection. We set the value to the real hostname because that is what the server
+        // Bongo() connection. We set the value to the real hostname because that is what the server
         // uses.
         master.host = resolvedHost + ':' + masterPort;
 
-        var slave = new Mongo(resolvedHost + ':' + String(parseInt(masterPort) + 1));
+        var slave = new Bongo(resolvedHost + ':' + String(parseInt(masterPort) + 1));
 
         this.nodeList = function() {
             return [master.host, slave.host];
@@ -79,7 +79,7 @@
     };
 
     var startTime = Date.now();
-    assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a mongod?');
+    assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a bongod?');
 
     var primaryInfo = db.isMaster();
 
@@ -89,8 +89,8 @@
     var cmdLineOpts = db.adminCommand('getCmdLineOpts');
     assert.commandWorked(cmdLineOpts);
     var isMasterSlave = cmdLineOpts.parsed.master === true;
-    var testFixture = isMasterSlave ? new MasterSlaveDBHashTest(db.getMongo().host)
-                                    : new ReplSetTest(db.getMongo().host);
+    var testFixture = isMasterSlave ? new MasterSlaveDBHashTest(db.getBongo().host)
+                                    : new ReplSetTest(db.getBongo().host);
     testFixture.checkReplicatedDataHashes();
 
     var totalTime = Date.now() - startTime;

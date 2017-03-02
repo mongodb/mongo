@@ -8,7 +8,7 @@
     db.batch_write_collation_estsize.drop();
     assert.writeOK(db.batch_write_collation_estsize.insert({str: "FOO"}));
 
-    if (db.getMongo().writeMode() !== "commands") {
+    if (db.getBongo().writeMode() !== "commands") {
         // Cannot use the bulk API to set a collation when using legacy write ops.
         let bulk;
 

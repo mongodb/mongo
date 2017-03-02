@@ -110,7 +110,7 @@ functions:
           YCSB_rev: ${YCSB_rev}
 
           # compositions of expansions
-          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz"
+          bongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/bongod-${version_id}.tar.gz"
           EOF
     - command: shell.exec
       params:
@@ -242,9 +242,9 @@ functions:
             exit 1
           fi
 
-  "configure mongodb cluster":
+  "configure bongodb cluster":
     - command: shell.exec
-      # bring up the mongod
+      # bring up the bongod
       params:
         working_dir: work
         script: |
@@ -252,7 +252,7 @@ functions:
           set -o verbose
           source ./dsienv.sh
           source ./venv/bin/activate
-          $DSI_PATH/bin/mongodb_setup.py && echo "${cluster} MongoDB Cluster STARTED."
+          $DSI_PATH/bin/bongodb_setup.py && echo "${cluster} BongoDB Cluster STARTED."
 
   "run test":
     - command: shell.exec
@@ -379,16 +379,16 @@ tasks:
           set -o verbose
 
           # We get the raw version string (r1.2.3-45-gabcdef) from git
-          MONGO_VERSION=$(git describe)
+          BONGO_VERSION=$(git describe)
           # If this is a patch build, we add the patch version id to the version string so we know
           # this build was a patch, and which evergreen task it came from
           if [ "${is_patch|}" = "true" ]; then
-            MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+            BONGO_VERSION="$BONGO_VERSION-patch-${version_id}"
           fi
 
           # This script converts the generated version string into a sanitized version string for
           # use by scons and uploading artifacts as well as information about for the scons cache.
-          echo $MONGO_VERSION | USE_SCONS_CACHE=${use_scons_cache|false} ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
+          echo $BONGO_VERSION | USE_SCONS_CACHE=${use_scons_cache|false} ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
     # Then we load the generated version data into the agent so we can use it in task definitions
     - command: expansions.update
       params:
@@ -399,29 +399,29 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
-          ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo${extension} mongod${extension} mongos${extension} MONGO_VERSION=${version}
-          mkdir -p mongodb/bin
-          mkdir -p mongodb/jstests/hooks
-          mv mongo${extension|} mongodb/bin
-          mv mongod${extension|} mongodb/bin
-          mv mongos${extension|} mongodb/bin
+          ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} bongo${extension} bongod${extension} bongos${extension} BONGO_VERSION=${version}
+          mkdir -p bongodb/bin
+          mkdir -p bongodb/jstests/hooks
+          mv bongo${extension|} bongodb/bin
+          mv bongod${extension|} bongodb/bin
+          mv bongos${extension|} bongodb/bin
           if [ -d jstests/hooks ]
           then
             echo "Fetching JS test DB correctness checks from directory jstests/hooks"
-            cp -a jstests/hooks/* mongodb/jstests/hooks
+            cp -a jstests/hooks/* bongodb/jstests/hooks
           fi
-          tar cvf mongodb.tar mongodb
-          gzip mongodb.tar
+          tar cvf bongodb.tar bongodb
+          gzip bongodb.tar
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/mongodb.tar.gz
-        remote_file: ${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz
+        local_file: src/bongodb.tar.gz
+        remote_file: ${project}/${version_id}/${revision}/${platform}/bongod-${version_id}.tar.gz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
-        display_name: mongodb.tar.gz
+        display_name: bongodb.tar.gz
 
 - name: industry_benchmarks_WT
   depends_on:
@@ -433,7 +433,7 @@ tasks:
         storageEngine: "wiredTiger"
         test: "ycsb"
     - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
+    - func: "configure bongodb cluster"
       vars:
         storageEngine: "wiredTiger"
     - func: "run test"
@@ -456,7 +456,7 @@ tasks:
         storageEngine: "mmapv1"
         test: "ycsb"
     - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
+    - func: "configure bongodb cluster"
       vars:
         storageEngine: "mmapv1"
     - func: "run test"
@@ -480,7 +480,7 @@ tasks:
         storageEngine: "wiredTiger"
         test: "benchRun"
     - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
+    - func: "configure bongodb cluster"
       vars:
         storageEngine: "wiredTiger"
     - func: "run test"
@@ -502,7 +502,7 @@ tasks:
         storageEngine: "mmapv1"
         test: "benchRun"
     - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
+    - func: "configure bongodb cluster"
       vars:
         storageEngine: "mmapv1"
     - func: "run test"
@@ -524,7 +524,7 @@ tasks:
         test: "benchRun"
         setup: "replica-2node"
     - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
+    - func: "configure bongodb cluster"
       vars:
         storageEngine: "wiredTiger"
         setup: "replica-2node"
@@ -547,7 +547,7 @@ tasks:
         test: "benchRun"
         setup: "replica-2node"
     - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
+    - func: "configure bongodb cluster"
       vars:
         storageEngine: "mmapv1"
         setup: "replica-2node"
@@ -633,7 +633,7 @@ tasks:
         storageEngine: "wiredTiger"
         test: "initialSync"
     - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
+    - func: "configure bongodb cluster"
       vars:
         storageEngine: "wiredTiger"
     - func: "run test"
@@ -654,7 +654,7 @@ tasks:
         storageEngine: "mmapv1"
         test: "initialSync"
     - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
+    - func: "configure bongodb cluster"
       vars:
         storageEngine: "mmapv1"
     - func: "run test"
@@ -676,7 +676,7 @@ tasks:
         setup: "replica-2node.dr"
         test: "initialSync"
     - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
+    - func: "configure bongodb cluster"
       vars:
         storageEngine: "wiredTiger"
         setup: "replica-2node.dr"
@@ -699,7 +699,7 @@ tasks:
         setup: "replica-2node.dr"
         test: "initialSync"
     - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
+    - func: "configure bongodb cluster"
       vars:
         storageEngine: "mmapv1"
         setup: "replica-2node.dr"
@@ -722,7 +722,7 @@ tasks:
         storageEngine: "wiredTiger"
         test: "initialsync-logkeeper"
     - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
+    - func: "configure bongodb cluster"
       vars:
         storageEngine: "wiredTiger"
     - func: "run test"
@@ -751,7 +751,7 @@ modules:
   branch: master
 
 - name: YCSB
-  repo: git@github.com:mongodb-labs/YCSB.git
+  repo: git@github.com:bongodb-labs/YCSB.git
   prefix: YCSB
   branch: evergreen
 
@@ -770,7 +770,7 @@ buildvariants:
     - workloads
     - YCSB
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/bongodbtoolchain/v2/bin/gcc CXX=/opt/bongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/bongodbtoolchain/v2/bin/objcopy
     setup: single-replica
     cluster: single
     platform: linux
@@ -789,7 +789,7 @@ buildvariants:
   batchtime: 1440 # 24 hours
   modules: *modules
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/bongodbtoolchain/v2/bin/gcc CXX=/opt/bongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/bongodbtoolchain/v2/bin/objcopy
     setup: standalone
     cluster: single
     platform: linux
@@ -811,7 +811,7 @@ buildvariants:
   batchtime: 10080 # 7 days
   modules: *modules
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/bongodbtoolchain/v2/bin/gcc CXX=/opt/bongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/bongodbtoolchain/v2/bin/objcopy
     setup: shard
     cluster: shard
     platform: linux
@@ -830,7 +830,7 @@ buildvariants:
   batchtime: 10080 # 7 days
   modules: *modules
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/bongodbtoolchain/v2/bin/gcc CXX=/opt/bongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/bongodbtoolchain/v2/bin/objcopy
     setup: replica
     cluster: replica
     platform: linux
@@ -850,7 +850,7 @@ buildvariants:
   batchtime: 10080 # 7 days
   modules: *modules
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/bongodbtoolchain/v2/bin/gcc CXX=/opt/bongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/bongodbtoolchain/v2/bin/objcopy
     setup: replica-2node
     cluster: replica
     platform: linux
@@ -869,7 +869,7 @@ buildvariants:
   batchtime: 10080 # 7 days
   modules: *modules
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/bongodbtoolchain/v2/bin/gcc CXX=/opt/bongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/bongodbtoolchain/v2/bin/objcopy
     setup: initialsync-logkeeper
     cluster: initialsync-logkeeper
     platform: linux
@@ -885,7 +885,7 @@ buildvariants:
   batchtime: 10080 # 7 days
   modules: *modules
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/bongodbtoolchain/v2/bin/gcc CXX=/opt/bongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/bongodbtoolchain/v2/bin/objcopy
     use_scons_cache: true
     project: *project
   run_on:

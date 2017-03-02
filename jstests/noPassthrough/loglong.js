@@ -5,7 +5,7 @@
     "use strict";
 
     const options = {setParameter: "maxLogSizeKB=9"};
-    const conn = MongoRunner.runMongod(options);
+    const conn = BongoRunner.runBongod(options);
 
     var db = conn.getDB('db');
     var res = db.adminCommand({getParameter: 1, maxLogSizeKB: 1});

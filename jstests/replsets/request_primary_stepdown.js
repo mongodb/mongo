@@ -22,7 +22,7 @@
 
     assert.commandWorked(
         replSet.nodes[0].adminCommand({setParameter: 1, logComponentVerbosity: {executor: 4}}));
-    clearRawMongoProgramOutput();
+    clearRawBongoProgramOutput();
 
     // Primary should step down long enough for election to occur on secondary.
     var stepDownException = assert.throws(function() {
@@ -37,7 +37,7 @@
 
     // Eventually node 0 will stand for election again because it has a higher priorty.
     replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY, 100 * 1000);
-    var logContents = rawMongoProgramOutput();
+    var logContents = rawBongoProgramOutput();
     assert.eq(logContents.indexOf("stepdown period must be longer than secondaryCatchUpPeriodSecs"),
               -1,
               "_requestRemotePrimaryStepDown sent an invalid replSetStepDown command");

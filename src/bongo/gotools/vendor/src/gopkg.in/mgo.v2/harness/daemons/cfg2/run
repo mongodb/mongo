@@ -1,0 +1,8 @@
+#!/bin/sh
+
+. ../.env
+
+exec bongod $COMMONCOPTS \
+	--port 40102 \
+	--configsvr
+

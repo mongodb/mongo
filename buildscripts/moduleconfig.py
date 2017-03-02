@@ -1,12 +1,12 @@
-"""Utility functions for SCons to discover and configure MongoDB modules.
+"""Utility functions for SCons to discover and configure BongoDB modules.
 
-A MongoDB module is an organized collection of source code and build rules that can be provided at
-compile-time to alter or extend the behavior of MongoDB.  The files comprising a single MongoDB
+A BongoDB module is an organized collection of source code and build rules that can be provided at
+compile-time to alter or extend the behavior of BongoDB.  The files comprising a single BongoDB
 module are arranged in a directory hierarchy, rooted in a directory whose name is by convention the
 module name, and containing in that root directory at least two files: a build.py file and a
 SConscript file.
 
-MongoDB modules are discovered by a call to the discover_modules() function, whose sole parameter is
+BongoDB modules are discovered by a call to the discover_modules() function, whose sole parameter is
 the directory which is the immediate parent of all module directories.  The exact directory is
 chosen by the SConstruct file, which is the direct consumer of this python module.  The only rule is
 that it must be a subdirectory of the src/ directory, to correctly work with the SCons variant
@@ -15,13 +15,13 @@ directory system that separates build products for source.
 Once discovered, modules are configured by the configure_modules() function, and the build system
 integrates their SConscript files into the rest of the build.
 
-MongoDB module build.py files implement a single function, configure(conf, env), which they may use
-to configure the supplied "env" object.  The configure functions may add extra LIBDEPS to mongod,
-mongos and the mongo shell (TODO: other mongo tools and the C++ client), and through those libraries
+BongoDB module build.py files implement a single function, configure(conf, env), which they may use
+to configure the supplied "env" object.  The configure functions may add extra LIBDEPS to bongod,
+bongos and the bongo shell (TODO: other bongo tools and the C++ client), and through those libraries
 alter those programs' behavior.
 
-MongoDB module SConscript files can describe libraries, programs and unit tests, just as other
-MongoDB SConscript files do.
+BongoDB module SConscript files can describe libraries, programs and unit tests, just as other
+BongoDB SConscript files do.
 """
 
 __all__ = ('discover_modules', 'discover_module_directories', 'configure_modules',
@@ -32,7 +32,7 @@ import inspect
 import os
 
 def discover_modules(module_root, allowed_modules):
-    """Scans module_root for subdirectories that look like MongoDB modules.
+    """Scans module_root for subdirectories that look like BongoDB modules.
 
     Returns a list of imported build.py module objects.
     """
@@ -71,7 +71,7 @@ def discover_modules(module_root, allowed_modules):
     return found_modules
 
 def discover_module_directories(module_root, allowed_modules):
-    """Scans module_root for subdirectories that look like MongoDB modules.
+    """Scans module_root for subdirectories that look like BongoDB modules.
 
     Returns a list of directory names.
     """
@@ -104,7 +104,7 @@ def configure_modules(modules, conf):
     """ Run the configure() function in the build.py python modules for each module in "modules"
     (as created by discover_modules).
 
-    The configure() function should prepare the Mongo build system for building the module.
+    The configure() function should prepare the Bongo build system for building the module.
     """
     for module in modules:
         name = module.name
@@ -135,37 +135,37 @@ def __get_src_relative_path(path):
     return result
 
 def __get_module_path(module_frame_depth):
-    """Return the path to the MongoDB module whose build.py is executing "module_frame_depth" frames
+    """Return the path to the BongoDB module whose build.py is executing "module_frame_depth" frames
     above this function, relative to the "src" directory.
     """
     module_filename = inspect.stack()[module_frame_depth + 1][1]
     return os.path.dirname(__get_src_relative_path(module_filename))
 
 def __get_module_src_path(module_frame_depth):
-    """Return the path relative to the SConstruct file of the MongoDB module's source tree.
+    """Return the path relative to the SConstruct file of the BongoDB module's source tree.
 
     module_frame_depth is the number of frames above the current one in which one can find a
-    function from the MongoDB module's build.py function.
+    function from the BongoDB module's build.py function.
     """
     return os.path.join('src', __get_module_path(module_frame_depth + 1))
 
 def __get_module_build_path(module_frame_depth):
-    """Return the path relative to the SConstruct file of the MongoDB module's build tree.
+    """Return the path relative to the SConstruct file of the BongoDB module's build tree.
 
     module_frame_depth is the number of frames above the current one in which one can find a
-    function from the MongoDB module's build.py function.
+    function from the BongoDB module's build.py function.
     """
     return os.path.join('$BUILD_DIR', __get_module_path(module_frame_depth + 1))
 
 def get_current_module_src_path():
-    """Return the path relative to the SConstruct file of the current MongoDB module's source tree.
+    """Return the path relative to the SConstruct file of the current BongoDB module's source tree.
 
     May only meaningfully be called from within build.py
     """
     return __get_module_src_path(1)
 
 def get_current_module_build_path():
-    """Return the path relative to the SConstruct file of the current MongoDB module's build tree.
+    """Return the path relative to the SConstruct file of the current BongoDB module's build tree.
 
     May only meaningfully be called from within build.py
     """
@@ -174,7 +174,7 @@ def get_current_module_build_path():
 
 def get_current_module_libdep_name(libdep_rel_path):
     """Return a $BUILD_DIR relative path to a "libdep_rel_path", where "libdep_rel_path"
-    is specified relative to the MongoDB module's build.py file.
+    is specified relative to the BongoDB module's build.py file.
 
     May only meaningfully be called from within build.py
     """

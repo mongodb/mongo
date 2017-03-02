@@ -5,18 +5,18 @@
 (function() {
     "use strict";
 
-    var st = new ShardingTest({shards: 1, mongos: 1});
+    var st = new ShardingTest({shards: 1, bongos: 1});
 
-    var mongos = st.s;
-    var coll = mongos.getCollection("foo.bar");
+    var bongos = st.s;
+    var coll = bongos.getCollection("foo.bar");
 
     jsTestLog("Stopping config servers");
     for (var i = 0; i < st._configServers.length; i++) {
-        MongoRunner.stopMongod(st._configServers[i]);
+        BongoRunner.stopBongod(st._configServers[i]);
     }
 
-    // Make sure mongos has no database info currently loaded
-    mongos.getDB("admin").runCommand({flushRouterConfig: 1});
+    // Make sure bongos has no database info currently loaded
+    bongos.getDB("admin").runCommand({flushRouterConfig: 1});
 
     jsTestLog("Config flushed and config servers down!");
 

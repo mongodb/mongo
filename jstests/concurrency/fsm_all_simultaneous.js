@@ -5,7 +5,7 @@ load('jstests/concurrency/fsm_libs/runner.js');
 var dir = 'jstests/concurrency/fsm_workloads';
 
 var blacklist = [
-    // Disabled due to MongoDB restrictions and/or workload restrictions
+    // Disabled due to BongoDB restrictions and/or workload restrictions
 
     // These workloads implicitly assume that their tid ranges are [0, $config.threadCount). This
     // isn't guaranteed to be true when they are run in parallel with other workloads.

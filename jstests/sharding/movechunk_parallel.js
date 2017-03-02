@@ -7,7 +7,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     'use strict';
 
     // For startParallelOps to write its state
-    var staticMongod = MongoRunner.runMongod({});
+    var staticBongod = BongoRunner.runBongod({});
 
     var st = new ShardingTest({shards: 4});
 
@@ -40,9 +40,9 @@ load('./jstests/libs/chunk_manipulation_util.js');
 
     // Both move chunk operations should proceed
     var joinMoveChunk1 = moveChunkParallel(
-        staticMongod, st.s0.host, {Key: 10}, null, 'TestDB.TestColl', st.shard2.shardName);
+        staticBongod, st.s0.host, {Key: 10}, null, 'TestDB.TestColl', st.shard2.shardName);
     var joinMoveChunk2 = moveChunkParallel(
-        staticMongod, st.s0.host, {Key: 30}, null, 'TestDB.TestColl', st.shard3.shardName);
+        staticBongod, st.s0.host, {Key: 30}, null, 'TestDB.TestColl', st.shard3.shardName);
 
     waitForMigrateStep(st.shard2, migrateStepNames.deletedPriorDataInRange);
     waitForMigrateStep(st.shard3, migrateStepNames.deletedPriorDataInRange);

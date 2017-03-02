@@ -3,14 +3,14 @@
 var baseName = "jstests_slowNightly_command_line_parsing";
 
 // test notablescan
-var m = MongoRunner.runMongod({notablescan: ""});
+var m = BongoRunner.runBongod({notablescan: ""});
 m.getDB(baseName).getCollection(baseName).save({a: 1});
 assert.throws(function() {
     m.getDB(baseName).getCollection(baseName).find({a: 1}).toArray();
 });
 
 // test config file
-var m2 = MongoRunner.runMongod({config: "jstests/libs/testconfig"});
+var m2 = BongoRunner.runBongod({config: "jstests/libs/testconfig"});
 
 var m2expected = {
     "parsed": {
@@ -34,7 +34,7 @@ delete m2result.parsed.storage.wiredTiger;
 assert.docEq(m2expected.parsed, m2result.parsed);
 
 // test JSON config file
-var m3 = MongoRunner.runMongod({config: "jstests/libs/testconfig"});
+var m3 = BongoRunner.runBongod({config: "jstests/libs/testconfig"});
 
 var m3expected = {
     "parsed": {

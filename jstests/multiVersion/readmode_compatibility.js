@@ -6,8 +6,8 @@
 
     var storageEngine = jsTest.options().storageEngine;
 
-    var conn30 = MongoRunner.runMongod({binVersion: '3.0', storageEngine: storageEngine});
-    assert.neq(conn30, null, 'unable to start 3.0 mongod');
+    var conn30 = BongoRunner.runBongod({binVersion: '3.0', storageEngine: storageEngine});
+    assert.neq(conn30, null, 'unable to start 3.0 bongod');
 
     // Force writeMode to "commands" so that we can check the results of write operations.
     conn30.forceWriteMode('commands');
@@ -30,12 +30,12 @@
     assert.eq(5, coll.find().batchSize(2).itcount());
     assert.eq('legacy', conn30._readMode);
 
-    MongoRunner.stopMongod(conn30);
+    BongoRunner.stopBongod(conn30);
 
-    // With the latest version of mongod, forcing the readMode to "compatibility" and then asking
+    // With the latest version of bongod, forcing the readMode to "compatibility" and then asking
     // for the readMode should cause the shell to resolve the readMode to "commands".
-    var connLatest = MongoRunner.runMongod({storageEngine: storageEngine});
-    assert.neq(connLatest, null, 'unable to start 3.2 mongod');
+    var connLatest = BongoRunner.runBongod({storageEngine: storageEngine});
+    assert.neq(connLatest, null, 'unable to start 3.2 bongod');
     connLatest.forceReadMode('compatibility');
     assert.eq('commands', connLatest.readMode());
 })();

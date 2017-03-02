@@ -784,7 +784,7 @@ Version 8.34 15-December-2013
     data that they returned was rubbish.
 
 26. In UCP mode, \s was not matching two of the characters that Perl matches,
-    namely NEL (U+0085) and MONGOLIAN VOWEL SEPARATOR (U+180E), though they
+    namely NEL (U+0085) and BONGOLIAN VOWEL SEPARATOR (U+180E), though they
     were matched by \h. The code has now been refactored so that the lists of
     the horizontal and vertical whitespace characters used for \h and \v (which
     are defined only in one place) are now also used for \s.
@@ -2803,7 +2803,7 @@ Version 7.7 07-May-08
 18. Changed CMakeLists.txt and cmake/FindReadline.cmake to arrange for the
     ncurses library to be included for pcretest when ReadLine support is
     requested, but also to allow for it to be overridden. This patch came from
-    Daniel Bergström.
+    Daniel Bergstrï¿½m.
 
 19. There was a typo in the file ucpinternal.h where f0_rangeflag was defined
     as 0x00f00000 instead of 0x00800000. Luckily, this would not have caused

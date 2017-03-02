@@ -16,20 +16,20 @@ function runTest(a, b) {
 }
 
 // run all tests standalone
-var conn = MongoRunner.runMongod({auth: ""});
+var conn = BongoRunner.runBongod({auth: ""});
 var a = conn.getDB("copydb2-test-a");
 var b = conn.getDB("copydb2-test-b");
 var adminDB = conn.getDB("admin");
 adminDB.createUser({user: "root", pwd: "root", roles: ["root"]});
 adminDB.auth("root", "root");
 runTest(a, b);
-MongoRunner.stopMongod(conn);
+BongoRunner.stopBongod(conn);
 
 /** Doesn't work in a sharded setup due to SERVER-13080
 // run all tests sharded
 var st = new ShardingTest({
     shards: 2,
-    mongos: 1,
+    bongos: 1,
     keyFile: "jstests/libs/key1",
 });
 var a = st.s.getDB( "copydb2-test-a" );

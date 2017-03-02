@@ -11,4 +11,4 @@ var resultUpper = dbUpperCase.c.insert({});
 assert.eq(0, resultUpper.nInserted);
 assert.writeError(resultUpper);
 
-assert.eq(-1, db.getMongo().getDBNames().indexOf("dbcase2test_dbnameA"));
+assert.eq(-1, db.getBongo().getDBNames().indexOf("dbcase2test_dbnameA"));

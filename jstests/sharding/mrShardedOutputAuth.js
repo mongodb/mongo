@@ -37,14 +37,14 @@
     }
 
     var st = new ShardingTest(
-        {name: "mrShardedOutputAuth", shards: 1, mongos: 1, other: {keyFile: 'jstests/libs/key1'}});
+        {name: "mrShardedOutputAuth", shards: 1, bongos: 1, other: {keyFile: 'jstests/libs/key1'}});
 
     // Setup the users to the input, output and admin databases
-    var mongos = st.s;
-    var adminDb = mongos.getDB("admin");
+    var bongos = st.s;
+    var adminDb = bongos.getDB("admin");
     adminDb.createUser({user: "user", pwd: "pass", roles: jsTest.adminUserRoles});
 
-    var authenticatedConn = new Mongo(mongos.host);
+    var authenticatedConn = new Bongo(bongos.host);
     authenticatedConn.getDB('admin').auth("user", "pass");
     adminDb = authenticatedConn.getDB("admin");
 
@@ -64,20 +64,20 @@
     assert.eq(inputDb.numbers.count(), 50);
 
     // Setup a connection authenticated to both input and output db
-    var inputOutputAuthConn = new Mongo(mongos.host);
+    var inputOutputAuthConn = new Bongo(bongos.host);
     inputOutputAuthConn.getDB('input').auth("user", "pass");
     inputOutputAuthConn.getDB('output').auth("user", "pass");
     doMapReduce(inputOutputAuthConn, outputDb);
     assertSuccess(configDb, outputDb);
 
     // setup a connection authenticated to only input db
-    var inputAuthConn = new Mongo(mongos.host);
+    var inputAuthConn = new Bongo(bongos.host);
     inputAuthConn.getDB('input').auth("user", "pass");
     doMapReduce(inputAuthConn, outputDb);
     assertFailure(configDb, outputDb);
 
     // setup a connection authenticated to only output db
-    var outputAuthConn = new Mongo(mongos.host);
+    var outputAuthConn = new Bongo(bongos.host);
     outputAuthConn.getDB('output').auth("user", "pass");
     doMapReduce(outputAuthConn, outputDb);
     assertFailure(configDb, outputDb);

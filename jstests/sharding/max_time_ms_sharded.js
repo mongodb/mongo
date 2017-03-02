@@ -1,22 +1,22 @@
-// Test mongos implementation of time-limited operations: verify that mongos correctly forwards max
-// time to shards, and that mongos correctly times out max time sharded getmore operations (which
+// Test bongos implementation of time-limited operations: verify that bongos correctly forwards max
+// time to shards, and that bongos correctly times out max time sharded getmore operations (which
 // are run in series on shards).
 //
-// Note that mongos does not time out commands or query ops (which remains responsibility of mongod,
-// pending development of an interrupt framework for mongos).
+// Note that bongos does not time out commands or query ops (which remains responsibility of bongod,
+// pending development of an interrupt framework for bongos).
 (function() {
     'use strict';
 
     var st = new ShardingTest({shards: 2});
 
-    var mongos = st.s0;
+    var bongos = st.s0;
     var shards = [st.shard0, st.shard1];
-    var coll = mongos.getCollection("foo.bar");
-    var admin = mongos.getDB("admin");
+    var coll = bongos.getCollection("foo.bar");
+    var admin = bongos.getDB("admin");
     var cursor;
     var res;
 
-    // Helper function to configure "maxTimeAlwaysTimeOut" fail point on shards, which forces mongod
+    // Helper function to configure "maxTimeAlwaysTimeOut" fail point on shards, which forces bongod
     // to throw if it receives an operation with a max time. See fail point declaration for complete
     // description.
     var configureMaxTimeAlwaysTimeOut = function(mode) {
@@ -27,7 +27,7 @@
     };
 
     // Helper function to configure "maxTimeAlwaysTimeOut" fail point on shards, which prohibits
-    // mongod from enforcing time limits. See fail point declaration for complete description.
+    // bongod from enforcing time limits. See fail point declaration for complete description.
     var configureMaxTimeNeverTimeOut = function(mode) {
         assert.commandWorked(shards[0].getDB("admin").runCommand(
             {configureFailPoint: "maxTimeNeverTimeOut", mode: mode}));
@@ -57,8 +57,8 @@
     assert.eq(50, shards[1].getCollection(coll.getFullName()).count());
 
     //
-    // Test that mongos correctly forwards max time to shards for sharded queries.  Uses
-    // maxTimeAlwaysTimeOut to ensure mongod throws if it receives a max time.
+    // Test that bongos correctly forwards max time to shards for sharded queries.  Uses
+    // maxTimeAlwaysTimeOut to ensure bongod throws if it receives a max time.
     //
 
     // Positive test.
@@ -67,7 +67,7 @@
     cursor.maxTimeMS(60 * 1000);
     assert.throws(function() {
         cursor.next();
-    }, [], "expected query to fail in mongod due to maxTimeAlwaysTimeOut fail point");
+    }, [], "expected query to fail in bongod due to maxTimeAlwaysTimeOut fail point");
 
     // Negative test.
     configureMaxTimeAlwaysTimeOut("off");
@@ -75,11 +75,11 @@
     cursor.maxTimeMS(60 * 1000);
     assert.doesNotThrow(function() {
         cursor.next();
-    }, [], "expected query to not hit time limit in mongod");
+    }, [], "expected query to not hit time limit in bongod");
 
     //
-    // Test that mongos correctly times out max time sharded getmore operations.  Uses
-    // maxTimeNeverTimeOut to ensure mongod doesn't enforce a time limit.
+    // Test that bongos correctly times out max time sharded getmore operations.  Uses
+    // maxTimeNeverTimeOut to ensure bongod doesn't enforce a time limit.
     //
     // TODO: This is unimplemented.  A test for this functionality should be written as
     // part of the work for SERVER-19410.
@@ -100,7 +100,7 @@
     cursor.maxTimeMS(1000 * 60 * 60 * 24);
     assert.doesNotThrow(function() {
         cursor.next();
-    }, [], "did not expect mongos to time out first batch of query");
+    }, [], "did not expect bongos to time out first batch of query");
     assert.doesNotThrow(function() {
         cursor.itcount();
     }, [], "did not expect getmore ops to hit the time limit");
@@ -108,8 +108,8 @@
     configureMaxTimeNeverTimeOut("off");
 
     //
-    // Test that mongos correctly forwards max time to shards for sharded commands.  Uses
-    // maxTimeAlwaysTimeOut to ensure mongod throws if it receives a max time.
+    // Test that bongos correctly forwards max time to shards for sharded commands.  Uses
+    // maxTimeAlwaysTimeOut to ensure bongod throws if it receives a max time.
     //
 
     // Positive test for "validate".
@@ -123,7 +123,7 @@
     // Negative test for "validate".
     configureMaxTimeAlwaysTimeOut("off");
     assert.commandWorked(coll.runCommand("validate", {maxTimeMS: 60 * 1000}),
-                         "expected validate to not hit time limit in mongod");
+                         "expected validate to not hit time limit in bongod");
 
     // Positive test for "count".
     configureMaxTimeAlwaysTimeOut("alwaysOn");
@@ -136,7 +136,7 @@
     // Negative test for "count".
     configureMaxTimeAlwaysTimeOut("off");
     assert.commandWorked(coll.runCommand("count", {maxTimeMS: 60 * 1000}),
-                         "expected count to not hit time limit in mongod");
+                         "expected count to not hit time limit in bongod");
 
     // Positive test for "collStats".
     configureMaxTimeAlwaysTimeOut("alwaysOn");
@@ -149,7 +149,7 @@
     // Negative test for "collStats".
     configureMaxTimeAlwaysTimeOut("off");
     assert.commandWorked(coll.runCommand("collStats", {maxTimeMS: 60 * 1000}),
-                         "expected collStats to not hit time limit in mongod");
+                         "expected collStats to not hit time limit in bongod");
 
     // Positive test for "mapReduce".
     configureMaxTimeAlwaysTimeOut("alwaysOn");
@@ -181,7 +181,7 @@
         out: {inline: 1},
         maxTimeMS: 60 * 1000
     }),
-                         "expected mapReduce to not hit time limit in mongod");
+                         "expected mapReduce to not hit time limit in bongod");
 
     // Positive test for "aggregate".
     configureMaxTimeAlwaysTimeOut("alwaysOn");
@@ -195,7 +195,7 @@
     configureMaxTimeAlwaysTimeOut("off");
     assert.commandWorked(
         coll.runCommand("aggregate", {pipeline: [], cursor: {}, maxTimeMS: 60 * 1000}),
-        "expected aggregate to not hit time limit in mongod");
+        "expected aggregate to not hit time limit in bongod");
 
     // Positive test for "moveChunk".
     configureMaxTimeAlwaysTimeOut("alwaysOn");
@@ -218,7 +218,7 @@
         to: "shard0000",
         maxTimeMS: 1000 * 60 * 60 * 24
     }),
-                         "expected moveChunk to not hit time limit in mongod");
+                         "expected moveChunk to not hit time limit in bongod");
 
     st.stop();
 

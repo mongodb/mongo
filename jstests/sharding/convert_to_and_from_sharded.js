@@ -66,9 +66,9 @@
         assert.commandWorked(st.s.adminCommand({split: 'test.sharded', middle: {_id: x}}));
     }
 
-    var newMongod = MongoRunner.runMongod({shardsvr: ''});
+    var newBongod = BongoRunner.runBongod({shardsvr: ''});
 
-    assert.commandWorked(st.s.adminCommand({addShard: newMongod.name, name: 'toRemoveLater'}));
+    assert.commandWorked(st.s.adminCommand({addShard: newBongod.name, name: 'toRemoveLater'}));
 
     for (x = 0; x < 2; x++) {
         assert.commandWorked(
@@ -88,7 +88,7 @@
         return res.state == 'completed';
     });
 
-    MongoRunner.stopMongod(newMongod.port);
+    BongoRunner.stopBongod(newBongod.port);
 
     checkBasicCRUD(st.s.getDB('test').unsharded);
     checkBasicCRUD(st.s.getDB('test').sharded);

@@ -5,7 +5,7 @@
 
 var baseName = "jstests_preallocate";
 
-var m = MongoRunner.runMongod({});
+var m = BongoRunner.runBongod({});
 
 var getTotalNonLocalNonAdminSize = function() {
     var totalNonLocalNonAdminDBSize = 0;
@@ -36,9 +36,9 @@ assert.soon(function() {
     return getTotalNonLocalNonAdminSize() >= expectedMB * 1024 * 1024;
 }, "\n\n\nFAIL preallocate.js expected second file to bring total size over " + expectedMB + "MB");
 
-MongoRunner.stopMongod(m);
+BongoRunner.stopBongod(m);
 
-m = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: m.dbpath});
+m = BongoRunner.runBongod({restart: true, cleanData: false, dbpath: m.dbpath});
 
 size = getTotalNonLocalNonAdminSize();
 

@@ -5,11 +5,11 @@
 (function() {
     "use strict";
 
-    var source = MongoRunner.runMongod({});
-    assert.neq(null, source, "mongod was unable to start up");
+    var source = BongoRunner.runBongod({});
+    assert.neq(null, source, "bongod was unable to start up");
 
-    var dest = MongoRunner.runMongod({});
-    assert.neq(null, dest, "mongod was unable to start up");
+    var dest = BongoRunner.runBongod({});
+    assert.neq(null, dest, "bongod was unable to start up");
 
     var sourceColl = source.getDB("test").collation;
     var destColl = dest.getDB("test").collation;
@@ -40,7 +40,7 @@
     destColl.drop();
     assert.commandWorked(destColl.getDB().runCommand({
         cloneCollection: sourceColl.getFullName(),
-        from: sourceColl.getMongo().host,
+        from: sourceColl.getBongo().host,
         query: {_id: "foo"}
     }));
 

@@ -20,14 +20,14 @@
     }
 
     function testShutdownLogging(launcher, crashFn, matchFn, expectedExitCode) {
-        clearRawMongoProgramOutput();
+        clearRawBongoProgramOutput();
         var conn = launcher.start({});
 
         function checkOutput() {
             var logContents = "";
             assert.soon(
                 () => {
-                    logContents = rawMongoProgramOutput();
+                    logContents = rawBongoProgramOutput();
                     return matchFn(logContents);
                 },
                 function() {
@@ -57,7 +57,7 @@
         const SIGABRT = 6;
         testShutdownLogging(launcher, function(conn) {
             conn.getDB('admin').shutdownServer();
-        }, makeRegExMatchFn(/shutdown command received/), MongoRunner.EXIT_CLEAN);
+        }, makeRegExMatchFn(/shutdown command received/), BongoRunner.EXIT_CLEAN);
 
         testShutdownLogging(launcher,
                             makeShutdownByCrashFn('fault'),
@@ -80,35 +80,35 @@
         return;
     }
 
-    (function testMongod() {
-        print("********************\nTesting exit logging in mongod\n********************");
+    (function testBongod() {
+        print("********************\nTesting exit logging in bongod\n********************");
 
         runAllTests({
             start: function(opts) {
                 var actualOpts = {nojournal: ""};
                 Object.extend(actualOpts, opts);
-                return MongoRunner.runMongod(actualOpts);
+                return BongoRunner.runBongod(actualOpts);
             },
 
-            stop: MongoRunner.stopMongod
+            stop: BongoRunner.stopBongod
         });
     }());
 
-    (function testMongos() {
-        print("********************\nTesting exit logging in mongos\n********************");
+    (function testBongos() {
+        print("********************\nTesting exit logging in bongos\n********************");
 
         var st = new ShardingTest({shards: 1, other: {shardOptions: {nojournal: ""}}});
-        var mongosLauncher = {
+        var bongosLauncher = {
             start: function(opts) {
                 var actualOpts = {configdb: st._configDB};
                 Object.extend(actualOpts, opts);
-                return MongoRunner.runMongos(actualOpts);
+                return BongoRunner.runBongos(actualOpts);
             },
 
-            stop: MongoRunner.stopMongos
+            stop: BongoRunner.stopBongos
         };
 
-        runAllTests(mongosLauncher);
+        runAllTests(bongosLauncher);
     }());
 
 }());

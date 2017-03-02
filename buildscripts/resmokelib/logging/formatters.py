@@ -13,7 +13,7 @@ class ISO8601Formatter(logging.Formatter):
     """
     An ISO 8601 compliant formatter for log messages. It formats the
     timezone as an hour/minute offset and uses a period as the
-    millisecond separator in order to match the log messages of MongoDB.
+    millisecond separator in order to match the log messages of BongoDB.
     """
 
     def formatTime(self, record, datefmt=None):

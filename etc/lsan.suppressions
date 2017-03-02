@@ -1,8 +1,8 @@
 # Client objects are leaked in threads that are never terminated
-leak:mongo::Client::Client
+leak:bongo::Client::Client
 
 # Thread names leak from threads that are never terminated.
-leak:mongo::setThreadName
-leak:mongo::getThreadName
+leak:bongo::setThreadName
+leak:bongo::getThreadName
 
 leak:glob64

@@ -55,9 +55,9 @@ ESLINT_HTTP_DARWIN_CACHE = "https://s3.amazonaws.com/boxes.10gen.com/build/eslin
 # Path in the tarball to the ESLint binary.
 ESLINT_SOURCE_TAR_BASE = string.Template(ESLINT_PROGNAME + "-$platform-$arch")
 
-# Path to the modules in the mongodb source tree.
+# Path to the modules in the bongodb source tree.
 # Has to match the string in SConstruct.
-MODULE_DIR = "src/mongo/db/modules"
+MODULE_DIR = "src/bongo/db/modules"
 
 # Copied from python 2.7 version of subprocess.py
 # Exception classes used by this module.
@@ -122,7 +122,7 @@ def extract_eslint(tar_path, target_file):
     tarfp.close()
 
 def get_eslint_from_cache(dest_file, platform, arch):
-    """Get ESLint binary from mongodb's cache
+    """Get ESLint binary from bongodb's cache
     """
     # Get URL
     if platform == "Linux":
@@ -169,8 +169,8 @@ class ESLint(object):
                 print("WARNING: Could not find ESLint at %s" % (path))
 
         # Check the environment variable
-        if "MONGO_ESLINT" in os.environ:
-            self.path = os.environ["MONGO_ESLINT"]
+        if "BONGO_ESLINT" in os.environ:
+            self.path = os.environ["BONGO_ESLINT"]
 
             if self.path and not self._validate_version(warn=True):
                 self.path = None
@@ -311,7 +311,7 @@ def parallel_process(items, func):
     return pp_result[0]
 
 def get_base_dir():
-    """Get the base directory for mongo repo.
+    """Get the base directory for bongo repo.
         This script assumes that it is running in buildscripts/, and uses
         that to find the base directory.
     """
@@ -328,10 +328,10 @@ def get_repos():
 
     # Get a list of modules
     # TODO: how do we filter rocks, does it matter?
-    mongo_modules = moduleconfig.discover_module_directories(
+    bongo_modules = moduleconfig.discover_module_directories(
                         os.path.join(base_dir, MODULE_DIR), None)
 
-    paths = [os.path.join(base_dir, MODULE_DIR, m) for m in mongo_modules]
+    paths = [os.path.join(base_dir, MODULE_DIR, m) for m in bongo_modules]
 
     paths.append(base_dir)
 
@@ -396,10 +396,10 @@ class Repo(object):
         gito = self._callgito(["ls-files"])
 
         # This allows us to pick all the interesting files
-        # in the mongo and mongo-enterprise repos
+        # in the bongo and bongo-enterprise repos
         file_list = [line.rstrip()
                      for line in gito.splitlines()
-                     if "src/mongo" in line or "jstests" in line]
+                     if "src/bongo" in line or "jstests" in line]
 
         files_match = re.compile('\\.js$')
 
@@ -518,10 +518,10 @@ def main():
     success = False
     usage = "%prog [-e <eslint>] [-d] lint|lint-patch|fix [glob patterns] "
     description = "lint runs ESLint on provided patterns or all .js files under jstests/ "\
-                  "and src/mongo. lint-patch runs ESLint against .js files modified in the "\
+                  "and src/bongo. lint-patch runs ESLint against .js files modified in the "\
                   "provided patch file (for upload.py). "\
                   "fix runs ESLint with --fix on provided patterns "\
-                  "or files under jstests/ and src/mongo."
+                  "or files under jstests/ and src/bongo."
     epilog ="*Unless you specify -d a separate ESLint process will be launched for every file"
     parser = OptionParser()
     parser = OptionParser(usage=usage, description=description, epilog=epilog)
@@ -537,7 +537,7 @@ def main():
         command = args[1]
         searchlist = args[2:]
         if not searchlist:
-            searchlist = ["jstests/", "src/mongo/"]
+            searchlist = ["jstests/", "src/bongo/"]
 
         if command == "lint":
             success = lint(options.eslint, options.dirmode, searchlist)

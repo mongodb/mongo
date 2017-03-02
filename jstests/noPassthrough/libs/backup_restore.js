@@ -1,12 +1,12 @@
 /**
  * Sets up a test for the backup/restore process:
  * - 3 node replica set
- * - Mongo CRUD client
- * - Mongo FSM client
+ * - Bongo CRUD client
+ * - Bongo FSM client
  * - fsyncLock (or stop) Secondary
  * - cp (or rsync) DB files
  * - fsyncUnlock (or start) Secondary
- * - Start mongod as hidden secondary
+ * - Start bongod as hidden secondary
  * - Wait until new hidden node becomes secondary
  *
  * @param {Object} options An object with the following fields:
@@ -87,10 +87,10 @@ var BackupRestoreTest = function(options) {
             }
         };
 
-        // Returns the pid of the started mongo shell so the CRUD test client can be terminated
+        // Returns the pid of the started bongo shell so the CRUD test client can be terminated
         // without waiting for its execution to finish.
-        return startMongoProgramNoConnect(
-            'mongo',
+        return startBongoProgramNoConnect(
+            'bongo',
             '--eval',
             '(' + crudClientCmds + ')("' + dbName + '", "' + collectionName + '")',
             host);
@@ -103,14 +103,14 @@ var BackupRestoreTest = function(options) {
         // Launch FSM client
         // SERVER-19488 The FSM framework assumes that there is an implicit 'db' connection when
         // started without any cluster options. Since the shell running this test was started with
-        // --nodb, another mongo shell is used to allow implicit connections to be made to the
+        // --nodb, another bongo shell is used to allow implicit connections to be made to the
         // primary of the replica set.
         var fsmClientCmds = function(blackListDb, numNodes) {
             'use strict';
             load('jstests/concurrency/fsm_libs/runner.js');
             var dir = 'jstests/concurrency/fsm_workloads';
             var blacklist = [
-                // Disabled due to MongoDB restrictions and/or workload restrictions
+                // Disabled due to BongoDB restrictions and/or workload restrictions
                 'agg_group_external.js',  // uses >100MB of data, which can overwhelm test hosts
                 'agg_sort_external.js',   // uses >100MB of data, which can overwhelm test hosts
                 'auth_create_role.js',
@@ -162,10 +162,10 @@ var BackupRestoreTest = function(options) {
             }
         };
 
-        // Returns the pid of the started mongo shell so the FSM test client can be terminated
+        // Returns the pid of the started bongo shell so the FSM test client can be terminated
         // without waiting for its execution to finish.
-        return startMongoProgramNoConnect(
-            'mongo',
+        return startBongoProgramNoConnect(
+            'bongo',
             '--eval',
             '(' + fsmClientCmds + ')("' + blackListDb + '", ' + numNodes + ');',
             host);
@@ -198,9 +198,9 @@ var BackupRestoreTest = function(options) {
         var clientTime = options.clientTime || 10000;
 
         // Set the dbpath for the replica set
-        var dbpathPrefix = MongoRunner.dataPath + 'backupRestore';
+        var dbpathPrefix = BongoRunner.dataPath + 'backupRestore';
         resetDbpath(dbpathPrefix);
-        var dbpathFormat = dbpathPrefix + '/mongod-$port';
+        var dbpathFormat = dbpathPrefix + '/bongod-$port';
 
         // Start numNodes node replSet
         var rst = new ReplSetTest({
@@ -240,7 +240,7 @@ var BackupRestoreTest = function(options) {
 
         // Configure new hidden secondary
         var dbpathSecondary = secondary.dbpath;
-        var hiddenDbpath = dbpathPrefix + '/mongod-hiddensecondary';
+        var hiddenDbpath = dbpathPrefix + '/bongod-hiddensecondary';
         resetDbpath(hiddenDbpath);
 
         var sourcePath = dbpathSecondary + "/";
@@ -267,7 +267,7 @@ var BackupRestoreTest = function(options) {
 
             dbHash = secondary.getDB(crudDb).runCommand({dbhash: 1}).md5;
             copyDbpath(dbpathSecondary, hiddenDbpath);
-            removeFile(hiddenDbpath + '/mongod.lock');
+            removeFile(hiddenDbpath + '/bongod.lock');
             print("Source directory:", tojson(ls(dbpathSecondary)));
             copiedFiles = ls(hiddenDbpath);
             print("Copied files:", tojson(copiedFiles));
@@ -281,21 +281,21 @@ var BackupRestoreTest = function(options) {
                 _runCmd(rsyncCmd);
                 sleep(10000);
             }
-            // Stop the mongod process
+            // Stop the bongod process
             rst.stop(secondary.nodeId);
             // One final rsync
             _runCmd(rsyncCmd);
-            removeFile(hiddenDbpath + '/mongod.lock');
+            removeFile(hiddenDbpath + '/bongod.lock');
             print("Source directory:", tojson(ls(dbpathSecondary)));
             copiedFiles = ls(hiddenDbpath);
             print("Copied files:", tojson(copiedFiles));
             assert.gt(copiedFiles.length, 0, testName + ' no files copied');
             rst.start(secondary.nodeId, {}, true);
         } else if (options.backup == 'stopStart') {
-            // Stop the mongod process
+            // Stop the bongod process
             rst.stop(secondary.nodeId);
             copyDbpath(dbpathSecondary, hiddenDbpath);
-            removeFile(hiddenDbpath + '/mongod.lock');
+            removeFile(hiddenDbpath + '/bongod.lock');
             print("Source directory:", tojson(ls(dbpathSecondary)));
             copiedFiles = ls(hiddenDbpath);
             print("Copied files:", tojson(copiedFiles));
@@ -348,8 +348,8 @@ var BackupRestoreTest = function(options) {
         // Stop CRUD client and FSM client.
         assert(checkProgram(crudPid), testName + ' CRUD client was not running at end of test');
         assert(checkProgram(fsmPid), testName + ' FSM client was not running at end of test');
-        stopMongoProgramByPid(crudPid);
-        stopMongoProgramByPid(fsmPid);
+        stopBongoProgramByPid(crudPid);
+        stopBongoProgramByPid(fsmPid);
 
         // Wait up to 5 minutes until the new hidden node is in state SECONDARY.
         rst.waitForState(hiddenNode, ReplSetTest.State.SECONDARY);

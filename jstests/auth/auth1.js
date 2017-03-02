@@ -5,7 +5,7 @@ function setupTest() {
     print("START auth1.js");
     baseName = "jstests_auth_auth1";
 
-    m = MongoRunner.runMongod(
+    m = BongoRunner.runBongod(
         {auth: "", nohttpinterface: "", bind_ip: "127.0.0.1", useHostname: false});
     return m;
 }
@@ -13,7 +13,7 @@ function setupTest() {
 function runTest(m) {
     // these are used by read-only user
     db = m.getDB("test");
-    mro = new Mongo(m.host);
+    mro = new Bongo(m.host);
     dbRO = mro.getDB("test");
     tRO = dbRO[baseName];
 

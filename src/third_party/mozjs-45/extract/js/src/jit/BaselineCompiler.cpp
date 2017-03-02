@@ -199,7 +199,7 @@ BaselineCompiler::compile()
                             epilogueOffset_.offset(),
                             profilerEnterFrameToggleOffset_.offset(),
                             profilerExitFrameToggleOffset_.offset(),
-// MONGODB MODIFICATION: Support debug spidermonkey builds with ENABLE_TRACE_LOGGING disabled
+// BONGODB MODIFICATION: Support debug spidermonkey builds with ENABLE_TRACE_LOGGING disabled
 #ifdef ENABLE_TRACE_LOGGING
                             traceLoggerEnterToggleOffset_.offset(),
                             traceLoggerExitToggleOffset_.offset(),

@@ -1,6 +1,6 @@
 'use strict';
 
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isBongod
 
 /**
  * yield.js
@@ -123,13 +123,13 @@ var $config = (function() {
         // page fault, the query will yield. This failpoint will mock page faulting on such
         // fetches every other time.
 
-        cluster.executeOnMongodNodes(function enableFailPoint(db) {
+        cluster.executeOnBongodNodes(function enableFailPoint(db) {
             assertAlways.commandWorked(
                 db.adminCommand({configureFailPoint: 'recordNeedsFetchFail', mode: 'alwaysOn'}));
         });
 
         // Lower the following parameters to force even more yields.
-        cluster.executeOnMongodNodes(function lowerYieldParams(db) {
+        cluster.executeOnBongodNodes(function lowerYieldParams(db) {
             assertAlways.commandWorked(
                 db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 5}));
             assertAlways.commandWorked(
@@ -151,11 +151,11 @@ var $config = (function() {
      * Reset parameters and disable failpoint.
      */
     function teardown(db, collName, cluster) {
-        cluster.executeOnMongodNodes(function disableFailPoint(db) {
+        cluster.executeOnBongodNodes(function disableFailPoint(db) {
             assertAlways.commandWorked(
                 db.adminCommand({configureFailPoint: 'recordNeedsFetchFail', mode: 'off'}));
         });
-        cluster.executeOnMongodNodes(function resetYieldParams(db) {
+        cluster.executeOnBongodNodes(function resetYieldParams(db) {
             assertAlways.commandWorked(
                 db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 128}));
             assertAlways.commandWorked(

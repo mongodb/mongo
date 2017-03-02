@@ -7,7 +7,7 @@ from __future__ import absolute_import
 import os.path
 import time
 
-import pymongo
+import pybongo
 
 from . import interface
 from . import standalone
@@ -21,15 +21,15 @@ class ReplicaSetFixture(interface.ReplFixture):
     Fixture which provides JSTests with a replica set to run against.
     """
 
-    # Error response codes copied from mongo/base/error_codes.err.
+    # Error response codes copied from bongo/base/error_codes.err.
     _ALREADY_INITIALIZED = 23
     _NODE_NOT_FOUND = 74
 
     def __init__(self,
                  logger,
                  job_num,
-                 mongod_executable=None,
-                 mongod_options=None,
+                 bongod_executable=None,
+                 bongod_options=None,
                  dbpath_prefix=None,
                  preserve_dbpath=False,
                  num_nodes=2,
@@ -41,8 +41,8 @@ class ReplicaSetFixture(interface.ReplFixture):
 
         interface.ReplFixture.__init__(self, logger, job_num)
 
-        self.mongod_executable = mongod_executable
-        self.mongod_options = utils.default_if_none(mongod_options, {})
+        self.bongod_executable = bongod_executable
+        self.bongod_options = utils.default_if_none(bongod_options, {})
         self.preserve_dbpath = preserve_dbpath
         self.num_nodes = num_nodes
         self.start_initial_sync_node = start_initial_sync_node
@@ -51,11 +51,11 @@ class ReplicaSetFixture(interface.ReplFixture):
         self.replset_config_options = utils.default_if_none(replset_config_options, {})
         self.voting_secondaries = voting_secondaries
 
-        # The dbpath in mongod_options is used as the dbpath prefix for replica set members and
+        # The dbpath in bongod_options is used as the dbpath prefix for replica set members and
         # takes precedence over other settings. The ShardedClusterFixture uses this parameter to
         # create replica sets and assign their dbpath structure explicitly.
-        if "dbpath" in self.mongod_options:
-            self._dbpath_prefix = self.mongod_options.pop("dbpath")
+        if "dbpath" in self.bongod_options:
+            self._dbpath_prefix = self.bongod_options.pop("dbpath")
         else:
             # Command line options override the YAML configuration.
             dbpath_prefix = utils.default_if_none(config.DBPATH_PREFIX, dbpath_prefix)
@@ -70,11 +70,11 @@ class ReplicaSetFixture(interface.ReplFixture):
         self.initial_sync_node_idx = -1
 
     def setup(self):
-        self.replset_name = self.mongod_options.get("replSet", "rs")
+        self.replset_name = self.bongod_options.get("replSet", "rs")
 
         if not self.nodes:
             for i in xrange(self.num_nodes):
-                node = self._new_mongod(i, self.replset_name)
+                node = self._new_bongod(i, self.replset_name)
                 self.nodes.append(node)
 
         for node in self.nodes:
@@ -83,7 +83,7 @@ class ReplicaSetFixture(interface.ReplFixture):
         if self.start_initial_sync_node:
             if not self.initial_sync_node:
                 self.initial_sync_node_idx = len(self.nodes)
-                self.initial_sync_node = self._new_mongod(self.initial_sync_node_idx,
+                self.initial_sync_node = self._new_bongod(self.initial_sync_node_idx,
                                                           self.replset_name)
             self.initial_sync_node.setup()
             self.initial_sync_node.await_ready()
@@ -115,7 +115,7 @@ class ReplicaSetFixture(interface.ReplFixture):
 
         initiate_cmd_obj = {"replSetInitiate": {"_id": self.replset_name, "members": members}}
 
-        client = utils.new_mongo_client(port=self.port)
+        client = utils.new_bongo_client(port=self.port)
         if self.auth_options is not None:
             auth_db = client[self.auth_options["authenticationDatabase"]]
             auth_db.authenticate(self.auth_options["username"],
@@ -147,7 +147,7 @@ class ReplicaSetFixture(interface.ReplFixture):
             try:
                 client.admin.command(initiate_cmd_obj)
                 break
-            except pymongo.errors.OperationFailure as err:
+            except pybongo.errors.OperationFailure as err:
                 # Ignore errors from the "replSetInitiate" command when the replica set has already
                 # been initiated.
                 if err.code == ReplicaSetFixture._ALREADY_INITIALIZED:
@@ -166,7 +166,7 @@ class ReplicaSetFixture(interface.ReplFixture):
 
     def await_ready(self):
         # Wait for the primary to be elected.
-        client = utils.new_mongo_client(port=self.port)
+        client = utils.new_bongo_client(port=self.port)
         while True:
             is_master = client.admin.command("isMaster")["ismaster"]
             if is_master:
@@ -180,8 +180,8 @@ class ReplicaSetFixture(interface.ReplFixture):
 
         # Wait for the secondaries to become available.
         for secondary in secondaries:
-            client = utils.new_mongo_client(port=secondary.port,
-                                            read_preference=pymongo.ReadPreference.SECONDARY)
+            client = utils.new_bongo_client(port=secondary.port,
+                                            read_preference=pybongo.ReadPreference.SECONDARY)
             while True:
                 is_secondary = client.admin.command("isMaster")["secondary"]
                 if is_secondary:
@@ -230,24 +230,24 @@ class ReplicaSetFixture(interface.ReplFixture):
     def get_initial_sync_node(self):
         return self.initial_sync_node
 
-    def _new_mongod(self, index, replset_name):
+    def _new_bongod(self, index, replset_name):
         """
-        Returns a standalone.MongoDFixture configured to be used as a
+        Returns a standalone.BongoDFixture configured to be used as a
         replica-set member of 'replset_name'.
         """
 
-        mongod_logger = self._get_logger_for_mongod(index)
-        mongod_options = self.mongod_options.copy()
-        mongod_options["replSet"] = replset_name
-        mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "node%d" % (index))
+        bongod_logger = self._get_logger_for_bongod(index)
+        bongod_options = self.bongod_options.copy()
+        bongod_options["replSet"] = replset_name
+        bongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "node%d" % (index))
 
-        return standalone.MongoDFixture(mongod_logger,
+        return standalone.BongoDFixture(bongod_logger,
                                         self.job_num,
-                                        mongod_executable=self.mongod_executable,
-                                        mongod_options=mongod_options,
+                                        bongod_executable=self.bongod_executable,
+                                        bongod_options=bongod_options,
                                         preserve_dbpath=self.preserve_dbpath)
 
-    def _get_logger_for_mongod(self, index):
+    def _get_logger_for_bongod(self, index):
         """
         Returns a new logging.Logger instance for use as the primary, secondary, or initial
         sync member of a replica-set.

@@ -186,7 +186,7 @@ function runTest(conn) {
         assert.eq(0, db.getUser('user1').roles.length);
         assert.eq(null, db.getUser('user1').customData);
         // Make sure password didn't change
-        assert(new Mongo(db.getMongo().host).getDB(db.getName()).auth('user1', 'pwd'));
+        assert(new Bongo(db.getBongo().host).getDB(db.getName()).auth('user1', 'pwd'));
     })();
 
     (function testRevokeRolesFromUser() {
@@ -276,10 +276,10 @@ function runTest(conn) {
 }
 
 jsTest.log('Test standalone');
-var conn = MongoRunner.runMongod({auth: ''});
+var conn = BongoRunner.runBongod({auth: ''});
 conn.getDB('admin').runCommand({setParameter: 1, newCollectionsUsePowerOf2Sizes: false});
 runTest(conn);
-MongoRunner.stopMongod(conn.port);
+BongoRunner.stopBongod(conn.port);
 
 jsTest.log('Test sharding');
 var st = new ShardingTest({shards: 2, config: 3, keyFile: 'jstests/libs/key1'});

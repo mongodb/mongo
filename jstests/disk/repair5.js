@@ -6,11 +6,11 @@
     'use strict';
     var baseName = "jstests_disk_repair5";
 
-    var dbpath = MongoRunner.dataPath + baseName + "/";
+    var dbpath = BongoRunner.dataPath + baseName + "/";
 
     resetDbpath(dbpath);
 
-    var m = MongoRunner.runMongod({
+    var m = BongoRunner.runBongod({
         dbpath: dbpath,
         restart: true,
         cleanData: false
@@ -53,5 +53,5 @@
     assert.eq(20000, dbTest[baseName].find().itcount());
     assert(dbTest[baseName].validate().valid);
 
-    MongoRunner.stopMongod(m);
+    BongoRunner.stopBongod(m);
 })();

@@ -36,7 +36,7 @@ var workerThread = (function() {
                     gc();
                 }
 
-                myDB = new Mongo(args.host).getDB(args.dbName);
+                myDB = new Bongo(args.host).getDB(args.dbName);
             }
 
             workloads.forEach(function(workload) {

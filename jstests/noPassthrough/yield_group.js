@@ -7,10 +7,10 @@
     const nDocsToInsert = 300;
     const worksPerYield = 50;
 
-    // Start a mongod that will yield every 50 work cycles.
+    // Start a bongod that will yield every 50 work cycles.
     var conn =
-        MongoRunner.runMongod({setParameter: `internalQueryExecYieldIterations=${worksPerYield}`});
-    assert.neq(null, conn, 'mongod was unable to start up');
+        BongoRunner.runBongod({setParameter: `internalQueryExecYieldIterations=${worksPerYield}`});
+    assert.neq(null, conn, 'bongod was unable to start up');
 
     var coll = conn.getDB('test').yield_group;
 

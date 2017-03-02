@@ -1,0 +1,13 @@
+Import("env")
+
+env = env.Clone()
+
+sorterEnv = env.Clone()
+sorterEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
+sorterEnv.CppUnitTest('sorter_test',
+                      'sorter_test.cpp',
+                       LIBDEPS=['$BUILD_DIR/bongo/db/service_context',
+                                '$BUILD_DIR/bongo/db/storage/wiredtiger/storage_wiredtiger_customization_hooks',
+                                '$BUILD_DIR/bongo/db/storage/storage_options',
+                                '$BUILD_DIR/bongo/s/is_bongos',
+                                '$BUILD_DIR/third_party/shim_snappy'])

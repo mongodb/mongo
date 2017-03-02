@@ -21,7 +21,7 @@ function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
     // Add another node to the replica set to allow an initial sync to occur
     rst.add();
 
-    clearRawMongoProgramOutput();
+    clearRawBongoProgramOutput();
     reInitiateWithoutThrowingOnAbortedMember(rst);
 
     var msg;
@@ -34,7 +34,7 @@ function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
     print("**** Looking for string in logs: " + msg);
 
     var assertFn = function() {
-        var foundMatch = rawMongoProgramOutput().match(msg);
+        var foundMatch = rawBongoProgramOutput().match(msg);
         if (foundMatch) {
             print("***** found matching string in log: " + msg);
         }
@@ -47,7 +47,7 @@ function testInitialSyncAbortsWithUnsupportedAuthSchema(schema) {
 
     rst.stopSet(undefined,
                 undefined,
-                {allowedExitCodes: [MongoRunner.EXIT_ABRUPT, MongoRunner.EXIT_ABORT]});
+                {allowedExitCodes: [BongoRunner.EXIT_ABRUPT, BongoRunner.EXIT_ABORT]});
 }
 
 function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
@@ -68,7 +68,7 @@ function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
     // Add another node to the replica set to allow an initial sync to occur
     rst.add();
 
-    clearRawMongoProgramOutput();
+    clearRawBongoProgramOutput();
     reInitiateWithoutThrowingOnAbortedMember(rst);
 
     var msg = /During initial sync, found documents in admin\.system\.users/;
@@ -76,7 +76,7 @@ function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
     print("**** Looking for string in logs: " + msg);
 
     var assertFn = function() {
-        var foundMatch = rawMongoProgramOutput().match(msg);
+        var foundMatch = rawBongoProgramOutput().match(msg);
         if (foundMatch) {
             print("***** found matching string in log: " + msg);
         }
@@ -90,7 +90,7 @@ function testInitialSyncAbortsWithExistingUserAndNoAuthSchema() {
 
     rst.stopSet(undefined,
                 undefined,
-                {allowedExitCodes: [MongoRunner.EXIT_ABRUPT, MongoRunner.EXIT_ABORT]});
+                {allowedExitCodes: [BongoRunner.EXIT_ABRUPT, BongoRunner.EXIT_ABORT]});
 }
 
 testInitialSyncAbortsWithUnsupportedAuthSchema({_id: 'authSchema'});

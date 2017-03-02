@@ -3,16 +3,16 @@
  * replica set seed that has none of the nodes up will be able to recover
  * once the replica set come back up.
  *
- * ReplSetMonitor is tested indirectly through mongos. This is because
- * attempting to create a connection through the Mongo constructor won't
- * work because the shell will throw an exception before the mongo shell
+ * ReplSetMonitor is tested indirectly through bongos. This is because
+ * attempting to create a connection through the Bongo constructor won't
+ * work because the shell will throw an exception before the bongo shell
  * binds the variable properly to the js environment (in simple terms,
  * the connection object is never returned when it cannot connect to it).
- * Another reason for using mongos in this test is so we can use
+ * Another reason for using bongos in this test is so we can use
  * connPoolStats to synchronize the test and make sure that the monitor
  * was able to refresh before proceeding to check.
  *
- * Any tests that restart a shard mongod and send sharding requests to it after restart cannot make
+ * Any tests that restart a shard bongod and send sharding requests to it after restart cannot make
  * the shard use an in-memory storage engine, since the shardIdentity document will be lost after
  * restart.
  *
@@ -28,13 +28,13 @@
     assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
     assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
 
-    // The cluster now has the shard information. Then kill the replica set so when mongos restarts
+    // The cluster now has the shard information. Then kill the replica set so when bongos restarts
     // and tries to create a ReplSetMonitor for that shard, it will not be able to connect to any of
     // the seed servers.
     // Don't clear the data directory so that the shardIdentity is not deleted.
     replTest.stopSet(undefined /* send default signal */, true /* don't clear data directory */);
 
-    st.restartMongos(0);
+    st.restartBongos(0);
 
     replTest.startSet({restart: true, noCleanData: true});
     replTest.awaitSecondaryNodes();

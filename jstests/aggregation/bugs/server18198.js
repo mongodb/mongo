@@ -5,12 +5,12 @@
     var t = db.server18198;
     t.drop();
 
-    var mongo = db.getMongo();
+    var bongo = db.getBongo();
 
     try {
         var commandsRan = [];
-        // hook in our patched mongo
-        var mockMongo = {
+        // hook in our patched bongo
+        var mockBongo = {
             getSlaveOk: function() {
                 return true;
             },
@@ -26,7 +26,7 @@
             }
         };
 
-        db._mongo = mockMongo;
+        db._bongo = mockBongo;
 
         // this query should not get a read pref
         t.aggregate([{$sort: {"x": 1}}, {$out: "foo"}]);
@@ -42,6 +42,6 @@
         // check that it has a read preference
         assert(commandsRan[0].cmd.hasOwnProperty("$readPreference"));
     } finally {
-        db._mongo = mongo;
+        db._bongo = bongo;
     }
 })();

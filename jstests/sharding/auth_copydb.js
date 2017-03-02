@@ -1,14 +1,14 @@
-// Tests the copydb command on mongos with auth
+// Tests the copydb command on bongos with auth
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 1, mongos: 1, other: {keyFile: 'jstests/libs/key1'}});
-    var mongos = st.s0;
-    var destAdminDB = mongos.getDB('admin');
-    var destTestDB = mongos.getDB('test');
+    var st = new ShardingTest({shards: 1, bongos: 1, other: {keyFile: 'jstests/libs/key1'}});
+    var bongos = st.s0;
+    var destAdminDB = bongos.getDB('admin');
+    var destTestDB = bongos.getDB('test');
 
-    var sourceMongodConn = MongoRunner.runMongod({});
-    var sourceTestDB = sourceMongodConn.getDB('test');
+    var sourceBongodConn = BongoRunner.runBongod({});
+    var sourceTestDB = sourceBongodConn.getDB('test');
 
     sourceTestDB.foo.insert({a: 1});
 
@@ -20,7 +20,7 @@
 
     jsTestLog("Running copydb that should fail");
     var res = destAdminDB.runCommand(
-        {copydb: 1, fromhost: sourceMongodConn.host, fromdb: 'test', todb: 'test'});
+        {copydb: 1, fromhost: sourceBongodConn.host, fromdb: 'test', todb: 'test'});
     printjson(res);
     assert.commandFailed(res);
 
@@ -29,7 +29,7 @@
 
     jsTestLog("Running copydb that should succeed");
     res = destAdminDB.runCommand(
-        {copydb: 1, fromhost: sourceMongodConn.host, fromdb: 'test', todb: 'test'});
+        {copydb: 1, fromhost: sourceBongodConn.host, fromdb: 'test', todb: 'test'});
     printjson(res);
     assert.commandWorked(res);
 

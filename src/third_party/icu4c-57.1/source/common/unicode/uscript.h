@@ -114,7 +114,7 @@ typedef enum UScriptCode {
       /** @stable ICU 2.2 */
       USCRIPT_MALAYALAM    = 26,  /* Mlym */
       /** @stable ICU 2.2 */
-      USCRIPT_MONGOLIAN    = 27,  /* Mong */
+      USCRIPT_BONGOLIAN    = 27,  /* Mong */
       /** @stable ICU 2.2 */
       USCRIPT_MYANMAR      = 28,  /* Mymr */
       /** @stable ICU 2.2 */

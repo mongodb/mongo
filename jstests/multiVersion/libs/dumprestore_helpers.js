@@ -9,12 +9,12 @@ load('./jstests/multiVersion/libs/verify_collection_data.js');
 // {
 //     'serverSourceVersion' : "latest",
 //     'serverDestVersion' : "2.4",
-//     'mongoDumpVersion' : "2.2",
-//     'mongoRestoreVersion' : "latest",
+//     'bongoDumpVersion' : "2.2",
+//     'bongoRestoreVersion' : "latest",
 //     'dumpDir' : dumpDir,
 //     'testDbpath' : testDbpath,
-//     'dumpType' : "mongos",
-//     'restoreType' : "mongod", // "mongos" also supported
+//     'dumpType' : "bongos",
+//     'restoreType' : "bongod", // "bongos" also supported
 //     'storageEngine': [ "mmapv1" ]
 // }
 //
@@ -25,16 +25,16 @@ load('./jstests/multiVersion/libs/verify_collection_data.js');
 // The "testDbpath" is the external directory to use as the server dbpath directory.
 //
 // For the "dumpType" and "restoreType" fields, the following values are supported:
-//     - "mongod" - Do the dump or restore by connecting to a single mongod node
-//     - "mongos" - Do the dump or restore by connecting to a sharded cluster
+//     - "bongod" - Do the dump or restore by connecting to a single bongod node
+//     - "bongos" - Do the dump or restore by connecting to a sharded cluster
 //
 function multiVersionDumpRestoreTest(configObj) {
     // First sanity check the arguments in our configObj
     var requiredKeys = [
         'serverSourceVersion',
         'serverDestVersion',
-        'mongoDumpVersion',
-        'mongoRestoreVersion',
+        'bongoDumpVersion',
+        'bongoRestoreVersion',
         'dumpDir',
         'testDbpath',
         'dumpType',
@@ -51,10 +51,10 @@ function multiVersionDumpRestoreTest(configObj) {
 
     resetDbpath(configObj.dumpDir);
     resetDbpath(configObj.testDbpath);
-    if (configObj.dumpType === "mongos") {
+    if (configObj.dumpType === "bongos") {
         var shardingTestConfig = {
             name: testBaseName + "_sharded_source",
-            mongos: [{binVersion: configObj.serverSourceVersion}],
+            bongos: [{binVersion: configObj.serverSourceVersion}],
             shards: [{
                 binVersion: configObj.serverSourceVersion,
                 storageEngine: configObj.storageEngine
@@ -64,7 +64,7 @@ function multiVersionDumpRestoreTest(configObj) {
         var shardingTest = new ShardingTest(shardingTestConfig);
         var serverSource = shardingTest.s;
     } else {
-        var serverSource = MongoRunner.runMongod({
+        var serverSource = BongoRunner.runBongod({
             binVersion: configObj.serverSourceVersion,
             dbpath: configObj.testDbpath,
             storageEngine: configObj.storageEngine
@@ -87,49 +87,49 @@ function multiVersionDumpRestoreTest(configObj) {
     var collValid = new CollectionDataValidator();
     collValid.recordCollectionData(sourceColl);
 
-    // Dump using the specified version of mongodump from the running mongod or mongos instance.
-    if (configObj.dumpType === "mongod") {
-        MongoRunner.runMongoTool("mongodump", {
+    // Dump using the specified version of bongodump from the running bongod or bongos instance.
+    if (configObj.dumpType === "bongod") {
+        BongoRunner.runBongoTool("bongodump", {
             out: configObj.dumpDir,
-            binVersion: configObj.mongoDumpVersion,
+            binVersion: configObj.bongoDumpVersion,
             host: serverSource.host,
             db: testBaseName
         });
-        MongoRunner.stopMongod(serverSource.port);
-    } else { /* "mongos" */
-        MongoRunner.runMongoTool("mongodump", {
+        BongoRunner.stopBongod(serverSource.port);
+    } else { /* "bongos" */
+        BongoRunner.runBongoTool("bongodump", {
             out: configObj.dumpDir,
-            binVersion: configObj.mongoDumpVersion,
+            binVersion: configObj.bongoDumpVersion,
             host: serverSource.host,
             db: testBaseName
         });
         shardingTest.stop();
     }
 
-    // Restore using the specified version of mongorestore
-    if (configObj.restoreType === "mongod") {
-        var serverDest = MongoRunner.runMongod(
+    // Restore using the specified version of bongorestore
+    if (configObj.restoreType === "bongod") {
+        var serverDest = BongoRunner.runBongod(
             {binVersion: configObj.serverDestVersion, storageEngine: configObj.storageEngine});
 
-        MongoRunner.runMongoTool("mongorestore", {
+        BongoRunner.runBongoTool("bongorestore", {
             dir: configObj.dumpDir + "/" + testBaseName,
-            binVersion: configObj.mongoRestoreVersion,
+            binVersion: configObj.bongoRestoreVersion,
             host: serverDest.host,
             db: testBaseName
         });
-    } else { /* "mongos" */
+    } else { /* "bongos" */
         var shardingTestConfig = {
             name: testBaseName + "_sharded_dest",
-            mongos: [{binVersion: configObj.serverDestVersion}],
+            bongos: [{binVersion: configObj.serverDestVersion}],
             shards:
                 [{binVersion: configObj.serverDestVersion, storageEngine: configObj.storageEngine}],
             config: [{binVersion: configObj.serverDestVersion}]
         };
         var shardingTest = new ShardingTest(shardingTestConfig);
         serverDest = shardingTest.s;
-        MongoRunner.runMongoTool("mongorestore", {
+        BongoRunner.runBongoTool("bongorestore", {
             dir: configObj.dumpDir + "/" + testBaseName,
-            binVersion: configObj.mongoRestoreVersion,
+            binVersion: configObj.bongoRestoreVersion,
             host: serverDest.host,
             db: testBaseName
         });
@@ -149,7 +149,7 @@ function multiVersionDumpRestoreTest(configObj) {
 
     let destDbVersion = destDB.version();
 
-    // The mongorestore tool removes the "v" field when creating indexes from a dump. This allows
+    // The bongorestore tool removes the "v" field when creating indexes from a dump. This allows
     // indexes to be built with the latest supported index version. We therefore remove the "v"
     // field when comparing whether the indexes we built are equivalent.
     const options = {indexSpecFieldsToSkip: ["v"]};
@@ -158,10 +158,10 @@ function multiVersionDumpRestoreTest(configObj) {
     assert(collValid.validateCollectionData(destColl, destDbVersion, options));
     assert(cappedCollValid.validateCollectionData(destCollCapped, destDbVersion, options));
 
-    if (configObj.restoreType === "mongos") {
+    if (configObj.restoreType === "bongos") {
         shardingTest.stop();
     } else {
-        MongoRunner.stopMongod(serverDest.port);
+        BongoRunner.stopBongod(serverDest.port);
     }
 }
 
@@ -240,12 +240,12 @@ function getPermutationIterator(permsObj) {
 // {
 //     'serverSourceVersion' : [ "latest", "2.4" ],
 //     'serverDestVersion' :[ "latest", "2.4" ],
-//     'mongoDumpVersion' :[ "latest", "2.4" ],
-//     'mongoRestoreVersion' :[ "latest", "2.4" ],
+//     'bongoDumpVersion' :[ "latest", "2.4" ],
+//     'bongoRestoreVersion' :[ "latest", "2.4" ],
 //     'dumpDir' : [ dumpDir ],
 //     'testDbpath' : [ testDbpath ],
-//     'dumpType' : [ "mongod", "mongos" ],
-//     'restoreType' : [ "mongod", "mongos" ],
+//     'dumpType' : [ "bongod", "bongos" ],
+//     'restoreType' : [ "bongod", "bongos" ],
 //     'storageEngine': [ "mmapv1" ]
 // }
 //
@@ -255,7 +255,7 @@ function runAllDumpRestoreTests(testCasePermutations) {
     var testCaseCursor = getPermutationIterator(testCasePermutations);
     while (testCaseCursor.hasNext()) {
         var testCase = testCaseCursor.next();
-        print("Running multiversion mongodump mongorestore test:");
+        print("Running multiversion bongodump bongorestore test:");
         printjson(testCase);
         multiVersionDumpRestoreTest(testCase);
     }

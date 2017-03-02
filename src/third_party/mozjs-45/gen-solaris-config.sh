@@ -19,7 +19,7 @@ fi
 
 cd mozilla-release/js/src
 
-PYTHON=/opt/python27/bin/python CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++ CFLAGS=-m64 CCFLAGS=-m64 LINKFLAGS=-m64 ./configure -without-intl-api --enable-posix-nspr-emulation --disable-ion --disable-trace-logging
+PYTHON=/opt/python27/bin/python CC=/opt/bongodbtoolchain/bin/gcc CXX=/opt/bongodbtoolchain/bin/g++ CFLAGS=-m64 CCFLAGS=-m64 LINKFLAGS=-m64 ./configure -without-intl-api --enable-posix-nspr-emulation --disable-ion --disable-trace-logging
 
 cd ../../..
 

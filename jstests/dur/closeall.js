@@ -4,7 +4,7 @@
 function f(variant, quickCommits, paranoid) {
     var ourdb = "closealltest";
 
-    print("closeall.js start mongod variant:" + variant + "." + quickCommits + "." + paranoid);
+    print("closeall.js start bongod variant:" + variant + "." + quickCommits + "." + paranoid);
     var options = (paranoid == 1 ? 8 : 0);  // 8 is DurParanoid
     print("closeall.js --journalOptions " + options);
     var N = 1000;
@@ -13,16 +13,16 @@ function f(variant, quickCommits, paranoid) {
 
     // use replication to exercise that code too with a close, and also to test local.sources with a
     // close
-    var conn = MongoRunner.runMongod(
+    var conn = BongoRunner.runBongod(
         {journal: "", journalOptions: options + "", master: "", oplogSize: 64});
-    var connSlave = MongoRunner.runMongod(
+    var connSlave = BongoRunner.runBongod(
         {journal: "", journalOptions: options + "", slave: "", source: "localhost:" + conn.port});
 
     var slave = connSlave.getDB(ourdb);
 
     // we'll use two connections to make a little parallelism
     var db1 = conn.getDB(ourdb);
-    var db2 = new Mongo(db1.getMongo().host).getDB(ourdb);
+    var db2 = new Bongo(db1.getBongo().host).getDB(ourdb);
     if (quickCommits) {
         print("closeall.js QuickCommits variant (using a small syncdelay)");
         assert(db2.adminCommand({setParameter: 1, syncdelay: 5}).ok);
@@ -85,8 +85,8 @@ function f(variant, quickCommits, paranoid) {
     print(slave.foo.count());
 
     print("closeall.js shutting down servers");
-    MongoRunner.stopMongod(connSlave);
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(connSlave);
+    BongoRunner.stopBongod(conn);
 }
 
 // Skip this test on 32-bit Windows (unfixable failures in MapViewOfFileEx)

@@ -5,14 +5,14 @@
 (function() {
     'use strict';
 
-    var dbpath = MongoRunner.dataPath + 'noncapped_oplog_creation';
+    var dbpath = BongoRunner.dataPath + 'noncapped_oplog_creation';
     resetDbpath(dbpath);
 
-    var conn = MongoRunner.runMongod({
+    var conn = BongoRunner.runBongod({
         dbpath: dbpath,
         noCleanData: true,
     });
-    assert.neq(null, conn, 'mongod was unable to start up');
+    assert.neq(null, conn, 'bongod was unable to start up');
 
     var localDB = conn.getDB('local');
 
@@ -34,5 +34,5 @@
         pipeline: [{$out: 'oplog.aggregation'}],
     }));
 
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
 })();

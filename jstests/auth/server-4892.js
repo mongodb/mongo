@@ -1,7 +1,7 @@
 /**
  * Regression test for SERVER-4892.
  *
- * Verify that a client can delete cursors that it creates, when mongod is running with "auth"
+ * Verify that a client can delete cursors that it creates, when bongod is running with "auth"
  * enabled.
  *
  * This test requires users to persist across a restart.
@@ -9,36 +9,36 @@
  */
 
 var baseName = 'jstests_auth_server4892';
-var dbpath = MongoRunner.dataPath + baseName;
+var dbpath = BongoRunner.dataPath + baseName;
 resetDbpath(dbpath);
-var mongodCommonArgs = {
+var bongodCommonArgs = {
     dbpath: dbpath,
     noCleanData: true,
 };
 
 /*
- * Start an instance of mongod, pass it as a parameter to operation(), then stop the instance of
- * mongod before unwinding or returning out of with_mongod().
+ * Start an instance of bongod, pass it as a parameter to operation(), then stop the instance of
+ * bongod before unwinding or returning out of with_bongod().
  *
- * 'extraMongodArgs' are extra arguments to pass on the mongod command line, as an object.
+ * 'extraBongodArgs' are extra arguments to pass on the bongod command line, as an object.
  */
-function withMongod(extraMongodArgs, operation) {
-    var mongod = MongoRunner.runMongod(Object.merge(mongodCommonArgs, extraMongodArgs));
+function withBongod(extraBongodArgs, operation) {
+    var bongod = BongoRunner.runBongod(Object.merge(bongodCommonArgs, extraBongodArgs));
 
     try {
-        operation(mongod);
+        operation(bongod);
     } finally {
-        MongoRunner.stopMongod(mongod.port);
+        BongoRunner.stopBongod(bongod.port);
     }
 }
 
 /*
- * Fail an assertion if the given "mongod" instance does not have exactly expectNumLiveCursors live
+ * Fail an assertion if the given "bongod" instance does not have exactly expectNumLiveCursors live
  * cursors on the server.
  */
-function expectNumLiveCursors(mongod, expectedNumLiveCursors) {
-    var conn = new Mongo(mongod.host);
-    var db = mongod.getDB('admin');
+function expectNumLiveCursors(bongod, expectedNumLiveCursors) {
+    var conn = new Bongo(bongod.host);
+    var db = bongod.getDB('admin');
     db.auth('admin', 'admin');
     var actualNumLiveCursors = db.serverStatus().metrics.cursor.open.total;
     assert(actualNumLiveCursors == expectedNumLiveCursors,
@@ -46,9 +46,9 @@ function expectNumLiveCursors(mongod, expectedNumLiveCursors) {
                expectedNumLiveCursors + ")");
 }
 
-withMongod({noauth: ""}, function setupTest(mongod) {
+withBongod({noauth: ""}, function setupTest(bongod) {
     var admin, somedb, conn;
-    conn = new Mongo(mongod.host);
+    conn = new Bongo(bongod.host);
     admin = conn.getDB('admin');
     somedb = conn.getDB('somedb');
     admin.createUser({user: 'admin', pwd: 'admin', roles: jsTest.adminUserRoles});
@@ -61,16 +61,16 @@ withMongod({noauth: ""}, function setupTest(mongod) {
     admin.logout();
 });
 
-withMongod({auth: ""}, function runTest(mongod) {
-    var conn = new Mongo(mongod.host);
+withBongod({auth: ""}, function runTest(bongod) {
+    var conn = new Bongo(bongod.host);
     var somedb = conn.getDB('somedb');
     somedb.auth('frim', 'fram');
 
-    expectNumLiveCursors(mongod, 0);
+    expectNumLiveCursors(bongod, 0);
 
     var cursor = somedb.data.find({}, {'_id': 1}).batchSize(1);
     cursor.next();
-    expectNumLiveCursors(mongod, 1);
+    expectNumLiveCursors(bongod, 1);
 
     cursor.close();
 
@@ -79,5 +79,5 @@ withMongod({auth: ""}, function runTest(mongod) {
     // have to force a message to the server.
     somedb.data.findOne();
 
-    expectNumLiveCursors(mongod, 0);
+    expectNumLiveCursors(bongod, 0);
 });

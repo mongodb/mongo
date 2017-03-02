@@ -1,4 +1,4 @@
-// Confirms basic killOp execution via mongod and mongos.
+// Confirms basic killOp execution via bongod and bongos.
 
 (function() {
     "use strict";
@@ -6,8 +6,8 @@
     const dbName = "killop";
     const collName = "test";
 
-    // 'conn' is a connection to either a mongod when testing a replicaset or a mongos when testing
-    // a sharded cluster. 'shardConn' is a connection to the mongod we enable failpoints on.
+    // 'conn' is a connection to either a bongod when testing a replicaset or a bongos when testing
+    // a sharded cluster. 'shardConn' is a connection to the bongod we enable failpoints on.
     function runTest(conn, shardConn) {
         const db = conn.getDB(dbName);
         assert.commandWorked(db.dropDatabase());
@@ -58,13 +58,13 @@
         assert(result.inprog.length === 0, tojson(db.currentOp()));
     }
 
-    const st = new ShardingTest({shards: 1, rs: {nodes: 1}, mongos: 1});
+    const st = new ShardingTest({shards: 1, rs: {nodes: 1}, bongos: 1});
     const shardConn = st.rs0.getPrimary();
 
-    // Test killOp against mongod.
+    // Test killOp against bongod.
     runTest(shardConn, shardConn);
 
-    // Test killOp against mongos.
+    // Test killOp against bongos.
     runTest(st.s, shardConn);
 
     st.stop();

@@ -404,8 +404,8 @@ var runner = (function() {
         // lock is already held by the balancer or by a workload operation. The increased wait
         // is shorter than the distributed-lock-takeover period because otherwise the node
         // would be assumed to be down and the lock would be overtaken.
-        clusterOptions.setupFunctions.mongos.push(increaseDropDistLockTimeout);
-        clusterOptions.teardownFunctions.mongos.push(resetDropDistLockTimeout);
+        clusterOptions.setupFunctions.bongos.push(increaseDropDistLockTimeout);
+        clusterOptions.teardownFunctions.bongos.push(resetDropDistLockTimeout);
     }
 
     function loadWorkloadContext(workloads, context, executionOptions, applyMultipliers) {

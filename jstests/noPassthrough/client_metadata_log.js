@@ -20,29 +20,29 @@
                 "\n************************************************************");
     };
 
-    // Test MongoD
-    let testMongoD = function() {
-        let conn = MongoRunner.runMongod({useLogFiles: true});
-        assert.neq(null, conn, 'mongod was unable to start up');
+    // Test BongoD
+    let testBongoD = function() {
+        let conn = BongoRunner.runBongod({useLogFiles: true});
+        assert.neq(null, conn, 'bongod was unable to start up');
 
         checkLog(conn);
 
-        MongoRunner.stopMongod(conn);
+        BongoRunner.stopBongod(conn);
     };
 
-    // Test MongoS
-    let testMongoS = function() {
+    // Test BongoS
+    let testBongoS = function() {
         let options = {
-            mongosOptions: {useLogFiles: true},
+            bongosOptions: {useLogFiles: true},
         };
 
-        let st = new ShardingTest({shards: 1, mongos: 1, other: options});
+        let st = new ShardingTest({shards: 1, bongos: 1, other: options});
 
         checkLog(st.s0);
 
         st.stop();
     };
 
-    testMongoD();
-    testMongoS();
+    testBongoD();
+    testBongoS();
 })();

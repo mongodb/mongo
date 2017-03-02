@@ -2,7 +2,7 @@
 
 load("jstests/libs/slow_weekly_util.js");
 
-var testServer = new SlowWeeklyMongod("indexbg1");
+var testServer = new SlowWeeklyBongod("indexbg1");
 var db = testServer.getDB("test");
 var baseName = "jstests_indexbg1";
 
@@ -18,11 +18,11 @@ var resetParallel = function() {
 var doParallel = function(work) {
     resetParallel();
     print("doParallel: " + work);
-    return startMongoProgramNoConnect(
-        "mongo",
+    return startBongoProgramNoConnect(
+        "bongo",
         "--eval",
         work + "; db." + baseName + "_parallelStatus.save( {done:1} );",
-        db.getMongo().host);
+        db.getBongo().host);
 };
 
 var doneParallel = function() {

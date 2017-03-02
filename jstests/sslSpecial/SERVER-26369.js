@@ -4,7 +4,7 @@
 
     var st = new ShardingTest({
         shards: {rs0: {nodes: 1}},
-        mongos: 1,
+        bongos: 1,
     });
 
     st.rs0.restart(0, {

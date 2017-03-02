@@ -98,7 +98,7 @@ static const int64 kint64max = static_cast<int64>(0x7FFFFFFFFFFFFFFFLL);
 
 // x86 and PowerPC can simply do these loads and stores native.
 
-// MongoDB customization: Prefer memcpy on all architectures. Using reinterpret_cast is undefined
+// BongoDB customization: Prefer memcpy on all architectures. Using reinterpret_cast is undefined
 // behavior.
 #if 0 && (defined(__i386__) || defined(__x86_64__) || defined(__powerpc__))
 
@@ -119,7 +119,7 @@ static const int64 kint64max = static_cast<int64>(0x7FFFFFFFFFFFFFFFLL);
 //
 // This is a mess, but there's not much we can do about it.
 
-// MongoDB customization: see memcpy notes above
+// BongoDB customization: see memcpy notes above
 #elif 0 && (defined(__arm__) && \
       !defined(__ARM_ARCH_4__) && \
       !defined(__ARM_ARCH_4T__) && \

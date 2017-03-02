@@ -29,7 +29,7 @@
     }
 
     var cluster = new ShardingTest(
-        {name: "authwhere", shards: 1, mongos: 1, other: {keyFile: 'jstests/libs/key1'}});
+        {name: "authwhere", shards: 1, bongos: 1, other: {keyFile: 'jstests/libs/key1'}});
 
     // Set up the test data.
     (function() {

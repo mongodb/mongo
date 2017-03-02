@@ -5,7 +5,7 @@
 #
 # This script can be run from anywhere within the root of the source repository.  This script
 # expects the ICU third-party directory (src/third_party/icu4c-xx.yy/) to exist and contain a
-# newline-separated language file in source/mongo_sources/languages.txt.  This language file must
+# newline-separated language file in source/bongo_sources/languages.txt.  This language file must
 # list each locale for which collation data should be packaged as part of the generated custom data
 # file.
 #
@@ -44,10 +44,10 @@ TARBALL="${NAME}-${MAJOR_VERSION}_${MINOR_VERSION}-src.tgz"
 TARBALL_DOWNLOAD_URL="http://download.icu-project.org/files/${NAME}/${VERSION}/${TARBALL}"
 
 ICU_THIRD_PARTY_DIR="$(git rev-parse --show-toplevel)/src/third_party/${NAME}-${VERSION}"
-MONGO_SOURCES_DIR="${ICU_THIRD_PARTY_DIR}/source/mongo_sources"
-LANGUAGE_FILE_IN="${MONGO_SOURCES_DIR}/languages.txt"
-ICU_DATA_FILE_LITTLE_ENDIAN_OUT="${MONGO_SOURCES_DIR}/icudt${MAJOR_VERSION}l.dat"
-ICU_DATA_FILE_BIG_ENDIAN_OUT="${MONGO_SOURCES_DIR}/icudt${MAJOR_VERSION}b.dat"
+BONGO_SOURCES_DIR="${ICU_THIRD_PARTY_DIR}/source/bongo_sources"
+LANGUAGE_FILE_IN="${BONGO_SOURCES_DIR}/languages.txt"
+ICU_DATA_FILE_LITTLE_ENDIAN_OUT="${BONGO_SOURCES_DIR}/icudt${MAJOR_VERSION}l.dat"
+ICU_DATA_FILE_BIG_ENDIAN_OUT="${BONGO_SOURCES_DIR}/icudt${MAJOR_VERSION}b.dat"
 
 #
 # Set up temp directory.

@@ -7,19 +7,19 @@
     "use strict";
 
     // TODO: use configured storageEngine from testData once wiredTiger supports readOnly mode.
-    var mongod = MongoRunner.runMongod({storageEngine: "mmapv1"});
-    var dbpath = mongod.dbpath;
+    var bongod = BongoRunner.runBongod({storageEngine: "mmapv1"});
+    var dbpath = bongod.dbpath;
 
     // ensure dbpath gets set up.
-    assert.writeOK(mongod.getDB("foo").x.insert({x: 1}));
+    assert.writeOK(bongod.getDB("foo").x.insert({x: 1}));
 
-    assert(!mongod.getDB("admin").isMaster().readOnly);
-    assert(!mongod.getDB("admin").serverStatus().storageEngine.readOnly);
-    MongoRunner.stopMongod(mongod);
+    assert(!bongod.getDB("admin").isMaster().readOnly);
+    assert(!bongod.getDB("admin").serverStatus().storageEngine.readOnly);
+    BongoRunner.stopBongod(bongod);
 
-    mongod = MongoRunner.runMongod(
+    bongod = BongoRunner.runBongod(
         {storageEngine: "mmapv1", queryableBackupMode: "", dbpath: dbpath, noCleanData: true});
-    assert(mongod.getDB("admin").isMaster().readOnly);
-    assert(mongod.getDB("admin").serverStatus().storageEngine.readOnly);
-    MongoRunner.stopMongod(mongod);
+    assert(bongod.getDB("admin").isMaster().readOnly);
+    assert(bongod.getDB("admin").serverStatus().storageEngine.readOnly);
+    BongoRunner.stopBongod(bongod);
 }());

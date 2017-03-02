@@ -1,6 +1,6 @@
-path = MongoRunner.dataDir + '/indexbg2_dur';
+path = BongoRunner.dataDir + '/indexbg2_dur';
 
-var m = MongoRunner.runMongod({journal: "", smallfiles: ""});
+var m = BongoRunner.runBongod({journal: "", smallfiles: ""});
 
 t = m.getDB('test').test;
 t.createIndex({a: 1});

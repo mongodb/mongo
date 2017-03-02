@@ -2,7 +2,7 @@
 // Test creating and authenticating users with special characters.
 
 (function() {
-    var conn = MongoRunner.runMongod({auth: ''});
+    var conn = BongoRunner.runBongod({auth: ''});
 
     var adminDB = conn.getDB('admin');
     adminDB.createUser({user: 'admin', pwd: 'pass', roles: jsTest.adminUserRoles});
@@ -63,5 +63,5 @@
     };
     testUserAndDatabaseAtSymbolConflation();
 
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
 })();

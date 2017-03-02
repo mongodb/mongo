@@ -59,7 +59,7 @@ rs.nodes[1].getDB("admin").auth("foo", "bar");
 rs.nodes[2].getDB("admin").auth("foo", "bar");
 testInvalidAuthStates();
 
-print("restart mongod with bad keyFile");
+print("restart bongod with bad keyFile");
 
 rs.stop(0);
 m = rs.restart(0, {"keyFile": key2});

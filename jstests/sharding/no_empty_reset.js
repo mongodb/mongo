@@ -1,6 +1,6 @@
 // Tests that an empty shard can't be the cause of a chunk reset
 
-var st = new ShardingTest({shards: 2, mongos: 2});
+var st = new ShardingTest({shards: 2, bongos: 2});
 
 // Don't balance since we're manually moving chunks
 st.stopBalancer();
@@ -16,14 +16,14 @@ jsTestLog("Sharded setup complete");
 
 st.printShardingStatus();
 
-jsTestLog("Setting initial versions for each mongos...");
+jsTestLog("Setting initial versions for each bongos...");
 
 coll.find().itcount();
 
 var collB = st.s1.getCollection("" + coll);
 collB.find().itcount();
 
-jsTestLog("Migrating via first mongos...");
+jsTestLog("Migrating via first bongos...");
 
 var fullShard = st.getShard(coll, {_id: 1});
 var emptyShard = st.getShard(coll, {_id: -1});
@@ -39,7 +39,7 @@ assert.soon(
     "Setup FAILURE:  Unable to move chunk from " + emptyShard.shardName + " to " +
         fullShard.shardName);
 
-jsTestLog("Resetting shard version via first mongos...");
+jsTestLog("Resetting shard version via first bongos...");
 
 coll.find().itcount();
 

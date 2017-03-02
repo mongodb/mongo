@@ -3,7 +3,7 @@
 
 (function() {
 
-    var st = new ShardingTest({shards: 1, mongos: 2});
+    var st = new ShardingTest({shards: 1, bongos: 2});
     st.stopBalancer();
 
     var admin = st.s0.getDB('admin');

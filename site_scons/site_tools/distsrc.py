@@ -1,4 +1,4 @@
-# Copyright (C) 2015 MongoDB Inc.
+# Copyright (C) 2015 BongoDB Inc.
 #
 # This program is free software: you can redistribute it and/or  modify
 # it under the terms of the GNU Affero General Public License, version 3,
@@ -165,7 +165,7 @@ def distsrc_action_generator(source, target, env, for_signature):
         print "Invalid file format for distsrc. Must be tar or zip file"
         env.Exit(1)
 
-    git_cmd = "\"%s\" archive --format %s --output %s --prefix ${MONGO_DIST_SRC_PREFIX} HEAD" % (
+    git_cmd = "\"%s\" archive --format %s --output %s --prefix ${BONGO_DIST_SRC_PREFIX} HEAD" % (
         git_path, target_ext, target[0])
 
     return [

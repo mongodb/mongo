@@ -5,7 +5,7 @@
     var st = new ShardingTest({name: "add_shard_idempotent", shards: 0});
 
     jsTestLog("Testing adding a standalone shard multiple times");
-    var shard1 = MongoRunner.runMongod({});
+    var shard1 = BongoRunner.runBongod({});
     assert.commandWorked(
         st.admin.runCommand({addshard: shard1.host, name: "newShard1", maxSize: 1024}));
 

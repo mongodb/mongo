@@ -24,7 +24,7 @@ var blacklist = [
     'view_catalog_cycle_lookup.js',
 
     // Disabled due to SERVER-20057, 'Concurrent, sharded mapReduces can fail when temporary
-    // namespaces collide across mongos processes'
+    // namespaces collide across bongos processes'
     'map_reduce_drop.js',
     'map_reduce_inline.js',
     'map_reduce_merge.js',
@@ -35,7 +35,7 @@ var blacklist = [
     'map_reduce_replace_nonexistent.js',
     'map_reduce_replace_remove.js',
 
-    // Disabled due to MongoDB restrictions and/or workload restrictions
+    // Disabled due to BongoDB restrictions and/or workload restrictions
 
     // These workloads sometimes trigger 'Could not lock auth data update lock'
     // errors because the AuthorizationManager currently waits for only five
@@ -47,10 +47,10 @@ var blacklist = [
 
     'agg_group_external.js',                  // uses >100MB of data, which can overwhelm test hosts
     'agg_sort_external.js',                   // uses >100MB of data, which can overwhelm test hosts
-    'compact.js',                             // compact can only be run against a standalone mongod
-    'compact_simultaneous_padding_bytes.js',  // compact can only be run against a mongod
-    'convert_to_capped_collection.js',        // convertToCapped can't be run on mongos processes
-    'convert_to_capped_collection_index.js',  // convertToCapped can't be run on mongos processes
+    'compact.js',                             // compact can only be run against a standalone bongod
+    'compact_simultaneous_padding_bytes.js',  // compact can only be run against a bongod
+    'convert_to_capped_collection.js',        // convertToCapped can't be run on bongos processes
+    'convert_to_capped_collection_index.js',  // convertToCapped can't be run on bongos processes
     'findAndModify_mixed_queue.js',           // findAndModify requires a shard key
     'findAndModify_mixed_queue_unindexed.js',   // findAndModify requires a shard key
     'findAndModify_remove_queue.js',            // remove cannot be {} for findAndModify
@@ -91,8 +91,8 @@ var blacklist = [
     'update_upsert_multi.js',          // our update queries lack shard keys
     'update_upsert_multi_noindex.js',  // our update queries lack shard keys
     'upsert_where.js',      // cannot use upsert command with $where with sharded collections
-    'yield_and_hashed.js',  // stagedebug can only be run against a standalone mongod
-    'yield_and_sorted.js',  // stagedebug can only be run against a standalone mongod
+    'yield_and_hashed.js',  // stagedebug can only be run against a standalone bongod
+    'yield_and_sorted.js',  // stagedebug can only be run against a standalone bongod
 ].map(function(file) {
     return dir + '/' + file;
 });

@@ -28,11 +28,11 @@
 
     // calling this function with and without a primary, should provide sufficient code coverage
     // to catch any JS errors
-    var mongo =
+    var bongo =
         startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", primary.port);
-    mongo();
+    bongo();
     assert.soon(function() {
-        return rawMongoProgramOutput().match("behind the primary");
+        return rawBongoProgramOutput().match("behind the primary");
     });
 
     // get to a primaryless state
@@ -45,11 +45,11 @@
     } catch (e) {
     }
 
-    mongo =
+    bongo =
         startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", primary.port);
-    mongo();
+    bongo();
     assert.soon(function() {
-        return rawMongoProgramOutput().match("behind the freshest");
+        return rawBongoProgramOutput().match("behind the freshest");
     });
 
 })();

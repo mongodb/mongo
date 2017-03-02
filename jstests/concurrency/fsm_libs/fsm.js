@@ -21,14 +21,14 @@ var fsm = (function() {
         // See fsm_libs/cluster.js for the format of args.cluster.
         var connCache;
         if (args.passConnectionCache) {
-            connCache = {mongos: [], config: [], shards: {}};
-            connCache.mongos = args.cluster.mongos.map(connStr => new Mongo(connStr));
-            connCache.config = args.cluster.config.map(connStr => new Mongo(connStr));
+            connCache = {bongos: [], config: [], shards: {}};
+            connCache.bongos = args.cluster.bongos.map(connStr => new Bongo(connStr));
+            connCache.config = args.cluster.config.map(connStr => new Bongo(connStr));
 
             var shardNames = Object.keys(args.cluster.shards);
 
             shardNames.forEach(name => (connCache.shards[name] = args.cluster.shards[name].map(
-                                            connStr => new Mongo(connStr))));
+                                            connStr => new Bongo(connStr))));
         }
 
         for (var i = 0; i < args.iterations; ++i) {

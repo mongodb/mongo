@@ -34,7 +34,7 @@
               1);
 
     // From a different client
-    var a2 = connect(`mongodb://${s._connections[0].name}/admin`);
+    var a2 = connect(`bongodb://${s._connections[0].name}/admin`);
 
     assert.eq(
         a2.runCommand({"getShardVersion": "alleyinsider.foo", configdb: s._configDB}).global.t,
@@ -45,7 +45,7 @@
               "a2 mine 1");
 
     function simpleFindOne() {
-        return a2.getMongo().getDB("alleyinsider").foo.findOne();
+        return a2.getBongo().getDB("alleyinsider").foo.findOne();
     }
 
     var barEpoch = s.getDB('config').chunks.findOne({ns: 'alleyinsider.bar'}).lastmodEpoch;

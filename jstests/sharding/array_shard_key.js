@@ -2,13 +2,13 @@
 
 var st = new ShardingTest({name: jsTestName(), shards: 3});
 
-var mongos = st.s0;
+var bongos = st.s0;
 
-var coll = mongos.getCollection(jsTestName() + ".foo");
+var coll = bongos.getCollection(jsTestName() + ".foo");
 
 st.shardColl(coll, {_id: 1, i: 1}, {_id: ObjectId(), i: 1});
 
-printjson(mongos.getDB("config").chunks.find().toArray());
+printjson(bongos.getDB("config").chunks.find().toArray());
 
 st.printShardingStatus();
 
@@ -78,7 +78,7 @@ assert.eq(coll.find().itcount(), 1);
 printjson("Sharding-then-inserting-multikey tested, now trying inserting-then-sharding-multikey");
 
 // Insert a bunch of data then shard over key which is an array
-var coll = mongos.getCollection("" + coll + "2");
+var coll = bongos.getCollection("" + coll + "2");
 for (var i = 0; i < 10; i++) {
     // TODO : does not check weird cases like [ i, i ]
     assert.writeOK(coll.insert({i: [i, i + 1]}));
@@ -95,7 +95,7 @@ try {
 st.printShardingStatus();
 
 // Insert a bunch of data then shard over key which is not an array
-var coll = mongos.getCollection("" + coll + "3");
+var coll = bongos.getCollection("" + coll + "3");
 for (var i = 0; i < 10; i++) {
     // TODO : does not check weird cases like [ i, i ]
     assert.writeOK(coll.insert({i: i}));

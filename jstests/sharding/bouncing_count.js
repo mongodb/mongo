@@ -1,19 +1,19 @@
-// Tests whether new sharding is detected on insert by mongos
+// Tests whether new sharding is detected on insert by bongos
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 10, mongos: 3});
+    var st = new ShardingTest({shards: 10, bongos: 3});
 
-    var mongosA = st.s0;
-    var mongosB = st.s1;
-    var mongosC = st.s2;
+    var bongosA = st.s0;
+    var bongosB = st.s1;
+    var bongosC = st.s2;
 
-    var admin = mongosA.getDB("admin");
-    var config = mongosA.getDB("config");
+    var admin = bongosA.getDB("admin");
+    var config = bongosA.getDB("config");
 
-    var collA = mongosA.getCollection("foo.bar");
-    var collB = mongosB.getCollection("" + collA);
-    var collC = mongosB.getCollection("" + collA);
+    var collA = bongosA.getCollection("foo.bar");
+    var collB = bongosB.getCollection("" + collA);
+    var collC = bongosB.getCollection("" + collA);
 
     var shards = config.shards.find().sort({_id: 1}).toArray();
 
@@ -30,8 +30,8 @@
             admin.runCommand({moveChunk: "" + collA, find: {_id: i}, to: shards[i]._id}));
     }
 
-    mongosB.getDB("admin").runCommand({flushRouterConfig: 1});
-    mongosC.getDB("admin").runCommand({flushRouterConfig: 1});
+    bongosB.getDB("admin").runCommand({flushRouterConfig: 1});
+    bongosC.getDB("admin").runCommand({flushRouterConfig: 1});
 
     printjson(collB.count());
     printjson(collC.count());
@@ -42,8 +42,8 @@
             {moveChunk: "" + collA, find: {_id: i}, to: shards[(i + 1) % shards.length]._id}));
     }
 
-    // Make sure mongos A is up-to-date
-    mongosA.getDB("admin").runCommand({flushRouterConfig: 1});
+    // Make sure bongos A is up-to-date
+    bongosA.getDB("admin").runCommand({flushRouterConfig: 1});
 
     jsTestLog("Running count!");
 

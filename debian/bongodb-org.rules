@@ -1,0 +1,137 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+TOOLS=bsondump bongodump bongoexport bongofiles bongoimport bongooplog bongoperf bongorestore bongostat bongotop
+
+# Uncomment this to turn on verbose mode.
+export DH_VERBOSE=1
+
+
+configure: configure-stamp
+configure-stamp:
+	dh_testdir
+
+	touch configure-stamp
+
+
+build: build-stamp
+
+build-stamp: configure-stamp  
+	dh_testdir
+
+	# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED. 
+	# scons 
+	#docbook-to-man debian/bongodb.sgml > bongodb.1
+	echo -n > debian/bongodb-org-tools.manpages
+	for binary in ${TOOLS} ; \
+	do \
+	  echo debian/$$binary.1 >> debian/bongodb-org-tools.manpages ; \
+	done
+
+	echo debian/bongo.1 > debian/bongodb-org-shell.manpages
+	echo debian/bongod.1 > debian/bongodb-org-server.manpages
+	echo debian/bongos.1 > debian/bongodb-org-bongos.manpages
+
+	touch $@
+
+clean: 
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp configure-stamp
+
+	# FIXME: scons freaks out at the presence of target files
+	# under debian/bongodb.
+	#scons -c
+
+	rm -f debian/*.manpages
+
+	rm -rf $(CURDIR)/debian/bongodb-org
+	rm -rf $(CURDIR)/debian/bongodb-org-shell
+	rm -rf $(CURDIR)/debian/bongodb-org-server
+	rm -rf $(CURDIR)/debian/bongodb-org-bongos
+	rm -rf $(CURDIR)/debian/bongodb-org-tools
+	rm -f config.log
+	rm -f bongo
+	rm -f bongod
+	rm -f bongoimportjson
+	rm -f bongoexport
+	rm -f bongorestore
+	rm -f bongodump
+	rm -f bongofiles
+	rm -f .sconsign.dblite
+	rm -f libbongoclient.a
+	rm -rf client/*.o
+	rm -rf tools/*.o
+	rm -rf shell/*.o
+	rm -rf .sconf_temp
+	rm -f buildscripts/*.pyc 
+	rm -f *.pyc
+	rm -f buildinfo.cpp
+	dh_clean debian/files
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+
+	# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED.
+	# scons --prefix=$(CURDIR)/debian/bongodb/usr install
+	mkdir -p $(CURDIR)/debian/bongodb-org-shell/usr/bin
+	mkdir -p $(CURDIR)/debian/bongodb-org-server/usr/bin
+	mkdir -p $(CURDIR)/debian/bongodb-org-bongos/usr/bin
+	mkdir -p $(CURDIR)/debian/bongodb-org-tools/usr/bin
+	cp -v $(CURDIR)/bin/bongo $(CURDIR)/debian/bongodb-org-shell/usr/bin
+	cp -v $(CURDIR)/bin/bongod $(CURDIR)/debian/bongodb-org-server/usr/bin
+	cp -v $(CURDIR)/bin/bongos $(CURDIR)/debian/bongodb-org-bongos/usr/bin
+
+	for binary in ${TOOLS} ; \
+	do \
+	  cp -v $(CURDIR)/bin/$$binary $(CURDIR)/debian/bongodb-org-tools/usr/bin ; \
+	done
+
+	mkdir -p $(CURDIR)/debian/bongodb-org-server/etc
+	cp $(CURDIR)/debian/bongod.conf $(CURDIR)/debian/bongodb-org-server/etc/bongod.conf
+
+	mkdir -p $(CURDIR)/debian/bongodb-org-shell/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/bongodb-org-server/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/bongodb-org-bongos/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/bongodb-org-tools/usr/share/lintian/overrides/
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/bongodb-org-shell/usr/share/lintian/overrides/bongodb-org-shell
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/bongodb-org-server/usr/share/lintian/overrides/bongodb-org-server
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/bongodb-org-bongos/usr/share/lintian/overrides/bongodb-org-bongos
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/bongodb-org-tools/usr/share/lintian/overrides/bongodb-org-tools
+
+# Build architecture-independent files here.
+binary-indep: build install
+# We have nothing to do by default.
+
+# Build architecture-dependent files here.
+binary-arch: build install
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs 
+	dh_installdocs
+	dh_installexamples
+#	dh_install
+#	dh_installmenu
+#	dh_installdebconf	
+#	dh_installlogrotate
+#	dh_installemacsen
+#	dh_installpam
+#	dh_installmime
+	dh_installinit -pbongodb-org-server --name=bongod
+#	dh_installinfo
+	dh_installman
+	dh_link
+# Appears to be broken on Ubuntu 11.10...?
+#	dh_strip
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install configure

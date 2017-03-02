@@ -122,9 +122,9 @@
     // The remaining tests involve $lookup and $graphLookup. We cannot lookup into sharded
     // collections, so skip these tests if running in a sharded configuration.
     let isMasterResponse = assert.commandWorked(viewsDB.runCommand("isMaster"));
-    const isMongos = (isMasterResponse.msg === "isdbgrid");
-    if (isMongos) {
-        jsTest.log("Tests are being run on a mongos; skipping all $lookup and $graphLookup tests.");
+    const isBongos = (isMasterResponse.msg === "isdbgrid");
+    if (isBongos) {
+        jsTest.log("Tests are being run on a bongos; skipping all $lookup and $graphLookup tests.");
         return;
     }
 

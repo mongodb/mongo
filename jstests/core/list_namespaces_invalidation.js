@@ -25,7 +25,7 @@
         printjson(res);
 
         // Ensure the cursor has data, invalidate the namespace, and exhaust the cursor.
-        let cursor = new DBCommandCursor(dbInvalid.getMongo(), res);
+        let cursor = new DBCommandCursor(dbInvalid.getBongo(), res);
         let errMsg =
             'expected more data from command ' + tojson(cmd) + ', with result ' + tojson(res);
         assert(cursor.hasNext(), errMsg);
@@ -44,7 +44,7 @@
                 validator: {
                     $or: [
                         {phone: {$type: "string"}},
-                        {email: {$regex: /@mongodb\.com$/}},
+                        {email: {$regex: /@bongodb\.com$/}},
                         {status: {$in: ["Unknown", "Incomplete"]}},
                         {address: {$type: "string"}},
                         {ssn: {$type: "string"}},

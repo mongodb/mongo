@@ -1,5 +1,5 @@
 /* test durability
-   runs mongod, kill -9's, recovers
+   runs bongod, kill -9's, recovers
 */
 
 var debugging = false;
@@ -58,20 +58,20 @@ function work() {
 }
 
 if (debugging) {
-    // mongod already running in debugger
+    // bongod already running in debugger
     print(
-        "DOING DEBUG MODE BEHAVIOR AS 'db' IS DEFINED -- RUN mongo --nodb FOR REGULAR TEST BEHAVIOR");
-    conn = db.getMongo();
+        "DOING DEBUG MODE BEHAVIOR AS 'db' IS DEFINED -- RUN bongo --nodb FOR REGULAR TEST BEHAVIOR");
+    conn = db.getBongo();
     work();
     sleep(30000);
     quit();
 }
 
 // directories
-var path = MongoRunner.dataPath + testname + "dur";
+var path = BongoRunner.dataPath + testname + "dur";
 
-log("run mongod with --dur");
-conn = MongoRunner.runMongod({
+log("run bongod with --dur");
+conn = BongoRunner.runBongod({
     dbpath: path,
     journal: "",
     smallfiles: "",
@@ -82,15 +82,15 @@ conn = MongoRunner.runMongod({
 work();
 
 log("kill -9");
-MongoRunner.stopMongod(conn, /*signal*/ 9);
+BongoRunner.stopBongod(conn, /*signal*/ 9);
 
 // journal file should be present, and non-empty as we killed hard
 assert(listFiles(path + "/journal/").length > 0,
        "journal directory is unexpectantly empty after kill");
 
 // restart and recover
-log("restart mongod and recover");
-conn = MongoRunner.runMongod({
+log("restart bongod and recover");
+conn = BongoRunner.runBongod({
     restart: true,
     cleanData: false,
     dbpath: path,
@@ -102,7 +102,7 @@ conn = MongoRunner.runMongod({
 });
 verify();
 
-log("stopping mongod " + conn.port);
-MongoRunner.stopMongod(conn);
+log("stopping bongod " + conn.port);
+BongoRunner.stopBongod(conn);
 
 print(testname + " SUCCESS");

@@ -14,6 +14,6 @@ env.Library(
 	"varint.cc",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/bongo/base',
         '$BUILD_DIR/third_party/s2/base/base',
     ])

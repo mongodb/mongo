@@ -1,5 +1,5 @@
 load("jstests/libs/slow_weekly_util.js");
-test = new SlowWeeklyMongod("conc_update");
+test = new SlowWeeklyBongod("conc_update");
 db = test.getDB("test");
 t = db.disk_reuse1;
 t.drop();

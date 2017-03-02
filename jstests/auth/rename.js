@@ -1,6 +1,6 @@
 // test renameCollection with auth
 
-var m = MongoRunner.runMongod({auth: ""});
+var m = BongoRunner.runBongod({auth: ""});
 
 var db1 = m.getDB("foo");
 var db2 = m.getDB("bar");

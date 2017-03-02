@@ -2,12 +2,12 @@
 (function() {
     var st = new ShardingTest({shards: 2});
 
-    var mongos = st.s0;
-    var config = mongos.getDB("config");
+    var bongos = st.s0;
+    var config = bongos.getDB("config");
 
-    var dbA = mongos.getDB("DropSharded_A");
-    var dbB = mongos.getDB("DropSharded_B");
-    var dbC = mongos.getDB("DropSharded_C");
+    var dbA = bongos.getDB("DropSharded_A");
+    var dbB = bongos.getDB("DropSharded_B");
+    var dbC = bongos.getDB("DropSharded_C");
 
     // Dropping a database that doesn't exist will result in an info field in the response.
     var res = assert.commandWorked(dbA.dropDatabase());
@@ -31,13 +31,13 @@
     // Insert a document to an unsharded collection and make sure that the document is there.
     assert.writeOK(dbA.unsharded.insert({dummy: 1}));
     var shardName = config.databases.findOne({_id: dbA.getName()}).primary;
-    var shardHostConn = new Mongo(config.shards.findOne({_id: shardName}).host);
+    var shardHostConn = new Bongo(config.shards.findOne({_id: shardName}).host);
     var dbAOnShard = shardHostConn.getDB(dbA.getName());
     assert.neq(null, dbAOnShard.unsharded.findOne({dummy: 1}));
 
     // Drop the non-suffixed db and ensure that it is the only one that was dropped.
     dbA.dropDatabase();
-    var dbs = mongos.getDBNames();
+    var dbs = bongos.getDBNames();
     for (var i = 0; i < dbs.length; i++) {
         assert.neq(dbs, "" + dbA);
     }

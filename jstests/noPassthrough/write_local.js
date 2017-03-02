@@ -10,10 +10,10 @@
         new ReplSetTest({name: "write_local", nodes: 1, oplogSize: 1, nodeOptions: options});
     replTest.startSet();
     replTest.initiate();
-    var mongod = replTest.getPrimary();
-    mongod.adminCommand({setParameter: 1, wiredTigerConcurrentWriteTransactions: 1});
+    var bongod = replTest.getPrimary();
+    bongod.adminCommand({setParameter: 1, wiredTigerConcurrentWriteTransactions: 1});
 
-    var local = mongod.getDB('local');
+    var local = bongod.getDB('local');
 
     // Start inserting documents in test.capped and local.capped capped collections.
     var shells = ['test', 'local'].map(function(dbname) {
@@ -26,7 +26,7 @@
                                       '        mydb.capped.insert({ x: i }); ' +
                                       '    } ' +
                                       '})();',
-                                  mongod.port);
+                                  bongod.port);
     });
 
     // The following causes inconsistent locking order in the ticket system, depending on

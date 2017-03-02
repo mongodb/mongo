@@ -22,12 +22,12 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
     StandaloneFixture = function() {};
 
     StandaloneFixture.prototype.runLoadPhase = function runLoadPhase(test) {
-        this.mongod = MongoRunner.runMongod({});
-        this.dbpath = this.mongod.dbpath;
+        this.bongod = BongoRunner.runBongod({});
+        this.dbpath = this.bongod.dbpath;
 
-        test.load(this.mongod.getDB("test")[test.name]);
-        assert.commandWorked(this.mongod.getDB("local").dropDatabase());
-        MongoRunner.stopMongod(this.mongod);
+        test.load(this.bongod.getDB("test")[test.name]);
+        assert.commandWorked(this.bongod.getDB("local").dropDatabase());
+        BongoRunner.stopBongod(this.bongod);
     };
 
     StandaloneFixture.prototype.runExecPhase = function runExecPhase(test) {
@@ -36,11 +36,11 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
 
             var options = {queryableBackupMode: "", noCleanData: true, dbpath: this.dbpath};
 
-            this.mongod = MongoRunner.runMongod(options);
+            this.bongod = BongoRunner.runBongod(options);
 
-            test.exec(this.mongod.getDB("test")[test.name]);
+            test.exec(this.bongod.getDB("test")[test.name]);
 
-            MongoRunner.stopMongod(this.mongod);
+            BongoRunner.stopBongod(this.bongod);
         } finally {
             makeDirectoryWritable(this.dbpath);
         }
@@ -51,7 +51,7 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
     };
 
     ShardedFixture.prototype.runLoadPhase = function runLoadPhase(test) {
-        this.shardingTest = new ShardingTest({nopreallocj: true, mongos: 1, shards: this.nShards});
+        this.shardingTest = new ShardingTest({nopreallocj: true, bongos: 1, shards: this.nShards});
 
         this.paths = this.shardingTest.getDBPaths();
 
@@ -98,14 +98,14 @@ var StandaloneFixture, ShardedFixture, runReadOnlyTest, zip2, cycleN;
                 };
 
                 assert.commandWorked(this.shardingTest["d" + i].getDB("local").dropDatabase());
-                this.shardingTest.restartMongod(i, opts, () => {
+                this.shardingTest.restartBongod(i, opts, () => {
                     makeDirectoryReadOnly(this.paths[i]);
                 });
             }
 
-            jsTest.log("restarting mongos...");
+            jsTest.log("restarting bongos...");
 
-            this.shardingTest.restartMongos(0);
+            this.shardingTest.restartBongos(0);
 
             test.exec(this.shardingTest.getDB("test")[test.name]);
 

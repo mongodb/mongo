@@ -1,5 +1,5 @@
 # Generate vcxproj and vcxproj.filters files for browsing code in Visual Studio 2015.
-# To build mongodb, you must use scons. You can use this project to navigate code during debugging.
+# To build bongodb, you must use scons. You can use this project to navigate code during debugging.
 #
 #  HOW TO USE
 #
@@ -9,7 +9,7 @@
 #  Next, run the following command
 #    python buildscripts/make_vcxproj.py FILE_NAME
 #
-#   where FILE_NAME is the of the file to generate e.g., "mongod"
+#   where FILE_NAME is the of the file to generate e.g., "bongod"
 #
 
 import json
@@ -21,11 +21,11 @@ import uuid
 VCXPROJ_FOOTER = r"""
 
   <ItemGroup>
-    <None Include="src\mongo\db\mongo.ico" />
+    <None Include="src\bongo\db\bongo.ico" />
   </ItemGroup>
 
   <ItemGroup>
-    <ResourceCompile Include="src\mongo\db\db.rc" />
+    <ResourceCompile Include="src\bongo\db\db.rc" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
@@ -176,7 +176,7 @@ class ProjFileGenerator(object):
                     self.files.add(directory + "\\" + file_name)
 
             # Make sure the set also includes the base directories
-            # (i.e. src/mongo and src as examples)
+            # (i.e. src/bongo and src as examples)
             base_name = os.path.dirname(directory)
             while base_name:
                 base_dirs.add(base_name)

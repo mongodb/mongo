@@ -9,8 +9,8 @@
     var primary = replTest.getPrimary();
 
     // Two connections
-    var m1 = new Mongo(primary.host);
-    var m2 = new Mongo(primary.host);
+    var m1 = new Bongo(primary.host);
+    var m2 = new Bongo(primary.host);
 
     // Do a write with m1, then a write with m2, then a no-op write with m1. m1 should have a lastOp
     // of m2's write.

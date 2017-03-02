@@ -1,15 +1,15 @@
 //
-// Tests mongos-only query behavior
+// Tests bongos-only query behavior
 //
 
-var st = new ShardingTest({shards: 1, mongos: 1, verbose: 0});
+var st = new ShardingTest({shards: 1, bongos: 1, verbose: 0});
 
-var mongos = st.s0;
-var coll = mongos.getCollection("foo.bar");
+var bongos = st.s0;
+var coll = bongos.getCollection("foo.bar");
 
 //
 //
-// Ensure we can't use exhaust option through mongos
+// Ensure we can't use exhaust option through bongos
 coll.remove({});
 assert.writeOK(coll.insert({a: 'b'}));
 var query = coll.find({});
@@ -21,10 +21,10 @@ assert.throws(function() {
 
 //
 //
-// Ensure we can't trick mongos by inserting exhaust option on a command through mongos
+// Ensure we can't trick bongos by inserting exhaust option on a command through bongos
 coll.remove({});
 assert.writeOK(coll.insert({a: 'b'}));
-var cmdColl = mongos.getCollection(coll.getDB().toString() + ".$cmd");
+var cmdColl = bongos.getCollection(coll.getDB().toString() + ".$cmd");
 var cmdQuery = cmdColl.find({ping: 1}).limit(1);
 assert.commandWorked(cmdQuery.next());
 cmdQuery = cmdColl.find({ping: 1}).limit(1).addOption(DBQuery.Option.exhaust);

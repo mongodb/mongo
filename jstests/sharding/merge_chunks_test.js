@@ -1,15 +1,15 @@
 //
-// Tests that merging chunks via mongos works/doesn't work with different chunk configurations
+// Tests that merging chunks via bongos works/doesn't work with different chunk configurations
 //
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 2, mongos: 2});
+    var st = new ShardingTest({shards: 2, bongos: 2});
 
-    var mongos = st.s0;
-    var staleMongos = st.s1;
-    var admin = mongos.getDB("admin");
-    var coll = mongos.getCollection("foo.bar");
+    var bongos = st.s0;
+    var staleBongos = st.s1;
+    var admin = bongos.getDB("admin");
+    var coll = bongos.getCollection("foo.bar");
 
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
     st.ensurePrimaryShard('foo', st.shard0.shardName);
@@ -41,7 +41,7 @@
     assert.writeOK(coll.insert({_id: 40}));
     assert.writeOK(coll.insert({_id: 110}));
 
-    var staleCollection = staleMongos.getCollection(coll + "");
+    var staleCollection = staleBongos.getCollection(coll + "");
 
     jsTest.log("Trying merges that should fail...");
 

@@ -1,9 +1,9 @@
 // tests that listDatabases doesn't show config db on a shard, even if it is there
 
-var test = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1}});
+var test = new ShardingTest({shards: 1, bongos: 1, other: {chunkSize: 1}});
 
-var mongos = test.s0;
-var mongod = test.shard0;
+var bongos = test.s0;
+var bongod = test.shard0;
 
 // grab the config db instance by name
 var getDBSection = function(dbsArray, dbToFind) {
@@ -21,12 +21,12 @@ var dbInConfigEntryCheck = function(dbEntry) {
     assert.eq(false, dbEntry.empty);
 };
 
-assert.writeOK(mongos.getDB("blah").foo.insert({_id: 1}));
-assert.writeOK(mongos.getDB("foo").foo.insert({_id: 1}));
-assert.writeOK(mongos.getDB("raw").foo.insert({_id: 1}));
+assert.writeOK(bongos.getDB("blah").foo.insert({_id: 1}));
+assert.writeOK(bongos.getDB("foo").foo.insert({_id: 1}));
+assert.writeOK(bongos.getDB("raw").foo.insert({_id: 1}));
 
 // verify that the config db is not on a shard
-var res = mongos.adminCommand("listDatabases");
+var res = bongos.adminCommand("listDatabases");
 var dbArray = res.databases;
 dbInConfigEntryCheck(getDBSection(dbArray, "config"));
 
@@ -35,21 +35,21 @@ var localSection = getDBSection(dbArray, 'local');
 assert(!localSection);
 
 // add doc in admin db on the config server.
-assert.writeOK(mongos.getDB('admin').test.insert({_id: 1}));
-res = mongos.adminCommand("listDatabases");
+assert.writeOK(bongos.getDB('admin').test.insert({_id: 1}));
+res = bongos.adminCommand("listDatabases");
 dbArray = res.databases;
 dbInConfigEntryCheck(getDBSection(dbArray, "config"));
 dbInConfigEntryCheck(getDBSection(dbArray, 'admin'));
 
 // add doc in config/admin db on the shard
-mongod.getDB("config").foo.insert({_id: 1});
-mongod.getDB("admin").foo.insert({_id: 1});
+bongod.getDB("config").foo.insert({_id: 1});
+bongod.getDB("admin").foo.insert({_id: 1});
 
-// add doc in admin db (via mongos)
-mongos.getDB("admin").foo.insert({_id: 1});
+// add doc in admin db (via bongos)
+bongos.getDB("admin").foo.insert({_id: 1});
 
 // verify that the config db is not on a shard
-res = mongos.adminCommand("listDatabases");
+res = bongos.adminCommand("listDatabases");
 dbArray = res.databases;
 // check config db
 assert(getDBSection(dbArray, "config"), "config db not found! 2");

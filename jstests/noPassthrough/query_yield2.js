@@ -11,7 +11,7 @@ if (0) {  // Test disabled until SERVER-8579 is finished. Reminder ticket: SERVE
     var insertTime;
 
     load("jstests/libs/slow_weekly_util.js");
-    testServer = new SlowWeeklyMongod("query_yield2");
+    testServer = new SlowWeeklyBongod("query_yield2");
     db = testServer.getDB("test");
 
     t = db.query_yield2;

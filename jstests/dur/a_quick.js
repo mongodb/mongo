@@ -43,7 +43,7 @@ function checkNoJournalFiles(path, pass) {
             return f.name.indexOf("prealloc") < 0;
         })) {
         if (pass == null) {
-            // wait a bit longer for mongod to potentially finish if it is still running.
+            // wait a bit longer for bongod to potentially finish if it is still running.
             sleep(10000);
             return checkNoJournalFiles(path, 1);
         }
@@ -56,21 +56,21 @@ function checkNoJournalFiles(path, pass) {
 }
 
 // directories
-var path1 = MongoRunner.dataDir + "/quicknodur";
-var path2 = MongoRunner.dataDir + "/quickdur";
+var path1 = BongoRunner.dataDir + "/quicknodur";
+var path2 = BongoRunner.dataDir + "/quickdur";
 
 // non-durable version
-tst.log("start mongod without dur");
-var conn = MongoRunner.runMongod({dbpath: path1, nojournal: ""});
+tst.log("start bongod without dur");
+var conn = BongoRunner.runBongod({dbpath: path1, nojournal: ""});
 tst.log("without dur work");
 var d = conn.getDB("test");
 assert.writeOK(d.foo.insert({_id: 123}));
 tst.log("stop without dur");
-MongoRunner.stopMongod(conn);
+BongoRunner.stopBongod(conn);
 
 // durable version
-tst.log("start mongod with dur");
-conn = MongoRunner.runMongod({dbpath: path2, journal: "", journalOptions: 8});
+tst.log("start bongod with dur");
+conn = BongoRunner.runBongod({dbpath: path2, journal: "", journalOptions: 8});
 tst.log("with dur work");
 d = conn.getDB("test");
 assert.writeOK(d.foo.insert({_id: 123}));
@@ -82,8 +82,8 @@ tst.log("sleep a bit for a group commit");
 sleep(8000);
 
 // kill the process hard
-tst.log("kill -9 mongod");
-MongoRunner.stopMongod(conn.port, /*signal*/ 9);
+tst.log("kill -9 bongod");
+BongoRunner.stopBongod(conn.port, /*signal*/ 9);
 
 // journal file should be present, and non-empty as we killed hard
 
@@ -108,7 +108,7 @@ if (files.some(function(f) {
 
 // restart and recover
 tst.log("restart and recover");
-conn = MongoRunner.runMongod(
+conn = BongoRunner.runBongod(
     {restart: true, cleanData: false, dbpath: path2, journal: "", journalOptions: 9});
 tst.log("check data results");
 d = conn.getDB("test");
@@ -120,7 +120,7 @@ if (!countOk) {
 }
 
 tst.log("stop");
-MongoRunner.stopMongod(conn);
+BongoRunner.stopBongod(conn);
 
 // at this point, after clean shutdown, there should be no journal files
 tst.log("check no journal files");

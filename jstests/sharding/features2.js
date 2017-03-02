@@ -1,6 +1,6 @@
 (function() {
 
-    var s = new ShardingTest({name: "features2", shards: 2, mongos: 1});
+    var s = new ShardingTest({name: "features2", shards: 2, bongos: 1});
 
     s.adminCommand({enablesharding: "test"});
     s.ensurePrimaryShard('test', 'shard0001');
@@ -177,8 +177,8 @@
     // OP_COMMAND changes will add a code of 121 (CommandFailed) if a failing command
     // does not set one, so this comparison fails as "undefined" != 121.
     //
-    // TODO: Uncomment this line when OP_COMMAND is implemented in mongos (SERVER-18292)
-    // as then MongoS should set code 121 as well.
+    // TODO: Uncomment this line when OP_COMMAND is implemented in bongos (SERVER-18292)
+    // as then BongoS should set code 121 as well.
     //
     // assert.eq( x.code , y.code , "assert format" )
     assert.eq(x.errmsg, y.errmsg, "assert format");

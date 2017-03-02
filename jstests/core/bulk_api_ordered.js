@@ -48,7 +48,7 @@ var executeTests = function() {
     assert.eq(2, result.nUpserted);
     assert.eq(5, result.nMatched);
     // only check nModified if write commands are enabled
-    if (coll.getMongo().writeMode() == "commands") {
+    if (coll.getBongo().writeMode() == "commands") {
         assert.eq(4, result.nModified);
     }
     assert.eq(2, result.nRemoved);
@@ -156,14 +156,14 @@ var executeTests = function() {
 
 var buildVersion = parseInt(db.runCommand({buildInfo: 1}).versionArray.slice(0, 3).join(""), 10);
 // Save the existing useWriteCommands function
-var _useWriteCommands = coll.getMongo().useWriteCommands;
+var _useWriteCommands = coll.getBongo().useWriteCommands;
 
 //
 // Only execute write command tests if we have > 2.5.5 otherwise
 // execute the down converted version
 if (buildVersion >= 255) {
     // Force the use of useWriteCommands
-    coll._mongo.useWriteCommands = function() {
+    coll._bongo.useWriteCommands = function() {
         return true;
     };
 
@@ -172,7 +172,7 @@ if (buildVersion >= 255) {
 }
 
 // Force the use of legacy commands
-coll._mongo.useWriteCommands = function() {
+coll._bongo.useWriteCommands = function() {
     return false;
 };
 
@@ -180,4 +180,4 @@ coll._mongo.useWriteCommands = function() {
 executeTests();
 
 // Reset the function
-coll.getMongo().useWriteCommands = _useWriteCommands;
+coll.getBongo().useWriteCommands = _useWriteCommands;

@@ -29,7 +29,7 @@
     }
 
     var cluster = new ShardingTest(
-        {name: "authmr", shards: 1, mongos: 1, other: {keyFile: "jstests/libs/key1"}});
+        {name: "authmr", shards: 1, bongos: 1, other: {keyFile: "jstests/libs/key1"}});
 
     // Set up the test data.
     (function() {
@@ -70,11 +70,11 @@
             test1DB.foo.mapReduce(
                 function() {
                     emit(0, this.a);
-                    var t2 = new Mongo().getDB("test2");
+                    var t2 = new Bongo().getDB("test2");
                     t2.ad.insert(this);
                 },
                 function(k, vs) {
-                    var t2 = new Mongo().getDB("test2");
+                    var t2 = new Bongo().getDB("test2");
                     t2.reductio.insert(this);
 
                     return Array.sum(vs);
@@ -86,7 +86,7 @@
                           if (this.hasOwnProperty(k))
                               print(k + "=" + v);
                       }
-                      var t2 = new Mongo().getDB("test2");
+                      var t2 = new Bongo().getDB("test2");
                       t2.absurdum.insert({key: k, value: v});
                   }
                 });

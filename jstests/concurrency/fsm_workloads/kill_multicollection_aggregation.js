@@ -53,7 +53,7 @@ var $config = (function() {
                 {aggregate: collName, pipeline: pipeline, cursor: {batchSize: this.batchSize}});
 
             if (res.ok) {
-                this.cursor = new DBCommandCursor(db.getMongo(), res, this.batchSize);
+                this.cursor = new DBCommandCursor(db.getBongo(), res, this.batchSize);
             }
         },
 
@@ -262,7 +262,7 @@ var $config = (function() {
         // underlying it isn't exhausted when the "aggregate" command is sent. This makes it more
         // likely for the "killCursors" command to need to handle destroying the underlying
         // PlanExecutor.
-        cluster.executeOnMongodNodes(function lowerDocumentSourceCursorBatchSize(db) {
+        cluster.executeOnBongodNodes(function lowerDocumentSourceCursorBatchSize(db) {
             assertAlways.commandWorked(
                 db.adminCommand({setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 1}));
         });
@@ -279,7 +279,7 @@ var $config = (function() {
     }
 
     function teardown(db, collName, cluster) {
-        cluster.executeOnMongodNodes(function lowerDocumentSourceCursorBatchSize(db) {
+        cluster.executeOnBongodNodes(function lowerDocumentSourceCursorBatchSize(db) {
             // Restore DocumentSourceCursor batch size to the default.
             assertAlways.commandWorked(db.adminCommand(
                 {setParameter: 1, internalDocumentSourceCursorBatchSizeBytes: 4 * 1024 * 1024}));

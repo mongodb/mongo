@@ -1,5 +1,5 @@
 load("jstests/libs/slow_weekly_util.js");
-test = new SlowWeeklyMongod("conc_update");
+test = new SlowWeeklyBongod("conc_update");
 db = test.getDB("concurrency");
 db.dropDatabase();
 

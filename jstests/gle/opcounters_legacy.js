@@ -3,27 +3,27 @@
 
 // Remember the global 'db' var
 var lastDB = db;
-var mongo = new Mongo(db.getMongo().host);
-mongo.writeMode = function() {
+var bongo = new Bongo(db.getBongo().host);
+bongo.writeMode = function() {
     return "legacy";
 };
-db = mongo.getDB(db.toString());
+db = bongo.getDB(db.toString());
 
 var t = db.opcounters;
-var isMongos = ("isdbgrid" == db.runCommand("ismaster").msg);
+var isBongos = ("isdbgrid" == db.runCommand("ismaster").msg);
 var opCounters;
 
 //
 // 1. Insert.
 //
-// - mongod, single insert:
+// - bongod, single insert:
 //     counted as 1 op if successful, else 0
-// - mongod, bulk insert of N with continueOnError=true:
+// - bongod, bulk insert of N with continueOnError=true:
 //     counted as K ops, where K is number of docs successfully inserted
-// - mongod, bulk insert of N with continueOnError=false:
+// - bongod, bulk insert of N with continueOnError=false:
 //     counted as K ops, where K is number of docs successfully inserted
 //
-// - mongos
+// - bongos
 //     count ops attempted like insert commands
 //
 
@@ -59,7 +59,7 @@ var continueOnErrorFlag = 1;
 opCounters = db.serverStatus().opcounters;
 t.insert([{_id: 5}, {_id: 5}, {_id: 6}], continueOnErrorFlag);
 assert(db.getLastError());
-assert.eq(opCounters.insert + (isMongos ? 2 : 3), db.serverStatus().opcounters.insert);
+assert.eq(opCounters.insert + (isBongos ? 2 : 3), db.serverStatus().opcounters.insert);
 
 //
 // 2. Update.
@@ -106,8 +106,8 @@ assert.eq(opCounters.delete + 1, db.serverStatus().opcounters.delete);
 //
 // 4. Query.
 //
-// - mongod: counted as 1 op, regardless of errors
-// - mongos: counted as 1 op if successful, else 0
+// - bongod: counted as 1 op, regardless of errors
+// - bongos: counted as 1 op if successful, else 0
 //
 
 t.drop();
@@ -123,7 +123,7 @@ opCounters = db.serverStatus().opcounters;
 assert.throws(function() {
     t.findOne({_id: {$invalidOp: 1}});
 });
-assert.eq(opCounters.query + (isMongos ? 0 : 1), db.serverStatus().opcounters.query);
+assert.eq(opCounters.query + (isBongos ? 0 : 1), db.serverStatus().opcounters.query);
 
 //
 // 5. Getmore.

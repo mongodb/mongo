@@ -56,7 +56,7 @@ var replShouldFail = function(name, opt1, opt2) {
 
 /**
  * Test that $lookup works with a sharded source collection. This is tested because of
- * the connections opened between mongos/shards and between the shards themselves.
+ * the connections opened between bongos/shards and between the shards themselves.
  */
 function testShardedLookup(shardingTest) {
     var st = shardingTest;
@@ -91,7 +91,7 @@ function testShardedLookup(shardingTest) {
 }
 
 /**
- * Takes in two mongod/mongos configuration options and runs a basic
+ * Takes in two bongod/bongos configuration options and runs a basic
  * sharding test to see if they can work together...
  */
 function mixedShardTest(options1, options2, shouldSucceed) {
@@ -100,7 +100,7 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         // off the balancer otherwise, which it will not be authorized to do if auth is enabled.
         // Once SERVER-14017 is fixed the "enableBalancer" line can be removed.
         var st = new ShardingTest({
-            mongos: [options1],
+            bongos: [options1],
             config: [options1],
             shards: [options1, options2],
             other: {enableBalancer: true}
@@ -115,7 +115,7 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         // Test that $lookup works because it causes outgoing connections to be opened
         testShardedLookup(st);
 
-        // Test mongos talking to config servers
+        // Test bongos talking to config servers
         var r = st.adminCommand({enableSharding: "test"});
         assert.eq(r, true, "error enabling sharding for this configuration");
 
@@ -127,7 +127,7 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         r = st.adminCommand({shardCollection: "test.col", key: {_id: 1}});
         assert.eq(r, true, "error sharding collection for this configuration");
 
-        // Test mongos talking to shards
+        // Test bongos talking to shards
         var bigstr = Array(1024 * 1024).join("#");
 
         var bulk = db1.col.initializeUnorderedBulkOp();

@@ -1,0 +1,117 @@
+Source: bongodb-enterprise
+Section: database
+Priority: optional
+Maintainer: Ernie Hershey <ernie.hershey@bongodb.com>
+Build-Depends: 
+Standards-Version: 3.8.0
+Homepage: http://www.bongodb.org
+
+Package: bongodb-enterprise
+Conflicts: bongo-10gen, bongo-10gen-enterprise, bongo-10gen-enterprise-server, bongo-10gen-server, bongo-10gen-unstable, bongo-10gen-unstable-enterprise, bongo-10gen-unstable-enterprise-bongos, bongo-10gen-unstable-enterprise-server, bongo-10gen-unstable-enterprise-shell, bongo-10gen-unstable-enterprise-tools, bongo-10gen-unstable-bongos, bongo-10gen-unstable-server, bongo-10gen-unstable-shell, bongo-10gen-unstable-tools, bongo18-10gen, bongo18-10gen-server, bongo20-10gen, bongo20-10gen-server, bongodb, bongodb-server, bongodb-dev, bongodb-clients, bongodb-10gen, bongodb-10gen-enterprise, bongodb-10gen-unstable, bongodb-10gen-unstable-enterprise, bongodb-10gen-unstable-enterprise-bongos, bongodb-10gen-unstable-enterprise-server, bongodb-10gen-unstable-enterprise-shell, bongodb-10gen-unstable-enterprise-tools, bongodb-10gen-unstable-bongos, bongodb-10gen-unstable-server, bongodb-10gen-unstable-shell, bongodb-10gen-unstable-tools, bongodb-enterprise-unstable, bongodb-enterprise-unstable-bongos, bongodb-enterprise-unstable-server, bongodb-enterprise-unstable-shell, bongodb-enterprise-unstable-tools, bongodb-org-unstable, bongodb-org-unstable-bongos, bongodb-org-unstable-shell, bongodb-org-unstable-tools, bongodb-org-unstable-server, bongodb-nightly, bongodb-org, bongodb-org-bongos, bongodb-org-server, bongodb-org-shell, bongodb-org-tools, bongodb-stable, bongodb18-10gen, bongodb20-10gen
+Architecture: any
+Depends: bongodb-enterprise-shell, bongodb-enterprise-server, bongodb-enterprise-bongos, bongodb-enterprise-tools
+Description: BongoDB open source document-oriented database system (enterprise metapackage)
+ BongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, BongoDB provides high performance for both reads and writes. BongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
+ .
+ BongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
+ .
+ BongoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
+ .
+ BongoDB features:
+ * JSON Data Model with Dynamic Schemas
+ * Auto-Sharding for Horizontal Scalability
+ * Built-In Replication for High Availability
+ * Rich Secondary Indexes, including geospatial
+ * TTL indexes
+ * Text Search
+ * Aggregation Framework & Native MapReduce
+ .
+ This metapackage will install the bongo shell, import/export tools, other client utilities, server software, default configuration, and init.d scripts.
+
+Package: bongodb-enterprise-shell
+Conflicts: bongo-10gen, bongo-10gen-enterprise, bongo-10gen-enterprise-server, bongo-10gen-server, bongo-10gen-unstable, bongo-10gen-unstable-enterprise, bongo-10gen-unstable-enterprise-bongos, bongo-10gen-unstable-enterprise-server, bongo-10gen-unstable-enterprise-shell, bongo-10gen-unstable-enterprise-tools, bongo-10gen-unstable-bongos, bongo-10gen-unstable-server, bongo-10gen-unstable-shell, bongo-10gen-unstable-tools, bongo18-10gen, bongo18-10gen-server, bongo20-10gen, bongo20-10gen-server, bongodb, bongodb-server, bongodb-dev, bongodb-clients, bongodb-10gen, bongodb-10gen-enterprise, bongodb-10gen-unstable, bongodb-10gen-unstable-enterprise, bongodb-10gen-unstable-enterprise-bongos, bongodb-10gen-unstable-enterprise-server, bongodb-10gen-unstable-enterprise-shell, bongodb-10gen-unstable-enterprise-tools, bongodb-10gen-unstable-bongos, bongodb-10gen-unstable-server, bongodb-10gen-unstable-shell, bongodb-10gen-unstable-tools, bongodb-enterprise-unstable, bongodb-enterprise-unstable-bongos, bongodb-enterprise-unstable-server, bongodb-enterprise-unstable-shell, bongodb-enterprise-unstable-tools, bongodb-org-unstable, bongodb-org-unstable-bongos, bongodb-org-unstable-shell, bongodb-org-unstable-tools, bongodb-org-unstable-server, bongodb-nightly, bongodb-org, bongodb-org-bongos, bongodb-org-server, bongodb-org-shell, bongodb-org-tools, bongodb-stable, bongodb18-10gen, bongodb20-10gen
+Architecture: any
+Depends: ${shlibs:Depends}
+Description: BongoDB shell client (enterprise)
+ BongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, BongoDB provides high performance for both reads and writes. BongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
+ .
+ BongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
+ .
+ BongoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
+ .
+ BongoDB features:
+ * JSON Data Model with Dynamic Schemas
+ * Auto-Sharding for Horizontal Scalability
+ * Built-In Replication for High Availability
+ * Rich Secondary Indexes, including geospatial
+ * TTL indexes
+ * Text Search
+ * Aggregation Framework & Native MapReduce
+ .
+ This package contains the bongo shell.
+
+Package: bongodb-enterprise-server
+Conflicts: bongo-10gen, bongo-10gen-enterprise, bongo-10gen-enterprise-server, bongo-10gen-server, bongo-10gen-unstable, bongo-10gen-unstable-enterprise, bongo-10gen-unstable-enterprise-bongos, bongo-10gen-unstable-enterprise-server, bongo-10gen-unstable-enterprise-shell, bongo-10gen-unstable-enterprise-tools, bongo-10gen-unstable-bongos, bongo-10gen-unstable-server, bongo-10gen-unstable-shell, bongo-10gen-unstable-tools, bongo18-10gen, bongo18-10gen-server, bongo20-10gen, bongo20-10gen-server, bongodb, bongodb-server, bongodb-dev, bongodb-clients, bongodb-10gen, bongodb-10gen-enterprise, bongodb-10gen-unstable, bongodb-10gen-unstable-enterprise, bongodb-10gen-unstable-enterprise-bongos, bongodb-10gen-unstable-enterprise-server, bongodb-10gen-unstable-enterprise-shell, bongodb-10gen-unstable-enterprise-tools, bongodb-10gen-unstable-bongos, bongodb-10gen-unstable-server, bongodb-10gen-unstable-shell, bongodb-10gen-unstable-tools, bongodb-enterprise-unstable, bongodb-enterprise-unstable-bongos, bongodb-enterprise-unstable-server, bongodb-enterprise-unstable-shell, bongodb-enterprise-unstable-tools, bongodb-org-unstable, bongodb-org-unstable-bongos, bongodb-org-unstable-shell, bongodb-org-unstable-tools, bongodb-org-unstable-server, bongodb-nightly, bongodb-org, bongodb-org-bongos, bongodb-org-server, bongodb-org-shell, bongodb-org-tools, bongodb-stable, bongodb18-10gen, bongodb20-10gen
+Architecture: any
+Depends: ${shlibs:Depends}, snmp, adduser
+Description: BongoDB database server (enterprise)
+ BongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, BongoDB provides high performance for both reads and writes. BongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
+ .
+ BongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
+ .
+ BongoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
+ .
+ BongoDB features:
+ * JSON Data Model with Dynamic Schemas
+ * Auto-Sharding for Horizontal Scalability
+ * Built-In Replication for High Availability
+ * Rich Secondary Indexes, including geospatial
+ * TTL indexes
+ * Text Search
+ * Aggregation Framework & Native MapReduce
+ .
+ This package contains the BongoDB server software, default configuration files, and init.d scripts.
+
+Package: bongodb-enterprise-bongos
+Conflicts: bongo-10gen, bongo-10gen-enterprise, bongo-10gen-enterprise-server, bongo-10gen-server, bongo-10gen-unstable, bongo-10gen-unstable-enterprise, bongo-10gen-unstable-enterprise-bongos, bongo-10gen-unstable-enterprise-server, bongo-10gen-unstable-enterprise-shell, bongo-10gen-unstable-enterprise-tools, bongo-10gen-unstable-bongos, bongo-10gen-unstable-server, bongo-10gen-unstable-shell, bongo-10gen-unstable-tools, bongo18-10gen, bongo18-10gen-server, bongo20-10gen, bongo20-10gen-server, bongodb, bongodb-server, bongodb-dev, bongodb-clients, bongodb-10gen, bongodb-10gen-enterprise, bongodb-10gen-unstable, bongodb-10gen-unstable-enterprise, bongodb-10gen-unstable-enterprise-bongos, bongodb-10gen-unstable-enterprise-server, bongodb-10gen-unstable-enterprise-shell, bongodb-10gen-unstable-enterprise-tools, bongodb-10gen-unstable-bongos, bongodb-10gen-unstable-server, bongodb-10gen-unstable-shell, bongodb-10gen-unstable-tools, bongodb-enterprise-unstable, bongodb-enterprise-unstable-bongos, bongodb-enterprise-unstable-server, bongodb-enterprise-unstable-shell, bongodb-enterprise-unstable-tools, bongodb-org-unstable, bongodb-org-unstable-bongos, bongodb-org-unstable-shell, bongodb-org-unstable-tools, bongodb-org-unstable-server, bongodb-nightly, bongodb-org, bongodb-org-bongos, bongodb-org-server, bongodb-org-shell, bongodb-org-tools, bongodb-stable, bongodb18-10gen, bongodb20-10gen
+Architecture: any
+Depends: ${shlibs:Depends}, snmp
+Description: BongoDB sharded cluster query router (enterprise)
+ BongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, BongoDB provides high performance for both reads and writes. BongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
+ .
+ BongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
+ .
+ BongoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
+ .
+ BongoDB features:
+ * JSON Data Model with Dynamic Schemas
+ * Auto-Sharding for Horizontal Scalability
+ * Built-In Replication for High Availability
+ * Rich Secondary Indexes, including geospatial
+ * TTL indexes
+ * Text Search
+ * Aggregation Framework & Native MapReduce
+ .
+ This package contains bongos, the BongoDB sharded cluster query router.
+
+Package: bongodb-enterprise-tools
+Conflicts: bongo-10gen, bongo-10gen-enterprise, bongo-10gen-enterprise-server, bongo-10gen-server, bongo-10gen-unstable, bongo-10gen-unstable-enterprise, bongo-10gen-unstable-enterprise-bongos, bongo-10gen-unstable-enterprise-server, bongo-10gen-unstable-enterprise-shell, bongo-10gen-unstable-enterprise-tools, bongo-10gen-unstable-bongos, bongo-10gen-unstable-server, bongo-10gen-unstable-shell, bongo-10gen-unstable-tools, bongo18-10gen, bongo18-10gen-server, bongo20-10gen, bongo20-10gen-server, bongodb, bongodb-server, bongodb-dev, bongodb-clients, bongodb-10gen, bongodb-10gen-enterprise, bongodb-10gen-unstable, bongodb-10gen-unstable-enterprise, bongodb-10gen-unstable-enterprise-bongos, bongodb-10gen-unstable-enterprise-server, bongodb-10gen-unstable-enterprise-shell, bongodb-10gen-unstable-enterprise-tools, bongodb-10gen-unstable-bongos, bongodb-10gen-unstable-server, bongodb-10gen-unstable-shell, bongodb-10gen-unstable-tools, bongodb-enterprise-unstable, bongodb-enterprise-unstable-bongos, bongodb-enterprise-unstable-server, bongodb-enterprise-unstable-shell, bongodb-enterprise-unstable-tools, bongodb-org-unstable, bongodb-org-unstable-bongos, bongodb-org-unstable-shell, bongodb-org-unstable-tools, bongodb-org-unstable-server, bongodb-nightly, bongodb-org, bongodb-org-bongos, bongodb-org-server, bongodb-org-shell, bongodb-org-tools, bongodb-stable, bongodb18-10gen, bongodb20-10gen
+Architecture: any
+Depends: ${shlibs:Depends}, snmp
+Description: BongoDB tools (enterprise)
+ BongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, BongoDB provides high performance for both reads and writes. BongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
+ .
+ BongoDB is an open-source database used by companies of all sizes, across all industries and for a wide variety of applications. It is an agile database that allows schemas to change quickly as applications evolve, while still providing the functionality developers expect from traditional databases, such as secondary indexes, a full query language and strict consistency.
+ .
+ BongoDB has a rich client ecosystem including hadoop integration, officially supported drivers for 10 programming languages and environments, as well as 40 drivers supported by the user community.
+ .
+ BongoDB features:
+ * JSON Data Model with Dynamic Schemas
+ * Auto-Sharding for Horizontal Scalability
+ * Built-In Replication for High Availability
+ * Rich Secondary Indexes, including geospatial
+ * TTL indexes
+ * Text Search
+ * Aggregation Framework & Native MapReduce
+ .
+ This package contains standard utilities for interacting with BongoDB.

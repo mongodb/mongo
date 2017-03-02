@@ -17,7 +17,7 @@ var slaveConns = replTest.liveNodes.slaves;
 var slave = [];
 for (var i in slaveConns) {
     var d = slaveConns[i].getDB(name);
-    d.getMongo().setSlaveOk();
+    d.getBongo().setSlaveOk();
     slave.push(d);
 }
 

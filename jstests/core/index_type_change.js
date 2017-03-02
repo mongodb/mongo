@@ -19,7 +19,7 @@ load("jstests/libs/analyze_plan.js");  // For 'isIndexOnly'.
     var res = coll.update({}, {a: newVal});  // Replacement update.
     assert.writeOK(res);
     assert.eq(res.nMatched, 1);
-    if (coll.getMongo().writeMode() == "commands")
+    if (coll.getBongo().writeMode() == "commands")
         assert.eq(res.nModified, 1);
 
     // Make sure it actually changed the type.

@@ -1,18 +1,18 @@
 // Tests various cases of dropping and recreating collections in the same namespace with multiple
-// mongoses
+// bongoses
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 3, mongos: 3});
+    var st = new ShardingTest({shards: 3, bongos: 3});
 
     var config = st.s0.getDB("config");
     var admin = st.s0.getDB("admin");
     var coll = st.s0.getCollection("foo.bar");
 
-    // Use separate mongoses for admin, inserting data, and validating results, so no single-mongos
+    // Use separate bongoses for admin, inserting data, and validating results, so no single-bongos
     // tricks will work
-    var staleMongos = st.s1;
-    var insertMongos = st.s2;
+    var staleBongos = st.s1;
+    var insertBongos = st.s2;
 
     var shards = [];
     config.shards.find().forEach(function(doc) {
@@ -33,12 +33,12 @@
     assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
     st.configRS.awaitLastOpCommitted();  // TODO: Remove after collection lifecyle project (PM-85)
 
-    var bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
+    var bulk = insertBongos.getCollection(coll + "").initializeUnorderedBulkOp();
     for (var i = 0; i < 100; i++) {
         bulk.insert({_id: i, test: "a"});
     }
     assert.writeOK(bulk.execute());
-    assert.eq(100, staleMongos.getCollection(coll + "").find({test: "a"}).itcount());
+    assert.eq(100, staleBongos.getCollection(coll + "").find({test: "a"}).itcount());
 
     assert(coll.drop());
 
@@ -53,13 +53,13 @@
     assert.commandWorked(coll.ensureIndex({notId: 1}));
     assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {notId: 1}}));
 
-    bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
+    bulk = insertBongos.getCollection(coll + "").initializeUnorderedBulkOp();
     for (var i = 0; i < 100; i++) {
         bulk.insert({notId: i, test: "b"});
     }
     assert.writeOK(bulk.execute());
-    assert.eq(100, staleMongos.getCollection(coll + "").find({test: "b"}).itcount());
-    assert.eq(0, staleMongos.getCollection(coll + "").find({test: {$in: ["a"]}}).itcount());
+    assert.eq(100, staleBongos.getCollection(coll + "").find({test: "b"}).itcount());
+    assert.eq(0, staleBongos.getCollection(coll + "").find({test: {$in: ["a"]}}).itcount());
 
     assert(coll.drop());
 
@@ -84,14 +84,14 @@
 
     jsTest.log("moved primary...");
 
-    bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
+    bulk = insertBongos.getCollection(coll + "").initializeUnorderedBulkOp();
     for (var i = 0; i < 100; i++) {
         bulk.insert({test: "c"});
     }
     assert.writeOK(bulk.execute());
 
-    assert.eq(100, staleMongos.getCollection(coll + "").find({test: "c"}).itcount());
-    assert.eq(0, staleMongos.getCollection(coll + "").find({test: {$in: ["a", "b"]}}).itcount());
+    assert.eq(100, staleBongos.getCollection(coll + "").find({test: "c"}).itcount());
+    assert.eq(0, staleBongos.getCollection(coll + "").find({test: {$in: ["a", "b"]}}).itcount());
 
     assert(coll.drop());
 
@@ -109,15 +109,15 @@
     }));
     assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
-    bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();
+    bulk = insertBongos.getCollection(coll + "").initializeUnorderedBulkOp();
     for (var i = 0; i < 100; i++) {
         bulk.insert({test: "d"});
     }
     assert.writeOK(bulk.execute());
 
-    assert.eq(100, staleMongos.getCollection(coll + "").find({test: "d"}).itcount());
+    assert.eq(100, staleBongos.getCollection(coll + "").find({test: "d"}).itcount());
     assert.eq(0,
-              staleMongos.getCollection(coll + "").find({test: {$in: ["a", "b", "c"]}}).itcount());
+              staleBongos.getCollection(coll + "").find({test: {$in: ["a", "b", "c"]}}).itcount());
 
     assert(coll.drop());
 

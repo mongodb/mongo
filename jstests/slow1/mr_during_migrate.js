@@ -2,10 +2,10 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 10, mongos: 2, verbose: 2});
+    var st = new ShardingTest({shards: 10, bongos: 2, verbose: 2});
 
-    var mongos = st.s0;
-    var admin = mongos.getDB("admin");
+    var bongos = st.s0;
+    var admin = bongos.getDB("admin");
     var coll = st.s.getCollection(jsTest.name() + ".coll");
 
     var numDocs = 1024 * 1024;
@@ -68,9 +68,9 @@
     for (var t = 0; t < numTests; t++) {
         jsTest.log("Test #" + t);
 
-        var mongos = st.s1;  // use other mongos so we get stale shard versions
-        var coll = mongos.getCollection(coll + "");
-        var outputColl = mongos.getCollection(coll + "_output");
+        var bongos = st.s1;  // use other bongos so we get stale shard versions
+        var coll = bongos.getCollection(coll + "");
+        var outputColl = bongos.getCollection(coll + "_output");
 
         var numTypes = 32;
         var map = function() {
@@ -90,7 +90,7 @@
 
         // assert.eq( coll.find().itcount(), numDocs )
 
-        coll.getMongo().getDB("admin").runCommand({setParameter: 1, traceExceptions: true});
+        coll.getBongo().getDB("admin").runCommand({setParameter: 1, traceExceptions: true});
 
         printjson(coll.mapReduce(
             map, reduce, {out: {replace: outputColl.getName(), db: outputColl.getDB() + ""}}));

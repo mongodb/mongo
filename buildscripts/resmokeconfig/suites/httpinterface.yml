@@ -10,7 +10,7 @@ executor:
     hooks:
     - class: ValidateCollections
     fixture:
-      class: MongoDFixture
-      mongod_options:
+      class: BongoDFixture
+      bongod_options:
         set_parameters:
           enableTestCommands: 1

@@ -1,6 +1,6 @@
 (function() {
 
-    var s = new ShardingTest({name: "sort1", shards: 2, mongos: 2});
+    var s = new ShardingTest({name: "sort1", shards: 2, bongos: 2});
 
     s.adminCommand({enablesharding: "test"});
     s.ensurePrimaryShard('test', 'shard0001');
@@ -59,7 +59,7 @@
     }, 200);
     assert.eq(67, z.length, "C2");
 
-    print("a: " + a + " b:" + b + " mongos slow down: " + Math.ceil(100 * ((a - b) / b)) + "%");
+    print("a: " + a + " b:" + b + " bongos slow down: " + Math.ceil(100 * ((a - b) / b)) + "%");
 
     // -- secondary index sorting
 

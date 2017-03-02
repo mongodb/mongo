@@ -33,7 +33,7 @@ rstConn2.getDB("test").a.insert({a: 2, str: "CHECKCHECK"});
 assert.eq(2, rstConn2.getDB("test").a.count(), "Error interacting with replSet");
 
 // Check that non-ssl connections can still be made
-var canConnectNoSSL = runMongoProgram("mongo", "--port", rst.ports[0], "--eval", ";");
+var canConnectNoSSL = runBongoProgram("bongo", "--port", rst.ports[0], "--eval", ";");
 assert.eq(0, canConnectNoSSL, "non-SSL Connection attempt failed when it should succeed");
 
 print("===== UPGRADE preferSSL -> requireSSL =====");
@@ -44,6 +44,6 @@ rstConn3.getDB("test").a.insert({a: 3, str: "GREENEGGSANDHAM"});
 assert.eq(3, rstConn3.getDB("test").a.count(), "Error interacting with replSet");
 
 // Check that ssl connections can be made
-var canConnectSSL = runMongoProgram(
-    "mongo", "--port", rst.ports[0], "--ssl", "--sslAllowInvalidCertificates", "--eval", ";");
+var canConnectSSL = runBongoProgram(
+    "bongo", "--port", rst.ports[0], "--ssl", "--sslAllowInvalidCertificates", "--eval", ";");
 assert.eq(0, canConnectSSL, "SSL Connection attempt failed when it should succeed");

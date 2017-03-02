@@ -5,7 +5,7 @@
 if (db.serverBuildInfo().bits == 32) {
     print("skip on 32 bit systems");
 } else {
-    var conn = MongoRunner.runMongod({
+    var conn = BongoRunner.runBongod({
         journal: "",
         smallfiles: "",
         syncdelay: 5,  // seconds between fsyncs.
@@ -78,5 +78,5 @@ if (db.serverBuildInfo().bits == 32) {
     }
 
     assert(!firstJournalFileExists(), "Expected to have deleted the first journal file by now");
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
 }

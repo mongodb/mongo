@@ -3,15 +3,15 @@
  *
  * Ensure that:
  * 1. A function stored in a document can be loaded into a Code()
- *    object in the mongo shell with the --enableJavaScriptProtection flag.
+ *    object in the bongo shell with the --enableJavaScriptProtection flag.
  * 2. A Code object is correctly serialized as BSON type 'Code' or
  *    'CodeWScope'.
  */
 (function() {
     "use strict";
 
-    var testServer = MongoRunner.runMongod();
-    assert.neq(null, testServer, "failed to start mongod");
+    var testServer = BongoRunner.runBongod();
+    assert.neq(null, testServer, "failed to start bongod");
     var db = testServer.getDB("test");
     var t = db.js_protection_roundtrip;
 
@@ -34,8 +34,8 @@
         var evalString = "(" + tojson(evalFunc) + ")();";
         var protectionFlag =
             jsProtection ? "--enableJavaScriptProtection" : "--disableJavaScriptProtection";
-        var exitCode = runMongoProgram(
-            "mongo", "--port", testServer.port, protectionFlag, "--eval", evalString);
+        var exitCode = runBongoProgram(
+            "bongo", "--port", testServer.port, protectionFlag, "--eval", evalString);
         assert.eq(exitCode, 0);
     }
 
@@ -53,5 +53,5 @@
     testFunctionUnmarshall(true, withJavaScriptProtection);
     testFunctionUnmarshall(false, withoutJavaScriptProtection);
 
-    MongoRunner.stopMongod(testServer);
+    BongoRunner.stopBongod(testServer);
 })();

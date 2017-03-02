@@ -10,7 +10,7 @@ var baseDir = "jstests_disk_preallocate_directoryperdb";
 var baseName = "preallocate_directoryperdb";
 var baseName2 = "preallocate_directoryperdb2";
 var baseName3 = "preallocate_directoryperdb3";
-dbpath = MongoRunner.dataPath + baseDir + "/";
+dbpath = BongoRunner.dataPath + baseDir + "/";
 
 function checkDb2DirAbsent() {
     files = listFiles(dbpath);
@@ -21,7 +21,7 @@ function checkDb2DirAbsent() {
     }
 }
 
-var m = MongoRunner.runMongod(
+var m = BongoRunner.runBongod(
     {smallfiles: "", directoryperdb: "", dbpath: dbpath, bind_ip: "127.0.0.1"});
 db = m.getDB(baseName);
 db2 = m.getDB(baseName2);

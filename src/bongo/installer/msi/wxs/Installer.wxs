@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+	<Product Id="$(var.ProductId)" 
+           Name="!(wix.ProductName)" 
+           Language="1033" 
+           Version="$(var.BongoDBVersion)"
+           Manufacturer="BongoDB"
+           UpgradeCode="$(var.UpgradeCode)">
+
+    <Package InstallerVersion="200" Compressed="yes" />
+    <WixVariable Id="ProductName" Value="BongoDB $(var.BongoDBVersion)" />
+    <WixVariable Id="ProductMajorName" Value="BongoDB $(var.BongoDBMajorVersion)" />
+    <WixVariable Id="InstallFolder" Value="$(var.BongoDBMajorVersion)"/>
+
+    <MajorUpgrade
+      DowngradeErrorMessage="A later version of [ProductName] is already installed. Setup will now exit."/>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+        <Directory Id="ProgramFilesFolder">
+            <Directory Id="BongoDB" Name="BongoDB">
+                <Directory Id="Server" Name="Server">
+                    <Directory Id="INSTALLLOCATION" Name="!(wix.InstallFolder)">
+                      <Directory Id="BIN" Name="bin" />
+                    </Directory>
+                </Directory>
+            </Directory>
+        </Directory>
+    </Directory>
+
+    <Media Id="1" Cabinet="media1.cab" EmbedCab="yes" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(var.ProjectDir)Dialog.bmp" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(var.ProjectDir)Banner.bmp" />
+    <WixVariable Id="WixUIInfoIco" Value="$(var.ProjectDir)Installer_Icon_32x32.ico" />
+    <WixVariable Id="WixUIExclamationIco" Value="$(var.ProjectDir)Installer_Icon_32x32.ico" />
+    <!--
+    <WixVariable Id="WixUINewIco" Value="Installer_Icon_16x16.ico" />
+    <WixVariable Id="WixUIUpIco" Value="Installer_Icon_16x16.ico" />
+  More information can be found at http://wix.tramontana.co.hu/tutorial/user-interface/ui-wizardry
+    -->
+
+    <Property Id="ARPPRODUCTICON" Value="BongoDBIcon" />
+    <Property Id="ARPHELPLINK" Value="http://www.bongodb.org/" />
+    <Property Id="ARPURLINFOABOUT" Value="http://www.bongodb.org/" />
+
+    <Icon Id="BongoDBIcon" SourceFile="$(var.ProjectDir)Installer_Icon_32x32.ico" />
+
+    <FeatureGroupRef Id="fg_BongoDBAll" />
+
+    <UIRef Id="BongoWixUI" />
+    <UIRef Id="WixUI_ErrorProgressText" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLLOCATION" />
+
+    <Property Id="BONGO_MULTIPLE_SKU" >
+        <RegistrySearch Id="Bongo_Multiple_Sku"
+            Root="HKLM"
+            Key="Software\BongoDB\Server\$(var.BongoDBMajorVersion)"
+            Name="Edition"
+            Type="raw" />
+    </Property>
+
+    <Condition Message="You cannot install multple editions for the same version of BongoDB. Already installed product '[BONGO_MULTIPLE_SKU]' conflicts with this product.">
+        Installed OR (NOT BONGO_MULTIPLE_SKU OR BONGO_MULTIPLE_SKU = "!(wix.ProductMajorName)")
+    </Condition>
+  </Product>
+</Wix>

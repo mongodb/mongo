@@ -1,10 +1,10 @@
 // Tests that commands properly handle their underlying plan executor being killed.
 (function() {
     'use strict';
-    var dbpath = MongoRunner.dataPath + jsTest.name();
+    var dbpath = BongoRunner.dataPath + jsTest.name();
     resetDbpath(dbpath);
-    var mongod = MongoRunner.runMongod({dbpath: dbpath});
-    var db = mongod.getDB("test");
+    var bongod = BongoRunner.runBongod({dbpath: dbpath});
+    var db = bongod.getDB("test");
     var collName = jsTest.name();
     var coll = db.getCollection(collName);
     coll.drop();

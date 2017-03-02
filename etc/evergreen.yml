@@ -40,7 +40,7 @@ ignore:
 ## Some variables for convenience:
 variables:
 
-# Used when the tests it runs depend only on mongod, mongos, the mongo shell and the tools.
+# Used when the tests it runs depend only on bongod, bongos, the bongo shell and the tools.
 - &task_template
   name: template
   depends_on:
@@ -77,16 +77,16 @@ variables:
       set -o verbose
 
       # We get the raw version string (r1.2.3-45-gabcdef) from git
-      MONGO_VERSION=$(git describe)
+      BONGO_VERSION=$(git describe)
       # If this is a patch build, we add the patch version id to the version string so we know
       # this build was a patch, and which evergreen task it came from
       if [ "${is_patch|}" = "true" ]; then
-        MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+        BONGO_VERSION="$BONGO_VERSION-patch-${version_id}"
       fi
 
       # This script converts the generated version string into a sanitized version string for
       # use by scons and uploading artifacts as well as information about for the scons cache.
-      echo $MONGO_VERSION | SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
+      echo $BONGO_VERSION | SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
 
 - &apply_compile_expansions
   command: expansions.update
@@ -216,7 +216,7 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/artifacts/${build_id}.tgz
+      remote_file: bongodb-bongo-master/${build_variant}/${revision}/artifacts/${build_id}.tgz
       bucket: mciuploads
       extract_to: src
 
@@ -225,9 +225,9 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/binaries/mongo-${build_id}.${ext|tgz}
+      remote_file: bongodb-bongo-master/${build_variant}/${revision}/binaries/bongo-${build_id}.${ext|tgz}
       bucket: mciuploads
-      local_file: src/mongo-binaries.tgz
+      local_file: src/bongo-binaries.tgz
 
   "extract binaries" : &extract_binaries
     command: shell.exec
@@ -235,8 +235,8 @@ functions:
       working_dir: src
       script: |
         set -o errexit
-        ${decompress} mongo-binaries.tgz
-        cp mongodb*/bin/* .
+        ${decompress} bongo-binaries.tgz
+        cp bongodb*/bin/* .
 
   "check binary version" : &check_binary_version
     command: shell.exec
@@ -244,18 +244,18 @@ functions:
       working_dir: src
       script: |
         set -o errexit
-        mongo_binary=$(find mongodb*/bin -name mongo${exe})
-        # There should only be one mongo shell
-        if [ $(echo $mongo_binary | wc -w) -ne 1 ]; then
-          echo "There is more than 1 extracted mongo binary: $mongo_binary"
+        bongo_binary=$(find bongodb*/bin -name bongo${exe})
+        # There should only be one bongo shell
+        if [ $(echo $bongo_binary | wc -w) -ne 1 ]; then
+          echo "There is more than 1 extracted bongo binary: $bongo_binary"
           exit 1
         fi
         bin_ver=$(${python|python} -c "import yaml; print(yaml.safe_load(open('compile_expansions.yml'))['version']);" | tr -d '[ \r\n]')
-        # Due to SERVER-23810, we cannot use $mongo_binary --quiet --nodb --eval "version();"
-        mongo_ver=$($mongo_binary --version | perl -pe '/version v(.*)$/; $_ = $1;' | tr -d '[ \r\n]')
+        # Due to SERVER-23810, we cannot use $bongo_binary --quiet --nodb --eval "version();"
+        bongo_ver=$($bongo_binary --version | perl -pe '/version v(.*)$/; $_ = $1;' | tr -d '[ \r\n]')
         # The versions must match
-        if [ "$bin_ver" != "$mongo_ver" ]; then
-          echo "The mongo version is $mongo_ver, expected version is $bin_ver"
+        if [ "$bin_ver" != "$bongo_ver" ]; then
+          echo "The bongo version is $bongo_ver, expected version is $bin_ver"
           exit 1
         fi
 
@@ -277,30 +277,30 @@ functions:
         # On Windows we can use typeperf.exe to dump performance counters.
         if [ "Windows_NT" = "$OS" ]; then
             typeperf -qx PhysicalDisk | grep Disk | grep -v _Total > disk_counters.txt
-            typeperf -cf disk_counters.txt -si 5 -o mongo-diskstats
+            typeperf -cf disk_counters.txt -si 5 -o bongo-diskstats
         # Solaris: iostat -T d option for timestamp.
         elif iostat -T d -Mx > /dev/null 2>&1; then
-            iostat -T d -Mx 5 > mongo-diskstats
+            iostat -T d -Mx 5 > bongo-diskstats
         # Linux: iostat -t option for timestamp.
         elif iostat -tdmx > /dev/null 2>&1; then
-            iostat -tdmx 5 > mongo-diskstats
+            iostat -tdmx 5 > bongo-diskstats
         # OSX: Simulate the iostat timestamp.
         elif iostat -d > /dev/null 2>&1; then
             while [ 1 ]
             do
-                date +'%m/%d/%Y %I:%M:%S %p' >> mongo-diskstats
-                iostat -d >> mongo-diskstats
-                printf "\n" >> mongo-diskstats
+                date +'%m/%d/%Y %I:%M:%S %p' >> bongo-diskstats
+                iostat -d >> bongo-diskstats
+                printf "\n" >> bongo-diskstats
                 sleep 5
             done
         # Check if vmstat -t is available.
         elif vmstat -td  > /dev/null 2>&1; then
-            vmstat -td 5 > mongo-diskstats
+            vmstat -td 5 > bongo-diskstats
         # Check if vmstat -T d is available.
         elif vmstat -T d > /dev/null 2>&1; then
-            vmstat -T d 5 > mongo-diskstats
+            vmstat -T d 5 > bongo-diskstats
         else
-            printf "Cannot collect mongo-diskstats on this platform\n"
+            printf "Cannot collect bongo-diskstats on this platform\n"
         fi
 
   # Run a monitor process as a background, system task to periodically
@@ -311,7 +311,7 @@ functions:
       background: true
       system_log: true
       script: |
-        proc_list="(bsondump|java|lein|mongo|python|_test$|_test\.exe$)"
+        proc_list="(bsondump|java|lein|bongo|python|_test$|_test\.exe$)"
         if [ "Windows_NT" = "$OS" ]; then
           get_pids() {
             proc_pids=$(tasklist /fo:csv |
@@ -379,8 +379,8 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      local_file: src/mongo-debugsymbols.tgz
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/debugsymbols/debugsymbols-${build_id}.${ext|tgz}
+      local_file: src/bongo-debugsymbols.tgz
+      remote_file: bongodb-bongo-master/${build_variant}/${revision}/debugsymbols/debugsymbols-${build_id}.${ext|tgz}
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
@@ -392,9 +392,9 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/debugsymbols/debugsymbols-${build_id}.${ext|tgz}
+      remote_file: bongodb-bongo-master/${build_variant}/${revision}/debugsymbols/debugsymbols-${build_id}.${ext|tgz}
       bucket: mciuploads
-      local_file: src/mongo-debugsymbols.tgz
+      local_file: src/bongo-debugsymbols.tgz
       build_variants:
         *debug_symbol_variants
 
@@ -407,9 +407,9 @@ functions:
       script: |
         set -o errexit
         set -o verbose
-        ${decompress} mongo-debugsymbols.tgz
-        mv mongodb*/mongo.{debug,dSYM,pdb} mongodb*/mongod.{debug,dSYM,pdb} mongodb*/mongos.{debug,dSYM,pdb} . 2>/dev/null || true
-        rm -r mongodb*/*.{debug,dSYM,pdb} mongo-debugsymbols.tgz 2>/dev/null || true
+        ${decompress} bongo-debugsymbols.tgz
+        mv bongodb*/bongo.{debug,dSYM,pdb} bongodb*/bongod.{debug,dSYM,pdb} bongodb*/bongos.{debug,dSYM,pdb} . 2>/dev/null || true
+        rm -r bongodb*/*.{debug,dSYM,pdb} bongo-debugsymbols.tgz 2>/dev/null || true
 
   "build rocksdb" :
     command: shell.exec
@@ -421,13 +421,13 @@ functions:
         rm -rf rocksdb
         git clone https://github.com/facebook/rocksdb.git
         cd rocksdb
-        make CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ static_lib
+        make CC=/opt/bongodbtoolchain/v2/bin/gcc CXX=/opt/bongodbtoolchain/v2/bin/g++ static_lib
         fi
 
   "build new tools" :
     command: shell.exec
     params:
-      working_dir: src/src/mongo/gotools
+      working_dir: src/src/bongo/gotools
       script: |
         set -o verbose
         set -o errexit
@@ -442,15 +442,15 @@ functions:
         sed -i.bak "s/built-without-version-string/$(git describe)/" common/options/options.go
         sed -i.bak "s/built-without-git-spec/$(git rev-parse HEAD)/" common/options/options.go
 
-        build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongooplog"
+        build_tools="bsondump bongostat bongofiles bongoexport bongoimport bongorestore bongodump bongotop bongooplog"
 
-        if [ "${build_mongoreplay}" = "true" ]; then
-            build_tools="$build_tools mongoreplay"
+        if [ "${build_bongoreplay}" = "true" ]; then
+            build_tools="$build_tools bongoreplay"
         fi
 
         for i in $build_tools; do
-             ${gorootvars} go build ${tooltags|} -o "../../mongo-tools/$i${exe|}" $i/main/$i.go
-             "../../mongo-tools/$i${exe|}" --version
+             ${gorootvars} go build ${tooltags|} -o "../../bongo-tools/$i${exe|}" $i/main/$i.go
+             "../../bongo-tools/$i${exe|}" --version
         done
 
   "do setup" :
@@ -591,7 +591,7 @@ functions:
           set -o errexit
           git clone git@github.com:10gen/jepsen.git
           cd jepsen/jepsen
-          git checkout mongodb-master-linearizable-2
+          git checkout bongodb-master-linearizable-2
           branch=$(git symbolic-ref --short HEAD)
           commit=$(git show -s --pretty=format:"%h - %an, %ar: %s")
           echo "Git branch: $branch, commit: $commit"
@@ -602,7 +602,7 @@ functions:
         script: |
           # On each LXC host do the following:
           #   Check to see if it's running, if not try to restart it.
-          #   Copy the mongodb tarball to /root.
+          #   Copy the bongodb tarball to /root.
           numVms=5
           exit_failure_code=0
           ${set_sudo}
@@ -626,7 +626,7 @@ functions:
                 break
               fi
             done
-            scp -o ConnectTimeout=30 -o ConnectionAttempts=10 mongo-binaries.tgz root@$hostn:
+            scp -o ConnectTimeout=30 -o ConnectionAttempts=10 bongo-binaries.tgz root@$hostn:
             exit_code=$?
             # If the copy fails, then tail the LXC host log.
             if [ $exit_code -ne 0 ]; then
@@ -635,7 +635,7 @@ functions:
               exit_failure_code=$exit_code
             else
               # Cleanup any existing logs from previous runs.
-              ssh root@$hostn "rm -f /root/mongod.log /root/stdout.log /opt/mongod/mongod.log /opt/mongod/stdout.log"
+              ssh root@$hostn "rm -f /root/bongod.log /root/stdout.log /opt/bongod/bongod.log /opt/bongod/stdout.log"
             fi
           done
           exit $exit_failure_code
@@ -645,11 +645,11 @@ functions:
       type: test
       timeout_secs: 2700 # Timeout test if there is no output for more than 45 minutes.
       params:
-        working_dir: src/jepsen/mongodb
+        working_dir: src/jepsen/bongodb
         script: |
           set -o verbose
           start_time=$(date +%s)
-          lein run --tarball "file:///root/mongo-binaries.tgz" ${jepsen_key_time_limit} ${jepsen_protocol_version} ${jepsen_read_concern} ${jepsen_read_with_find_and_modify} ${jepsen_storage_engine} ${jepsen_time_limit} ${jepsen_write_concern} 2>&1 | tee jepsen_${task_name}_${execution}.log
+          lein run --tarball "file:///root/bongo-binaries.tgz" ${jepsen_key_time_limit} ${jepsen_protocol_version} ${jepsen_read_concern} ${jepsen_read_with_find_and_modify} ${jepsen_storage_engine} ${jepsen_time_limit} ${jepsen_write_concern} 2>&1 | tee jepsen_${task_name}_${execution}.log
           end_time=$(date +%s)
           elapsed_secs=$((end_time-start_time))
           # Since we cannot use PIPESTATUS to get the exit code from the "lein run ..." pipe in dash shell,
@@ -676,7 +676,7 @@ functions:
           exit $exit_code
     - command: shell.exec
       params:
-        working_dir: src/jepsen/mongodb
+        working_dir: src/jepsen/bongodb
         script: |
           set -o verbose
           # Jepsen system failure if file exists.
@@ -694,7 +694,7 @@ functions:
 
           git clone git@github.com:10gen/jstestfuzz.git
 
-          cp mongodb*/bin/mongod .
+          cp bongodb*/bin/bongod .
     - command: shell.exec
       params:
         working_dir: src
@@ -702,7 +702,7 @@ functions:
           set -o errexit
           set -o verbose
 
-          git clone --depth 1 git@github.com:10gen/mongo-enterprise-modules.git jstests/enterprise_tests
+          git clone --depth 1 git@github.com:10gen/bongo-enterprise-modules.git jstests/enterprise_tests
           git clone --depth 1 git@github.com:10gen/QA.git jstests/qa_tests
     - command: shell.exec
       type: test
@@ -749,7 +749,7 @@ functions:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: jstests.tgz
-        remote_file: mongodb-mongo-master/${build_variant}/${revision}/jstestfuzz/${task_id}-${execution}.tgz
+        remote_file: bongodb-bongo-master/${build_variant}/${revision}/jstestfuzz/${task_id}-${execution}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -764,7 +764,7 @@ functions:
         set -o verbose
 
         rm -rf /data/install /data/multiversion
-        ${python|python} buildscripts/setup_multiversion_mongodb.py /data/install /data/multiversion ${multiversion_edition|"base"} ${multiversion_platform_arch|"linux/x86_64"} "3.0" "3.2" "3.4"
+        ${python|python} buildscripts/setup_multiversion_bongodb.py /data/install /data/multiversion ${multiversion_edition|"base"} ${multiversion_platform_arch|"linux/x86_64"} "3.0" "3.2" "3.4"
 
   "do snmp setup" :
     command: shell.exec
@@ -775,7 +775,7 @@ functions:
         set -o verbose
 
         mkdir -p snmpconf
-        cp -f src/mongo/db/modules/enterprise/docs/mongod.conf.master snmpconf/mongod.conf
+        cp -f src/bongo/db/modules/enterprise/docs/bongod.conf.master snmpconf/bongod.conf
 
   "cleanup environment" :
     command: shell.exec
@@ -784,14 +784,14 @@ functions:
         set -o errexit
         set -o verbose
 
-        rm -rf src /data/db/* mongo-diskstats* mongo-*.tgz ~/.aws
+        rm -rf src /data/db/* bongo-diskstats* bongo-*.tgz ~/.aws
 
   "kill processes" :
     command: shell.exec
     params:
       silent: true
       script: |
-        process_kill_list="(^cl\.exe$|bsondump|java|lein|lldb|mongo|python|_test$|_test\.exe$)"
+        process_kill_list="(^cl\.exe$|bsondump|java|lein|lldb|bongo|python|_test$|_test\.exe$)"
         # Exclude Evergreen agent processes
         process_exclude_list="(main)"
 
@@ -991,7 +991,7 @@ post:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/diagnostic-data.tgz
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/ftdc/mongo-diagnostic-data-${task_id}-${execution}.tgz
+      remote_file: bongodb-bongo-master/${build_variant}/${revision}/ftdc/bongo-diagnostic-data-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
@@ -1007,7 +1007,7 @@ post:
             file_list=$(find ./build -type f -name "*.gcda")
             if [ -n "$file_list" ]; then
                 for gcda_file in $file_list; do
-                    /opt/mongodbtoolchain/v2/bin/gcov -i $gcda_file
+                    /opt/bongodbtoolchain/v2/bin/gcov -i $gcda_file
                 done
             fi
         fi
@@ -1022,34 +1022,34 @@ post:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: "src/gcov-intermediate-files.tgz"
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/gcov/gcov-intermediate-files-${task_id}-${execution}.tgz
+      remote_file: bongodb-bongo-master/${build_variant}/${revision}/gcov/gcov-intermediate-files-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
       display_name: gcov intermediate files - Execution ${execution}
       optional: true
 
-  # Gather and archive the Jepsen mongod logs.
+  # Gather and archive the Jepsen bongod logs.
   - command: shell.exec
     params:
       working_dir: src
       script: |
-        # For Jepsen tasks, archive the mongod log files.
+        # For Jepsen tasks, archive the bongod log files.
         if [ -d jepsen ]; then
-          # Copy mongod.log & stdout.log from each LXC host for archive purposes. Note that
-          # stdout.log is also generated as a result of starting mongod.
+          # Copy bongod.log & stdout.log from each LXC host for archive purposes. Note that
+          # stdout.log is also generated as a result of starting bongod.
           # The logs can reside in 1 of 2 places:
           #   If the task completed: /root
-          #   If the task failed to complete: /opt/mongodb
-          # There may be logs in both places, but the ones in /opt/mongodb should override
+          #   If the task failed to complete: /opt/bongodb
+          # There may be logs in both places, but the ones in /opt/bongodb should override
           # the ones in /root, since the logs in /root could be from a previous successful run.
           numVms=5
           for i in $(seq 1 $numVms)
           do
             hostn=n$i
-            for log_dir in /root /opt/mongodb
+            for log_dir in /root /opt/bongodb
             do
-              for log in mongod.log stdout.log
+              for log in bongod.log stdout.log
               do
                 outlog="$(echo $log | cut -f1 -d '.')-n$i.log"
                 scp -q root@$hostn:$log_dir/$log $outlog 2> /dev/null
@@ -1062,28 +1062,28 @@ post:
         fi
   - command: archive.targz_pack
     params:
-      target: "src/jepsen-mongod-logs.tgz"
+      target: "src/jepsen-bongod-logs.tgz"
       source_dir: "src"
       include:
-        - "mongod*.log"
+        - "bongod*.log"
         - "stdout*.log"
   - command: s3.put
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      local_file: src/jepsen-mongod-logs.tgz
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/jepsen/jepsen-mongod-logs-${task_id}-${execution}.tgz
+      local_file: src/jepsen-bongod-logs.tgz
+      remote_file: bongodb-bongo-master/${build_variant}/${revision}/jepsen/jepsen-bongod-logs-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
-      display_name: Jepsen mongod Logs - ${execution}
+      display_name: Jepsen bongod Logs - ${execution}
       optional: true
 
   # Gather and archive the Jepsen results.
   - command: archive.targz_pack
     params:
       target: "src/jepsen-results.tgz"
-      source_dir: "src/jepsen/mongodb/store"
+      source_dir: "src/jepsen/bongodb/store"
       include:
         - "./**"
   - command: s3.put
@@ -1091,17 +1091,17 @@ post:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/jepsen-results.tgz
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/jepsen/jepsen-results-${task_id}-${execution}.tgz
+      remote_file: bongodb-bongo-master/${build_variant}/${revision}/jepsen/jepsen-results-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
       display_name: Jepsen Test Results - ${execution}
       optional: true
 
-  # Gather and archive mongo coredumps.
+  # Gather and archive bongo coredumps.
   - command: archive.targz_pack
     params:
-      target: "mongo-coredumps.tgz"
+      target: "bongo-coredumps.tgz"
       source_dir: "./"
       include:
         - "./**.core"
@@ -1110,8 +1110,8 @@ post:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      local_file: mongo-coredumps.tgz
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/coredumps/mongo-coredumps-${build_id}-${task_name}-${execution}.tgz
+      local_file: bongo-coredumps.tgz
+      remote_file: bongodb-bongo-master/${build_variant}/${revision}/coredumps/bongo-coredumps-${build_id}-${task_name}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
@@ -1121,7 +1121,7 @@ post:
   # Gather and archive hang_analyzer debugger files.
   - command: archive.targz_pack
     params:
-      target: "src/mongo-hanganalyzer.tgz"
+      target: "src/bongo-hanganalyzer.tgz"
       source_dir: "src"
       include:
         - "./debugger*.log"
@@ -1129,8 +1129,8 @@ post:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      local_file: src/mongo-hanganalyzer.tgz
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/hanganalyzer/mongo-hanganalyzer-${build_id}-${task_name}-${execution}.tgz
+      local_file: src/bongo-hanganalyzer.tgz
+      remote_file: bongodb-bongo-master/${build_variant}/${revision}/hanganalyzer/bongo-hanganalyzer-${build_id}-${task_name}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
@@ -1143,14 +1143,14 @@ post:
       target: "diskstats.tgz"
       source_dir: "./"
       include:
-        - "./mongo-diskstats*"
-        - "./mongo-diskstats*.csv"
+        - "./bongo-diskstats*"
+        - "./bongo-diskstats*.csv"
   - command: s3.put
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: diskstats.tgz
-      remote_file: mongodb-mongo-master/${build_variant}/${revision}/diskstats/mongo-diskstats-${task_id}-${execution}.tgz
+      remote_file: bongodb-bongo-master/${build_variant}/${revision}/diskstats/bongo-diskstats-${task_id}-${execution}.tgz
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
@@ -1179,9 +1179,9 @@ timeout:
       working_dir: src
       script: |
         set -o verbose
-        hang_analyzer_option="-c -o file -o stdout -p ${hang_analyzer_processes|dbtest,java,mongo,mongod,mongos,python,_test} -g bsondump,mongodump,mongoexport,mongofiles,mongoimport,mongooplog,mongoreplay,mongorestore,mongostat,mongotop"
-        echo "Calling the hang analyzer: PATH=\"/opt/mongodbtoolchain/gdb/bin:$PATH\" python buildscripts/hang_analyzer.py $hang_analyzer_option"
-        PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" python buildscripts/hang_analyzer.py $hang_analyzer_option
+        hang_analyzer_option="-c -o file -o stdout -p ${hang_analyzer_processes|dbtest,java,bongo,bongod,bongos,python,_test} -g bsondump,bongodump,bongoexport,bongofiles,bongoimport,bongooplog,bongoreplay,bongorestore,bongostat,bongotop"
+        echo "Calling the hang analyzer: PATH=\"/opt/bongodbtoolchain/gdb/bin:$PATH\" python buildscripts/hang_analyzer.py $hang_analyzer_option"
+        PATH="/opt/bongodbtoolchain/gdb/bin:$PATH" python buildscripts/hang_analyzer.py $hang_analyzer_option
 
 #######################################
 #               Tasks                 #
@@ -1211,20 +1211,20 @@ tasks:
           set -o errexit
           set -o verbose
 
-          rm -rf ${install_directory|/data/mongo-install-directory}
+          rm -rf ${install_directory|/data/bongo-install-directory}
 
-          ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" core tools dbtest integration_tests dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|} MONGO_VERSION=${version}
+          ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-bongoreplay="${build_bongoreplay}" core tools dbtest integration_tests dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|} BONGO_VERSION=${version}
 
-          mv mongodb-src-*.${ext|tgz} distsrc.${ext|tgz}
-          mv mongodb-*-debugsymbols.${ext|tgz} mongo-debugsymbols.tgz || true
-          mv mongodb-*.${ext|tgz} mongodb-binaries.tgz
+          mv bongodb-src-*.${ext|tgz} distsrc.${ext|tgz}
+          mv bongodb-*-debugsymbols.${ext|tgz} bongo-debugsymbols.tgz || true
+          mv bongodb-*.${ext|tgz} bongodb-binaries.tgz
 
           # If strip is on the path (everywhere except windows) then we should strip the test binaries
           # before tarring them up
           if [ -x ${strip_path|/usr/bin/strip} ]; then
             cat build/integration_tests.txt | xargs ${strip_command|/usr/bin/strip}
             ${strip_command|/usr/bin/strip} dbtest
-            ${strip_command|/usr/bin/strip} mongobridge
+            ${strip_command|/usr/bin/strip} bongobridge
           fi
 
           # If this is a scheduled build, we check for changes against the last scheduled commit.
@@ -1244,7 +1244,7 @@ tasks:
 
           if [ "${has_packages|}" = "true" ] ; then
             cd buildscripts
-            ${python|python} ${packager_script} --prefix `pwd`/.. --distros ${packager_distro} --tarball `pwd`/../mongodb-binaries.tgz -s ${version} -m HEAD -a ${packager_arch}
+            ${python|python} ${packager_script} --prefix `pwd`/.. --distros ${packager_distro} --tarball `pwd`/../bongodb-binaries.tgz -s ${version} -m HEAD -a ${packager_arch}
             cd ..
           fi
     - command: archive.targz_pack
@@ -1252,15 +1252,15 @@ tasks:
         target: "artifacts.tgz"
         source_dir: "src"
         include:
-          - "src/mongo/db/modules/enterprise/jstests/**"
+          - "src/bongo/db/modules/enterprise/jstests/**"
           - "compile_expansions.yml"
-          - "src/mongo/db/modules/subscription/jstests/**"
-          - "src/mongo/db/modules/enterprise/docs/**"
+          - "src/bongo/db/modules/subscription/jstests/**"
+          - "src/bongo/db/modules/enterprise/docs/**"
           - "*.exe"
           - "jstests/**"
           - "./test*"
           - "./dbtest*"
-          - "./mongobridge*"
+          - "./bongobridge*"
           - "buildscripts/**"
           - "*Example"
           - "*Test"
@@ -1272,7 +1272,7 @@ tasks:
           - "./build/integration_tests.txt"
           - "./build/**.gcno"
           - "repo/**"
-          - "src/mongo/util/options_parser/test_config_files/**"
+          - "src/bongo/util/options_parser/test_config_files/**"
         exclude_files:
           - "*_test.pdb"
     - func: "upload debugsymbols"
@@ -1280,8 +1280,8 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-binaries.tgz
-        remote_file: mongodb-mongo-master/${build_variant}/${revision}/binaries/mongo-${build_id}.${ext|tgz}
+        local_file: src/bongodb-binaries.tgz
+        remote_file: bongodb-bongo-master/${build_variant}/${revision}/binaries/bongo-${build_id}.${ext|tgz}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -1291,7 +1291,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: artifacts.tgz
-        remote_file: mongodb-mongo-master/${build_variant}/${revision}/artifacts/${build_id}.tgz
+        remote_file: bongodb-bongo-master/${build_variant}/${revision}/artifacts/${build_id}.tgz
         bucket: mciuploads
         permissions: public-read
         content_type: application/tar
@@ -1301,7 +1301,7 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/distsrc.${ext|tgz}
-        remote_file: mongodb-mongo-master/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
+        remote_file: bongodb-bongo-master/${build_variant}/${revision}/sources/bongo-src-${build_id}.${ext|tgz}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -1332,9 +1332,9 @@ tasks:
           set -o errexit
           set -o verbose
 
-          rm -rf ${install_directory|/data/mongo-install-directory}
+          rm -rf ${install_directory|/data/bongo-install-directory}
 
-          ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" all ${additional_targets|} MONGO_VERSION=${version}
+          ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-bongoreplay="${build_bongoreplay}" all ${additional_targets|} BONGO_VERSION=${version}
 
     # Run the C++ unittests as part of compile_all. The compiled binaries are automatically
     # installed into the top-level directory by SCons.
@@ -1810,7 +1810,7 @@ tasks:
           . ./venv/bin/activate
         fi
         # we should go back to using pip when it works on SLES
-        easy_install --upgrade `cat src/mongo/db/modules/enterprise/jstests/encryptdb/libs/requirements.txt`
+        easy_install --upgrade `cat src/bongo/db/modules/enterprise/jstests/encryptdb/libs/requirements.txt`
   - func: "run tests"
     vars:
       resmoke_args: --suites=ese --storageEngine=wiredTiger
@@ -2244,12 +2244,12 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: mongosTest
+  name: bongosTest
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=mongos_test
+      resmoke_args: --suites=bongos_test
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -2324,21 +2324,21 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: noPassthroughWithMongod
+  name: noPassthroughWithBongod
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=no_passthrough_with_mongod --storageEngine=mmapv1
+      resmoke_args: --suites=no_passthrough_with_bongod --storageEngine=mmapv1
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: noPassthroughWithMongod_WT
+  name: noPassthroughWithBongod_WT
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=no_passthrough_with_mongod --storageEngine=wiredTiger
+      resmoke_args: --suites=no_passthrough_with_bongod --storageEngine=wiredTiger
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -2782,14 +2782,14 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: sharding_last_stable_mongos_and_mixed_shards
+  name: sharding_last_stable_bongos_and_mixed_shards
   commands:
   - func: "do setup"
   - func: "do multiversion setup"
   - func: "run tests"
     vars:
       task_path_suffix: /data/multiversion
-      resmoke_args: --suites=sharding_last_stable_mongos_and_mixed_shards
+      resmoke_args: --suites=sharding_last_stable_bongos_and_mixed_shards
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -2924,7 +2924,7 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: mongodb-mongo-master/${build_variant}/${revision}/sources/mongo-src-${build_id}.${ext|tgz}
+        remote_file: bongodb-bongo-master/${build_variant}/${revision}/sources/bongo-src-${build_id}.${ext|tgz}
         bucket: mciuploads
         local_file: src/distsrc.${ext|tgz}
         build_variants: [ linux-64, windows-64-2k8 ]
@@ -2965,20 +2965,20 @@ tasks:
           set -o errexit
           set -o verbose
 
-          mv mongo-binaries.tgz mongodb-binaries.${ext|tgz}
-          mv mongo-debugsymbols.tgz debugsymbols-*.${ext|tgz} || true
-          cp mongodb-*.${ext|tgz} mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
-          cp debugsymbols-*.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} || true
-          mv distsrc.${ext|tgz} mongodb-src-${src_suffix}.${ext|tar.gz} || true
-          /usr/bin/find build/ -type f | grep msi$ | xargs -I original_filename cp original_filename mongodb-win32-${push_arch}-${suffix}.msi || true
+          mv bongo-binaries.tgz bongodb-binaries.${ext|tgz}
+          mv bongo-debugsymbols.tgz debugsymbols-*.${ext|tgz} || true
+          cp bongodb-*.${ext|tgz} bongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+          cp debugsymbols-*.${ext|tgz} bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} || true
+          mv distsrc.${ext|tgz} bongodb-src-${src_suffix}.${ext|tar.gz} || true
+          /usr/bin/find build/ -type f | grep msi$ | xargs -I original_filename cp original_filename bongodb-win32-${push_arch}-${suffix}.msi || true
 
           # Extract shell and banner files out of scons-made archive for separate shell archive
-          ${platform_decompress|tar --wildcards -zxvf} mongodb-binaries.${ext|tgz} mongodb-*/bin/mongo${exe} mongodb-*/\[A-Z\]*
+          ${platform_decompress|tar --wildcards -zxvf} bongodb-binaries.${ext|tgz} bongodb-*/bin/bongo${exe} bongodb-*/\[A-Z\]*
 
           # Create new shell archive (make_archive.py uses filename to determine what format archive to create)
-          ${python|python} buildscripts/make_archive.py -o mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz} $(ls -d mongodb-*/bin/mongo${exe} mongodb-*/[A-Z]*)
+          ${python|python} buildscripts/make_archive.py -o bongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz} $(ls -d bongodb-*/bin/bongo${exe} bongodb-*/[A-Z]*)
 
-          /usr/local/bin/notary-client.py --key-name "server-3.4" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --skip-missing mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz} mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} mongodb-win32-${push_arch}-${suffix}.msi mongodb-src-${src_suffix}.${ext|tar.gz}
+          /usr/local/bin/notary-client.py --key-name "server-3.4" --auth-token-file ${workdir}/src/signing_auth_token --comment "Evergreen Automatic Signing ${revision} - ${build_variant} - ${branch_name}" --notary-url http://notary-service.build.10gen.cc:5000 --skip-missing bongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz} bongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz} bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz} bongodb-win32-${push_arch}-${suffix}.msi bongodb-src-${src_suffix}.${ext|tar.gz}
 
           if [ "${has_packages|}" = "true" ]; then
              CURATOR_RELEASE="88f34a9f1c79db7ea9597b6e85eb5995d03714ba"
@@ -2991,32 +2991,32 @@ tasks:
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+        local_file: src/bongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
         aws_key: ${aws_key}
         bucket: build-push-testing
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}
     # Put the shell tarball/zipfile
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+        local_file: src/bongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}
         aws_key: ${aws_key}
         bucket: build-push-testing
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}
     # Put the source tarball
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-src-${src_suffix}.${ext|tar.gz}
+        local_file: src/bongodb-src-${src_suffix}.${ext|tar.gz}
         aws_key: ${aws_key}
         bucket: build-push-testing
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}
         build_variants: [ linux-64, windows-64-2k8 ]
 
     # Put the debug symbols
@@ -3026,43 +3026,43 @@ tasks:
         aws_key: ${aws_key}
         build_variants: *debug_symbol_variants
         permissions: public-read
-        local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}
+        local_file: src/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}
         bucket: build-push-testing
         content_type: ${content_type|application/x-gzip}
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}
 
     # Put the binaries tarball signature
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+        local_file: src/bongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
         aws_key: ${aws_key}
         bucket: build-push-testing
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig
     # Put the shell tarball signature
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+        local_file: src/bongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
         aws_key: ${aws_key}
         bucket: build-push-testing
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig
 
 
     # Put the source tarball signature
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-src-${src_suffix}.${ext|tar.gz}.sig
+        local_file: src/bongodb-src-${src_suffix}.${ext|tar.gz}.sig
         aws_key: ${aws_key}
         bucket: build-push-testing
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sig
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sig
         build_variants: [ linux-64, windows-64-2k8 ]
 
     # Put the debug symbols signature
@@ -3072,10 +3072,10 @@ tasks:
         aws_key: ${aws_key}
         build_variants: *debug_symbol_variants
         permissions: public-read
-        local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sig
+        local_file: src/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sig
         bucket: build-push-testing
         content_type: ${content_type|application/x-gzip}
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.sig
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.sig
 
     # Put the signed MSI file
     - command: s3.put
@@ -3084,42 +3084,42 @@ tasks:
         aws_secret: ${aws_secret}
         permissions: public-read
         build_variants: ["enterprise-windows-64", "windows-64", "windows-64-2k8", "windows-64-2k8-ssl"]
-        local_file: src/mongodb-win32-${push_arch}-${suffix}-signed.msi
+        local_file: src/bongodb-win32-${push_arch}-${suffix}-signed.msi
         bucket: build-push-testing
         content_type: application/x-msi
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi
 
     # Put the binaries tarball sha1
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+        local_file: src/bongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
         aws_key: ${aws_key}
         permissions: public-read
         bucket: build-push-testing
         content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1
     # Put the shell tarball sha1
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+        local_file: src/bongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
         aws_key: ${aws_key}
         permissions: public-read
         bucket: build-push-testing
         content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1
 
     # Put the source tarball sha1
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha1
+        local_file: src/bongodb-src-${src_suffix}.${ext|tar.gz}.sha1
         aws_key: ${aws_key}
         permissions: public-read
         bucket: build-push-testing
         content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha1
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha1
         build_variants: [ linux-64, windows-64-2k8 ]
 
     # Put the debug symbols sha1
@@ -3129,10 +3129,10 @@ tasks:
         aws_key: ${aws_key}
         build_variants: *debug_symbol_variants
         permissions: public-read
-        local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha1
+        local_file: src/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha1
         bucket: build-push-testing
         content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.sha1
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.sha1
 
     # Push the signed MSI sha1
     - command: s3.put
@@ -3141,42 +3141,42 @@ tasks:
         aws_secret: ${aws_secret}
         permissions: public-read
         build_variants: ["enterprise-windows-64", "windows-64", "windows-64-2k8", "windows-64-2k8-ssl"]
-        local_file: src/mongodb-win32-${push_arch}-${suffix}-signed.msi.sha1
+        local_file: src/bongodb-win32-${push_arch}-${suffix}-signed.msi.sha1
         bucket: build-push-testing
         content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha1
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha1
 
     # Put the binaries tarball sha256
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+        local_file: src/bongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
         permissions: public-read
         aws_key: ${aws_key}
         bucket: build-push-testing
         content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256
     # Put the shell tarball sha256
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+        local_file: src/bongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
         permissions: public-read
         aws_key: ${aws_key}
         bucket: build-push-testing
         content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256
 
     # Put the source tarball sha256
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha256
+        local_file: src/bongodb-src-${src_suffix}.${ext|tar.gz}.sha256
         permissions: public-read
         aws_key: ${aws_key}
         bucket: build-push-testing
         content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha256
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha256
         build_variants: [ linux-64, windows-64-2k8 ]
 
     # Put the debug symbols sha256
@@ -3184,12 +3184,12 @@ tasks:
       params:
         aws_secret: ${aws_secret}
         build_variants: *debug_symbol_variants
-        local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha256
+        local_file: src/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha256
         aws_key: ${aws_key}
         bucket: build-push-testing
         permissions: public-read
         content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.sha256
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.sha256
 
     # Put the signed MSI sha256
     - command: s3.put
@@ -3197,43 +3197,43 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         build_variants: ["enterprise-windows-64", "windows-64", "windows-64-2k8", "windows-64-2k8-ssl"]
-        local_file: src/mongodb-win32-${push_arch}-${suffix}-signed.msi.sha256
+        local_file: src/bongodb-win32-${push_arch}-${suffix}-signed.msi.sha256
         bucket: build-push-testing
         permissions: public-read
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha256
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha256
         content_type: text/plain
 
     # Put the binaries tarball md5
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+        local_file: src/bongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
         aws_key: ${aws_key}
         bucket: build-push-testing
         permissions: public-read
         content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5
     # Put the shell tarball md5
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+        local_file: src/bongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
         aws_key: ${aws_key}
         bucket: build-push-testing
         permissions: public-read
         content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5
 
     # Put the source tarball md5
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
-        local_file: src/mongodb-src-${src_suffix}.${ext|tar.gz}.md5
+        local_file: src/bongodb-src-${src_suffix}.${ext|tar.gz}.md5
         aws_key: ${aws_key}
         bucket: build-push-testing
         permissions: public-read
         content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.md5
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.md5
         build_variants: [ linux-64, windows-64-2k8 ]
 
     # Put the debug symbols md5
@@ -3242,11 +3242,11 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         build_variants: *debug_symbol_variants
-        local_file: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5
+        local_file: src/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5
         bucket: build-push-testing
         content_type: text/plain
         permissions: public-read
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.md5
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.md5
 
     # Put the signed MSI md5
     - command: s3.put
@@ -3254,11 +3254,11 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         build_variants: ["enterprise-windows-64", "windows-64", "windows-64-2k8", "windows-64-2k8-ssl"]
-        local_file: src/mongodb-win32-${push_arch}-${suffix}-signed.msi.md5
+        local_file: src/bongodb-win32-${push_arch}-${suffix}-signed.msi.md5
         bucket: build-push-testing
         permissions: public-read
         content_type: text/plain
-        remote_file: ${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.md5
+        remote_file: ${push_path}-STAGE/${push_name}/bongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.md5
 
     - command: s3Copy.copy
       params:
@@ -3266,123 +3266,123 @@ tasks:
         aws_secret: ${aws_secret}
         s3_copy_files:
             #Binaries
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'}}
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/bongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'}}
 
             #Shell
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'}}
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/bongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'}}
 
             #Source tarball
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}', 'bucket': 'build-push-testing'},
-               'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}', 'bucket': '${push_bucket}'},
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}', 'bucket': 'build-push-testing'},
+               'destination': {'path': 'src/bongodb-src-${src_suffix}.${ext|tar.gz}', 'bucket': '${push_bucket}'},
                'build_variants': [ 'linux-64', 'windows-64-2k8' ]
             }
 
             #Debug Symbols
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'},
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}', 'bucket': '${push_bucket}'},
                'build_variants': *debug_symbol_variants
               }
 
             #MSI (Windows only)
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi', 'bucket': '${push_bucket}'},
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/bongodb-win32-${push_arch}-${suffix}-signed.msi', 'bucket': '${push_bucket}'},
                'build_variants': [ 'enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl' ] }
 
             #Binaries Signature
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig', 'bucket': '${push_bucket}'}}
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/bongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig', 'bucket': '${push_bucket}'}}
 
             #Shell Signature
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig', 'bucket': '${push_bucket}'}}
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sig', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/bongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig', 'bucket': '${push_bucket}'}}
 
             #Debug Symbols Signature
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.sig', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sig', 'bucket': '${push_bucket}'},
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.sig', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sig', 'bucket': '${push_bucket}'},
                'build_variants': *debug_symbol_variants
               }
 
             #Source tarball signature
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sig', 'bucket': 'build-push-testing'},
-               'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sig', 'bucket': '${push_bucket}'},
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sig', 'bucket': 'build-push-testing'},
+               'destination': {'path': 'src/bongodb-src-${src_suffix}.${ext|tar.gz}.sig', 'bucket': '${push_bucket}'},
                'build_variants': [ 'linux-64', 'windows-64-2k8' ]
             }
 
             #SHA1 for binaries
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1', 'bucket': '${push_bucket}'}}
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/bongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1', 'bucket': '${push_bucket}'}}
 
             #SHA1 for shell
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1', 'bucket': '${push_bucket}'}}
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/bongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1', 'bucket': '${push_bucket}'}}
 
             #SHA1 for source tarball
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha1', 'bucket': 'build-push-testing'},
-               'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha1', 'bucket': '${push_bucket}'},
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha1', 'bucket': 'build-push-testing'},
+               'destination': {'path': 'src/bongodb-src-${src_suffix}.${ext|tar.gz}.sha1', 'bucket': '${push_bucket}'},
                'build_variants': [ 'linux-64', 'windows-64-2k8' ]
             }
 
             #SHA1 for debug symbols
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha1', 'bucket': '${push_bucket}'},
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.sha1', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha1', 'bucket': '${push_bucket}'},
                'build_variants': *debug_symbol_variants
               }
 
             #SHA1 for MSI
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha1', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi.sha1', 'bucket': '${push_bucket}'},
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha1', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/bongodb-win32-${push_arch}-${suffix}-signed.msi.sha1', 'bucket': '${push_bucket}'},
                'build_variants': ['enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl'] }
 
             #SHA256 for binaries
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256', 'bucket': '${push_bucket}'}}
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/bongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256', 'bucket': '${push_bucket}'}}
 
             #SHA256 for shell
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256', 'bucket': '${push_bucket}'}}
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.sha256', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/bongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256', 'bucket': '${push_bucket}'}}
 
             #SHA256 for source tarball
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha256', 'bucket': 'build-push-testing'},
-               'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha256', 'bucket': '${push_bucket}'},
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.sha256', 'bucket': 'build-push-testing'},
+               'destination': {'path': 'src/bongodb-src-${src_suffix}.${ext|tar.gz}.sha256', 'bucket': '${push_bucket}'},
                'build_variants': [ 'linux-64', 'windows-64-2k8' ]
             }
 
             #SHA256 for debugsymbols
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.sha256', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha256', 'bucket': '${push_bucket}'},
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.sha256', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha256', 'bucket': '${push_bucket}'},
                'build_variants': *debug_symbol_variants}
 
             #SHA256 for MSI files
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha256', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi.sha256', 'bucket': '${push_bucket}'},
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.sha256', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/bongodb-win32-${push_arch}-${suffix}-signed.msi.sha256', 'bucket': '${push_bucket}'},
                'build_variants': ['enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl'], }
 
 
             #MD5 for binaries
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/bongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
 
             #MD5 for shell
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-shell-${push_name}-${push_arch}-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/bongodb-shell-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'}}
 
             #MD5 for source tarball
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.md5', 'bucket': 'build-push-testing'},
-               'destination': {'path': 'src/mongodb-src-${src_suffix}.${ext|tar.gz}.md5', 'bucket': '${push_bucket}'},
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-src-${src_suffix}-${task_id}.${ext|tar.gz}.md5', 'bucket': 'build-push-testing'},
+               'destination': {'path': 'src/bongodb-src-${src_suffix}.${ext|tar.gz}.md5', 'bucket': '${push_bucket}'},
                'build_variants': [ 'linux-64', 'windows-64-2k8' ]
             }
 
             #MD5 for debugsymbols
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'},
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}-${task_id}.${ext|tgz}.md5', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/bongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5', 'bucket': '${push_bucket}'},
                'build_variants': *debug_symbol_variants
                 }
 
             #MD5 for MSIs
-            - {'source': {'path': '${push_path}-STAGE/${push_name}/mongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.md5', 'bucket': 'build-push-testing'},
-               'destination': {'path': '${push_path}/mongodb-win32-${push_arch}-${suffix}-signed.msi.md5', 'bucket': '${push_bucket}'},
+            - {'source': {'path': '${push_path}-STAGE/${push_name}/bongodb-win32-${push_arch}-${suffix}-${task_id}-signed.msi.md5', 'bucket': 'build-push-testing'},
+               'destination': {'path': '${push_path}/bongodb-win32-${push_arch}-${suffix}-signed.msi.md5', 'bucket': '${push_bucket}'},
                'build_variants': ['enterprise-windows-64', 'windows-64', 'windows-64-2k8', 'windows-64-2k8-ssl'], }
 
 
@@ -3393,13 +3393,13 @@ tasks:
 # be sure to add the module to git.get_project revisions parameter
 modules:
 - name: enterprise
-  repo: git@github.com:10gen/mongo-enterprise-modules.git
-  prefix: src/mongo/db/modules
+  repo: git@github.com:10gen/bongo-enterprise-modules.git
+  prefix: src/bongo/db/modules
   branch: master
 
 - name: rocksdb
-  repo: git@github.com:mongodb-partners/mongo-rocks.git
-  prefix: src/mongo/db/modules
+  repo: git@github.com:bongodb-partners/bongo-rocks.git
+  prefix: src/bongo/db/modules
   branch: master
 
 #######################################
@@ -3419,13 +3419,13 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     push_path: linux
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: linux
     push_arch: x86_64
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --release
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/bongodbtoolchain_gcc.vars --release
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -3485,15 +3485,15 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: multiversion
   - name: multiversion_auth
   - name: multiversion_WT
   - name: multiversion_multistorage_engine
   - name: noPassthrough
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -3537,7 +3537,7 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_bongos_and_mixed_shards
   - name: tool
   - name: tool_WT
   - name: push
@@ -3549,11 +3549,11 @@ buildvariants:
   - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --repeat=10 --shuffle
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -3582,13 +3582,13 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     push_path: linux
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: linux-debug
     push_arch: x86_64
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -3618,11 +3618,11 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: noPassthrough
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -3691,14 +3691,14 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     push_path: linux
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: linux-duroff
     push_arch: x86_64
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --nojournal --excludeWithAnyTags=requires_journaling
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -3733,9 +3733,9 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthroughWithBongod
   - name: bulk_gle_passthrough
   - name: parallel
   - name: parallel_compatibility
@@ -3764,11 +3764,11 @@ buildvariants:
   - rhel62-small
   batchtime: 1440 # 1 day
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -3794,7 +3794,7 @@ buildvariants:
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough_WT
   - name: parallel_WT
   - name: parallel_compatibility_WT
@@ -3822,10 +3822,10 @@ buildvariants:
   expansions:
     tooltags: "-tags ssl"
     push_path: linux
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: linux
     push_arch: x86_64-ubuntu1204
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1204 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=ubuntu1204 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     multiversion_platform_arch: "ubuntu1204"
     multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -3835,7 +3835,7 @@ buildvariants:
     packager_distro: ubuntu1204
     repo_edition: org
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -3887,14 +3887,14 @@ buildvariants:
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
-  - name: mongosTest
+  - name: bongosTest
   - name: mmap
   - name: multiversion
   - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -3922,7 +3922,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_bongos_and_mixed_shards
   - name: slow1
   - name: slow1_WT
   - name: serial_run
@@ -3946,10 +3946,10 @@ buildvariants:
   expansions:
     tooltags: "-tags ssl"
     push_path: linux
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: linux
     push_arch: x86_64-ubuntu1404
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     multiversion_platform_arch: "ubuntu1404"
     multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -3959,7 +3959,7 @@ buildvariants:
     packager_distro: ubuntu1404
     repo_edition: org
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -4021,13 +4021,13 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: multiversion
   - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -4055,7 +4055,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_bongos_and_mixed_shards
   - name: slow1
   - name: slow1_WT
   - name: serial_run
@@ -4079,10 +4079,10 @@ buildvariants:
   expansions:
     tooltags: "-tags ssl"
     push_path: linux
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: linux
     push_arch: x86_64-ubuntu1604
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     multiversion_platform_arch: "ubuntu1604"
     multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -4092,7 +4092,7 @@ buildvariants:
     packager_distro: ubuntu1604
     repo_edition: org
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -4145,13 +4145,13 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: multiversion
   - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -4179,7 +4179,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_bongos_and_mixed_shards
   - name: slow1
   - name: slow1_WT
   - name: serial_run
@@ -4204,13 +4204,13 @@ buildvariants:
   - ubuntu1604-arm64-large
   batchtime: 1440 # 1 day
   expansions:
-    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    gorootvars: PATH=/opt/bongodbtoolchain/v2/bin:$PATH
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libcrypto libsasl2)" -tags 'sasl ssl'
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: arm64-enterprise-ubuntu1604
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=armv8-a+crc -mtune=generic" --release --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
@@ -4218,7 +4218,7 @@ buildvariants:
     packager_arch: arm64
     packager_distro: ubuntu1604
     repo_edition: enterprise
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -4247,9 +4247,9 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
-  - name: mongosTest
+  - name: bongosTest
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough_WT
   - name: parallel_WT
   - name: parallel_compatibility_WT
@@ -4293,13 +4293,13 @@ buildvariants:
   - ubuntu1604-arm64-large
   batchtime: 1440 # 1 day
   expansions:
-    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    gorootvars: PATH=/opt/bongodbtoolchain/v2/bin:$PATH
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libcrypto)" -tags 'ssl'
     push_path: linux
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: linux
     push_arch: arm64-ubuntu1604
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release CCFLAGS="-march=armv8-a+crc -mtune=generic" --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
@@ -4307,7 +4307,7 @@ buildvariants:
     packager_arch: arm64
     packager_distro: ubuntu1604
     repo_edition: org
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -4336,9 +4336,9 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
-  - name: mongosTest
+  - name: bongosTest
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough_WT
   - name: parallel_WT
   - name: parallel_compatibility_WT
@@ -4384,13 +4384,13 @@ buildvariants:
   - ubuntu1604-power8-test
   batchtime: 1440 # 1 day
   expansions:
-    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    gorootvars: PATH=/opt/bongodbtoolchain/v2/bin:$PATH
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2 libcrypto)" -tags 'sasl ssl'
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: ppc64le-enterprise-ubuntu1604
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) --release CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=ubuntu1604 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) --release CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     num_jobs_available: 2
     test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
@@ -4398,7 +4398,7 @@ buildvariants:
     packager_arch: ppc64le
     packager_distro: ubuntu1604
     repo_edition: enterprise
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -4428,9 +4428,9 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
-  - name: mongosTest
+  - name: bongosTest
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough_WT
   - name: parallel_WT
   - name: parallel_compatibility_WT
@@ -4465,13 +4465,13 @@ buildvariants:
   - ubuntu1604-zseries-small
   batchtime: 1440 # 1 day
   expansions:
-    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    gorootvars: PATH=/opt/bongodbtoolchain/v2/bin:$PATH
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libcrypto libsasl2)" -tags 'sasl ssl'
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: s390x-enterprise-ubuntu1604
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_gcc.vars --use-s390x-crc32=off
+    compile_flags: --ssl BONGO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/bongodbtoolchain_gcc.vars --use-s390x-crc32=off
     num_jobs_available: 2
     test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
@@ -4479,7 +4479,7 @@ buildvariants:
     packager_arch: s390x
     packager_distro: ubuntu1604
     repo_edition: enterprise
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -4517,8 +4517,8 @@ buildvariants:
   - name: jsCore_compression
   - name: jsCore_decimal_WT
   - name: jsCore_op_query_WT
-  - name: mongosTest
-  - name: noPassthroughWithMongod_WT
+  - name: bongosTest
+  - name: noPassthroughWithBongod_WT
   - name: noPassthrough_WT
   - name: parallel_WT
   - name: parallel_compatibility_WT
@@ -4568,7 +4568,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-amzn64
-    compile_flags: --ssl MONGO_DISTMOD=amzn64 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=amzn64 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
@@ -4576,7 +4576,7 @@ buildvariants:
     packager_distro: amazon
     repo_edition: enterprise
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -4617,8 +4617,8 @@ buildvariants:
   - name: mmap
   - name: noPassthrough
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: replica_sets_auth
@@ -4655,10 +4655,10 @@ buildvariants:
   expansions:
     tooltags: "-tags 'ssl'"
     push_path: linux
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: linux
     push_arch: x86_64-amazon
-    compile_flags: --ssl MONGO_DISTMOD=amazon -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=amazon -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     multiversion_platform_arch: "amzn64"
     multiversion_edition: "enterprise"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -4668,7 +4668,7 @@ buildvariants:
     packager_distro: amazon
     repo_edition: org
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -4721,13 +4721,13 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: multiversion
   - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -4755,7 +4755,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_bongos_and_mixed_shards
   - name: slow1
   - name: slow1_WT
   - name: serial_run
@@ -4787,7 +4787,7 @@ buildvariants:
     platform_decompress: unzip
     exe: ".exe"
     push_path: win32
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: win32
     push_arch: x86_64
     msi_target: msi
@@ -4844,11 +4844,11 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: noPassthrough
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -4897,13 +4897,13 @@ buildvariants:
     platform_decompress: unzip
     exe: ".exe"
     push_path: win32
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: win32
     push_arch: x86_64-2008plus
     multiversion_platform_arch: "windows/x86_64-2008plus"
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=2008plus
+    compile_flags: --release --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) BONGO_DISTMOD=2008plus
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
@@ -4958,15 +4958,15 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: multiversion
   - name: multiversion_auth
   - name: multiversion_WT
   - name: multiversion_multistorage_engine
   - name: noPassthrough
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -5005,7 +5005,7 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_bongos_and_mixed_shards
   - name: tool
   - name: tool_WT
   - name: push
@@ -5020,12 +5020,12 @@ buildvariants:
     platform_decompress: unzip
     exe: ".exe"
     push_path: win32
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: win32-debug
     push_arch: x86_64-2008plus
     content_type: application/zip
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) MONGO_DISTMOD=2008plus
+    compile_flags: --dbg=on --opt=on --win-version-min=ws08r2 -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) BONGO_DISTMOD=2008plus
     ext: zip
     use_scons_cache: true
   tasks:
@@ -5062,11 +5062,11 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: noPassthrough
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -5175,7 +5175,7 @@ buildvariants:
     push_arch: x86_64-enterprise-windows-64
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --release --ssl BONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
@@ -5245,7 +5245,7 @@ buildvariants:
     push_arch: x86_64-enterprise-windows-64
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --release --ssl BONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
     ext: zip
@@ -5300,12 +5300,12 @@ buildvariants:
     gorootvars: 'PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"'
     tooltags: "-tags ssl"
     push_path: win32
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: win32
     push_arch: x86_64-2008plus-ssl
     msi_target: msi
     content_type: application/zip
-    compile_flags: --release --ssl MONGO_DISTMOD=2008plus-ssl CPPPATH="c:/openssl/include" LIBPATH="c:/openssl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --release --ssl BONGO_DISTMOD=2008plus-ssl CPPPATH="c:/openssl/include" LIBPATH="c:/openssl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
@@ -5345,11 +5345,11 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: noPassthrough
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -5404,12 +5404,12 @@ buildvariants:
     exe: ".exe"
     gorootvars: 'PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"'
     content_type: application/zip
-    compile_flags: --dbg=on --opt=off --ssl MONGO_DISTMOD=2008plus CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    compile_flags: --dbg=on --opt=off --ssl BONGO_DISTMOD=2008plus CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
   tasks:
-  # This variant tests that unoptimized, DEBUG mongos and mongod binaries can run on Windows.
+  # This variant tests that unoptimized, DEBUG bongos and bongod binaries can run on Windows.
   # It has a minimal amount of tasks because unoptimized builds are slow, which causes
   # timing-sensitive tests to fail.
   - name: compile
@@ -5429,12 +5429,12 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     push_path: osx
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: osx
     push_arch: x86_64
     compile_flags: --allocator=system -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
     num_jobs_available: 1
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
   - name: compile_all
@@ -5481,11 +5481,11 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: noPassthrough
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -5531,13 +5531,13 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     push_path: osx
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: osx-ssl
     push_arch: x86_64
     tooltags: "-tags ssl"
     compile_flags: --ssl --allocator=system -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
     num_jobs_available: 1
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
   - name: compile_all
@@ -5584,11 +5584,11 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: noPassthrough
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -5633,12 +5633,12 @@ buildvariants:
   - osx-1010
   expansions:
     push_path: osx
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: osx-debug
     push_arch: x86_64
     num_jobs_available: 1
     compile_flags: --dbg=on --opt=on --allocator=system -j$(sysctl -n hw.logicalcpu) --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
   - name: compile_all
@@ -5659,7 +5659,7 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_decimal_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: replica_sets
   - name: replica_sets_WT
   - name: master_slave
@@ -5682,7 +5682,7 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     compile_flags: --ssl --allocator=system -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
     num_jobs_available: 1
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
   - name: compile_all
@@ -5735,8 +5735,8 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel62
-    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    rlp_environment: BONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
+    compile_flags: --ssl BONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/bongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
     multiversion_platform_arch: "rhel62"
     multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -5746,7 +5746,7 @@ buildvariants:
     packager_distro: rhel62
     repo_edition: enterprise
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     requires:
@@ -5829,14 +5829,14 @@ buildvariants:
   - name: jstestfuzz_replication_initsync
   - name: jstestfuzz_replication_initsync_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: multiversion
   - name: multiversion_auth
   - name: multiversion_WT
   - name: multiversion_multistorage_engine
   - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: noPassthrough_WT
   - name: parallel
   - name: parallel_WT
@@ -5935,7 +5935,7 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_bongos_and_mixed_shards
     distros:
     - rhel62-large
   - name: sharding_op_query_WT
@@ -5970,8 +5970,8 @@ buildvariants:
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
-    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
-    compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    rlp_environment: BONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
+    compile_flags: --dbg=on --gcov --ssl BONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/bongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
     multiversion_platform_arch: "rhel62"
     multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -5983,7 +5983,7 @@ buildvariants:
     # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
     timeout_secs: 10800 # 3 hour timeout
     use_scons_cache: false
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -6062,14 +6062,14 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsCore_op_query_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: multiversion
   - name: multiversion_auth
   - name: multiversion_WT
   - name: multiversion_multistorage_engine
   - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: noPassthrough_WT
   - name: parallel
   - name: parallel_WT
@@ -6168,7 +6168,7 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_bongos_and_mixed_shards
     distros:
     - rhel62-large
   - name: sharding_op_query_WT
@@ -6200,7 +6200,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel70
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
@@ -6208,7 +6208,7 @@ buildvariants:
     packager_distro: rhel70
     repo_edition: enterprise
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -6259,10 +6259,10 @@ buildvariants:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags ssl"
     push_path: linux
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: linux
     push_arch: x86_64-rhel62
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     multiversion_platform_arch: "rhel62"
     multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -6272,7 +6272,7 @@ buildvariants:
     packager_distro: rhel62
     repo_edition: org
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -6325,13 +6325,13 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: multiversion
   - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -6365,7 +6365,7 @@ buildvariants:
   - name: serial_run_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_bongos_and_mixed_shards
   - name: ssl
   - name: sslSpecial
   - name: tool
@@ -6384,10 +6384,10 @@ buildvariants:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags ssl"
     push_path: linux
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: linux
     push_arch: x86_64-rhel70
-    compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     multiversion_platform_arch: "rhel70"
     multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -6397,7 +6397,7 @@ buildvariants:
     packager_distro: rhel70
     repo_edition: org
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -6450,13 +6450,13 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: multiversion
   - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -6506,7 +6506,7 @@ buildvariants:
   - name: serial_run_WT
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_bongos_and_mixed_shards
   - name: ssl
   - name: sslSpecial
   - name: tool
@@ -6526,10 +6526,10 @@ buildvariants:
   batchtime: 1440 # 1 day
   stepback: false
   expansions:
-    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    gorootvars: PATH=/opt/bongodbtoolchain/v2/bin:$PATH
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)" -tags 'sasl ssl'
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
-    compile_flags: --ssl MONGO_DISTMOD=rhel71 --release -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=rhel71 --release -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     num_jobs_available: $(echo "$(grep -c processor /proc/cpuinfo)/4" | bc)
     test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
@@ -6541,7 +6541,7 @@ buildvariants:
     push_name: linux
     push_arch: ppc64le-enterprise-rhel71
     repo_edition: enterprise
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -6601,10 +6601,10 @@ buildvariants:
   # - name: jsCore_op_query
   - name: jsCore_op_query_WT
   # - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   # - name: noPassthrough
-  # - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  # - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: noPassthrough_WT
   # - name: parallel
   - name: parallel_WT
@@ -6666,9 +6666,9 @@ buildvariants:
   batchtime: 2880 # 2 days
   stepback: false
   expansions:
-    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    gorootvars: PATH=/opt/bongodbtoolchain/v2/bin:$PATH
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)" -tags 'sasl ssl'
-    compile_flags: --ssl MONGO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_gcc.vars --use-s390x-crc32=off
+    compile_flags: --ssl BONGO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/bongodbtoolchain_gcc.vars --use-s390x-crc32=off
     num_jobs_available: 2
     test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
@@ -6680,7 +6680,7 @@ buildvariants:
     push_name: linux
     push_arch: s390x-enterprise-rhel72
     repo_edition: enterprise
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -6740,10 +6740,10 @@ buildvariants:
   # - name: jsCore_op_query
   - name: jsCore_op_query_WT
   # - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   # - name: noPassthrough
-  # - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  # - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: noPassthrough_WT
   # - name: parallel
   - name: parallel_WT
@@ -6805,9 +6805,9 @@ buildvariants:
   batchtime: 1440 # 1 day
   stepback: false
   expansions:
-    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    gorootvars: PATH=/opt/bongodbtoolchain/v2/bin:$PATH
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libcrypto) -lsasl2" -tags 'sasl ssl'
-    compile_flags: --ssl MONGO_DISTMOD=rhel67 --release -j3 CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/mongodbtoolchain_gcc.vars --use-s390x-crc32=off
+    compile_flags: --ssl BONGO_DISTMOD=rhel67 --release -j3 CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/bongodbtoolchain_gcc.vars --use-s390x-crc32=off
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
@@ -6819,7 +6819,7 @@ buildvariants:
     push_name: linux
     push_arch: s390x-enterprise-rhel67
     repo_edition: enterprise
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -6879,10 +6879,10 @@ buildvariants:
   # - name: jsCore_op_query
   - name: jsCore_op_query_WT
   # - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   # - name: noPassthrough
-  # - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  # - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: noPassthrough_WT
   # - name: parallel
   - name: parallel_WT
@@ -6952,7 +6952,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1204
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1204 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=ubuntu1204 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
@@ -6960,7 +6960,7 @@ buildvariants:
     packager_distro: ubuntu1204
     repo_edition: enterprise
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -7015,7 +7015,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1404
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1404 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=ubuntu1404 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
@@ -7023,7 +7023,7 @@ buildvariants:
     packager_distro: ubuntu1404
     repo_edition: enterprise
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -7087,7 +7087,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-ubuntu1604
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=ubuntu1604 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
@@ -7095,7 +7095,7 @@ buildvariants:
     packager_distro: ubuntu1604
     repo_edition: enterprise
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -7147,7 +7147,7 @@ buildvariants:
     tooltags: "-tags 'ssl sasl'"
     compile_flags: --ssl CC=/usr/bin/clang-3.7 CXX=/usr/bin/clang++-3.7 --libc++ -j$(grep -c ^processor /proc/cpuinfo) CPPPATH=/usr/include/libcxxabi/
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -7174,7 +7174,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-suse12
-    compile_flags: --ssl MONGO_DISTMOD=suse12 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=suse12 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
@@ -7182,7 +7182,7 @@ buildvariants:
     packager_distro: suse12
     repo_edition: enterprise
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -7232,13 +7232,13 @@ buildvariants:
   - suse12-zseries-test
   batchtime: 1440 # 1 day
   expansions:
-    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    gorootvars: PATH=/opt/bongodbtoolchain/v2/bin:$PATH
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)" -tags 'sasl ssl'
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: s390x-enterprise-suse12
-    compile_flags: --ssl MONGO_DISTMOD=suse12 --release -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_gcc.vars --use-s390x-crc32=off
+    compile_flags: --ssl BONGO_DISTMOD=suse12 --release -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/bongodbtoolchain_gcc.vars --use-s390x-crc32=off
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
@@ -7246,7 +7246,7 @@ buildvariants:
     packager_arch: s390x
     packager_distro: suse12
     repo_edition: enterprise
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -7283,8 +7283,8 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: jsCore_decimal_WT
   - name: jsCore_op_query_WT
-  - name: mongosTest
-  - name: noPassthroughWithMongod_WT
+  - name: bongosTest
+  - name: noPassthroughWithBongod_WT
   - name: noPassthrough_WT
   - name: parallel_WT
   - name: parallel_compatibility_WT
@@ -7329,10 +7329,10 @@ buildvariants:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags ssl"
     push_path: linux
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: linux
     push_arch: x86_64-suse12
-    compile_flags: --ssl MONGO_DISTMOD=suse12 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=suse12 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     multiversion_platform_arch: "suse12"
     multiversion_edition: "targeted"
@@ -7342,7 +7342,7 @@ buildvariants:
     packager_distro: suse12
     repo_edition: org
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -7393,13 +7393,13 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: multiversion
   - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -7427,7 +7427,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_bongos_and_mixed_shards
   - name: slow1
   - name: slow1_WT
   - name: serial_run
@@ -7458,7 +7458,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-suse11
-    compile_flags: --ssl MONGO_DISTMOD=suse11 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=suse11 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
@@ -7513,13 +7513,13 @@ buildvariants:
   - suse11-zseries-build
   batchtime: 1440 # 1 day
   expansions:
-    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    gorootvars: PATH=/opt/bongodbtoolchain/v2/bin:$PATH
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)" -tags 'sasl ssl'
     push_path: linux
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: s390x-enterprise-suse11
-    compile_flags: --ssl MONGO_DISTMOD=suse11 --release -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/mongodbtoolchain_gcc.vars --use-s390x-crc32=off
+    compile_flags: --ssl BONGO_DISTMOD=suse11 --release -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/bongodbtoolchain_gcc.vars --use-s390x-crc32=off
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --excludeWithAnyTags=requires_mmapv1
     has_packages: true
@@ -7559,8 +7559,8 @@ buildvariants:
   - name: jsCore_compatibility_WT
   - name: jsCore_decimal_WT
   - name: jsCore_op_query_WT
-  - name: mongosTest
-  - name: noPassthroughWithMongod_WT
+  - name: bongosTest
+  - name: noPassthroughWithBongod_WT
   - name: noPassthrough_WT
   - name: parallel_WT
   - name: parallel_compatibility_WT
@@ -7605,10 +7605,10 @@ buildvariants:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags ssl"
     push_path: linux
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: linux
     push_arch: x86_64-suse11
-    compile_flags: --ssl MONGO_DISTMOD=suse11 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=suse11 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     multiversion_platform_arch: "suse11"
     multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -7668,13 +7668,13 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: multiversion
   - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -7702,7 +7702,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_bongos_and_mixed_shards
   - name: slow1
   - name: slow1_WT
   - name: serial_run
@@ -7729,12 +7729,12 @@ buildvariants:
   - solaris
   expansions:
     push_path: sunos5
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: sunos5
     push_arch: x86_64
-    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    gorootvars: PATH=/opt/bongodbtoolchain/v2/bin:$PATH
     tooltags: -gccgoflags "-lsocket -lnsl"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_gcc.vars -j$(kstat cpu | sort -u | grep -c "^module") --release CCFLAGS="-m64" LINKFLAGS="-m64 -static-libstdc++ -static-libgcc"
+    compile_flags: --variables-files=etc/scons/bongodbtoolchain_gcc.vars -j$(kstat cpu | sort -u | grep -c "^module") --release CCFLAGS="-m64" LINKFLAGS="-m64 -static-libstdc++ -static-libgcc"
     num_jobs_available: $(( $(kstat cpu | sort -u | grep -c "^module") / 2 ))
     use_scons_cache: true
   tasks:
@@ -7780,10 +7780,10 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: noPassthrough_WT
   - name: parallel
   - name: parallel_compatibility
@@ -7832,7 +7832,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-debian71
-    compile_flags: --ssl MONGO_DISTMOD=debian71 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=debian71 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
@@ -7840,7 +7840,7 @@ buildvariants:
     packager_distro: debian71
     repo_edition: enterprise
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -7895,7 +7895,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-debian81
-    compile_flags: --ssl MONGO_DISTMOD=debian81 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=debian81 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
@@ -7903,7 +7903,7 @@ buildvariants:
     packager_distro: debian81
     repo_edition: enterprise
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -7953,10 +7953,10 @@ buildvariants:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags ssl"
     push_path: linux
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: linux
     push_arch: x86_64-debian71
-    compile_flags: --ssl MONGO_DISTMOD=debian71 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=debian71 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     multiversion_platform_arch: "debian71"
     multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -7966,7 +7966,7 @@ buildvariants:
     packager_distro: debian71
     repo_edition: org
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -8017,13 +8017,13 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: multiversion
   - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -8051,7 +8051,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_bongos_and_mixed_shards
   - name: slow1
   - name: slow1_WT
   - name: serial_run
@@ -8080,10 +8080,10 @@ buildvariants:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags ssl"
     push_path: linux
-    push_bucket: downloads.mongodb.org
+    push_bucket: downloads.bongodb.org
     push_name: linux
     push_arch: x86_64-debian81
-    compile_flags: --ssl MONGO_DISTMOD=debian81 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --ssl BONGO_DISTMOD=debian81 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     multiversion_platform_arch: "debian81"
     multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -8093,7 +8093,7 @@ buildvariants:
     packager_distro: debian81
     repo_edition: org
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -8144,13 +8144,13 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: multiversion
   - name: multiversion_WT
   - name: noPassthrough
   - name: noPassthrough_WT
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: parallel
@@ -8178,7 +8178,7 @@ buildvariants:
   - name: sharding
   - name: sharding_WT
   - name: sharding_auth
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_bongos_and_mixed_shards
   - name: slow1
   - name: slow1_WT
   - name: serial_run
@@ -8212,12 +8212,12 @@ buildvariants:
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
-    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
+    rlp_environment: BONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    compile_flags: --ssl BONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/bongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -8259,9 +8259,9 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
-  - name: mongosTest
+  - name: bongosTest
   - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthroughWithBongod
   - name: parallel
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
@@ -8298,10 +8298,10 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --storageEngine=ephemeralForTest --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -8341,12 +8341,12 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded_WT
   - name: jstestfuzz_replication_WT
   - name: jstestfuzz_sharded_WT
-  - name: mongosTest
+  - name: bongosTest
   - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthroughWithBongod
   - name: bulk_gle_passthrough
   - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthroughWithBongod
   - name: parallel
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
@@ -8377,13 +8377,13 @@ buildvariants:
   batchtime: 10080 # 7 days
   stepback: false
   expansions:
-    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    gorootvars: PATH=/opt/bongodbtoolchain/v2/bin:$PATH
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)" -tags 'sasl ssl'
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
-    compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel71 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: --dbg=on --opt=on --ssl BONGO_DISTMOD=rhel71 -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc) CCFLAGS="-mcpu=power8 -mtune=power8 -mcmodel=medium" --variables-files=etc/scons/bongodbtoolchain_gcc.vars
     num_jobs_available: $(echo "$(grep -c processor /proc/cpuinfo)/4" | bc)
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_mmapv1,requires_journaling
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -8417,9 +8417,9 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_op_query
-  - name: mongosTest
+  - name: bongosTest
   - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthroughWithBongod
   - name: parallel
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
@@ -8458,12 +8458,12 @@ buildvariants:
   batchtime: 10080 # 7 days
   stepback: false
   expansions:
-    gorootvars: PATH=/opt/mongodbtoolchain/v2/bin:$PATH
+    gorootvars: PATH=/opt/bongodbtoolchain/v2/bin:$PATH
     tooltags: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)" -tags 'sasl ssl'
-    compile_flags: --dbg=on --opt=on --ssl MONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_gcc.vars --use-s390x-crc32=off
+    compile_flags: --dbg=on --opt=on --ssl BONGO_DISTMOD=rhel72 -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/bongodbtoolchain_gcc.vars --use-s390x-crc32=off
     num_jobs_available: 2
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_mmapv1,requires_journaling
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -8505,9 +8505,9 @@ buildvariants:
   - name: jsCore_auth
   - name: jsCore_compatibility
   - name: jsCore_op_query
-  - name: mongosTest
+  - name: bongosTest
   - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthroughWithBongod
   - name: parallel
   - name: parallel_compatibility
   - name: read_concern_linearizable_passthrough
@@ -8545,11 +8545,11 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     build_rocksdb: true
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CPPPATH=$(readlink -f ../rocksdb/include/) LIBPATH=$(readlink -f ../rocksdb/) LIBS=rocksdb --variables-files=etc/scons/mongodbtoolchain_gcc.vars --runtime-hardening=off
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on CPPPATH=$(readlink -f ../rocksdb/include/) LIBPATH=$(readlink -f ../rocksdb/) LIBS=rocksdb --variables-files=etc/scons/bongodbtoolchain_gcc.vars --runtime-hardening=off
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --storageEngine=rocksdb
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -8583,7 +8583,7 @@ buildvariants:
   - name: jstestfuzz_replication
   - name: jstestfuzz_sharded
   - name: noPassthrough
-  - name: noPassthroughWithMongod
+  - name: noPassthroughWithBongod
   - name: bulk_gle_passthrough
   - name: parallel
   - name: parallel_compatibility
@@ -8623,13 +8623,13 @@ buildvariants:
   expansions:
     tooltags: "-tags 'ssl'"
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
-    variant_path_suffix: /opt/mongodbtoolchain/v2/bin
+    variant_path_suffix: /opt/bongodbtoolchain/v2/bin
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions" ASAN_OPTIONS=detect_leaks=1
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
+    compile_flags: --variables-files=etc/scons/bongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
     multiversion_platform_arch: "ubuntu1604"
     multiversion_edition: "targeted"
-    num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under ASAN build.
-    build_mongoreplay: true
+    num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many bongod's under ASAN build.
+    build_bongoreplay: true
   tasks:
   - name: compile
   - name: compile_all
@@ -8690,14 +8690,14 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsCore_op_query_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: multiversion
   - name: multiversion_auth
   - name: multiversion_WT
   - name: multiversion_multistorage_engine
   - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: noPassthrough_WT
   - name: parallel
   - name: parallel_WT
@@ -8743,7 +8743,7 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_bongos_and_mixed_shards
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
@@ -8768,11 +8768,11 @@ buildvariants:
   expansions:
     tooltags: "-tags 'ssl'"
     # We need llvm-symbolizer in the PATH for ASAN for clang-3.7 or later.
-    variant_path_suffix: /opt/mongodbtoolchain/v2/bin
+    variant_path_suffix: /opt/bongodbtoolchain/v2/bin
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions" ASAN_OPTIONS=detect_leaks=1
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
-    num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under ASAN build.
-    build_mongoreplay: true
+    compile_flags: --variables-files=etc/scons/bongodbtoolchain_clang.vars --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
+    num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many bongod's under ASAN build.
+    build_bongoreplay: true
   tasks:
   - name: compile
   - name: compile_all
@@ -8799,15 +8799,15 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     # We need llvm-symbolizer in the PATH for UBSAN.
-    variant_path_suffix: /opt/mongodbtoolchain/v2/bin
+    variant_path_suffix: /opt/bongodbtoolchain/v2/bin
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
     san_options: UBSAN_OPTIONS="print_stacktrace=1"
-    compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
+    compile_flags: --variables-files=etc/scons/bongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
     multiversion_platform_arch: "ubuntu1604"
     multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -8872,14 +8872,14 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsCore_op_query_WT
   - name: mmap
-  - name: mongosTest
+  - name: bongosTest
   - name: multiversion
   - name: multiversion_auth
   - name: multiversion_WT
   - name: multiversion_multistorage_engine
   - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: noPassthrough_WT
   - name: parallel
   - name: parallel_WT
@@ -8925,7 +8925,7 @@ buildvariants:
   - name: sharding_gle_auth_basics_passthrough_WT
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_bongos_and_mixed_shards
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
@@ -8948,11 +8948,11 @@ buildvariants:
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --link-model=dynamic
+    compile_flags: --ssl BONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/bongodbtoolchain_gcc.vars --link-model=dynamic
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
     scons_cache_mode: all
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -8971,12 +8971,12 @@ buildvariants:
   expansions:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
-    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
-    test_flags: "\"--mongodSetParameters={use3dot2InitialSync: true, initialSyncOplogBuffer: \"inMemoryBlockingQueue\"}\""
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    rlp_environment: BONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
+    test_flags: "\"--bongodSetParameters={use3dot2InitialSync: true, initialSyncOplogBuffer: \"inMemoryBlockingQueue\"}\""
+    compile_flags: --ssl BONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/bongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
-    build_mongoreplay: true
+    build_bongoreplay: true
   tasks:
   - name: compile
     distros:
@@ -8990,8 +8990,8 @@ buildvariants:
   - name: jsCore
   - name: jsCore_WT
   - name: noPassthrough
-  - name: noPassthroughWithMongod
-  - name: noPassthroughWithMongod_WT
+  - name: noPassthroughWithBongod
+  - name: noPassthroughWithBongod_WT
   - name: noPassthrough_WT
   - name: read_concern_linearizable_passthrough
     distros:
@@ -9055,7 +9055,7 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: sharding_jscore_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
-  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: sharding_last_stable_bongos_and_mixed_shards
     distros:
     - rhel62-large
   - name: sharding_op_query_WT

@@ -1,0 +1,9 @@
+#!/bin/sh
+
+. ../.env
+
+exec bongod $COMMONCOPTS \
+	--port 40103 \
+	--configsvr \
+	--auth \
+	--keyFile=../../certs/keyfile

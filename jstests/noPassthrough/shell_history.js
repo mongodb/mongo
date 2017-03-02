@@ -5,13 +5,13 @@
     "use strict";
 
     // Use dataPath because it includes the trailing "/" or "\".
-    var tmpHome = MongoRunner.dataPath;
+    var tmpHome = BongoRunner.dataPath;
     // Ensure it exists and is a dir (eg. if running without resmoke.py and /data/db doesn't exist).
     mkdir(tmpHome);
     removeFile(tmpHome + ".dbshell");
 
     var args = [];
-    var cmdline = "mongo --nodb";
+    var cmdline = "bongo --nodb";
     var redirection = "";
     var env = {};
     if (_isWindows()) {
@@ -23,7 +23,7 @@
         redirection = "< NUL > NUL";
 
         // USERPROFILE set to the tmp homedir.
-        // Since NUL is a character device, isatty() will return true, which means that .mongorc.js
+        // Since NUL is a character device, isatty() will return true, which means that .bongorc.js
         // will be created in the HOMEDRIVE + HOMEPATH location, so we must set them also.
         if (tmpHome.match("^[a-zA-Z]:")) {
             var tmpHomeDrive = tmpHome.substr(0, 2);
@@ -40,8 +40,8 @@
         args.push("sh");
         args.push("-c");
 
-        // Use the mongo shell from the current dir, same as resmoke.py does.
-        // Doesn't handle resmoke's --mongo= option.
+        // Use the bongo shell from the current dir, same as resmoke.py does.
+        // Doesn't handle resmoke's --bongo= option.
         cmdline = "./" + cmdline;
 
         // Set umask to 0 prior to running the shell.
@@ -61,7 +61,7 @@
     cmdline += " " + redirection;
     args.push(cmdline);
     jsTestLog("Running args:\n    " + tojson(args) + "\nwith env:\n    " + tojson(env));
-    var pid = _startMongoProgram({args, env});
+    var pid = _startBongoProgram({args, env});
     var rc = waitProgram(pid);
 
     assert.eq(rc, 0);
@@ -91,17 +91,17 @@
         // There is no stat utility in POSIX.
         // `ls -l` is POSIX, so this is the best that we have.
         // Check for exactly "-rw-------".
-        clearRawMongoProgramOutput();
+        clearRawBongoProgramOutput();
         var rc = runProgram("ls", "-l", file.name);
         assert.eq(rc, 0);
         // Before SERVER-22992 is fixed:
         var output = null;
         assert.soon(function() {
-            output = rawMongoProgramOutput();
+            output = rawBongoProgramOutput();
             return output != "";
         });
         // After SERVER-22992 is fixed:
-        // var output = rawMongoProgramOutput();
+        // var output = rawBongoProgramOutput();
         var fields = output.split(" ");
         // First field is the prefix, second field is the `ls -l` permissions.
         assert.eq(fields[1], "-rw-------", targetFile + " has bad permissions");

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# This program makes Debian and RPM repositories for MongoDB, by
+# This program makes Debian and RPM repositories for BongoDB, by
 # downloading our tarballs of statically linked executables and
 # insinuating them into Linux packages.  It must be run on a
 # Debianoid, since Debian provides tools to make RPMs, but RPM-based
@@ -41,7 +41,7 @@ import tempfile
 import time
 import urlparse
 
-# The MongoDB names for the architectures we support.
+# The BongoDB names for the architectures we support.
 ARCH_CHOICES=["x86_64", "ppc64le", "s390x", "arm64"]
 
 # Made up names for the flavors of distribution we package for.
@@ -66,26 +66,26 @@ class EnterpriseDistro(packager.Distro):
 
         Examples:
 
-        repo/apt/ubuntu/dists/precise/mongodb-enterprise/testing/multiverse/binary-amd64
-        repo/apt/ubuntu/dists/precise/mongodb-enterprise/testing/multiverse/binary-i386
+        repo/apt/ubuntu/dists/precise/bongodb-enterprise/testing/multiverse/binary-amd64
+        repo/apt/ubuntu/dists/precise/bongodb-enterprise/testing/multiverse/binary-i386
 
-        repo/apt/ubuntu/dists/precise/mongodb-enterprise/2.5/multiverse/binary-amd64
-        repo/apt/ubuntu/dists/precise/mongodb-enterprise/2.5/multiverse/binary-i386
+        repo/apt/ubuntu/dists/precise/bongodb-enterprise/2.5/multiverse/binary-amd64
+        repo/apt/ubuntu/dists/precise/bongodb-enterprise/2.5/multiverse/binary-i386
 
-        repo/apt/ubuntu/dists/trusty/mongodb-enterprise/2.5/multiverse/binary-amd64
-        repo/apt/ubuntu/dists/trusty/mongodb-enterprise/2.5/multiverse/binary-i386
+        repo/apt/ubuntu/dists/trusty/bongodb-enterprise/2.5/multiverse/binary-amd64
+        repo/apt/ubuntu/dists/trusty/bongodb-enterprise/2.5/multiverse/binary-i386
 
-        repo/apt/debian/dists/wheezy/mongodb-enterprise/2.5/main/binary-amd64
-        repo/apt/debian/dists/wheezy/mongodb-enterprise/2.5/main/binary-i386
+        repo/apt/debian/dists/wheezy/bongodb-enterprise/2.5/main/binary-amd64
+        repo/apt/debian/dists/wheezy/bongodb-enterprise/2.5/main/binary-i386
 
-        repo/yum/redhat/6/mongodb-enterprise/2.5/x86_64
-        repo/yum/redhat/6/mongodb-enterprise/2.5/i386
+        repo/yum/redhat/6/bongodb-enterprise/2.5/x86_64
+        repo/yum/redhat/6/bongodb-enterprise/2.5/i386
 
-        repo/zypper/suse/11/mongodb-enterprise/2.5/x86_64
-        repo/zypper/suse/11/mongodb-enterprise/2.5/i386
+        repo/zypper/suse/11/bongodb-enterprise/2.5/x86_64
+        repo/zypper/suse/11/bongodb-enterprise/2.5/i386
 
-        repo/zypper/suse/11/mongodb-enterprise/testing/x86_64
-        repo/zypper/suse/11/mongodb-enterprise/testing/i386
+        repo/zypper/suse/11/bongodb-enterprise/testing/x86_64
+        repo/zypper/suse/11/bongodb-enterprise/testing/i386
 
         """
 
@@ -97,11 +97,11 @@ class EnterpriseDistro(packager.Distro):
           repo_directory = spec.branch()
 
         if re.search("^(debian|ubuntu)", self.n):
-            return "repo/apt/%s/dists/%s/mongodb-enterprise/%s/%s/binary-%s/" % (self.n, self.repo_os_version(build_os), repo_directory, self.repo_component(), self.archname(arch))
+            return "repo/apt/%s/dists/%s/bongodb-enterprise/%s/%s/binary-%s/" % (self.n, self.repo_os_version(build_os), repo_directory, self.repo_component(), self.archname(arch))
         elif re.search("(redhat|fedora|centos|amazon)", self.n):
-            return "repo/yum/%s/%s/mongodb-enterprise/%s/%s/RPMS/" % (self.n, self.repo_os_version(build_os), repo_directory, self.archname(arch))
+            return "repo/yum/%s/%s/bongodb-enterprise/%s/%s/RPMS/" % (self.n, self.repo_os_version(build_os), repo_directory, self.archname(arch))
         elif re.search("(suse)", self.n):
-            return "repo/zypper/%s/%s/mongodb-enterprise/%s/%s/RPMS/" % (self.n, self.repo_os_version(build_os), repo_directory, self.archname(arch))
+            return "repo/zypper/%s/%s/bongodb-enterprise/%s/%s/RPMS/" % (self.n, self.repo_os_version(build_os), repo_directory, self.archname(arch))
         else:
             raise Exception("BUG: unsupported platform?")
 
@@ -183,15 +183,15 @@ def main(argv):
 def tarfile(build_os, arch, spec):
     """Return the location where we store the downloaded tarball for
     this package"""
-    return "dl/mongodb-linux-%s-enterprise-%s-%s.tar.gz" % (spec.version(), build_os, arch)
+    return "dl/bongodb-linux-%s-enterprise-%s-%s.tar.gz" % (spec.version(), build_os, arch)
 
 def setupdir(distro, build_os, arch, spec):
     # The setupdir will be a directory containing all inputs to the
     # distro's packaging tools (e.g., package metadata files, init
     # scripts, etc), along with the already-built binaries).  In case
     # the following format string is unclear, an example setupdir
-    # would be dst/x86_64/debian-sysvinit/wheezy/mongodb-org-unstable/
-    # or dst/x86_64/redhat/rhel57/mongodb-org-unstable/
+    # would be dst/x86_64/debian-sysvinit/wheezy/bongodb-org-unstable/
+    # or dst/x86_64/redhat/rhel57/bongodb-org-unstable/
     return "dst/%s/%s/%s/%s%s-%s/" % (arch, distro.name(), build_os, distro.pkgbase(), spec.suffix(), spec.pversion(distro))
 
 def unpack_binaries_into(build_os, arch, spec, where):
@@ -205,7 +205,7 @@ def unpack_binaries_into(build_os, arch, spec, where):
     os.chdir(where)
     try:
 	packager.sysassert(["tar", "xvzf", rootdir+"/"+tarfile(build_os, arch, spec)])
-    	release_dir = glob('mongodb-linux-*')[0]
+    	release_dir = glob('bongodb-linux-*')[0]
         for releasefile in "bin", "snmp", "LICENSE.txt", "README", "THIRD-PARTY-NOTICES", "MPL-2":
             os.rename("%s/%s" % (release_dir, releasefile), releasefile)
         os.rmdir(release_dir)
@@ -233,10 +233,10 @@ def make_package(distro, build_os, arch, spec, srcdir):
     # packaging infrastructure will move the files to wherever they
     # need to go.
     unpack_binaries_into(build_os, arch, spec, sdir)
-    # Remove the mongoreplay binary due to libpcap dynamic
+    # Remove the bongoreplay binary due to libpcap dynamic
     # linkage.
-    if os.path.exists(sdir + "bin/mongoreplay"):
-      os.unlink(sdir + "bin/mongoreplay")
+    if os.path.exists(sdir + "bin/bongoreplay"):
+      os.unlink(sdir + "bin/bongoreplay")
     return distro.make_pkg(build_os, arch, spec, srcdir)
 
 def make_repo(repodir, distro, build_os, spec):
@@ -266,13 +266,13 @@ def make_deb_repo(repo, distro, build_os, spec):
     # Notes: the Release{,.gpg} files must live in a special place,
     # and must be created after all the Packages.gz files have been
     # done.
-    s="""Origin: mongodb
-Label: mongodb
+    s="""Origin: bongodb
+Label: bongodb
 Suite: %s
-Codename: %s/mongodb-enterprise
+Codename: %s/bongodb-enterprise
 Architectures: amd64 ppc64el s390x arm64
 Components: %s
-Description: MongoDB packages
+Description: BongoDB packages
 """ % (distro.repo_os_version(build_os), distro.repo_os_version(build_os), distro.repo_component())
     if os.path.exists(repo+"../../Release"):
         os.unlink(repo+"../../Release")

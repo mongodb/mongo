@@ -19,7 +19,7 @@
     // pre-split the collection so to avoid interference from balancer
     s.adminCommand({split: "test.stuff", middle: {_id: numObjs / 2}});
     s.adminCommand(
-        {movechunk: "test.stuff", find: {_id: numObjs / 2}, to: secondary.getMongo().name});
+        {movechunk: "test.stuff", find: {_id: numObjs / 2}, to: secondary.getBongo().name});
 
     var bulk = db.stuff.initializeUnorderedBulkOp();
     for (var i = 0; i < numObjs; i++) {

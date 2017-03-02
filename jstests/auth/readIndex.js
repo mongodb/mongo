@@ -1,5 +1,5 @@
 // SERVER-8625: Test that dbAdmins can view index definitions.
-var conn = MongoRunner.runMongod({auth: ""});
+var conn = BongoRunner.runBongod({auth: ""});
 
 var adminDB = conn.getDB("admin");
 var testDB = conn.getDB("testdb");

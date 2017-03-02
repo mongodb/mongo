@@ -1,9 +1,9 @@
 selector:
   js_test:
     roots:
-    - src/mongo/db/modules/*/jstests/snmp/*.js
+    - src/bongo/db/modules/*/jstests/snmp/*.js
 
-# snmp tests start their own mongod's.
+# snmp tests start their own bongod's.
 executor:
   js_test:
     config:

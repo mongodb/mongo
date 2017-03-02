@@ -1,9 +1,9 @@
 selector:
   js_test:
     roots:
-    - src/mongo/db/modules/*/jstests/audit/*.js
+    - src/bongo/db/modules/*/jstests/audit/*.js
 
-# audit tests start their own mongod's.
+# audit tests start their own bongod's.
 executor:
   js_test:
     config:

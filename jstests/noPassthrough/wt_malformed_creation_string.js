@@ -18,20 +18,20 @@
     // Build an array of malformed strings to test
     var malformedStrings = ["\u0000000", "\0,", "bl\0ah", "split_pct=30,\0split_pct=35,"];
 
-    // Start up a mongod.
+    // Start up a bongod.
     // Test that collection and index creation with malformed creation strings fail gracefully.
     runTest();
 
     function runTest() {
-        var dbpath = MongoRunner.dataPath + 'wt_malformed_creation_string';
+        var dbpath = BongoRunner.dataPath + 'wt_malformed_creation_string';
         resetDbpath(dbpath);
 
-        // Start a mongod
-        var conn = MongoRunner.runMongod({
+        // Start a bongod
+        var conn = BongoRunner.runBongod({
             dbpath: dbpath,
             noCleanData: true,
         });
-        assert.neq(null, conn, 'mongod was unable to start up');
+        assert.neq(null, conn, 'bongod was unable to start up');
 
         var testDB = conn.getDB('test');
 
@@ -55,6 +55,6 @@
                                          ErrorCodes.FailedToParse);
         }
 
-        MongoRunner.stopMongod(conn);
+        BongoRunner.stopBongod(conn);
     }
 })();

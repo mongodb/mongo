@@ -51,7 +51,7 @@
         oplogDeleteFromPoint: Timestamp(),
     };
 
-    // This weird mechanism is the only way to bypass mongod's attempt to fill in null
+    // This weird mechanism is the only way to bypass bongod's attempt to fill in null
     // Timestamps.
     var minValidColl = conn.getCollection('local.replset.minvalid');
     assert.writeOK(minValidColl.remove({}));

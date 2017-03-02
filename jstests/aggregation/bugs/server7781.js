@@ -143,14 +143,14 @@
         delete aggCmd.$geoNear.num;
         var cmdRes = db[coll].runCommand("aggregate", {pipeline: [aggCmd], cursor: {batchSize: 0}});
         assert.commandWorked(cmdRes);
-        var cmdCursor = new DBCommandCursor(db[coll].getMongo(), cmdRes, 0);
+        var cmdCursor = new DBCommandCursor(db[coll].getBongo(), cmdRes, 0);
         checkOutput(db.runCommand(geoCmd), cmdCursor, 70);
     }
 
     test(db, false, '2d');
     test(db, false, '2dsphere');
 
-    var sharded = new ShardingTest({shards: 3, mongos: 1});
+    var sharded = new ShardingTest({shards: 3, bongos: 1});
     assert.commandWorked(sharded.s0.adminCommand({enablesharding: "test"}));
     sharded.ensurePrimaryShard('test', 'shard0001');
 

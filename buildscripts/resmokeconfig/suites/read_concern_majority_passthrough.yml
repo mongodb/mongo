@@ -57,7 +57,7 @@ selector:
     - jstests/core/read_after_optime.js # verifies read after optime fails on standalone
     - jstests/core/remove8.js # db.eval() used
     - jstests/core/rename4.js # db.eval() used
-    - jstests/core/shell1.js # tests setSlaveOk() variations on standalone mongod
+    - jstests/core/shell1.js # tests setSlaveOk() variations on standalone bongod
     - jstests/core/shellkillop.js # db.eval() used
     - jstests/core/shell_writeconcern.js # checks write concern shell helpers
     - jstests/core/storefunc.js # db.eval() used
@@ -84,7 +84,7 @@ executor:
       n: 20
     fixture:
       class: ReplicaSetFixture
-      mongod_options:
+      bongod_options:
         set_parameters:
           enableTestCommands: 1
           numInitialSyncAttempts: 1

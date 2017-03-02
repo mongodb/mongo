@@ -3,16 +3,16 @@
 // On error inserting documents, traces back and shows where the document was dropped
 //
 
-function traceMissingDoc(coll, doc, mongos) {
-    if (mongos)
-        coll = mongos.getCollection(coll + "");
+function traceMissingDoc(coll, doc, bongos) {
+    if (bongos)
+        coll = bongos.getCollection(coll + "");
     else
-        mongos = coll.getMongo();
+        bongos = coll.getBongo();
 
-    var config = mongos.getDB("config");
+    var config = bongos.getDB("config");
     var shards = config.shards.find().toArray();
     for (var i = 0; i < shards.length; i++) {
-        shards[i].conn = new Mongo(shards[i].host);
+        shards[i].conn = new Bongo(shards[i].host);
     }
 
     var shardKeyPatt = config.collections.findOne({_id: coll + ""}).key;

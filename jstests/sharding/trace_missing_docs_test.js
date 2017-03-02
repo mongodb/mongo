@@ -11,12 +11,12 @@ load('jstests/libs/trace_missing_docs.js');
             rsOptions: {nodes: 1, oplogSize: 10}
         };
 
-        var st = new ShardingTest({shards: 2, mongos: 1, other: options});
+        var st = new ShardingTest({shards: 2, bongos: 1, other: options});
 
-        var mongos = st.s0;
-        var coll = mongos.getCollection("foo.bar");
-        var admin = mongos.getDB("admin");
-        var shards = mongos.getCollection("config.shards").find().toArray();
+        var bongos = st.s0;
+        var coll = bongos.getCollection("foo.bar");
+        var admin = bongos.getDB("admin");
+        var shards = bongos.getCollection("config.shards").find().toArray();
 
         assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
         st.ensurePrimaryShard(coll.getDB() + "", shards[0]._id);

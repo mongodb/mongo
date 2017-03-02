@@ -10,12 +10,12 @@ load('./jstests/libs/chunk_manipulation_util.js');
 (function() {
     "use strict";
 
-    var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+    var staticBongod = BongoRunner.runBongod({});  // For startParallelOps.
 
     var st = new ShardingTest({shards: 3});
 
-    var mongos = st.s0, admin = mongos.getDB('admin'), dbName = "testDB", ns1 = dbName + ".foo",
-        ns2 = dbName + ".bar", coll1 = mongos.getCollection(ns1), coll2 = mongos.getCollection(ns2),
+    var bongos = st.s0, admin = bongos.getDB('admin'), dbName = "testDB", ns1 = dbName + ".foo",
+        ns2 = dbName + ".bar", coll1 = bongos.getCollection(ns1), coll2 = bongos.getCollection(ns2),
         shard0 = st.shard0, shard1 = st.shard1, shard2 = st.shard2,
         shard0Coll1 = shard0.getCollection(ns1), shard1Coll1 = shard1.getCollection(ns1),
         shard2Coll1 = shard2.getCollection(ns1), shard0Coll2 = shard0.getCollection(ns2),
@@ -50,7 +50,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     pauseMigrateAtStep(shard1, migrateStepNames.cloned);
     pauseMoveChunkAtStep(shard0, moveChunkStepNames.startedMoveChunk);
     var joinMoveChunk = moveChunkParallel(
-        staticMongod, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
+        staticBongod, st.s0.host, {a: 0}, null, coll1.getFullName(), st.shard1.shardName);
     waitForMigrateStep(shard1, migrateStepNames.cloned);
 
     // Abort migration on donor side, recipient is unaware
@@ -73,7 +73,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     // Start coll2 migration to shard2, pause recipient after cloning step.
     pauseMigrateAtStep(shard2, migrateStepNames.cloned);
     joinMoveChunk = moveChunkParallel(
-        staticMongod, st.s0.host, {a: 0}, null, coll2.getFullName(), st.shard2.shardName);
+        staticBongod, st.s0.host, {a: 0}, null, coll2.getFullName(), st.shard2.shardName);
     waitForMigrateStep(shard2, migrateStepNames.cloned);
 
     // Populate donor (shard0) xfermods log.

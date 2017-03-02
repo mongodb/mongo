@@ -106,9 +106,9 @@ var $config = extendWorkload($config, function($config, $super) {
         // Save the number of documents found in these two chunks' ranges before the mergeChunks
         // operation. This will be used to verify that the same number of documents in that
         // range are still found after the mergeChunks.
-        // Choose the mongos randomly to distribute load.
+        // Choose the bongos randomly to distribute load.
         var numDocsBefore = ChunkHelper.getNumDocs(
-            ChunkHelper.getRandomMongos(connCache.mongos), ns, chunk1.min._id, chunk2.max._id);
+            ChunkHelper.getRandomBongos(connCache.bongos), ns, chunk1.min._id, chunk2.max._id);
 
         // If the second chunk is not on the same shard as the first, move it,
         // because mergeChunks requires the chunks being merged to be on the same shard.
@@ -189,57 +189,57 @@ var $config = extendWorkload($config, function($config, $super) {
             }
         }
 
-        // Verify that all mongos processes see the correct after-state on the shards and configs.
+        // Verify that all bongos processes see the correct after-state on the shards and configs.
         // (see comments below for specifics).
-        for (var mongos of connCache.mongos) {
+        for (var bongos of connCache.bongos) {
             // Regardless of if the mergeChunks operation succeeded or failed, verify that each
-            // mongos sees as many documents in the original chunks' range after the move as there
+            // bongos sees as many documents in the original chunks' range after the move as there
             // were before.
-            var numDocsAfter = ChunkHelper.getNumDocs(mongos, ns, chunk1.min._id, chunk2.max._id);
-            msg = 'Mongos sees a different amount of documents between chunk bounds after ' +
+            var numDocsAfter = ChunkHelper.getNumDocs(bongos, ns, chunk1.min._id, chunk2.max._id);
+            msg = 'Bongos sees a different amount of documents between chunk bounds after ' +
                 'mergeChunks.\n' + msgBase;
             assertWhenOwnColl.eq(numDocsAfter, numDocsBefore, msg);
 
             // Regardless of if the mergeChunks operation succeeded or failed, verify that each
-            // mongos sees all data in the original chunks' range only on the shard the original
+            // bongos sees all data in the original chunks' range only on the shard the original
             // chunk was on.
             var shardsForChunk =
-                ChunkHelper.getShardsForRange(mongos, ns, chunk1.min._id, chunk2.max._id);
-            msg = 'Mongos does not see exactly 1 shard for chunk after mergeChunks.\n' + msgBase +
+                ChunkHelper.getShardsForRange(bongos, ns, chunk1.min._id, chunk2.max._id);
+            msg = 'Bongos does not see exactly 1 shard for chunk after mergeChunks.\n' + msgBase +
                 '\n' +
-                'Mongos find().explain() results for chunk: ' + tojson(shardsForChunk);
+                'Bongos find().explain() results for chunk: ' + tojson(shardsForChunk);
             assertWhenOwnColl.eq(shardsForChunk.shards.length, 1, msg);
-            msg = 'Mongos sees different shard for chunk than chunk does after mergeChunks.\n' +
+            msg = 'Bongos sees different shard for chunk than chunk does after mergeChunks.\n' +
                 msgBase + '\n' +
-                'Mongos find().explain() results for chunk: ' + tojson(shardsForChunk);
+                'Bongos find().explain() results for chunk: ' + tojson(shardsForChunk);
             assertWhenOwnColl.eq(shardsForChunk.shards[0], chunk1.shard, msg);
 
-            // If the mergeChunks operation succeeded, verify that the mongos sees one chunk between
+            // If the mergeChunks operation succeeded, verify that the bongos sees one chunk between
             // the original chunks' lower and upper bounds. If the operation failed, verify that the
-            // mongos still sees two chunks between the original chunks' lower and upper bounds.
+            // bongos still sees two chunks between the original chunks' lower and upper bounds.
             var numChunksBetweenOldChunksBounds =
-                ChunkHelper.getNumChunks(mongos, chunk1.min._id, chunk2.max._id);
+                ChunkHelper.getNumChunks(bongos, chunk1.min._id, chunk2.max._id);
             if (mergeChunksRes.ok) {
-                msg = 'mergeChunks succeeded but mongos does not see exactly 1 chunk between ' +
+                msg = 'mergeChunks succeeded but bongos does not see exactly 1 chunk between ' +
                     'the chunk bounds.\n' + msgBase;
                 assertWhenOwnColl.eq(numChunksBetweenOldChunksBounds, 1, msg);
             } else {
-                msg = 'mergeChunks failed but mongos does not see exactly 2 chunks between ' +
+                msg = 'mergeChunks failed but bongos does not see exactly 2 chunks between ' +
                     'the chunk bounds.\n' + msgBase;
                 assertWhenOwnColl.eq(numChunksBetweenOldChunksBounds, 2, msg);
             }
 
-            // If the mergeChunks operation succeeded, verify that the mongos sees that the total
+            // If the mergeChunks operation succeeded, verify that the bongos sees that the total
             // number of chunks in our partition has decreased by 1. If it failed, verify that it
             // has stayed the same.
             var numChunksAfter = ChunkHelper.getNumChunks(
-                mongos, this.partition.chunkLower, this.partition.chunkUpper);
+                bongos, this.partition.chunkLower, this.partition.chunkUpper);
             if (mergeChunksRes.ok) {
-                msg = 'mergeChunks succeeded but mongos does not see exactly 1 fewer chunks ' +
+                msg = 'mergeChunks succeeded but bongos does not see exactly 1 fewer chunks ' +
                     'between the chunk bounds.\n' + msgBase;
                 assertWhenOwnColl.eq(numChunksAfter, numChunksBefore - 1, msg);
             } else {
-                msg = 'mergeChunks failed but mongos does not see the same number of chunks ' +
+                msg = 'mergeChunks failed but bongos does not see the same number of chunks ' +
                     'between the chunk bounds.\n' + msgBase;
                 assertWhenOwnColl.eq(numChunksAfter, numChunksBefore, msg);
             }

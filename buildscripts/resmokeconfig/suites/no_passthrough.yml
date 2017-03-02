@@ -6,7 +6,7 @@ selector:
     # Disable inmem_full as per SERVER-27014
     - jstests/noPassthrough/inmem_full.js
 
-# noPassthrough tests start their own mongod's.
+# noPassthrough tests start their own bongod's.
 executor:
   js_test:
     config:

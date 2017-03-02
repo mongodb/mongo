@@ -1,0 +1,156 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone()
+
+# WorkingSet target and associated test
+env.Library(
+    target = "working_set",
+    source = [
+        "working_set.cpp",
+    ],
+    LIBDEPS = [
+        "$BUILD_DIR/bongo/base",
+        "$BUILD_DIR/bongo/db/bson/dotted_path_support",
+        "$BUILD_DIR/bongo/db/service_context",
+    ],
+)
+
+env.CppUnitTest(
+    target = "working_set_test",
+    source = [
+        "working_set_test.cpp"
+    ],
+    LIBDEPS = [
+        "working_set",
+    ],
+)
+
+env.Library(
+    target = "scoped_timer",
+    source = [
+        "scoped_timer.cpp",
+    ],
+    LIBDEPS = [
+        '$BUILD_DIR/bongo/util/net/network',
+    ],
+)
+
+env.Library(
+    target = 'exec',
+    source = [
+        "and_hash.cpp",
+        "and_sorted.cpp",
+        "cached_plan.cpp",
+        "collection_scan.cpp",
+        "count.cpp",
+        "count_scan.cpp",
+        "delete.cpp",
+        "distinct_scan.cpp",
+        "ensure_sorted.cpp",
+        "eof.cpp",
+        "fetch.cpp",
+        "geo_near.cpp",
+        "group.cpp",
+        "idhack.cpp",
+        "index_iterator.cpp",
+        "index_scan.cpp",
+        "keep_mutations.cpp",
+        "limit.cpp",
+        "merge_sort.cpp",
+        "multi_iterator.cpp",
+        "multi_plan.cpp",
+        "near.cpp",
+        "oplogstart.cpp",
+        "or.cpp",
+        "pipeline_proxy.cpp",
+        "plan_stage.cpp",
+        "projection.cpp",
+        "projection_exec.cpp",
+        "queued_data_stage.cpp",
+        "shard_filter.cpp",
+        "skip.cpp",
+        "sort.cpp",
+        "sort_key_generator.cpp",
+        "stagedebug_cmd.cpp",
+        "subplan.cpp",
+        "text.cpp",
+        "text_match.cpp",
+        "text_or.cpp",
+        "update.cpp",
+        "working_set_common.cpp",
+        "write_stage_common.cpp",
+    ],
+    LIBDEPS = [
+        "scoped_timer",
+        "working_set",
+        "$BUILD_DIR/bongo/base",
+        "$BUILD_DIR/bongo/db/bson/dotted_path_support",
+        "$BUILD_DIR/bongo/db/concurrency/write_conflict_exception",
+        "$BUILD_DIR/bongo/db/commands",
+        "$BUILD_DIR/bongo/db/curop",
+        "$BUILD_DIR/bongo/db/fts/base",
+        "$BUILD_DIR/bongo/db/index/index_descriptor",
+        "$BUILD_DIR/bongo/db/index/key_generator",
+        "$BUILD_DIR/bongo/db/ops/update_driver",
+        "$BUILD_DIR/bongo/db/pipeline/pipeline",
+        "$BUILD_DIR/bongo/db/repl/repl_coordinator_global",
+        "$BUILD_DIR/bongo/scripting/scripting",
+        "$BUILD_DIR/bongo/db/storage/storage_options",
+        "$BUILD_DIR/bongo/s/common",
+        '$BUILD_DIR/third_party/s2/s2',
+        '$BUILD_DIR/bongo/db/query/query_common',
+        #'$BUILD_DIR/bongo/db/ops/write_ops', # CYCLE
+        #'$BUILD_DIR/bongo/db/index/index_access_methods', # CYCLE
+        #'$BUILD_DIR/bongo/db/matcher/expressions_bongod_only', # CYCLE
+        #'$BUILD_DIR/bongo/db/s/sharding', # CYCLE
+        #'$BUILD_DIR/bongo/db/query/query', # CYCLE
+        #'$BUILD_DIR/bongo/db/catalog/catalog', # CYCLE
+        #'$BUILD_DIR/bongo/db/pipeline/serveronly', # CYCLE
+    ],
+    LIBDEPS_TAGS=[
+        # TODO(ADAM, 2017-01-06): See `CYCLE` tags above
+        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+    ]
+)
+
+env.CppUnitTest(
+    target = "queued_data_stage_test",
+    source = [
+        "queued_data_stage_test.cpp",
+    ],
+    LIBDEPS = [
+        "exec",
+        "$BUILD_DIR/bongo/db/serveronly",
+        "$BUILD_DIR/bongo/dbtests/mocklib",
+        "$BUILD_DIR/bongo/util/clock_source_mock",
+    ],
+)
+
+env.CppUnitTest(
+    target = "sort_test",
+    source = [
+        "sort_test.cpp",
+    ],
+    LIBDEPS = [
+        "exec",
+        "$BUILD_DIR/bongo/db/serveronly",
+        "$BUILD_DIR/bongo/dbtests/mocklib",
+        "$BUILD_DIR/bongo/db/query/collation/collator_factory_mock",
+        "$BUILD_DIR/bongo/db/query/collation/collator_interface_mock",
+        "$BUILD_DIR/bongo/util/clock_source_mock",
+    ],
+)
+
+env.CppUnitTest(
+    target = "projection_exec_test",
+    source = [
+        "projection_exec_test.cpp",
+    ],
+    LIBDEPS = [
+        "$BUILD_DIR/bongo/db/query/collation/collator_interface_mock",
+        "$BUILD_DIR/bongo/db/serveronly",
+        "exec",
+    ],
+)

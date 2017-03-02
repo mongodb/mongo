@@ -1,28 +1,28 @@
 #!/usr/bin/env python
 
-# smoke.py: run some mongo tests.
+# smoke.py: run some bongo tests.
 
 # Bugs, TODOs:
 
-# 0 Some tests hard-code pathnames relative to the mongo repository,
+# 0 Some tests hard-code pathnames relative to the bongo repository,
 #   so the smoke.py process and all its children must be run with the
-#   mongo repo as current working directory.  That's kinda icky.
+#   bongo repo as current working directory.  That's kinda icky.
 
 # 1 The tests that are implemented as standalone executables ("test"),
 #   don't take arguments for the dbpath, but unconditionally use
 #   "/tmp/unittest".
 
-# 2 mongod output gets intermingled with mongo output, and it's often
+# 2 bongod output gets intermingled with bongo output, and it's often
 #   hard to find error messages in the slop.  Maybe have smoke.py do
 #   some fancier wrangling of child process output?
 
-# 3 Some test suites run their own mongods, and so don't need us to
-#   run any mongods around their execution.  (It's harmless to do so,
+# 3 Some test suites run their own bongods, and so don't need us to
+#   run any bongods around their execution.  (It's harmless to do so,
 #   but adds noise in the output.)
 
-# 4 Running a separate mongo shell for each js file is slower than
-#   loading js files into one mongo shell process.  Maybe have runTest
-#   queue up all filenames ending in ".js" and run them in one mongo
+# 4 Running a separate bongo shell for each js file is slower than
+#   loading js files into one bongo shell process.  Maybe have runTest
+#   queue up all filenames ending in ".js" and run them in one bongo
 #   shell at the "end" of testing?
 
 # 5 Right now small-oplog implies master/slave replication.  Maybe
@@ -30,7 +30,7 @@
 #   maybe test replica set replication, too.)
 
 # 6 We use cleanbb.py to clear out the dbpath, but cleanbb.py kills
-#   off all mongods on a box, which means you can't run two smoke.py
+#   off all bongods on a box, which means you can't run two smoke.py
 #   jobs on the same host at once.  So something's gotta change.
 
 from datetime import datetime
@@ -51,9 +51,9 @@ import time
 import threading
 import traceback
 
-from pymongo import MongoClient
-from pymongo.errors import OperationFailure
-from pymongo import ReadPreference
+from pybongo import BongoClient
+from pybongo.errors import OperationFailure
+from pybongo import ReadPreference
 
 import cleanbb
 import utils
@@ -84,15 +84,15 @@ from buildscripts.resmokelib.core import pipe
 
 
 # TODO clean this up so we don't need globals...
-mongo_repo = os.getcwd() #'./'
-failfile = os.path.join(mongo_repo, 'failfile.smoke')
+bongo_repo = os.getcwd() #'./'
+failfile = os.path.join(bongo_repo, 'failfile.smoke')
 test_path = None
-mongod_executable = None
-mongod_port = None
+bongod_executable = None
+bongod_port = None
 shell_executable = None
 continue_on_failure = None
 file_of_commands_mode = False
-start_mongod = True
+start_bongod = True
 temp_path = None
 clean_every_n_tests = 1
 clean_whole_dbroot = False
@@ -116,7 +116,7 @@ test_report = { "results": [] }
 report_file = None
 
 # This class just implements the with statement API
-class NullMongod(object):
+class NullBongod(object):
     def start(self):
         pass
 
@@ -147,11 +147,11 @@ def dump_stacks(signal, frame):
 
 
 def buildlogger(cmd, is_global=False):
-    # if the environment variable MONGO_USE_BUILDLOGGER
+    # if the environment variable BONGO_USE_BUILDLOGGER
     # is set to 'true', then wrap the command with a call
     # to buildlogger.py, which sends output to the buidlogger
     # machine; otherwise, return as usual.
-    if os.environ.get('MONGO_USE_BUILDLOGGER', '').lower().strip() == 'true':
+    if os.environ.get('BONGO_USE_BUILDLOGGER', '').lower().strip() == 'true':
         if is_global:
             return [utils.find_python(), 'buildscripts/buildlogger.py', '-g'] + cmd
         else:
@@ -168,7 +168,7 @@ def clean_dbroot(dbroot="", nokill=False):
         cleanbb.cleanup(dbroot, nokill)
 
 
-class mongod(NullMongod):
+class bongod(NullBongod):
     def __init__(self, **kwargs):
         self.kwargs = kwargs
         self.proc = None
@@ -183,53 +183,53 @@ class mongod(NullMongod):
         utils.ensureDir(smoke_db_prefix + "/data/")
         utils.ensureDir(smoke_db_prefix + "/data/db/")
 
-    def check_mongo_port(self, port=27017):
+    def check_bongo_port(self, port=27017):
         sock = socket.socket()
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         sock.settimeout(1)
         sock.connect(("localhost", int(port)))
         sock.close()
         
-    def is_mongod_up(self, port=mongod_port):
-        if not start_mongod:
+    def is_bongod_up(self, port=bongod_port):
+        if not start_bongod:
             return False
         try:
-            self.check_mongo_port(int(port))
+            self.check_bongo_port(int(port))
             return True
         except Exception,e:
             print >> sys.stderr, e
             return False
         
-    def did_mongod_start(self, port=mongod_port, timeout=300):
+    def did_bongod_start(self, port=bongod_port, timeout=300):
         while timeout > 0:
             time.sleep(1)
-            is_up = self.is_mongod_up(port)
+            is_up = self.is_bongod_up(port)
             if is_up:
                 return True
             timeout = timeout - 1
-        print >> sys.stderr, "timeout starting mongod"
+        print >> sys.stderr, "timeout starting bongod"
         return False
 
     def start(self):
-        global mongod_port
-        global mongod
+        global bongod_port
+        global bongod
         if self.proc:
             print >> sys.stderr, "probable bug: self.proc already set in start()"
             return
         self.ensure_test_dirs()
         dir_name = smoke_db_prefix + "/data/db/sconsTests/"
-        self.port = int(mongod_port)
+        self.port = int(bongod_port)
         self.slave = False
         if 'slave' in self.kwargs:
             dir_name = smoke_db_prefix + '/data/db/sconsTestsSlave/'
-            srcport = mongod_port
+            srcport = bongod_port
             self.port += 1
             self.slave = True
 
         clean_dbroot(dbroot=dir_name, nokill=self.slave)
         utils.ensureDir(dir_name)
 
-        argv = [mongod_executable, "--port", str(self.port), "--dbpath", dir_name]
+        argv = [bongod_executable, "--port", str(self.port), "--dbpath", dir_name]
         # These parameters are always set for tests
         # SERVER-9137 Added httpinterface parameter to keep previous behavior
         argv += ['--setParameter', 'enableTestCommands=1', '--httpinterface']
@@ -273,16 +273,16 @@ class mongod(NullMongod):
         print "running " + " ".join(argv)
         self.proc = self._start(buildlogger(argv, is_global=True))
 
-        # If the mongod process is spawned under buildlogger.py, then the first line of output
-        # should include the pid of the underlying mongod process. If smoke.py didn't create its own
+        # If the bongod process is spawned under buildlogger.py, then the first line of output
+        # should include the pid of the underlying bongod process. If smoke.py didn't create its own
         # job object because it is already inside one, then the pid is used to attempt to terminate
-        # the underlying mongod process.
+        # the underlying bongod process.
         first_line = self.proc.stdout.readline()
         match = re.search("^\[buildlogger.py\] pid: (?P<pid>[0-9]+)$", first_line.rstrip())
         if match is not None:
             self._inner_proc_pid = int(match.group("pid"))
         else:
-            # The first line of output didn't include the pid of the underlying mongod process. We
+            # The first line of output didn't include the pid of the underlying bongod process. We
             # write the first line of output to smoke.py's stdout to ensure the message doesn't get
             # lost since it's possible that buildlogger.py isn't being used.
             sys.stdout.write(first_line)
@@ -295,11 +295,11 @@ class mongod(NullMongod):
         self._stdout_pipe = pipe.LoggerPipe(logger, logging.INFO, self.proc.stdout)
         self._stdout_pipe.wait_until_started()
 
-        if not self.did_mongod_start(self.port):
-            raise Exception("Failed to start mongod")
+        if not self.did_bongod_start(self.port):
+            raise Exception("Failed to start bongod")
 
         if self.slave:
-            local = MongoClient(port=self.port,
+            local = BongoClient(port=self.port,
                 read_preference=ReadPreference.SECONDARY_PREFERRED).local
             synced = False
             while not synced:
@@ -320,9 +320,9 @@ class mongod(NullMongod):
         if os.sys.platform == "win32":
             # Create a job object with the "kill on job close"
             # flag; this is inherited by child processes (ie
-            # the mongod started on our behalf by buildlogger)
+            # the bongod started on our behalf by buildlogger)
             # and lets us terminate the whole tree of processes
-            # rather than orphaning the mongod.
+            # rather than orphaning the bongod.
             import win32job
             import win32process
 
@@ -385,7 +385,7 @@ class mongod(NullMongod):
                         if return_code == win32con.STILL_ACTIVE:
                             raise
 
-                # Terminate the mongod process underlying buildlogger.py if one exists.
+                # Terminate the bongod process underlying buildlogger.py if one exists.
                 if self._inner_proc_pid is not None:
                     # The PROCESS_TERMINATE privilege is necessary to call TerminateProcess() and
                     # the SYNCHRONIZE privilege is necessary to call WaitForSingleObject(). See
@@ -408,7 +408,7 @@ class mongod(NullMongod):
             else:
                 os.kill(self.proc.pid, 15)
         except Exception, e:
-            print >> sys.stderr, "error shutting down mongod"
+            print >> sys.stderr, "error shutting down bongod"
             print >> sys.stderr, e
         self.proc.wait()
 
@@ -418,17 +418,17 @@ class mongod(NullMongod):
         sys.stderr.flush()
         sys.stdout.flush()
 
-        # Fail hard if mongod terminates with an error. That might indicate that an
+        # Fail hard if bongod terminates with an error. That might indicate that an
         # instrumented build (e.g. LSAN) has detected an error. For now we aren't doing this on
         # windows because the exit code seems to be unpredictable. We don't have LSAN there
         # anyway.
         retcode = self.proc.returncode
         if os.sys.platform != "win32" and retcode != 0:
-            raise(Exception('mongod process exited with non-zero code %d' % retcode))
+            raise(Exception('bongod process exited with non-zero code %d' % retcode))
 
     def wait_for_repl(self):
         print "Awaiting replicated (w:2, wtimeout:5min) insert (port:" + str(self.port) + ")"
-        MongoClient(port=self.port).testing.smokeWait.insert({}, w=2, wtimeout=5*60*1000)
+        BongoClient(port=self.port).testing.smokeWait.insert({}, w=2, wtimeout=5*60*1000)
         print "Replicated write completed -- done wait_for_repl"
 
 class Bug(Exception):
@@ -452,7 +452,7 @@ class TestServerFailure(TestFailure):
         self.status = -1 # this is meaningless as an exit code, but
                          # that's the point.
     def __str__(self):
-        return 'mongod not running after executing test %s' % self.path
+        return 'bongod not running after executing test %s' % self.path
 
 def check_db_hashes(master, slave):
     # Need to pause a bit so a slave might catch up...
@@ -462,10 +462,10 @@ def check_db_hashes(master, slave):
     master.wait_for_repl()
 
     # FIXME: maybe make this run dbhash on all databases?
-    for mongod in [master, slave]:
-        client = MongoClient(port=mongod.port, read_preference=ReadPreference.SECONDARY_PREFERRED)
-        mongod.dbhash = client.test.command("dbhash")
-        mongod.dict = mongod.dbhash["collections"]
+    for bongod in [master, slave]:
+        client = BongoClient(port=bongod.port, read_preference=ReadPreference.SECONDARY_PREFERRED)
+        bongod.dbhash = client.test.command("dbhash")
+        bongod.dict = bongod.dbhash["collections"]
 
     global lost_in_slave, lost_in_master, screwy_in_slave, replicated_collections
 
@@ -477,8 +477,8 @@ def check_db_hashes(master, slave):
         mhash = master.dict[coll]
         shash = slave.dict[coll]
         if mhash != shash:
-            mTestDB = MongoClient(port=master.port).test
-            sTestDB = MongoClient(port=slave.port,
+            mTestDB = BongoClient(port=master.port).test
+            sTestDB = BongoClient(port=slave.port,
                 read_preference=ReadPreference.SECONDARY_PREFERRED).test
             mCount = mTestDB[coll].count()
             sCount = sTestDB[coll].count()
@@ -545,7 +545,7 @@ def skipTest(path):
         # Skip any tests that run with auth explicitly
         if parentDir.lower() == "auth" or "auth" in basename.lower():
             return True
-        if parentPath == mongo_repo: # Skip client tests
+        if parentPath == bongo_repo: # Skip client tests
             return True
         if parentDir == "tool": # SERVER-6368
             return True
@@ -558,7 +558,7 @@ def skipTest(path):
                            ("jstests", "killop.js"), # SERVER-10128
                            ("sharding", "sync3.js"), # SERVER-6388 for this and those below
                            ("sharding", "parallel.js"),
-                           ("sharding", "copydb_from_mongos.js"), # SERVER-13080
+                           ("sharding", "copydb_from_bongos.js"), # SERVER-13080
                            ("jstests", "bench_test1.js"),
                            ("jstests", "bench_test2.js"),
                            ("jstests", "bench_test3.js"),
@@ -584,13 +584,13 @@ def runTest(test, result):
 
     # test is a tuple of ( filename , usedb<bool> )
     # filename should be a js file to run
-    # usedb is true if the test expects a mongod to be running
+    # usedb is true if the test expects a bongod to be running
 
     (path, usedb) = test
     (ignore, ext) = os.path.splitext(path)
-    test_mongod = mongod()
-    mongod_is_up = test_mongod.is_mongod_up(mongod_port)
-    result["mongod_running_at_start"] = mongod_is_up;
+    test_bongod = bongod()
+    bongod_is_up = test_bongod.is_bongod_up(bongod_port)
+    result["bongod_running_at_start"] = bongod_is_up;
 
     if file_of_commands_mode:
         # smoke.py was invoked like "--mode files --from-file foo",
@@ -604,7 +604,7 @@ def runTest(test, result):
         if os.path.basename(path) in ('python', 'python.exe'):
             path = argv[1]
     elif ext == ".js":
-        argv = [shell_executable, "--port", mongod_port]
+        argv = [shell_executable, "--port", bongod_port]
         
         setShellWriteModeForTest(path, argv)
         
@@ -637,25 +637,25 @@ def runTest(test, result):
                 argv.extend(["--wiredTigerIndexConfigString", wiredtiger_index_config_string])
 
         # more blech
-        elif os.path.basename(path) in ['mongos', 'mongos.exe']:
+        elif os.path.basename(path) in ['bongos', 'bongos.exe']:
             argv = [path, "--test"]
         else:
             argv = [test_path and os.path.abspath(os.path.join(test_path, path)) or path,
-                    "--port", mongod_port]
+                    "--port", bongod_port]
     else:
         raise Bug("fell off in extension case: %s" % path)
 
-    mongo_test_filename = os.path.basename(path)
+    bongo_test_filename = os.path.basename(path)
 
     # sys.stdout.write() is more atomic than print, so using it prevents
     # lines being interrupted by, e.g., child processes
     sys.stdout.write(" *******************************************\n")
-    sys.stdout.write("         Test : %s ...\n" % mongo_test_filename)
+    sys.stdout.write("         Test : %s ...\n" % bongo_test_filename)
     sys.stdout.flush()
 
     # FIXME: we don't handle the case where the subprocess
     # hangs... that's bad.
-    if ( argv[0].endswith( 'mongo' ) or argv[0].endswith( 'mongo.exe' ) ) and not '--eval' in argv :
+    if ( argv[0].endswith( 'bongo' ) or argv[0].endswith( 'bongo.exe' ) ) and not '--eval' in argv :
         evalString = 'TestData = new Object();' + \
                      'TestData.storageEngine = "' + ternary( storage_engine, storage_engine, "" ) + '";' + \
                      'TestData.wiredTigerEngineConfigString = "' + ternary( wiredtiger_engine_config_string, wiredtiger_engine_config_string, "" ) + '";' + \
@@ -663,7 +663,7 @@ def runTest(test, result):
                      'TestData.wiredTigerIndexConfigString = "' + ternary( wiredtiger_index_config_string, wiredtiger_index_config_string, "" ) + '";' + \
                      'TestData.testName = "' + re.sub( ".js$", "", os.path.basename( path ) ) + '";' + \
                      'TestData.setParameters = "' + ternary( set_parameters, set_parameters, "" )  + '";' + \
-                     'TestData.setParametersMongos = "' + ternary( set_parameters_mongos, set_parameters_mongos, "" )  + '";' + \
+                     'TestData.setParametersBongos = "' + ternary( set_parameters_bongos, set_parameters_bongos, "" )  + '";' + \
                      'TestData.noJournal = ' + ternary( no_journal )  + ";" + \
                      'TestData.noJournalPrealloc = ' + ternary( no_preallocj )  + ";" + \
                      'TestData.auth = ' + ternary( auth ) + ";" + \
@@ -671,9 +671,9 @@ def runTest(test, result):
                      'TestData.keyFileData = ' + ternary( keyFile , '"' + str(keyFileData) + '"' , 'null' ) + ";" + \
                      'TestData.authMechanism = ' + ternary( authMechanism,
                                                '"' + str(authMechanism) + '"', 'null') + ";"
-        # this updates the default data directory for mongod processes started through shell (src/mongo/shell/servers.js)
-        evalString += 'MongoRunner.dataDir = "' + os.path.abspath(smoke_db_prefix + '/data/db') + '";'
-        evalString += 'MongoRunner.dataPath = MongoRunner.dataDir + "/";'
+        # this updates the default data directory for bongod processes started through shell (src/bongo/shell/servers.js)
+        evalString += 'BongoRunner.dataDir = "' + os.path.abspath(smoke_db_prefix + '/data/db') + '";'
+        evalString += 'BongoRunner.dataPath = BongoRunner.dataDir + "/";'
         if temp_path:
             evalString += 'TestData.tmpPath = "' + temp_path + '";'
         if os.sys.platform == "win32":
@@ -683,7 +683,7 @@ def runTest(test, result):
             evalString = evalString.replace('\\', '\\\\')
 
         if auth and usedb:
-            evalString += 'jsTest.authenticate(db.getMongo());'
+            evalString += 'jsTest.authenticate(db.getBongo());'
 
         argv = argv + [ '--eval', evalString]
 
@@ -699,7 +699,7 @@ def runTest(test, result):
     sys.stdout.write("         Date : %s\n" % datetime.now().ctime())
     sys.stdout.flush()
 
-    os.environ['MONGO_TEST_FILENAME'] = mongo_test_filename
+    os.environ['BONGO_TEST_FILENAME'] = bongo_test_filename
     t1 = time.time()
 
     proc = Popen(buildlogger(argv), cwd=test_path, stdout=PIPE, stderr=STDOUT, bufsize=0)
@@ -723,7 +723,7 @@ def runTest(test, result):
     r = proc.returncode
 
     t2 = time.time()
-    del os.environ['MONGO_TEST_FILENAME']
+    del os.environ['BONGO_TEST_FILENAME']
 
     timediff = t2 - t1
     # timediff is seconds by default
@@ -743,13 +743,13 @@ def runTest(test, result):
     result["exit_code"] = r
 
 
-    is_mongod_still_up = test_mongod.is_mongod_up(mongod_port)
-    if start_mongod and not is_mongod_still_up:
-        print "mongod is not running after test"
-        result["mongod_running_at_end"] = is_mongod_still_up;
+    is_bongod_still_up = test_bongod.is_bongod_up(bongod_port)
+    if start_bongod and not is_bongod_still_up:
+        print "bongod is not running after test"
+        result["bongod_running_at_end"] = is_bongod_still_up;
         raise TestServerFailure(path)
 
-    result["mongod_running_at_end"] = is_mongod_still_up;
+    result["bongod_running_at_end"] = is_bongod_still_up;
 
     if r != 0:
         raise TestExitFailure(path, r)
@@ -757,20 +757,20 @@ def runTest(test, result):
     print ""
 
 def run_tests(tests):
-    # FIXME: some suites of tests start their own mongod, so don't
+    # FIXME: some suites of tests start their own bongod, so don't
     # need this.  (So long as there are no conflicts with port,
     # dbpath, etc., and so long as we shut ours down properly,
-    # starting this mongod shouldn't break anything, though.)
+    # starting this bongod shouldn't break anything, though.)
 
     # The reason we want to use "with" is so that we get __exit__ semantics
     # but "with" is only supported on Python 2.5+
 
-    master = NullMongod()
-    slave = NullMongod()
+    master = NullBongod()
+    slave = NullBongod()
 
     try:
-        if start_mongod:
-            master = mongod(small_oplog_rs=small_oplog_rs,
+        if start_bongod:
+            master = bongod(small_oplog_rs=small_oplog_rs,
                             small_oplog=small_oplog,
                             no_journal=no_journal,
                             storage_engine=storage_engine,
@@ -787,7 +787,7 @@ def run_tests(tests):
             master.start()
 
         if small_oplog:
-            slave = mongod(slave=True,
+            slave = bongod(slave=True,
                            small_oplog=True,
                            small_oplog_rs=False,
                            storage_engine=storage_engine,
@@ -797,7 +797,7 @@ def run_tests(tests):
                            set_parameters=set_parameters)
             slave.start()
         elif small_oplog_rs:
-            slave = mongod(slave=True,
+            slave = bongod(slave=True,
                            small_oplog_rs=True,
                            small_oplog=False,
                            no_journal=no_journal,
@@ -813,7 +813,7 @@ def run_tests(tests):
                            rlp_path=rlp_path,
                            use_ssl=use_ssl)
             slave.start()
-            primary = MongoClient(port=master.port);
+            primary = BongoClient(port=master.port);
 
             primary.admin.command({'replSetInitiate' : {'_id' : 'foo', 'members' : [
                             {'_id': 0, 'host':'localhost:%s' % master.port},
@@ -829,7 +829,7 @@ def run_tests(tests):
                     time.sleep(.2)
             
             secondaryUp = False
-            sConn = MongoClient(port=slave.port,
+            sConn = BongoClient(port=slave.port,
                 read_preference=ReadPreference.SECONDARY_PREFERRED);
             while not secondaryUp:
                 result = sConn.admin.command("ismaster");
@@ -847,8 +847,8 @@ def run_tests(tests):
 
             (test_path, use_db) = test
 
-            if test_path.startswith(mongo_repo + os.path.sep):
-                test_result["test_file"] = test_path[len(mongo_repo)+1:]
+            if test_path.startswith(bongo_repo + os.path.sep):
+                test_result["test_file"] = test_path[len(bongo_repo)+1:]
             else:
                 # user could specify a file not in repo. leave it alone.
                 test_result["test_file"] = test_path
@@ -872,16 +872,16 @@ def run_tests(tests):
                 if small_oplog or small_oplog_rs:
                     master.wait_for_repl()
                     # check the db_hashes
-                    if isinstance(slave, mongod):
+                    if isinstance(slave, bongod):
                         check_db_hashes(master, slave)
                         check_and_report_replication_dbhashes()
 
                 elif use_db: # reach inside test and see if "usedb" is true
                     if clean_every_n_tests and (tests_run % clean_every_n_tests) == 0:
-                        # Restart mongod periodically to clean accumulated test data
-                        # clean_dbroot() is invoked by mongod.start()
+                        # Restart bongod periodically to clean accumulated test data
+                        # clean_dbroot() is invoked by bongod.start()
                         master.stop()
-                        master = mongod(small_oplog_rs=small_oplog_rs,
+                        master = bongod(small_oplog_rs=small_oplog_rs,
                                         small_oplog=small_oplog,
                                         no_journal=no_journal,
                                         storage_engine=storage_engine,
@@ -913,7 +913,7 @@ def run_tests(tests):
                 except TestFailure, f:
                     if not continue_on_failure:
                         return 1
-        if isinstance(slave, mongod):
+        if isinstance(slave, bongod):
             check_db_hashes(master, slave)
 
     finally:
@@ -989,12 +989,12 @@ def report():
         raise Exception("Test failures")
 
 # Keys are the suite names (passed on the command line to smoke.py)
-# Values are pairs: (filenames, <start mongod before running tests>)
+# Values are pairs: (filenames, <start bongod before running tests>)
 suiteGlobalConfig = {"js": ("core/*.js", True),
                      "quota": ("quota/*.js", True),
                      "jsPerf": ("perf/*.js", True),
                      "disk": ("disk/*.js", True),
-                     "noPassthroughWithMongod": ("noPassthroughWithMongod/*.js", True),
+                     "noPassthroughWithBongod": ("noPassthroughWithBongod/*.js", True),
                      "noPassthrough": ("noPassthrough/*.js", False),
                      "parallel": ("parallel/*.js", True),
                      "concurrency": ("concurrency/*.js", True),
@@ -1031,11 +1031,11 @@ def get_module_suites():
     This means the values of this dictionary can be used as "glob"s to match all jstests in the
     suite directory that don't start with an underscore
 
-    The module tests should be put in 'src/mongo/db/modules/<module_name>/<suite_name>/*.js'
+    The module tests should be put in 'src/bongo/db/modules/<module_name>/<suite_name>/*.js'
 
     NOTE: This assumes that if we have more than one module the suite names don't conflict
     """
-    modules_directory = 'src/mongo/db/modules'
+    modules_directory = 'src/bongo/db/modules'
     test_suites = {}
 
     # Return no suites if we have no modules
@@ -1069,7 +1069,7 @@ def expand_suites(suites,expandUseDB=True):
     "all"), detection of suites in the "modules" directory, and enumerating the test files in a
     given suite.  It returns a list of tests of the form (path_to_test, usedb), where the second
     part of the tuple specifies whether the test is run against the database (see --nodb in the
-    mongo shell)
+    bongo shell)
 
     """
     globstr = None
@@ -1081,7 +1081,7 @@ def expand_suites(suites,expandUseDB=True):
                                   'jsCore', 
                                   'jsPerf', 
                                   'mmap_v1',
-                                  'noPassthroughWithMongod', 
+                                  'noPassthroughWithBongod', 
                                   'noPassthrough', 
                                   'clone', 
                                   'parallel', 
@@ -1099,19 +1099,19 @@ def expand_suites(suites,expandUseDB=True):
             else:
                 program = 'dbtest'
             (globstr, usedb) = (program, False)
-        elif suite == 'mongosTest':
+        elif suite == 'bongosTest':
             if os.sys.platform == "win32":
-                program = 'mongos.exe'
+                program = 'bongos.exe'
             else:
-                program = 'mongos'
-            tests += [(os.path.join(mongo_repo, program), False)]
+                program = 'bongos'
+            tests += [(os.path.join(bongo_repo, program), False)]
         elif os.path.exists( suite ):
             usedb = True
             for name in suiteGlobalConfig:
                 if suite in glob.glob( "jstests/" + suiteGlobalConfig[name][0] ):
                     usedb = suiteGlobalConfig[name][1]
                     break
-            tests += [ ( os.path.join( mongo_repo , suite ) , usedb ) ]
+            tests += [ ( os.path.join( bongo_repo , suite ) , usedb ) ]
         elif suite in module_suites:
             # Currently we connect to a database in all module tests since there's no mechanism yet
             # to configure it independently
@@ -1133,7 +1133,7 @@ def expand_suites(suites,expandUseDB=True):
                     loc = 'jstests/'
                 else:
                     loc = ''
-                globstr = os.path.join(mongo_repo, (os.path.join(loc, globstr)))
+                globstr = os.path.join(bongo_repo, (os.path.join(loc, globstr)))
                 globstr = os.path.normpath(globstr)
                 paths = glob.glob(globstr)
                 paths.sort()
@@ -1149,10 +1149,10 @@ def add_exe(e):
 
 
 def set_globals(options, tests):
-    global mongod_executable, mongod_port, shell_executable, continue_on_failure
+    global bongod_executable, bongod_port, shell_executable, continue_on_failure
     global small_oplog, small_oplog_rs
-    global no_journal, set_parameters, set_parameters_mongos, no_preallocj, storage_engine, wiredtiger_engine_config_string, wiredtiger_collection_config_string, wiredtiger_index_config_string
-    global auth, authMechanism, keyFile, keyFileData, smoke_db_prefix, test_path, start_mongod
+    global no_journal, set_parameters, set_parameters_bongos, no_preallocj, storage_engine, wiredtiger_engine_config_string, wiredtiger_collection_config_string, wiredtiger_index_config_string
+    global auth, authMechanism, keyFile, keyFileData, smoke_db_prefix, test_path, start_bongod
     global rlp_path
     global use_ssl
     global file_of_commands_mode
@@ -1161,21 +1161,21 @@ def set_globals(options, tests):
     global clean_every_n_tests
     global clean_whole_dbroot
 
-    start_mongod = options.start_mongod
+    start_bongod = options.start_bongod
     if hasattr(options, 'use_ssl'):
         use_ssl = options.use_ssl
     #Careful, this can be called multiple times
     test_path = options.test_path
 
-    mongod_executable = add_exe(options.mongod_executable)
-    if not os.path.exists(mongod_executable):
-        raise Exception("no mongod found in this directory.")
+    bongod_executable = add_exe(options.bongod_executable)
+    if not os.path.exists(bongod_executable):
+        raise Exception("no bongod found in this directory.")
 
-    mongod_port = options.mongod_port
+    bongod_port = options.bongod_port
 
     shell_executable = add_exe( options.shell_executable )
     if not os.path.exists(shell_executable):
-        raise Exception("no mongo shell found in this directory.")
+        raise Exception("no bongo shell found in this directory.")
 
     continue_on_failure = options.continue_on_failure
     smoke_db_prefix = options.smoke_db_prefix
@@ -1188,7 +1188,7 @@ def set_globals(options, tests):
     wiredtiger_collection_config_string = options.wiredtiger_collection_config_string
     wiredtiger_index_config_string = options.wiredtiger_index_config_string
     set_parameters = options.set_parameters
-    set_parameters_mongos = options.set_parameters_mongos
+    set_parameters_bongos = options.set_parameters_bongos
     no_preallocj = options.no_preallocj
     auth = options.auth
     authMechanism = options.authMechanism
@@ -1201,7 +1201,7 @@ def set_globals(options, tests):
     if auth and not keyFile:
         # if only --auth was given to smoke.py, load the
         # default keyFile from jstests/libs/authTestsKey
-        keyFile = os.path.join(mongo_repo, 'jstests', 'libs', 'authTestsKey')
+        keyFile = os.path.join(bongo_repo, 'jstests', 'libs', 'authTestsKey')
 
     if keyFile:
         f = open(keyFile, 'r')
@@ -1301,8 +1301,8 @@ def add_to_failfile(tests, options):
 
 
 def main():
-    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog
-    global no_journal, set_parameters, set_parameters_mongos, no_preallocj, auth, storage_engine, wiredtiger_engine_config_string, wiredtiger_collection_config_string, wiredtiger_index_config_string
+    global bongod_executable, bongod_port, shell_executable, continue_on_failure, small_oplog
+    global no_journal, set_parameters, set_parameters_bongos, no_preallocj, auth, storage_engine, wiredtiger_engine_config_string, wiredtiger_collection_config_string, wiredtiger_index_config_string
     global keyFile, smoke_db_prefix, test_path, use_write_commands, rlp_path
 
     try:
@@ -1315,23 +1315,23 @@ def main():
                       help='If "files", ARGS are filenames; if "suite", ARGS are sets of tests (%default)')
     # Some of our tests hard-code pathnames e.g., to execute, so until
     # that changes we don't have the freedom to run from anyplace.
-    # parser.add_option('--mongo-repo', dest='mongo_repo', default=None,
+    # parser.add_option('--bongo-repo', dest='bongo_repo', default=None,
     parser.add_option('--test-path', dest='test_path', default=None,
                       help="Path to the test executables to run, "
                       "currently only used for 'client' (%default)")
-    parser.add_option('--mongod', dest='mongod_executable', default=os.path.join(mongo_repo, 'mongod'),
-                      help='Path to mongod to run (%default)')
-    parser.add_option('--port', dest='mongod_port', default="27999",
-                      help='Port the mongod will bind to (%default)')
-    parser.add_option('--mongo', dest='shell_executable', default=os.path.join(mongo_repo, 'mongo'),
-                      help='Path to mongo, for .js test files (%default)')
+    parser.add_option('--bongod', dest='bongod_executable', default=os.path.join(bongo_repo, 'bongod'),
+                      help='Path to bongod to run (%default)')
+    parser.add_option('--port', dest='bongod_port', default="27999",
+                      help='Port the bongod will bind to (%default)')
+    parser.add_option('--bongo', dest='shell_executable', default=os.path.join(bongo_repo, 'bongo'),
+                      help='Path to bongo, for .js test files (%default)')
     parser.add_option('--continue-on-failure', dest='continue_on_failure',
                       action="store_true", default=False,
                       help='If supplied, continue testing even after a test fails')
     parser.add_option('--from-file', dest='File',
                       help="Run tests/suites named in FILE, one test per line, '-' means stdin")
     parser.add_option('--smoke-db-prefix', dest='smoke_db_prefix', default=smoke_db_prefix,
-                      help="Prefix to use for the mongods' dbpaths ('%default')")
+                      help="Prefix to use for the bongods' dbpaths ('%default')")
     parser.add_option('--small-oplog', dest='small_oplog', default=False,
                       action="store_true",
                       help='Run tests with master/slave replication & use a small oplog')
@@ -1339,13 +1339,13 @@ def main():
                       action="store_true",
                       help='Run tests with replica set replication & use a small oplog')
     parser.add_option('--storageEngine', dest='storage_engine', default=None,
-                      help='What storage engine to start mongod with')
+                      help='What storage engine to start bongod with')
     parser.add_option('--wiredTigerEngineConfig', dest='wiredtiger_engine_config_string', default=None,
-                      help='Wired Tiger configuration to pass through to mongod')
+                      help='Wired Tiger configuration to pass through to bongod')
     parser.add_option('--wiredTigerCollectionConfig', dest='wiredtiger_collection_config_string', default=None,
-                      help='Wired Tiger collection configuration to pass through to mongod')
+                      help='Wired Tiger collection configuration to pass through to bongod')
     parser.add_option('--wiredTigerIndexConfig', dest='wiredtiger_index_config_string', default=None,
-                      help='Wired Tiger index configuration to pass through to mongod')
+                      help='Wired Tiger index configuration to pass through to bongod')
     parser.add_option('--nojournal', dest='no_journal', default=False,
                       action="store_true",
                       help='Do not turn on journaling in tests')
@@ -1354,7 +1354,7 @@ def main():
                       help='Do not preallocate journal files in tests')
     parser.add_option('--auth', dest='auth', default=False,
                       action="store_true",
-                      help='Run standalone mongods in tests with authentication enabled')
+                      help='Run standalone bongods in tests with authentication enabled')
     parser.add_option('--authMechanism', dest='authMechanism', default='SCRAM-SHA-1',
                       help='Use the given authentication mechanism, when --auth is used.')
     parser.add_option('--keyFile', dest='keyFile', default=None,
@@ -1373,18 +1373,18 @@ def main():
     parser.add_option('--clean-every', dest='clean_every_n_tests', type='int',
                       default=(1 if 'detect_leaks=1' in os.getenv("ASAN_OPTIONS", "") else 20),
                       help='Clear database files every N tests [default %default]')
-    parser.add_option('--dont-start-mongod', dest='start_mongod', default=True,
+    parser.add_option('--dont-start-bongod', dest='start_bongod', default=True,
                       action='store_false',
-                      help='Do not start mongod before commencing test running')
+                      help='Do not start bongod before commencing test running')
     parser.add_option('--use-ssl', dest='use_ssl', default=False,
                       action='store_true',
-                      help='Run mongo shell and mongod instances with SSL encryption')
+                      help='Run bongo shell and bongod instances with SSL encryption')
     parser.add_option('--set-parameters', dest='set_parameters', default="",
-                      help='Adds --setParameter to mongod for each passed in item in the csv list - ex. "param1=1,param2=foo" ')
-    parser.add_option('--set-parameters-mongos', dest='set_parameters_mongos', default="",
-                      help='Adds --setParameter to mongos for each passed in item in the csv list - ex. "param1=1,param2=foo" ')
+                      help='Adds --setParameter to bongod for each passed in item in the csv list - ex. "param1=1,param2=foo" ')
+    parser.add_option('--set-parameters-bongos', dest='set_parameters_bongos', default="",
+                      help='Adds --setParameter to bongos for each passed in item in the csv list - ex. "param1=1,param2=foo" ')
     parser.add_option('--temp-path', dest='temp_path', default=None,
-                      help='If present, passed as --tempPath to unittests and dbtests or TestData.tmpPath to mongo')
+                      help='If present, passed as --tempPath to unittests and dbtests or TestData.tmpPath to bongo')
     # Buildlogger invocation from command line
     parser.add_option('--buildlogger-builder', dest='buildlogger_builder', default=os.getenv("BUILDLOGGER_BUILDER"),
                       action="store", help='Set the "builder name" for buildlogger')
@@ -1414,12 +1414,12 @@ def main():
 
     buildlogger_opts = (options.buildlogger_builder, options.buildlogger_buildnum, options.buildlogger_credentials)
     if all(buildlogger_opts):
-        os.environ['MONGO_USE_BUILDLOGGER'] = 'true'
-        os.environ['MONGO_BUILDER_NAME'] = options.buildlogger_builder
-        os.environ['MONGO_BUILD_NUMBER'] = options.buildlogger_buildnum
+        os.environ['BONGO_USE_BUILDLOGGER'] = 'true'
+        os.environ['BONGO_BUILDER_NAME'] = options.buildlogger_builder
+        os.environ['BONGO_BUILD_NUMBER'] = options.buildlogger_buildnum
         os.environ['BUILDLOGGER_CREDENTIALS'] = options.buildlogger_credentials
         if options.buildlogger_phase:
-            os.environ['MONGO_PHASE'] = options.buildlogger_phase
+            os.environ['BONGO_PHASE'] = options.buildlogger_phase
     elif any(buildlogger_opts):
         # some but not all of the required options were sete
         raise Exception("you must set all of --buildlogger-builder, --buildlogger-buildnum, --buildlogger-credentials")
@@ -1446,7 +1446,7 @@ def main():
     if options.mode == 'suite':
         tests = expand_suites(tests)
     elif options.mode == 'files':
-        tests = [(os.path.abspath(test), start_mongod) for test in tests]
+        tests = [(os.path.abspath(test), start_bongod) for test in tests]
 
     if options.ignore_files != None :
         ignore_patt = re.compile( options.ignore_files )
@@ -1469,7 +1469,7 @@ def main():
         clean_dbroot(nokill=True)
 
     test_report["start"] = time.time()
-    test_report["mongod_running_at_start"] = mongod().is_mongod_up(mongod_port)
+    test_report["bongod_running_at_start"] = bongod().is_bongod_up(bongod_port)
     try:
         run_tests(tests)
     finally:
@@ -1478,7 +1478,7 @@ def main():
         test_report["end"] = time.time()
         test_report["elapsed"] = test_report["end"] - test_report["start"]
         test_report["failures"] = len(losers.keys())
-        test_report["mongod_running_at_end"] = mongod().is_mongod_up(mongod_port)
+        test_report["bongod_running_at_end"] = bongod().is_bongod_up(bongod_port)
         if report_file:
             f = open( report_file, "wb" )
             f.write( json.dumps( test_report, indent=4, separators=(',', ': ')) )

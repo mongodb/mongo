@@ -1,6 +1,6 @@
 (function() {
 
-    var s = new ShardingTest({name: "shard_existing", shards: 2, mongos: 1, other: {chunkSize: 1}});
+    var s = new ShardingTest({name: "shard_existing", shards: 2, bongos: 1, other: {chunkSize: 1}});
 
     db = s.getDB("test");
 

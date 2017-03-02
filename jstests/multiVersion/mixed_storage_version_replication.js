@@ -503,13 +503,13 @@ function getCollectionDiff(db1, db2, collName) {
         }
     }
     if (cur1.hasNext()) {
-        diffText += db1.getMongo().host + " has extra documents:";
+        diffText += db1.getBongo().host + " has extra documents:";
         while (cur1.hasNext()) {
             diffText += "\n" + tojson(cur1.next());
         }
     }
     if (cur2.hasNext()) {
-        diffText += db2.getMongo().host + " has extra documents:";
+        diffText += db2.getBongo().host + " has extra documents:";
         while (cur2.hasNext()) {
             diffText += "\n" + tojson(cur2.next());
         }
@@ -525,8 +525,8 @@ function assertDBsEq(db1, db2) {
     assert.eq(db1.getName(), db2.getName());
     var hash1 = db1.runCommand({dbHash: 1});
     var hash2 = db2.runCommand({dbHash: 1});
-    var host1 = db1.getMongo().host;
-    var host2 = db2.getMongo().host;
+    var host1 = db1.getBongo().host;
+    var host2 = db2.getBongo().host;
     var success = true;
     var collNames1 = db1.getCollectionNames();
     var collNames2 = db2.getCollectionNames();
@@ -605,7 +605,7 @@ function startCmds(randomOps, host) {
         "convertToCapped",
         "appendOplogNote"
     ];
-    var m = new Mongo(host);
+    var m = new Bongo(host);
     var numOps = 200;
     Random.setRandomSeed();
     randomOps.doRandomWork(m, numOps, ops);
@@ -616,7 +616,7 @@ function startCmds(randomOps, host) {
  * function to pass to a thread to make it start doing random CRUD operations.
  */
 function startCRUD(randomOps, host) {
-    var m = new Mongo(host);
+    var m = new Bongo(host);
     var numOps = 500;
     Random.setRandomSeed();
     randomOps.doRandomWork(m, numOps, ["insert", "update", "remove"]);
@@ -626,7 +626,7 @@ function startCRUD(randomOps, host) {
 /*
  * To avoid race conditions on things like trying to drop a collection while another thread is
  * trying to rename it, just have one thread that might issue commands, and the others do random
- * CRUD operations. To be clear, this is something that the Mongod should be able to handle, but
+ * CRUD operations. To be clear, this is something that the Bongod should be able to handle, but
  * this test code does not have atomic random operations. E.g. it has to first randomly select
  * a collection to drop an index from, which may not be there by the time it tries to get a list
  * of indices on the collection.

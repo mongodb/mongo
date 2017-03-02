@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+	<Fragment>
+    <DirectoryRef Id="BIN">
+      <Component Id="c_bsondump" Guid="DEEA45CA-5175-453B-9D0B-6168B4C0C891">
+        <File Id="f_bsondump" Name="bsondump.exe" Source="$(var.ToolBinarySource)\bsondump.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_bongo" Guid="395C3DA5-A905-409C-AD96-29BFFF5E12D6">
+        <File Id="f_bongo" Name="bongo.exe" Source="$(var.BinarySource)\bongo.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_bongod" Guid="7EDFB4A2-5A45-4C41-8F6D-976558B3A9D6">
+        <File Id="f_bongod" Name="bongod.exe" Source="$(var.BinarySource)\bongod.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_bongodPdb" Guid="8B41A2E2-911C-4399-8E9F-D3C1AD3B9EDD">
+        <File Id="f_bongodPdb" Name="bongod.pdb" Source="$(var.BinarySource)\bongod.pdb"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_bongodump" Guid="FFE32884-ACAD-4EC6-AF84-6BC94F55819E">
+        <File Id="f_bongodump" Name="bongodump.exe" Source="$(var.ToolBinarySource)\bongodump.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_bongoexport" Guid="FD5FFDE2-53A1-45F3-9CCA-3AC311DF647C">
+        <File Id="f_bongoexport" Name="bongoexport.exe" Source="$(var.ToolBinarySource)\bongoexport.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_bongofiles" Guid="CF8696D3-92B4-4CB9-B4D0-16155D726FE6">
+        <File Id="f_bongofiles" Name="bongofiles.exe" Source="$(var.ToolBinarySource)\bongofiles.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_bongoimport" Guid="A4C06F69-2BB3-4068-A7E7-25347CCF01DE">
+        <File Id="f_bongoimport" Name="bongoimport.exe" Source="$(var.ToolBinarySource)\bongoimport.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_bongooplog" Guid="FAD84CBB-4666-4C22-A0DF-E1D2AEEC1601">
+        <File Id="f_bongooplog" Name="bongooplog.exe" Source="$(var.ToolBinarySource)\bongooplog.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_bongoperf" Guid="B046CCD2-39DC-4CB4-8A58-A7790148C41E">
+        <File Id="f_bongoperf" Name="bongoperf.exe" Source="$(var.BinarySource)\bongoperf.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_bongorestore" Guid="72A16D11-242E-4368-93C9-5F6162C548FC">
+        <File Id="f_bongorestore" Name="bongorestore.exe" Source="$(var.ToolBinarySource)\bongorestore.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_bongos" Guid="3CA63864-9FA0-4DAE-A664-2BE9A157FB60">
+        <File Id="f_bongos" Name="bongos.exe" Source="$(var.BinarySource)\bongos.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_bongosPdb" Guid="F1694AB8-4B0D-4096-AD67-948063FF2A6C">
+        <File Id="f_bongosPdb" Name="bongos.pdb" Source="$(var.BinarySource)\bongos.pdb"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_bongostat" Guid="0A881C85-AB39-4247-BADD-C8191F2FFF0C">
+        <File Id="f_bongostat" Name="bongostat.exe" Source="$(var.ToolBinarySource)\bongostat.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_bongotop" Guid="616C562D-0504-4F2D-A6E7-CC21A58F9F81">
+        <File Id="f_bongotop" Name="bongotop.exe" Source="$(var.ToolBinarySource)\bongotop.exe"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <?if $(var.Edition) = Enterprise ?>
+        <Component Id="c_bongodecrypt" Guid="B81B0CED-8CAD-4A92-BABC-7C473BBFF44E">
+          <File Id="f_bongodecrypt" Name="bongodecrypt.exe" Source="$(var.EnterpriseToolBinarySource)\bongodecrypt.exe"
+                DiskId="1" KeyPath="yes"/>
+        </Component>
+        <Component Id="c_bongoldap" Guid="553E4E3D-ED32-4ABA-8F27-3A7525C3145C">
+          <File Id="f_bongoldap" Name="bongoldap.exe" Source="$(var.EnterpriseToolBinarySource)\bongoldap.exe"
+                DiskId="1" KeyPath="yes"/>
+        </Component>
+        <Component Id="c_sasl" Guid="6632B1B8-9F0C-452C-9101-BE6044471CAC">
+          <File Id="f_sasl" Name="libsasl.dll" Source="$(var.SaslSource)\libsasl.dll"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_saslPdb" Guid="84DE7D8C-A6D6-4A23-935F-F0FFE3BBC52B">
+          <File Id="f_saslPdb" Name="libsasl.pdb" Source="$(var.SaslSource)\libsasl.pdb"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_snmp" Guid="F5E5A889-FC9F-4B9A-BEFD-C8ABC9A92D8D">
+          <File Id="f_ssnmp" Name="netsnmp.dll" Source="$(var.SnmpSource)\netsnmp.dll"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_snmpPdb" Guid="6AAB0ACE-C354-4D3A-B490-2AA235647AB3">
+          <File Id="f_snmpPdb" Name="netsnmp.pdb" Source="$(var.SnmpSource)\netsnmp.pdb"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+      <?endif ?>
+      <?if $(var.Edition) = Enterprise Or $(var.Edition) = SSL ?>
+        <Component Id="c_ssleay" Guid="8879033A-F4F7-4879-A7F8-4D81355A47E3">
+          <File Id="f_ssleay" Name="ssleay32.dll" Source="$(var.SslSource)\ssleay32.dll"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_libeay" Guid="E6CC6AA5-AC71-45EC-803C-71F816E33135">
+          <File Id="f_libeay" Name="libeay32.dll" Source="$(var.SslSource)\libeay32.dll"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+      <?endif ?>
+    </DirectoryRef>
+    <?if $(var.Edition) = Enterprise ?>
+      <DirectoryRef Id="SNMP">
+      <Component Id="c_snmpReadme" Guid="B968FBAC-1813-4039-9FED-A607A0E4CBB3">
+          <File Id="f_snmpReadme" Name="README-snmp.txt" Source="$(var.EnterpriseBase)\docs\README-snmp.txt"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_snmpConfMaster" Guid="0C8CAA6C-1473-4B14-9EE5-AF5A35B1DD8D">
+          <File Id="f_snmpConfMaster" Name="bongod.conf.master" Source="$(var.EnterpriseBase)\docs\bongod.conf.master"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_snmpConfSubagent" Guid="6FB66102-41A7-41BD-BB1F-1987E150FA78">
+          <File Id="f_snmpConfSubagent" Name="bongod.conf.subagent" Source="$(var.EnterpriseBase)\docs\bongod.conf.subagent"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_snmpBongodMib" Guid="F3E98C6B-FE42-44E7-8A1F-E47BDDD0A3D7">
+          <File Id="f_snmpBongodMib" Name="BONGOD-MIB.txt" Source="$(var.EnterpriseBase)\docs\BONGOD-MIB.txt"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_snmpBongodbincMib" Guid="58c6bd8e-a785-48a0-af48-42f6bf9f68b4">
+          <File Id="f_snmpBongodbincMib" Name="BONGODBINC-MIB.txt" Source="$(var.EnterpriseBase)\docs\BONGODBINC-MIB.txt"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+      </DirectoryRef>
+    <?endif ?>
+
+
+    <?if $(var.Edition) = Enterprise or $(var.Edition) = SSL ?>
+      <DirectoryRef Id="TARGETDIR">
+        <Merge Id="m_vcredist" SourceFile="$(var.MergeModulesBasePath)\Microsoft_VC140_CRT_x64.msm" DiskId="1" Language="0"/>
+      </DirectoryRef>
+    <?endif ?>
+
+    <?if $(var.Edition) = Enterprise ?>
+      <ComponentGroup Id="cg_EnterpriseBase">
+        <ComponentRef Id="c_sasl" />
+        <ComponentRef Id="c_saslPdb" />
+        <ComponentRef Id="c_ssleay" />
+        <ComponentRef Id="c_libeay" />
+      </ComponentGroup>
+      <ComponentGroup Id="cg_EnterpriseServer">
+        <ComponentGroupRef Id="cg_EnterpriseBase" />
+        <ComponentRef Id="c_snmp" />
+        <ComponentRef Id="c_snmpPdb" />
+        <ComponentRef Id="c_snmpReadme" />
+        <ComponentRef Id="c_snmpConfMaster" />
+        <ComponentRef Id="c_snmpConfSubagent" />
+        <ComponentRef Id="c_snmpBongodMib" />
+        <ComponentRef Id="c_snmpBongodbincMib" />
+      </ComponentGroup>
+    <?endif ?>
+
+    <?if $(var.Edition) = SSL ?>
+      <ComponentGroup Id="cg_SSLBase">
+        <ComponentRef Id="c_ssleay" />
+        <ComponentRef Id="c_libeay" />
+      </ComponentGroup>
+    <?endif ?>
+  </Fragment>
+</Wix>

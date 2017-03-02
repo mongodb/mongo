@@ -1,21 +1,21 @@
-// Tests bulk inserts to mongos
+// Tests bulk inserts to bongos
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 2, mongos: 2});
+    var st = new ShardingTest({shards: 2, bongos: 2});
 
-    var mongos = st.s;
-    var staleMongos = st.s1;
-    var config = mongos.getDB("config");
-    var admin = mongos.getDB("admin");
+    var bongos = st.s;
+    var staleBongos = st.s1;
+    var config = bongos.getDB("config");
+    var admin = bongos.getDB("admin");
     var shards = config.shards.find().toArray();
 
     for (var i = 0; i < shards.length; i++) {
-        shards[i].conn = new Mongo(shards[i].host);
+        shards[i].conn = new Bongo(shards[i].host);
     }
 
-    var collSh = mongos.getCollection(jsTestName() + ".collSharded");
-    var collUn = mongos.getCollection(jsTestName() + ".collUnsharded");
+    var collSh = bongos.getCollection(jsTestName() + ".collSharded");
+    var collUn = bongos.getCollection(jsTestName() + ".collUnsharded");
     var collDi = shards[0].conn.getCollection(jsTestName() + ".collDirect");
 
     jsTest.log('Checking write to config collections...');
@@ -69,7 +69,7 @@
     assert.writeOK(collDi.insert(inserts));
     assert.eq(2, collDi.find().itcount());
 
-    jsTest.log("Bulk insert (no COE) with mongos error...");
+    jsTest.log("Bulk insert (no COE) with bongos error...");
 
     resetColls();
     var inserts = [{ukey: 0}, {hello: "world"}, {ukey: 1}];
@@ -77,7 +77,7 @@
     assert.writeError(collSh.insert(inserts));
     assert.eq(1, collSh.find().itcount());
 
-    jsTest.log("Bulk insert (no COE) with mongod error...");
+    jsTest.log("Bulk insert (no COE) with bongod error...");
 
     resetColls();
     var inserts = [{ukey: 0}, {ukey: 0}, {ukey: 1}];
@@ -91,7 +91,7 @@
     assert.writeError(collDi.insert(inserts));
     assert.eq(1, collDi.find().itcount());
 
-    jsTest.log("Bulk insert (no COE) with mongod and mongos error...");
+    jsTest.log("Bulk insert (no COE) with bongod and bongos error...");
 
     resetColls();
     var inserts = [{ukey: 0}, {ukey: 0}, {ukey: 1}, {hello: "world"}];
@@ -122,7 +122,7 @@
     assert.writeOK(collDi.insert(inserts));
     assert.eq(2, collDi.find().itcount());
 
-    jsTest.log("Bulk insert to second shard (no COE) with mongos error...");
+    jsTest.log("Bulk insert to second shard (no COE) with bongos error...");
 
     resetColls();
     var inserts = [
@@ -135,7 +135,7 @@
     assert.writeError(collSh.insert(inserts));
     assert.eq(3, collSh.find().itcount());
 
-    jsTest.log("Bulk insert to second shard (no COE) with mongod error...");
+    jsTest.log("Bulk insert to second shard (no COE) with bongod error...");
 
     resetColls();
     var inserts = [{ukey: 0}, {ukey: 1}, {ukey: -1}, {ukey: -2}, {ukey: -2}];
@@ -149,7 +149,7 @@
     assert.writeError(collDi.insert(inserts));
     assert.eq(4, collDi.find().itcount());
 
-    jsTest.log("Bulk insert to third shard (no COE) with mongod and mongos error...");
+    jsTest.log("Bulk insert to third shard (no COE) with bongod and bongos error...");
 
     resetColls();
     var inserts =
@@ -171,7 +171,7 @@
     // CONTINUE-ON-ERROR
     //
 
-    jsTest.log("Bulk insert (yes COE) with mongos error...");
+    jsTest.log("Bulk insert (yes COE) with bongos error...");
 
     resetColls();
     var inserts = [{ukey: 0}, {hello: "world"}, {ukey: 1}];
@@ -179,7 +179,7 @@
     assert.writeError(collSh.insert(inserts, 1));  // COE
     assert.eq(2, collSh.find().itcount());
 
-    jsTest.log("Bulk insert (yes COE) with mongod error...");
+    jsTest.log("Bulk insert (yes COE) with bongod error...");
 
     resetColls();
     var inserts = [{ukey: 0}, {ukey: 0}, {ukey: 1}];
@@ -193,19 +193,19 @@
     assert.writeError(collDi.insert(inserts, 1));
     assert.eq(2, collDi.find().itcount());
 
-    jsTest.log("Bulk insert to third shard (yes COE) with mongod and mongos error...");
+    jsTest.log("Bulk insert to third shard (yes COE) with bongod and bongos error...");
 
     resetColls();
     var inserts =
         [{ukey: 0}, {ukey: 1}, {ukey: -2}, {ukey: -3}, {ukey: 4}, {ukey: 4}, {hello: "world"}];
 
-    // Last error here is mongos error
+    // Last error here is bongos error
     res = assert.writeError(collSh.insert(inserts, 1));
     assert(!isDupKeyError(res.getWriteErrorAt(res.getWriteErrorCount() - 1).errmsg),
            res.toString());
     assert.eq(5, collSh.find().itcount());
 
-    // Extra insert goes through, since mongos error "doesn't count"
+    // Extra insert goes through, since bongos error "doesn't count"
     res = assert.writeError(collUn.insert(inserts, 1));
     assert.eq(6, res.nInserted, res.toString());
     assert.eq(6, collUn.find().itcount());
@@ -214,19 +214,19 @@
     assert.eq(6, res.nInserted, res.toString());
     assert.eq(6, collDi.find().itcount());
 
-    jsTest.log("Bulk insert to third shard (yes COE) with mongod and mongos error " +
-               "(mongos error first)...");
+    jsTest.log("Bulk insert to third shard (yes COE) with bongod and bongos error " +
+               "(bongos error first)...");
 
     resetColls();
     var inserts =
         [{ukey: 0}, {ukey: 1}, {ukey: -2}, {ukey: -3}, {hello: "world"}, {ukey: 4}, {ukey: 4}];
 
-    // Last error here is mongos error
+    // Last error here is bongos error
     res = assert.writeError(collSh.insert(inserts, 1));
     assert(isDupKeyError(res.getWriteErrorAt(res.getWriteErrorCount() - 1).errmsg), res.toString());
     assert.eq(5, collSh.find().itcount());
 
-    // Extra insert goes through, since mongos error "doesn't count"
+    // Extra insert goes through, since bongos error "doesn't count"
     res = assert.writeError(collUn.insert(inserts, 1));
     assert(isDupKeyError(res.getWriteErrorAt(res.getWriteErrorCount() - 1).errmsg), res.toString());
     assert.eq(6, collUn.find().itcount());
@@ -244,7 +244,7 @@
 
     var inserts = [{ukey: 1}, {ukey: -1}];
 
-    var staleCollSh = staleMongos.getCollection(collSh + "");
+    var staleCollSh = staleBongos.getCollection(collSh + "");
     assert.eq(null, staleCollSh.findOne(), 'Collections should be empty');
 
     assert.commandWorked(admin.runCommand(
@@ -270,7 +270,7 @@
         {ukey: -2, data: data10MB}
     ];
 
-    staleCollSh = staleMongos.getCollection(collSh + "");
+    staleCollSh = staleBongos.getCollection(collSh + "");
     assert.eq(null, staleCollSh.findOne(), 'Collections should be empty');
 
     assert.commandWorked(admin.runCommand(

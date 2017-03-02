@@ -36,11 +36,11 @@ function cleanupOrphaned(shardConnection, ns, expectedIterations) {
 //     keyGen: function() { return [{ a: 'foo', b: 1 }, { a: 'bar', b: 2 }]; }
 // }
 function testCleanupOrphaned(options) {
-    var st = new ShardingTest({shards: 2, mongos: 2});
+    var st = new ShardingTest({shards: 2, bongos: 2});
 
-    var mongos = st.s0, admin = mongos.getDB('admin'),
-        shards = mongos.getCollection('config.shards').find().toArray(),
-        coll = mongos.getCollection('foo.bar'),
+    var bongos = st.s0, admin = bongos.getDB('admin'),
+        shards = bongos.getCollection('config.shards').find().toArray(),
+        coll = bongos.getCollection('foo.bar'),
         shard0Coll = st.shard0.getCollection(coll.getFullName()), keys = options.keyGen(),
         beginning = keys[0], oneQuarter = keys[Math.round(keys.length / 4)],
         middle = keys[Math.round(keys.length / 2)],

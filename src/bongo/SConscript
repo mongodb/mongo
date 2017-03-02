@@ -1,0 +1,615 @@
+# -*- mode: python; -*-
+
+# This SConscript describes build rules for the "bongo" project.
+
+import itertools
+import os
+import re
+import sys
+from buildscripts import utils
+
+Import("env")
+Import("has_option")
+Import("get_option")
+Import("usemozjs")
+Import("use_system_version_of_library")
+
+env = env.Clone()
+
+env.InjectBongoIncludePaths()
+
+env.SConscript(
+    dirs=[
+        'base',
+        'bson',
+        'client',
+        'crypto',
+        'db',
+        'dbtests',
+        'executor',
+        'installer',
+        'logger',
+        'platform',
+        'rpc',
+        's',
+        'scripting',
+        'shell',
+        'tools',
+        'transport',
+        'unittest',
+        'util',
+    ],
+    exports=[
+        'env',
+    ],
+)
+
+# NOTE: This library does not really belong here. Its presence here is
+# temporary. Do not add to this library, do not remove from it, and do
+# not declare other libraries in this file.
+
+baseSource=[
+    'base/data_range.cpp',
+    'base/data_range_cursor.cpp',
+    'base/data_type.cpp',
+    'base/data_type_string_data.cpp',
+    'base/data_type_terminated.cpp',
+    'base/error_codes.cpp',
+    'base/global_initializer.cpp',
+    'base/global_initializer_registerer.cpp',
+    'base/init.cpp',
+    'base/initializer.cpp',
+    'base/initializer_context.cpp',
+    'base/initializer_dependency_graph.cpp',
+    'base/make_string_vector.cpp',
+    'base/parse_number.cpp',
+    'base/simple_string_data_comparator.cpp',
+    'base/status.cpp',
+    'base/string_data.cpp',
+    'base/validate_locale.cpp',
+    'bson/bson_comparator_interface_base.cpp',
+    'bson/bson_validate.cpp',
+    'bson/bsonelement.cpp',
+    'bson/bsonmisc.cpp',
+    'bson/bsonobj.cpp',
+    'bson/bsonobjbuilder.cpp',
+    'bson/bsontypes.cpp',
+    'bson/json.cpp',
+    'bson/oid.cpp',
+    'bson/simple_bsonelement_comparator.cpp',
+    'bson/simple_bsonobj_comparator.cpp',
+    'bson/timestamp.cpp',
+    'logger/component_message_log_domain.cpp',
+    'logger/console.cpp',
+    'logger/log_component.cpp',
+    'logger/log_component_settings.cpp',
+    'logger/log_manager.cpp',
+    'logger/log_severity.cpp',
+    'logger/logger.cpp',
+    'logger/logstream_builder.cpp',
+    'logger/message_event_utf8_encoder.cpp',
+    'logger/message_log_domain.cpp',
+    'logger/ramlog.cpp',
+    'logger/redaction.cpp',
+    'logger/rotatable_file_manager.cpp',
+    'logger/rotatable_file_writer.cpp',
+    'platform/decimal128.cpp',
+    'platform/posix_fadvise.cpp',
+    'platform/process_id.cpp',
+    'platform/random.cpp',
+    'platform/shared_library.cpp',
+    'platform/shared_library_${TARGET_OS_FAMILY}.cpp',
+    'platform/stack_locator.cpp',
+    'platform/stack_locator_${TARGET_OS}.cpp',
+    'platform/strcasestr.cpp',
+    'platform/strnlen.cpp',
+    'util/allocator.cpp',
+    'util/assert_util.cpp',
+    'util/base64.cpp',
+    'util/concurrency/thread_name.cpp',
+    'util/duration.cpp',
+    'util/exception_filter_win32.cpp',
+    'util/exit.cpp',
+    'util/file.cpp',
+    'util/hex.cpp',
+    'util/itoa.cpp',
+    'util/log.cpp',
+    'util/platform_init.cpp',
+    'util/signal_handlers_synchronous.cpp',
+    'util/stacktrace.cpp',
+    'util/stacktrace_${TARGET_OS_FAMILY}.cpp',
+    'util/startup_test.cpp',
+    'util/stringutils.cpp',
+    'util/system_clock_source.cpp',
+    'util/system_tick_source.cpp',
+    'util/text.cpp',
+    'util/time_support.cpp',
+    'util/timer.cpp',
+    'util/version.cpp',
+]
+
+baseLibDeps=[
+    # NOTE: This library *must not* depend on any libraries than
+    # the ones declared here. Do not add to this list.
+    '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
+    '$BUILD_DIR/third_party/shim_allocator',
+    '$BUILD_DIR/third_party/shim_boost',
+    '$BUILD_DIR/third_party/shim_intel_decimal128',
+    '$BUILD_DIR/third_party/shim_pcrecpp',
+    '$BUILD_DIR/third_party/shim_tz',
+    'logger/max_log_size',
+    'util/debugger',
+    'util/quick_exit',
+]
+
+env.Library(
+    target='base',
+    source=baseSource,
+    LIBDEPS=baseLibDeps,
+)
+
+js_engine_ver = get_option("js-engine") if get_option("server-js") == "on" else "none"
+
+# On windows, we need to escape the backslashes in the command-line
+# so that windows paths look okay.
+cmd_line = " ".join(sys.argv).encode('string-escape')
+if env.TargetOSIs('windows'):
+    cmd_line = cmd_line.replace('\\', r'\\')
+
+module_list = '{ %s }' % ', '.join([ '"{0}"'.format(x) for x in env['BONGO_MODULES'] ])
+
+# This generates a numeric representation of the version string so that
+# you can easily compare versions of BongoDB without having to parse
+# the version string.
+#
+# The rules for this are
+# {major}{minor}{release}{pre/rc/final}
+# If the version is pre-release and not an rc, the final number is 0
+# If the version is an RC, the final number of 1 + rc number
+# If the version is pre-release between RC's, the final number is 1 + rc number
+# If the version is a final release, the final number is 99
+#
+# Examples:
+# 3.1.1-123     = 3010100
+# 3.1.1-rc2     = 3010103
+# 3.1.1-rc2-123 = 3010103
+# 3.1.1         = 3010199
+#
+version_parts = [ x for x in re.match(r'^(\d+)\.(\d+)\.(\d+)-?((?:(rc)(\d+))?.*)?',
+    env['BONGO_VERSION']).groups() ]
+version_extra = version_parts[3] if version_parts[3] else ""
+if version_parts[4] == 'rc':
+    version_parts[3] = int(version_parts[5]) + -50
+elif version_parts[3]:
+    version_parts[2] = int(version_parts[2]) + 1
+    version_parts[3] = -100
+else:
+    version_parts[3] = 0
+version_parts = [ int(x) for x in version_parts[:4]]
+
+# This turns the BONGO_BUILDINFO_ENVIRONMENT_DATA tuples into a std::vector of
+# std::tuple<string, string, bool, bool>.
+buildInfoInitializer = []
+for tup in env['BONGO_BUILDINFO_ENVIRONMENT_DATA']:
+    def pyToCXXBool(val):
+        return "true" if val else "false"
+    def wrapInQuotes(val):
+        return '"{0}"'.format(val)
+    buildInfoInitializer.append(
+        'std::make_tuple({0})'.format(', '.join(
+            (
+                wrapInQuotes(tup[0]),
+                wrapInQuotes(env.subst(tup[1])),
+                pyToCXXBool(tup[2]),
+                pyToCXXBool(tup[3]),
+            )
+        ))
+    )
+buildInfoInitializer = '{{ {0} }}'.format(', '.join(buildInfoInitializer))
+
+generatedVersionFile = env.Substfile(
+    'util/version_constants.h.in',
+    SUBST_DICT=[
+        ('@bongo_version@', env['BONGO_VERSION']),
+        ('@bongo_version_major@', version_parts[0]),
+        ('@bongo_version_minor@', version_parts[1]),
+        ('@bongo_version_patch@', version_parts[2]),
+        ('@bongo_version_extra@', version_parts[3]),
+        ('@bongo_version_extra_str@', version_extra),
+        ('@bongo_git_hash@', env['BONGO_GIT_HASH']),
+        ('@buildinfo_js_engine@', js_engine_ver),
+        ('@buildinfo_allocator@', env['BONGO_ALLOCATOR']),
+        ('@buildinfo_modules@', module_list),
+        ('@buildinfo_environment_data@', buildInfoInitializer),
+    ])
+env.Alias('generated-sources', generatedVersionFile)
+
+if env.TargetOSIs('windows'):
+    enterpriseEnv = env.Clone().InjectModule("enterprise")
+    generatedResourceConstantFile = enterpriseEnv.Substfile(
+        'util/resource_constants.h.in',
+        SUBST_DICT=[
+            ('@bongo_version@', env['BONGO_VERSION']),
+            ('@bongo_version_major@', version_parts[0]),
+            ('@bongo_version_minor@', version_parts[1]),
+            ('@bongo_version_patch@', version_parts[2]),
+            ('@bongo_git_hash@', env['BONGO_GIT_HASH']),
+        ])
+    env.Alias('generated-sources', generatedResourceConstantFile)
+
+config_header_substs = (
+    ('@bongo_config_byte_order@', 'BONGO_CONFIG_BYTE_ORDER'),
+    ('@bongo_config_debug_build@', 'BONGO_CONFIG_DEBUG_BUILD'),
+    ('@bongo_config_have___declspec_thread@', 'BONGO_CONFIG_HAVE___DECLSPEC_THREAD'),
+    ('@bongo_config_have___thread@', 'BONGO_CONFIG_HAVE___THREAD'),
+    ('@bongo_config_have_execinfo_backtrace@', 'BONGO_CONFIG_HAVE_EXECINFO_BACKTRACE'),
+    ('@bongo_config_have_fips_mode_set@', 'BONGO_CONFIG_HAVE_FIPS_MODE_SET'),
+    ('@bongo_config_have_header_unistd_h@', 'BONGO_CONFIG_HAVE_HEADER_UNISTD_H'),
+    ('@bongo_config_have_memset_s@', 'BONGO_CONFIG_HAVE_MEMSET_S'),
+    ('@bongo_config_have_posix_monotonic_clock@', 'BONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK'),
+    ('@bongo_config_have_pthread_setname_np@', 'BONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP'),
+    ('@bongo_config_have_std_enable_if_t@', 'BONGO_CONFIG_HAVE_STD_ENABLE_IF_T'),
+    ('@bongo_config_have_std_make_unique@', 'BONGO_CONFIG_HAVE_STD_MAKE_UNIQUE'),
+    ('@bongo_config_have_strnlen@', 'BONGO_CONFIG_HAVE_STRNLEN'),
+    ('@bongo_config_have_thread_local@', 'BONGO_CONFIG_HAVE_THREAD_LOCAL'),
+    ('@bongo_config_optimized_build@', 'BONGO_CONFIG_OPTIMIZED_BUILD'),
+    ('@bongo_config_ssl@', 'BONGO_CONFIG_SSL'),
+    ('@bongo_config_ssl_has_asn1_any_definitions@', 'BONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS'),
+    ('@bongo_config_wiredtiger_enabled@', 'BONGO_CONFIG_WIREDTIGER_ENABLED'),
+)
+
+def makeConfigHeaderDefine(self, key):
+    val = "// #undef {0}".format(key)
+    if key in self['CONFIG_HEADER_DEFINES']:
+        val = "#define {0} {1}".format(key, self['CONFIG_HEADER_DEFINES'][key])
+    return val
+env.AddMethod(makeConfigHeaderDefine)
+
+generateConfigHeaderFile = env.Substfile(
+    'config.h.in',
+    SUBST_DICT=[(k, env.makeConfigHeaderDefine(v)) for (k, v) in config_header_substs]
+)
+env.Alias('generated-sources', generateConfigHeaderFile)
+
+bongodLibDeps = [
+    'db/assemble_response',
+    'db/commands/core',
+    'db/conn_pool_options',
+    'db/catalog/catalog',
+    'db/clientcursor',
+    'db/dbdirectclient',
+    'db/ftdc/ftdc_bongod',
+    'db/index_d',
+    'db/initialize_snmp',
+    'db/bongod_options',
+    'db/bongodandbongos',
+    'db/op_observer_d',
+    'db/bongodwebserver',
+    'db/repl/replset_commands',
+    'db/range_deleter_d',
+    'db/repair_database',
+    'db/repl/storage_interface_impl',
+    'db/repl/topology_coordinator_impl',
+    'db/s/balancer',
+    'db/serveronly',
+    'db/service_context_d',
+    'db/startup_warnings_bongod',
+    'db/ttl_d',
+    'executor/network_interface_factory',
+    'rpc/rpc',
+    's/commands/shared_cluster_commands',
+    'transport/service_entry_point_utils',
+    'transport/transport_layer_legacy',
+    'util/clock_sources',
+    'util/fail_point',
+    'util/ntservice',
+    'util/version_impl',
+]
+
+if has_option('use-cpu-profiler'):
+    bongodLibDeps.append('db/commands/cpuprofiler')
+
+bongod = env.Program(
+    target="bongod",
+    source=[
+        "db/db.cpp",
+        "db/bongod_options_init.cpp",
+        "db/service_entry_point_bongod.cpp",
+    ] + env.WindowsResourceFile("db/db.rc"),
+    LIBDEPS=bongodLibDeps,
+)
+env.Default(env.Install('#/', bongod))
+
+# tools
+rewrittenTools = [ "bongodump", "bongorestore", "bongoexport", "bongoimport", "bongostat", "bongotop", "bsondump", "bongofiles", "bongooplog" ]
+
+# bongoperf
+env.Install(
+    '#/',
+    [
+        env.Program("bongoperf",
+                    [
+                        "client/examples/bongoperf.cpp",
+                    ] + env.WindowsResourceFile("client/examples/bongoperf.rc"),
+                    LIBDEPS=[
+                        "db/serveronly",
+                    ]),
+    ])
+
+# bongos
+env.Install(
+    '#/',
+    env.Program(
+        target='bongos',
+        source=[
+            's/cluster_cursor_stats.cpp',
+            's/bongos_options.cpp',
+            's/bongos_options_init.cpp',
+            's/s_sharding_server_status.cpp',
+            's/server.cpp',
+            's/service_entry_point_bongos.cpp',
+            's/sharding_uptime_reporter.cpp',
+            's/version_bongos.cpp',
+        ] + env.WindowsResourceFile("s/server.rc"),
+        LIBDEPS=[
+            'db/commands/core',
+            'db/conn_pool_options',
+            'db/bongodandbongos',
+            'db/server_options',
+            'db/stats/counters',
+            's/client/sharding_connection_hook',
+            's/commands/cluster_commands',
+            's/commands/shared_cluster_commands',
+            's/coreshard',
+            's/is_bongos',
+            's/sharding_egress_metadata_hook_for_bongos',
+            's/sharding_initialization',
+            'transport/service_entry_point_utils',
+            'transport/transport_layer_legacy',
+            'util/clock_sources',
+            'util/fail_point',
+            'util/ntservice',
+            'util/options_parser/options_parser_init',
+            'util/version_impl',
+        ]))
+
+env.Library("linenoise_utf8",
+    source=[
+        "shell/linenoise_utf8.cpp",
+    ])
+
+# --- shell ---
+
+if not has_option('noshell') and usemozjs:
+    shell_core_env = env.Clone()
+    if has_option("safeshell"):
+        shell_core_env.Append(CPPDEFINES=["BONGO_SAFE_SHELL"])
+    shell_core_env.Library("shell_core",
+                source=[
+                    "shell/bench.cpp",
+                    "shell/linenoise.cpp",
+                    "shell/mk_wcwidth.cpp",
+                    "shell/bongo-server.cpp",
+                    "shell/shell_options.cpp",
+                    "shell/shell_options_init.cpp",
+                    "shell/shell_utils.cpp",
+                    "shell/shell_utils_extended.cpp",
+                    "shell/shell_utils_launcher.cpp",
+                ],
+                LIBDEPS=[
+                    'db/catalog/index_key_validate',
+                    'db/index/external_key_generator',
+                    'db/query/command_request_response',
+                    'db/query/query_request',
+                    'db/server_options_core',
+                    'linenoise_utf8',
+                    'rpc/protocol',
+                    'scripting/scripting',
+                    'shell/bongojs',
+                    'transport/message_compressor',
+                    'util/net/network',
+                    'util/options_parser/options_parser_init',
+                    'util/processinfo',
+                    'util/signal_handlers',
+                    'util/version_impl',
+                    'executor/thread_pool_task_executor',
+                    'executor/network_interface_thread_pool',
+                    'executor/network_interface_factory'
+                ],
+                # Because `::environ` is resolved in `/usr/lib/crt1.o` on FreeBSD, this library
+                # needs to be marked `incomplete` on FreeBSD.
+                LIBDEPS_TAGS=[] if not env.TargetOSIs('freebsd') else [
+                    'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+                ],
+    )
+
+    shellEnv = env.Clone()
+    if env.TargetOSIs('windows'):
+       shellEnv.Append(LIBS=["winmm.lib"])
+
+    bongo_shell = shellEnv.Program(
+        "bongo",
+        ["shell/dbshell.cpp"] + env.WindowsResourceFile("shell/shell.rc"),
+        LIBDEPS=["$BUILD_DIR/third_party/shim_pcrecpp",
+                 "shell_core",
+                 "db/server_options_core",
+                 "client/clientdriver",
+                 "$BUILD_DIR/bongo/util/password",
+                 ])
+
+    shellEnv.Install( '#/', bongo_shell )
+else:
+    shellEnv = None
+
+#  ----  INSTALL -------
+
+# binaries
+
+distBinaries = []
+distDebugSymbols = []
+
+def add_exe( v ):
+    return "${PROGPREFIX}%s${PROGSUFFIX}" % v
+
+def failMissingObjCopy(env, target, source):
+    env.FatalError("Generating debug symbols requires objcopy, please set the OBJCOPY variable.")
+
+def installBinary( e, name ):
+    debug_sym_name = name
+    name = add_exe( name )
+
+    debug_sym_cmd = None
+    if e.TargetOSIs('linux', 'solaris'):
+        if 'OBJCOPY' not in e:
+            debug_sym_cmd = failMissingObjCopy
+        else:
+            debug_sym_cmd = '${OBJCOPY} --only-keep-debug ${SOURCE} ${TARGET}'
+        debug_sym_name += '.debug'
+    elif e.TargetOSIs('darwin'):
+        debug_sym_name += '.dSYM'
+        debug_sym_cmd = 'dsymutil -o ${TARGET} ${SOURCE}'
+    elif e.ToolchainIs('msvc'):
+        debug_sym_name += '.pdb'
+        distBinaries.append(debug_sym_name)
+        distDebugSymbols.append(debug_sym_name)
+
+    if debug_sym_cmd:
+        debug_sym = e.Command(
+            debug_sym_name,
+            name,
+            debug_sym_cmd
+        )
+        e.Install("#/", debug_sym)
+        e.Alias('debugsymbols', debug_sym)
+        distDebugSymbols.append(debug_sym)
+
+    if env.TargetOSIs('linux', 'solaris') and (not has_option("nostrip")):
+        strip_cmd = e.Command(
+            'stripped/%s' % name,
+            [name, debug_sym],
+            '${OBJCOPY} --strip-debug --add-gnu-debuglink ${SOURCES[1]} ${SOURCES[0]} $TARGET'
+        )
+        distBinaries.append('stripped/%s' % name)
+    else:
+        distBinaries.append(name)
+
+    inst = e.Install( "$INSTALL_DIR/bin", name )
+
+    if env.TargetOSIs('posix'):
+        e.AddPostAction( inst, 'chmod 755 $TARGET' )
+
+def installExternalBinary( e, name_str ):
+    name = env.File("#/%s" % add_exe(name_str))
+    if not name.isfile():
+        env.FatalError("ERROR: external binary not found: {0}", name)
+
+    distBinaries.append(name)
+    inst = e.Install( "$INSTALL_DIR/bin", name )
+
+    if env.TargetOSIs('posix'):
+        e.AddPostAction( inst, 'chmod 755 $TARGET' )
+
+
+# "--use-new-tools" adds dependencies for rewritten (Go) tools
+# It is required for "dist" but optional for "install"
+if has_option("use-new-tools"):
+    toolsRoot = "src/bongo-tools"
+    for t in rewrittenTools:
+        installExternalBinary(env, "%s/%s" % (toolsRoot, t))
+    if has_option("build-bongoreplay") and get_option("build-bongoreplay") == "true":
+        installExternalBinary(env, "%s/%s" % (toolsRoot, "bongoreplay"))
+
+# legacy tools
+installBinary(env, "bongoperf")
+env.Alias("tools", '#/' + add_exe("bongoperf"))
+
+env.Alias("tools", "#/" + add_exe("bongobridge"))
+
+installBinary( env, "bongod" )
+installBinary( env, "bongos" )
+
+if shellEnv is not None:
+    installBinary( shellEnv, "bongo" )
+
+env.Alias( "core", [ '#/%s' % b for b in [ add_exe( "bongo" ), add_exe( "bongod" ), add_exe( "bongos" ) ] ] )
+
+# Stage the top-level bongodb banners
+distsrc = env.Dir('#distsrc')
+env.Append(MODULE_BANNERS = [distsrc.File('README'),
+                             distsrc.File('THIRD-PARTY-NOTICES'),
+                             distsrc.File('MPL-2')])
+
+# If no module has introduced a file named LICENSE.txt, then inject the AGPL.
+if sum(itertools.imap(lambda x: x.name == "LICENSE.txt", env['MODULE_BANNERS'])) == 0:
+    env.Append(MODULE_BANNERS = [distsrc.File('GNU-AGPL-3.0')])
+
+# All module banners get staged to the top level of the tarfile, so we
+# need to fail if we are going to have a name collision.
+module_banner_filenames = set([f.name for f in env['MODULE_BANNERS']])
+if not len(module_banner_filenames) == len(env['MODULE_BANNERS']):
+    # TODO: Be nice and identify conflicts in error.
+    env.FatalError("ERROR: Filename conflicts exist in module banners.")
+
+# Build a set of directories containing module banners, and use that
+# to build a --transform option for each directory so that the files
+# are tar'ed up to the proper location.
+module_banner_dirs = set([Dir('#').rel_path(f.get_dir()) for f in env['MODULE_BANNERS']])
+module_banner_transforms = ["--transform %s=$SERVER_DIST_BASENAME" % d for d in module_banner_dirs]
+
+# Allow modules to map original file name directories to subdirectories
+# within the archive (e.g. { "src/bongo/db/modules/enterprise/docs": "snmp"})
+archive_addition_transforms = []
+for full_dir, archive_dir in env["ARCHIVE_ADDITION_DIR_MAP"].items():
+  archive_addition_transforms.append("--transform \"%s=$SERVER_DIST_BASENAME/%s\"" %
+                                     (full_dir, archive_dir))
+
+for target in env["DIST_BINARIES"]:
+    installBinary(env, "db/modules/" + target)
+
+# "dist" target is valid only when --use-new-tools is specified
+# Attempts to build release artifacts without tools must fail
+if has_option("use-new-tools"):
+    env.Command(
+        target='#/${SERVER_ARCHIVE}',
+        source=['#buildscripts/make_archive.py'] + env["MODULE_BANNERS"] + env["ARCHIVE_ADDITIONS"] + distBinaries,
+        action=' '.join(
+            ['$PYTHON ${SOURCES[0]} -o $TARGET'] +
+            archive_addition_transforms +
+            module_banner_transforms +
+            [
+                '--transform $BUILD_DIR/bongo/db/modules/enterprise=$SERVER_DIST_BASENAME/bin',
+                '--transform $BUILD_DIR/bongo/stripped/db/modules/enterprise=$SERVER_DIST_BASENAME/bin',
+                '--transform $BUILD_DIR/bongo/stripped=$SERVER_DIST_BASENAME/bin',
+                '--transform $BUILD_DIR/bongo=$SERVER_DIST_BASENAME/bin',
+                '--transform $BUILD_DIR/bongo/stripped/src/bongo-tools=$SERVER_DIST_BASENAME/bin',
+                '--transform src/bongo-tools=$SERVER_DIST_BASENAME/bin',
+                '${TEMPFILE(SOURCES[1:])}'
+            ],
+        ),
+        BUILD_DIR=env.Dir('$BUILD_DIR').path
+    )
+
+    env.Alias("dist", source='#/${SERVER_ARCHIVE}')
+else:
+    def failDist(env, target, source):
+        env.FatalError("ERROR: 'dist' target only valid with --use-new-tools.")
+    env.Alias("dist", [], [ failDist ] )
+    env.AlwaysBuild("dist")
+
+debug_symbols_dist = env.Command(
+    target='#/${SERVER_DIST_BASENAME}-debugsymbols${DIST_ARCHIVE_SUFFIX}',
+    source=['#buildscripts/make_archive.py'] + distDebugSymbols,
+    action=' '.join(
+        [
+            '$PYTHON ${SOURCES[0]} -o $TARGET',
+            '--transform $BUILD_DIR/bongo/db/modules/enterprise=$SERVER_DIST_BASENAME',
+            '--transform $BUILD_DIR/bongo=$SERVER_DIST_BASENAME',
+            '${TEMPFILE(SOURCES[1:])}',
+        ]
+    ),
+    BUILD_DIR=env.Dir('$BUILD_DIR').path
+)
+env.Alias('dist-debugsymbols', debug_symbols_dist)
+
+#final alias
+env.Alias( "install", "$INSTALL_DIR" )

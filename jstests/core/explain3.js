@@ -19,5 +19,5 @@ try {
 
 s();
 
-// Sanity check to make sure mongod didn't seg fault.
+// Sanity check to make sure bongod didn't seg fault.
 assert.eq(10000, t.count());

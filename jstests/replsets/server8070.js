@@ -108,7 +108,7 @@
            "node 3 is syncing from node 2 :(");
 
     jsTest.log("Pause 3's bgsync thread");
-    stopServerReplication(member3.getMongo());
+    stopServerReplication(member3.getBongo());
 
     // count documents in member 3
     assert.eq(26,
@@ -130,7 +130,7 @@
     }, "Replication member 3 did not apply ops 25-75");
 
     jsTest.log("Start 3's bgsync thread");
-    restartServerReplication(member3.getMongo());
+    restartServerReplication(member3.getBongo());
 
     jsTest.log("Node 3 shouldn't hit rollback");
     var end = (new Date()).getTime() + 10000;

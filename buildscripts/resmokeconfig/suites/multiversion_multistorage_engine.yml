@@ -4,7 +4,7 @@ selector:
     - jstests/multiVersion/mixed_storage_version_replication.js
     - jstests/multiVersion/transitioning_to_and_from_WT.js
 
-# Multiversion tests start their own mongod's.
+# Multiversion tests start their own bongod's.
 executor:
   js_test:
     config:

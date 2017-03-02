@@ -63,7 +63,7 @@
     s.adminCommand({
         movechunk: "test.foo",
         find: {name: "eliot"},
-        to: secondary.getMongo().name,
+        to: secondary.getBongo().name,
         _waitForDelete: true
     });
 

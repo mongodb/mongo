@@ -18,10 +18,10 @@ function writeDataAndRestart(doFsync) {
     }
 
     jsTestLog("kill -9");
-    MongoRunner.stopMongod(conn, /*signal*/ 9);
+    BongoRunner.stopBongod(conn, /*signal*/ 9);
 
     jsTestLog("restart node");
-    conn = MongoRunner.runMongod({
+    conn = BongoRunner.runBongod({
         restart: true,
         port: conn.port,
         cleanData: false,
@@ -37,8 +37,8 @@ if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredT
 } else {
     var name = "wt_nojournal_fsync";
 
-    jsTestLog("run mongod without journaling");
-    conn = MongoRunner.runMongod({storageEngine: "wiredTiger", nojournal: ""});
+    jsTestLog("run bongod without journaling");
+    conn = BongoRunner.runBongod({storageEngine: "wiredTiger", nojournal: ""});
 
     // restart node without fsync and --nojournal.  Data should not be there after restart
     conn = writeDataAndRestart(false);
@@ -50,6 +50,6 @@ if (jsTest.options().storageEngine && jsTest.options().storageEngine !== "wiredT
     jsTestLog("check data is in collection foo");
     assert.eq(conn.getDB(name).foo.count(), 100);
 
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
     jsTestLog("Success!");
 }

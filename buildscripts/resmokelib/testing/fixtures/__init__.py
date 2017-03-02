@@ -5,7 +5,7 @@ Fixtures for executing JSTests against.
 from __future__ import absolute_import
 
 from .interface import Fixture, ReplFixture
-from .standalone import MongoDFixture
+from .standalone import BongoDFixture
 from .replicaset import ReplicaSetFixture
 from .masterslave import MasterSlaveFixture
 from .shardedcluster import ShardedClusterFixture
@@ -15,7 +15,7 @@ NOOP_FIXTURE_CLASS = "Fixture"
 
 _FIXTURES = {
     "Fixture": Fixture,
-    "MongoDFixture": MongoDFixture,
+    "BongoDFixture": BongoDFixture,
     "ReplicaSetFixture": ReplicaSetFixture,
     "MasterSlaveFixture": MasterSlaveFixture,
     "ShardedClusterFixture": ShardedClusterFixture,

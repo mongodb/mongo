@@ -36,7 +36,7 @@
 
     var s = new ShardingTest({
         name: "auth",
-        mongos: 1,
+        bongos: 1,
         shards: 0,
         other: {keyFile: "jstests/libs/key1", chunkSize: 1, enableAutoSplit: true},
     });
@@ -62,8 +62,8 @@
 
     printjson(s.getDB("config").settings.find().toArray());
 
-    print("Restart mongos with different auth options");
-    s.restartMongos(0);
+    print("Restart bongos with different auth options");
+    s.restartBongos(0);
     login(adminUser);
 
     var d1 = new ReplSetTest({name: "d1", nodes: 3, useHostName: true});
@@ -265,7 +265,7 @@
     print("testing map reduce");
 
     // Sharded map reduce can be tricky since all components talk to each other. For example
-    // SERVER-4114 is triggered when 1 mongod connects to another for final reduce it's not
+    // SERVER-4114 is triggered when 1 bongod connects to another for final reduce it's not
     // properly tested here since addresses are localhost, which is more permissive.
     var res = s.getDB("test").runCommand({
         mapreduce: "foo",
@@ -281,19 +281,19 @@
     assert.commandWorked(res);
 
     // Check that dump doesn't get stuck with auth
-    var exitCode = MongoRunner.runMongoTool("mongodump", {
+    var exitCode = BongoRunner.runBongoTool("bongodump", {
         host: s.s.host,
         db: testUser.db,
         username: testUser.username,
         password: testUser.password,
         authenticationMechanism: "SCRAM-SHA-1",
     });
-    assert.eq(0, exitCode, "mongodump failed to run with authentication enabled");
+    assert.eq(0, exitCode, "bongodump failed to run with authentication enabled");
 
     // Test read only users
     print("starting read only tests");
 
-    var readOnlyS = new Mongo(s.getDB("test").getMongo().host);
+    var readOnlyS = new Bongo(s.getDB("test").getBongo().host);
     var readOnlyDB = readOnlyS.getDB("test");
 
     print("   testing find that should fail");
@@ -317,7 +317,7 @@
     assert.commandFailed(readOnlyDB.currentOp());
     assert.commandFailed(readOnlyDB.killOp(123));
 
-    // fsyncUnlock doesn't work in mongos anyway, so no need check authorization for it
+    // fsyncUnlock doesn't work in bongos anyway, so no need check authorization for it
     /*
     broken because of SERVER-4156
     print( "   testing write command (should fail)" );

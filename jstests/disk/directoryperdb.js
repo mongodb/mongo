@@ -1,6 +1,6 @@
 var baseDir = 'jstests_disk_directoryper';
 var baseName = 'directoryperdb';
-var dbpath = MongoRunner.dataPath + baseDir + '/';
+var dbpath = BongoRunner.dataPath + baseDir + '/';
 var storageEngine = db.serverStatus().storageEngine.name;
 
 // The pattern which matches the names of database files
@@ -30,8 +30,8 @@ checkDBFilesInDBDirectory = function(conn, dbToCheck) {
     if (storageEngine == 'mmapv1') {
         conn.adminCommand({fsync: 1});
     } else if (storageEngine == 'wiredTiger') {
-        MongoRunner.stopMongod(conn);
-        conn = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: '', restart: true});
+        BongoRunner.stopBongod(conn);
+        conn = BongoRunner.runBongod({dbpath: dbpath, directoryperdb: '', restart: true});
     }
 
     var dir = dbpath + dbToCheck;
@@ -67,8 +67,8 @@ checkDBDirectoryNonexistent = function(conn, dbToCheck) {
     if (storageEngine == 'mmapv1') {
         conn.adminCommand({fsync: 1});
     } else if (storageEngine == 'wiredTiger') {
-        MongoRunner.stopMongod(conn);
-        conn = MongoRunner.runMongod({dbpath: dbpath, directoryperdb: '', restart: true});
+        BongoRunner.stopBongod(conn);
+        conn = BongoRunner.runBongod({dbpath: dbpath, directoryperdb: '', restart: true});
     }
 
     var files = listFiles(dbpath);
@@ -106,8 +106,8 @@ checkDBDirectoryNonexistent = function(conn, dbToCheck) {
     return conn;
 };
 
-// Start the directoryperdb instance of mongod.
-var m = MongoRunner.runMongod({storageEngine: storageEngine, dbpath: dbpath, directoryperdb: ''});
+// Start the directoryperdb instance of bongod.
+var m = BongoRunner.runBongod({storageEngine: storageEngine, dbpath: dbpath, directoryperdb: ''});
 // Check that the 'local' db has allocated data.
 m = checkDBFilesInDBDirectory(m, 'local');
 
@@ -152,7 +152,7 @@ assertDocumentCount(dbAnd, 1);
 m = checkDBFilesInDBDirectory(m, dbAnd);
 
 // Unicode directoryperdb databases do not work on Windows.
-// Disabled until https://jira.mongodb.org/browse/SERVER-16725
+// Disabled until https://jira.bongodb.org/browse/SERVER-16725
 // is resolved.
 if (!_isWindows()) {
     // Create a database named '処'.

@@ -35,7 +35,7 @@ addShard = function(st, replTest) {
         assert.eq(true, st.adminCommand({addshard: seed}));
     }
     awaitRSClientHosts(
-        new Mongo(st.s.host), replTest.getSecondaries(), {ok: true, secondary: true});
+        new Bongo(st.s.host), replTest.getSecondaries(), {ok: true, secondary: true});
 
     assert.soon(function() {
         var x = st.chunkDiff(coll.getName(), coll.getDB().getName());
@@ -63,7 +63,7 @@ st.s.getDB("config").settings.update({_id: "balancer"}, {$set: {_waitForDelete: 
 var rst0 = st._rs[0].test;
 var rst1 = st._rs[1].test;
 
-var conn = new Mongo(st.s.host);
+var conn = new Bongo(st.s.host);
 var coll = conn.getCollection("test.remove2");
 coll.drop();
 
@@ -186,4 +186,4 @@ addShard(st, rst1);
 
 jsTestLog("finishing!");
 // this should be fixed by SERVER-22176
-st.stop({allowedExitCodes: [MongoRunner.EXIT_ABRUPT]});
+st.stop({allowedExitCodes: [BongoRunner.EXIT_ABRUPT]});

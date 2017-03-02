@@ -1,0 +1,45 @@
+language: go
+
+go_import_path: gopkg.in/mgo.v2
+
+addons:
+    apt:
+        packages:
+
+env:
+    global:
+        - BUCKET=https://niemeyer.s3.amazonaws.com
+    matrix:
+        - GO=1.4.1 BONGODB=x86_64-2.2.7
+        - GO=1.4.1 BONGODB=x86_64-2.4.14
+        - GO=1.4.1 BONGODB=x86_64-2.6.11
+        - GO=1.4.1 BONGODB=x86_64-3.0.9
+        - GO=1.4.1 BONGODB=x86_64-3.2.3-nojournal
+        - GO=1.5.3 BONGODB=x86_64-3.0.9
+        - GO=1.6   BONGODB=x86_64-3.0.9
+
+install:
+    - eval "$(gimme $GO)"
+
+    - wget $BUCKET/bongodb-linux-$BONGODB.tgz
+    - tar xzvf bongodb-linux-$BONGODB.tgz
+    - export PATH=$PWD/bongodb-linux-$BONGODB/bin:$PATH
+
+    - wget $BUCKET/daemontools.tar.gz
+    - tar xzvf daemontools.tar.gz
+    - export PATH=$PWD/daemontools:$PATH
+
+    - go get gopkg.in/check.v1
+    - go get gopkg.in/yaml.v2
+    - go get gopkg.in/tomb.v2
+
+before_script:
+    - export NOIPV6=1
+    - make startdb
+
+script:
+    - (cd bson && go test -check.v)
+    - go test -check.v -fast
+    - (cd txn && go test -check.v)
+
+# vim:sw=4:ts=4:et

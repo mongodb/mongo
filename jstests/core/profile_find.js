@@ -9,7 +9,7 @@
     var testDB = db.getSiblingDB("profile_find");
     assert.commandWorked(testDB.dropDatabase());
     var coll = testDB.getCollection("test");
-    var isLegacyReadMode = (testDB.getMongo().readMode() === "legacy");
+    var isLegacyReadMode = (testDB.getBongo().readMode() === "legacy");
 
     testDB.setProfilingLevel(2);
     const profileEntryFilter = {op: "query"};
@@ -43,7 +43,7 @@
     } else {
         assert.eq(profileObj.query.limit, 1, tojson(profileObj));
         assert.eq(profileObj.protocol,
-                  getProfilerProtocolStringForCommand(testDB.getMongo()),
+                  getProfilerProtocolStringForCommand(testDB.getBongo()),
                   tojson(profileObj));
     }
 
@@ -59,7 +59,7 @@
     assert(profileObj.locks.hasOwnProperty("Global"), tojson(profileObj));
     assert(profileObj.locks.hasOwnProperty("Database"), tojson(profileObj));
     assert(profileObj.locks.hasOwnProperty("Collection"), tojson(profileObj));
-    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+    assert.eq(profileObj.appName, "BongoDB Shell", tojson(profileObj));
 
     //
     // Confirm "cursorId" and "hasSortStage" metrics.
@@ -78,7 +78,7 @@
     assert.eq(profileObj.hasSortStage, true, tojson(profileObj));
     assert(profileObj.hasOwnProperty("cursorid"), tojson(profileObj));
     assert(!profileObj.hasOwnProperty("cursorExhausted"), tojson(profileObj));
-    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+    assert.eq(profileObj.appName, "BongoDB Shell", tojson(profileObj));
 
     //
     // Confirm "fromMultiPlanner" metric.
@@ -94,7 +94,7 @@
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
 
     assert.eq(profileObj.fromMultiPlanner, true, tojson(profileObj));
-    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+    assert.eq(profileObj.appName, "BongoDB Shell", tojson(profileObj));
 
     //
     // Confirm "replanned" metric.
@@ -114,7 +114,7 @@
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
 
     assert.eq(profileObj.replanned, true, tojson(profileObj));
-    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+    assert.eq(profileObj.appName, "BongoDB Shell", tojson(profileObj));
 
     //
     // Confirm that query modifiers such as "hint" are in the profiler document.

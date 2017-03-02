@@ -32,9 +32,9 @@ var $config = extendWorkload($config, function($config, $super) {
         // Save the number of documents found in this chunk's range before the splitChunk
         // operation. This will be used to verify that the same number of documents in that
         // range are found after the splitChunk.
-        // Choose the mongos randomly to distribute load.
+        // Choose the bongos randomly to distribute load.
         var numDocsBefore = ChunkHelper.getNumDocs(
-            ChunkHelper.getRandomMongos(connCache.mongos), ns, chunk.min._id, chunk.max._id);
+            ChunkHelper.getRandomBongos(connCache.bongos), ns, chunk.min._id, chunk.max._id);
 
         // Save the number of chunks before the splitChunk operation. This will be used
         // to verify that the number of chunks after a successful splitChunk increases
@@ -95,43 +95,43 @@ var $config = extendWorkload($config, function($config, $super) {
             }
         }
 
-        // Verify that all mongos processes see the correct after-state on the shards and configs.
+        // Verify that all bongos processes see the correct after-state on the shards and configs.
         // (see comments below for specifics).
-        for (var mongos of connCache.mongos) {
+        for (var bongos of connCache.bongos) {
             // Regardless of if the splitChunk operation succeeded or failed, verify that each
-            // mongos sees as many documents in the chunk's range after the move as there were
+            // bongos sees as many documents in the chunk's range after the move as there were
             // before.
-            var numDocsAfter = ChunkHelper.getNumDocs(mongos, ns, chunk.min._id, chunk.max._id);
+            var numDocsAfter = ChunkHelper.getNumDocs(bongos, ns, chunk.min._id, chunk.max._id);
 
-            msg = 'Mongos does not see same number of documents after splitChunk.\n' + msgBase;
+            msg = 'Bongos does not see same number of documents after splitChunk.\n' + msgBase;
             assertWhenOwnColl.eq(numDocsAfter, numDocsBefore, msgBase);
 
             // Regardless of if the splitChunk operation succeeded or failed,
-            // verify that each mongos sees all data in the original chunk's
+            // verify that each bongos sees all data in the original chunk's
             // range only on the shard the original chunk was on.
             var shardsForChunk =
-                ChunkHelper.getShardsForRange(mongos, ns, chunk.min._id, chunk.max._id);
-            msg = 'Mongos does not see exactly 1 shard for chunk after splitChunk.\n' + msgBase +
+                ChunkHelper.getShardsForRange(bongos, ns, chunk.min._id, chunk.max._id);
+            msg = 'Bongos does not see exactly 1 shard for chunk after splitChunk.\n' + msgBase +
                 '\n' +
-                'Mongos find().explain() results for chunk: ' + tojson(shardsForChunk);
+                'Bongos find().explain() results for chunk: ' + tojson(shardsForChunk);
             assertWhenOwnColl.eq(shardsForChunk.shards.length, 1, msg);
 
-            msg = 'Mongos sees different shard for chunk than chunk does after splitChunk.\n' +
+            msg = 'Bongos sees different shard for chunk than chunk does after splitChunk.\n' +
                 msgBase + '\n' +
-                'Mongos find().explain() results for chunk: ' + tojson(shardsForChunk);
+                'Bongos find().explain() results for chunk: ' + tojson(shardsForChunk);
             assertWhenOwnColl.eq(shardsForChunk.shards[0], chunk.shard, msg);
 
-            // If the splitChunk operation succeeded, verify that the mongos sees two chunks between
+            // If the splitChunk operation succeeded, verify that the bongos sees two chunks between
             // the old chunk's lower and upper bounds. If the operation failed, verify that the
-            // mongos still only sees one chunk between the old chunk's lower and upper bounds.
+            // bongos still only sees one chunk between the old chunk's lower and upper bounds.
             var numChunksBetweenOldChunksBounds =
-                ChunkHelper.getNumChunks(mongos, chunk.min._id, chunk.max._id);
+                ChunkHelper.getNumChunks(bongos, chunk.min._id, chunk.max._id);
             if (splitChunkRes.ok) {
-                msg = 'splitChunk succeeded but the mongos does not see exactly 2 chunks ' +
+                msg = 'splitChunk succeeded but the bongos does not see exactly 2 chunks ' +
                     'between the chunk bounds.\n' + msgBase;
                 assertWhenOwnColl.eq(numChunksBetweenOldChunksBounds, 2, msg);
             } else {
-                msg = 'splitChunk failed but the mongos does not see exactly 1 chunk between ' +
+                msg = 'splitChunk failed but the bongos does not see exactly 1 chunk between ' +
                     'the chunk bounds.\n' + msgBase;
                 assertWhenOwnColl.eq(numChunksBetweenOldChunksBounds, 1, msg);
             }
@@ -139,13 +139,13 @@ var $config = extendWorkload($config, function($config, $super) {
             // If the splitChunk operation succeeded, verify that the total number of chunks in our
             // partition has increased by 1. If it failed, verify that it has stayed the same.
             var numChunksAfter = ChunkHelper.getNumChunks(
-                mongos, this.partition.chunkLower, this.partition.chunkUpper);
+                bongos, this.partition.chunkLower, this.partition.chunkUpper);
             if (splitChunkRes.ok) {
-                msg = 'splitChunk succeeded but the mongos does nnot see exactly 1 more ' +
+                msg = 'splitChunk succeeded but the bongos does nnot see exactly 1 more ' +
                     'chunk between the chunk bounds.\n' + msgBase;
                 assertWhenOwnColl.eq(numChunksAfter, numChunksBefore + 1, msg);
             } else {
-                msg = 'splitChunk failed but the mongos does not see the same number ' +
+                msg = 'splitChunk failed but the bongos does not see the same number ' +
                     'of chunks between the chunk bounds.\n' + msgBase;
                 assertWhenOwnColl.eq(numChunksAfter, numChunksBefore, msg);
             }

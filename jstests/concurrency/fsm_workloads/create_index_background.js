@@ -8,7 +8,7 @@
  * index has completed and the test no longer needs to execute more transitions.
  * The first thread (tid = 0) will be the one that creates the background index.
  */
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isBongos
 
 var $config = (function() {
 
@@ -93,7 +93,7 @@ var $config = (function() {
         function updateDocs(db, collName) {
             // Update random documents from the collection on index x.
             // Since an update requires a shard key, do not run in a sharded cluster.
-            if (!isMongos(db)) {
+            if (!isBongos(db)) {
                 var coll = db[collName];
                 var res;
                 var count = coll.find({tid: this.tid}).itcount();
@@ -108,7 +108,7 @@ var $config = (function() {
                     res =
                         coll.update({x: Random.randInt(highest), tid: this.tid}, {$inc: {crud: 1}});
                     assertAlways.writeOK(res);
-                    if (db.getMongo().writeMode() === 'commands') {
+                    if (db.getBongo().writeMode() === 'commands') {
                         assertWhenOwnColl.contains(res.nModified, [0, 1], tojson(res));
                     }
                     assertWhenOwnColl.contains(res.nMatched, [0, 1], tojson(res));
@@ -189,7 +189,7 @@ var $config = (function() {
         assertAlways.eq(nSetupDocs, res.nInserted, tojson(res));
 
         // Increase the following parameters to reduce the number of yields.
-        cluster.executeOnMongodNodes(function(db) {
+        cluster.executeOnBongodNodes(function(db) {
             var res;
             res = db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 100000});
             assertAlways.commandWorked(res);
@@ -202,7 +202,7 @@ var $config = (function() {
     }
 
     function teardown(db, collName, cluster) {
-        cluster.executeOnMongodNodes(function(db) {
+        cluster.executeOnBongodNodes(function(db) {
             assertAlways.commandWorked(db.adminCommand({
                 setParameter: 1,
                 internalQueryExecYieldIterations: internalQueryExecYieldIterations

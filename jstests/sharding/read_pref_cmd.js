@@ -28,15 +28,15 @@ var tearDown = function() {
 /**
  * Performs a series of tests on commands with read preference.
  *
- * @param conn {Mongo} the connection object of which to test the read
+ * @param conn {Bongo} the connection object of which to test the read
  *     preference functionality.
- * @param hostList {Array.<Mongo>} list of the replica set host members.
- * @param isMongos {boolean} true if conn is a mongos connection.
+ * @param hostList {Array.<Bongo>} list of the replica set host members.
+ * @param isBongos {boolean} true if conn is a bongos connection.
  * @param mode {string} a read preference mode like 'secondary'
  * @param tagSets {Array.<Object>} list of tag sets to use
  * @param secExpected {boolean} true if we expect to run any commands on secondary
  */
-var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secExpected) {
+var testReadPreference = function(conn, hostList, isBongos, mode, tagSets, secExpected) {
     var testDB = conn.getDB('test');
     conn.setSlaveOk(false);  // purely rely on readPref
     jsTest.log('Testing mode: ' + mode + ', tag sets: ' + tojson(tagSets));
@@ -115,7 +115,7 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
     // Test inline mapReduce on sharded collection.
     // Note that in sharded map reduce, it will output the result in a temp collection
     // even if out is inline.
-    if (isMongos) {
+    if (isBongos) {
         cmdTest({mapreduce: 'user', map: mapFunc, reduce: reduceFunc, out: {inline: 1}},
                 false,
                 formatProfileQuery({mapreduce: 'user', shardedFirstPass: true}));
@@ -127,7 +127,7 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
             formatProfileQuery({mapreduce: 'mrIn', 'out.inline': 1}));
 
     // Test non-inline mapReduce on sharded collection.
-    if (isMongos) {
+    if (isBongos) {
         cmdTest({mapreduce: 'user', map: mapFunc, reduce: reduceFunc, out: {replace: 'mrOut'}},
                 false,
                 formatProfileQuery({mapreduce: 'user', shardedFirstPass: true}));
@@ -152,8 +152,8 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
     testDB.runCommand({getLastError: 1, w: NODE_COUNT});
     cmdTest({geoNear: 'user', near: [1, 1]}, true, formatProfileQuery({geoNear: 'user'}));
 
-    // Mongos doesn't implement geoSearch; test it only with ReplicaSetConnection.
-    if (!isMongos) {
+    // Bongos doesn't implement geoSearch; test it only with ReplicaSetConnection.
+    if (!isBongos) {
         cmdTest({geoSearch: 'user', near: [1, 1], search: {type: 'restaurant'}, maxDistance: 10},
                 true,
                 formatProfileQuery({geoSearch: 'user'}));
@@ -173,14 +173,14 @@ var testReadPreference = function(conn, hostList, isMongos, mode, tagSets, secEx
 /**
  * Verify that commands fail with the given combination of mode and tags.
  *
- * @param conn {Mongo} the connection object of which to test the read
+ * @param conn {Bongo} the connection object of which to test the read
  *     preference functionality.
- * @param hostList {Array.<Mongo>} list of the replica set host members.
- * @param isMongos {boolean} true if conn is a mongos connection.
+ * @param hostList {Array.<Bongo>} list of the replica set host members.
+ * @param isBongos {boolean} true if conn is a bongos connection.
  * @param mode {string} a read preference mode like 'secondary'
  * @param tagSets {Array.<Object>} list of tag sets to use
  */
-var testBadMode = function(conn, hostList, isMongos, mode, tagSets) {
+var testBadMode = function(conn, hostList, isBongos, mode, tagSets) {
     var failureMsg, testDB, cmdResult;
 
     jsTest.log('Expecting failure for mode: ' + mode + ', tag sets: ' + tojson(tagSets));
@@ -189,7 +189,7 @@ var testBadMode = function(conn, hostList, isMongos, mode, tagSets) {
     testDB = conn.getDB('test');
 
     // Test that a command that could be routed to a secondary fails with bad mode / tags.
-    if (isMongos) {
+    if (isBongos) {
         // Command result should have ok: 0.
         cmdResult = testDB.runReadCommand({distinct: 'user', key: 'x'});
         jsTest.log('cmd result: ' + tojson(cmdResult));
@@ -208,7 +208,7 @@ var testBadMode = function(conn, hostList, isMongos, mode, tagSets) {
     }
 };
 
-var testAllModes = function(conn, hostList, isMongos) {
+var testAllModes = function(conn, hostList, isBongos) {
 
     // The primary is tagged with { tag: 'one' } and the secondary with
     // { tag: 'two' } so we can test the interaction of modes and tags. Test
@@ -241,7 +241,7 @@ var testAllModes = function(conn, hostList, isMongos) {
         var mode = args[0], tagSets = args[1], secExpected = args[2];
 
         setUp();
-        testReadPreference(conn, hostList, isMongos, mode, tagSets, secExpected);
+        testReadPreference(conn, hostList, isBongos, mode, tagSets, secExpected);
         tearDown();
     });
 
@@ -262,7 +262,7 @@ var testAllModes = function(conn, hostList, isMongos) {
         var mode = args[0], tagSets = args[1];
 
         setUp();
-        testBadMode(conn, hostList, isMongos, mode, tagSets);
+        testBadMode(conn, hostList, isBongos, mode, tagSets);
         tearDown();
     });
 };
@@ -300,13 +300,13 @@ try {
 
 st.rs0.awaitSecondaryNodes();
 
-// Force mongos to reconnect after our reconfig
+// Force bongos to reconnect after our reconfig
 assert.soon(function() {
     try {
         st.s.getDB('foo').runCommand({create: 'foo'});
         return true;
     } catch (x) {
-        // Intentionally caused an error that forces mongos's monitor to refresh.
+        // Intentionally caused an error that forces bongos's monitor to refresh.
         jsTest.log('Caught exception while doing dummy command: ' + tojson(x));
         return false;
     }
@@ -318,7 +318,7 @@ reconnect(secondary);
 rsConfig = primary.getDB("local").system.replset.findOne();
 jsTest.log('got rsconf ' + tojson(rsConfig));
 
-var replConn = new Mongo(st.rs0.getURL());
+var replConn = new Bongo(st.rs0.getURL());
 
 // Make sure replica set connection is ready
 _awaitRSHostViaRSMonitor(primary.name, {ok: true, tags: PRIMARY_TAG}, st.rs0.name);
@@ -334,7 +334,7 @@ assert.commandWorked(
 
 testAllModes(replConn, st.rs0.nodes, false);
 
-jsTest.log('Starting test for mongos connection');
+jsTest.log('Starting test for bongos connection');
 
 testAllModes(st.s, st.rs0.nodes, true);
 

@@ -1,5 +1,5 @@
 // Tests basic sharding with x509 cluster auth. The purpose is to verify the connectivity between
-// mongos and the shards.
+// bongos and the shards.
 (function() {
     'use strict';
 
@@ -17,11 +17,11 @@
     // "enableBalancer" line could be removed.
     var st = new ShardingTest({
         shards: 2,
-        mongos: 1,
+        bongos: 1,
         other: {
             enableBalancer: true,
             configOptions: x509_options,
-            mongosOptions: x509_options,
+            bongosOptions: x509_options,
             rsOptions: x509_options,
             shardOptions: x509_options
         }

@@ -4,23 +4,23 @@
     'use strict';
 
     // start up a new sharded cluster
-    var st = new ShardingTest({shards: 2, mongos: 1});
+    var st = new ShardingTest({shards: 2, bongos: 1});
 
-    var mongos = st.s;
-    var admin = mongos.getDB("admin");
-    var shards = mongos.getDB("config").shards.find().toArray();
-    var coll = mongos.getCollection("foo.bar");
+    var bongos = st.s;
+    var admin = bongos.getDB("admin");
+    var shards = bongos.getDB("config").shards.find().toArray();
+    var coll = bongos.getCollection("foo.bar");
 
     // Enable sharding of the collection
-    assert.commandWorked(mongos.adminCommand({enablesharding: coll.getDB() + ""}));
+    assert.commandWorked(bongos.adminCommand({enablesharding: coll.getDB() + ""}));
     st.ensurePrimaryShard(coll.getDB() + "", shards[0]._id);
-    assert.commandWorked(mongos.adminCommand({shardcollection: coll + "", key: {_id: 1}}));
+    assert.commandWorked(bongos.adminCommand({shardcollection: coll + "", key: {_id: 1}}));
 
     var numChunks = 30;
 
     // Create a bunch of chunks
     for (var i = 0; i < numChunks; i++) {
-        assert.commandWorked(mongos.adminCommand({split: coll + "", middle: {_id: i}}));
+        assert.commandWorked(bongos.adminCommand({split: coll + "", middle: {_id: i}}));
     }
 
     jsTest.log("Inserting a lot of small documents...");
@@ -32,9 +32,9 @@
     }
     assert.writeOK(bulk.execute());
 
-    jsTest.log("Opening a mongod cursor...");
+    jsTest.log("Opening a bongod cursor...");
 
-    // Open a new cursor on the mongod
+    // Open a new cursor on the bongod
     var cursor = coll.find();
     var next = cursor.next();
 
@@ -43,7 +43,7 @@
     // Move a bunch of chunks, but don't close the cursor so they stack.
     for (var i = 0; i < numChunks; i++) {
         assert.commandWorked(
-            mongos.adminCommand({moveChunk: coll + "", find: {_id: i}, to: shards[1]._id}));
+            bongos.adminCommand({moveChunk: coll + "", find: {_id: i}, to: shards[1]._id}));
     }
 
     jsTest.log("Dropping and re-creating collection...");

@@ -42,4 +42,4 @@ assert.soon(function() {
     return 1002 == s1.getDB(baseName)[baseName].count();
 });
 
-assert(!rawMongoProgramOutput().match(/resync/));
+assert(!rawBongoProgramOutput().match(/resync/));

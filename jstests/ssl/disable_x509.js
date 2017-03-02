@@ -1,8 +1,8 @@
-// Test enabling and disabling the MONGODB-X509 auth mech
+// Test enabling and disabling the BONGODB-X509 auth mech
 
-var CLIENT_USER = "C=US,ST=New York,L=New York City,O=MongoDB,OU=KernelUser,CN=client";
+var CLIENT_USER = "C=US,ST=New York,L=New York City,O=BongoDB,OU=KernelUser,CN=client";
 
-var conn = MongoRunner.runMongod({
+var conn = BongoRunner.runBongod({
     smallfiles: "",
     auth: "",
     sslMode: "requireSSL",
@@ -11,12 +11,12 @@ var conn = MongoRunner.runMongod({
 });
 
 // Find out if this build supports the authenticationMechanisms startup parameter.
-// If it does, restart with and without the MONGODB-X509 mechanisms enabled.
+// If it does, restart with and without the BONGODB-X509 mechanisms enabled.
 var cmdOut = conn.getDB('admin').runCommand({getParameter: 1, authenticationMechanisms: 1});
 if (cmdOut.ok) {
-    MongoRunner.stopMongod(conn);
-    conn = MongoRunner.runMongod(
-        {restart: conn, setParameter: "authenticationMechanisms=MONGODB-X509"});
+    BongoRunner.stopBongod(conn);
+    conn = BongoRunner.runBongod(
+        {restart: conn, setParameter: "authenticationMechanisms=BONGODB-X509"});
     external = conn.getDB("$external");
 
     // Add user using localhost exception
@@ -33,14 +33,14 @@ if (cmdOut.ok) {
         test.foo.findOne();
     }, [], "read without login");
 
-    assert(external.auth({user: CLIENT_USER, mechanism: 'MONGODB-X509'}),
+    assert(external.auth({user: CLIENT_USER, mechanism: 'BONGODB-X509'}),
            "authentication with valid user failed");
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
 
-    conn = MongoRunner.runMongod(
+    conn = BongoRunner.runBongod(
         {restart: conn, setParameter: "authenticationMechanisms=SCRAM-SHA-1"});
     external = conn.getDB("$external");
 
-    assert(!external.auth({user: CLIENT_USER, mechanism: 'MONGODB-X509'}),
+    assert(!external.auth({user: CLIENT_USER, mechanism: 'BONGODB-X509'}),
            "authentication with disabled auth mechanism succeeded");
 }

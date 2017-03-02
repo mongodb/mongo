@@ -7,13 +7,13 @@ load('jstests/libs/command_line/test_parsed_options.js');
 // Object Check
 jsTest.log("Testing \"objcheck\" command line option");
 var expectedResult = {"parsed": {"net": {"wireObjectCheck": true}}};
-testGetCmdLineOptsMongod({objcheck: ""}, expectedResult);
+testGetCmdLineOptsBongod({objcheck: ""}, expectedResult);
 
 jsTest.log("Testing \"noobjcheck\" command line option");
 expectedResult = {
     "parsed": {"net": {"wireObjectCheck": false}}
 };
-testGetCmdLineOptsMongod({noobjcheck: ""}, expectedResult);
+testGetCmdLineOptsBongod({noobjcheck: ""}, expectedResult);
 
 jsTest.log("Testing \"net.wireObjectCheck\" config file option");
 expectedResult = {
@@ -22,37 +22,37 @@ expectedResult = {
         "net": {"wireObjectCheck": true}
     }
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/enable_objcheck.json"},
+testGetCmdLineOptsBongod({config: "jstests/libs/config_files/enable_objcheck.json"},
                          expectedResult);
 
 jsTest.log("Testing with no explicit network option setting");
 expectedResult = {
     "parsed": {"net": {}}
 };
-testGetCmdLineOptsMongod({}, expectedResult);
+testGetCmdLineOptsBongod({}, expectedResult);
 
 // HTTP Interface
 jsTest.log("Testing \"httpinterface\" command line option");
 var expectedResult = {"parsed": {"net": {"http": {"enabled": true}}}};
-testGetCmdLineOptsMongod({httpinterface: ""}, expectedResult);
+testGetCmdLineOptsBongod({httpinterface: ""}, expectedResult);
 
 jsTest.log("Testing \"nohttpinterface\" command line option");
 expectedResult = {
     "parsed": {"net": {"http": {"enabled": false}}}
 };
-testGetCmdLineOptsMongod({nohttpinterface: ""}, expectedResult);
+testGetCmdLineOptsBongod({nohttpinterface: ""}, expectedResult);
 
 jsTest.log("Testing implicit enabling of http interface with \"jsonp\" command line option");
 expectedResult = {
     "parsed": {"net": {"http": {"JSONPEnabled": true, "enabled": true}}}
 };
-testGetCmdLineOptsMongod({jsonp: ""}, expectedResult);
+testGetCmdLineOptsBongod({jsonp: ""}, expectedResult);
 
 jsTest.log("Testing implicit enabling of http interface with \"rest\" command line option");
 expectedResult = {
     "parsed": {"net": {"http": {"RESTInterfaceEnabled": true, "enabled": true}}}
 };
-testGetCmdLineOptsMongod({rest: ""}, expectedResult);
+testGetCmdLineOptsBongod({rest: ""}, expectedResult);
 
 jsTest.log("Testing \"net.http.enabled\" config file option");
 expectedResult = {
@@ -61,20 +61,20 @@ expectedResult = {
         "net": {"http": {"enabled": true}}
     }
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/enable_httpinterface.json"},
+testGetCmdLineOptsBongod({config: "jstests/libs/config_files/enable_httpinterface.json"},
                          expectedResult);
 
 jsTest.log("Testing with no explicit network option setting");
 expectedResult = {
     "parsed": {"net": {}}
 };
-testGetCmdLineOptsMongod({}, expectedResult);
+testGetCmdLineOptsBongod({}, expectedResult);
 
 // Unix Socket
 if (!_isWindows()) {
     jsTest.log("Testing \"nounixsocket\" command line option");
     expectedResult = {"parsed": {"net": {"unixDomainSocket": {"enabled": false}}}};
-    testGetCmdLineOptsMongod({nounixsocket: ""}, expectedResult);
+    testGetCmdLineOptsBongod({nounixsocket: ""}, expectedResult);
 
     jsTest.log("Testing \"net.wireObjectCheck\" config file option");
     expectedResult = {
@@ -83,12 +83,12 @@ if (!_isWindows()) {
             "net": {"unixDomainSocket": {"enabled": true}}
         }
     };
-    testGetCmdLineOptsMongod({config: "jstests/libs/config_files/enable_unixsocket.json"},
+    testGetCmdLineOptsBongod({config: "jstests/libs/config_files/enable_unixsocket.json"},
                              expectedResult);
 
     jsTest.log("Testing with no explicit network option setting");
     expectedResult = {"parsed": {"net": {}}};
-    testGetCmdLineOptsMongod({}, expectedResult);
+    testGetCmdLineOptsBongod({}, expectedResult);
 }
 
 // Test that we preserve switches explicitly set to false in config files.  See SERVER-13439.
@@ -99,28 +99,28 @@ expectedResult = {
         "net": {"http": {"RESTInterfaceEnabled": false}}
     }
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/disable_rest_interface.json"},
+testGetCmdLineOptsBongod({config: "jstests/libs/config_files/disable_rest_interface.json"},
                          expectedResult);
 
-jsTest.log("Testing explicitly disabling \"net.http.JSONPEnabled\" config file option on mongoD");
+jsTest.log("Testing explicitly disabling \"net.http.JSONPEnabled\" config file option on bongoD");
 expectedResult = {
     "parsed": {
         "config": "jstests/libs/config_files/disable_jsonp.json",
         "net": {"http": {"JSONPEnabled": false}}
     }
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/disable_jsonp.json"}, expectedResult);
+testGetCmdLineOptsBongod({config: "jstests/libs/config_files/disable_jsonp.json"}, expectedResult);
 
-// jsonp on mongos is legacy and not supported in json/yaml config files since this interface is not
+// jsonp on bongos is legacy and not supported in json/yaml config files since this interface is not
 // well defined.  See SERVER-11707 for an example.
-jsTest.log("Testing explicitly disabling \"jsonp\" config file option on mongoS");
+jsTest.log("Testing explicitly disabling \"jsonp\" config file option on bongoS");
 expectedResult = {
     "parsed": {
         "config": "jstests/libs/config_files/disable_jsonp.ini",
         "net": {"http": {"JSONPEnabled": false}}
     }
 };
-testGetCmdLineOptsMongos({config: "jstests/libs/config_files/disable_jsonp.ini"}, expectedResult);
+testGetCmdLineOptsBongos({config: "jstests/libs/config_files/disable_jsonp.ini"}, expectedResult);
 
 jsTest.log("Testing explicitly disabled \"objcheck\" config file option");
 expectedResult = {
@@ -129,7 +129,7 @@ expectedResult = {
         "net": {"wireObjectCheck": false}
     }
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/disable_objcheck.ini"},
+testGetCmdLineOptsBongod({config: "jstests/libs/config_files/disable_objcheck.ini"},
                          expectedResult);
 
 jsTest.log("Testing explicitly disabled \"noobjcheck\" config file option");
@@ -139,7 +139,7 @@ expectedResult = {
         "net": {"wireObjectCheck": true}
     }
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/disable_noobjcheck.ini"},
+testGetCmdLineOptsBongod({config: "jstests/libs/config_files/disable_noobjcheck.ini"},
                          expectedResult);
 
 jsTest.log("Testing explicitly disabled \"httpinterface\" config file option");
@@ -149,7 +149,7 @@ expectedResult = {
         "net": {"http": {"enabled": false}}
     }
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/disable_httpinterface.ini"},
+testGetCmdLineOptsBongod({config: "jstests/libs/config_files/disable_httpinterface.ini"},
                          expectedResult);
 
 jsTest.log("Testing explicitly disabled \"nohttpinterface\" config file option");
@@ -159,14 +159,14 @@ expectedResult = {
         "net": {"http": {"enabled": true}}
     }
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/disable_nohttpinterface.ini"},
+testGetCmdLineOptsBongod({config: "jstests/libs/config_files/disable_nohttpinterface.ini"},
                          expectedResult);
 
 jsTest.log("Testing explicitly disabled \"ipv6\" config file option");
 expectedResult = {
     "parsed": {"config": "jstests/libs/config_files/disable_ipv6.ini", "net": {"ipv6": false}}
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/disable_ipv6.ini"}, expectedResult);
+testGetCmdLineOptsBongod({config: "jstests/libs/config_files/disable_ipv6.ini"}, expectedResult);
 
 if (!_isWindows()) {
     jsTest.log("Testing explicitly disabled \"nounixsocket\" config file option");
@@ -176,7 +176,7 @@ if (!_isWindows()) {
             "net": {"unixDomainSocket": {"enabled": true}}
         }
     };
-    testGetCmdLineOptsMongod({config: "jstests/libs/config_files/disable_nounixsocket.ini"},
+    testGetCmdLineOptsBongod({config: "jstests/libs/config_files/disable_nounixsocket.ini"},
                              expectedResult);
 }
 

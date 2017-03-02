@@ -1,6 +1,6 @@
 /**
  * Basic test for the 'sharding' section of the serverStatus response object for
- * both mongos and the shard.
+ * both bongos and the shard.
  */
 
 (function() {
@@ -20,7 +20,7 @@
         assert.neq(shardingSection, null);
 
         var configConnStr = shardingSection.configsvrConnectionString;
-        var configConn = new Mongo(configConnStr);
+        var configConn = new Bongo(configConnStr);
         var configIsMaster = configConn.getDB('admin').runCommand({isMaster: 1});
 
         var configOpTimeObj = shardingSection.lastSeenConfigServerOpTime;
@@ -39,12 +39,12 @@
         }
     };
 
-    var mongosServerStatus = testDB.adminCommand({serverStatus: 1});
+    var bongosServerStatus = testDB.adminCommand({serverStatus: 1});
     var isCSRS = st.configRS != null;
-    checkShardingServerStatus(mongosServerStatus, isCSRS);
+    checkShardingServerStatus(bongosServerStatus, isCSRS);
 
-    var mongodServerStatus = st.d0.getDB('admin').runCommand({serverStatus: 1});
-    checkShardingServerStatus(mongodServerStatus, isCSRS);
+    var bongodServerStatus = st.d0.getDB('admin').runCommand({serverStatus: 1});
+    checkShardingServerStatus(bongodServerStatus, isCSRS);
 
     st.stop();
 })();

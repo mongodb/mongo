@@ -1,0 +1,22 @@
+# -*- mode: python; -*-
+
+Import('env')
+
+env = env.Clone()
+
+bongobridge = env.Program(
+    target="bongobridge",
+    source=[
+        "bridge.cpp",
+        "bridge_commands.cpp",
+        "bongobridge_options.cpp",
+        "bongobridge_options_init.cpp"
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/bongo/client/clientdriver",
+        "$BUILD_DIR/bongo/util/signal_handlers",
+        "$BUILD_DIR/bongo/util/options_parser/options_parser_init",
+    ],
+)
+
+env.Install("#/", bongobridge)

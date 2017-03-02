@@ -1,5 +1,5 @@
 // Check that username information gets recorded properly in profiler.
-var conn = MongoRunner.runMongod();
+var conn = BongoRunner.runBongod();
 var db1 = conn.getDB("profile-a");
 var db2 = db1.getSisterDB("profile-b");
 var username = "user";

@@ -15,7 +15,7 @@
     assert.eq(coll.find({a: "124"}).count(), 1);
 
     // $min respects query collation.
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getBongo().writeMode() === "commands") {
         coll.drop();
 
         // 1234 > 124, so no change should occur.
@@ -36,7 +36,7 @@
     assert.eq(coll.find({a: "124"}).count(), 1);
 
     // $max respects query collation.
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getBongo().writeMode() === "commands") {
         coll.drop();
 
         // "1234" < "124", so an update should not occur.
@@ -57,7 +57,7 @@
     assert.eq(coll.find({a: "1234"}).count(), 1);
 
     // $addToSet respects query collation.
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getBongo().writeMode() === "commands") {
         coll.drop();
 
         // "foo" == "FOO" (case-insensitive), so set isn't extended.
@@ -94,7 +94,7 @@
     assert.eq(set.length, 1);
 
     // $pull respects query collation.
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getBongo().writeMode() === "commands") {
         coll.drop();
 
         // "foo" != "FOO" (case-sensitive), so it is not pulled.
@@ -141,7 +141,7 @@
     assert.eq(arr.length, 0);
 
     // $pullAll respects query collation.
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getBongo().writeMode() === "commands") {
         coll.drop();
 
         // "foo" != "FOO" (case-sensitive), so no changes are made.
@@ -165,7 +165,7 @@
     assert.eq(arr.length, 0);
 
     // $push with $sort respects query collation.
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getBongo().writeMode() === "commands") {
         coll.drop();
 
         // "1230" < "1234" < "124" (case-sensitive)
@@ -200,7 +200,7 @@
     assert.eq(arr[2], "1234");
 
     // $ positional operator respects query collation on $set.
-    if (db.getMongo().writeMode() === "commands") {
+    if (db.getBongo().writeMode() === "commands") {
         coll.drop();
 
         // "foo" != "FOO" (case-sensitive) so no update occurs.

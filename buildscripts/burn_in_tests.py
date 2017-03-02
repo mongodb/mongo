@@ -153,8 +153,8 @@ def read_evg_config():
 def find_last_activated_task(revisions, variant, branch_name):
     """ Get the git hash of the most recently activated build before this one """
     rest_prefix = "/rest/v1/"
-    project = "mongodb-mongo-" + branch_name
-    build_prefix = "mongodb_mongo_" + branch_name + "_" + variant.replace('-', '_')
+    project = "bongodb-bongo-" + branch_name
+    build_prefix = "bongodb_bongo_" + branch_name + "_" + variant.replace('-', '_')
 
     evg_cfg = read_evg_config()
     try:

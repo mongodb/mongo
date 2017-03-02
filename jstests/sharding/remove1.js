@@ -24,11 +24,11 @@
     assert(!s.admin.runCommand({removeshard: "shard0001"}).ok, "allowed removing last shard");
 
     // should create a shard0002 shard
-    var conn = MongoRunner.runMongod({});
+    var conn = BongoRunner.runBongod({});
     assert(s.admin.runCommand({addshard: conn.host}).ok, "failed to add shard");
     assert.eq(2, s.config.shards.count(), "new server does not appear in count");
 
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
     s.stop();
 
 })();

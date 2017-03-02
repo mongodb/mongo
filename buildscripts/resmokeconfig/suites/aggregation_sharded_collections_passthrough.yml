@@ -11,7 +11,7 @@ selector:
     - jstests/aggregation/bugs/server6118.js
     - jstests/aggregation/bugs/server6179.js
     - jstests/aggregation/bugs/server7781.js
-    - jstests/aggregation/mongos_slaveok.js
+    - jstests/aggregation/bongos_slaveok.js
     - jstests/aggregation/sources/addFields/use_cases.js
     - jstests/aggregation/sources/addFields/weather.js
     - jstests/aggregation/sources/facet/use_cases.js
@@ -20,7 +20,7 @@ selector:
     - jstests/aggregation/testshard1.js
     # The following tests start their own ReplSetTest.
     - jstests/aggregation/testSlave.js
-    # The following tests start their own mongod.
+    # The following tests start their own bongod.
     - jstests/aggregation/bugs/cursor_timeout.js
     - jstests/aggregation/bugs/lookup_unwind_getmore.js
     - jstests/aggregation/bugs/lookup_unwind_killcursor.js
@@ -37,10 +37,10 @@ executor:
       n: 20
     fixture:
       class: ShardedClusterFixture
-      mongos_options:
+      bongos_options:
         set_parameters:
           enableTestCommands: 1
-      mongod_options:
+      bongod_options:
         nopreallocj: ''
         set_parameters:
           enableTestCommands: 1

@@ -41,7 +41,7 @@
     assert.commandWorked(nonExistentDb.repairDatabase());
 
     // 5. Verify only "repairDB" exists.
-    var dbNames = db.getMongo().getDBNames();
+    var dbNames = db.getBongo().getDBNames();
     assert.contains(
         "repair_database_input_validation_REPAIRDB", dbNames, "Should contain REPAIRDB");
     assert.eq(false, dbNames.some(function(x) {

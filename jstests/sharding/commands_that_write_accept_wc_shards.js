@@ -16,12 +16,12 @@ load('jstests/libs/write_concern_util.js');
             rs1: {nodes: 3, settings: {chainingAllowed: false}}
         },
         configReplSetTestOptions: {settings: {chainingAllowed: false}},
-        mongos: 1,
+        bongos: 1,
     });
 
-    var mongos = st.s;
+    var bongos = st.s;
     var dbName = "wc-test-shards";
-    var db = mongos.getDB(dbName);
+    var db = bongos.getDB(dbName);
     var collName = 'leaves';
     var coll = db[collName];
 

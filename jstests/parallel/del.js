@@ -1,7 +1,7 @@
 load('jstests/libs/parallelTester.js');
 
 N = 1000;
-HOST = db.getMongo().host;
+HOST = db.getBongo().host;
 
 a = db.getSisterDB("fooa");
 b = db.getSisterDB("foob");
@@ -9,7 +9,7 @@ a.dropDatabase();
 b.dropDatabase();
 
 function del1(dbname, host, max) {
-    var m = new Mongo(host);
+    var m = new Bongo(host);
     var db = m.getDB("foo" + dbname);
     var t = db.del;
 
@@ -31,7 +31,7 @@ function del1(dbname, host, max) {
 }
 
 function del2(dbname, host, max) {
-    var m = new Mongo(host);
+    var m = new Bongo(host);
     var db = m.getDB("foo" + dbname);
     var t = db.del;
 

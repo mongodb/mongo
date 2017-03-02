@@ -44,10 +44,10 @@
  *      database as its single argument.
  *
  *  skipSharded
- *      If true, do not run this command on a mongos.
+ *      If true, do not run this command on a bongos.
  *
  *  skipStandalone
- *      If true, do not run this command on a standalone mongod.
+ *      If true, do not run this command on a standalone bongod.
  */
 
 (function() {
@@ -105,7 +105,7 @@
             skip: "Tested in views/views_sharded.js",
         },
         clone: {skip: "Tested in replsets/cloneDb.js"},
-        cloneCollection: {skip: "Tested in noPassthroughWithMongod/clonecollection.js"},
+        cloneCollection: {skip: "Tested in noPassthroughWithBongod/clonecollection.js"},
         cloneCollectionAsCapped: {
             command: {cloneCollectionAsCapped: "view", toCollection: "testcapped", size: 10240},
             expectFailure: true,
@@ -268,7 +268,7 @@
             command: {getShardVersion: "test.view"},
             isAdminCommand: true,
             expectFailure: true,
-            skipSharded: true,  // mongos is tested in views/views_sharded.js
+            skipSharded: true,  // bongos is tested in views/views_sharded.js
         },
         getnonce: {skip: isUnrelated},
         godinsert: {skip: isAnInternalCommand},
@@ -505,10 +505,10 @@
             assert.commandFailed(res, msg);
     };
 
-    // Are we on a mongos?
+    // Are we on a bongos?
     var isMaster = db.runCommand("ismaster");
     assert.commandWorked(isMaster);
-    var isMongos = (isMaster.msg === "isdbgrid");
+    var isBongos = (isMaster.msg === "isdbgrid");
 
     // Obtain a list of all commands.
     let res = db.runCommand({listCommands: 1});
@@ -535,13 +535,13 @@
             let commandHandle = dbHandle;
 
             // Skip tests depending on sharding configuration.
-            if (subtest.skipSharded && isMongos) {
-                print("Skipping " + command + ": not applicable to mongoS");
+            if (subtest.skipSharded && isBongos) {
+                print("Skipping " + command + ": not applicable to bongoS");
                 continue;
             }
 
-            if (subtest.skipStandalone && !isMongos) {
-                print("Skipping " + command + ": not applicable to mongoD");
+            if (subtest.skipStandalone && !isBongos) {
+                print("Skipping " + command + ": not applicable to bongoD");
                 continue;
             }
 

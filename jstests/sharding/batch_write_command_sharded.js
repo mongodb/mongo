@@ -1,16 +1,16 @@
 //
 // Tests sharding-related batch write protocol functionality
 // NOTE: Basic write functionality is tested via the passthrough tests, this file should contain
-// *only* mongos-specific tests.
+// *only* bongos-specific tests.
 //
 (function() {
     "use strict";
 
-    var st = new ShardingTest({shards: 2, mongos: 1});
+    var st = new ShardingTest({shards: 2, bongos: 1});
 
-    var mongos = st.s0;
-    var admin = mongos.getDB("admin");
-    var config = mongos.getDB("config");
+    var bongos = st.s0;
+    var admin = bongos.getDB("admin");
+    var config = bongos.getDB("config");
     var shards = config.shards.find().toArray();
     var configConnStr = st._configDB;
 
@@ -23,9 +23,9 @@
 
     //
     //
-    // Mongos _id autogeneration tests for sharded collections
+    // Bongos _id autogeneration tests for sharded collections
 
-    var coll = mongos.getCollection("foo.bar");
+    var coll = bongos.getCollection("foo.bar");
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().toString()}));
     st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
     assert.commandWorked(admin.runCommand({shardCollection: coll.toString(), key: {_id: 1}}));
@@ -63,7 +63,7 @@
     for (var i = 0; i < 1000; i++)
         documents.push({a: i, data: data});
 
-    assert.commandWorked(coll.getMongo().getDB("admin").runCommand({setParameter: 1, logLevel: 4}));
+    assert.commandWorked(coll.getBongo().getDB("admin").runCommand({setParameter: 1, logLevel: 4}));
     coll.remove({});
     request = {insert: coll.getName(), documents: documents};
     printjson(result = coll.runCommand(request));
@@ -101,10 +101,10 @@
     //
     // Stale config progress tests
     // Set up a new collection across two shards, then revert the chunks to an earlier state to put
-    // mongos and mongod permanently out of sync.
+    // bongos and bongod permanently out of sync.
 
     // START SETUP
-    var brokenColl = mongos.getCollection("broken.coll");
+    var brokenColl = bongos.getCollection("broken.coll");
     assert.commandWorked(admin.runCommand({enableSharding: brokenColl.getDB().toString()}));
     st.ensurePrimaryShard(brokenColl.getDB().toString(), shards[0]._id);
     assert.commandWorked(admin.runCommand({shardCollection: brokenColl.toString(), key: {_id: 1}}));
@@ -112,10 +112,10 @@
 
     var oldChunks = config.chunks.find().toArray();
 
-    // Start a new mongos and bring it up-to-date with the chunks so far
+    // Start a new bongos and bring it up-to-date with the chunks so far
 
-    var staleMongos = MongoRunner.runMongos({configdb: configConnStr});
-    brokenColl = staleMongos.getCollection(brokenColl.toString());
+    var staleBongos = BongoRunner.runBongos({configdb: configConnStr});
+    brokenColl = staleBongos.getCollection(brokenColl.toString());
     assert.writeOK(brokenColl.insert({hello: "world"}));
 
     // Modify the chunks to make shards at a higher version
@@ -133,7 +133,7 @@
     // Ensure that the inserts have propagated to all secondary nodes
     st.configRS.awaitReplication();
 
-    // Stale mongos can no longer bring itself up-to-date!
+    // Stale bongos can no longer bring itself up-to-date!
     // END SETUP
 
     //
@@ -202,8 +202,8 @@
     assert.eq(0, st.config1.getCollection(configColl + "").count());
     assert.eq(0, st.config2.getCollection(configColl + "").count());
 
-    MongoRunner.stopMongod(st.config1);
-    MongoRunner.stopMongod(st.config2);
+    BongoRunner.stopBongod(st.config1);
+    BongoRunner.stopBongod(st.config2);
     st.configRS.awaitNoPrimary();
 
     // Config server insert with no config PRIMARY
@@ -231,7 +231,7 @@
 
     jsTest.log("DONE!");
 
-    MongoRunner.stopMongos(staleMongos);
+    BongoRunner.stopBongos(staleBongos);
     st.stop();
 
 }());

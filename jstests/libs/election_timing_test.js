@@ -25,7 +25,7 @@ var ElectionTimingTest = function(opts) {
     // A function that runs after the ReplSetTest is initialized.
     this.testSetup = opts.testSetup || Function.prototype;
 
-    // A function that triggers election, default is to kill the mongod process.
+    // A function that triggers election, default is to kill the bongod process.
     this.electionTrigger = opts.electionTrigger || this.stopPrimary;
 
     // A function that waits for new primary to be elected.

@@ -151,16 +151,16 @@
         return origPriConn == configRS.getPrimary();
     });
 
-    // Now we just need to start up a mongos and add a shard to confirm that the shard gets added
+    // Now we just need to start up a bongos and add a shard to confirm that the shard gets added
     // with the proper clusterId value.
-    jsTest.log("Starting mongos");
-    var mongos = MongoRunner.runMongos({configdb: configRS.getURL()});
+    jsTest.log("Starting bongos");
+    var bongos = BongoRunner.runBongos({configdb: configRS.getURL()});
 
-    jsTest.log("Starting shard mongod");
-    var shard = MongoRunner.runMongod({shardsvr: ""});
+    jsTest.log("Starting shard bongod");
+    var shard = BongoRunner.runBongod({shardsvr: ""});
 
     jsTest.log("Adding shard to cluster");
-    assert.commandWorked(mongos.adminCommand({addShard: shard.host}));
+    assert.commandWorked(bongos.adminCommand({addShard: shard.host}));
 
     jsTest.log("Verifying that shard was provided the proper clusterId");
     var shardIdentityDoc = shard.getDB('admin').system.version.findOne({_id: 'shardIdentity'});

@@ -13,7 +13,7 @@ contains = function(arr, func) {
     return false;
 };
 
-// test doesn't work when talking to mongos
+// test doesn't work when talking to bongos
 if (db.isMaster().msg != "isdbgrid") {
     // run a slow query
     glcol.save({"SENTINEL": 1});
@@ -43,8 +43,8 @@ if (db.isMaster().msg != "isdbgrid") {
     // ensure that slow query is logged in detail
     assert(contains(resp.log, function(v) {
         print(v);
-        var opString = db.getMongo().useReadCommands() ? " find " : " query ";
-        var filterString = db.getMongo().useReadCommands() ? "filter:" : "query:";
+        var opString = db.getBongo().useReadCommands() ? " find " : " query ";
+        var filterString = db.getBongo().useReadCommands() ? "filter:" : "query:";
         return v.indexOf(opString) != -1 && v.indexOf(filterString) != -1 &&
             v.indexOf("keysExamined:") != -1 && v.indexOf("docsExamined:") != -1 &&
             v.indexOf("SENTINEL") != -1;

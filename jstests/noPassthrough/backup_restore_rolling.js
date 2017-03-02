@@ -1,12 +1,12 @@
 /**
  * Test the backup/restore process:
  * - 3 node replica set
- * - Mongo CRUD client
- * - Mongo FSM client
+ * - Bongo CRUD client
+ * - Bongo FSM client
  * - fsyncLock (or stop) Secondary
  * - cp (or rsync) DB files
  * - fsyncUnlock (or start) Secondary
- * - Start mongod as hidden secondary
+ * - Start bongod as hidden secondary
  * - Wait until new hidden node becomes secondary
  *
  * Some methods for backup used in this test checkpoint the files in the dbpath. This technique will

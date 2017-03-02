@@ -26,7 +26,7 @@ function validateCollections(db, obj) {
         assert.eq(version, getFeatureCompatibilityVersion(adminDB));
     }
 
-    assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a mongod?');
+    assert.eq(typeof db, 'object', 'Invalid `db` object, is the shell connected to a bongod?');
     assert.eq(typeof obj, 'object', 'The `obj` argument must be an object');
     assert(obj.hasOwnProperty('full'), 'Please specify whether to use full validation');
 
@@ -67,7 +67,7 @@ function validateCollections(db, obj) {
         // on the admin database.
         //
         // TODO SERVER-25493: Remove the $exists clause once performing an initial sync from
-        // versions of MongoDB <= 3.2 is no longer supported.
+        // versions of BongoDB <= 3.2 is no longer supported.
         filter = {$or: [filter, {type: {$exists: false}}]};
     }
 

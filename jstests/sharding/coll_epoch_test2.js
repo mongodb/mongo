@@ -1,27 +1,27 @@
 // Tests that resharding a collection is detected correctly by all operation types
 //
 // The idea here is that a collection may be resharded / unsharded at any point, and any type of
-// operation on a mongos may be active when it happens.  All operations should handle gracefully.
+// operation on a bongos may be active when it happens.  All operations should handle gracefully.
 //
 
-var st = new ShardingTest({shards: 2, mongos: 5, verbose: 1});
+var st = new ShardingTest({shards: 2, bongos: 5, verbose: 1});
 // Balancer is by default stopped, thus it will not interfere
 
-// Use separate mongos for reading, updating, inserting, removing data
-var readMongos = st.s1;
-var updateMongos = st.s2;
-var insertMongos = st.s3;
-var removeMongos = st.s4;
+// Use separate bongos for reading, updating, inserting, removing data
+var readBongos = st.s1;
+var updateBongos = st.s2;
+var insertBongos = st.s3;
+var removeBongos = st.s4;
 
 var config = st.s.getDB("config");
 var admin = st.s.getDB("admin");
 var coll = st.s.getCollection("foo.bar");
 
-insertMongos.getDB("admin").runCommand({setParameter: 1, traceExceptions: true});
+insertBongos.getDB("admin").runCommand({setParameter: 1, traceExceptions: true});
 
 var shards = {};
 config.shards.find().forEach(function(doc) {
-    shards[doc._id] = new Mongo(doc.host);
+    shards[doc._id] = new Bongo(doc.host);
 });
 
 //
@@ -55,14 +55,14 @@ printjson(admin.runCommand({
 st.printShardingStatus();
 
 //
-// Force all mongoses to load the current status of the cluster
+// Force all bongoses to load the current status of the cluster
 //
 
-jsTest.log("Loading this status in all mongoses...");
+jsTest.log("Loading this status in all bongoses...");
 
-for (var i = 0; i < st._mongos.length; i++) {
-    printjson(st._mongos[i].getDB("admin").runCommand({flushRouterConfig: 1}));
-    assert.neq(null, st._mongos[i].getCollection(coll + "").findOne());
+for (var i = 0; i < st._bongos.length; i++) {
+    printjson(st._bongos[i].getDB("admin").runCommand({flushRouterConfig: 1}));
+    assert.neq(null, st._bongos[i].getCollection(coll + "").findOne());
 }
 
 //
@@ -98,28 +98,28 @@ printjson(admin.runCommand({
 }));
 
 //
-// Make sure all operations on mongoses aren't tricked by the change
+// Make sure all operations on bongoses aren't tricked by the change
 //
 
-jsTest.log("Checking other mongoses for detection of change...");
+jsTest.log("Checking other bongoses for detection of change...");
 
 jsTest.log("Checking find...");
 // Ensure that finding an element works when resharding
-assert.neq(null, readMongos.getCollection(coll + "").findOne({_id: 1}));
+assert.neq(null, readBongos.getCollection(coll + "").findOne({_id: 1}));
 
 jsTest.log("Checking update...");
 // Ensure that updating an element finds the right location
-assert.writeOK(updateMongos.getCollection(coll + "").update({_id: 1}, {$set: {updated: true}}));
+assert.writeOK(updateBongos.getCollection(coll + "").update({_id: 1}, {$set: {updated: true}}));
 assert.neq(null, coll.findOne({updated: true}));
 
 jsTest.log("Checking insert...");
 // Ensure that inserting an element finds the right shard
-assert.writeOK(insertMongos.getCollection(coll + "").insert({_id: 101}));
+assert.writeOK(insertBongos.getCollection(coll + "").insert({_id: 101}));
 assert.neq(null, coll.findOne({_id: 101}));
 
 jsTest.log("Checking remove...");
-// Ensure that removing an element finds the right shard, verified by the mongos doing the sharding
-assert.writeOK(removeMongos.getCollection(coll + "").remove({_id: 2}));
+// Ensure that removing an element finds the right shard, verified by the bongos doing the sharding
+assert.writeOK(removeBongos.getCollection(coll + "").remove({_id: 2}));
 assert.eq(null, coll.findOne({_id: 2}));
 
 coll.drop();

@@ -117,7 +117,7 @@
     // Find.
 
     // Test a find command on strings with a non-simple collation. This should be scatter-gather.
-    if (testDB.getMongo().useReadCommands()) {
+    if (testDB.getBongo().useReadCommands()) {
         assert.eq(2, coll.find({a: "foo"}).collation(caseInsensitive).itcount());
         explain = coll.find({a: "foo"}).collation(caseInsensitive).explain();
         assert.commandWorked(explain);
@@ -131,7 +131,7 @@
     assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
     // Test a find command on numbers with a non-simple collation. This should be single-shard.
-    if (testDB.getMongo().useReadCommands()) {
+    if (testDB.getBongo().useReadCommands()) {
         assert.eq(1, coll.find({a: 100}).collation(caseInsensitive).itcount());
         explain = coll.find({a: 100}).collation(caseInsensitive).explain();
         assert.commandWorked(explain);
@@ -224,7 +224,7 @@
     // Remove.
 
     // Test a remove command on strings with non-simple collation. This should be scatter-gather.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getBongo().writeMode() === "commands") {
         writeRes = coll.remove({a: "foo"}, {collation: caseInsensitive});
         assert.writeOK(writeRes);
         assert.eq(2, writeRes.nRemoved);
@@ -245,7 +245,7 @@
     assert.writeOK(coll.insert(a_foo));
 
     // Test a remove command on numbers with non-simple collation. This should be single-shard.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getBongo().writeMode() === "commands") {
         writeRes = coll.remove({a: 100}, {collation: caseInsensitive});
         assert.writeOK(writeRes);
         assert.eq(1, writeRes.nRemoved);
@@ -261,7 +261,7 @@
 
     // Single remove on string shard key with non-simple collation should fail, because it is not
     // single-shard.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getBongo().writeMode() === "commands") {
         assert.writeError(coll.remove({a: "foo"}, {justOne: true, collation: caseInsensitive}));
     }
 
@@ -277,7 +277,7 @@
 
     // Single remove on number shard key with non-simple collation should succeed, because it is
     // single-shard.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getBongo().writeMode() === "commands") {
         writeRes = coll.remove({a: 100}, {justOne: true, collation: caseInsensitive});
         assert.writeOK(writeRes);
         assert.eq(1, writeRes.nRemoved);
@@ -289,7 +289,7 @@
 
     // Single remove on string _id with non-collection-default collation should fail, because it is
     // not an exact-ID query.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getBongo().writeMode() === "commands") {
         assert.writeError(coll.remove({_id: "foo"}, {justOne: true, collation: caseInsensitive}));
     }
 
@@ -302,7 +302,7 @@
 
     // Single remove on string _id with collection-default collation explicitly given should
     // succeed, because it is an exact-ID query.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getBongo().writeMode() === "commands") {
         assert.writeOK(coll.insert({_id: "foo", a: "bar"}));
         writeRes = coll.remove({_id: "foo"}, {justOne: true, collation: {locale: "simple"}});
         assert.writeOK(writeRes);
@@ -311,7 +311,7 @@
 
     // Single remove on number _id with non-collection-default collation should succeed, because it
     // is an exact-ID query.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getBongo().writeMode() === "commands") {
         writeRes = coll.remove({_id: a_100._id}, {justOne: true, collation: caseInsensitive});
         assert.writeOK(writeRes);
         assert.eq(1, writeRes.nRemoved);
@@ -321,7 +321,7 @@
     // Update.
 
     // Test an update command on strings with non-simple collation. This should be scatter-gather.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getBongo().writeMode() === "commands") {
         writeRes =
             coll.update({a: "foo"}, {$set: {b: 1}}, {multi: true, collation: caseInsensitive});
         assert.writeOK(writeRes);
@@ -341,7 +341,7 @@
     assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
     // Test an update command on numbers with non-simple collation. This should be single-shard.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getBongo().writeMode() === "commands") {
         writeRes = coll.update({a: 100}, {$set: {b: 1}}, {multi: true, collation: caseInsensitive});
         assert.writeOK(writeRes);
         assert.eq(1, writeRes.nMatched);
@@ -357,7 +357,7 @@
 
     // Single update on string shard key with non-simple collation should fail, because it is not
     // single-shard.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getBongo().writeMode() === "commands") {
         assert.writeError(coll.update({a: "foo"}, {$set: {b: 1}}, {collation: caseInsensitive}));
     }
 
@@ -372,7 +372,7 @@
 
     // Single update on number shard key with non-simple collation should succeed, because it is
     // single-shard.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getBongo().writeMode() === "commands") {
         writeRes = coll.update({a: 100}, {$set: {b: 1}}, {collation: caseInsensitive});
         assert.writeOK(writeRes);
         assert.eq(1, writeRes.nMatched);
@@ -383,7 +383,7 @@
 
     // Single update on string _id with non-collection-default collation should fail, because it is
     // not an exact-ID query.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getBongo().writeMode() === "commands") {
         assert.writeOK(coll.insert({_id: "foo", a: "bar"}));
         assert.writeError(coll.update({_id: "foo"}, {$set: {b: 1}}, {collation: caseInsensitive}));
         assert.writeOK(coll.remove({_id: "foo"}, {justOne: true}));
@@ -399,7 +399,7 @@
 
     // Single update on string _id with collection-default collation explicitly given should
     // succeed, because it is an exact-ID query.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getBongo().writeMode() === "commands") {
         assert.writeOK(coll.insert({_id: "foo", a: "bar"}));
         writeRes = coll.update({_id: "foo"}, {$set: {b: 1}}, {collation: {locale: "simple"}});
         assert.writeOK(writeRes);
@@ -409,7 +409,7 @@
 
     // Single update on number _id with non-collection-default collation should succeed, because it
     // is an exact-ID query.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getBongo().writeMode() === "commands") {
         writeRes = coll.update({_id: a_foo._id}, {$set: {b: 1}}, {collation: caseInsensitive});
         assert.writeOK(writeRes);
         assert.eq(1, writeRes.nMatched);
@@ -418,7 +418,7 @@
     // Upsert must always be single-shard.
 
     // Upsert on strings with non-simple collation should fail, because it is not single-shard.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getBongo().writeMode() === "commands") {
         assert.writeError(coll.update(
             {a: "foo"}, {$set: {b: 1}}, {multi: true, upsert: true, collation: caseInsensitive}));
     }
@@ -432,7 +432,7 @@
     assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
     // Upsert on numbers with non-simple collation should succeed, because it is single shard.
-    if (testDB.getMongo().writeMode() === "commands") {
+    if (testDB.getBongo().writeMode() === "commands") {
         writeRes = coll.update(
             {a: 100}, {$set: {b: 1}}, {multi: true, upsert: true, collation: caseInsensitive});
         assert.writeOK(writeRes);

@@ -17,11 +17,11 @@ executor:
             forceValidationWithFeatureCompatibilityVersion: "3.4"
     fixture:
       class: ShardedClusterFixture
-      mongos_options:
+      bongos_options:
         set_parameters:
           enableTestCommands: 1
         verbose: ''
-      mongod_options:
+      bongod_options:
         set_parameters:
           enableTestCommands: 1
           numInitialSyncAttempts: 1

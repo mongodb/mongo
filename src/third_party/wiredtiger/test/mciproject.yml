@@ -1,6 +1,6 @@
 #
 # This file defines the tasks and platforms for WiredTiger in the
-# MongoDB continuous integration system (see https://mci.mongodb.com).
+# BongoDB continuous integration system (see https://mci.bongodb.com).
 #
 
 functions:
@@ -151,7 +151,7 @@ buildvariants:
     # It's ugly, but we need the absolute path here, not the relative
     test_env_vars: LD_LIBRARY_PATH=`pwd`/.libs
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
-    configure_env_vars: CC=/opt/mongodbtoolchain/bin/gcc CXX=/opt/mongodbtoolchain/bin/g++
+    configure_env_vars: CC=/opt/bongodbtoolchain/bin/gcc CXX=/opt/bongodbtoolchain/bin/g++
   tasks:
     - name: compile
     - name: unit-test
@@ -162,10 +162,10 @@ buildvariants:
   run_on:
   - solaris
   expansions:
-    make_command: PATH=/opt/mongodbtoolchain/bin:$PATH gmake
+    make_command: PATH=/opt/bongodbtoolchain/bin:$PATH gmake
     test_env_vars: LD_LIBRARY_PATH=`pwd`/.libs
     smp_command: -j $(kstat cpu | sort -u | grep -c "^module")
-    configure_env_vars: PATH=/opt/mongodbtoolchain/bin:$PATH CFLAGS="-m64"
+    configure_env_vars: PATH=/opt/bongodbtoolchain/bin:$PATH CFLAGS="-m64"
   tasks:
     - name: compile
     - name: unit-test

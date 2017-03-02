@@ -9,7 +9,7 @@ function runTest(conn) {
 
     conn.getDB('admin').createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
 
-    var adminConn = new Mongo(conn.host);
+    var adminConn = new Bongo(conn.host);
     adminConn.getDB('admin').auth('admin', 'pwd');
     var admin = adminConn.getDB('admin');
     admin.createRole({role: 'myRole', roles: [], privileges: []});
@@ -41,10 +41,10 @@ function runTest(conn) {
     }
 
     /**
-     * Returns true if conn is a connection to mongos,
+     * Returns true if conn is a connection to bongos,
      * and false otherwise.
      */
-    function isMongos(db) {
+    function isBongos(db) {
         var res = db.adminCommand({isdbgrid: 1});
         return (res.ok == 1 && res.isdbgrid == 1);
     }
@@ -113,7 +113,7 @@ function runTest(conn) {
             var passed = true;
             try {
                 var opid;
-                if (isMongos(db)) {  // opid format different between mongos and mongod
+                if (isBongos(db)) {  // opid format different between bongos and bongod
                     opid = "shard0000:1234";
                 } else {
                     opid = 1234;
@@ -131,8 +131,8 @@ function runTest(conn) {
     })();
 
     (function testUnlock() {
-        if (isMongos(db)) {
-            return;  // unlock doesn't work on mongos
+        if (isBongos(db)) {
+            return;  // unlock doesn't work on bongos
         }
 
         jsTestLog("Testing unlock");
@@ -185,9 +185,9 @@ function runTest(conn) {
 }
 
 jsTest.log('Test standalone');
-var conn = MongoRunner.runMongod({auth: ''});
+var conn = BongoRunner.runBongod({auth: ''});
 runTest(conn);
-MongoRunner.stopMongod(conn.port);
+BongoRunner.stopBongod(conn.port);
 
 jsTest.log('Test sharding');
 var st = new ShardingTest({shards: 2, config: 3, keyFile: 'jstests/libs/key1'});

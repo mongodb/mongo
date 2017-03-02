@@ -3,8 +3,8 @@
 (function() {
     "use strict";
 
-    const conn = MongoRunner.runMongod({});
-    assert.neq(null, conn, "mongod was unable to start up");
+    const conn = BongoRunner.runBongod({});
+    assert.neq(null, conn, "bongod was unable to start up");
 
     const viewsDB = conn.getDB("views_feature_compatibility_version");
     assert.commandWorked(viewsDB.dropDatabase());
@@ -60,5 +60,5 @@
     // We can drop the system.views collection when the featureCompatibilityVersion is 3.2.
     assert.eq(true, viewsDB.system.views.drop());
 
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
 }());

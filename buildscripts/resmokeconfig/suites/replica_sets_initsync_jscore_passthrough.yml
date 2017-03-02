@@ -70,7 +70,7 @@ executor:
       n: *run_hook_interval
     fixture:
       class: ReplicaSetFixture
-      mongod_options:
+      bongod_options:
         oplogSize: 511
         set_parameters:
           enableTestCommands: 1

@@ -23,7 +23,7 @@ executor:
     - class: PeriodicKillSecondaries
     fixture:
       class: ReplicaSetFixture
-      mongod_options:
+      bongod_options:
         oplogSize: 511
         set_parameters:
           enableTestCommands: 1

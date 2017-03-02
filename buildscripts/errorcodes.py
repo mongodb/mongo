@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Produces a report of all assertions in the MongoDB server codebase.
+"""Produces a report of all assertions in the BongoDB server codebase.
 
 Parses .cpp files for assertions and verifies assertion codes are distinct.
 Optionally replaces zero codes in source code with new distinct values.
@@ -46,7 +46,7 @@ def assignErrorCodes():
 
 
 def parseSourceFiles( callback ):
-    """Walks MongoDB sourcefiles and invokes callback for each AssertLocation found."""
+    """Walks BongoDB sourcefiles and invokes callback for each AssertLocation found."""
 
     quick = [ "assert" , "Exception"]
 
@@ -60,7 +60,7 @@ def parseSourceFiles( callback ):
     bad = [ re.compile( r"^\s*assert *\(" ) ]
 
     for sourceFile in utils.getAllSourceFiles():
-        if not sourceFile.find( "src/mongo/" ) >= 0:
+        if not sourceFile.find( "src/bongo/" ) >= 0:
             # Skip generated sources
             continue
 

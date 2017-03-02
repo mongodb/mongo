@@ -31,7 +31,7 @@
     assert.eq(profileObj.docsExamined, 8, tojson(profileObj));
     assert.eq(profileObj.planSummary, "IXSCAN { a: 1 }", tojson(profileObj));
     assert.eq(profileObj.protocol,
-              getProfilerProtocolStringForCommand(testDB.getMongo()),
+              getProfilerProtocolStringForCommand(testDB.getBongo()),
               tojson(profileObj));
     assert.eq(profileObj.command.aggregate, coll.getName(), tojson(profileObj));
     assert.eq(profileObj.command.collation, {locale: "fr"}, tojson(profileObj));
@@ -40,7 +40,7 @@
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));
     assert(!profileObj.hasOwnProperty("hasSortStage"), tojson(profileObj));
-    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+    assert.eq(profileObj.appName, "BongoDB Shell", tojson(profileObj));
 
     //
     // Confirm hasSortStage with in-memory sort.

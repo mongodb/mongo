@@ -6,7 +6,7 @@ pre:
       params:
         silent: true
         script: |
-          ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongooplog-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongooplog-2.4; pkill -9 mongotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 lldb; pkill -9 _test} >/dev/null 2>&1
+          ${killall_mci|pkill -9 bongod; pkill -9 bongos; pkill -9 bongo; pkill -9 bsondump; pkill -9 bongoimport; pkill -9 bongoexport; pkill -9 bongodump; pkill -9 bongorestore; pkill -9 bongostat; pkill -9 bongofiles; pkill -9 bongooplog; pkill -9 bongotop; pkill -9 bongobridge; pkill -9 bongod-2.6; pkill -9 bongos-2.6; pkill -9 bongo-2.6; pkill -9 bsondump-2.6; pkill -9 bongoimport-2.6; pkill -9 bongoexport-2.6; pkill -9 bongodump-2.6; pkill -9 bongorestore-2.6; pkill -9 bongostat-2.6; pkill -9 bongofiles-2.6; pkill -9 bongooplog-2.6; pkill -9 bongotop-2.6; pkill -9 bongobridge-2.6; pkill -9 bongod-2.4; pkill -9 bongos-2.4; pkill -9 bongo-2.4; pkill -9 bsondump-2.4; pkill -9 bongoimport-2.4; pkill -9 bongoexport-2.4; pkill -9 bongodump-2.4; pkill -9 bongorestore-2.4; pkill -9 bongostat-2.4; pkill -9 bongofiles-2.4; pkill -9 bongooplog-2.4; pkill -9 bongotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 lldb; pkill -9 _test} >/dev/null 2>&1
           exit 0
 
 post:
@@ -17,17 +17,17 @@ post:
       params:
             aws_key: ${aws_key}
             aws_secret: ${aws_secret}
-            local_file: src/mongod.log
-            remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/mongod-${build_id}.log
+            local_file: src/bongod.log
+            remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/bongod-${build_id}.log
             bucket: mciuploads
             permissions: public-read
             content_type: ${content_type|text/plain}
-            display_name: mongod.log
+            display_name: bongod.log
     - command: shell.exec
       params:
         silent: true
         script: |
-          ${killall_mci|pkill -9 mongod; pkill -9 mongos; pkill -9 mongo; pkill -9 bsondump; pkill -9 mongoimport; pkill -9 mongoexport; pkill -9 mongodump; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongotop; pkill -9 mongobridge; pkill -9 mongod-2.6; pkill -9 mongos-2.6; pkill -9 mongo-2.6; pkill -9 bsondump-2.6; pkill -9 mongoimport-2.6; pkill -9 mongoexport-2.6; pkill -9 mongodump-2.6; pkill -9 mongorestore-2.6; pkill -9 mongostat-2.6; pkill -9 mongofiles-2.6; pkill -9 mongooplog-2.6; pkill -9 mongotop-2.6; pkill -9 mongobridge-2.6; pkill -9 mongod-2.4; pkill -9 mongos-2.4; pkill -9 mongo-2.4; pkill -9 bsondump-2.4; pkill -9 mongoimport-2.4; pkill -9 mongoexport-2.4; pkill -9 mongodump-2.4; pkill -9 mongorestore-2.4; pkill -9 mongostat-2.4; pkill -9 mongofiles-2.4; pkill -9 mongooplog-2.4; pkill -9 mongotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 lldb; pkill -9 _test} >/dev/null 2>&1
+          ${killall_mci|pkill -9 bongod; pkill -9 bongos; pkill -9 bongo; pkill -9 bsondump; pkill -9 bongoimport; pkill -9 bongoexport; pkill -9 bongodump; pkill -9 bongorestore; pkill -9 bongostat; pkill -9 bongofiles; pkill -9 bongooplog; pkill -9 bongotop; pkill -9 bongobridge; pkill -9 bongod-2.6; pkill -9 bongos-2.6; pkill -9 bongo-2.6; pkill -9 bsondump-2.6; pkill -9 bongoimport-2.6; pkill -9 bongoexport-2.6; pkill -9 bongodump-2.6; pkill -9 bongorestore-2.6; pkill -9 bongostat-2.6; pkill -9 bongofiles-2.6; pkill -9 bongooplog-2.6; pkill -9 bongotop-2.6; pkill -9 bongobridge-2.6; pkill -9 bongod-2.4; pkill -9 bongos-2.4; pkill -9 bongo-2.4; pkill -9 bsondump-2.4; pkill -9 bongoimport-2.4; pkill -9 bongoexport-2.4; pkill -9 bongodump-2.4; pkill -9 bongorestore-2.4; pkill -9 bongostat-2.4; pkill -9 bongofiles-2.4; pkill -9 bongooplog-2.4; pkill -9 bongotop-2.4; pkill -9 resmoke.py; pkill -9 python; pkill -9 lldb; pkill -9 _test} >/dev/null 2>&1
           exit 0
     - command: shell.exec
       params:
@@ -44,8 +44,8 @@ post:
 
 modules:
 - name: enterprise
-  repo: git@github.com:10gen/mongo-enterprise-modules.git
-  prefix: src/mongo/db/modules
+  repo: git@github.com:10gen/bongo-enterprise-modules.git
+  prefix: src/bongo/db/modules
   branch: master
 
 
@@ -68,25 +68,25 @@ functions:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/${version_id}/${revision}/mongod-${version_id}
+        remote_file: ${project}/${version_id}/${revision}/bongod-${version_id}
         bucket: mciuploads
-        local_file: src/mongod
+        local_file: src/bongod
     - command: s3.get
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/${version_id}/${revision}/mongo-${version_id}
+        remote_file: ${project}/${version_id}/${revision}/bongo-${version_id}
         bucket: mciuploads
-        local_file: src/mongo
+        local_file: src/bongo
     - command: shell.exec
       params:
         working_dir: src
         script: |
           set -e
           set -v
-          chmod +x mongod
-          chmod +x mongo
-          git clone https://github.com/mongodb/mongo-perf perf
+          chmod +x bongod
+          chmod +x bongo
+          git clone https://github.com/bongodb/bongo-perf perf
           cd perf
           git describe --tags
     - command: shell.exec
@@ -97,7 +97,7 @@ functions:
           set -e
           set -o verbose
           mkdir -p ./dbdata
-          ${mongod_exec_wrapper} ./mongod --dbpath ./dbdata ${mongod_flags}
+          ${bongod_exec_wrapper} ./bongod --dbpath ./dbdata ${bongod_flags}
     - command : shell.exec
       params:
         working_dir: src
@@ -106,15 +106,15 @@ functions:
           set -o verbose
           sleep 5
           # if we started a replset, initiate it and wait for it to become primary
-          ./mongo --eval "if(db.isMaster().isreplicaset){rs.initiate(); assert.soon(function(){return db.isMaster().ismaster}, 'no primary')}"
+          ./bongo --eval "if(db.isMaster().isreplicaset){rs.initiate(); assert.soon(function(){return db.isMaster().ismaster}, 'no primary')}"
 
           # benchRun() authenticates against the admin db, with a user that must has admin access.
           # Note: This is possibly a legacy requirement from times when it would call serverStatus.
-          # Btw, when mongod is started without --auth, these should be harmless no-ops
-          ./mongo --eval "db.createUser({user: 'admin', pwd: 'password', roles:\
+          # Btw, when bongod is started without --auth, these should be harmless no-ops
+          ./bongo --eval "db.createUser({user: 'admin', pwd: 'password', roles:\
                          [ { role: 'root', db: 'admin' } ] })"\
                            admin
-            echo "MONGOD STARTED."
+            echo "BONGOD STARTED."
   "compare":
     - command: json.get
       params:
@@ -192,7 +192,7 @@ functions:
           set -o verbose
           source ./venv/bin/activate
 
-          # Any tasks that want the analysis scripts to analyze mongod.log files should pass in
+          # Any tasks that want the analysis scripts to analyze bongod.log files should pass in
           # `reports_analysis: true` as a var to this function. The following line will select the
           # appropriate flags if it's `true`.
           reports_analysis_flags="--reports-analysis . --perf-file perf/perf.json"
@@ -218,11 +218,11 @@ functions:
           set -v
           source ./venv/bin/activate
           cd perf
-          #  give mongod a few seconds to start up so that we can connect.
+          #  give bongod a few seconds to start up so that we can connect.
           sleep 5
-          ${perf_exec_wrapper} python benchrun.py --shell ../mongo -t ${threads} --trialCount 5 -f testcases/*.js --readCmd ${readCmd} --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed --username admin --password password
+          ${perf_exec_wrapper} python benchrun.py --shell ../bongo -t ${threads} --trialCount 5 -f testcases/*.js --readCmd ${readCmd} --includeFilter ${includeFilter1}  --includeFilter ${includeFilter2} --excludeFilter ${excludeFilter} --out perf.json --exclude-testbed --username admin --password password
           echo "Oplog size at end of tests..."
-          ../mongo --username admin --password password --eval "db.getSiblingDB('local').oplog.rs.totalSize()/1024/1024" admin
+          ../bongo --username admin --password password --eval "db.getSiblingDB('local').oplog.rs.totalSize()/1024/1024" admin
     - command: "json.send"
       params:
         name: "perf"
@@ -243,16 +243,16 @@ tasks:
           set -o verbose
 
           # We get the raw version string (r1.2.3-45-gabcdef) from git
-          MONGO_VERSION=$(git describe)
+          BONGO_VERSION=$(git describe)
           # If this is a patch build, we add the patch version id to the version string so we know
           # this build was a patch, and which evergreen task it came from
           if [ "${is_patch|}" = "true" ]; then
-            MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+            BONGO_VERSION="$BONGO_VERSION-patch-${version_id}"
           fi
 
           # This script converts the generated version string into a sanitized version string for
           # use by scons and uploading artifacts as well as information about for the scons cache.
-          echo $MONGO_VERSION | USE_SCONS_CACHE=${use_scons_cache|false} ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
+          echo $BONGO_VERSION | USE_SCONS_CACHE=${use_scons_cache|false} ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
     # Then we load the generated version data into the agent so we can use it in task definitions
     - command: expansions.update
       params:
@@ -264,27 +264,27 @@ tasks:
           set -o errexit
           set -o verbose
 
-          ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo mongod
+          ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} bongo bongod
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/mongod
-        remote_file: ${project}/${version_id}/${revision}/mongod-${version_id}
+        local_file: src/bongod
+        remote_file: ${project}/${version_id}/${revision}/bongod-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
-        display_name: mongod
+        display_name: bongod
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/build/cached/mongo/mongo
-        remote_file: ${project}/${version_id}/${revision}/mongo-${version_id}
+        local_file: src/build/cached/bongo/bongo
+        remote_file: ${project}/${version_id}/${revision}/bongo-${version_id}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/octet-stream}
-        display_name: mongo
+        display_name: bongo
 - name: query
   depends_on:
   - variant: linux-wt-standalone
@@ -607,10 +607,10 @@ buildvariants:
   modules:
     - enterprise
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy --ssl
-    mongod_exec_wrapper: &exec_wrapper "numactl --physcpubind=4,5,6,7 -i 1"
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/bongodbtoolchain/v2/bin/gcc CXX=/opt/bongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/bongodbtoolchain/v2/bin/objcopy --ssl
+    bongod_exec_wrapper: &exec_wrapper "numactl --physcpubind=4,5,6,7 -i 1"
     perf_exec_wrapper: &perf_wrapper "numactl --physcpubind=1,2,3 -i 0"
-    mongod_flags: "--storageEngine=inMemory --logpath ./mongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false  --inMemorySizeGB 60 --auth"
+    bongod_flags: "--storageEngine=inMemory --logpath ./bongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false  --inMemorySizeGB 60 --auth"
     use_scons_cache: true
     project: &project perf
   run_on:
@@ -634,9 +634,9 @@ buildvariants:
   display_name: Standalone Linux MMAPv1
   batchtime: 90 # 1.5 hours
   expansions:
-    mongod_exec_wrapper: *exec_wrapper
+    bongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false --auth"
+    bongod_flags: "--storageEngine=mmapv1 --logpath ./bongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false --auth"
     project: *project
   run_on:
   - "centos6-perf"
@@ -656,9 +656,9 @@ buildvariants:
   display_name: 1-Node ReplSet Linux inMemory
   batchtime: 360 # 6 hours
   expansions:
-    mongod_exec_wrapper: *exec_wrapper
+    bongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--replSet=test --storageEngine=inMemory  --logpath ./mongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --inMemorySizeGB 60 --oplogSize 30000 --setParameter diagnosticDataCollectionEnabled=false --auth"
+    bongod_flags: "--replSet=test --storageEngine=inMemory  --logpath ./bongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --inMemorySizeGB 60 --oplogSize 30000 --setParameter diagnosticDataCollectionEnabled=false --auth"
     project: *project
   run_on:
   - "centos6-perf"
@@ -672,9 +672,9 @@ buildvariants:
   display_name: 1-Node ReplSet Linux MMAPv1
   batchtime: 360 # 6 hours
   expansions:
-    mongod_exec_wrapper: *exec_wrapper
+    bongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --oplogSize 100000 --setParameter diagnosticDataCollectionEnabled=false --auth"
+    bongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./bongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --oplogSize 100000 --setParameter diagnosticDataCollectionEnabled=false --auth"
     project: *project
   run_on:
   - "centos6-perf"

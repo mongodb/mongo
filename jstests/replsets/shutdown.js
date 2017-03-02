@@ -23,7 +23,7 @@ load('jstests/replsets/rslib.js');
     rst.stop(id);
     let program = rst.start(
         id, {waitForConnect: false, setParameter: "failpoint.shutdownAtStartup={mode:'alwaysOn'}"});
-    // mongod should exit automatically, since failpoint was set.
+    // bongod should exit automatically, since failpoint was set.
     let exitCode = waitProgram(program.pid);
     assert.eq(0, exitCode);
     rst.stopSet();

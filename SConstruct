@@ -24,7 +24,7 @@ EnsureSConsVersion( 2, 3, 0 )
 from buildscripts import utils
 from buildscripts import moduleconfig
 
-from mongo_scons_utils import (
+from bongo_scons_utils import (
     default_buildinfo_environment_data,
     default_variant_dir_generator,
     get_toolchain_ver,
@@ -230,7 +230,7 @@ add_option('server-js',
     choices=['on', 'off'],
     const='on',
     default='on',
-    help='Build mongod without JavaScript support',
+    help='Build bongod without JavaScript support',
     type='choice',
 )
 
@@ -399,8 +399,8 @@ add_option('use-new-tools',
     nargs=0,
 )
 
-add_option('build-mongoreplay',
-    help='when building with --use-new-tools, build mongoreplay ( requires pcap dev )',
+add_option('build-bongoreplay',
+    help='when building with --use-new-tools, build bongoreplay ( requires pcap dev )',
     nargs=1,
 )
 
@@ -465,16 +465,16 @@ add_option("cxx-std",
     help="Select the C++ langauge standard to build with",
 )
 
-def find_mongo_custom_variables():
+def find_bongo_custom_variables():
     files = []
     for path in sys.path:
-        probe = os.path.join(path, 'mongo_custom_variables.py')
+        probe = os.path.join(path, 'bongo_custom_variables.py')
         if os.path.isfile(probe):
             files.append(probe)
     return files
 
 add_option('variables-files',
-    default=find_mongo_custom_variables(),
+    default=find_bongo_custom_variables(),
     help="Specify variables files to load",
 )
 
@@ -601,8 +601,8 @@ def variable_tools_converter(val):
         "gziptool",
         "jsheader",
         "mergelib",
-        "mongo_integrationtest",
-        "mongo_unittest",
+        "bongo_integrationtest",
+        "bongo_unittest",
         "textfile",
     ]
 
@@ -700,33 +700,33 @@ env_vars.Add('MAXLINELENGTH',
 
 # Note: This is only really meaningful when configured via a variables file. See the
 # default_buildinfo_environment_data() function for examples of how to use this.
-env_vars.Add('MONGO_BUILDINFO_ENVIRONMENT_DATA',
+env_vars.Add('BONGO_BUILDINFO_ENVIRONMENT_DATA',
     help='Sets the info returned from the buildInfo command and --version command-line flag',
     default=default_buildinfo_environment_data())
 
-env_vars.Add('MONGO_DIST_SRC_PREFIX',
+env_vars.Add('BONGO_DIST_SRC_PREFIX',
     help='Sets the prefix for files in the source distribution archive',
     converter=variable_distsrc_converter,
-    default="mongodb-src-r${MONGO_VERSION}")
+    default="bongodb-src-r${BONGO_VERSION}")
 
-env_vars.Add('MONGO_DISTARCH',
+env_vars.Add('BONGO_DISTARCH',
     help='Adds a string representing the target processor architecture to the dist archive',
     default='$TARGET_ARCH')
 
-env_vars.Add('MONGO_DISTMOD',
+env_vars.Add('BONGO_DISTMOD',
     help='Adds a string that will be embedded in the dist archive naming',
     default='')
 
-env_vars.Add('MONGO_DISTNAME',
+env_vars.Add('BONGO_DISTNAME',
     help='Sets the version string to be used in dist archive naming',
-    default='$MONGO_VERSION')
+    default='$BONGO_VERSION')
 
-env_vars.Add('MONGO_VERSION',
-    help='Sets the version string for MongoDB',
+env_vars.Add('BONGO_VERSION',
+    help='Sets the version string for BongoDB',
     default=version_data['version'])
 
-env_vars.Add('MONGO_GIT_HASH',
-    help='Sets the githash to store in the MongoDB version information',
+env_vars.Add('BONGO_GIT_HASH',
+    help='Sets the githash to store in the BongoDB version information',
     default=version_data['githash'])
 
 env_vars.Add('MSVC_USE_SCRIPT',
@@ -859,7 +859,7 @@ printLocalInfo()
 
 boostLibs = [ "thread" , "filesystem" , "program_options", "system", "regex", "chrono", "iostreams" ]
 
-onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) in [ "mongod" , "mongos" , "test" ] )
+onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) in [ "bongod" , "bongos" , "test" ] )
 
 releaseBuild = has_option("release")
 
@@ -1001,9 +1001,9 @@ if endian == "auto":
     endian = sys.byteorder
 
 if endian == "little":
-    env.SetConfigHeaderDefine("MONGO_CONFIG_BYTE_ORDER", "1234")
+    env.SetConfigHeaderDefine("BONGO_CONFIG_BYTE_ORDER", "1234")
 elif endian == "big":
-    env.SetConfigHeaderDefine("MONGO_CONFIG_BYTE_ORDER", "4321")
+    env.SetConfigHeaderDefine("BONGO_CONFIG_BYTE_ORDER", "4321")
 
 # These preprocessor macros came from
 # http://nadeausoftware.com/articles/2012/02/c_c_tip_how_detect_processor_type_using_compiler_predefined_macros
@@ -1188,11 +1188,11 @@ env['TARGET_OS_FAMILY'] = 'posix' if env.TargetOSIs('posix') else env.GetTargetO
 if get_option('allocator') == "auto":
     if env.TargetOSIs('windows') or \
        env.TargetOSIs('linux'):
-        env['MONGO_ALLOCATOR'] = "tcmalloc"
+        env['BONGO_ALLOCATOR'] = "tcmalloc"
     else:
-        env['MONGO_ALLOCATOR'] = "system"
+        env['BONGO_ALLOCATOR'] = "system"
 else:
-    env['MONGO_ALLOCATOR'] = get_option('allocator')
+    env['BONGO_ALLOCATOR'] = get_option('allocator')
 
 if has_option("cache"):
     if has_option("gcov"):
@@ -1297,7 +1297,7 @@ if link_model.startswith("dynamic"):
     #   links all of them.
     #
     # - The symbol is provided by an executable into which the library
-    #   will be linked. The mongo::inShutdown symbol is a good
+    #   will be linked. The bongo::inShutdown symbol is a good
     #   example.
     #
     # - The symbol is provided by a third-party library, outside of our
@@ -1347,7 +1347,7 @@ if link_model.startswith("dynamic"):
                 env['LIBDEPS_TAG_EXPANSIONS'].append(libdeps_tags_expand_incomplete)
 
 if optBuild:
-    env.SetConfigHeaderDefine("MONGO_CONFIG_OPTIMIZED_BUILD")
+    env.SetConfigHeaderDefine("BONGO_CONFIG_OPTIMIZED_BUILD")
 
 # Enable the fast decider if exlicltly requested or if in 'auto' mode and not in conflict with other
 # options.
@@ -1437,7 +1437,7 @@ elif env.TargetOSIs('solaris'):
 
 # ---- other build setup -----
 if debugBuild:
-    env.SetConfigHeaderDefine("MONGO_CONFIG_DEBUG_BUILD")
+    env.SetConfigHeaderDefine("BONGO_CONFIG_DEBUG_BUILD")
 else:
     env.AppendUnique( CPPDEFINES=[ 'NDEBUG' ] )
 
@@ -1696,7 +1696,7 @@ if get_option('wiredtiger') == 'on':
             "Re-run scons with --wiredtiger=off to build on 32-bit platforms")
     else:
         wiredtiger = True
-        env.SetConfigHeaderDefine("MONGO_CONFIG_WIREDTIGER_ENABLED")
+        env.SetConfigHeaderDefine("BONGO_CONFIG_WIREDTIGER_ENABLED")
 
 if env['TARGET_ARCH'] == 'i386':
     # If we are using GCC or clang to target 32 bit, set the ISA minimum to 'nocona',
@@ -1733,8 +1733,8 @@ if get_option("system-boost-lib-search-suffixes") is not None:
         boostSuffixList = boostSuffixList.split(',')
 
 # discover modules, and load the (python) module for each module's build.py
-mongo_modules = moduleconfig.discover_modules('src/mongo/db/modules', get_option('modules'))
-env['MONGO_MODULES'] = [m.name for m in mongo_modules]
+bongo_modules = moduleconfig.discover_modules('src/bongo/db/modules', get_option('modules'))
+env['BONGO_MODULES'] = [m.name for m in bongo_modules]
 
 # --- check system ---
 
@@ -1755,7 +1755,7 @@ def doConfigure(myenv):
         #endif
 
         #if _MSC_VER < 1900 || (_MSC_VER == 1900 && _MSC_FULL_VER < 190023918)
-        #error %s or newer is required to build MongoDB
+        #error %s or newer is required to build BongoDB
         #endif
 
         int main(int argc, char* argv[]) {
@@ -1771,7 +1771,7 @@ def doConfigure(myenv):
         #endif
 
         #if (__GNUC__ < 5) || (__GNUC__ == 5 && __GNUC_MINOR__ < 3) || (__GNUC__ == 5 && __GNUC_MINOR__ == 3 && __GNUC_PATCHLEVEL__ < 0)
-        #error %s or newer is required to build MongoDB
+        #error %s or newer is required to build BongoDB
         #endif
 
         int main(int argc, char* argv[]) {
@@ -1788,10 +1788,10 @@ def doConfigure(myenv):
 
         #if defined(__apple_build_version__)
         #if __apple_build_version__ < 6020049
-        #error %s or newer is required to build MongoDB
+        #error %s or newer is required to build BongoDB
         #endif
         #elif (__clang_major__ < 3) || (__clang_major__ == 3 && __clang_minor__ < 6)
-        #error %s or newer is required to build MongoDB
+        #error %s or newer is required to build BongoDB
         #endif
 
         int main(int argc, char* argv[]) {
@@ -1984,7 +1984,7 @@ def doConfigure(myenv):
         AddToCCFLAGSIfSupported(myenv, "-Wno-tautological-constant-out-of-range-compare")
 
         # New in clang-3.4, trips up things mostly in third_party, but in a few places in the
-        # primary mongo sources as well.
+        # primary bongo sources as well.
         AddToCCFLAGSIfSupported(myenv, "-Wno-unused-const-variable")
 
         # Prevents warning about unused but set variables found in boost version 1.49
@@ -2134,7 +2134,7 @@ def doConfigure(myenv):
         iOS  : scons CCFLAGS="-miphoneos-version-min=10.3" LINKFLAGS="-miphoneos-version-min=10.3" ...
         tvOS : scons CCFLAGS="-mtvos-version-min=10.3" LINKFLAGS="-tvos-version-min=10.3" ...
 
-        Note that MongoDB requires macOS 10.10, iOS 10.2, or tvOS 10.2 or later.
+        Note that BongoDB requires macOS 10.10, iOS 10.2, or tvOS 10.2 or later.
         """
         myenv.ConfError(textwrap.dedent(message))
 
@@ -2204,7 +2204,7 @@ def doConfigure(myenv):
     })
 
     if not conf.CheckCxx14():
-        myenv.ConfError('C++14 support is required to build MongoDB')
+        myenv.ConfError('C++14 support is required to build BongoDB')
 
     conf.Finish()
 
@@ -2227,10 +2227,10 @@ def doConfigure(myenv):
         'CheckMemset_s' : CheckMemset_s,
     })
     if conf.CheckMemset_s():
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_MEMSET_S")
+        conf.env.SetConfigHeaderDefine("BONGO_CONFIG_HAVE_MEMSET_S")
 
     if conf.CheckFunc('strnlen'):
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_STRNLEN")
+        conf.env.SetConfigHeaderDefine("BONGO_CONFIG_HAVE_STRNLEN")
 
     conf.Finish()
 
@@ -2262,7 +2262,7 @@ def doConfigure(myenv):
 
         suppress_invalid = has_option("disable-minimum-compiler-version-enforcement")
         if not conf.CheckModernLibStdCxx() and not suppress_invalid:
-            myenv.ConfError("When using libstdc++, MongoDB requires libstdc++ from GCC 5.3.0 or newer")
+            myenv.ConfError("When using libstdc++, BongoDB requires libstdc++ from GCC 5.3.0 or newer")
 
         conf.Finish()
 
@@ -2301,7 +2301,7 @@ def doConfigure(myenv):
         })
 
         if not conf.CheckWindowsSDKVersion():
-            myenv.ConfError('Windows SDK Version 8.1 or higher is required to build MongoDB')
+            myenv.ConfError('Windows SDK Version 8.1 or higher is required to build BongoDB')
 
         conf.Finish()
 
@@ -2370,7 +2370,7 @@ def doConfigure(myenv):
             # GCC's implementation of ASAN depends on libdl.
             env.Append(LIBS=['dl'])
 
-        if env['MONGO_ALLOCATOR'] == 'tcmalloc':
+        if env['BONGO_ALLOCATOR'] == 'tcmalloc':
             # There are multiply defined symbols between the sanitizer and
             # our vendorized tcmalloc.
             env.FatalError("Cannot use --sanitize with tcmalloc")
@@ -2565,9 +2565,9 @@ def doConfigure(myenv):
     })
     haveTriviallyConstructibleThreadLocals = False
     for storage_class, macro_name in [
-            ('thread_local', 'MONGO_CONFIG_HAVE_THREAD_LOCAL'),
-            ('__thread', 'MONGO_CONFIG_HAVE___THREAD'),
-            ('__declspec(thread)', 'MONGO_CONFIG_HAVE___DECLSPEC_THREAD')]:
+            ('thread_local', 'BONGO_CONFIG_HAVE_THREAD_LOCAL'),
+            ('__thread', 'BONGO_CONFIG_HAVE___THREAD'),
+            ('__declspec(thread)', 'BONGO_CONFIG_HAVE___DECLSPEC_THREAD')]:
         if conf.CheckStorageClass(storage_class):
             haveTriviallyConstructibleThreadLocals = True
             myenv.SetConfigHeaderDefine(macro_name)
@@ -2607,7 +2607,7 @@ def doConfigure(myenv):
     })
 
     if conf.CheckCXX14EnableIfT():
-        conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_STD_ENABLE_IF_T')
+        conf.env.SetConfigHeaderDefine('BONGO_CONFIG_HAVE_STD_ENABLE_IF_T')
 
     myenv = conf.Finish()
 
@@ -2630,7 +2630,7 @@ def doConfigure(myenv):
     })
 
     if conf.CheckCXX14MakeUnique():
-        conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_STD_MAKE_UNIQUE')
+        conf.env.SetConfigHeaderDefine('BONGO_CONFIG_HAVE_STD_MAKE_UNIQUE')
 
     myenv = conf.Finish()
 
@@ -2677,7 +2677,7 @@ def doConfigure(myenv):
         })
 
         if conf.CheckPThreadSetNameNP():
-            conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP")
+            conf.env.SetConfigHeaderDefine("BONGO_CONFIG_HAVE_PTHREAD_SETNAME_NP")
 
     libdeps.setup_conftests(conf)
 
@@ -2756,8 +2756,8 @@ def doConfigure(myenv):
         if not conf.CheckLinkSSL():
             conf.env.ConfError("SSL is enabled, but is unavailable")
 
-        env.SetConfigHeaderDefine("MONGO_CONFIG_SSL")
-        env.Append( MONGO_CRYPTO=["openssl"] )
+        env.SetConfigHeaderDefine("BONGO_CONFIG_SSL")
+        env.Append( BONGO_CRYPTO=["openssl"] )
 
         if conf.CheckDeclaration(
             "FIPS_mode_set",
@@ -2765,17 +2765,17 @@ def doConfigure(myenv):
                 #include <openssl/crypto.h>
                 #include <openssl/evp.h>
             """):
-            conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_FIPS_MODE_SET')
+            conf.env.SetConfigHeaderDefine('BONGO_CONFIG_HAVE_FIPS_MODE_SET')
 
         if conf.CheckDeclaration(
             "d2i_ASN1_SEQUENCE_ANY",
             includes="""
                 #include <openssl/asn1.h>
             """):
-            conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS')
+            conf.env.SetConfigHeaderDefine('BONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS')
 
     else:
-        env.Append( MONGO_CRYPTO=["tom"] )
+        env.Append( BONGO_CRYPTO=["tom"] )
 
     if use_system_version_of_library("pcre"):
         conf.FindSysLibDep("pcre", ["pcre"])
@@ -2859,27 +2859,27 @@ def doConfigure(myenv):
         )
 
     if posix_system:
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_HEADER_UNISTD_H")
+        conf.env.SetConfigHeaderDefine("BONGO_CONFIG_HAVE_HEADER_UNISTD_H")
         conf.CheckLib('rt')
         conf.CheckLib('dl')
 
     if posix_monotonic_clock:
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK")
+        conf.env.SetConfigHeaderDefine("BONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK")
 
     if (conf.CheckCXXHeader( "execinfo.h" ) and
         conf.CheckDeclaration('backtrace', includes='#include <execinfo.h>') and
         conf.CheckDeclaration('backtrace_symbols', includes='#include <execinfo.h>') and
         conf.CheckDeclaration('backtrace_symbols_fd', includes='#include <execinfo.h>')):
 
-        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE")
+        conf.env.SetConfigHeaderDefine("BONGO_CONFIG_HAVE_EXECINFO_BACKTRACE")
 
     conf.env["_HAVEPCAP"] = conf.CheckLib( ["pcap", "wpcap"], autoadd=False )
 
     if env.TargetOSIs('solaris'):
         conf.CheckLib( "nsl" )
 
-    conf.env['MONGO_BUILD_SASL_CLIENT'] = bool(has_option("use-sasl-client"))
-    if conf.env['MONGO_BUILD_SASL_CLIENT'] and not conf.CheckLibWithHeader(
+    conf.env['BONGO_BUILD_SASL_CLIENT'] = bool(has_option("use-sasl-client"))
+    if conf.env['BONGO_BUILD_SASL_CLIENT'] and not conf.CheckLibWithHeader(
             "sasl2",
             ["stddef.h","sasl/sasl.h"],
             "C",
@@ -2894,13 +2894,13 @@ def doConfigure(myenv):
 
     # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this
     # point.
-    if myenv['MONGO_ALLOCATOR'] == 'tcmalloc':
+    if myenv['BONGO_ALLOCATOR'] == 'tcmalloc':
         if use_system_version_of_library('tcmalloc'):
             conf.FindSysLibDep("tcmalloc", ["tcmalloc"])
-    elif myenv['MONGO_ALLOCATOR'] == 'system':
+    elif myenv['BONGO_ALLOCATOR'] == 'system':
         pass
     else:
-        myenv.FatalError("Invalid --allocator parameter: $MONGO_ALLOCATOR")
+        myenv.FatalError("Invalid --allocator parameter: $BONGO_ALLOCATOR")
 
     def CheckStdAtomic(context, base_type, extra_message):
         test_body = """
@@ -2944,7 +2944,7 @@ def doConfigure(myenv):
             myenv.ConfError("The toolchain does not support std::atomic, cannot continue")
 
     # ask each module to configure itself and the build environment.
-    moduleconfig.configure_modules(mongo_modules, conf)
+    moduleconfig.configure_modules(bongo_modules, conf)
 
     return conf.Finish()
 
@@ -2981,7 +2981,7 @@ env.AddMethod(env_windows_resource_file, 'WindowsResourceFile')
 
 def doLint( env , target , source ):
     import buildscripts.eslint
-    if not buildscripts.eslint.lint(None, dirmode=True, glob=["jstests/", "src/mongo/"]):
+    if not buildscripts.eslint.lint(None, dirmode=True, glob=["jstests/", "src/bongo/"]):
         raise Exception("ESLint errors")
 
     import buildscripts.clang_format
@@ -2989,7 +2989,7 @@ def doLint( env , target , source ):
         raise Exception("clang-format lint errors")
 
     import buildscripts.lint
-    if not buildscripts.lint.run_lint( [ "src/mongo/" ] ):
+    if not buildscripts.lint.run_lint( [ "src/bongo/" ] ):
         raise Exception( "lint errors" )
 
 env.Alias( "lint" , [] , [ doLint ] )
@@ -2999,7 +2999,7 @@ env.AlwaysBuild( "lint" )
 #  ----  INSTALL -------
 
 def getSystemInstallName():
-    arch_name = env.subst('$MONGO_DISTARCH')
+    arch_name = env.subst('$BONGO_DISTARCH')
 
     # We need to make sure the directory names inside dist tarballs are permanently
     # consistent, even if the target OS name used in scons is different. Any differences
@@ -3012,10 +3012,10 @@ def getSystemInstallName():
     os_name = os_name_translations.get(os_name, os_name)
     n = os_name + "-" + arch_name
 
-    if len(mongo_modules):
-            n += "-" + "-".join(m.name for m in mongo_modules)
+    if len(bongo_modules):
+            n += "-" + "-".join(m.name for m in bongo_modules)
 
-    dn = env.subst('$MONGO_DISTMOD')
+    dn = env.subst('$BONGO_DISTMOD')
     if len(dn) > 0:
         n = n + "-" + dn
 
@@ -3024,11 +3024,11 @@ def getSystemInstallName():
 # This function will add the version.txt file to the source tarball
 # so that versioning will work without having the git repo available.
 def add_version_to_distsrc(env, archive):
-    version_file_path = env.subst("$MONGO_DIST_SRC_PREFIX") + "version.json"
+    version_file_path = env.subst("$BONGO_DIST_SRC_PREFIX") + "version.json"
     if version_file_path not in archive:
         version_data = {
-            'version': env['MONGO_VERSION'],
-            'githash': env['MONGO_GIT_HASH'],
+            'version': env['BONGO_VERSION'],
+            'githash': env['BONGO_GIT_HASH'],
         }
         archive.append_file_contents(
             version_file_path,
@@ -3042,9 +3042,9 @@ def add_version_to_distsrc(env, archive):
 
 env.AddDistSrcCallback(add_version_to_distsrc)
 
-env['SERVER_DIST_BASENAME'] = env.subst('mongodb-%s-$MONGO_DISTNAME' % (getSystemInstallName()))
+env['SERVER_DIST_BASENAME'] = env.subst('bongodb-%s-$BONGO_DISTNAME' % (getSystemInstallName()))
 
-module_sconscripts = moduleconfig.get_module_sconscripts(mongo_modules)
+module_sconscripts = moduleconfig.get_module_sconscripts(bongo_modules)
 
 # The following symbols are exported for use in subordinate SConscript files.
 # Ideally, the SConscript files would be purely declarative.  They would only
@@ -3065,9 +3065,9 @@ Export("wiredtiger")
 Export("mmapv1")
 Export("endian")
 
-def injectMongoIncludePaths(thisEnv):
+def injectBongoIncludePaths(thisEnv):
     thisEnv.AppendUnique(CPPPATH=['$BUILD_DIR'])
-env.AddMethod(injectMongoIncludePaths, 'InjectMongoIncludePaths')
+env.AddMethod(injectBongoIncludePaths, 'InjectBongoIncludePaths')
 
 def injectModule(env, module, **kwargs):
     injector = env['MODULE_INJECTORS'].get(module)
@@ -3081,17 +3081,17 @@ compileDb = env.Alias("compiledb", compileCommands)
 
 # Microsoft Visual Studio Project generation for code browsing
 vcxprojFile = env.Command(
-    "mongodb.vcxproj",
+    "bongodb.vcxproj",
     compileCommands,
-    r"$PYTHON buildscripts\make_vcxproj.py mongodb")
+    r"$PYTHON buildscripts\make_vcxproj.py bongodb")
 vcxproj = env.Alias("vcxproj", vcxprojFile)
 
-env.Alias("distsrc-tar", env.DistSrc("mongodb-src-${MONGO_VERSION}.tar"))
+env.Alias("distsrc-tar", env.DistSrc("bongodb-src-${BONGO_VERSION}.tar"))
 env.Alias("distsrc-tgz", env.GZip(
-    target="mongodb-src-${MONGO_VERSION}.tgz",
-    source=["mongodb-src-${MONGO_VERSION}.tar"])
+    target="bongodb-src-${BONGO_VERSION}.tgz",
+    source=["bongodb-src-${BONGO_VERSION}.tar"])
 )
-env.Alias("distsrc-zip", env.DistSrc("mongodb-src-${MONGO_VERSION}.zip"))
+env.Alias("distsrc-zip", env.DistSrc("bongodb-src-${BONGO_VERSION}.zip"))
 env.Alias("distsrc", "distsrc-tgz")
 
 env.SConscript(
@@ -3135,7 +3135,7 @@ env.Alias('cache-prune', cachePrune)
 #
 # > scons --prefix=/foo/bar '$INSTALL_DIR'
 # or
-# > scons \$BUILD_DIR/mongo/base
+# > scons \$BUILD_DIR/bongo/base
 #
 # That way, you can reference targets under the variant dir or install
 # path via an invariant name.

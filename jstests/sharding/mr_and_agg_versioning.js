@@ -2,7 +2,7 @@
 (function() {
     "use strict";
 
-    var st = new ShardingTest({shards: 2, mongos: 3});
+    var st = new ShardingTest({shards: 2, bongos: 3});
 
     var dbName = jsTest.name();
     var collName = dbName + ".coll";
@@ -13,11 +13,11 @@
     st.ensurePrimaryShard(dbName, 'shard0000');
     st.s.adminCommand({shardCollection: collName, key: {key: 1}});
 
-    // Load chunk data to the stale mongoses before moving a chunk
-    var staleMongos1 = st.s1;
-    var staleMongos2 = st.s2;
-    staleMongos1.getCollection(collName).find().itcount();
-    staleMongos2.getCollection(collName).find().itcount();
+    // Load chunk data to the stale bongoses before moving a chunk
+    var staleBongos1 = st.s1;
+    var staleBongos2 = st.s2;
+    staleBongos1.getCollection(collName).find().itcount();
+    staleBongos2.getCollection(collName).find().itcount();
 
     st.s.adminCommand({split: collName, middle: {key: numKeys / 2}});
     st.s.adminCommand({moveChunk: collName, find: {key: 0}, to: 'shard0001'});
@@ -51,12 +51,12 @@
         }
     }
 
-    var res = staleMongos1.getCollection(collName).mapReduce(map, reduce, {out: {inline: 1}});
+    var res = staleBongos1.getCollection(collName).mapReduce(map, reduce, {out: {inline: 1}});
     validateOutput(res.results);
 
     jsTest.log("Doing aggregation");
 
-    res = staleMongos2.getCollection(collName).aggregate(
+    res = staleBongos2.getCollection(collName).aggregate(
         [{'$group': {_id: "$key", value: {"$sum": "$value"}}}, {'$sort': {_id: 1}}]);
     validateOutput(res.toArray());
 

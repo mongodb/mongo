@@ -1,4 +1,4 @@
-// mongodump/mongoexport from primary should succeed.  mongorestore and mongoimport to a
+// bongodump/bongoexport from primary should succeed.  bongorestore and bongoimport to a
 // secondary node should fail.
 
 var name = "dumprestore3";
@@ -18,38 +18,38 @@ for (i = 0; i < 20; i++) {
 jsTestLog("wait for secondary");
 replTest.awaitReplication();
 
-jsTestLog("mongodump from primary");
-var data = MongoRunner.dataDir + "/dumprestore3-other1/";
+jsTestLog("bongodump from primary");
+var data = BongoRunner.dataDir + "/dumprestore3-other1/";
 resetDbpath(data);
-var ret = MongoRunner.runMongoTool("mongodump", {
+var ret = BongoRunner.runBongoTool("bongodump", {
     host: primary.host,
     out: data,
 });
-assert.eq(ret, 0, "mongodump should exit w/ 0 on primary");
+assert.eq(ret, 0, "bongodump should exit w/ 0 on primary");
 
-jsTestLog("try mongorestore to secondary");
-ret = MongoRunner.runMongoTool("mongorestore", {
+jsTestLog("try bongorestore to secondary");
+ret = BongoRunner.runBongoTool("bongorestore", {
     host: secondary.host,
     dir: data,
 });
-assert.neq(ret, 0, "mongorestore should exit w/ 1 on secondary");
+assert.neq(ret, 0, "bongorestore should exit w/ 1 on secondary");
 
-jsTestLog("mongoexport from primary");
-dataFile = MongoRunner.dataDir + "/dumprestore3-other2.json";
-ret = MongoRunner.runMongoTool("mongoexport", {
+jsTestLog("bongoexport from primary");
+dataFile = BongoRunner.dataDir + "/dumprestore3-other2.json";
+ret = BongoRunner.runBongoTool("bongoexport", {
     host: primary.host,
     out: dataFile,
     db: "foo",
     collection: "bar",
 });
-assert.eq(ret, 0, "mongoexport should exit w/ 0 on primary");
+assert.eq(ret, 0, "bongoexport should exit w/ 0 on primary");
 
-jsTestLog("mongoimport from secondary");
-ret = MongoRunner.runMongoTool("mongoimport", {
+jsTestLog("bongoimport from secondary");
+ret = BongoRunner.runBongoTool("bongoimport", {
     host: secondary.host,
     file: dataFile,
 });
-assert.neq(ret, 0, "mongoimport should exit w/ 1 on secondary");
+assert.neq(ret, 0, "bongoimport should exit w/ 1 on secondary");
 
 jsTestLog("stopSet");
 replTest.stopSet();

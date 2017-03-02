@@ -6,7 +6,7 @@
 
 baseName = "jstests_disk_quota";
 
-var m = MongoRunner.runMongod({quotaFiles: 2, smallfiles: ""});
+var m = BongoRunner.runBongod({quotaFiles: 2, smallfiles: ""});
 db = m.getDB(baseName);
 
 big = new Array(10000).toString();

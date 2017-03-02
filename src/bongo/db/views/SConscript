@@ -1,0 +1,54 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone()
+
+env.Library(
+    target='views_bongod',
+    source=[
+        'durable_view_catalog.cpp',
+        'view_sharding_check.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/db/dbhelpers',
+        '$BUILD_DIR/bongo/db/views/views',
+        '$BUILD_DIR/bongo/db/catalog/catalog',
+        '$BUILD_DIR/bongo/db/s/sharding',
+    ]
+)
+
+env.Library(
+    target='views',
+    source=[
+        'view.cpp',
+        'view_catalog.cpp',
+        'view_graph.cpp',
+        'resolved_view.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+        '$BUILD_DIR/bongo/db/server_parameters',
+        '$BUILD_DIR/bongo/db/pipeline/aggregation',
+        '$BUILD_DIR/bongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/bongo/db/query/collation/collator_factory_interface',
+    ]
+)
+
+env.CppUnitTest(
+    target='views_test',
+    source=[
+        'resolved_view_test.cpp',
+        'view_catalog_test.cpp',
+        'view_definition_test.cpp',
+    ],
+    LIBDEPS=[
+        'views',
+        '$BUILD_DIR/bongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/bongo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/bongo/db/query/query_test_service_context',
+        '$BUILD_DIR/bongo/db/service_context_noop_init',
+        '$BUILD_DIR/bongo/s/is_bongos',
+        '$BUILD_DIR/bongo/unittest/unittest',
+    ],
+)

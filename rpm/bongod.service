@@ -1,0 +1,33 @@
+[Unit]
+Description=High-performance, schema-free document-oriented database
+After=network.target
+Documentation=https://docs.bongodb.org/manual
+
+[Service]
+User=bongod
+Group=bongod
+Environment="OPTIONS=--quiet -f /etc/bongod.conf"
+ExecStart=/usr/bin/bongod $OPTIONS run
+ExecStartPre=/usr/bin/mkdir -p /var/run/bongodb
+ExecStartPre=/usr/bin/chown bongod:bongod /var/run/bongodb
+ExecStartPre=/usr/bin/chmod 0755 /var/run/bongodb
+PermissionsStartOnly=true
+PIDFile=/var/run/bongodb/bongod.pid
+# file size
+LimitFSIZE=infinity
+# cpu time
+LimitCPU=infinity
+# virtual memory size
+LimitAS=infinity
+# open files
+LimitNOFILE=64000
+# processes/threads
+LimitNPROC=64000
+# total threads (user+kernel)
+TasksMax=infinity
+TasksAccounting=false
+# Recommended limits for for bongod as specified in
+# http://docs.bongodb.org/manual/reference/ulimit/#recommended-settings
+
+[Install]
+WantedBy=multi-user.target

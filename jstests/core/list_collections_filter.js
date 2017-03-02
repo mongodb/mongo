@@ -19,7 +19,7 @@
             filter = {};
         }
 
-        var cursor = new DBCommandCursor(mydb.getMongo(),
+        var cursor = new DBCommandCursor(mydb.getBongo(),
                                          mydb.runCommand("listCollections", {filter: filter}));
         function stripToName(result) {
             return result.name;

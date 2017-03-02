@@ -15,7 +15,7 @@
     assert(!isMasterSlave, 'Master/Slave is not supported with initial sync hooks');
 
     // The initial sync hooks only work for replica sets.
-    var rst = new ReplSetTest(db.getMongo().host);
+    var rst = new ReplSetTest(db.getBongo().host);
 
     // Call getPrimary to populate rst with information about the nodes.
     var primary = rst.getPrimary();

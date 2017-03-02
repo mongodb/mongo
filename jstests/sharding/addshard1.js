@@ -3,9 +3,9 @@
 
     var s = new ShardingTest({name: "add_shard1", shards: 1, useHostname: false});
 
-    // Create a shard and add a database; if the database is not duplicated the mongod should accept
+    // Create a shard and add a database; if the database is not duplicated the bongod should accept
     // it as shard
-    var conn1 = MongoRunner.runMongod({'shardsvr': ""});
+    var conn1 = BongoRunner.runBongod({'shardsvr': ""});
     var db1 = conn1.getDB("testDB");
 
     var numObjs = 3;
@@ -25,8 +25,8 @@
     var newShardDoc = configDB.shards.findOne({_id: newShard});
     assert.eq(1024, newShardDoc.maxSize);
 
-    // a mongod with an existing database name should not be allowed to become a shard
-    var conn2 = MongoRunner.runMongod({'shardsvr': ""});
+    // a bongod with an existing database name should not be allowed to become a shard
+    var conn2 = BongoRunner.runBongod({'shardsvr': ""});
 
     var db2 = conn2.getDB("otherDB");
     assert.writeOK(db2.foo.save({a: 1}));
@@ -38,16 +38,16 @@
 
     var rejectedShard = "rejectedShard";
     assert(!s.admin.runCommand({addshard: "localhost:" + conn2.port, name: rejectedShard}).ok,
-           "accepted mongod with duplicate db");
+           "accepted bongod with duplicate db");
 
-    // Check that all collection that were local to the mongod's are accessible through the mongos
+    // Check that all collection that were local to the bongod's are accessible through the bongos
     var sdb1 = s.getDB("testDB");
     assert.eq(numObjs, sdb1.foo.count(), "wrong count for database that existed before addshard");
 
     var sdb2 = s.getDB("otherDB");
-    assert.eq(0, sdb2.foo.count(), "database of rejected shard appears through mongos");
+    assert.eq(0, sdb2.foo.count(), "database of rejected shard appears through bongos");
 
-    // make sure we can move a DB from the original mongod to a previoulsy existing shard
+    // make sure we can move a DB from the original bongod to a previoulsy existing shard
     assert.eq(s.normalize(s.config.databases.findOne({_id: "testDB"}).primary),
               newShard,
               "DB primary is wrong");
@@ -72,8 +72,8 @@
     assert.eq(
         numObjs, sdb1.foo.count(), "wrong count after splitting collection that existed before");
 
-    MongoRunner.stopMongod(conn1);
-    MongoRunner.stopMongod(conn2);
+    BongoRunner.stopBongod(conn1);
+    BongoRunner.stopBongod(conn2);
 
     s.stop();
 

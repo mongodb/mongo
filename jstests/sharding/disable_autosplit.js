@@ -7,17 +7,17 @@
     // Autosplit is disabled by default, but specify it anyway in case the default changes,
     // especially since it defaults to the enableBalancer setting.
     var st = new ShardingTest(
-        {shards: 1, mongos: 1, other: {chunkSize: chunkSizeMB, enableAutoSplit: false}});
+        {shards: 1, bongos: 1, other: {chunkSize: chunkSizeMB, enableAutoSplit: false}});
 
     var data = "x";
     while (data.length < chunkSizeMB * 1024 * 1024) {
         data += data;
     }
 
-    var mongos = st.s0;
-    var admin = mongos.getDB("admin");
-    var config = mongos.getDB("config");
-    var coll = mongos.getCollection("foo.bar");
+    var bongos = st.s0;
+    var admin = bongos.getDB("admin");
+    var config = bongos.getDB("config");
+    var coll = bongos.getCollection("foo.bar");
 
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
     assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));

@@ -7,7 +7,7 @@ selector:
     - jstests/sharding/auth*.js
     - jstests/sharding/cleanup_orphaned_auth.js
     - jstests/sharding/localhostAuthBypass.js
-    - jstests/sharding/mongos_rs_auth_shard_failure_tolerance.js
+    - jstests/sharding/bongos_rs_auth_shard_failure_tolerance.js
     - jstests/sharding/mrShardedOutputAuth.js
     # Count/write/aggregate/group commands against the config shard do not support retries yet
     - jstests/sharding/addshard1.js
@@ -45,7 +45,7 @@ selector:
     - jstests/sharding/presplit.js
     - jstests/sharding/query_config.js
     - jstests/sharding/remove1.js
-    - jstests/sharding/rename_across_mongos.js
+    - jstests/sharding/rename_across_bongos.js
     - jstests/sharding/shard1.js
     - jstests/sharding/shard2.js
     - jstests/sharding/shard3.js
@@ -75,7 +75,7 @@ selector:
     - jstests/sharding/parallel.js
     - jstests/sharding/migrateBig.js
     - jstests/sharding/sharding_rs1.js
-    # Calls the config server primary directly (not through mongos)
+    # Calls the config server primary directly (not through bongos)
     - jstests/sharding/moveprimary_ignore_sharded.js
     - jstests/sharding/min_optime_recovery_on_successful_move_chunk_commit.js
     - jstests/sharding/read_after_optime.js
@@ -88,7 +88,7 @@ selector:
     - jstests/sharding/ssv_config_check.js
     # Already stop or blackholes the primary of the CSRS config shard
     - jstests/sharding/all_config_hosts_down.js
-    - jstests/sharding/all_config_servers_blackholed_from_mongos.js
+    - jstests/sharding/all_config_servers_blackholed_from_bongos.js
     - jstests/sharding/batch_write_command_sharded.js
     - jstests/sharding/config_rs_no_primary.js
     - jstests/sharding/config_version_rollback.js
@@ -96,9 +96,9 @@ selector:
     - jstests/sharding/lagged_config_secondary.js
     - jstests/sharding/autodiscover_config_rs_from_secondary.js
     - jstests/sharding/rs_stepdown_and_pooling.js
-    - jstests/sharding/mongos_no_replica_set_refresh.js
+    - jstests/sharding/bongos_no_replica_set_refresh.js
     - jstests/sharding/movechunk_interrupt_at_primary_stepdown.js
-    - jstests/sharding/primary_config_server_blackholed_from_mongos.js
+    - jstests/sharding/primary_config_server_blackholed_from_bongos.js
     # Nothing is affected by config server step down
     - jstests/sharding/basic_sharding_params.js
     # ShardingTest is never used, so continuous step down thread never starts

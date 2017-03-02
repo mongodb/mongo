@@ -1,16 +1,16 @@
 // Test that opcounters get incremented properly.
 // Legacy write mode test also available at jstests/gle.
 
-var mongo = new Mongo(db.getMongo().host);
+var bongo = new Bongo(db.getBongo().host);
 
-var newdb = mongo.getDB(db.toString());
+var newdb = bongo.getDB(db.toString());
 
 var t = newdb.opcounters;
 var opCounters;
 var res;
 
 //
-// Count ops attempted in write commands in mongod and mongos
+// Count ops attempted in write commands in bongod and bongos
 //
 
 //
@@ -38,7 +38,7 @@ assert.writeOK(res);
 assert.eq(opCounters.insert + 2, newdb.serverStatus().opcounters.insert);
 
 // Test is not run when in compatibility mode as errors are not counted
-if (t.getMongo().writeMode() != "compatibility") {
+if (t.getBongo().writeMode() != "compatibility") {
     // Single insert, with error.
     opCounters = newdb.serverStatus().opcounters;
     res = t.insert({_id: 0});

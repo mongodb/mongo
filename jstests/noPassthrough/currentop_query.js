@@ -12,8 +12,8 @@
      * "getMore" commands.
      */
     function runTest(params) {
-        var conn = MongoRunner.runMongod({smallfiles: "", nojournal: ""});
-        assert.neq(null, conn, "mongod was unable to start up");
+        var conn = BongoRunner.runBongod({smallfiles: "", nojournal: ""});
+        assert.neq(null, conn, "bongod was unable to start up");
 
         var testDB = conn.getDB("test");
         assert.commandWorked(testDB.dropDatabase());
@@ -47,7 +47,7 @@
             TestData.shellReadMode = params.readMode;
             TestData.currentOpTest = testObj.test;
             testObj.test = function() {
-                db.getMongo().forceReadMode(TestData.shellReadMode);
+                db.getBongo().forceReadMode(TestData.shellReadMode);
                 TestData.currentOpTest();
             };
 
@@ -71,7 +71,7 @@
                     assert.commandWorked(result);
 
                     if (result.inprog.length === 1) {
-                        assert.eq(result.inprog[0].appName, "MongoDB Shell", tojson(result));
+                        assert.eq(result.inprog[0].appName, "BongoDB Shell", tojson(result));
 
                         return true;
                     }
@@ -296,7 +296,7 @@
 
         confirmCurrentOpContents({
             test: function() {
-                var cursor = new DBCommandCursor(db.getMongo(), TestData.commandResult, 5);
+                var cursor = new DBCommandCursor(db.getBongo(), TestData.commandResult, 5);
                 assert.eq(cursor.itcount(), 10);
             },
             planSummary: "COLLSCAN",

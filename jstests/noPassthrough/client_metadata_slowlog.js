@@ -1,11 +1,11 @@
 /**
- * Test that verifies client metadata is logged as part of slow query logging in MongoD.
+ * Test that verifies client metadata is logged as part of slow query logging in BongoD.
  */
 (function() {
     'use strict';
 
-    let conn = MongoRunner.runMongod({useLogFiles: true});
-    assert.neq(null, conn, 'mongod was unable to start up');
+    let conn = BongoRunner.runBongod({useLogFiles: true});
+    assert.neq(null, conn, 'bongod was unable to start up');
 
     let coll = conn.getCollection("test.foo");
     assert.writeOK(coll.insert({_id: 1}));
@@ -22,12 +22,12 @@
     print(`Checking ${conn.fullOptions.logFile} for client metadata message`);
     let log = cat(conn.fullOptions.logFile);
     assert(
-        /COMMAND .* command test.foo appName: "MongoDB Shell" command: count { count: "foo", query: { \$where: function ()/
+        /COMMAND .* command test.foo appName: "BongoDB Shell" command: count { count: "foo", query: { \$where: function ()/
             .test(log),
-        "'slow query' log line missing in mongod log file!\n" + "Log file contents: " +
+        "'slow query' log line missing in bongod log file!\n" + "Log file contents: " +
             conn.fullOptions.logFile +
             "\n************************************************************\n" + log +
             "\n************************************************************");
 
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
 })();

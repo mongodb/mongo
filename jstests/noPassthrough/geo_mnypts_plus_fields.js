@@ -1,7 +1,7 @@
 // Test sanity of geo queries with a lot of points
 
 load("jstests/libs/slow_weekly_util.js");
-testServer = new SlowWeeklyMongod("geo_mnypts_plus_fields");
+testServer = new SlowWeeklyBongod("geo_mnypts_plus_fields");
 db = testServer.getDB("test");
 
 var maxFields = 3;

@@ -1,0 +1,9 @@
+snmp/bongod.conf.master
+snmp/bongod.conf.subagent
+snmp/README-snmp.txt
+snmp/BONGOD-MIB.txt
+snmp/BONGODBINC-MIB.txt
+LICENSE.txt
+README
+THIRD-PARTY-NOTICES
+MPL-2

@@ -2,7 +2,7 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({name: "remove_shard3", shards: 2, mongos: 2});
+    var st = new ShardingTest({name: "remove_shard3", shards: 2, bongos: 2});
 
     assert.commandWorked(st.s0.adminCommand({enableSharding: 'TestDB'}));
     st.ensurePrimaryShard('TestDB', 'shard0000');
@@ -16,7 +16,7 @@
     assert.commandWorked(st.s0.adminCommand(
         {moveChunk: 'TestDB.Coll', find: {_id: 1}, to: 'shard0001', _waitForDelete: true}));
 
-    // Make sure both mongos instances know of the latest metadata
+    // Make sure both bongos instances know of the latest metadata
     assert.eq(2, st.s0.getDB('TestDB').Coll.find({}).toArray().length);
     assert.eq(2, st.s1.getDB('TestDB').Coll.find({}).toArray().length);
 
@@ -35,7 +35,7 @@
     removeRes = assert.commandWorked(st.s0.adminCommand({removeShard: 'shard0001'}));
     assert.eq('completed', removeRes.state);
 
-    // Make sure both mongos instance refresh their metadata and do not reference the missing shard
+    // Make sure both bongos instance refresh their metadata and do not reference the missing shard
     assert.eq(2, st.s0.getDB('TestDB').Coll.find({}).toArray().length);
     assert.eq(2, st.s1.getDB('TestDB').Coll.find({}).toArray().length);
 

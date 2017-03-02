@@ -4,12 +4,12 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 2, mongos: 1});
+    var st = new ShardingTest({shards: 2, bongos: 1});
 
-    var mongos = st.s0;
-    var coll = mongos.getCollection("foo.bar");
-    var admin = mongos.getDB("admin");
-    var shards = mongos.getCollection("config.shards").find().toArray();
+    var bongos = st.s0;
+    var coll = bongos.getCollection("foo.bar");
+    var admin = bongos.getDB("admin");
+    var shards = bongos.getCollection("config.shards").find().toArray();
     var shardAdmin = st.shard0.getDB("admin");
 
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));

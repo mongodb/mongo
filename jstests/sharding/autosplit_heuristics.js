@@ -5,7 +5,7 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1, enableAutoSplit: true}});
+    var st = new ShardingTest({shards: 1, bongos: 1, other: {chunkSize: 1, enableAutoSplit: true}});
 
     // The balancer is by default stopped, thus it will NOT interfere unpredictably with the chunk
     // moves/splits depending on the timing.
@@ -14,10 +14,10 @@
     var isDebugBuild = st.s0.getDB("admin").serverBuildInfo().debug;
 
     if (!isDebugBuild) {
-        var mongos = st.s0;
-        var config = mongos.getDB("config");
-        var admin = mongos.getDB("admin");
-        var coll = mongos.getCollection("foo.hashBar");
+        var bongos = st.s0;
+        var config = bongos.getDB("config");
+        var admin = bongos.getDB("admin");
+        var coll = bongos.getCollection("foo.hashBar");
 
         assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
         assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));

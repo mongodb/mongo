@@ -7,18 +7,18 @@ and send output in batches to the buildlogs web application via HTTP POST.
 The script configures itself from environment variables:
 
   required env vars:
-    MONGO_BUILDER_NAME (e.g. "Nightly Linux 64-bit")
-    MONGO_BUILD_NUMBER (an integer)
-    MONGO_TEST_FILENAME (not required when invoked with -g)
+    BONGO_BUILDER_NAME (e.g. "Nightly Linux 64-bit")
+    BONGO_BUILD_NUMBER (an integer)
+    BONGO_TEST_FILENAME (not required when invoked with -g)
 
   optional env vars:
-    MONGO_PHASE (e.g. "core", "slow nightly", etc)
-    MONGO_* (any other environment vars are passed to the web app)
+    BONGO_PHASE (e.g. "core", "slow nightly", etc)
+    BONGO_* (any other environment vars are passed to the web app)
     BUILDLOGGER_CREDENTIALS (see below)
 
 This script has two modes: a "test" mode, intended to wrap the invocation of
-an individual test file, and a "global" mode, intended to wrap the mongod
-instances that run throughout the duration of a mongo test phase (the logs
+an individual test file, and a "global" mode, intended to wrap the bongod
+instances that run throughout the duration of a bongo test phase (the logs
 from "global" invocations are displayed interspersed with the logs of each
 test, in order to let the buildlogs web app display the full output sensibly.)
 
@@ -90,7 +90,7 @@ for path in possible_paths:
             pass
 
 
-URL_ROOT = os.environ.get('BUILDLOGGER_URL', 'http://buildlogs.mongodb.org/')
+URL_ROOT = os.environ.get('BUILDLOGGER_URL', 'http://buildlogs.bongodb.org/')
 TIMEOUT_SECONDS = 10
 socket.setdefaulttimeout(TIMEOUT_SECONDS)
 
@@ -208,7 +208,7 @@ def append_test_logs(build_id, test_id, log_lines):
 @traceback_to_stderr
 def append_global_logs(build_id, log_lines):
     """
-    "global" logs are for the mongod(s) started by smoke.py
+    "global" logs are for the bongod(s) started by smoke.py
     that last the duration of a test phase -- since there
     may be output in here that is important but spans individual
     tests, the buildlogs webapp handles these logs specially.
@@ -304,8 +304,8 @@ def wrap_test(command):
     """
 
     # get builder name and build number from environment
-    builder = os.environ.get('MONGO_BUILDER_NAME')
-    buildnum = os.environ.get('MONGO_BUILD_NUMBER')
+    builder = os.environ.get('BONGO_BUILDER_NAME')
+    buildnum = os.environ.get('BONGO_BUILD_NUMBER')
 
     if builder is None or buildnum is None:
         return run_and_echo(command)
@@ -318,14 +318,14 @@ def wrap_test(command):
         return run_and_echo(command)
 
     # test takes some extra info
-    phase = os.environ.get('MONGO_PHASE', 'unknown')
-    test_filename = os.environ.get('MONGO_TEST_FILENAME', 'unknown')
+    phase = os.environ.get('BONGO_PHASE', 'unknown')
+    test_filename = os.environ.get('BONGO_TEST_FILENAME', 'unknown')
 
-    build_info = dict((k, v) for k, v in os.environ.items() if k.startswith('MONGO_'))
-    build_info.pop('MONGO_BUILDER_NAME', None)
-    build_info.pop('MONGO_BUILD_NUMBER', None)
-    build_info.pop('MONGO_PHASE', None)
-    build_info.pop('MONGO_TEST_FILENAME', None)
+    build_info = dict((k, v) for k, v in os.environ.items() if k.startswith('BONGO_'))
+    build_info.pop('BONGO_BUILDER_NAME', None)
+    build_info.pop('BONGO_BUILD_NUMBER', None)
+    build_info.pop('BONGO_PHASE', None)
+    build_info.pop('BONGO_TEST_FILENAME', None)
 
     build_id = get_or_create_build(builder, buildnum, extra=build_info)
     if not build_id:
@@ -372,8 +372,8 @@ def wrap_global(command):
     """
 
     # get builder name and build number from environment
-    builder = os.environ.get('MONGO_BUILDER_NAME')
-    buildnum = os.environ.get('MONGO_BUILD_NUMBER')
+    builder = os.environ.get('BONGO_BUILDER_NAME')
+    buildnum = os.environ.get('BONGO_BUILD_NUMBER')
 
     if builder is None or buildnum is None:
         return run_and_echo(command)
@@ -381,14 +381,14 @@ def wrap_global(command):
     try:
         buildnum = int(buildnum)
     except ValueError:
-        sys.stderr.write('int(os.environ["MONGO_BUILD_NUMBER"]):\n')
+        sys.stderr.write('int(os.environ["BONGO_BUILD_NUMBER"]):\n')
         sys.stderr.write(traceback.format_exc())
         sys.stderr.flush()
         return run_and_echo(command)
 
-    build_info = dict((k, v) for k, v in os.environ.items() if k.startswith('MONGO_'))
-    build_info.pop('MONGO_BUILDER_NAME', None)
-    build_info.pop('MONGO_BUILD_NUMBER', None)
+    build_info = dict((k, v) for k, v in os.environ.items() if k.startswith('BONGO_'))
+    build_info.pop('BONGO_BUILDER_NAME', None)
+    build_info.pop('BONGO_BUILD_NUMBER', None)
 
     build_id = get_or_create_build(builder, buildnum, extra=build_info)
     if not build_id:

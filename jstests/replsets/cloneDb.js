@@ -28,7 +28,7 @@
         masterDB.dropDatabase();
 
         jsTest.log("Create standalone server");
-        var standalone = MongoRunner.runMongod();
+        var standalone = BongoRunner.runBongod();
         standalone.getDB("admin").runCommand({setParameter: 1, logLevel: 5});
         var standaloneDB = standalone.getDB(replsetDBName);
         standaloneDB.dropDatabase();
@@ -117,7 +117,7 @@
             'cloneDatabase from standalone to SECONDARY succeeded and should not accept writes');
 
         jsTest.log("Shut down replica set and standalone server");
-        MongoRunner.stopMongod(standalone.port);
+        BongoRunner.stopBongod(standalone.port);
 
         replTest.stopSet();
     }

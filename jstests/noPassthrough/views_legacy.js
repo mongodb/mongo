@@ -5,7 +5,7 @@
 (function() {
     "use strict";
 
-    let conn = MongoRunner.runMongod({});
+    let conn = BongoRunner.runBongod({});
 
     let viewsDB = conn.getDB("views_legacy");
     assert.commandWorked(viewsDB.dropDatabase());
@@ -25,7 +25,7 @@
     let cmdRes =
         viewsDB.runCommand({find: "view", filter: {a: {$gt: 0}}, sort: {a: 1}, batchSize: 0});
     assert.commandWorked(cmdRes);
-    let cursor = new DBCommandCursor(viewsDB.getMongo(), cmdRes, 2);
+    let cursor = new DBCommandCursor(viewsDB.getBongo(), cmdRes, 2);
 
     let err = assert.throws(function() {
         cursor.itcount();
@@ -37,7 +37,7 @@
     //
     cmdRes = viewsDB.runCommand({find: "view", filter: {a: {$gt: 0}}, sort: {a: 1}, batchSize: 0});
     assert.commandWorked(cmdRes);
-    cursor = new DBCommandCursor(viewsDB.getMongo(), cmdRes, 2);
+    cursor = new DBCommandCursor(viewsDB.getBongo(), cmdRes, 2);
 
     // When DBCommandCursor is constructed under legacy readMode, cursor.close() will execute a
     // legacy killcursors operation.
@@ -64,5 +64,5 @@
     });
     assert.eq(res.code, ErrorCodes.CommandNotSupportedOnView, tojson(res));
 
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
 }());

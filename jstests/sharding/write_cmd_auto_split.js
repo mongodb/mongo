@@ -17,7 +17,7 @@
 
     assert.eq(1, configDB.chunks.find().itcount());
 
-    // Note: Estimated 'chunk size' tracked by mongos is initialized with a random value so
+    // Note: Estimated 'chunk size' tracked by bongos is initialized with a random value so
     // we are going to be conservative.
     for (var x = 0; x < 3100; x++) {
         assert.writeOK(testDB.runCommand({
@@ -78,7 +78,7 @@
 
     assert.eq(1, configDB.chunks.find().itcount());
 
-    // Note: Estimated 'chunk size' tracked by mongos is initialized with a random value so
+    // Note: Estimated 'chunk size' tracked by bongos is initialized with a random value so
     // we are going to be conservative.
     for (var x = 0; x < 1100; x += 400) {
         var docs = [];

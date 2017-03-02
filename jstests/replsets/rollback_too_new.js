@@ -45,17 +45,17 @@
 
     // Node C should connect to new master as a sync source because chaining is disallowed.
     // C is ahead of master but it will still connect to it.
-    clearRawMongoProgramOutput();
+    clearRawBongoProgramOutput();
     replTest.restart(CID);
     assert.soon(function() {
         try {
-            return rawMongoProgramOutput().match(
+            return rawBongoProgramOutput().match(
                 "rollback error: not willing to roll back more than 30 minutes of data");
         } catch (e) {
             return false;
         }
     }, "node C failed to fassert", 60 * 1000);
 
-    replTest.stopSet(undefined, undefined, {allowedExitCodes: [MongoRunner.EXIT_ABRUPT]});
+    replTest.stopSet(undefined, undefined, {allowedExitCodes: [BongoRunner.EXIT_ABRUPT]});
 
 }());

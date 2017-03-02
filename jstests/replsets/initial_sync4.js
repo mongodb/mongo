@@ -27,7 +27,7 @@ replTest.awaitReplication();
 print("4. Bring up a new node");
 hostname = getHostName();
 
-s = MongoRunner.runMongod({replSet: basename, oplogSize: 2});
+s = BongoRunner.runBongod({replSet: basename, oplogSize: 2});
 
 var config = replTest.getReplSetConfig();
 config.version = replTest.getReplSetConfigFromNode().version + 1;

@@ -8,13 +8,13 @@ load('./jstests/libs/chunk_manipulation_util.js');
 (function() {
     'use strict';
 
-    var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+    var staticBongod = BongoRunner.runBongod({});  // For startParallelOps.
 
-    var st = new ShardingTest({shards: 2, mongos: 1});
+    var st = new ShardingTest({shards: 2, bongos: 1});
 
-    var mongos = st.s0;
-    var admin = mongos.getDB("admin");
-    var coll = mongos.getCollection("db.coll");
+    var bongos = st.s0;
+    var admin = bongos.getDB("admin");
+    var coll = bongos.getCollection("db.coll");
 
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
     st.ensurePrimaryShard(coll.getDB() + "", st.shard0.shardName);
@@ -25,7 +25,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.startedMoveChunk);
 
     var joinMoveChunk = moveChunkParallel(
-        staticMongod, st.s0.host, {_id: 1}, null, coll.getFullName(), st.shard1.shardName);
+        staticBongod, st.s0.host, {_id: 1}, null, coll.getFullName(), st.shard1.shardName);
 
     var assertMigrationStatusOnServerStatus = function(serverStatusResult,
                                                        sourceShard,
@@ -60,9 +60,9 @@ load('./jstests/libs/chunk_manipulation_util.js');
     var shard1ServerStatus = st.shard1.getDB('admin').runCommand({serverStatus: 1});
     assert(!shard1ServerStatus.sharding.migrations);
 
-    // Mongos should never return a migration status.
-    var mongosServerStatus = st.s0.getDB('admin').runCommand({serverStatus: 1});
-    assert(!mongosServerStatus.sharding.migrations);
+    // Bongos should never return a migration status.
+    var bongosServerStatus = st.s0.getDB('admin').runCommand({serverStatus: 1});
+    assert(!bongosServerStatus.sharding.migrations);
 
     unpauseMoveChunkAtStep(st.shard0, moveChunkStepNames.startedMoveChunk);
     joinMoveChunk();

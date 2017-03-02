@@ -14,10 +14,10 @@
     try {
         replTest.startSet();
     } catch (e) {
-        var conn = MongoRunner.runMongod();
+        var conn = BongoRunner.runBongod();
         if (!conn.getDB('admin').serverStatus().storageEngine.supportsCommittedReads) {
             print("Skipping read_majority.js since storageEngine doesn't support it.");
-            MongoRunner.stopMongod(conn);
+            BongoRunner.stopBongod(conn);
             return;
         }
         throw e;

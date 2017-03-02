@@ -115,7 +115,7 @@ functions:
           YCSB_rev: ${YCSB_rev}
 
           # compositions of expansions
-          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz"
+          bongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/bongod-${version_id}.tar.gz"
           EOF
     - command: shell.exec
       params:
@@ -170,15 +170,15 @@ functions:
         working_dir: work
         silent: true
         script: |
-          # to create a mongod EC2 cluster
+          # to create a bongod EC2 cluster
           set -e
           set -o verbose
           source ./dsienv.sh
           $DSI_PATH/bin/setup-cluster.sh ${cluster} false
 
-  "configure mongodb cluster":
+  "configure bongodb cluster":
     - command: shell.exec
-      # bring up the mongod
+      # bring up the bongod
       params:
         working_dir: work
         script: |
@@ -186,7 +186,7 @@ functions:
           set -o verbose
           source ./dsienv.sh
           source ./venv/bin/activate
-          $DSI_PATH/bin/mongodb_setup.py && echo "${setup} MongoDB Cluster STARTED."
+          $DSI_PATH/bin/bongodb_setup.py && echo "${setup} BongoDB Cluster STARTED."
 
   "run test":
     - command: shell.exec
@@ -252,7 +252,7 @@ functions:
           set -o errexit
           set -o verbose
           TAG="3.2.1-Baseline"
-          PROJECT="mongo-longevity"
+          PROJECT="bongo-longevity"
           OVERRIDEFILE="../src/dsi/dsi/analysis/master/longevity_override.json"
           python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --reports-analysis reports --perf-file reports/perf.json --rev ${revision} -f history.json -t tags.json --refTag $TAG --overrideFile $OVERRIDEFILE --project_id $PROJECT --task_name ${task_name} --variant ${build_variant}
 
@@ -271,16 +271,16 @@ tasks:
           set -o verbose
 
           # We get the raw version string (r1.2.3-45-gabcdef) from git
-          MONGO_VERSION=$(git describe)
+          BONGO_VERSION=$(git describe)
           # If this is a patch build, we add the patch version id to the version string so we know
           # this build was a patch, and which evergreen task it came from
           if [ "${is_patch|}" = "true" ]; then
-            MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+            BONGO_VERSION="$BONGO_VERSION-patch-${version_id}"
           fi
 
           # This script converts the generated version string into a sanitized version string for
           # use by scons and uploading artifacts as well as information about for the scons cache.
-          echo $MONGO_VERSION | USE_SCONS_CACHE=${use_scons_cache|false} ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
+          echo $BONGO_VERSION | USE_SCONS_CACHE=${use_scons_cache|false} ${python|python} buildscripts/generate_compile_expansions.py | tee compile_expansions.yml
     # Then we load the generated version data into the agent so we can use it in task definitions
     - command: expansions.update
       params:
@@ -292,28 +292,28 @@ tasks:
           set -o errexit
           set -o verbose
 
-          ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo mongod mongos
+          ${python|python} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} bongo bongod bongos
 
           # strip binaries here
-          strip mongo
-          strip mongos
-          strip mongod
-          mkdir -p mongodb/bin
-          mv mongo mongodb/bin
-          mv mongod mongodb/bin
-          mv mongos mongodb/bin
-          tar cvf mongodb.tar mongodb
-          gzip mongodb.tar
+          strip bongo
+          strip bongos
+          strip bongod
+          mkdir -p bongodb/bin
+          mv bongo bongodb/bin
+          mv bongod bongodb/bin
+          mv bongos bongodb/bin
+          tar cvf bongodb.tar bongodb
+          gzip bongodb.tar
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: src/mongodb.tar.gz
-        remote_file: ${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz
+        local_file: src/bongodb.tar.gz
+        remote_file: ${project}/${version_id}/${revision}/${platform}/bongod-${version_id}.tar.gz
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
-        display_name: mongodb.tar.gz
+        display_name: bongodb.tar.gz
 
 - name: shard_cluster_test
   depends_on:
@@ -325,7 +325,7 @@ tasks:
         storageEngine: "wiredTiger"
         test: "ycsb"
     - func: "bring up 3 shard cluster"
-    - func: "configure mongodb cluster"
+    - func: "configure bongodb cluster"
     - func: "run test"
       vars:
         storageEngine: "wiredTiger"
@@ -346,7 +346,7 @@ tasks:
         storageEngine: "mmapv1"
         test: "ycsb"
     - func: "bring up 3 shard cluster"
-    - func: "configure mongodb cluster"
+    - func: "configure bongodb cluster"
     - func: "run test"
       vars:
         storageEngine: "mmapv1"
@@ -370,7 +370,7 @@ modules:
   branch: master
 
 - name: YCSB
-  repo: git@github.com:mongodb-labs/YCSB.git
+  repo: git@github.com:bongodb-labs/YCSB.git
   prefix: YCSB
   branch: evergreen
 
@@ -384,7 +384,7 @@ buildvariants:
     - dsi
     - YCSB
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/bongodbtoolchain/v2/bin/gcc CXX=/opt/bongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/bongodbtoolchain/v2/bin/objcopy
     setup: shard-longevity
     cluster: longevity
     numShard: 3
@@ -404,7 +404,7 @@ buildvariants:
   batchtime: 40320 # 4 week
   modules: *modules
   expansions:
-    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/bongodbtoolchain/v2/bin/gcc CXX=/opt/bongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/bongodbtoolchain/v2/bin/objcopy
     setup: shard-longevity
     cluster: longevity
     numShard: 3

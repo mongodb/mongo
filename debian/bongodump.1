@@ -1,0 +1,621 @@
+.\" Man page generated from reStructuredText.
+.
+.TH "BONGODUMP" "1" "January 30, 2015" "3.0" "bongodb-manual"
+.SH NAME
+bongodump \- BongoDB Data Dump Utility
+.
+.nr rst2man-indent-level 0
+.
+.de1 rstReportMargin
+\\$1 \\n[an-margin]
+level \\n[rst2man-indent-level]
+level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
+-
+\\n[rst2man-indent0]
+\\n[rst2man-indent1]
+\\n[rst2man-indent2]
+..
+.de1 INDENT
+.\" .rstReportMargin pre:
+. RS \\$1
+. nr rst2man-indent\\n[rst2man-indent-level] \\n[an-margin]
+. nr rst2man-indent-level +1
+.\" .rstReportMargin post:
+..
+.de UNINDENT
+. RE
+.\" indent \\n[an-margin]
+.\" old: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.nr rst2man-indent-level -1
+.\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
+.in \\n[rst2man-indent\\n[rst2man-indent-level]]u
+..
+.SH SYNOPSIS
+.sp
+\fBbongodump\fP is a utility for creating a binary export of the
+contents of a database. Consider using this utility as part of an
+effective \fBbackup strategy\fP\&. Use
+\fBbongodump\fP in conjunction with \fBbongorestore\fP to
+restore databases.
+.sp
+\fBbongodump\fP can read data from either \fBbongod\fP or \fBbongos\fP
+instances, in addition to reading directly from BongoDB data files
+without an active \fBbongod\fP\&.
+.sp
+\fBSEE ALSO:\fP
+.INDENT 0.0
+.INDENT 3.5
+\fBbongorestore\fP,
+http://docs.bongodb.org/manual/tutorial/backup\-sharded\-cluster\-with\-database\-dumps
+and http://docs.bongodb.org/manual/core/backups\&.
+.UNINDENT
+.UNINDENT
+.SH BEHAVIOR
+.sp
+\fBbongodump\fP does \fInot\fP dump the content of the \fBlocal\fP database.
+.sp
+The data format used by \fBbongodump\fP from version 2.2 or
+later is \fIincompatible\fP with earlier versions of \fBbongod\fP\&.
+Do not use recent versions of \fBbongodump\fP to back up older
+data stores.
+.sp
+When running \fBbongodump\fP against a \fBbongos\fP instance
+where the \fIsharded cluster\fP consists of \fIreplica sets\fP, the \fIread preference\fP of the operation will prefer reads
+from \fIsecondary\fP members of the set.
+.sp
+Changed in version 2.2: When used in combination with \fBfsync\fP or
+\fBdb.fsyncLock()\fP, \fBbongod\fP will block
+reads, including those from \fBbongodump\fP, when
+queued write operation waits behind the \fBfsync\fP
+lock. Do not use \fBbongodump\fP with
+\fBdb.fsyncLock()\fP\&.
+
+.sp
+\fBbongodump\fP overwrites output files if they exist in the
+backup data folder. Before running the \fBbongodump\fP command
+multiple times, either ensure that you no longer need the files in the
+output folder (the default is the \fBdump/\fP folder) or rename the
+folders or files.
+.SH REQUIRED ACCESS
+.SS Backup Collections
+.sp
+To backup all the databases in a cluster via \fBbongodump\fP, you
+should have the \fBbackup\fP role. The \fBbackup\fP role provides
+the required privileges for backing up all databases. The role confers no
+additional access, in keeping with the policy of \fIleast privilege\fP\&.
+.sp
+To backup a given database, you must have \fBread\fP access on the database.
+Several roles provide this access, including the \fBbackup\fP role.
+.sp
+To backup the \fBsystem.profile\fP
+collection, which is created when you activate \fIdatabase profiling\fP, you must have \fBadditional\fP
+\fBread\fP access on this collection. Several
+roles provide this access, including the \fBclusterAdmin\fP and
+\fBdbAdmin\fP roles.
+.SS Backup Users
+.sp
+Changed in version 2.6.
+
+.sp
+To backup users and \fIuser\-defined roles\fP for a
+given database, you must have access to the \fBadmin\fP database. BongoDB
+stores the user data and role definitions for all databases in the
+\fBadmin\fP database.
+.sp
+Specifically, to backup a given database\(aqs users, you must have the
+\fBfind\fP \fIaction\fP on the \fBadmin\fP
+database\(aqs \fBadmin.system.users\fP collection. The \fBbackup\fP
+and \fBuserAdminAnyDatabase\fP roles both provide this privilege.
+.sp
+To backup the user\-defined roles on a database, you must have the
+\fBfind\fP action on the \fBadmin\fP database\(aqs
+\fBadmin.system.roles\fP collection. Both the \fBbackup\fP and
+\fBuserAdminAnyDatabase\fP roles provide this privilege.
+.SH OPTIONS
+.sp
+Changed in version 3.0.0: \fBbongodump\fP removed the \fB\-\-dbpath\fP as well as related
+\fB\-\-directoryperdb\fP and \fB\-\-journal\fP options. You must use
+\fBbongodump\fP while connected to a \fBbongod\fP instance.
+
+.INDENT 0.0
+.TP
+.B bongodump
+.UNINDENT
+.INDENT 0.0
+.TP
+.B bongodump
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-help
+Returns information on the options and use of \fBbongodump\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-verbose, \-v
+Increases the amount of internal reporting returned on standard output
+or in log files. Increase the verbosity with the \fB\-v\fP form by
+including the option multiple times, (e.g. \fB\-vvvvv\fP\&.)
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-quiet
+Runs the \fBbongodump\fP in a quiet mode that attempts to limit the amount
+of output.
+.sp
+This option suppresses:
+.INDENT 7.0
+.IP \(bu 2
+output from \fIdatabase commands\fP
+.IP \(bu 2
+replication activity
+.IP \(bu 2
+connection accepted events
+.IP \(bu 2
+connection closed events
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-version
+Returns the \fBbongodump\fP release number.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-host <hostname><:port>, \-h <hostname><:port>
+\fIDefault\fP: localhost:27017
+.sp
+Specifies a resolvable hostname for the \fBbongod\fP to which to
+connect. By default, the \fBbongodump\fP attempts to connect to a BongoDB
+instance running on the localhost on port number \fB27017\fP\&.
+.sp
+To connect to a replica set, specify the
+\fBreplSetName\fP and a seed list of set members, as in
+the following:
+.INDENT 7.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+<replSetName>/<hostname1><:port>,<hostname2><:port>,<...>
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+You can always connect directly to a single BongoDB instance by
+specifying the host and port number directly.
+.sp
+Changed in version 3.0.0: If you use IPv6 and use the \fB<address>:<port>\fP format, you must
+enclose the portion of an address and port combination in
+brackets (e.g. \fB[<address>]\fP).
+
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-port <port>
+\fIDefault\fP: 27017
+.sp
+Specifies the TCP port on which the BongoDB instance listens for
+client connections.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ipv6
+Enables IPv6 support and allows the \fBbongodump\fP to connect to the
+BongoDB instance using an IPv6 network. All BongoDB programs and
+processes disable IPv6 support by default.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-ssl
+New in version 2.6.
+
+.sp
+Enables connection to a \fBbongod\fP or \fBbongos\fP that has
+SSL support enabled.
+.sp
+The default distribution of BongoDB does not contain support for SSL.
+For more information on BongoDB and SSL, see http://docs.bongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslCAFile <filename>
+New in version 2.6.
+
+.sp
+Specifies the \fB\&.pem\fP file that contains the root certificate chain
+from the Certificate Authority. Specify the file name of the
+\fB\&.pem\fP file using relative or absolute paths.
+.sp
+The default distribution of BongoDB does not contain support for SSL.
+For more information on BongoDB and SSL, see http://docs.bongodb.org/manual/tutorial/configure\-ssl\&.
+.sp
+\fBWARNING:\fP
+.INDENT 7.0
+.INDENT 3.5
+If the \fBbongo\fP shell or any other tool that connects to
+\fBbongos\fP or \fBbongod\fP is run without
+\fI\-\-sslCAFile\fP, it will not attempt to validate
+server certificates. This results in vulnerability to expired
+\fBbongod\fP and \fBbongos\fP certificates as well as to foreign
+processes posing as valid \fBbongod\fP or \fBbongos\fP
+instances. Ensure that you \fIalways\fP specify the CA file against which
+server certificates should be validated in cases where intrusion is a
+possibility.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslPEMKeyFile <filename>
+New in version 2.6.
+
+.sp
+Specifies the \fB\&.pem\fP file that contains both the SSL certificate
+and key. Specify the file name of the \fB\&.pem\fP file using relative
+or absolute paths.
+.sp
+This option is required when using the \fI\-\-ssl\fP option to connect
+to a \fBbongod\fP or \fBbongos\fP that has
+\fBCAFile\fP enabled \fIwithout\fP
+\fBallowConnectionsWithoutCertificates\fP\&.
+.sp
+The default distribution of BongoDB does not contain support for SSL.
+For more information on BongoDB and SSL, see http://docs.bongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslPEMKeyPassword <value>
+New in version 2.6.
+
+.sp
+Specifies the password to de\-crypt the certificate\-key file (i.e.
+\fI\-\-sslPEMKeyFile\fP). Use the \fI\-\-sslPEMKeyPassword\fP option only if the
+certificate\-key file is encrypted. In all cases, the \fBbongodump\fP will
+redact the password from all logging and reporting output.
+.sp
+If the private key in the PEM file is encrypted and you do not specify
+the \fI\-\-sslPEMKeyPassword\fP option, the \fBbongodump\fP will prompt for a passphrase. See
+\fIssl\-certificate\-password\fP\&.
+.sp
+The default distribution of BongoDB does not contain support for SSL.
+For more information on BongoDB and SSL, see http://docs.bongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslCRLFile <filename>
+New in version 2.6.
+
+.sp
+Specifies the \fB\&.pem\fP file that contains the Certificate Revocation
+List. Specify the file name of the \fB\&.pem\fP file using relative or
+absolute paths.
+.sp
+The default distribution of BongoDB does not contain support for SSL.
+For more information on BongoDB and SSL, see http://docs.bongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslAllowInvalidCertificates
+New in version 2.6.
+
+.sp
+Bypasses the validation checks for server certificates and allows
+the use of invalid certificates. When using the
+\fBallowInvalidCertificates\fP setting, BongoDB logs as a
+warning the use of the invalid certificate.
+.sp
+The default distribution of BongoDB does not contain support for SSL.
+For more information on BongoDB and SSL, see http://docs.bongodb.org/manual/tutorial/configure\-ssl\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslAllowInvalidHostnames
+New in version 3.0.
+
+.sp
+Disables the validation of the hostnames in SSL certificates. Allows
+\fBbongodump\fP to connect to BongoDB instances if the hostname their
+certificates do not match the specified hostname.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-sslFIPSMode
+New in version 2.6.
+
+.sp
+Directs the \fBbongodump\fP to use the FIPS mode of the installed OpenSSL
+library. Your system must have a FIPS compliant OpenSSL library to use
+the \fI\-\-sslFIPSMode\fP option.
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
+FIPS Compatible SSL is
+available only in \fI\%BongoDB Enterprise\fP\&. See
+http://docs.bongodb.org/manual/tutorial/configure\-fips for more information.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-username <username>, \-u <username>
+Specifies a username with which to authenticate to a BongoDB database
+that uses authentication. Use in conjunction with the \fB\-\-password\fP and
+\fB\-\-authenticationDatabase\fP options.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-password <password>, \-p <password>
+Specifies a password with which to authenticate to a BongoDB database
+that uses authentication. Use in conjunction with the \fB\-\-username\fP and
+\fB\-\-authenticationDatabase\fP options.
+.sp
+If you do not specify an argument for \fI\-\-password\fP, \fBbongodump\fP will
+prompt interactively for a password on the console.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-authenticationDatabase <dbname>
+If you do not specify an authentication database, \fBbongodump\fP
+assumes that the database specified to export holds the user\(aqs credentials.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-authenticationMechanism <name>
+\fIDefault\fP: BONGODB\-CR
+.sp
+New in version 2.4.
+
+.sp
+Changed in version 2.6: Added support for the \fBPLAIN\fP and \fBBONGODB\-X509\fP authentication
+mechanisms.
+
+.sp
+Specifies the authentication mechanism the \fBbongodump\fP instance uses to
+authenticate to the \fBbongod\fP or \fBbongos\fP\&.
+.TS
+center;
+|l|l|.
+_
+T{
+Value
+T}	T{
+Description
+T}
+_
+T{
+BONGODB\-CR
+T}	T{
+BongoDB challenge/response authentication.
+T}
+_
+T{
+BONGODB\-X509
+T}	T{
+BongoDB SSL certificate authentication.
+T}
+_
+T{
+PLAIN
+T}	T{
+External authentication using LDAP. You can also use \fBPLAIN\fP
+for authenticating in\-database users. \fBPLAIN\fP transmits
+passwords in plain text. This mechanism is available only in
+\fI\%BongoDB Enterprise\fP\&.
+T}
+_
+T{
+GSSAPI
+T}	T{
+External authentication using Kerberos. This mechanism is
+available only in \fI\%BongoDB Enterprise\fP\&.
+T}
+_
+.TE
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-gssapiServiceName
+New in version 2.6.
+
+.sp
+Specify the name of the service using \fBGSSAPI/Kerberos\fP\&. Only required if the service does not use the
+default name of \fBbongodb\fP\&.
+.sp
+This option is available only in BongoDB Enterprise.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-gssapiHostName
+New in version 2.6.
+
+.sp
+Specify the hostname of a service using \fBGSSAPI/Kerberos\fP\&. \fIOnly\fP required if the hostname of a machine does
+not match the hostname resolved by DNS.
+.sp
+This option is available only in BongoDB Enterprise.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-db <database>, \-d <database>
+Specifies a database to backup. If you do not specify a database,
+\fBbongodump\fP copies all databases in this instance into the dump
+files.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-collection <collection>, \-c <collection>
+Specifies a collection to backup. If you do not specify a collection,
+this option copies all collections in the specified database or instance
+to the dump files.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-query <json>, \-q <json>
+Provides a \fIJSON document\fP as a query that optionally limits the
+documents included in the output of \fBbongodump\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-forceTableScan
+Forces \fBbongodump\fP to scan the data store directly: typically,
+\fBbongodump\fP saves entries as they appear in the index of
+the \fB_id\fP field. If you specify a query \fI\-\-query\fP,
+\fBbongodump\fP will use the most appropriate index to support that query.
+.sp
+Use \fI\-\-forceTableScan\fP to skip the index and scan the data directly. Typically
+there are two cases where this behavior is preferable to the
+default:
+.INDENT 7.0
+.IP 1. 3
+If you have key sizes over 800 bytes that would not be present in the
+\fB_id\fP index.
+.IP 2. 3
+Your database uses a custom \fB_id\fP field.
+.UNINDENT
+.sp
+When you run with \fI\-\-forceTableScan\fP, \fBbongodump\fP does
+not use \fB$snapshot\fP\&. As a result, the dump produced by
+\fBbongodump\fP can reflect the state of the database at many
+different points in time.
+.sp
+\fBIMPORTANT:\fP
+.INDENT 7.0
+.INDENT 3.5
+Use \fI\-\-forceTableScan\fP with extreme caution and
+consideration.
+.UNINDENT
+.UNINDENT
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-out <path>, \-o <path>
+Specifies the directory where \fBbongodump\fP will write
+\fIBSON\fP files for the dumped databases. By default,
+\fBbongodump\fP saves output files in a directory named
+\fBdump\fP in the current working directory.
+.sp
+To send the database dump to standard output, specify "\fB\-\fP" instead of
+a path. Write to standard output if you want process the output before
+saving it, such as to use \fBgzip\fP to compress the dump. When writing
+standard output, \fBbongodump\fP does not write the metadata that
+writes in a \fB<dbname>.metadata.json\fP file when writing to files
+directly.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-repair
+Runs a repair option in addition to dumping the
+database. The repair option changes the behavior of \fBbongodump\fP to
+only write valid data and exclude data that may be in
+an invalid state as a result of an improper shutdown or
+\fBbongod\fP crash.
+.sp
+The \fI\%\-\-repair\fP option uses aggressive data\-recovery algorithms
+that may produce a large amount of duplication.
+.sp
+\fI\%\-\-repair\fP is only available for use with \fBbongod\fP
+instances using the \fBmmapv1\fP storage engine. You cannot run
+\fI\%\-\-repair\fP with \fBbongos\fP or with \fBbongod\fP instances
+that use the \fBwiredTiger\fP storage engine. To repair data in a
+\fBbongod\fP instance using \fBwiredTiger\fP use
+\fIbongod \-\-repair\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-oplog
+Ensures that \fBbongodump\fP creates a dump of
+the database that includes a partial \fIoplog\fP containing operations
+from the duration of the \fBbongodump\fP operation. This oplog
+produces an effective point\-in\-time snapshot of the state of a
+\fBbongod\fP instance. To restore to a specific point\-in\-time
+backup, use the output created with this option in conjunction with
+\fIbongorestore \-\-oplogReplay\fP\&.
+.sp
+Without \fI\%\-\-oplog\fP, if there are write operations during the dump
+operation, the dump will not reflect a single moment in time. Changes
+made to the database during the update process can affect the output of
+the backup.
+.sp
+\fI\%\-\-oplog\fP has no effect when running \fBbongodump\fP
+against a \fBbongos\fP instance to dump the entire contents of a
+sharded cluster. However, you can use \fI\%\-\-oplog\fP to dump
+individual shards.
+.sp
+\fI\%\-\-oplog\fP only works against nodes that maintain an
+\fIoplog\fP\&. This includes all members of a replica set, as well as
+\fImaster\fP nodes in master/slave replication deployments.
+.sp
+\fI\%\-\-oplog\fP does not dump the oplog collection.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-dumpDbUsersAndRoles
+Includes user and role definitions when performing \fBbongodump\fP
+on a specific database. This option applies only when you specify a
+database in the \fI\-\-db\fP option. BongoDB always includes user and
+role definitions when \fBbongodump\fP applies to an entire instance
+and not just a specific database.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-excludeCollection array of strings
+New in version 3.0.0.
+
+.sp
+Specifies collections to exclude from the output of \fBbongodump\fP output.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B \-\-excludeCollectionsWithPrefix array of strings
+New in version 3.0.0.
+
+.sp
+Excludes all collections from the output of \fBbongodump\fP with a specified prefix.
+.UNINDENT
+.SH USE
+.sp
+See the http://docs.bongodb.org/manual/tutorial/backup\-with\-bongodump
+for a larger overview of \fBbongodump\fP usage. Also see the
+\fBbongorestore\fP document for an overview of the
+\fBbongorestore\fP, which provides the related inverse
+functionality.
+.sp
+The following command creates a dump file that contains only the
+collection named \fBcollection\fP in the database named \fBtest\fP\&. In
+this case the database is running on the local interface on port
+\fB27017\fP:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+bongodump  \-\-db test \-\-collection collection
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.sp
+In the next example, \fBbongodump\fP creates a database dump
+located at \fB/opt/backup/bongodump\-2011\-10\-24\fP, from a database
+running on port \fB37017\fP on the host \fBbongodb1.example.net\fP and
+authenticating using the username \fBuser\fP and the password
+\fBpass\fP, as follows:
+.INDENT 0.0
+.INDENT 3.5
+.sp
+.nf
+.ft C
+bongodump \-\-host bongodb1.example.net \-\-port 37017 \-\-username user \-\-password pass \-\-out /opt/backup/bongodump\-2011\-10\-24
+.ft P
+.fi
+.UNINDENT
+.UNINDENT
+.SH AUTHOR
+BongoDB Documentation Project
+.SH COPYRIGHT
+2011-2015
+.\" Generated by docutils manpage writer.
+.

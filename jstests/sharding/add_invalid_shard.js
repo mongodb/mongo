@@ -10,7 +10,7 @@
     var configDB = st.s.getDB('config');
     var shardDoc = configDB.shards.findOne();
 
-    // Can't add mongos as shard.
+    // Can't add bongos as shard.
     assert.commandFailed(st.admin.runCommand({addshard: st.s.host}));
 
     // Can't add config servers as shard.

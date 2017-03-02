@@ -1,4 +1,4 @@
-// Check index rebuild is disabled with --noIndexBuildRetry when MongoDB is killed.
+// Check index rebuild is disabled with --noIndexBuildRetry when BongoDB is killed.
 //
 // This test requires persistence beacuase it assumes data/indices will survive a restart.
 // This test requires journaling because the information that an index build was started
@@ -7,10 +7,10 @@
 (function() {
     'use strict';
     var baseName = 'index_no_retry';
-    var dbpath = MongoRunner.dataPath + baseName;
+    var dbpath = BongoRunner.dataPath + baseName;
 
-    var conn = MongoRunner.runMongod({dbpath: dbpath});
-    assert.neq(null, conn, 'failed to start mongod');
+    var conn = BongoRunner.runBongod({dbpath: dbpath});
+    assert.neq(null, conn, 'failed to start bongod');
 
     var test = conn.getDB("test");
 
@@ -32,24 +32,24 @@
         var createIdx = startParallelShell(function() {
             var coll = db.getSiblingDB('test').getCollection('jstests_slownightly_index_no_retry');
 
-            // Fail point will handle journal flushing and killing the mongod
+            // Fail point will handle journal flushing and killing the bongod
             assert.commandWorked(db.adminCommand(
                 {configureFailPoint: 'crashAfterStartingIndexBuild', mode: 'alwaysOn'}));
             coll.createIndex({a: 1}, {background: true});
         }, conn.port);
 
         var exitCode = createIdx({checkExitSuccess: false});
-        assert.neq(0, exitCode, "expected shell to exit abnormally due to mongod being terminated");
+        assert.neq(0, exitCode, "expected shell to exit abnormally due to bongod being terminated");
     }
 
     abortDuringIndexBuild();
 
     assert.eq(waitProgram(conn.pid),
-              MongoRunner.EXIT_TEST,
-              "mongod should have crashed due to the 'crashAfterStartingIndexBuild' " +
+              BongoRunner.EXIT_TEST,
+              "bongod should have crashed due to the 'crashAfterStartingIndexBuild' " +
                   "failpoint being set.");
 
-    conn = MongoRunner.runMongod({dbpath: dbpath, noIndexBuildRetry: '', restart: true});
+    conn = BongoRunner.runBongod({dbpath: dbpath, noIndexBuildRetry: '', restart: true});
     test = conn.getDB("test");
     t = test.getCollection(name);
 
@@ -60,5 +60,5 @@
     var indexes = t.getIndexes();
     assert.eq(1, indexes.length, 'unfinished indexes in listIndexes result: ' + tojson(indexes));
 
-    MongoRunner.stopMongod(conn.port);
+    BongoRunner.stopBongod(conn.port);
 }());

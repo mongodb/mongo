@@ -15,8 +15,8 @@
     var admin = s.getDB("admin");
     var config = s.getDB("config");
     var shards = config.shards.find().toArray();
-    var shard0 = new Mongo(shards[0].host);
-    var shard1 = new Mongo(shards[1].host);
+    var shard0 = new Bongo(shards[0].host);
+    var shard1 = new Bongo(shards[1].host);
 
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
     s.ensurePrimaryShard('test', 'shard0001');

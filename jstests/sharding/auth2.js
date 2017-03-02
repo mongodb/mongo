@@ -6,9 +6,9 @@
         other: {chunkSize: 1, useHostname: true, keyFile: 'jstests/libs/key1'},
     });
 
-    var mongos = st.s;
-    var adminDB = mongos.getDB('admin');
-    var db = mongos.getDB('test');
+    var bongos = st.s;
+    var adminDB = bongos.getDB('admin');
+    var db = bongos.getDB('test');
 
     adminDB.createUser({user: 'admin', pwd: 'password', roles: jsTest.adminUserRoles});
 
@@ -16,7 +16,7 @@
 
     // Test for SERVER-6549, make sure that repeatedly logging in always passes.
     for (var i = 0; i < 100; i++) {
-        adminDB = new Mongo(mongos.host).getDB('admin');
+        adminDB = new Bongo(bongos.host).getDB('admin');
         assert(adminDB.auth('admin', 'password'), "Auth failed on attempt #: " + i);
     }
 

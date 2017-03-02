@@ -1,10 +1,10 @@
 // Tests the reset logic for the periodic query yield timer.  Regression test for SERVER-21341.
 (function() {
     'use strict';
-    var dbpath = MongoRunner.dataPath + jsTest.name();
+    var dbpath = BongoRunner.dataPath + jsTest.name();
     resetDbpath(dbpath);
-    var mongod = MongoRunner.runMongod({dbpath: dbpath});
-    var coll = mongod.getDB("test").getCollection(jsTest.name());
+    var bongod = BongoRunner.runBongod({dbpath: dbpath});
+    var coll = bongod.getDB("test").getCollection(jsTest.name());
 
     // Configure the server so that queries are expected to yield after every 10 work cycles, or
     // after every 500 milliseconds (whichever comes first). In addition, enable a failpoint that

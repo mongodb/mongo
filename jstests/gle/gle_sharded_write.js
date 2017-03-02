@@ -5,12 +5,12 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 2, mongos: 1, verbose: 3});
+    var st = new ShardingTest({shards: 2, bongos: 1, verbose: 3});
 
-    var mongos = st.s0;
-    var admin = mongos.getDB("admin");
-    var config = mongos.getDB("config");
-    var coll = mongos.getCollection(jsTestName() + ".coll");
+    var bongos = st.s0;
+    var admin = bongos.getDB("admin");
+    var config = bongos.getDB("config");
+    var coll = bongos.getCollection(jsTestName() + ".coll");
     var shards = config.shards.find().toArray();
 
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().toString()}));
@@ -142,7 +142,7 @@
     assert.eq(coll.count(), 0);
 
     //
-    // Geo $near is not supported on mongos
+    // Geo $near is not supported on bongos
     coll.ensureIndex({loc: "2dsphere"});
     coll.remove({});
     var query = {
@@ -172,7 +172,7 @@
     coll.insert([{_id: 1}, {_id: -1}]);
     // Wait for write to be written to shards before shutting it down.
     printjson(gle = coll.getDB().runCommand({getLastError: 1}));
-    MongoRunner.stopMongod(st.shard0);
+    BongoRunner.stopBongod(st.shard0);
     printjson(gle = coll.getDB().runCommand({getLastError: 1}));
     // Should get an error about contacting dead host.
     assert(!gle.ok);

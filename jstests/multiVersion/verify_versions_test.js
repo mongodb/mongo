@@ -9,12 +9,12 @@
     "use strict";
 
     function assertBinVersionsEqual(v1, v2) {
-        assert(MongoRunner.areBinVersionsTheSame(v1, v2),
+        assert(BongoRunner.areBinVersionsTheSame(v1, v2),
                "Expected \"" + v1 + "\" to equal \"" + v2 + "\"");
     }
 
     function assertBinVersionsNotEqual(v1, v2) {
-        assert(!MongoRunner.areBinVersionsTheSame(v1, v2),
+        assert(!BongoRunner.areBinVersionsTheSame(v1, v2),
                "Expected \"" + v1 + "\" not to equal \"" + v2 + "\"");
     }
 
@@ -39,6 +39,6 @@
     assertBinVersionsNotEqual("3.4.0", "3.4.0-abcd");
 
     // Prohibit versions that don't have at least two components (3 is no good, 3.2 is).
-    assert.throws(MongoRunner.areBinVersionsTheSame, ["3", "3.2"]);
-    assert.throws(MongoRunner.areBinVersionsTheSame, ["3.2", "3"]);
+    assert.throws(BongoRunner.areBinVersionsTheSame, ["3", "3.2"]);
+    assert.throws(BongoRunner.areBinVersionsTheSame, ["3.2", "3"]);
 }());

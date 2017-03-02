@@ -17,14 +17,14 @@ load('jstests/libs/write_concern_util.js');
             rs0: {nodes: 3, settings: {chainingAllowed: false}},
             rs1: {nodes: 5, settings: {chainingAllowed: false}}
         },
-        mongos: 1,
+        bongos: 1,
         config: 1,
         configReplSetTestOptions: {settings: {chainingAllowed: false}}
     });
 
-    var mongos = st.s;
+    var bongos = st.s;
     var dbName = "move-chunk-wc-test";
-    var db = mongos.getDB(dbName);
+    var db = bongos.getDB(dbName);
     var collName = 'leaves';
     var coll = db[collName];
     var numberDoc = 20;

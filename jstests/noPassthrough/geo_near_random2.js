@@ -2,7 +2,7 @@
 load("jstests/libs/geo_near_random.js");
 load("jstests/libs/slow_weekly_util.js");
 
-testServer = new SlowWeeklyMongod("geo_near_random2");
+testServer = new SlowWeeklyBongod("geo_near_random2");
 db = testServer.getDB("test");
 
 var test = new GeoNearRandomTest("weekly.geo_near_random2");

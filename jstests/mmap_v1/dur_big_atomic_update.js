@@ -2,7 +2,7 @@
 //
 // this tests writing 1GB in an atomic update to make sure we commit periodically
 
-var conn = MongoRunner.runMongod({journal: "", journalOptions: 8});
+var conn = BongoRunner.runBongod({journal: "", journalOptions: 8});
 d = conn.getDB("test");
 d.foo.drop();
 
@@ -34,7 +34,7 @@ assert.writeOK(bulk.execute());
 
 // Do it again but in a db.eval
 d.eval(function(big_string) {
-    new Mongo().getDB("test").foo.update(
+    new Bongo().getDB("test").foo.update(
         {}, {$set: {big_string: big_string}}, false, /*multi*/ true);
 }, big_string);  // Can't pass in connection or DB objects
 
@@ -46,6 +46,6 @@ assert(err.n == 1024);
 // free up space
 d.dropDatabase();
 
-MongoRunner.stopMongod(conn);
+BongoRunner.stopBongod(conn);
 
 print("dur big atomic update SUCCESS");

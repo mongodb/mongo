@@ -1,6 +1,6 @@
 // SERVER-8802: Test that you can't build indexes on system.users and use that to drop users with
 // dropDups.
-var conn = MongoRunner.runMongod({auth: ""});
+var conn = BongoRunner.runBongod({auth: ""});
 
 var adminDB = conn.getDB("admin");
 var testDB = conn.getDB("test");
@@ -28,7 +28,7 @@ var collectionInfosCursor = adminDB.runCommand("listCollections", {
     }
 });
 
-assert.eq([], new DBCommandCursor(adminDB.getMongo(), collectionInfosCursor).toArray());
+assert.eq([], new DBCommandCursor(adminDB.getBongo(), collectionInfosCursor).toArray());
 adminDB.logout();
 
 adminDB.auth('admin', 'x');

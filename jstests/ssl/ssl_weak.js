@@ -4,21 +4,21 @@
 
 // Test that connecting with no client certificate and --sslAllowConnectionsWithoutCertificates
 // (an alias for sslWeakCertificateValidation) connects successfully.
-var md = MongoRunner.runMongod({
+var md = BongoRunner.runBongod({
     sslMode: "requireSSL",
     sslPEMKeyFile: "jstests/libs/server.pem",
     sslCAFile: "jstests/libs/ca.pem",
     sslAllowConnectionsWithoutCertificates: ""
 });
 
-var mongo = runMongoProgram(
-    "mongo", "--port", md.port, "--ssl", "--sslAllowInvalidCertificates", "--eval", ";");
+var bongo = runBongoProgram(
+    "bongo", "--port", md.port, "--ssl", "--sslAllowInvalidCertificates", "--eval", ";");
 
 // 0 is the exit code for success
-assert(mongo == 0);
+assert(bongo == 0);
 
 // Test that connecting with a valid client certificate connects successfully.
-mongo = runMongoProgram("mongo",
+bongo = runBongoProgram("bongo",
                         "--port",
                         md.port,
                         "--ssl",
@@ -29,18 +29,18 @@ mongo = runMongoProgram("mongo",
                         ";");
 
 // 0 is the exit code for success
-assert(mongo == 0);
+assert(bongo == 0);
 
 // Test that connecting with no client certificate and no --sslAllowConnectionsWithoutCertificates
 // fails to connect.
-var md2 = MongoRunner.runMongod({
+var md2 = BongoRunner.runBongod({
     sslMode: "requireSSL",
     sslPEMKeyFile: "jstests/libs/server.pem",
     sslCAFile: "jstests/libs/ca.pem"
 });
 
-mongo = runMongoProgram(
-    "mongo", "--port", md2.port, "--ssl", "--sslAllowInvalidCertificates", "--eval", ";");
+bongo = runBongoProgram(
+    "bongo", "--port", md2.port, "--ssl", "--sslAllowInvalidCertificates", "--eval", ";");
 
 // 1 is the exit code for failure
-assert(mongo == 1);
+assert(bongo == 1);

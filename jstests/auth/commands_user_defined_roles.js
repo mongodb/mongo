@@ -187,12 +187,12 @@ var opts = {auth: "", enableExperimentalStorageDetailsCmd: ""};
 var impls = {createUsers: createUsers, runOneTest: runOneTest};
 
 // run all tests standalone
-var conn = MongoRunner.runMongod(opts);
+var conn = BongoRunner.runBongod(opts);
 authCommandsLib.runTests(conn, impls);
-MongoRunner.stopMongod(conn);
+BongoRunner.stopBongod(conn);
 
 // run all tests sharded
 conn = new ShardingTest(
-    {shards: 2, mongos: 1, keyFile: "jstests/libs/key1", other: {shardOptions: opts}});
+    {shards: 2, bongos: 1, keyFile: "jstests/libs/key1", other: {shardOptions: opts}});
 authCommandsLib.runTests(conn, impls);
 conn.stop();

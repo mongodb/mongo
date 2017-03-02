@@ -4,11 +4,11 @@ load('jstests/libs/analyze_plan.js');  // For planHasStage.
 jsTestLog("Creating sharded cluster");
 var shardedAggTest = new ShardingTest({
     shards: 2,
-    mongos: 1,
+    bongos: 1,
     other: {
         chunkSize: 1,
         enableBalancer: true,
-        mongosOptions: {verbose: ''},
+        bongosOptions: {verbose: ''},
         shardOptions: {verbose: ''},
         configOptions: {verbose: ''},
     }
@@ -28,13 +28,13 @@ shardedAggTest.adminCommand({shardcollection: "aggShard.ts1", key: {"_id": 1}});
 shardedAggTest.adminCommand({shardcollection: "aggShard.literal", key: {"_id": 1}});
 
 /*
-Test combining results in mongos for operations that sub-aggregate on shards.
+Test combining results in bongos for operations that sub-aggregate on shards.
 
 The unusual operators here are $avg, $pushToSet, $push.   In the case of $avg,
 the shard pipeline produces an object with the current subtotal and item count
-so that these can be combined in mongos by totalling the subtotals counts
+so that these can be combined in bongos by totalling the subtotals counts
 before performing the final division.  For $pushToSet and $push, the shard
-pipelines produce arrays, but in mongos these are combined rather than simply
+pipelines produce arrays, but in bongos these are combined rather than simply
 being added as arrays within arrays.
 */
 
@@ -59,18 +59,18 @@ for (i = 1; i <= nItems; ++i) {
 }
 assert.writeOK(bulk.execute());
 
-// Turn on exception tracing in mongod to figure out exactly where the SCEs are coming from
+// Turn on exception tracing in bongod to figure out exactly where the SCEs are coming from
 // TEMPORARY - REMOVE ONCE SERVER-9622 IS RESOLVED
-var config = db.getMongo().getDB("config");
+var config = db.getBongo().getDB("config");
 var shards = config.shards.find().toArray();
 
-jsTest.log("Tracing all exceptions in mongod...");
+jsTest.log("Tracing all exceptions in bongod...");
 for (var i = 0; i < shards.length; i++) {
-    var shardConn = new Mongo(shards[i].host);
+    var shardConn = new Bongo(shards[i].host);
     printjson(shardConn.getDB("admin").runCommand({setParameter: 1, traceExceptions: true}));
 }
 
-jsTestLog('a project and group in shards, result combined in mongos');
+jsTestLog('a project and group in shards, result combined in bongos');
 var a1 = db.ts1
              .aggregate([
                  {$project: {cMod10: {$mod: ["$counter", 10]}, number: 1, counter: 1}},
@@ -90,7 +90,7 @@ for (i = 0; i < 10; ++i) {
     assert.eq(a1[i].numberSet.length, 2, 'agg sharded test numberSet length failed');
 }
 
-jsTestLog('an initial group starts the group in the shards, and combines them in mongos');
+jsTestLog('an initial group starts the group in the shards, and combines them in bongos');
 var a2 = db.ts1.aggregate([{$group: {_id: "all", total: {$sum: "$counter"}}}]).toArray();
 
 jsTestLog('sum of an arithmetic progression S(n) = (n/2)(a(1) + a(n));');
@@ -100,7 +100,7 @@ jsTestLog('A group combining all documents into one, averaging a null field.');
 assert.eq(db.ts1.aggregate([{$group: {_id: null, avg: {$avg: "$missing"}}}]).toArray(),
           [{_id: null, avg: null}]);
 
-jsTestLog('an initial group starts the group in the shards, and combines them in mongos');
+jsTestLog('an initial group starts the group in the shards, and combines them in bongos');
 var a3 =
     db.ts1.aggregate([{$group: {_id: "$number", total: {$sum: 1}}}, {$sort: {_id: 1}}]).toArray();
 
@@ -108,7 +108,7 @@ for (i = 0; i < strings.length; ++i) {
     assert.eq(a3[i].total, nItems / strings.length, 'agg sharded test sum numbers failed');
 }
 
-jsTestLog('a match takes place in the shards; just returning the results from mongos');
+jsTestLog('a match takes place in the shards; just returning the results from bongos');
 var a4 = db.ts1
              .aggregate([{
                  $match: {
@@ -134,7 +134,7 @@ for (i = 0; i < 6; ++i) {
 function testSkipLimit(ops, expectedCount) {
     jsTestLog('testSkipLimit(' + tojson(ops) + ', ' + expectedCount + ')');
     if (expectedCount > 10) {
-        // make shard -> mongos intermediate results less than 16MB
+        // make shard -> bongos intermediate results less than 16MB
         ops.unshift({$project: {_id: 1}});
     }
 
@@ -253,7 +253,7 @@ for (var shardName in res.shards) {
 }
 
 (function() {
-    jsTestLog("Do a sharded explain from a mongod, not mongos, to ensure that it does not have " +
+    jsTestLog("Do a sharded explain from a bongod, not bongos, to ensure that it does not have " +
               "a SHARDING_FILTER stage.");
     var shardDb = shardedAggTest.shard0.getDB('aggShard');
     var res = shardDb.ts1.aggregate([{$match: {}}], {explain: true});

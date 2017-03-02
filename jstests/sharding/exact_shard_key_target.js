@@ -6,10 +6,10 @@
 
 var st = new ShardingTest({shards: 2, verbose: 4});
 
-var mongos = st.s0;
-var coll = mongos.getCollection("foo.bar");
-var admin = mongos.getDB("admin");
-var shards = mongos.getDB("config").shards.find().toArray();
+var bongos = st.s0;
+var coll = bongos.getCollection("foo.bar");
+var admin = bongos.getDB("admin");
+var shards = bongos.getDB("config").shards.find().toArray();
 
 assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().getName()}));
 printjson(admin.runCommand({movePrimary: coll.getDB().getName(), to: shards[0]._id}));

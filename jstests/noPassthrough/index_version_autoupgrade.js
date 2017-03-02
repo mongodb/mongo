@@ -1,5 +1,5 @@
 /**
- * Tests whether various MongoDB commands automatically upgrade the index version of existing
+ * Tests whether various BongoDB commands automatically upgrade the index version of existing
  * indexes when they are rebuilt on a collection.
  */
 (function() {
@@ -13,8 +13,8 @@
         return res.featureCompatibilityVersion;
     }
 
-    var conn = MongoRunner.runMongod({});
-    assert.neq(null, conn, "mongod was unable to start up");
+    var conn = BongoRunner.runBongod({});
+    assert.neq(null, conn, "bongod was unable to start up");
     assert.eq("3.4", getFeatureCompatibilityVersion(conn));
 
     var testDB = conn.getDB("test");
@@ -149,8 +149,8 @@
 
     // Test that the "cloneCollection" command doesn't upgrade existing indexes to the latest
     // version.
-    var cloneConn = MongoRunner.runMongod({});
-    assert.neq(null, cloneConn, "mongod was unable to start up");
+    var cloneConn = BongoRunner.runBongod({});
+    assert.neq(null, cloneConn, "bongod was unable to start up");
     assert.eq("3.4", getFeatureCompatibilityVersion(cloneConn));
     testIndexVersionAutoUpgrades(function(coll) {
         var cloneDB = cloneConn.getDB(coll.getDB().getName());
@@ -160,11 +160,11 @@
         }));
         return cloneDB[coll.getName()];
     }, false);
-    MongoRunner.stopMongod(cloneConn);
+    BongoRunner.stopBongod(cloneConn);
 
     // Test that the "clone" command doesn't upgrade existing indexes to the latest version.
-    cloneConn = MongoRunner.runMongod({});
-    assert.neq(null, cloneConn, "mongod was unable to start up");
+    cloneConn = BongoRunner.runBongod({});
+    assert.neq(null, cloneConn, "bongod was unable to start up");
     assert.eq("3.4", getFeatureCompatibilityVersion(cloneConn));
     testIndexVersionAutoUpgrades(function(coll) {
         var cloneDB = cloneConn.getDB(coll.getDB().getName());
@@ -174,7 +174,7 @@
         }));
         return cloneDB[coll.getName()];
     }, false);
-    MongoRunner.stopMongod(cloneConn);
+    BongoRunner.stopBongod(cloneConn);
 
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
 })();

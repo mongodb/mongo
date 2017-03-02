@@ -1,5 +1,5 @@
 // to run:
-//   ./mongo jstests/ref3.js
+//   ./bongo jstests/ref3.js
 
 db.otherthings3.drop();
 db.things3.drop();

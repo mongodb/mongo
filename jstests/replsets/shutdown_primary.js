@@ -59,7 +59,7 @@
         // the primary can still accept connections despite successfully starting to shutdown.
         // So, retry connecting until connections cannot be established and an error is thrown.
         assert.throws(function() {
-            new Mongo(primary.host);
+            new Bongo(primary.host);
         });
         return true;
     }, "expected primary node to shut down and not be connectable");

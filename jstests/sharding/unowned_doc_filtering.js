@@ -1,5 +1,5 @@
 /**
- * Tests that the mongod chunk filtering stage properly filters out unowned documents even after
+ * Tests that the bongod chunk filtering stage properly filters out unowned documents even after
  * the shards are restarted.
  *
  * This test involves restarting a standalone shard, so cannot be run on ephemeral storage engines.
@@ -31,8 +31,8 @@
     st.d0.getDB('test').foo.insert({x: 100});
     st.d1.getDB('test').foo.insert({x: 0});
 
-    st.restartMongod(0);
-    st.restartMongod(1);
+    st.restartBongod(0);
+    st.restartBongod(1);
 
     var fooCount;
     for (var retries = 0; retries <= 2; retries++) {
@@ -40,7 +40,7 @@
             fooCount = testDB.foo.find().itcount();
             break;
         } catch (e) {
-            // expected for reestablishing connections broken by the mongod restart.
+            // expected for reestablishing connections broken by the bongod restart.
             assert.eq(ErrorCodes.HostUnreachable, e.code, tojson(e));
         }
     }

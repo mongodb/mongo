@@ -16,7 +16,7 @@ function runTest(conn) {
         {user: 'userAdmin', pwd: 'pwd', roles: ['userAdminAnyDatabase']});
     conn.getDB('admin').logout();
 
-    var userAdminConn = new Mongo(conn.host);
+    var userAdminConn = new Bongo(conn.host);
     var adminUserAdmin = userAdminConn.getDB('admin');
     adminUserAdmin.auth('userAdmin', 'pwd');
     adminUserAdmin.createRole({role: 'adminRole', privileges: [], roles: []});
@@ -140,9 +140,9 @@ function runTest(conn) {
 }
 
 jsTest.log('Test standalone');
-var conn = MongoRunner.runMongod({auth: ''});
+var conn = BongoRunner.runBongod({auth: ''});
 runTest(conn);
-MongoRunner.stopMongod(conn.port);
+BongoRunner.stopBongod(conn.port);
 
 jsTest.log('Test sharding');
 var st = new ShardingTest({shards: 2, config: 3, keyFile: 'jstests/libs/key1'});

@@ -19,13 +19,13 @@ def shouldKill( c, root=None ):
     if "java" in c:
         return False
 
-    # if root directory is provided, see if command line matches mongod process running
+    # if root directory is provided, see if command line matches bongod process running
     # with the same data directory
 
-    if root and re.compile("(\W|^)mongod(.exe)?\s+.*--dbpath(\s+|=)%s(\s+|$)" % root).search( c ):
+    if root and re.compile("(\W|^)bongod(.exe)?\s+.*--dbpath(\s+|=)%s(\s+|$)" % root).search( c ):
         return True
 
-    if ( c.find( "buildbot" ) >= 0 or c.find( "slave" ) >= 0 ) and c.find( "/mongo/" ) >= 0:
+    if ( c.find( "buildbot" ) >= 0 or c.find( "slave" ) >= 0 ) and c.find( "/bongo/" ) >= 0:
         return True
 
     if c.find( "xml-data/build-dir" ) >= 0: # for bamboo

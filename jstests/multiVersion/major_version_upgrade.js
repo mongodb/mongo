@@ -17,7 +17,7 @@
     load('jstests/multiVersion/libs/verify_versions.js');
 
     // Setup the dbpath for this test.
-    const dbpath = MongoRunner.dataPath + 'major_version_upgrade';
+    const dbpath = BongoRunner.dataPath + 'major_version_upgrade';
     resetDbpath(dbpath);
 
     // We set noCleanData to true in order to preserve the data files between iterations.
@@ -116,18 +116,18 @@
     // outlined at the top of this test file.
     for (let i = 0; i < versions.length; i++) {
         let version = versions[i];
-        let mongodOptions = Object.extend({binVersion: version.binVersion}, defaultOptions);
+        let bongodOptions = Object.extend({binVersion: version.binVersion}, defaultOptions);
         var changedAuthMechanism = false;
         if (TestData.authMechanism === "SCRAM-SHA-1" && version.binVersion === "2.6") {
             TestData.authMechanism = undefined;
-            DB.prototype._defaultAuthenticationMechanism = "MONGODB-CR";
+            DB.prototype._defaultAuthenticationMechanism = "BONGODB-CR";
             changedAuthMechanism = true;
         }
 
-        // Start a mongod with specified version.
-        let conn = MongoRunner.runMongod(mongodOptions);
+        // Start a bongod with specified version.
+        let conn = BongoRunner.runBongod(bongodOptions);
         assert.neq(
-            null, conn, 'mongod was unable to start up with options: ' + tojson(mongodOptions));
+            null, conn, 'bongod was unable to start up with options: ' + tojson(bongodOptions));
         assert.binVersion(conn, version.binVersion);
 
         // Connect to the 'test' database.
@@ -139,12 +139,12 @@
             assert.eq(1,
                       testDB[oldVersionCollection].count(),
                       `data from ${oldVersionCollection} should be available; options: ` +
-                          tojson(mongodOptions));
+                          tojson(bongodOptions));
             assert.neq(
                 null,
                 GetIndexHelpers.findByKeyPattern(testDB[oldVersionCollection].getIndexes(), {a: 1}),
                 `index from ${oldVersionCollection} should be available; options: ` +
-                    tojson(mongodOptions));
+                    tojson(bongodOptions));
         }
 
         // Create a new collection.
@@ -155,8 +155,8 @@
         assert.eq(
             1,
             testDB[version.testCollection].count(),
-            `mongo should have inserted 1 document into collection ${version.testCollection}; ` +
-                'options: ' + tojson(mongodOptions));
+            `bongo should have inserted 1 document into collection ${version.testCollection}; ` +
+                'options: ' + tojson(bongodOptions));
 
         // Create an index on the new collection.
         assert.commandWorked(testDB[version.testCollection].createIndex({a: 1}));
@@ -168,8 +168,8 @@
             // We're on the latest version, check bad indexes are still readable.
             validateBadIndexesStandalone(testDB);
         }
-        // Shutdown the current mongod.
-        MongoRunner.stopMongod(conn);
+        // Shutdown the current bongod.
+        BongoRunner.stopBongod(conn);
 
         if (version.binVersion === "2.6" && changedAuthMechanism) {
             TestData.authMechanism = "SCRAM-SHA-1";
@@ -188,7 +188,7 @@
     var changedAuthMechanisms = false;
     if (TestData.authMechanism === "SCRAM-SHA-1" && versions[0].binVersion === "2.6") {
         TestData.authMechanism = undefined;
-        DB.prototype._defaultAuthenticationMechanism = "MONGODB-CR";
+        DB.prototype._defaultAuthenticationMechanism = "BONGODB-CR";
         changedAuthMechanism = true;
     }
 
@@ -227,7 +227,7 @@
         assert.eq(
             1,
             testDB[version.testCollection].count(),
-            `mongo should have inserted 1 document into collection ${version.testCollection}; ` +
+            `bongo should have inserted 1 document into collection ${version.testCollection}; ` +
                 'nodes: ' + tojson(nodes));
 
         // Create an index on the new collection.
@@ -255,7 +255,7 @@
         assert.eq(
             2,
             testDB[version.testCollection].count(),
-            `mongo should have inserted 2 documents into collection ${version.testCollection}; ` +
+            `bongo should have inserted 2 documents into collection ${version.testCollection}; ` +
                 'nodes: ' + tojson(nodes));
 
         assert.commandWorked(testDB[version.testCollection].createIndex({b: 1}));

@@ -8,14 +8,14 @@ var CLIENT_CERT = "jstests/libs/client.pem";
 var BAD_SAN_CERT = "jstests/libs/badSAN.pem";
 
 function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSucceed) {
-    var mongod =
-        MongoRunner.runMongod({sslMode: "requireSSL", sslPEMKeyFile: certPath, sslCAFile: CA_CERT});
+    var bongod =
+        BongoRunner.runBongod({sslMode: "requireSSL", sslPEMKeyFile: certPath, sslCAFile: CA_CERT});
 
-    var mongo;
+    var bongo;
     if (allowInvalidCert) {
-        mongo = runMongoProgram("mongo",
+        bongo = runBongoProgram("bongo",
                                 "--port",
-                                mongod.port,
+                                bongod.port,
                                 "--ssl",
                                 "--sslCAFile",
                                 CA_CERT,
@@ -25,9 +25,9 @@ function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSuc
                                 "--eval",
                                 ";");
     } else if (allowInvalidHost) {
-        mongo = runMongoProgram("mongo",
+        bongo = runBongoProgram("bongo",
                                 "--port",
-                                mongod.port,
+                                bongod.port,
                                 "--ssl",
                                 "--sslCAFile",
                                 CA_CERT,
@@ -37,9 +37,9 @@ function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSuc
                                 "--eval",
                                 ";");
     } else {
-        mongo = runMongoProgram("mongo",
+        bongo = runBongoProgram("bongo",
                                 "--port",
-                                mongod.port,
+                                bongod.port,
                                 "--ssl",
                                 "--sslCAFile",
                                 CA_CERT,
@@ -50,15 +50,15 @@ function testCombination(certPath, allowInvalidHost, allowInvalidCert, shouldSuc
     }
 
     if (shouldSucceed) {
-        // runMongoProgram returns 0 on success
+        // runBongoProgram returns 0 on success
         assert.eq(
-            0, mongo, "Connection attempt failed when it should succeed certPath: " + certPath);
+            0, bongo, "Connection attempt failed when it should succeed certPath: " + certPath);
     } else {
-        // runMongoProgram returns 1 on failure
+        // runBongoProgram returns 1 on failure
         assert.eq(
-            1, mongo, "Connection attempt succeeded when it should fail certPath: " + certPath);
+            1, bongo, "Connection attempt succeeded when it should fail certPath: " + certPath);
     }
-    MongoRunner.stopMongod(mongod.port);
+    BongoRunner.stopBongod(bongod.port);
 }
 
 // 1. Test client connections with different server certificates

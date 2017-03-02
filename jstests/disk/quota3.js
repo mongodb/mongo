@@ -6,9 +6,9 @@
 if (0) {  // SERVER-3511
 
     baseName = "jstests_disk_quota3";
-    dbpath = MongoRunner.dataPath + baseName;
+    dbpath = BongoRunner.dataPath + baseName;
 
-    var m = MongoRunner.runMongod({dbpath: dbpath, quotaFiles: 3, smallfiles: ""});
+    var m = BongoRunner.runBongod({dbpath: dbpath, quotaFiles: 3, smallfiles: ""});
     db = m.getDB(baseName);
 
     db.createCollection(baseName, {size: 128 * 1024 * 1024});

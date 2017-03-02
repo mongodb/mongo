@@ -3,14 +3,14 @@
     'use strict';
 
     var getListCollectionsCursor = function(database, options, subsequentBatchSize) {
-        return new DBCommandCursor(database.getMongo(),
+        return new DBCommandCursor(database.getBongo(),
                                    database.runCommand("listCollections", options),
                                    subsequentBatchSize);
     };
 
     var getListIndexesCursor = function(coll, options, subsequentBatchSize) {
         return new DBCommandCursor(
-            coll.getDB().getMongo(), coll.runCommand("listIndexes", options), subsequentBatchSize);
+            coll.getDB().getBongo(), coll.runCommand("listIndexes", options), subsequentBatchSize);
     };
 
     var arrayGetNames = function(array) {
@@ -86,7 +86,7 @@
             "databases",
             "lockpings",
             "locks",
-            "mongos",
+            "bongos",
             "settings",
             "shards",
             "tags",
@@ -379,7 +379,7 @@
         assert(userColl.drop());
     };
 
-    var st = new ShardingTest({shards: 2, mongos: 1});
+    var st = new ShardingTest({shards: 2, bongos: 1});
     var testNamespaces = setupTestCollections(st);
     var configDB = st.s.getDB("config");
     var adminDB = st.s.getDB("admin");

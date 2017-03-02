@@ -25,14 +25,14 @@ def getAllSourceFiles( arr=None , prefix="." ):
         if ( x.startswith( "." )
           or x.startswith( "pcre-" )
           or x.startswith( "32bit" )
-          or x.startswith( "mongodb-" )
+          or x.startswith( "bongodb-" )
           or x.startswith( "debian" )
-          or x.startswith( "mongo-cxx-driver" )
+          or x.startswith( "bongo-cxx-driver" )
           or 'gotools' in x ):
             continue
 
         # XXX: Avoid conflict between v8, v8-3.25 and mozjs source files in
-        #      src/mongo/scripting
+        #      src/bongo/scripting
         #      Remove after v8-3.25 migration.
 
         if x.find("v8-3.25") != -1 or x.find("mozjs") != -1:
@@ -72,7 +72,7 @@ def getGitBranch():
 
 def getGitBranchString( prefix="" , postfix="" ):
     t = re.compile( '[/\\\]' ).split( os.getcwd() )
-    if len(t) > 2 and t[len(t)-1] == "mongo":
+    if len(t) > 2 and t[len(t)-1] == "bongo":
         par = t[len(t)-2]
         m = re.compile( ".*_([vV]\d+\.\d+)$" ).match( par )
         if m is not None:
@@ -161,7 +161,7 @@ def distinctAsString( arr ):
         s.add( str(x) )
     return list(s)
 
-def checkMongoPort( port=27017 ):
+def checkBongoPort( port=27017 ):
     sock = socket.socket()
     sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
     sock.settimeout(1)
@@ -169,11 +169,11 @@ def checkMongoPort( port=27017 ):
     sock.close()
 
 
-def didMongodStart( port=27017 , timeout=20 ):
+def didBongodStart( port=27017 , timeout=20 ):
     while timeout > 0:
         time.sleep( 1 )
         try:
-            checkMongoPort( port )
+            checkBongoPort( port )
             return True
         except Exception,e:
             print( e )

@@ -1,4 +1,4 @@
-// Tests that mongos and shard mongods can both be started up successfully when there is no config
+// Tests that bongos and shard bongods can both be started up successfully when there is no config
 // server, and that they will wait until there is a config server online before handling any
 // sharding operations.
 //
@@ -9,13 +9,13 @@
     "use strict";
 
     /**
-     * Restarts the mongod backing the specified shard instance, without restarting the mongobridge.
+     * Restarts the bongod backing the specified shard instance, without restarting the bongobridge.
      */
     function restartShard(shard, waitForConnect) {
-        MongoRunner.stopMongod(shard);
+        BongoRunner.stopBongod(shard);
         shard.restart = true;
         shard.waitForConnect = waitForConnect;
-        MongoRunner.runMongod(shard);
+        BongoRunner.runBongod(shard);
     }
 
     var st = new ShardingTest({shards: 2});
@@ -34,7 +34,7 @@
     assert.commandWorked(
         st.s0.adminCommand({moveChunk: 'test.foo', find: {_id: 75}, to: 'shard0001'}));
 
-    // Make sure the pre-existing mongos already has the routing information loaded into memory
+    // Make sure the pre-existing bongos already has the routing information loaded into memory
     assert.eq(100, st.s.getDB('test').foo.find().itcount());
 
     jsTestLog("Shutting down all config servers");
@@ -42,12 +42,12 @@
         st.stopConfigServer(i);
     }
 
-    jsTestLog("Starting a new mongos when there are no config servers up");
-    var newMongosInfo = MongoRunner.runMongos({configdb: st._configDB, waitForConnect: false});
-    // The new mongos won't accept any new connections, but it should stay up and continue trying
+    jsTestLog("Starting a new bongos when there are no config servers up");
+    var newBongosInfo = BongoRunner.runBongos({configdb: st._configDB, waitForConnect: false});
+    // The new bongos won't accept any new connections, but it should stay up and continue trying
     // to contact the config servers to finish startup.
     assert.throws(function() {
-        new Mongo(newMongosInfo.host);
+        new Bongo(newBongosInfo.host);
     });
 
     jsTestLog("Restarting a shard while there are no config servers up");
@@ -69,27 +69,27 @@
     print("Sleeping for 60 seconds to let the other shards restart their ReplicaSetMonitors");
     sleep(60000);
 
-    jsTestLog("Queries against the original mongos should work again");
+    jsTestLog("Queries against the original bongos should work again");
     assert.eq(100, st.s.getDB('test').foo.find().itcount());
 
-    jsTestLog("Should now be possible to connect to the mongos that was started while the config " +
+    jsTestLog("Should now be possible to connect to the bongos that was started while the config " +
               "servers were down");
-    var newMongosConn = null;
+    var newBongosConn = null;
     var caughtException = null;
     assert.soon(
         function() {
             try {
-                newMongosConn = new Mongo(newMongosInfo.host);
+                newBongosConn = new Bongo(newBongosInfo.host);
                 return true;
             } catch (e) {
                 caughtException = e;
                 return false;
             }
         },
-        "Failed to connect to mongos after config servers were restarted: " +
+        "Failed to connect to bongos after config servers were restarted: " +
             tojson(caughtException));
 
-    assert.eq(100, newMongosConn.getDB('test').foo.find().itcount());
+    assert.eq(100, newBongosConn.getDB('test').foo.find().itcount());
 
     st.stop();
 }());

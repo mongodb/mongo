@@ -57,11 +57,11 @@ options = {
 assert.writeOK(a_conn.getDB(name).foo.insert({x: 2}, options));
 
 // restart B, which should attempt rollback but then fassert
-clearRawMongoProgramOutput();
+clearRawBongoProgramOutput();
 replTest.restart(BID);
 assert.soon(function() {
-    return rawMongoProgramOutput().match(
+    return rawBongoProgramOutput().match(
         "rollback : can't rollback drop database full resync will be required");
 }, "B failed to fassert");
 
-replTest.stopSet(undefined, undefined, {allowedExitCodes: [MongoRunner.EXIT_ABRUPT]});
+replTest.stopSet(undefined, undefined, {allowedExitCodes: [BongoRunner.EXIT_ABRUPT]});

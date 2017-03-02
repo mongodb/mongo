@@ -31,7 +31,7 @@
     assert.neq(null, fooDBDoc);
     assert(fooDBDoc.partitioned);
 
-    var newShardConn = MongoRunner.runMongod({});
+    var newShardConn = BongoRunner.runBongod({});
     var unshardedDB = newShardConn.getDB('unshardedDB');
 
     unshardedDB.user.insert({z: 1});
@@ -40,7 +40,7 @@
 
     assert.neq(null, configDB.databases.findOne({_id: 'unshardedDB'}));
 
-    MongoRunner.stopMongod(newShardConn.port);
+    BongoRunner.stopBongod(newShardConn.port);
     st.stop();
 
 })();

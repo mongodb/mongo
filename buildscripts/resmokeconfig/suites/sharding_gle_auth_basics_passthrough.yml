@@ -22,7 +22,7 @@ executor:
             authMechanism: SCRAM-SHA-1
             keyFile: *keyFile
             keyFileData: *keyFileData
-        eval: jsTest.authenticate(db.getMongo())
+        eval: jsTest.authenticate(db.getBongo())
         authenticationDatabase: admin
         authenticationMechanism: SCRAM-SHA-1
         password: *keyFileData
@@ -31,12 +31,12 @@ executor:
 
     fixture:
       class: ShardedClusterFixture
-      mongos_options:
+      bongos_options:
         keyFile: *keyFile
         set_parameters:
           enableTestCommands: 1
           enableLocalhostAuthBypass: false
-      mongod_options:
+      bongod_options:
         auth: ''
         keyFile: *keyFile
         set_parameters:

@@ -1,6 +1,6 @@
 # Section that is ignored by resmoke.py.
 config_variables:
-- &keyFile src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2
+- &keyFile src/bongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2
 
 selector:
   js_test:
@@ -17,8 +17,8 @@ executor:
     - class: CleanEveryN
       n: 20
     fixture:
-      class: MongoDFixture
-      mongod_options:
+      class: BongoDFixture
+      bongod_options:
         enableEncryption: ''
         encryptionKeyFile: *keyFile
         set_parameters:

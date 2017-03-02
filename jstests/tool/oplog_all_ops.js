@@ -1,5 +1,5 @@
 /**
- * Performs a simple test on mongooplog by doing different types of operations
+ * Performs a simple test on bongooplog by doing different types of operations
  * that will show up in the oplog then replaying it on another replica set.
  * Correctness is verified using the dbhash command.
  */
@@ -11,7 +11,7 @@ repl1.startSet({oplogSize: 10});
 repl1.initiate();
 repl1.awaitSecondaryNodes();
 
-var repl1Conn = new Mongo(repl1.getURL());
+var repl1Conn = new Bongo(repl1.getURL());
 var testDB = repl1Conn.getDB('test');
 var testColl = testDB.user;
 
@@ -44,15 +44,15 @@ repl2.initiate();
 repl2.awaitSecondaryNodes();
 
 var srcConn = repl1.getPrimary();
-var exitCode = MongoRunner.runMongoTool('mongooplog', {
+var exitCode = BongoRunner.runBongoTool('bongooplog', {
     from: repl1.getPrimary().host,
     host: repl2.getPrimary().host,
 });
-assert.eq(0, exitCode, 'mongooplog failed to poll operations from rs1 and apply them to rs2');
+assert.eq(0, exitCode, 'bongooplog failed to poll operations from rs1 and apply them to rs2');
 
 var repl1Hash = testDB.runCommand({dbhash: 1});
 
-var repl2Conn = new Mongo(repl2.getURL());
+var repl2Conn = new Bongo(repl2.getURL());
 var testDB2 = repl2Conn.getDB(testDB.getName());
 var repl2Hash = testDB2.runCommand({dbhash: 1});
 

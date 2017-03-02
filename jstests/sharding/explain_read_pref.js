@@ -6,17 +6,17 @@
 
 load("jstests/replsets/rslib.js");
 
-var assertCorrectTargeting = function(explain, isMongos, secExpected) {
+var assertCorrectTargeting = function(explain, isBongos, secExpected) {
     assert.commandWorked(explain);
 
     var serverInfo;
-    if (isMongos) {
+    if (isBongos) {
         serverInfo = explain.queryPlanner.winningPlan.shards[0].serverInfo;
     } else {
         serverInfo = explain.serverInfo;
     }
 
-    var explainDestConn = new Mongo(serverInfo.host + ':' + serverInfo.port);
+    var explainDestConn = new Bongo(serverInfo.host + ':' + serverInfo.port);
     var isMaster = explainDestConn.getDB('admin').runCommand({isMaster: 1});
 
     if (secExpected) {
@@ -26,7 +26,7 @@ var assertCorrectTargeting = function(explain, isMongos, secExpected) {
     }
 };
 
-var testAllModes = function(conn, isMongos) {
+var testAllModes = function(conn, isBongos) {
 
     // The primary is tagged with { tag: 'one' } and the secondary with
     // { tag: 'two' } so we can test the interaction of modes and tags. Test
@@ -66,29 +66,29 @@ var testAllModes = function(conn, isMongos) {
         var explainableQuery = testDB.user.explain().find();
         explainableQuery.readPref(mode, tagSets);
         var explain = explainableQuery.finish();
-        assertCorrectTargeting(explain, isMongos, secExpected);
+        assertCorrectTargeting(explain, isBongos, secExpected);
 
         // Set read pref on the connection.
-        var oldReadPrefMode = testDB.getMongo().getReadPrefMode();
-        var oldReadPrefTagSet = testDB.getMongo().getReadPrefTagSet();
+        var oldReadPrefMode = testDB.getBongo().getReadPrefMode();
+        var oldReadPrefTagSet = testDB.getBongo().getReadPrefTagSet();
         try {
-            testDB.getMongo().setReadPref(mode, tagSets);
+            testDB.getBongo().setReadPref(mode, tagSets);
 
             // .explain().count();
             explain = testDB.user.explain().count();
-            assertCorrectTargeting(explain, isMongos, secExpected);
+            assertCorrectTargeting(explain, isBongos, secExpected);
 
             // .explain().distinct()
             explain = testDB.user.explain().distinct("_id");
-            assertCorrectTargeting(explain, isMongos, secExpected);
+            assertCorrectTargeting(explain, isBongos, secExpected);
 
             // .explain().group()
             explain = testDB.user.explain().group(
                 {key: {_id: 1}, reduce: function(curr, result) {}, initial: {}});
-            assertCorrectTargeting(explain, isMongos, secExpected);
+            assertCorrectTargeting(explain, isBongos, secExpected);
         } finally {
             // Restore old read pref.
-            testDB.getMongo().setReadPref(oldReadPrefMode, oldReadPrefTagSet);
+            testDB.getBongo().setReadPref(oldReadPrefMode, oldReadPrefTagSet);
         }
     });
 };
@@ -126,13 +126,13 @@ try {
 
 st.rs0.awaitSecondaryNodes();
 
-// Force mongos to reconnect after our reconfig and also create the test database
+// Force bongos to reconnect after our reconfig and also create the test database
 assert.soon(function() {
     try {
         st.s.getDB('TestDB').runCommand({create: 'TestColl'});
         return true;
     } catch (x) {
-        // Intentionally caused an error that forces mongos's monitor to refresh.
+        // Intentionally caused an error that forces bongos's monitor to refresh.
         jsTest.log('Caught exception while doing dummy command: ' + tojson(x));
         return false;
     }
@@ -144,7 +144,7 @@ reconnect(secondary);
 rsConfig = primary.getDB("local").system.replset.findOne();
 jsTest.log('got rsconf ' + tojson(rsConfig));
 
-var replConn = new Mongo(st.rs0.getURL());
+var replConn = new Bongo(st.rs0.getURL());
 
 // Make sure replica set connection is ready
 _awaitRSHostViaRSMonitor(primary.name, {ok: true, tags: PRIMARY_TAG}, st.rs0.name);
@@ -152,7 +152,7 @@ _awaitRSHostViaRSMonitor(secondary.name, {ok: true, tags: SECONDARY_TAG}, st.rs0
 
 testAllModes(replConn, false);
 
-jsTest.log('Starting test for mongos connection');
+jsTest.log('Starting test for bongos connection');
 
 testAllModes(st.s, true);
 

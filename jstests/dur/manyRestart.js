@@ -13,7 +13,7 @@ function checkNoJournalFiles(path, pass) {
             return f.name.indexOf("prealloc") < 0;
         })) {
         if (pass == null) {
-            // wait a bit longer for mongod to potentially finish if it is still running.
+            // wait a bit longer for bongod to potentially finish if it is still running.
             sleep(10000);
             return checkNoJournalFiles(path, 1);
         }
@@ -94,8 +94,8 @@ function verifyRows(nrows) {
 }
 
 if (debugging) {
-    // mongod already running in debugger
-    conn = db.getMongo();
+    // bongod already running in debugger
+    conn = db.getBongo();
     work();
     sleep(30000);
     quit();
@@ -104,33 +104,33 @@ if (debugging) {
 log();
 
 // directories
-var path1 = MongoRunner.dataPath + testname + "nodur";
-var path2 = MongoRunner.dataPath + testname + "dur";
+var path1 = BongoRunner.dataPath + testname + "nodur";
+var path2 = BongoRunner.dataPath + testname + "dur";
 
 // non-durable version
-log("starting first mongod");
-conn = MongoRunner.runMongod({dbpath: path1, nojournal: "", smallfiles: ""});
+log("starting first bongod");
+conn = BongoRunner.runBongod({dbpath: path1, nojournal: "", smallfiles: ""});
 work();
-MongoRunner.stopMongod(conn);
+BongoRunner.stopBongod(conn);
 
 // hail mary for windows
 // Sat Jun 11 14:07:57 Error: boost::filesystem::create_directory: Access is denied:
 // "\data\db\manyRestartsdur" (anon):1
 sleep(1000);
 
-log("starting second mongod");
-conn = MongoRunner.runMongod({dbpath: path2, journal: "", smallfiles: "", journalOptions: 8});
+log("starting second bongod");
+conn = BongoRunner.runBongod({dbpath: path2, journal: "", smallfiles: "", journalOptions: 8});
 work();
 // wait for group commit.
 printjson(conn.getDB('admin').runCommand({getlasterror: 1, fsync: 1}));
 
-MongoRunner.stopMongod(conn);
+BongoRunner.stopBongod(conn);
 sleep(5000);
 
 for (var i = 0; i < 3; ++i) {
     // durable version
-    log("restarting second mongod");
-    conn = MongoRunner.runMongod({
+    log("restarting second bongod");
+    conn = BongoRunner.runBongod({
         restart: true,
         cleanData: false,
         dbpath: path2,
@@ -146,7 +146,7 @@ for (var i = 0; i < 3; ++i) {
 
     // kill the process hard
     log("hard kill");
-    MongoRunner.stopMongod(conn, /*signal*/ 9);
+    BongoRunner.stopBongod(conn, /*signal*/ 9);
 
     sleep(5000);
 }
@@ -155,7 +155,7 @@ for (var i = 0; i < 3; ++i) {
 
 // restart and recover
 log("restart");
-conn = MongoRunner.runMongod({
+conn = BongoRunner.runBongod({
     restart: true,
     cleanData: false,
     dbpath: path2,
@@ -166,7 +166,7 @@ conn = MongoRunner.runMongod({
 log("verify");
 verify();
 log("stop");
-MongoRunner.stopMongod(conn);
+BongoRunner.stopBongod(conn);
 sleep(5000);
 
 // at this point, after clean shutdown, there should be no journal files
@@ -187,8 +187,8 @@ Random.setRandomSeed();
 var nrows = 0;
 for (var i = 0; i < 5; ++i) {
     // durable version
-    log("restarting second mongod");
-    conn = MongoRunner.runMongod({
+    log("restarting second bongod");
+    conn = BongoRunner.runBongod({
         restart: true,
         cleanData: false,
         dbpath: path2,
@@ -204,7 +204,7 @@ for (var i = 0; i < 5; ++i) {
 
     // kill the process hard
     log("hard kill");
-    MongoRunner.stopMongod(conn, /*signal*/ 9);
+    BongoRunner.stopBongod(conn, /*signal*/ 9);
 
     sleep(5000);
 }

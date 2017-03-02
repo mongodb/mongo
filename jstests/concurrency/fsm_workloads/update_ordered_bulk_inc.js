@@ -11,7 +11,7 @@
  * Uses an ordered, bulk operation to perform the updates.
  */
 
-// For isMongod, recordIdCanChangeOnUpdate, and supportsDocumentLevelConcurrency.
+// For isBongod, recordIdCanChangeOnUpdate, and supportsDocumentLevelConcurrency.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
 var $config = (function() {
@@ -41,7 +41,7 @@ var $config = (function() {
         find: function find(db, collName) {
             var docs = db[collName].find().toArray();
 
-            if (isMongod(db) && !recordIdCanChangeOnUpdate(db)) {
+            if (isBongod(db) && !recordIdCanChangeOnUpdate(db)) {
                 // If the RecordId cannot change and we aren't updating any fields in any indexes,
                 // we should always see all matching documents, since they would not be able to move
                 // ahead or behind our collection scan or index scan.
@@ -53,7 +53,7 @@ var $config = (function() {
                 assertWhenOwnColl.gte(docs.length, this.docCount);
             }
 
-            if (isMongod(db) && supportsDocumentLevelConcurrency(db)) {
+            if (isBongod(db) && supportsDocumentLevelConcurrency(db)) {
                 // Storage engines which support document-level concurrency will automatically retry
                 // any operations when there are conflicts, so we should have updated all matching
                 // documents.

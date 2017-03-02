@@ -19,7 +19,7 @@
         printjson(res);
 
         // Ensure the cursor has data, rename or drop the collection, and exhaust the cursor.
-        let cursor = new DBCommandCursor(db.getMongo(), res);
+        let cursor = new DBCommandCursor(db.getBongo(), res);
         let errMsg =
             'expected more data from command ' + tojson(cmd) + ', with result ' + tojson(res);
         assert(cursor.hasNext(), errMsg);

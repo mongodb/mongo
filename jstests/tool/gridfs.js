@@ -1,15 +1,15 @@
 // tests gridfs with a sharded fs.chunks collection.
 
-var test = new ShardingTest({shards: 3, mongos: 1, config: 1, verbose: 2, other: {chunkSize: 1}});
+var test = new ShardingTest({shards: 3, bongos: 1, config: 1, verbose: 2, other: {chunkSize: 1}});
 
-var mongos = test.s0;
+var bongos = test.s0;
 
-var filename = "mongod";  // A large file we are guaranteed to have
+var filename = "bongod";  // A large file we are guaranteed to have
 if (_isWindows())
     filename += ".exe";
 
 function testGridFS(name) {
-    var d = mongos.getDB(name);
+    var d = bongos.getDB(name);
 
     // this function should be called on a clean db
     assert.eq(d.name.files.count(), 0);
@@ -18,19 +18,19 @@ function testGridFS(name) {
     var rawmd5 = md5sumFile(filename);
 
     // upload file (currently calls filemd5 internally)
-    var exitCode = MongoRunner.runMongoTool("mongofiles",
+    var exitCode = BongoRunner.runBongoTool("bongofiles",
                                             {
-                                              port: mongos.port,
+                                              port: bongos.port,
                                               db: name,
                                             },
                                             "put",
                                             filename);
-    assert.eq(0, exitCode, "mongofiles failed to upload '" + filename + "' into a sharded cluster");
+    assert.eq(0, exitCode, "bongofiles failed to upload '" + filename + "' into a sharded cluster");
 
     assert.eq(d.fs.files.count(), 1);
     var fileObj = d.fs.files.findOne();
     print("fileObj: " + tojson(fileObj));
-    assert.eq(rawmd5, fileObj.md5);  // check that mongofiles inserted the correct md5
+    assert.eq(rawmd5, fileObj.md5);  // check that bongofiles inserted the correct md5
 
     // Call filemd5 ourself and check results.
     var res = d.runCommand({filemd5: fileObj._id});

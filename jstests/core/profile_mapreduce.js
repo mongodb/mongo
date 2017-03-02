@@ -8,7 +8,7 @@
 
     var testDB = db.getSiblingDB("profile_mapreduce");
     assert.commandWorked(testDB.dropDatabase());
-    var conn = testDB.getMongo();
+    var conn = testDB.getBongo();
     var coll = testDB.getCollection("test");
 
     testDB.setProfilingLevel(2);
@@ -49,7 +49,7 @@
     assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
     assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));
-    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+    assert.eq(profileObj.appName, "BongoDB Shell", tojson(profileObj));
 
     //
     // Confirm metrics for mapReduce with sort stage.
@@ -63,7 +63,7 @@
 
     profileObj = getLatestProfilerEntry(testDB);
     assert.eq(profileObj.hasSortStage, true, tojson(profileObj));
-    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+    assert.eq(profileObj.appName, "BongoDB Shell", tojson(profileObj));
 
     //
     // Confirm namespace field is correct when output is a collection.
@@ -93,5 +93,5 @@
     profileObj = getLatestProfilerEntry(testDB);
 
     assert.eq(profileObj.fromMultiPlanner, true, tojson(profileObj));
-    assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
+    assert.eq(profileObj.appName, "BongoDB Shell", tojson(profileObj));
 })();

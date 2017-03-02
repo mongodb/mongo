@@ -4,8 +4,8 @@
 // @tags: [requires_mmapv1]
 var baseName = "filesize";
 
-// Start mongod with --smallfiles
-var m = MongoRunner.runMongod({nojournal: "", smallfiles: ""});
+// Start bongod with --smallfiles
+var m = BongoRunner.runBongod({nojournal: "", smallfiles: ""});
 
 var db = m.getDB(baseName);
 
@@ -13,9 +13,9 @@ var db = m.getDB(baseName);
 if (db.serverBuildInfo().bits == 32) {
     print("Skip on 32-bit");
 } else {
-    // Restart mongod without --smallFiles
-    MongoRunner.stopMongod(m);
-    m = MongoRunner.runMongod({
+    // Restart bongod without --smallFiles
+    BongoRunner.stopBongod(m);
+    m = BongoRunner.runBongod({
         restart: true,
         cleanData: false,
         dbpath: m.dbpath,

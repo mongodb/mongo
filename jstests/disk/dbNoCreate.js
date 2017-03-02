@@ -1,6 +1,6 @@
 var baseName = "jstests_dbNoCreate";
 
-var m = MongoRunner.runMongod({});
+var m = BongoRunner.runBongod({});
 
 var t = m.getDB(baseName).t;
 
@@ -9,8 +9,8 @@ t.remove({});
 t.update({}, {a: 1});
 t.drop();
 
-MongoRunner.stopMongod(m);
+BongoRunner.stopBongod(m);
 
-m = MongoRunner.runMongod({restart: true, cleanData: false, dbpath: m.dbpath});
+m = BongoRunner.runBongod({restart: true, cleanData: false, dbpath: m.dbpath});
 assert.eq(
     -1, m.getDBNames().indexOf(baseName), "found " + baseName + " in " + tojson(m.getDBNames()));

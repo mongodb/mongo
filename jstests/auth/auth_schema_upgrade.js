@@ -8,10 +8,10 @@ var setupCRUsers = function(conn) {
     adminDB.system.version.update({_id: "authSchema"}, {"currentVersion": 3}, {upsert: true});
 
     adminDB.createUser({user: 'user1', pwd: 'pass', roles: jsTest.adminUserRoles});
-    assert(adminDB.auth({mechanism: 'MONGODB-CR', user: 'user1', pwd: 'pass'}));
+    assert(adminDB.auth({mechanism: 'BONGODB-CR', user: 'user1', pwd: 'pass'}));
 
     adminDB.createUser({user: 'user2', pwd: 'pass', roles: jsTest.adminUserRoles});
-    assert(adminDB.auth({mechanism: 'MONGODB-CR', user: 'user2', pwd: 'pass'}));
+    assert(adminDB.auth({mechanism: 'BONGODB-CR', user: 'user2', pwd: 'pass'}));
 
     // Add $external no-op user to verify that it does not affect
     // authSchemaUpgrade SERVER-18475
@@ -37,7 +37,7 @@ var verifySchemaUpgrade = function(adminDB) {
     verifyUserDoc(adminDB, 'user2', false, true);
     verifyUserDoc(adminDB.getSiblingDB('$external'), "evil", false, false, true);
 
-    // After authSchemaUpgrade MONGODB-CR no longer works.
+    // After authSchemaUpgrade BONGODB-CR no longer works.
     verifyAuth(adminDB, 'user1', 'newpass', false, true);
     verifyAuth(adminDB, 'user2', 'pass', false, true);
 };
@@ -56,26 +56,26 @@ var testAuthSchemaUpgrade = function(conn) {
 };
 
 // Test authSchemaUpgrade and upgrade shards
-var testUpgradeShards = function(mongos, shard) {
+var testUpgradeShards = function(bongos, shard) {
     setupCRUsers(shard);
 
-    assert.commandWorked(mongos.adminCommand({"authSchemaUpgrade": 1, "upgradeShards": 1}));
+    assert.commandWorked(bongos.adminCommand({"authSchemaUpgrade": 1, "upgradeShards": 1}));
     verifySchemaUpgrade(shard.getDB('admin'));
 };
 
 jsTest.log('Test authSchemUpgrade standalone');
-var conn = MongoRunner.runMongod();
+var conn = BongoRunner.runBongod();
 testAuthSchemaUpgrade(conn);
-MongoRunner.stopMongod(conn);
+BongoRunner.stopBongod(conn);
 
 jsTest.log('Test authSchemUpgrade sharded');
 var dopts = {smallfiles: "", nopreallocj: ""};
 var st = new ShardingTest({
     shards: 1,
-    mongos: 1,
+    bongos: 1,
     config: 1,
     useHostname: false,  // Needed when relying on the localhost exception
-    other: {shardOptions: dopts, configOptions: dopts, mongosOptions: {verbose: 1}}
+    other: {shardOptions: dopts, configOptions: dopts, bongosOptions: {verbose: 1}}
 });
 testAuthSchemaUpgrade(st.s);
 testUpgradeShards(st.s, st.shard0);

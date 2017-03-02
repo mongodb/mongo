@@ -34,8 +34,8 @@ var roles = [
 
 /**
  * Parameters:
- *   conn -- connection, either to standalone mongod,
- *      or to mongos in sharded cluster
+ *   conn -- connection, either to standalone bongod,
+ *      or to bongos in sharded cluster
  *   t -- a test object from the tests array in jstests/auth/commands.js
  *   testcase -- the particular testcase from t to test
  *   r -- a role object from the "roles" array above
@@ -143,12 +143,12 @@ var impls = {createUsers: createUsers, runOneTest: runOneTest};
 checkForNonExistentRoles();
 
 // run all tests standalone
-var conn = MongoRunner.runMongod(opts);
+var conn = BongoRunner.runBongod(opts);
 authCommandsLib.runTests(conn, impls);
-MongoRunner.stopMongod(conn);
+BongoRunner.stopBongod(conn);
 
 // run all tests sharded
 conn = new ShardingTest(
-    {shards: 2, mongos: 1, keyFile: "jstests/libs/key1", other: {shardOptions: opts}});
+    {shards: 2, bongos: 1, keyFile: "jstests/libs/key1", other: {shardOptions: opts}});
 authCommandsLib.runTests(conn, impls);
 conn.stop();

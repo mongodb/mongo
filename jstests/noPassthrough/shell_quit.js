@@ -2,13 +2,13 @@
     'use strict';
     var checkShell = function(retCode) {
         var args = [
-            "mongo",
+            "bongo",
             "--nodb",
             "--eval",
             "quit(" + retCode + ");",
         ];
 
-        var actualRetCode = _runMongoProgram.apply(null, args);
+        var actualRetCode = _runBongoProgram.apply(null, args);
         assert.eq(retCode, actualRetCode);
     };
 

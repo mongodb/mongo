@@ -1,0 +1,475 @@
+# -*- mode: python -*-
+
+Import('env')
+
+env = env.Clone()
+
+env.Library(
+    target='aggregation',
+    source=[
+    ],
+    LIBDEPS=[
+        'aggregation_request',
+        'document_source',
+        'document_source_facet',
+        'document_source_lookup',
+        'expression_context',
+        'pipeline',
+    ]
+)
+
+env.Library(
+    target='field_path',
+    source=[
+        'field_path.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+        ]
+    )
+
+env.CppUnitTest(
+    target='field_path_test',
+    source='field_path_test.cpp',
+    LIBDEPS=[
+        'field_path',
+        ],
+    )
+
+env.Library(
+    target='document_value',
+    source=[
+        'document.cpp',
+        'document_comparator.cpp',
+        'document_path_support.cpp',
+        'value.cpp',
+        'value_comparator.cpp',
+        ],
+    LIBDEPS=[
+        'field_path',
+        '$BUILD_DIR/bongo/base',
+        '$BUILD_DIR/bongo/util/intrusive_counter',
+        ]
+    )
+
+env.Library(
+    target='document_value_test_util',
+    source=[
+        'document_value_test_util.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/unittest/unittest',
+        'document_value',
+    ],
+)
+
+env.CppUnitTest(
+    target='document_value_test',
+    source=[
+        'document_comparator_test.cpp',
+        'document_value_test.cpp',
+        'document_path_support_test.cpp',
+        'document_value_test_util_self_test.cpp',
+        'value_comparator_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/db/query/collation/collator_interface_mock',
+        'document_value',
+        'document_value_test_util',
+        ],
+    )
+
+env.Library(
+    target='aggregation_request',
+    source=[
+        'aggregation_request.cpp',
+    ],
+    LIBDEPS=[
+        'document_value',
+        '$BUILD_DIR/bongo/base',
+        '$BUILD_DIR/bongo/db/query/command_request_response',
+        '$BUILD_DIR/bongo/db/namespace_string',
+        '$BUILD_DIR/bongo/db/query/query_request',
+        '$BUILD_DIR/bongo/db/repl/read_concern_args',
+        '$BUILD_DIR/bongo/db/storage/storage_options',
+    ]
+)
+
+env.CppUnitTest(
+    target='aggregation_request_test',
+    source='aggregation_request_test.cpp',
+    LIBDEPS=[
+        'aggregation_request',
+        'document_value_test_util',
+    ],
+)
+
+env.Library(
+    target='expression_context',
+    source=[
+        'expression_context.cpp',
+    ],
+    LIBDEPS=[
+        'aggregation_request',
+        '$BUILD_DIR/bongo/db/query/collation/collator_factory_interface',
+        '$BUILD_DIR/bongo/db/service_context',
+        '$BUILD_DIR/bongo/util/intrusive_counter',
+    ]
+)
+
+env.CppUnitTest(
+    target='document_source_test',
+    source=[
+        'document_source_add_fields_test.cpp',
+        'document_source_bucket_auto_test.cpp',
+        'document_source_bucket_test.cpp',
+        'document_source_count_test.cpp',
+        'document_source_geo_near_test.cpp',
+        'document_source_group_test.cpp',
+        'document_source_limit_test.cpp',
+        'document_source_lookup_test.cpp',
+        'document_source_match_test.cpp',
+        'document_source_mock_test.cpp',
+        'document_source_project_test.cpp',
+        'document_source_redact_test.cpp',
+        'document_source_replace_root_test.cpp',
+        'document_source_sample_test.cpp',
+        'document_source_skip_test.cpp',
+        'document_source_sort_by_count_test.cpp',
+        'document_source_sort_test.cpp',
+        'document_source_test.cpp',
+        'document_source_unwind_test.cpp',
+    ],
+    LIBDEPS=[
+        'document_source',
+        'document_source_lookup',
+        'document_value_test_util',
+        '$BUILD_DIR/bongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/bongo/db/query/query_test_service_context',
+        '$BUILD_DIR/bongo/db/service_context',
+        '$BUILD_DIR/bongo/s/is_bongos',
+        '$BUILD_DIR/bongo/util/clock_source_mock',
+    ],
+)
+
+env.Library(
+    target='dependencies',
+    source=[
+        'dependencies.cpp',
+        ],
+    LIBDEPS=[
+        'document_value',
+        'field_path',
+    ]
+)
+
+env.Library(
+    target='expression',
+    source=[
+        'expression.cpp',
+        ],
+    LIBDEPS=[
+        'dependencies',
+        'document_value',
+        'expression_context',
+        '$BUILD_DIR/bongo/util/summation',
+    ]
+)
+
+env.Library(
+    target='accumulator',
+    source=[
+        'accumulation_statement.cpp',
+        'accumulator_add_to_set.cpp',
+        'accumulator_avg.cpp',
+        'accumulator_first.cpp',
+        'accumulator_last.cpp',
+        'accumulator_min_max.cpp',
+        'accumulator_push.cpp',
+        'accumulator_std_dev.cpp',
+        'accumulator_sum.cpp',
+        ],
+    LIBDEPS=[
+        'document_value',
+        '$BUILD_DIR/bongo/util/summation',
+        'expression',
+        'field_path',
+    ]
+)
+
+env.Library(
+    target='granularity_rounder',
+    source=[
+        'granularity_rounder.cpp',
+        'granularity_rounder_powers_of_two.cpp',
+        'granularity_rounder_preferred_numbers.cpp',
+        ],
+    LIBDEPS=[
+        'document_value',
+        'expression',
+        'field_path',
+    ]
+)
+
+docSourceEnv = env.Clone()
+docSourceEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
+docSourceEnv.Library(
+    target='document_source',
+    source=[
+        'document_source.cpp',
+        'document_source_add_fields.cpp',
+        'document_source_bucket.cpp',
+        'document_source_bucket_auto.cpp',
+        'document_source_coll_stats.cpp',
+        'document_source_count.cpp',
+        'document_source_geo_near.cpp',
+        'document_source_group.cpp',
+        'document_source_index_stats.cpp',
+        'document_source_limit.cpp',
+        'document_source_match.cpp',
+        'document_source_merge_cursors.cpp',
+        'document_source_mock.cpp',
+        'document_source_out.cpp',
+        'document_source_project.cpp',
+        'document_source_redact.cpp',
+        'document_source_replace_root.cpp',
+        'document_source_sample.cpp',
+        'document_source_sample_from_random_cursor.cpp',
+        'document_source_single_document_transformation.cpp',
+        'document_source_skip.cpp',
+        'document_source_sort.cpp',
+        'document_source_sort_by_count.cpp',
+        'document_source_unwind.cpp',
+        'lite_parsed_document_source.cpp',
+        ],
+    LIBDEPS=[
+        'accumulator',
+        'granularity_rounder',
+        'dependencies',
+        'document_value',
+        'expression',
+        'parsed_aggregation_projection',
+        '$BUILD_DIR/bongo/client/clientdriver',
+        '$BUILD_DIR/bongo/db/bson/dotted_path_support',
+        '$BUILD_DIR/bongo/db/matcher/expressions',
+        '$BUILD_DIR/bongo/db/matcher/expression_algo',
+        '$BUILD_DIR/bongo/db/service_context',
+        '$BUILD_DIR/bongo/db/stats/top',
+        '$BUILD_DIR/bongo/db/storage/storage_options',
+        '$BUILD_DIR/bongo/db/storage/wiredtiger/storage_wiredtiger_customization_hooks',
+        '$BUILD_DIR/bongo/s/is_bongos',
+        '$BUILD_DIR/third_party/shim_snappy',
+    ],
+)
+
+env.Library(
+    target='pipeline',
+    source=[
+        'pipeline.cpp',
+        ],
+    LIBDEPS=[
+        'dependencies',
+        'document_source',
+        'document_value',
+        'expression_context',
+        '$BUILD_DIR/bongo/db/auth/authorization_manager_global',
+        '$BUILD_DIR/bongo/db/bson/dotted_path_support',
+        '$BUILD_DIR/bongo/db/query/collation/collator_interface',
+        '$BUILD_DIR/bongo/db/query/collation/collator_factory_interface',
+        '$BUILD_DIR/bongo/db/repl/read_concern_args',
+        '$BUILD_DIR/bongo/db/storage/storage_options',
+    ]
+)
+
+env.Library(
+    target='document_source_lookup',
+    source=[
+        'document_source_graph_lookup.cpp',
+        'document_source_lookup.cpp',
+    ],
+    LIBDEPS=[
+        'document_source',
+        'pipeline',
+    ],
+)
+
+env.CppUnitTest(
+    target='document_source_graph_lookup_test',
+    source='document_source_graph_lookup_test.cpp',
+    LIBDEPS=[
+        'document_source',
+        'document_source_lookup',
+        'document_value_test_util',
+        '$BUILD_DIR/bongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/bongo/db/query/query_test_service_context',
+        '$BUILD_DIR/bongo/db/service_context_noop_init',
+        '$BUILD_DIR/bongo/s/is_bongos',
+    ],
+)
+
+env.Library(
+    target='document_source_facet',
+    source=[
+        'document_source_facet.cpp',
+        'tee_buffer.cpp',
+        'document_source_tee_consumer.cpp',
+    ],
+    LIBDEPS=[
+        'document_source',
+        'pipeline',
+    ]
+)
+
+env.CppUnitTest(
+    target='document_source_facet_test',
+    source='document_source_facet_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/bongo/db/query/query_test_service_context',
+        '$BUILD_DIR/bongo/db/service_context_noop_init',
+        '$BUILD_DIR/bongo/s/is_bongos',
+        'document_source_facet',
+        'document_value_test_util',
+    ],
+)
+
+env.CppUnitTest(
+    target='tee_buffer_test',
+    source='tee_buffer_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/bongo/db/service_context_noop_init',
+        '$BUILD_DIR/bongo/s/is_bongos',
+        'document_source_facet',
+        'document_value_test_util',
+    ],
+)
+
+env.CppUnitTest(
+    target='agg_expression_test',
+    source='expression_test.cpp',
+    LIBDEPS=[
+        'accumulator',
+        'document_value_test_util',
+        'expression',
+        ],
+    )
+
+env.CppUnitTest(
+    target='accumulator_test',
+    source='accumulator_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/db/query/collation/collator_interface_mock',
+        'accumulator',
+        'document_value_test_util',
+        ],
+    )
+
+env.CppUnitTest(
+    target='pipeline_test',
+    source=[
+        'dependencies_test.cpp',
+        'pipeline_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/bongo/db/query/collation/collator_interface_mock',
+        '$BUILD_DIR/bongo/db/query/query_test_service_context',
+        '$BUILD_DIR/bongo/db/service_context',
+        '$BUILD_DIR/bongo/db/service_context_noop_init',
+        '$BUILD_DIR/bongo/s/is_bongos',
+        'document_value_test_util',
+        'document_source_lookup',
+        'pipeline',
+        ],
+    )
+
+env.CppUnitTest(
+    target='lookup_set_cache_test',
+    source=[
+        'lookup_set_cache_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/base',
+        '$BUILD_DIR/bongo/db/query/collation/collator_interface_mock',
+        'document_value',
+    ]
+)
+
+env.Library(
+    target='parsed_aggregation_projection',
+    source=[
+        'parsed_aggregation_projection.cpp',
+        'parsed_exclusion_projection.cpp',
+        'parsed_inclusion_projection.cpp',
+        'parsed_add_fields.cpp',
+    ],
+    LIBDEPS=[
+        'expression',
+        'field_path',
+        '$BUILD_DIR/bongo/db/matcher/expression_algo',
+    ]
+)
+
+env.CppUnitTest(
+    target='parsed_exclusion_projection_test',
+    source='parsed_exclusion_projection_test.cpp',
+    LIBDEPS=[
+        'document_value_test_util',
+        'parsed_aggregation_projection',
+    ],
+)
+
+env.CppUnitTest(
+    target='parsed_aggregation_projection_test',
+    source='parsed_aggregation_projection_test.cpp',
+    LIBDEPS=[
+        'parsed_aggregation_projection',
+    ],
+)
+
+env.CppUnitTest(
+    target='parsed_inclusion_projection_test',
+    source='parsed_inclusion_projection_test.cpp',
+    LIBDEPS=[
+        'document_value_test_util',
+        'parsed_aggregation_projection',
+    ],
+)
+
+env.CppUnitTest(
+    target='granularity_rounder_test',
+    source=[
+        'granularity_rounder_powers_of_two_test.cpp',
+        'granularity_rounder_preferred_numbers_test.cpp',
+    ],
+    LIBDEPS=[
+        'document_value_test_util',
+        'granularity_rounder',
+    ],
+)
+
+env.CppUnitTest(
+    target='parsed_add_fields_test',
+    source='parsed_add_fields_test.cpp',
+    LIBDEPS=[
+        'document_value_test_util',
+        'parsed_aggregation_projection',
+    ],
+)
+
+env.Library(
+    target='serveronly',
+    source=[
+        'document_source_cursor.cpp',
+        'pipeline_d.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/db/catalog/document_validation',
+        '$BUILD_DIR/bongo/db/db_raii',
+        '$BUILD_DIR/bongo/db/dbdirectclient',
+        '$BUILD_DIR/bongo/db/index/index_access_methods',
+        '$BUILD_DIR/bongo/db/matcher/expressions_bongod_only',
+        '$BUILD_DIR/bongo/db/stats/serveronly',
+    ],
+)

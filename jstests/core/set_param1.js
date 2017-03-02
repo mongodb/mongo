@@ -119,8 +119,8 @@ assert.commandWorked(
 // oplogFetcherMaxFetcherRestarts
 //
 
-var isMongos = (db.isMaster().msg === 'isdbgrid');
-if (!isMongos) {
+var isBongos = (db.isMaster().msg === 'isdbgrid');
+if (!isBongos) {
     var origRestarts =
         assert.commandWorked(db.adminCommand({getParameter: 1, oplogFetcherMaxFetcherRestarts: 1}))
             .oplogFetcherMaxFetcherRestarts;

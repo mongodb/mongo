@@ -2,7 +2,7 @@
 """
 A script that provides:
 1. Ability to grab binaries where possible from LLVM.
-2. Ability to download binaries from MongoDB cache for clang-format.
+2. Ability to download binaries from BongoDB cache for clang-format.
 3. Validates clang-format is the right version.
 4. Has support for checking which files are to be checked.
 5. Supports validating and updating a set of files to the right coding style.
@@ -57,9 +57,9 @@ CLANG_FORMAT_HTTP_DARWIN_CACHE = "https://s3.amazonaws.com/boxes.10gen.com/build
 # Path in the tarball to the clang-format binary
 CLANG_FORMAT_SOURCE_TAR_BASE = string.Template("clang+llvm-$version-$tar_path/bin/" + CLANG_FORMAT_PROGNAME)
 
-# Path to the modules in the mongodb source tree
+# Path to the modules in the bongodb source tree
 # Has to match the string in SConstruct
-MODULE_DIR = "src/mongo/db/modules"
+MODULE_DIR = "src/bongo/db/modules"
 
 ##############################################################################
 
@@ -140,7 +140,7 @@ def extract_clang_format(tar_path):
         tarfp.close()
 
 def get_clang_format_from_cache_and_extract(url, tarball_ext):
-    """Get clang-format from mongodb's cache
+    """Get clang-format from bongodb's cache
     and extract the tarball
     """
     dest_dir = tempfile.gettempdir()
@@ -175,7 +175,7 @@ def get_clang_format_from_darwin_cache(dest_file):
     shutil.move(get_tar_path(CLANG_FORMAT_VERSION, "x86_64-apple-darwin"), dest_file)
 
 def get_clang_format_from_linux_cache(dest_file):
-    """Get clang-format from mongodb's cache
+    """Get clang-format from bongodb's cache
     """
     get_clang_format_from_cache_and_extract(CLANG_FORMAT_HTTP_LINUX_CACHE, ".gz")
 
@@ -201,8 +201,8 @@ class ClangFormat(object):
                 print("WARNING: Could not find clang-format %s" % (path))
 
         # Check the environment variable
-        if "MONGO_CLANG_FORMAT" in os.environ:
-            self.path = os.environ["MONGO_CLANG_FORMAT"]
+        if "BONGO_CLANG_FORMAT" in os.environ:
+            self.path = os.environ["BONGO_CLANG_FORMAT"]
 
             if self.path and not self._validate_version():
                 self.path = None
@@ -400,7 +400,7 @@ def parallel_process(items, func):
     return pp_result[0]
 
 def get_base_dir():
-    """Get the base directory for mongo repo.
+    """Get the base directory for bongo repo.
         This script assumes that it is running in buildscripts/, and uses
         that to find the base directory.
     """
@@ -417,10 +417,10 @@ def get_repos():
 
     # Get a list of modules
     # TODO: how do we filter rocks, does it matter?
-    mongo_modules = moduleconfig.discover_module_directories(
+    bongo_modules = moduleconfig.discover_module_directories(
                         os.path.join(base_dir, MODULE_DIR), None)
 
-    paths = [os.path.join(base_dir, MODULE_DIR, m) for m in mongo_modules]
+    paths = [os.path.join(base_dir, MODULE_DIR, m) for m in bongo_modules]
 
     paths.append(base_dir)
 
@@ -496,12 +496,12 @@ class Repo(object):
         gito = self._callgito(cmd)
 
         # This allows us to pick all the interesting files
-        # in the mongo and mongo-enterprise repos
+        # in the bongo and bongo-enterprise repos
         file_list = [line.rstrip()
                 for line in gito.splitlines()
                     if (line.startswith("jstests") or line.startswith("src"))
                         and not line.startswith("src/third_party/")
-                        and not line.startswith("src/mongo/gotools/")]
+                        and not line.startswith("src/bongo/gotools/")]
 
         files_match = re.compile('\\.(h|cpp|js)$')
 
@@ -736,7 +736,7 @@ def reformat_branch(clang_format, commit_prior_to_reformat, commit_after_reforma
         raise ValueError("reformat-branch must be run from the repo root")
 
     if not os.path.exists("buildscripts/clang_format.py"):
-        raise ValueError("reformat-branch is only supported in the mongo repo")
+        raise ValueError("reformat-branch is only supported in the bongo repo")
 
     repo = Repo(get_base_dir())
 

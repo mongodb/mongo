@@ -32,9 +32,9 @@ load('./jstests/multiVersion/libs/multi_cluster.js');
 
         var st = new ShardingTest({
             shards: 2,
-            mongos: 1,
+            bongos: 1,
             other: {
-                mongosOptions: {binVersion: "last-stable"},
+                bongosOptions: {binVersion: "last-stable"},
                 configOptions: {binVersion: "last-stable"},
                 shardOptions: {binVersion: "last-stable"},
 
@@ -56,13 +56,13 @@ load('./jstests/multiVersion/libs/multi_cluster.js');
         assert.commandWorked(st.s.adminCommand({enableSharding: 'sharded'}));
         st.ensurePrimaryShard('sharded', st.shard0.shardName);
 
-        // We explicitly create an index on the shard key to avoid having mongos attempt to
-        // implicitly create one. This is necessary because mongos would otherwise explicitly
+        // We explicitly create an index on the shard key to avoid having bongos attempt to
+        // implicitly create one. This is necessary because bongos would otherwise explicitly
         // include the "collation" option in the requested index to prevent potentially inheriting
         // the collation-default collation. However, specifying the "collation" option requires a
         // v=2 index and that may not be possible if the server has featureCompatibilityVersion=3.2.
         //
-        // TODO SERVER-25955: Allow mongos to implicitly create the shard key index when sharding a
+        // TODO SERVER-25955: Allow bongos to implicitly create the shard key index when sharding a
         // collection with a "simple" default collation and update this test case to not explicitly
         // create it.
         assert.commandWorked(st.s.getDB('sharded').foo.createIndex({x: 1}));
@@ -76,24 +76,24 @@ load('./jstests/multiVersion/libs/multi_cluster.js');
 
         // upgrade the config servers first
         jsTest.log('upgrading config servers');
-        st.upgradeCluster("latest", {upgradeMongos: false, upgradeShards: false});
-        st.restartMongoses();
+        st.upgradeCluster("latest", {upgradeBongos: false, upgradeShards: false});
+        st.restartBongoses();
 
         testCRUD(st.s.getDB('unsharded'));
         testCRUD(st.s.getDB('sharded'));
 
         // Then upgrade the shards.
         jsTest.log('upgrading shard servers');
-        st.upgradeCluster("latest", {upgradeMongos: false, upgradeConfigs: false});
-        st.restartMongoses();
+        st.upgradeCluster("latest", {upgradeBongos: false, upgradeConfigs: false});
+        st.restartBongoses();
 
         testCRUD(st.s.getDB('unsharded'));
         testCRUD(st.s.getDB('sharded'));
 
-        // Finally, upgrade mongos
-        jsTest.log('upgrading mongos servers');
+        // Finally, upgrade bongos
+        jsTest.log('upgrading bongos servers');
         st.upgradeCluster("latest", {upgradeConfigs: false, upgradeShards: false});
-        st.restartMongoses();
+        st.restartBongoses();
 
         testCRUD(st.s.getDB('unsharded'));
         testCRUD(st.s.getDB('sharded'));

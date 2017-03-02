@@ -1,4 +1,4 @@
-var conn = MongoRunner.runMongod({auth: ""});
+var conn = BongoRunner.runBongod({auth: ""});
 
 var adminDb = conn.getDB("admin");
 var testDb = conn.getDB("testdb");

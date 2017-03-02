@@ -6,7 +6,7 @@
     // Verify we require admin database
     assert.commandFailed(db.diagdata.runCommand("getDiagnosticData"));
 
-    // We need to retry a few times if run this test immediately after mongod is started as FTDC may
+    // We need to retry a few times if run this test immediately after bongod is started as FTDC may
     // not have run yet.
     var foundGoodDocument = false;
 

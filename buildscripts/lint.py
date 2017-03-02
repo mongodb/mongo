@@ -14,11 +14,11 @@ class CheckForConfigH:
             return
 
         cur_line = clean_lines.elided[line_num]
-        self.found_configh = cur_line.startswith('#include "mongo/config.h"')
+        self.found_configh = cur_line.startswith('#include "bongo/config.h"')
 
-        if not self.found_configh and "MONGO_CONFIG_" in cur_line:
+        if not self.found_configh and "BONGO_CONFIG_" in cur_line:
             error(filename, line_num, 'build/config_h_include', 5,
-                  'MONGO_CONFIG define used without prior inclusion of config.h.')
+                  'BONGO_CONFIG define used without prior inclusion of config.h.')
 
 def run_lint( paths, nudgeOn=False ):
     # errors are as of 10/14
@@ -125,7 +125,7 @@ if __name__ == "__main__":
         paths.append( arg )
 
     if len(paths) == 0:
-        paths.append( "src/mongo/" )
+        paths.append( "src/bongo/" )
 
     if not run_lint( paths, nudge ):
         sys.exit(-1)

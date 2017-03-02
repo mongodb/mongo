@@ -88,7 +88,7 @@
 
         cmdRes = db.runCommand({isMaster: 1});
         assert.commandWorked(cmdRes);
-        var isMongos = (cmdRes.msg === "isdbgrid");
+        var isBongos = (cmdRes.msg === "isdbgrid");
 
         // Pin the cursor during a getMore.
         var code = 'db.runCommand({getMore: ' + cursorId.toString() + ', collection: "' +
@@ -102,13 +102,13 @@
         // is already pinned (although generally it will be).
         //
         // Currently, pinned cursors that are targeted by a killCursors operation are kept alive on
-        // mongod but are killed on mongos (see SERVER-21710).
+        // bongod but are killed on bongos (see SERVER-21710).
         cmdRes = db.runCommand({killCursors: coll.getName(), cursors: [NumberLong(123), cursorId]});
         assert.commandWorked(cmdRes);
         assert.eq(cmdRes.cursorsNotFound, [NumberLong(123)]);
         assert.eq(cmdRes.cursorsUnknown, []);
 
-        if (isMongos) {
+        if (isBongos) {
             assert.eq(cmdRes.cursorsKilled, [cursorId]);
             assert.eq(cmdRes.cursorsAlive, []);
         } else {

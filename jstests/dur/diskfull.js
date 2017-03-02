@@ -9,11 +9,11 @@ mkdir -p /data/db/diskfulltest
 mount -o loop /data/images/diskfulltest.img /data/db/diskfulltest
 */
 
-startPath = MongoRunner.dataDir + "/diskfulltest";
-recoverPath = MongoRunner.dataDir + "/dur_diskfull";
+startPath = BongoRunner.dataDir + "/diskfulltest";
+recoverPath = BongoRunner.dataDir + "/dur_diskfull";
 
 doIt = false;
-files = listFiles(MongoRunner.dataDir);
+files = listFiles(BongoRunner.dataDir);
 for (i in files) {
     if (files[i].name == startPath) {
         doIt = true;
@@ -31,7 +31,7 @@ function checkNoJournalFiles(path, pass) {
             return f.name.indexOf("prealloc") < 0;
         })) {
         if (pass == null) {
-            // wait a bit longer for mongod to potentially finish if it is still running.
+            // wait a bit longer for bongod to potentially finish if it is still running.
             sleep(10000);
             return checkNoJournalFiles(path, 1);
         }
@@ -94,11 +94,11 @@ function verify() {
     }
 }
 
-function runFirstMongodAndFillDisk() {
+function runFirstBongodAndFillDisk() {
     log();
 
     clear();
-    conn = MongoRunner.runMongod({
+    conn = BongoRunner.runBongod({
         restart: true,
         cleanData: false,
         dbpath: startPath,
@@ -109,7 +109,7 @@ function runFirstMongodAndFillDisk() {
     });
 
     assert.throws(work, null, "no exception thrown when exceeding disk capacity");
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
 
     sleep(5000);
 }
@@ -117,7 +117,7 @@ function runFirstMongodAndFillDisk() {
 function runSecondMongdAndRecover() {
     // restart and recover
     log();
-    conn = MongoRunner.runMongod({
+    conn = BongoRunner.runBongod({
         restart: true,
         cleanData: false,
         dbpath: startPath,
@@ -129,9 +129,9 @@ function runSecondMongdAndRecover() {
     verify();
 
     log("stop");
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
 
-    // stopMongod seems to be asynchronous (hmmm) so we sleep here.
+    // stopBongod seems to be asynchronous (hmmm) so we sleep here.
     sleep(5000);
 
     // at this point, after clean shutdown, there should be no journal files
@@ -142,7 +142,7 @@ function runSecondMongdAndRecover() {
 }
 
 function someWritesInJournal() {
-    runFirstMongodAndFillDisk();
+    runFirstBongodAndFillDisk();
     runSecondMongdAndRecover();
 }
 
@@ -150,7 +150,7 @@ function noWritesInJournal() {
     // It is too difficult to consistently trigger cases where there are no existing journal files
     // due to lack of disk space, but
     // if we were to test this case we would need to manualy remove the lock file.
-    //    removeFile( startPath + "/mongod.lock" );
+    //    removeFile( startPath + "/bongod.lock" );
 }
 
 if (doIt) {

@@ -59,7 +59,7 @@ var $config = (function() {
     // Intended for use on config servers only.
     // Get a random chunk within this thread's partition.
     data.getRandomChunkInPartition = function getRandomChunkInPartition(conn) {
-        assert(isMongodConfigsvr(conn.getDB('admin')), 'Not connected to a mongod configsvr');
+        assert(isBongodConfigsvr(conn.getDB('admin')), 'Not connected to a bongod configsvr');
         assert(this.partition,
                'This function must be called from workloads that partition data across threads.');
         var coll = conn.getDB('config').chunks;

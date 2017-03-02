@@ -1,0 +1,223 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone()
+
+env.Library('serverauth', ['bongo_authentication_session.cpp'])
+
+generateActionTypes = env.Command(
+    target=['action_type.h', 'action_type.cpp'],
+    source=['generate_action_types.py', 'action_types.txt'],
+    action='$PYTHON $SOURCES $TARGETS')
+env.Alias('generated-sources', generateActionTypes)
+
+env.Library('auth_rolename', ['role_name.cpp'],
+            LIBDEPS=[
+                     '$BUILD_DIR/bongo/base',
+            ]
+)
+
+# Just the data structures used
+env.Library('authcore', ['action_set.cpp',
+                         'action_type.cpp',
+                         'authorization_manager.cpp',
+                         'authorization_session.cpp',
+                         'auth_decorations.cpp',
+                         'authz_manager_external_state.cpp',
+                         'authz_manager_external_state_local.cpp',
+                         'authz_session_external_state.cpp',
+                         'privilege.cpp',
+                         'privilege_parser.cpp',
+                         'resource_pattern.cpp',
+                         'role_graph.cpp',
+                         'role_graph_update.cpp',
+                         'role_graph_builtin_roles.cpp',
+                         'user.cpp',
+                         'user_document_parser.cpp',
+                         'user_management_commands_parser.cpp',
+                         'user_name.cpp',
+                         'user_set.cpp'],
+            LIBDEPS=['auth_rolename',
+                     'sasl_options',
+                     '$BUILD_DIR/bongo/base',
+                     '$BUILD_DIR/bongo/bson/mutable/mutable_bson',
+                     '$BUILD_DIR/bongo/bson/util/bson_extract',
+                     '$BUILD_DIR/bongo/crypto/scramauth',
+                     '$BUILD_DIR/bongo/db/catalog/document_validation',
+                     '$BUILD_DIR/bongo/db/common',
+                     '$BUILD_DIR/bongo/db/ops/update_driver',
+                     '$BUILD_DIR/bongo/db/namespace_string',
+                     '$BUILD_DIR/bongo/db/service_context',
+                     '$BUILD_DIR/bongo/util/md5',
+                     '$BUILD_DIR/bongo/util/net/network'])
+
+env.Library('authcommon',
+            ['internal_user_auth.cpp'],
+            LIBDEPS=[
+                '$BUILD_DIR/bongo/base',
+                '$BUILD_DIR/bongo/bson/mutable/mutable_bson',
+                '$BUILD_DIR/bongo/bson/util/bson_extract',
+            ])
+
+env.Library('authorization_manager_global',
+            [
+                'authorization_manager_global.cpp',
+            ],
+            LIBDEPS=[
+                'authcore',
+                '$BUILD_DIR/bongo/db/server_options_core',
+                '$BUILD_DIR/bongo/db/service_context',
+            ])
+
+env.Library(
+    target='authorization_manager_mock_init',
+    source=[
+        'authorization_manager_mock_init.cpp'
+    ],
+    LIBDEPS=[
+        'authcore',
+        'authmocks',
+        '$BUILD_DIR/bongo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/bongo/executor/network_interface_thread_pool',
+        '$BUILD_DIR/bongo/executor/network_interface_factory'
+    ],
+)
+
+env.Library('authservercommon',
+            [
+                'authz_session_external_state_server_common.cpp',
+                'sasl_commands.cpp',
+                'security_key.cpp',
+            ],
+            LIBDEPS=[
+                '$BUILD_DIR/bongo/db/commands/core',
+                'authcommon',
+                'authcore',
+                'authmocks',
+                'authorization_manager_global',
+                'saslauth',
+                'security_file',
+            ])
+
+env.Library('security_file',
+            ['security_file.cpp'],
+            LIBDEPS=[
+                '$BUILD_DIR/bongo/base',
+            ],
+)
+
+env.Library('sasl_options',
+            ['sasl_options.cpp'],
+            LIBDEPS=[
+                '$BUILD_DIR/bongo/base',
+                '$BUILD_DIR/bongo/db/server_parameters',
+                '$BUILD_DIR/bongo/util/options_parser/options_parser',
+            ],
+)
+
+env.Library('saslauth',
+             ['native_sasl_authentication_session.cpp',
+             'sasl_authentication_session.cpp',
+             'sasl_plain_server_conversation.cpp',
+             'sasl_scramsha1_server_conversation.cpp',
+             'sasl_server_conversation.cpp'],
+             LIBDEPS=[
+                'authcore',
+                'authmocks', # Wat?
+                'sasl_options',
+                '$BUILD_DIR/bongo/base/secure_allocator',
+                '$BUILD_DIR/bongo/crypto/scramauth',
+                '$BUILD_DIR/bongo/db/commands/test_commands_enabled',
+                '$BUILD_DIR/bongo/util/net/network',
+             ],
+)
+
+env.Library('authbongod',
+            ['authz_manager_external_state_d.cpp',
+             'authz_session_external_state_d.cpp',
+             'auth_index_d.cpp',
+             'impersonation_session.cpp'
+            ],
+            LIBDEPS=[
+                'authservercommon',
+                '$BUILD_DIR/bongo/db/db_raii',
+                '$BUILD_DIR/bongo/db/dbdirectclient',
+                '$BUILD_DIR/bongo/db/dbhelpers',
+                '$BUILD_DIR/bongo/db/repl/repl_coordinator_global',
+                '$BUILD_DIR/bongo/db/server_parameters',
+            ],
+)
+
+env.Library('authbongos',
+            ['authz_manager_external_state_s.cpp',
+             'authz_session_external_state_s.cpp',
+             'user_cache_invalidator_job.cpp'],
+            LIBDEPS=[
+                'authservercommon',
+                '$BUILD_DIR/bongo/s/catalog/dist_lock_manager',
+                '$BUILD_DIR/bongo/s/coreshard',
+            ],
+)
+
+env.Library(
+    target='authmocks',
+    source=[
+        'authz_manager_external_state_mock.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/bongo/db/matcher/expressions',
+        '$BUILD_DIR/bongo/db/ops/update_driver',
+        '$BUILD_DIR/bongo/db/service_context',
+        'authcore'
+    ]
+)
+
+env.CppUnitTest('action_set_test', 'action_set_test.cpp',
+                LIBDEPS=['authcore', 'authmocks', 'saslauth'])
+env.CppUnitTest('privilege_parser_test', 'privilege_parser_test.cpp',
+                LIBDEPS=['authcore', 'authmocks', 'saslauth'])
+env.CppUnitTest('role_graph_test', 'role_graph_test.cpp',
+                LIBDEPS=['authcore', 'authmocks', 'saslauth'])
+env.CppUnitTest('user_document_parser_test', 'user_document_parser_test.cpp',
+                LIBDEPS=['authcore', 'authmocks', 'saslauth'])
+env.CppUnitTest('user_set_test', 'user_set_test.cpp',
+                LIBDEPS=['authcore', 'authmocks', 'saslauth'])
+env.CppUnitTest('authorization_manager_test', 'authorization_manager_test.cpp',
+                LIBDEPS=[
+                    '$BUILD_DIR/bongo/transport/transport_layer_common',
+                    '$BUILD_DIR/bongo/transport/transport_layer_mock',
+                    'authcore',
+                    'authmocks',
+                    'saslauth'])
+
+env.Library(
+    target='authorization_session_for_test',
+    source=[
+        'authorization_session_for_test.cpp',
+    ],
+    LIBDEPS=[
+        'authcore',
+    ]
+)
+
+env.CppUnitTest(
+    target='authorization_session_test',
+    source=[
+        'authorization_session_test.cpp',
+    ],
+    LIBDEPS=[
+        'authcore',
+        'authmocks',
+        'saslauth',
+        'authorization_session_for_test',
+    ]
+)
+
+env.CppUnitTest('sasl_scramsha1_test',
+                'sasl_scramsha1_test.cpp',
+                LIBDEPS=[
+                    'saslauth',
+                    '$BUILD_DIR/bongo/client/sasl_client',
+                ])
+

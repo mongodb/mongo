@@ -317,7 +317,7 @@ class JSTestCase(TestCase):
         TestCase.__init__(self, logger, test_kind, js_filename)
 
         # Command line options override the YAML configuration.
-        self.shell_executable = utils.default_if_none(config.MONGO_EXECUTABLE, shell_executable)
+        self.shell_executable = utils.default_if_none(config.BONGO_EXECUTABLE, shell_executable)
 
         self.js_filename = js_filename
         self.shell_options = utils.default_if_none(shell_options, {}).copy()
@@ -332,25 +332,25 @@ class JSTestCase(TestCase):
         global_vars = self.shell_options.get("global_vars", {}).copy()
         data_dir = self._get_data_dir(global_vars)
 
-        # Set MongoRunner.dataPath if overridden at command line or not specified in YAML.
-        if config.DBPATH_PREFIX is not None or "MongoRunner.dataPath" not in global_vars:
+        # Set BongoRunner.dataPath if overridden at command line or not specified in YAML.
+        if config.DBPATH_PREFIX is not None or "BongoRunner.dataPath" not in global_vars:
             # dataPath property is the dataDir property with a trailing slash.
             data_path = os.path.join(data_dir, "")
         else:
-            data_path = global_vars["MongoRunner.dataPath"]
+            data_path = global_vars["BongoRunner.dataPath"]
 
-        global_vars["MongoRunner.dataDir"] = data_dir
-        global_vars["MongoRunner.dataPath"] = data_path
+        global_vars["BongoRunner.dataDir"] = data_dir
+        global_vars["BongoRunner.dataPath"] = data_path
 
         # Don't set the path to the executables when the user didn't specify them via the command
-        # line. The functions in the mongo shell for spawning processes have their own logic for
+        # line. The functions in the bongo shell for spawning processes have their own logic for
         # determining the default path to use.
-        if config.MONGOD_EXECUTABLE is not None:
-            global_vars["MongoRunner.mongodPath"] = config.MONGOD_EXECUTABLE
-        if config.MONGOS_EXECUTABLE is not None:
-            global_vars["MongoRunner.mongosPath"] = config.MONGOS_EXECUTABLE
+        if config.BONGOD_EXECUTABLE is not None:
+            global_vars["BongoRunner.bongodPath"] = config.BONGOD_EXECUTABLE
+        if config.BONGOS_EXECUTABLE is not None:
+            global_vars["BongoRunner.bongosPath"] = config.BONGOS_EXECUTABLE
         if self.shell_executable is not None:
-            global_vars["MongoRunner.mongoShellPath"] = self.shell_executable
+            global_vars["BongoRunner.bongoShellPath"] = self.shell_executable
 
         test_data = global_vars.get("TestData", {}).copy()
         test_data["minPort"] = core.network.PortAllocator.min_test_port(fixture.job_num)
@@ -374,17 +374,17 @@ class JSTestCase(TestCase):
 
     def _get_data_dir(self, global_vars):
         """
-        Returns the value that the mongo shell should set for the
-        MongoRunner.dataDir property.
+        Returns the value that the bongo shell should set for the
+        BongoRunner.dataDir property.
         """
 
         # Command line options override the YAML configuration.
         data_dir_prefix = utils.default_if_none(config.DBPATH_PREFIX,
-                                                global_vars.get("MongoRunner.dataDir"))
+                                                global_vars.get("BongoRunner.dataDir"))
         data_dir_prefix = utils.default_if_none(data_dir_prefix, config.DEFAULT_DBPATH_PREFIX)
         return os.path.join(data_dir_prefix,
                             "job%d" % (self.fixture.job_num),
-                            config.MONGO_RUNNER_SUBDIR)
+                            config.BONGO_RUNNER_SUBDIR)
 
     def run_test(self):
         threads = []
@@ -418,7 +418,7 @@ class JSTestCase(TestCase):
         is_main_test = True
         if thread_id > 0:
             is_main_test = False
-        return core.programs.mongo_shell_program(logger,
+        return core.programs.bongo_shell_program(logger,
                                                  executable=self.shell_executable,
                                                  filename=self.js_filename,
                                                  isMainTest=is_main_test,
@@ -432,47 +432,47 @@ class JSTestCase(TestCase):
         self._execute(shell)
 
 
-class MongosTestCase(TestCase):
+class BongosTestCase(TestCase):
     """
-    A TestCase which runs a mongos binary with the given parameters.
+    A TestCase which runs a bongos binary with the given parameters.
     """
 
     def __init__(self,
                  logger,
-                 mongos_options):
+                 bongos_options):
         """
-        Initializes the mongos test and saves the options.
+        Initializes the bongos test and saves the options.
         """
 
-        self.mongos_executable = utils.default_if_none(config.MONGOS_EXECUTABLE,
-                                                       config.DEFAULT_MONGOS_EXECUTABLE)
+        self.bongos_executable = utils.default_if_none(config.BONGOS_EXECUTABLE,
+                                                       config.DEFAULT_BONGOS_EXECUTABLE)
         # Use the executable as the test name.
-        TestCase.__init__(self, logger, "mongos", self.mongos_executable)
-        self.options = mongos_options.copy()
+        TestCase.__init__(self, logger, "bongos", self.bongos_executable)
+        self.options = bongos_options.copy()
 
     def configure(self, fixture, *args, **kwargs):
         """
-        Ensures the --test option is present in the mongos options.
+        Ensures the --test option is present in the bongos options.
         """
 
         TestCase.configure(self, fixture, *args, **kwargs)
-        # Always specify test option to ensure the mongos will terminate.
+        # Always specify test option to ensure the bongos will terminate.
         if "test" not in self.options:
             self.options["test"] = ""
 
     def run_test(self):
         try:
-            mongos = self._make_process()
-            self._execute(mongos)
+            bongos = self._make_process()
+            self._execute(bongos)
         except self.failureException:
             raise
         except:
-            self.logger.exception("Encountered an error running %s.", mongos.as_command())
+            self.logger.exception("Encountered an error running %s.", bongos.as_command())
             raise
 
     def _make_process(self):
-        return core.programs.mongos_program(self.logger,
-                                            executable=self.mongos_executable,
+        return core.programs.bongos_program(self.logger,
+                                            executable=self.bongos_executable,
                                             **self.options)
 
 
@@ -481,5 +481,5 @@ _TEST_CASES = {
     "cpp_integration_test": CPPIntegrationTestCase,
     "db_test": DBTestCase,
     "js_test": JSTestCase,
-    "mongos_test": MongosTestCase,
+    "bongos_test": BongosTestCase,
 }

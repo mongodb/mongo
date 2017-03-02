@@ -4,12 +4,12 @@
     "use strict";
 
     //
-    // Test correct behavior of operations with collation against a mongod when the
+    // Test correct behavior of operations with collation against a bongod when the
     // featureCompatibilityVersion is 3.2.
     //
 
-    const conn = MongoRunner.runMongod({});
-    assert.neq(null, conn, "mongod was unable to start up");
+    const conn = BongoRunner.runBongod({});
+    assert.neq(null, conn, "bongod was unable to start up");
 
     let collationDB = conn.getDB("collation_operations_feature_compatibility_version");
     assert.commandWorked(collationDB.dropDatabase());
@@ -157,7 +157,7 @@
     assert.eq(1, caseInsensitive.update({str: "FOO"}, {$set: {a: 1}}).nMatched);
     assert.eq(1, caseInsensitive.remove({str: "FOO"}).nRemoved);
 
-    MongoRunner.stopMongod(conn);
+    BongoRunner.stopBongod(conn);
 
     //
     // Test correct behavior of aggregation with collation against a sharded cluster when the

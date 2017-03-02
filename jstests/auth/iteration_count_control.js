@@ -1,7 +1,7 @@
 // Test SCRAM iterationCount control.
 load('./jstests/multiVersion/libs/auth_helpers.js');
 
-var conn = MongoRunner.runMongod({auth: ''});
+var conn = BongoRunner.runBongod({auth: ''});
 
 var testIterationCountControl = function() {
     var adminDB = conn.getDB('admin');
@@ -27,4 +27,4 @@ var testIterationCountControl = function() {
 };
 
 testIterationCountControl();
-MongoRunner.stopMongod(conn);
+BongoRunner.stopBongod(conn);

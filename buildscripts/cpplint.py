@@ -190,7 +190,7 @@ _ERROR_CATEGORIES = [
   'build/printf_format',
   'build/storage_class',
   'legal/copyright',
-  'mongo/polyfill',
+  'bongo/polyfill',
   'readability/alt_tokens',
   'readability/braces',
   'readability/casting',
@@ -1653,27 +1653,27 @@ def make_polyfill_regex():
   qualified_names.extend('std::' + name  + "\\b" for name in polyfill_required_names)
   qualified_names_regex = '|'.join(qualified_names)
   return re.compile(qualified_names_regex)
-_RE_PATTERN_MONGO_POLYFILL=make_polyfill_regex()
+_RE_PATTERN_BONGO_POLYFILL=make_polyfill_regex()
 
-def CheckForMongoPolyfill(filename, clean_lines, linenum, error):
+def CheckForBongoPolyfill(filename, clean_lines, linenum, error):
   line = clean_lines.elided[linenum]
-  if re.search(_RE_PATTERN_MONGO_POLYFILL, line):
-    error(filename, linenum, 'mongodb/polyfill', 5,
-          'Illegal use of banned name from std::/boost::, use mongo::stdx:: variant instead')
+  if re.search(_RE_PATTERN_BONGO_POLYFILL, line):
+    error(filename, linenum, 'bongodb/polyfill', 5,
+          'Illegal use of banned name from std::/boost::, use bongo::stdx:: variant instead')
 
-def CheckForMongoAtomic(filename, clean_lines, linenum, error):
+def CheckForBongoAtomic(filename, clean_lines, linenum, error):
   line = clean_lines.elided[linenum]
   if re.search('std::atomic', line):
-    error(filename, linenum, 'mongodb/stdatomic', 5,
+    error(filename, linenum, 'bongodb/stdatomic', 5,
           'Illegal use of prohibited std::atomic<T>, use AtomicWord<T> or other types '
-          'from "mongo/platform/atomic_word.h"')
+          'from "bongo/platform/atomic_word.h"')
 
-def CheckForMongoVolatile(filename, clean_lines, linenum, error):
+def CheckForBongoVolatile(filename, clean_lines, linenum, error):
   line = clean_lines.elided[linenum]
   if re.search('[^_]volatile', line) and not "__asm__" in line:
-    error(filename, linenum, 'mongodb/volatile', 5,
+    error(filename, linenum, 'bongodb/volatile', 5,
           'Illegal use of the volatile storage keyword, use AtomicWord instead '
-          'from "mongo/platform/atomic_word.h"')
+          'from "bongo/platform/atomic_word.h"')
 
 def CheckForCopyright(filename, lines, error):
   """Logs an error if no Copyright message appears at the top of the file."""
@@ -5816,9 +5816,9 @@ def ProcessLine(filename, file_extension, clean_lines, line,
   nesting_state.Update(filename, clean_lines, line, error)
   CheckForNamespaceIndentation(filename, nesting_state, clean_lines, line,
                                error)
-  CheckForMongoPolyfill(filename, clean_lines, line, error)
-  CheckForMongoAtomic(filename, clean_lines, line, error)
-  CheckForMongoVolatile(filename, clean_lines, line, error)
+  CheckForBongoPolyfill(filename, clean_lines, line, error)
+  CheckForBongoAtomic(filename, clean_lines, line, error)
+  CheckForBongoVolatile(filename, clean_lines, line, error)
   if nesting_state.InAsmBlock(): return
   CheckForFunctionLengths(filename, clean_lines, line, function_state, error)
   CheckForMultilineCommentsAndStrings(filename, clean_lines, line, error)

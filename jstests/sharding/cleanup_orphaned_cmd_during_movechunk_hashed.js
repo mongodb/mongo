@@ -11,12 +11,12 @@ load('./jstests/libs/cleanup_orphaned_util.js');
 (function() {
     "use strict";
 
-    var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
+    var staticBongod = BongoRunner.runBongod({});  // For startParallelOps.
     var st = new ShardingTest({shards: 2, other: {separateConfig: true}});
 
-    var mongos = st.s0, admin = mongos.getDB('admin'),
-        shards = mongos.getCollection('config.shards').find().toArray(), dbName = 'foo',
-        ns = dbName + '.bar', coll = mongos.getCollection(ns);
+    var bongos = st.s0, admin = bongos.getDB('admin'),
+        shards = bongos.getCollection('config.shards').find().toArray(), dbName = 'foo',
+        ns = dbName + '.bar', coll = bongos.getCollection(ns);
 
     assert.commandWorked(admin.runCommand({enableSharding: dbName}));
     printjson(admin.runCommand({movePrimary: dbName, to: shards[0]._id}));
@@ -31,11 +31,11 @@ load('./jstests/libs/cleanup_orphaned_util.js');
 
     var found = false;
     for (var i = 0; i < 10000; i++) {
-        var doc = {key: ObjectId()}, hash = mongos.adminCommand({_hashBSONElement: doc.key}).out;
+        var doc = {key: ObjectId()}, hash = bongos.adminCommand({_hashBSONElement: doc.key}).out;
 
         print('doc.key ' + doc.key + ' hashes to ' + hash);
 
-        if (mongos.getCollection('config.chunks')
+        if (bongos.getCollection('config.chunks')
                 .findOne(
                     {_id: chunkWithDoc._id, 'min.key': {$lte: hash}, 'max.key': {$gt: hash}})) {
             found = true;
@@ -67,7 +67,7 @@ load('./jstests/libs/cleanup_orphaned_util.js');
     pauseMoveChunkAtStep(donor, moveChunkStepNames.startedMoveChunk);
     pauseMigrateAtStep(recip, migrateStepNames.cloned);
 
-    var joinMoveChunk = moveChunkParallel(staticMongod,
+    var joinMoveChunk = moveChunkParallel(staticBongod,
                                           st.s0.host,
                                           null,
                                           [chunkWithDoc.min, chunkWithDoc.max],  // bounds

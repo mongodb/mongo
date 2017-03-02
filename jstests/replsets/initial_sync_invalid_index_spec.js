@@ -24,7 +24,7 @@
     // Add another node to the replica set to allow an initial sync to occur.
     replTest.add();
 
-    clearRawMongoProgramOutput();
+    clearRawBongoProgramOutput();
     reInitiateWithoutThrowingOnAbortedMember(replTest);
 
     const msgInvalidOption = "The field 'invalidOption' is not valid for an index specification";
@@ -37,14 +37,14 @@
     const msg3dot2InitialSyncFatalAssertion = "Fatal Assertion 16233";
 
     const assertFn = function() {
-        return rawMongoProgramOutput().match(msgInvalidOption) &&
-            (rawMongoProgramOutput().match(msgInitialSyncFatalAssertion) ||
-             rawMongoProgramOutput().match(msg3dot2InitialSyncFatalAssertion));
+        return rawBongoProgramOutput().match(msgInvalidOption) &&
+            (rawBongoProgramOutput().match(msgInitialSyncFatalAssertion) ||
+             rawBongoProgramOutput().match(msg3dot2InitialSyncFatalAssertion));
     };
     assert.soon(assertFn, "Initial sync should have aborted on invalid index specification");
 
     replTest.stopSet(undefined,
                      undefined,
-                     {allowedExitCodes: [MongoRunner.EXIT_ABRUPT, MongoRunner.EXIT_ABORT]});
+                     {allowedExitCodes: [BongoRunner.EXIT_ABRUPT, BongoRunner.EXIT_ABORT]});
 
 })();

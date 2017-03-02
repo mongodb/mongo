@@ -26,7 +26,7 @@
             "Created an illegal view named 'system.indexes'");
     }
 
-    // Collections that start with 'system.' that are not special to MongoDB fail with a different
+    // Collections that start with 'system.' that are not special to BongoDB fail with a different
     // error code.
     assert.commandFailedWithCode(viewsDB.runCommand({create: "system.foo", viewOn: "collection"}),
                                  ErrorCodes.InvalidNamespace,

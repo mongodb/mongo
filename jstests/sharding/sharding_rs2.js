@@ -1,5 +1,5 @@
 //
-// Testing mongos with replica sets:
+// Testing bongos with replica sets:
 //  - config server should update when replica set config changes.
 //  - test insert and find commands are routed appropriately to shard primaries
 //    and secondaries.
@@ -12,7 +12,7 @@
 (function() {
     'use strict';
 
-    // The mongod secondaries are set to priority 0 and votes 0 to prevent the primaries
+    // The bongod secondaries are set to priority 0 and votes 0 to prevent the primaries
     // from stepping down during migrations on slow evergreen builders.
     var s = new ShardingTest({
         shards: 2,
@@ -97,7 +97,7 @@
 
     // --- not sharded ----
 
-    var m = new Mongo(s.s.name);
+    var m = new Bongo(s.s.name);
     var ts = m.getDB("test").foo;
 
     var before = rs.getPrimary().adminCommand("serverStatus").opcounters;
@@ -172,7 +172,7 @@
 
     // by non-shard key
 
-    m = new Mongo(s.s.name);
+    m = new Bongo(s.s.name);
     ts = m.getDB("test").foo;
 
     before = rs.getPrimary().adminCommand("serverStatus").opcounters;
@@ -192,7 +192,7 @@
 
     // by shard key
 
-    m = new Mongo(s.s.name);
+    m = new Bongo(s.s.name);
     m.forceWriteMode("commands");
 
     s.printShardingStatus();
@@ -226,7 +226,7 @@
     // Modify data only on the primary replica of the primary shard.
     // { x: 60 } goes to the shard of "rs", which is the primary shard.
     assert.writeOK(ts.insert({primaryOnly: true, x: 60}));
-    // Read from secondary through mongos, the doc is not there due to replication delay or fsync.
+    // Read from secondary through bongos, the doc is not there due to replication delay or fsync.
     // But we can guarantee not to read from primary.
     assert.eq(0, ts.find({primaryOnly: true, x: 60}).itcount());
     // Unlock the secondaries
@@ -237,14 +237,14 @@
     assert.writeOK(ts.remove({primaryOnly: true, x: 60}, {writeConcern: {w: 3}}));
 
     for (var i = 0; i < 10; i++) {
-        m = new Mongo(s.s.name);
+        m = new Bongo(s.s.name);
         m.setSlaveOk();
         ts = m.getDB("test").foo;
         assert.eq(100, ts.find().batchSize(5).itcount(), "F2." + i);
     }
 
     for (var i = 0; i < 10; i++) {
-        m = new Mongo(s.s.name);
+        m = new Bongo(s.s.name);
         ts = m.getDB("test").foo;
         assert.eq(100, ts.find().batchSize(5).itcount(), "F3." + i);
     }

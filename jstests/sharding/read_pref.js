@@ -16,7 +16,7 @@ var doTest = function(useDollarQuerySyntax) {
 
     // The $-prefixed query syntax is only legal for compatibility mode reads, not for the
     // find/getMore commands.
-    if (useDollarQuerySyntax && st.s.getDB("test").getMongo().useReadCommands()) {
+    if (useDollarQuerySyntax && st.s.getDB("test").getBongo().useReadCommands()) {
         return;
     }
 
@@ -73,7 +73,7 @@ var doTest = function(useDollarQuerySyntax) {
     // Wait until the ReplicaSetMonitor refreshes its view and see the tags
     var replConfig = replTest.getReplSetConfigFromNode();
     replConfig.members.forEach(function(node) {
-        var nodeConn = new Mongo(node.host);
+        var nodeConn = new Bongo(node.host);
         awaitRSClientHosts(conn, nodeConn, {ok: true, tags: node.tags}, replTest);
     });
     replTest.awaitReplication();
@@ -153,13 +153,13 @@ var doTest = function(useDollarQuerySyntax) {
     explainServer = getExplainServer(explain);
     assert.eq(primaryNode.name, explainServer);
 
-    // Check that mongos will try the next tag if nothing matches the first
+    // Check that bongos will try the next tag if nothing matches the first
     explain = getExplain("secondary", [{z: "3"}, {dc: "jp"}]);
     explainServer = getExplainServer(explain);
     checkTag(explainServer, {dc: "jp"});
     assert.eq(1, explain.executionStats.nReturned);
 
-    // Check that mongos will fallback to primary if none of tags given matches
+    // Check that bongos will fallback to primary if none of tags given matches
     explain = getExplain("secondaryPreferred", [{z: "3"}, {dc: "ph"}]);
     explainServer = getExplainServer(explain);
     // Call getPrimary again since the primary could have changed after the restart.
