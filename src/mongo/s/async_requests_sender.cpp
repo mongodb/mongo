@@ -53,7 +53,7 @@ const int kMaxNumFailedHostRetryAttempts = 3;
 
 AsyncRequestsSender::AsyncRequestsSender(OperationContext* txn,
                                          executor::TaskExecutor* executor,
-                                         std::string db,
+                                         StringData db,
                                          const std::vector<AsyncRequestsSender::Request>& requests,
                                          const ReadPreferenceSetting& readPreference,
                                          bool allowPartialResults)
@@ -82,6 +82,8 @@ AsyncRequestsSender::~AsyncRequestsSender() {
 
 std::vector<AsyncRequestsSender::Response> AsyncRequestsSender::waitForResponses(
     OperationContext* txn) {
+    invariant(!_remotes.empty());
+
     // Until all remotes have received a response or error, keep scheduling retries and waiting on
     // outstanding requests.
     while (!_done()) {
@@ -98,11 +100,16 @@ std::vector<AsyncRequestsSender::Response> AsyncRequestsSender::waitForResponses
         invariant(remote.swResponse);
         if (remote.swResponse->isOK()) {
             invariant(remote.shardHostAndPort);
-            responses.emplace_back(remote.swResponse->getValue(), *remote.shardHostAndPort);
+            responses.emplace_back(std::move(remote.swResponse->getValue()),
+                                   std::move(*remote.shardHostAndPort));
         } else {
-            responses.emplace_back(remote.swResponse->getStatus());
+            responses.emplace_back(std::move(remote.swResponse->getStatus()),
+                                   std::move(remote.shardHostAndPort));
         }
     }
+
+    _remotes.clear();
+
     return responses;
 }
 
@@ -196,7 +203,7 @@ Status AsyncRequestsSender::_scheduleRequest_inlock(OperationContext* txn, size_
     }
 
     executor::RemoteCommandRequest request(
-        remote.getTargetHost(), _db, remote.cmdObj, _metadataObj, txn);
+        remote.getTargetHost(), _db.toString(), remote.cmdObj, _metadataObj, txn);
 
     auto callbackStatus = _executor->scheduleRemoteCommand(
         request,
@@ -298,9 +305,10 @@ AsyncRequestsSender::Request::Request(ShardId shardId, BSONObj cmdObj)
     : shardId(shardId), cmdObj(cmdObj) {}
 
 AsyncRequestsSender::Response::Response(executor::RemoteCommandResponse response, HostAndPort hp)
-    : swResponse(response), shardHostAndPort(hp) {}
+    : swResponse(std::move(response)), shardHostAndPort(std::move(hp)) {}
 
-AsyncRequestsSender::Response::Response(Status status) : swResponse(status) {}
+AsyncRequestsSender::Response::Response(Status status, boost::optional<HostAndPort> hp)
+    : swResponse(std::move(status)), shardHostAndPort(std::move(hp)) {}
 
 AsyncRequestsSender::RemoteData::RemoteData(ShardId shardId, BSONObj cmdObj)
     : shardId(std::move(shardId)), cmdObj(std::move(cmdObj)) {}

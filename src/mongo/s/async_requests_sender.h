@@ -89,13 +89,13 @@ public:
         Response(executor::RemoteCommandResponse response, HostAndPort hp);
 
         // Constructor that specifies the reason the response was not successfully received.
-        Response(Status status);
+        Response(Status status, boost::optional<HostAndPort> hp);
 
         // The response or error from the remote.
         StatusWith<executor::RemoteCommandResponse> swResponse;
 
-        // The exact host on which the remote command was run. Is unset if swResponse has a non-OK
-        // status.
+        // The exact host on which the remote command was run. Is unset if the shard could not be
+        // found or no shard hosts matching the readPreference could be found.
         boost::optional<HostAndPort> shardHostAndPort;
     };
 
@@ -105,7 +105,7 @@ public:
      */
     AsyncRequestsSender(OperationContext* txn,
                         executor::TaskExecutor* executor,
-                        std::string db,
+                        StringData db,
                         const std::vector<AsyncRequestsSender::Request>& requests,
                         const ReadPreferenceSetting& readPreference,
                         bool allowPartialResults = false);
@@ -119,6 +119,8 @@ public:
      * If we were killed, returns immediately.
      * If we were interrupted, returns when any outstanding requests have completed.
      * Otherwise, returns when each remote has received a response or error.
+     *
+     * Must only be called once.
      */
     std::vector<Response> waitForResponses(OperationContext* txn);
 
@@ -259,7 +261,7 @@ private:
     BSONObj _metadataObj;
 
     // The database against which the commands are run.
-    const std::string _db;
+    const StringData _db;
 
     // The readPreference to use for all requests.
     ReadPreferenceSetting _readPreference;

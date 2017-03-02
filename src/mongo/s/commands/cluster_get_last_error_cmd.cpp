@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include <vector>
@@ -34,14 +36,148 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_last_error_info.h"
-#include "mongo/s/commands/dbclient_multi_command.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batch_downconvert.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
+
+using std::vector;
+
+// Adds a wOpTime and a wElectionId field to a set of gle options
+BSONObj buildGLECmdWithOpTime(const BSONObj& gleOptions,
+                              const repl::OpTime& opTime,
+                              const OID& electionId) {
+    BSONObjBuilder builder;
+    BSONObjIterator it(gleOptions);
+
+    for (int i = 0; it.more(); ++i) {
+        BSONElement el = it.next();
+
+        // Make sure first element is getLastError : 1
+        if (i == 0) {
+            StringData elName(el.fieldName());
+            if (!elName.equalCaseInsensitive("getLastError")) {
+                builder.append("getLastError", 1);
+            }
+        }
+
+        builder.append(el);
+    }
+    opTime.append(&builder, "wOpTime");
+    builder.appendOID("wElectionId", const_cast<OID*>(&electionId));
+    return builder.obj();
+}
+
+/**
+ * Uses GLE and the shard hosts and opTimes last written by write commands to enforce a
+ * write concern across the previously used shards.
+ *
+ * Returns OK with the LegacyWCResponses containing only write concern error information
+ * Returns !OK if there was an error getting a GLE response
+ */
+Status enforceLegacyWriteConcern(OperationContext* txn,
+                                 StringData dbName,
+                                 const BSONObj& options,
+                                 const HostOpTimeMap& hostOpTimes,
+                                 std::vector<LegacyWCResponse>* legacyWCResponses) {
+    if (hostOpTimes.empty()) {
+        return Status::OK();
+    }
+
+    // Assemble requests
+    std::vector<AsyncRequestsSender::Request> requests;
+    for (HostOpTimeMap::const_iterator it = hostOpTimes.begin(); it != hostOpTimes.end(); ++it) {
+        const ConnectionString& shardConnStr = it->first;
+        const auto& hot = it->second;
+        const repl::OpTime& opTime = hot.opTime;
+        const OID& electionId = hot.electionId;
+
+        auto swShard = Grid::get(txn)->shardRegistry()->getShard(txn, shardConnStr.toString());
+        if (!swShard.isOK()) {
+            return swShard.getStatus();
+        }
+
+        LOG(3) << "enforcing write concern " << options << " on " << shardConnStr.toString()
+               << " at opTime " << opTime.getTimestamp().toStringPretty() << " with electionID "
+               << electionId;
+
+        BSONObj gleCmd = buildGLECmdWithOpTime(options, opTime, electionId);
+        requests.emplace_back(swShard.getValue()->getId(), gleCmd);
+    }
+
+    // Send the requests and wait to receive all the responses.
+
+    const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
+    AsyncRequestsSender ars(
+        txn, Grid::get(txn)->getExecutorPool()->getArbitraryExecutor(), dbName, requests, readPref);
+    auto responses = ars.waitForResponses(txn);
+
+    // Parse the responses.
+
+    vector<Status> failedStatuses;
+    for (const auto& response : responses) {
+        // Return immediately if we failed to contact a shard.
+        if (!response.shardHostAndPort) {
+            invariant(!response.swResponse.isOK());
+            return response.swResponse.getStatus();
+        }
+
+        // We successfully contacted the shard, but it returned some error.
+        if (!response.swResponse.isOK()) {
+            failedStatuses.push_back(std::move(response.swResponse.getStatus()));
+            continue;
+        }
+
+        BSONObj gleResponse = stripNonWCInfo(response.swResponse.getValue().data);
+
+        // Use the downconversion tools to determine if this GLE response is ok, a
+        // write concern error, or an unknown error we should immediately abort for.
+        GLEErrors errors;
+        Status extractStatus = extractGLEErrors(gleResponse, &errors);
+        if (!extractStatus.isOK()) {
+            failedStatuses.push_back(extractStatus);
+            continue;
+        }
+
+        LegacyWCResponse wcResponse;
+        invariant(response.shardHostAndPort);
+        wcResponse.shardHost = response.shardHostAndPort->toString();
+        wcResponse.gleResponse = gleResponse;
+        if (errors.wcError.get()) {
+            wcResponse.errToReport = errors.wcError->getErrMessage();
+        }
+
+        legacyWCResponses->push_back(wcResponse);
+    }
+
+    if (failedStatuses.empty()) {
+        return Status::OK();
+    }
+
+    StringBuilder builder;
+    builder << "could not enforce write concern";
+
+    for (vector<Status>::const_iterator it = failedStatuses.begin(); it != failedStatuses.end();
+         ++it) {
+        const Status& failedStatus = *it;
+        if (it == failedStatuses.begin()) {
+            builder << causedBy(failedStatus.toString());
+        } else {
+            builder << ":: and ::" << failedStatus.toString();
+        }
+    }
+
+    return Status(failedStatuses.size() == 1u ? failedStatuses.front().code()
+                                              : ErrorCodes::MultipleErrorsOccurred,
+                  builder.str());
+}
+
 
 class GetLastErrorCmd : public Command {
 public:
@@ -101,38 +237,9 @@ public:
         // For compatibility with 2.4 sharded GLE, we always enforce the write concern
         // across all shards.
         const HostOpTimeMap hostOpTimes(ClusterLastErrorInfo::get(cc()).getPrevHostOpTimes());
-        HostOpTimeMap resolvedHostOpTimes;
 
-        Status status(Status::OK());
-        for (HostOpTimeMap::const_iterator it = hostOpTimes.begin(); it != hostOpTimes.end();
-             ++it) {
-            const ConnectionString& shardEndpoint = it->first;
-            const HostOpTime& hot = it->second;
-
-            const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
-            auto shardStatus = grid.shardRegistry()->getShard(txn, shardEndpoint.toString());
-            if (!shardStatus.isOK()) {
-                status = shardStatus.getStatus();
-                break;
-            }
-            auto shard = shardStatus.getValue();
-            auto swHostAndPort = shard->getTargeter()->findHostNoWait(readPref);
-            if (!swHostAndPort.isOK()) {
-                status = swHostAndPort.getStatus();
-                break;
-            }
-
-            ConnectionString resolvedHost(swHostAndPort.getValue());
-
-            resolvedHostOpTimes[resolvedHost] = hot;
-        }
-
-        DBClientMultiCommand dispatcher;
         std::vector<LegacyWCResponse> wcResponses;
-        if (status.isOK()) {
-            status = enforceLegacyWriteConcern(
-                &dispatcher, dbname, cmdObj, resolvedHostOpTimes, &wcResponses);
-        }
+        auto status = enforceLegacyWriteConcern(txn, dbname, cmdObj, hostOpTimes, &wcResponses);
 
         // Don't forget about our last hosts, reset the client info
         ClusterLastErrorInfo::get(cc()).disableForCommand();
