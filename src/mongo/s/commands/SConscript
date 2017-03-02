@@ -89,6 +89,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/aggregation',
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/rpc/client_metadata',
+        '$BUILD_DIR/mongo/s/async_requests_sender',
         '$BUILD_DIR/mongo/s/client/parallel',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/query/cluster_query',

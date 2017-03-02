@@ -31,19 +31,17 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/client/remote_command_targeter.h"
-#include "mongo/db/client.h"
-#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/write_commands/write_commands_common.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/stats/counters.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/commands/chunk_manager_targeter.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/cluster_write.h"
-#include "mongo/s/commands/dbclient_multi_command.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batch_upconvert.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -113,9 +111,7 @@ public:
         }
 
         BSONObjBuilder explainCmdBob;
-        int options = 0;
-        ClusterExplain::wrapAsExplain(
-            cmdObj, verbosity, serverSelectionMetadata, &explainCmdBob, &options);
+        ClusterExplain::wrapAsExplainForOP_COMMAND(cmdObj, verbosity, &explainCmdBob);
 
         // We will time how long it takes to run the commands on the shards.
         Timer timer;
@@ -258,53 +254,53 @@ private:
                 return status;
         }
 
-        DBClientMultiCommand dispatcher;
+        auto shardRegistry = Grid::get(txn)->shardRegistry();
 
         // Assemble requests
+        std::vector<AsyncRequestsSender::Request> requests;
         for (vector<ShardEndpoint*>::const_iterator it = endpoints.begin(); it != endpoints.end();
              ++it) {
             const ShardEndpoint* endpoint = *it;
 
-            const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
-            auto shardStatus = grid.shardRegistry()->getShard(txn, endpoint->shardName);
+            auto shardStatus = shardRegistry->getShard(txn, endpoint->shardName);
             if (!shardStatus.isOK()) {
                 return shardStatus.getStatus();
             }
-            auto swHostAndPort = shardStatus.getValue()->getTargeter()->findHostNoWait(readPref);
-            if (!swHostAndPort.isOK()) {
-                return swHostAndPort.getStatus();
-            }
-
-            ConnectionString host(swHostAndPort.getValue());
-            dispatcher.addCommand(host, dbName, command);
+            requests.emplace_back(shardStatus.getValue()->getId(), command);
         }
 
-        // Errors reported when recv'ing responses
-        dispatcher.sendAll();
+        // Send the requests and wait to receive all the responses.
+
+        const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
+        AsyncRequestsSender ars(txn,
+                                Grid::get(txn)->getExecutorPool()->getArbitraryExecutor(),
+                                dbName,
+                                requests,
+                                readPref);
+        auto responses = ars.waitForResponses(txn);
+
+        // Parse the responses.
+
         Status dispatchStatus = Status::OK();
-
-        // Recv responses
-        while (dispatcher.numPending() > 0) {
-            ConnectionString host;
-            RawBSONSerializable response;
-
-            Status status = dispatcher.recvAny(&host, &response);
-            if (!status.isOK()) {
-                // We always need to recv() all the sent operations
-                dispatchStatus = status;
-                continue;
+        for (const auto& response : responses) {
+            if (!response.swResponse.isOK()) {
+                dispatchStatus = std::move(response.swResponse.getStatus());
+                break;
             }
 
             Strategy::CommandResult result;
-            result.target = host;
-            {
-                auto shardStatus = grid.shardRegistry()->getShard(txn, host.toString());
-                if (!shardStatus.isOK()) {
-                    return shardStatus.getStatus();
-                }
-                result.shardTargetId = shardStatus.getValue()->getId();
+
+            // If the response status was OK, the response must contain which host was targeted.
+            invariant(response.shardHostAndPort);
+            result.target = ConnectionString(std::move(*response.shardHostAndPort));
+
+            auto shardStatus = shardRegistry->getShard(txn, result.target.toString());
+            if (!shardStatus.isOK()) {
+                return shardStatus.getStatus();
             }
-            result.result = response.toBSON();
+            result.shardTargetId = shardStatus.getValue()->getId();
+
+            result.result = std::move(response.swResponse.getValue().data);
 
             results->push_back(result);
         }

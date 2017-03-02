@@ -49,6 +49,19 @@ class ServerSelectionMetadata;
 class ClusterExplain {
 public:
     /**
+     * Given the BSON specification for a command, 'cmdObj', wraps the object in order to produce
+     * the BSON for an explain of that command, at the given verbosity level 'verbosity.'
+     *
+     * Adds the result to the BSONObjBuidler 'out'.
+     *
+     * Unlike wrapAsExplain, does not downconvert the command to OP_QUERY. Should be used for paths
+     * that send the command over the NetworkInterfaceASIO rather than DBClient.
+     */
+    static void wrapAsExplainForOP_COMMAND(const BSONObj& cmdObj,
+                                           ExplainCommon::Verbosity verbosity,
+                                           BSONObjBuilder* explainBuilder);
+
+    /**
      * Given the BSON specification for a command, 'cmdObj', wraps the object in order to
      * produce the BSON for an explain of that command, at the given verbosity level
      * 'verbosity' and according to the metadata in 'serverSelectionMetadata'.

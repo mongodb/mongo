@@ -100,6 +100,19 @@ bool appendElementsIfRoom(BSONObjBuilder* bob, const BSONObj& toAppend) {
 }  // namespace
 
 // static
+void ClusterExplain::wrapAsExplainForOP_COMMAND(const BSONObj& cmdObj,
+                                                ExplainCommon::Verbosity verbosity,
+                                                BSONObjBuilder* explainBuilder) {
+    explainBuilder->append("explain", cmdObj);
+    explainBuilder->append("verbosity", ExplainCommon::verbosityString(verbosity));
+
+    // Propagate readConcern
+    if (auto readConcern = cmdObj["readConcern"]) {
+        explainBuilder->append(readConcern);
+    }
+}
+
+// static
 void ClusterExplain::wrapAsExplain(const BSONObj& cmdObj,
                                    ExplainCommon::Verbosity verbosity,
                                    const rpc::ServerSelectionMetadata& serverSelectionMetadata,
