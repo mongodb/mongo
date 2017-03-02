@@ -44,6 +44,7 @@ namespace repl {
 class OplogInterface;
 class ReplicationCoordinator;
 class RollbackSource;
+class StorageInterface;
 
 /**
  * Initiates the rollback process.
@@ -65,6 +66,7 @@ class RollbackSource;
  *            provides oplog; and
  *            supports fetching documents and copying collections.
  * @param replCoord Used to track the rollback ID and to change the follower state
+ * @param storageInterface Used to update minValid.
  *
  * If requiredRBID is supplied, we error if the upstream node has a different RBID (ie it rolled
  * back) after fetching any information from it.
@@ -77,7 +79,8 @@ Status syncRollback(OperationContext* opCtx,
                     const OplogInterface& localOplog,
                     const RollbackSource& rollbackSource,
                     boost::optional<int> requiredRBID,
-                    ReplicationCoordinator* replCoord);
+                    ReplicationCoordinator* replCoord,
+                    StorageInterface* storageInterface);
 
 /**
  * This namespace contains internal details of the rollback system. It is only exposed in a header

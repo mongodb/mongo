@@ -337,7 +337,8 @@ namespace {
  */
 void checkRbidAndUpdateMinValid(OperationContext* opCtx,
                                 const int rbid,
-                                const RollbackSource& rollbackSource) {
+                                const RollbackSource& rollbackSource,
+                                StorageInterface* storageInterface) {
     // It is important that the steps are performed in order to avoid racing with upstream rollbacks
     //
     // 1) Get the last doc in their oplog.
@@ -357,8 +358,8 @@ void checkRbidAndUpdateMinValid(OperationContext* opCtx,
     // online until we get to that point in freshness.
     OpTime minValid = fassertStatusOK(28774, OpTime::parseFromOplogEntry(newMinValidDoc));
     log() << "Setting minvalid to " << minValid;
-    StorageInterface::get(opCtx)->setAppliedThrough(opCtx, {});  // Use top of oplog.
-    StorageInterface::get(opCtx)->setMinValid(opCtx, minValid);
+    storageInterface->setAppliedThrough(opCtx, {});  // Use top of oplog.
+    storageInterface->setMinValid(opCtx, minValid);
 
     if (MONGO_FAIL_POINT(rollbackHangThenFailAfterWritingMinValid)) {
         // This log output is used in js tests so please leave it.
@@ -376,7 +377,8 @@ void checkRbidAndUpdateMinValid(OperationContext* opCtx,
 void syncFixUp(OperationContext* opCtx,
                const FixUpInfo& fixUpInfo,
                const RollbackSource& rollbackSource,
-               ReplicationCoordinator* replCoord) {
+               ReplicationCoordinator* replCoord,
+               StorageInterface* storageInterface) {
     // fetch all first so we needn't handle interruption in a fancy way
 
     unsigned long long totalSize = 0;
@@ -415,7 +417,7 @@ void syncFixUp(OperationContext* opCtx,
     }
 
     log() << "rollback 3.5";
-    checkRbidAndUpdateMinValid(opCtx, fixUpInfo.rbid, rollbackSource);
+    checkRbidAndUpdateMinValid(opCtx, fixUpInfo.rbid, rollbackSource, storageInterface);
 
     // update them
     log() << "rollback 4 n:" << goodVersions.size();
@@ -519,7 +521,7 @@ void syncFixUp(OperationContext* opCtx,
         // we did more reading from primary, so check it again for a rollback (which would mess
         // us up), and make minValid newer.
         log() << "rollback 4.2";
-        checkRbidAndUpdateMinValid(opCtx, fixUpInfo.rbid, rollbackSource);
+        checkRbidAndUpdateMinValid(opCtx, fixUpInfo.rbid, rollbackSource, storageInterface);
     }
 
     log() << "rollback 4.6";
@@ -788,7 +790,8 @@ Status _syncRollback(OperationContext* opCtx,
                      const OplogInterface& localOplog,
                      const RollbackSource& rollbackSource,
                      boost::optional<int> requiredRBID,
-                     ReplicationCoordinator* replCoord) {
+                     ReplicationCoordinator* replCoord,
+                     StorageInterface* storageInterface) {
     invariant(!opCtx->lockState()->isLocked());
 
     FixUpInfo how;
@@ -834,7 +837,7 @@ Status _syncRollback(OperationContext* opCtx,
     log() << "rollback 3 fixup";
     try {
         ON_BLOCK_EXIT([&] { replCoord->incrementRollbackID(); });
-        syncFixUp(opCtx, how, rollbackSource, replCoord);
+        syncFixUp(opCtx, how, rollbackSource, replCoord, storageInterface);
     } catch (const RSFatalException& e) {
         return Status(ErrorCodes::UnrecoverableRollbackError, e.what(), 18753);
     }
@@ -858,7 +861,8 @@ Status syncRollback(OperationContext* opCtx,
                     const OplogInterface& localOplog,
                     const RollbackSource& rollbackSource,
                     boost::optional<int> requiredRBID,
-                    ReplicationCoordinator* replCoord) {
+                    ReplicationCoordinator* replCoord,
+                    StorageInterface* storageInterface) {
     invariant(opCtx);
     invariant(replCoord);
 
@@ -866,7 +870,8 @@ Status syncRollback(OperationContext* opCtx,
 
     DisableDocumentValidation validationDisabler(opCtx);
     UnreplicatedWritesBlock replicationDisabler(opCtx);
-    Status status = _syncRollback(opCtx, localOplog, rollbackSource, requiredRBID, replCoord);
+    Status status =
+        _syncRollback(opCtx, localOplog, rollbackSource, requiredRBID, replCoord, storageInterface);
 
     log() << "rollback finished" << rsLog;
     return status;

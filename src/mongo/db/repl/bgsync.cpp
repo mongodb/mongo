@@ -266,12 +266,13 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
         }
     }
 
+    auto storageInterface = StorageInterface::get(opCtx);
     // find a target to sync from the last optime fetched
     OpTime lastOpTimeFetched;
     HostAndPort source;
     SyncSourceResolverResponse syncSourceResp;
     {
-        const OpTime minValidSaved = StorageInterface::get(opCtx)->getMinValid(opCtx);
+        const OpTime minValidSaved = storageInterface->getMinValid(opCtx);
 
         stdx::lock_guard<stdx::mutex> lock(_mutex);
         const auto requiredOpTime = (minValidSaved > _lastOpTimeFetched) ? minValidSaved : OpTime();
@@ -358,9 +359,8 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
     // Set the applied point if unset. This is most likely the first time we've established a sync
     // source since stepping down or otherwise clearing the applied point. We need to set this here,
     // before the OplogWriter gets a chance to append to the oplog.
-    if (StorageInterface::get(opCtx)->getAppliedThrough(opCtx).isNull()) {
-        StorageInterface::get(opCtx)->setAppliedThrough(opCtx,
-                                                        _replCoord->getMyLastAppliedOpTime());
+    if (storageInterface->getAppliedThrough(opCtx).isNull()) {
+        storageInterface->setAppliedThrough(opCtx, _replCoord->getMyLastAppliedOpTime());
     }
 
     // "lastFetched" not used. Already set in _enqueueDocuments.
@@ -473,7 +473,11 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
             }
         }
 
-        _rollback(opCtx, source, syncSourceResp.rbid, getConnection);
+        OplogInterfaceLocal localOplog(opCtx, rsOplogName);
+        RollbackSourceImpl rollbackSource(getConnection, source, rsOplogName);
+        _rollback(
+            opCtx, localOplog, rollbackSource, syncSourceResp.rbid, _replCoord, storageInterface);
+
         // Reset the producer to clear the sync source and the last optime fetched.
         stop(true);
         startProducerIfStopped();
@@ -611,9 +615,11 @@ void BackgroundSync::consume(OperationContext* opCtx) {
 }
 
 void BackgroundSync::_rollback(OperationContext* opCtx,
-                               const HostAndPort& source,
+                               const OplogInterface& localOplog,
+                               const RollbackSource& rollbackSource,
                                boost::optional<int> requiredRBID,
-                               stdx::function<DBClientBase*()> getConnection) {
+                               ReplicationCoordinator* replCoord,
+                               StorageInterface* storageInterface) {
     if (MONGO_FAIL_POINT(rollbackHangBeforeStart)) {
         // This log output is used in js tests so please leave it.
         log() << "rollback - rollbackHangBeforeStart fail point "
@@ -637,19 +643,16 @@ void BackgroundSync::_rollback(OperationContext* opCtx,
     {
         log() << "rollback 0";
         Lock::GlobalWrite globalWrite(opCtx->lockState());
-        if (!_replCoord->setFollowerMode(MemberState::RS_ROLLBACK)) {
-            log() << "Cannot transition from " << _replCoord->getMemberState().toString() << " to "
+        if (!replCoord->setFollowerMode(MemberState::RS_ROLLBACK)) {
+            log() << "Cannot transition from " << replCoord->getMemberState().toString() << " to "
                   << MemberState(MemberState::RS_ROLLBACK).toString();
             return;
         }
     }
 
     try {
-        auto status = syncRollback(opCtx,
-                                   OplogInterfaceLocal(opCtx, rsOplogName),
-                                   RollbackSourceImpl(getConnection, source, rsOplogName),
-                                   requiredRBID,
-                                   _replCoord);
+        auto status = syncRollback(
+            opCtx, localOplog, rollbackSource, requiredRBID, replCoord, storageInterface);
 
         // Abort only when syncRollback detects we are in a unrecoverable state.
         // WARNING: these statuses sometimes have location codes which are lost with uassertStatusOK
@@ -668,8 +671,8 @@ void BackgroundSync::_rollback(OperationContext* opCtx,
         invariant(ex.getCode() != ErrorCodes::UnrecoverableRollbackError);
 
         warning() << "rollback cannot complete at this time (retrying later): " << redact(ex)
-                  << " appliedThrough=" << _replCoord->getMyLastAppliedOpTime()
-                  << " minvalid=" << StorageInterface::get(opCtx)->getMinValid(opCtx);
+                  << " appliedThrough=" << replCoord->getMyLastAppliedOpTime()
+                  << " minvalid=" << storageInterface->getMinValid(opCtx);
 
         // Sleep a bit to allow upstream node to coalesce, if that was the cause of the failure. If
         // we failed in a way that will keep failing, but wasn't flagged as a fatal failure, this
@@ -697,10 +700,10 @@ void BackgroundSync::_rollback(OperationContext* opCtx,
         fassertFailedNoTrace(40276);
     }
 
-    if (!_replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
+    if (!replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
         severe() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING)
                  << "; expected to be in state " << MemberState(MemberState::RS_ROLLBACK)
-                 << " but found self in " << _replCoord->getMemberState();
+                 << " but found self in " << replCoord->getMemberState();
         fassertFailedNoTrace(40364);
     }
 }
