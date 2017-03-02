@@ -138,8 +138,7 @@ public:
             // the simple fsync command case
             if (sync) {
                 // can this be GlobalRead? and if it can, it should be nongreedy.
-                ScopedTransaction transaction(opCtx, MODE_X);
-                Lock::GlobalWrite w(opCtx->lockState());
+                Lock::GlobalWrite w(opCtx);
                 // TODO SERVER-26822: Replace MMAPv1 specific calls with ones that are storage
                 // engine agnostic.
                 getDur().commitNow(opCtx);
@@ -148,7 +147,7 @@ public:
             }
 
             // Take a global IS lock to ensure the storage engine is not shutdown
-            Lock::GlobalLock global(opCtx->lockState(), MODE_IS, UINT_MAX);
+            Lock::GlobalLock global(opCtx, MODE_IS, UINT_MAX);
             StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
             result.append("numFiles", storageEngine->flushAllFiles(opCtx, sync));
             return true;
@@ -345,8 +344,7 @@ void FSyncLockThread::run() {
     try {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        ScopedTransaction transaction(&opCtx, MODE_X);
-        Lock::GlobalWrite global(opCtx.lockState());  // No WriteUnitOfWork needed
+        Lock::GlobalWrite global(&opCtx);  // No WriteUnitOfWork needed
 
         try {
             // TODO SERVER-26822: Replace MMAPv1 specific calls with ones that are storage engine

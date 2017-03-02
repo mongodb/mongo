@@ -438,8 +438,7 @@ void syncFixUp(OperationContext* opCtx,
 
 
             {
-                ScopedTransaction transaction(opCtx, MODE_IX);
-                Lock::DBLock dbLock(opCtx->lockState(), nss.db(), MODE_X);
+                Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
                 Database* db = dbHolder().openDb(opCtx, nss.db().toString());
                 invariant(db);
                 WriteUnitOfWork wunit(opCtx);
@@ -454,8 +453,7 @@ void syncFixUp(OperationContext* opCtx,
             log() << "rollback 4.1.2 coll metadata resync " << ns;
 
             const NamespaceString nss(ns);
-            ScopedTransaction transaction(opCtx, MODE_IX);
-            Lock::DBLock dbLock(opCtx->lockState(), nss.db(), MODE_X);
+            Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
             auto db = dbHolder().openDb(opCtx, nss.db().toString());
             invariant(db);
             auto collection = db->getCollection(ns);
@@ -534,9 +532,8 @@ void syncFixUp(OperationContext* opCtx,
 
         invariant(!fixUpInfo.indexesToDrop.count(*it));
 
-        ScopedTransaction transaction(opCtx, MODE_IX);
         const NamespaceString nss(*it);
-        Lock::DBLock dbLock(opCtx->lockState(), nss.db(), MODE_X);
+        Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
         Database* db = dbHolder().get(opCtx, nsToDatabaseSubstring(*it));
         if (db) {
             Helpers::RemoveSaver removeSaver("rollback", "", *it);
@@ -580,8 +577,7 @@ void syncFixUp(OperationContext* opCtx,
         const string& indexName = it->second;
         log() << "rollback drop index: collection: " << nss.toString() << ". index: " << indexName;
 
-        ScopedTransaction transaction(opCtx, MODE_IX);
-        Lock::DBLock dbLock(opCtx->lockState(), nss.db(), MODE_X);
+        Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
         auto db = dbHolder().get(opCtx, nss.db());
         if (!db) {
             continue;
@@ -641,8 +637,7 @@ void syncFixUp(OperationContext* opCtx,
 
                 // TODO: Lots of overhead in context. This can be faster.
                 const NamespaceString docNss(doc.ns);
-                ScopedTransaction transaction(opCtx, MODE_IX);
-                Lock::DBLock docDbLock(opCtx->lockState(), docNss.db(), MODE_X);
+                Lock::DBLock docDbLock(opCtx, docNss.db(), MODE_X);
                 OldClientContext ctx(opCtx, doc.ns);
 
                 Collection* collection = ctx.db()->getCollection(doc.ns);
@@ -761,8 +756,7 @@ void syncFixUp(OperationContext* opCtx,
     LOG(2) << "rollback truncate oplog after " << fixUpInfo.commonPoint.toString();
     {
         const NamespaceString oplogNss(rsOplogName);
-        ScopedTransaction transaction(opCtx, MODE_IX);
-        Lock::DBLock oplogDbLock(opCtx->lockState(), oplogNss.db(), MODE_IX);
+        Lock::DBLock oplogDbLock(opCtx, oplogNss.db(), MODE_IX);
         Lock::CollectionLock oplogCollectionLoc(opCtx->lockState(), oplogNss.ns(), MODE_X);
         OldClientContext ctx(opCtx, rsOplogName);
         Collection* oplogCollection = ctx.db()->getCollection(rsOplogName);
@@ -895,7 +889,7 @@ void rollback(OperationContext* opCtx,
     // then.
     {
         log() << "rollback 0";
-        Lock::GlobalWrite globalWrite(opCtx->lockState());
+        Lock::GlobalWrite globalWrite(opCtx);
         if (!replCoord->setFollowerMode(MemberState::RS_ROLLBACK)) {
             log() << "Cannot transition from " << replCoord->getMemberState().toString() << " to "
                   << MemberState(MemberState::RS_ROLLBACK).toString();

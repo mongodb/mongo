@@ -40,6 +40,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/background.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/dbwebserver.h"
@@ -306,7 +307,7 @@ public:
 
     virtual void run(OperationContext* opCtx, stringstream& ss) {
         Timer t;
-        Lock::GlobalLock globalSLock(opCtx->lockState(), MODE_S, 300);
+        Lock::GlobalLock globalSLock(opCtx, MODE_S, 300);
         if (globalSLock.isLocked()) {
             _gotLock(t.millis(), ss);
         } else {

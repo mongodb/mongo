@@ -211,7 +211,6 @@ void FeatureCompatibilityVersion::set(OperationContext* opCtx, StringData versio
         std::vector<BSONObj> indexSpecs{k32IncompatibleIndexSpec};
 
         {
-            ScopedTransaction transaction(opCtx, MODE_IX);
             AutoGetOrCreateDb autoDB(opCtx, nss.db(), MODE_X);
 
             uassert(ErrorCodes::NotMaster,
@@ -303,7 +302,6 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
         std::vector<BSONObj> indexSpecs{k32IncompatibleIndexSpec};
 
         {
-            ScopedTransaction transaction(opCtx, MODE_IX);
             AutoGetOrCreateDb autoDB(opCtx, nss.db(), MODE_X);
 
             IndexBuilder builder(k32IncompatibleIndexSpec, false);

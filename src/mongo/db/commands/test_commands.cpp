@@ -85,8 +85,7 @@ public:
         log() << "test only command godinsert invoked coll:" << nss.coll();
         BSONObj obj = cmdObj["obj"].embeddedObjectUserCheck();
 
-        ScopedTransaction transaction(opCtx, MODE_IX);
-        Lock::DBLock lk(opCtx->lockState(), dbname, MODE_X);
+        Lock::DBLock lk(opCtx, dbname, MODE_X);
         OldClientContext ctx(opCtx, nss.ns());
         Database* db = ctx.db();
 
@@ -141,14 +140,12 @@ public:
                                        std::vector<Privilege>* out) {}
 
     void _sleepInReadLock(mongo::OperationContext* opCtx, long long millis) {
-        ScopedTransaction transaction(opCtx, MODE_S);
-        Lock::GlobalRead lk(opCtx->lockState());
+        Lock::GlobalRead lk(opCtx);
         sleepmillis(millis);
     }
 
     void _sleepInWriteLock(mongo::OperationContext* opCtx, long long millis) {
-        ScopedTransaction transaction(opCtx, MODE_X);
-        Lock::GlobalWrite lk(opCtx->lockState());
+        Lock::GlobalWrite lk(opCtx);
         sleepmillis(millis);
     }
 

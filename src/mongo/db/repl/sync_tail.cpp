@@ -312,7 +312,7 @@ Status SyncTail::syncApply(OperationContext* opCtx,
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             // a command may need a global write lock. so we will conservatively go
             // ahead and grab one here. suboptimal. :-(
-            Lock::GlobalWrite globalWriteLock(opCtx->lockState());
+            Lock::GlobalWrite globalWriteLock(opCtx);
 
             // special case apply for commands to avoid implicit database creation
             Status status = applyCommandInLock(opCtx, op, inSteadyStateReplication);
@@ -339,7 +339,7 @@ Status SyncTail::syncApply(OperationContext* opCtx,
     if (isNoOp || (opType[0] == 'i' && nsToCollectionSubstring(ns) == "system.indexes")) {
         auto opStr = isNoOp ? "syncApply_noop" : "syncApply_indexBuild";
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            Lock::DBLock dbLock(opCtx->lockState(), nsToDatabaseSubstring(ns), MODE_X);
+            Lock::DBLock dbLock(opCtx, nsToDatabaseSubstring(ns), MODE_X);
             OldClientContext ctx(opCtx, ns);
             return applyOp(ctx.db());
         }
@@ -361,7 +361,7 @@ Status SyncTail::syncApply(OperationContext* opCtx,
                 // drop the DB lock before acquiring
                 // the upgraded one.
                 dbLock.reset();
-                dbLock.reset(new Lock::DBLock(opCtx->lockState(), dbName, mode));
+                dbLock.reset(new Lock::DBLock(opCtx, dbName, mode));
                 collectionLock.reset(new Lock::CollectionLock(opCtx->lockState(), ns, mode));
             };
 
@@ -418,7 +418,7 @@ void prefetchOp(const BSONObj& op) {
             // for multiple prefetches if they are for the same database.
             const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
             OperationContext& opCtx = *opCtxPtr;
-            AutoGetCollectionForRead ctx(&opCtx, NamespaceString(ns));
+            AutoGetCollectionForReadCommand ctx(&opCtx, NamespaceString(ns));
             Database* db = ctx.getDb();
             if (db) {
                 prefetchPagesForReplicatedOp(&opCtx, db, op);
@@ -478,8 +478,8 @@ void scheduleWritesToOplog(OperationContext* opCtx,
         // guarantees that 'ops' will stay in scope until the spawned threads complete.
         return [&ops, begin, end] {
             initializeWriterThread();
-            const auto txnHolder = cc().makeOperationContext();
-            const auto opCtx = txnHolder.get();
+            const auto opCtxHolder = cc().makeOperationContext();
+            const auto opCtx = opCtxHolder.get();
             opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
             UnreplicatedWritesBlock uwb(opCtx);
 
@@ -552,7 +552,7 @@ private:
     CollectionProperties getCollectionPropertiesImpl(OperationContext* opCtx, StringData ns) {
         CollectionProperties collProperties;
 
-        Lock::DBLock dbLock(opCtx->lockState(), nsToDatabaseSubstring(ns), MODE_IS);
+        Lock::DBLock dbLock(opCtx, nsToDatabaseSubstring(ns), MODE_IS);
         auto db = dbHolder().get(opCtx, ns);
         if (!db) {
             return collProperties;
@@ -640,8 +640,7 @@ void tryToGoLiveAsASecondary(OperationContext* opCtx, ReplicationCoordinator* re
     // This needs to happen after the attempt so readers can be sure we've already tried.
     ON_BLOCK_EXIT([] { attemptsToBecomeSecondary.increment(); });
 
-    ScopedTransaction transaction(opCtx, MODE_S);
-    Lock::GlobalRead readLock(opCtx->lockState());
+    Lock::GlobalRead readLock(opCtx);
 
     if (replCoord->getMaintenanceMode()) {
         LOG(1) << "Can't go live (tryToGoLiveAsASecondary) as maintenance mode is active.";

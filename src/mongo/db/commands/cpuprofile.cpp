@@ -140,8 +140,7 @@ bool CpuProfilerStartCommand::run(OperationContext* opCtx,
                                   std::string& errmsg,
                                   BSONObjBuilder& result) {
     // The DB lock here is just so we have IX on the global lock in order to prevent shutdown
-    ScopedTransaction transaction(opCtx, MODE_IX);
-    Lock::DBLock dbXLock(opCtx->lockState(), db, MODE_X);
+    Lock::DBLock dbXLock(opCtx, db, MODE_X);
     OldClientContext ctx(opCtx, db, false /* no shard version checking */);
 
     std::string profileFilename = cmdObj[commandName]["profileFilename"].String();
@@ -159,8 +158,7 @@ bool CpuProfilerStopCommand::run(OperationContext* opCtx,
                                  std::string& errmsg,
                                  BSONObjBuilder& result) {
     // The DB lock here is just so we have IX on the global lock in order to prevent shutdown
-    ScopedTransaction transaction(opCtx, MODE_IX);
-    Lock::DBLock dbXLock(opCtx->lockState(), db, MODE_X);
+    Lock::DBLock dbXLock(opCtx, db, MODE_X);
     OldClientContext ctx(opCtx, db, false /* no shard version checking */);
 
     ::ProfilerStop();

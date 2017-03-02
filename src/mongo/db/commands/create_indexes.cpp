@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -247,8 +248,7 @@ public:
 
         // now we know we have to create index(es)
         // Note: createIndexes command does not currently respect shard versioning.
-        ScopedTransaction transaction(opCtx, MODE_IX);
-        Lock::DBLock dbLock(opCtx->lockState(), ns.db(), MODE_X);
+        Lock::DBLock dbLock(opCtx, ns.db(), MODE_X);
         if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, ns)) {
             return appendCommandStatus(
                 result,

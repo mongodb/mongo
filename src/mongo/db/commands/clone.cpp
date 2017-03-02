@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/grid.h"
 
@@ -119,8 +120,7 @@ public:
 
         set<string> clonedColls;
 
-        ScopedTransaction transaction(opCtx, MODE_IX);
-        Lock::DBLock dbXLock(opCtx->lockState(), dbname, MODE_X);
+        Lock::DBLock dbXLock(opCtx, dbname, MODE_X);
 
         Cloner cloner;
         Status status = cloner.copyDb(opCtx, dbname, from, opts, &clonedColls);

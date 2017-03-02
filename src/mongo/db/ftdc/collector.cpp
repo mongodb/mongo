@@ -83,10 +83,7 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
 
         subObjBuilder.appendDate(kFTDCCollectStartField, now);
 
-        {
-            ScopedTransaction st(opCtx.get(), MODE_IS);
-            collector->collect(opCtx.get(), subObjBuilder);
-        }
+        collector->collect(opCtx.get(), subObjBuilder);
 
         end = client->getServiceContext()->getPreciseClockSource()->now();
         subObjBuilder.appendDate(kFTDCCollectEndField, end);

@@ -1605,7 +1605,7 @@ TEST_F(StepDownTest,
     const auto opCtx = makeOperationContext();
 
     // Make sure stepDown cannot grab the global shared lock
-    Lock::GlobalWrite lk(opCtx->lockState());
+    Lock::GlobalWrite lk(opCtx.get());
 
     Status status =
         getReplCoord()->stepDown(opCtx.get(), false, Milliseconds(0), Milliseconds(1000));

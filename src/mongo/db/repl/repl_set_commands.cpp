@@ -429,8 +429,7 @@ public:
         status =
             getGlobalReplicationCoordinator()->processReplSetReconfig(opCtx, parsedArgs, &result);
 
-        ScopedTransaction scopedXact(opCtx, MODE_X);
-        Lock::GlobalWrite globalWrite(opCtx->lockState());
+        Lock::GlobalWrite globalWrite(opCtx);
 
         WriteUnitOfWork wuow(opCtx);
         if (status.isOK() && !parsedArgs.force) {

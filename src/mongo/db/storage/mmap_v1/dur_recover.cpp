@@ -41,6 +41,7 @@
 #include <sys/stat.h>
 
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/compress.h"
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
@@ -647,8 +648,7 @@ void replayJournalFilesAtStartup() {
     // we use a lock so that exitCleanly will wait for us
     // to finish (or at least to notice what is up and stop)
     auto opCtx = cc().makeOperationContext();
-    ScopedTransaction transaction(opCtx.get(), MODE_X);
-    Lock::GlobalWrite lk(opCtx->lockState());
+    Lock::GlobalWrite lk(opCtx.get());
 
     _recover(opCtx.get());  // throws on interruption
 }

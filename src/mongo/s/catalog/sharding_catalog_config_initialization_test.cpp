@@ -221,7 +221,6 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
         repl::UnreplicatedWritesBlock uwb(opCtx);
         auto nss = NamespaceString(VersionType::ConfigNS);
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            ScopedTransaction transaction(opCtx, MODE_IX);
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
             auto coll = autoColl.getCollection();
             ASSERT_TRUE(coll);

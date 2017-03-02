@@ -32,6 +32,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
@@ -75,8 +76,7 @@ public:
             return appendCommandStatus(result, {ErrorCodes::CommandNotSupported, ""});
         }
 
-        ScopedTransaction st(opCtx, MODE_IX);
-        Lock::GlobalLock lk(opCtx->lockState(), MODE_IX, UINT_MAX);
+        Lock::GlobalLock lk(opCtx, MODE_IX, UINT_MAX);
 
         auto status = snapshotManager->prepareForCreateSnapshot(opCtx);
         if (status.isOK()) {
@@ -126,8 +126,7 @@ public:
             return appendCommandStatus(result, {ErrorCodes::CommandNotSupported, ""});
         }
 
-        ScopedTransaction st(opCtx, MODE_IX);
-        Lock::GlobalLock lk(opCtx->lockState(), MODE_IX, UINT_MAX);
+        Lock::GlobalLock lk(opCtx, MODE_IX, UINT_MAX);
         auto name = SnapshotName(cmdObj.firstElement().Long());
         snapshotManager->setCommittedSnapshot(name);
         return true;

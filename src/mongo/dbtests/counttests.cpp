@@ -51,8 +51,7 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 class Base {
 public:
     Base()
-        : _scopedXact(&_opCtx, MODE_IX),
-          _lk(_opCtx.lockState(), nsToDatabaseSubstring(ns()), MODE_X),
+        : _lk(&_opCtx, nsToDatabaseSubstring(ns()), MODE_X),
           _context(&_opCtx, ns()),
           _client(&_opCtx) {
         _database = _context.db();
@@ -112,9 +111,8 @@ protected:
     }
 
 
-    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _opCtx = *_txnPtr;
-    ScopedTransaction _scopedXact;
+    const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
+    OperationContext& _opCtx = *_opCtxPtr;
     Lock::DBLock _lk;
 
     OldClientContext _context;

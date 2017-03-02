@@ -175,7 +175,7 @@ public:
     }
 
     size_t numCursors() {
-        AutoGetCollectionForRead ctx(&_opCtx, nss);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         Collection* collection = ctx.getCollection();
         if (!collection)
             return 0;
@@ -184,7 +184,7 @@ public:
 
     void registerExec(PlanExecutor* exec) {
         // TODO: This is not correct (create collection under S-lock)
-        AutoGetCollectionForRead ctx(&_opCtx, nss);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         WriteUnitOfWork wunit(&_opCtx);
         Collection* collection = ctx.getDb()->getOrCreateCollection(&_opCtx, nss.ns());
         collection->getCursorManager()->registerExecutor(exec);
@@ -193,7 +193,7 @@ public:
 
     void deregisterExec(PlanExecutor* exec) {
         // TODO: This is not correct (create collection under S-lock)
-        AutoGetCollectionForRead ctx(&_opCtx, nss);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         WriteUnitOfWork wunit(&_opCtx);
         Collection* collection = ctx.getDb()->getOrCreateCollection(&_opCtx, nss.ns());
         collection->getCursorManager()->deregisterExecutor(exec);
@@ -201,8 +201,8 @@ public:
     }
 
 protected:
-    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _opCtx = *_txnPtr;
+    const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
+    OperationContext& _opCtx = *_opCtxPtr;
 
 private:
     IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
@@ -515,7 +515,7 @@ public:
         }
 
         {
-            AutoGetCollectionForRead ctx(&_opCtx, nss);
+            AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
             Collection* collection = ctx.getCollection();
 
             BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");

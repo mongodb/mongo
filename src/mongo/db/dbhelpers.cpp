@@ -209,7 +209,7 @@ RecordId Helpers::findById(OperationContext* opCtx,
 }
 
 bool Helpers::getSingleton(OperationContext* opCtx, const char* ns, BSONObj& result) {
-    AutoGetCollectionForRead ctx(opCtx, NamespaceString(ns));
+    AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString(ns));
     unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
         opCtx, ns, ctx.getCollection(), PlanExecutor::YIELD_MANUAL));
     PlanExecutor::ExecState state = exec->getNext(&result, NULL);
@@ -228,7 +228,7 @@ bool Helpers::getSingleton(OperationContext* opCtx, const char* ns, BSONObj& res
 }
 
 bool Helpers::getLast(OperationContext* opCtx, const char* ns, BSONObj& result) {
-    AutoGetCollectionForRead autoColl(opCtx, NamespaceString(ns));
+    AutoGetCollectionForReadCommand autoColl(opCtx, NamespaceString(ns));
     unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(opCtx,
                                                                   ns,
                                                                   autoColl.getCollection(),
@@ -319,7 +319,7 @@ long long Helpers::removeRange(OperationContext* opCtx,
     BSONObj max;
 
     {
-        AutoGetCollectionForRead ctx(opCtx, nss);
+        AutoGetCollectionForReadCommand ctx(opCtx, nss);
         Collection* collection = ctx.getCollection();
         if (!collection) {
             warning(LogComponent::kSharding)

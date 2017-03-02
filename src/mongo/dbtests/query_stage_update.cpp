@@ -227,7 +227,7 @@ public:
 
         // Verify the contents of the resulting collection.
         {
-            AutoGetCollectionForRead ctx(&_opCtx, nss);
+            AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
             Collection* collection = ctx.getCollection();
 
             vector<BSONObj> objs;
@@ -336,7 +336,7 @@ public:
 
         // Check the contents of the collection.
         {
-            AutoGetCollectionForRead ctx(&_opCtx, nss);
+            AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
             Collection* collection = ctx.getCollection();
 
             vector<BSONObj> objs;

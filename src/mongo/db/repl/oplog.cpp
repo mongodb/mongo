@@ -298,7 +298,6 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
 // Truncates the oplog after and including the "truncateTimestamp" entry.
 void truncateOplogTo(OperationContext* opCtx, Timestamp truncateTimestamp) {
     const NamespaceString oplogNss(rsOplogName);
-    ScopedTransaction transaction(opCtx, MODE_IX);
     AutoGetDb autoDb(opCtx, oplogNss.db(), MODE_IX);
     Lock::CollectionLock oplogCollectionLoc(opCtx->lockState(), oplogNss.ns(), MODE_X);
     Collection* oplogCollection = autoDb.getDb()->getCollection(oplogNss);
@@ -402,7 +401,7 @@ void logOp(OperationContext* opCtx,
 
     ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
     Collection* oplog = getLocalOplogCollection(opCtx, _oplogCollectionName);
-    Lock::DBLock lk(opCtx->lockState(), "local", MODE_IX);
+    Lock::DBLock lk(opCtx, "local", MODE_IX);
     Lock::CollectionLock lock(opCtx->lockState(), _oplogCollectionName, MODE_IX);
     OplogSlot slot;
     getNextOpTime(opCtx, oplog, replCoord, replMode, 1, &slot);
@@ -428,7 +427,7 @@ void logOps(OperationContext* opCtx,
     std::vector<OplogDocWriter> writers;
     writers.reserve(count);
     Collection* oplog = getLocalOplogCollection(opCtx, _oplogCollectionName);
-    Lock::DBLock lk(opCtx->lockState(), "local", MODE_IX);
+    Lock::DBLock lk(opCtx, "local", MODE_IX);
     Lock::CollectionLock lock(opCtx->lockState(), _oplogCollectionName, MODE_IX);
     std::unique_ptr<OplogSlot[]> slots(new OplogSlot[count]);
     getNextOpTime(opCtx, oplog, replCoord, replMode, count, slots.get());
@@ -490,8 +489,7 @@ long long getNewOplogSizeBytes(OperationContext* opCtx, const ReplSettings& repl
 }  // namespace
 
 void createOplog(OperationContext* opCtx, const std::string& oplogCollectionName, bool isReplSet) {
-    ScopedTransaction transaction(opCtx, MODE_X);
-    Lock::GlobalWrite lk(opCtx->lockState());
+    Lock::GlobalWrite lk(opCtx);
 
     const ReplSettings& replSettings = ReplicationCoordinator::get(opCtx)->getSettings();
 
@@ -1221,7 +1219,7 @@ void SnapshotThread::run() {
 
         try {
             auto opCtx = client.makeOperationContext();
-            Lock::GlobalLock globalLock(opCtx->lockState(), MODE_IS, UINT_MAX);
+            Lock::GlobalLock globalLock(opCtx.get(), MODE_IS, UINT_MAX);
 
             if (!replCoord->getMemberState().readable()) {
                 // If our MemberState isn't readable, we may not be in a consistent state so don't
@@ -1253,7 +1251,7 @@ void SnapshotThread::run() {
 
             auto opTimeOfSnapshot = OpTime();
             {
-                AutoGetCollectionForRead oplog(opCtx.get(), NamespaceString(rsOplogName));
+                AutoGetCollectionForReadCommand oplog(opCtx.get(), NamespaceString(rsOplogName));
                 invariant(oplog.getCollection());
                 // Read the latest op from the oplog.
                 auto cursor = oplog.getCollection()->getCursor(opCtx.get(), /*forward*/ false);

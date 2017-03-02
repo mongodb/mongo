@@ -292,7 +292,7 @@ TEST_F(RSRollbackTest, BothOplogsAtCommonPoint) {
 Collection* _createCollection(OperationContext* opCtx,
                               const NamespaceString& nss,
                               const CollectionOptions& options) {
-    Lock::DBLock dbLock(opCtx->lockState(), nss.db(), MODE_X);
+    Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
     mongo::WriteUnitOfWork wuow(opCtx);
     auto db = dbHolder().openDb(opCtx, nss.db());
     ASSERT_TRUE(db);
@@ -355,7 +355,7 @@ int _testRollbackDelete(OperationContext* opCtx,
                            storageInterface));
     ASSERT_TRUE(rollbackSource.called);
 
-    Lock::DBLock dbLock(opCtx->lockState(), "test", MODE_S);
+    Lock::DBLock dbLock(opCtx, "test", MODE_S);
     Lock::CollectionLock collLock(opCtx->lockState(), "test.t", MODE_S);
     auto db = dbHolder().get(opCtx, "test");
     ASSERT_TRUE(db);
@@ -451,7 +451,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
                           << "v"
                           << static_cast<int>(kIndexVersion));
     {
-        Lock::DBLock dbLock(_opCtx->lockState(), "test", MODE_X);
+        Lock::DBLock dbLock(_opCtx.get(), "test", MODE_X);
         MultiIndexBlock indexer(_opCtx.get(), collection);
         ASSERT_OK(indexer.init(indexSpec).getStatus());
         WriteUnitOfWork wunit(_opCtx.get());
@@ -502,7 +502,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
                   countLogLinesContaining("rollback drop index: collection: test.t. index: a_1"));
     ASSERT_FALSE(rollbackSource.called);
     {
-        Lock::DBLock dbLock(_opCtx->lockState(), "test", MODE_S);
+        Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
         auto indexCatalog = collection->getIndexCatalog();
         ASSERT(indexCatalog);
         ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
@@ -520,7 +520,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandIndexNotInCatalog) {
                           << "a_1");
     // Skip index creation to trigger warning during rollback.
     {
-        Lock::DBLock dbLock(_opCtx->lockState(), "test", MODE_S);
+        Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
         auto indexCatalog = collection->getIndexCatalog();
         ASSERT(indexCatalog);
         ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
@@ -564,7 +564,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandIndexNotInCatalog) {
     ASSERT_EQUALS(1, countLogLinesContaining("rollback failed to drop index a_1 in test.t"));
     ASSERT_FALSE(rollbackSource.called);
     {
-        Lock::DBLock dbLock(_opCtx->lockState(), "test", MODE_S);
+        Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
         auto indexCatalog = collection->getIndexCatalog();
         ASSERT(indexCatalog);
         ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
@@ -619,7 +619,7 @@ TEST_F(RSRollbackTest, RollbackDropIndexCommandWithOneIndex) {
     createOplog(_opCtx.get());
     auto collection = _createCollection(_opCtx.get(), "test.t", CollectionOptions());
     {
-        Lock::DBLock dbLock(_opCtx->lockState(), "test", MODE_S);
+        Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
         auto indexCatalog = collection->getIndexCatalog();
         ASSERT(indexCatalog);
         ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
@@ -677,7 +677,7 @@ TEST_F(RSRollbackTest, RollbackDropIndexCommandWithMultipleIndexes) {
     createOplog(_opCtx.get());
     auto collection = _createCollection(_opCtx.get(), "test.t", CollectionOptions());
     {
-        Lock::DBLock dbLock(_opCtx->lockState(), "test", MODE_S);
+        Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
         auto indexCatalog = collection->getIndexCatalog();
         ASSERT(indexCatalog);
         ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
@@ -860,7 +860,7 @@ TEST_F(RSRollbackTest, RollbackUnknownCommand) {
                                          << "t")),
                        RecordId(2));
     {
-        Lock::DBLock dbLock(_opCtx->lockState(), "test", MODE_X);
+        Lock::DBLock dbLock(_opCtx.get(), "test", MODE_X);
         mongo::WriteUnitOfWork wuow(_opCtx.get());
         auto db = dbHolder().openDb(_opCtx.get(), "test");
         ASSERT_TRUE(db);
@@ -1083,7 +1083,7 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
     ASSERT_EQUALS(1U, rollbackSource.searchedIds.count(3));
     ASSERT_EQUALS(1U, rollbackSource.searchedIds.count(4));
 
-    AutoGetCollectionForRead acr(_opCtx.get(), NamespaceString("test.t"));
+    AutoGetCollectionForReadCommand acr(_opCtx.get(), NamespaceString("test.t"));
     BSONObj result;
     ASSERT(Helpers::findOne(_opCtx.get(), acr.getCollection(), BSON("_id" << 1), result));
     ASSERT_EQUALS(1, result["v"].numberInt()) << result;
@@ -1119,7 +1119,7 @@ TEST_F(RSRollbackTest, RollbackCreateCollectionCommand) {
                            _coordinator,
                            &_storageInterface));
     {
-        Lock::DBLock dbLock(_opCtx->lockState(), "test", MODE_S);
+        Lock::DBLock dbLock(_opCtx.get(), "test", MODE_S);
         auto db = dbHolder().get(_opCtx.get(), "test");
         ASSERT_TRUE(db);
         ASSERT_FALSE(db->getCollection("test.t"));

@@ -220,7 +220,6 @@ Status collMod(OperationContext* opCtx,
                const BSONObj& cmdObj,
                BSONObjBuilder* result) {
     StringData dbName = nss.db();
-    ScopedTransaction transaction(opCtx, MODE_IX);
     AutoGetDb autoDb(opCtx, dbName, MODE_X);
     Database* const db = autoDb.getDb();
     Collection* coll = db ? db->getCollection(nss) : nullptr;

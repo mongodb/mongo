@@ -144,8 +144,7 @@ struct Cloner::Fun {
         invariant(from_collection.coll() != "system.indexes");
 
         // XXX: can probably take dblock instead
-        unique_ptr<ScopedTransaction> scopedXact(new ScopedTransaction(opCtx, MODE_X));
-        unique_ptr<Lock::GlobalWrite> globalWriteLock(new Lock::GlobalWrite(opCtx->lockState()));
+        unique_ptr<Lock::GlobalWrite> globalWriteLock(new Lock::GlobalWrite(opCtx));
         uassert(
             ErrorCodes::NotMaster,
             str::stream() << "Not primary while cloning collection " << from_collection.ns()
@@ -198,13 +197,11 @@ struct Cloner::Fun {
                 }
                 opCtx->checkForInterrupt();
 
-                scopedXact.reset();
                 globalWriteLock.reset();
 
                 CurOp::get(opCtx)->yielded();
 
-                scopedXact.reset(new ScopedTransaction(opCtx, MODE_X));
-                globalWriteLock.reset(new Lock::GlobalWrite(opCtx->lockState()));
+                globalWriteLock.reset(new Lock::GlobalWrite(opCtx));
 
                 // Check if everything is still all right.
                 if (opCtx->writesAreReplicated()) {
@@ -479,8 +476,7 @@ bool Cloner::copyCollection(OperationContext* opCtx,
     auto sourceIndexes = _conn->getIndexSpecs(nss.ns(), QueryOption_SlaveOk);
     auto idIndexSpec = getIdIndexSpec(sourceIndexes);
 
-    ScopedTransaction transaction(opCtx, MODE_IX);
-    Lock::DBLock dbWrite(opCtx->lockState(), dbname, MODE_X);
+    Lock::DBLock dbWrite(opCtx, dbname, MODE_X);
 
     uassert(ErrorCodes::PrimarySteppedDown,
             str::stream() << "Not primary while copying collection " << ns << " (Cloner)",

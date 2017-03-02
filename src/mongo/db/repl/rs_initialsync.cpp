@@ -144,8 +144,7 @@ bool _initialSyncClone(OperationContext* opCtx,
     options.createCollections = false;
 
     // Make database stable
-    ScopedTransaction transaction(opCtx, MODE_IX);
-    Lock::DBLock dbWrite(opCtx->lockState(), db, MODE_X);
+    Lock::DBLock dbWrite(opCtx, db, MODE_X);
 
     Status status = cloner.copyDb(opCtx, db, host, options, nullptr, collections);
     if (!status.isOK()) {
@@ -360,8 +359,7 @@ Status _initialSync(OperationContext* opCtx, BackgroundSync* bgsync) {
             createCollectionParams.push_back(params);
         }
 
-        ScopedTransaction transaction(opCtx, MODE_IX);
-        Lock::DBLock dbWrite(opCtx->lockState(), db, MODE_X);
+        Lock::DBLock dbWrite(opCtx, db, MODE_X);
 
         auto createStatus = cloner.createCollectionsForDb(opCtx, createCollectionParams, db);
         if (!createStatus.isOK()) {

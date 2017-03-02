@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/op_observer.h"
@@ -136,8 +137,7 @@ Status waitForLinearizableReadConcern(OperationContext* opCtx) {
         repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
 
     {
-        ScopedTransaction transaction(opCtx, MODE_IX);
-        Lock::DBLock lk(opCtx->lockState(), "local", MODE_IX);
+        Lock::DBLock lk(opCtx, "local", MODE_IX);
         Lock::CollectionLock lock(opCtx->lockState(), "local.oplog.rs", MODE_IX);
 
         if (!replCoord->canAcceptWritesForDatabase(opCtx, "admin")) {

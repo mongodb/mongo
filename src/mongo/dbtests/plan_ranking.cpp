@@ -107,7 +107,7 @@ public:
      * Does NOT take ownership of 'cq'.  Caller DOES NOT own the returned QuerySolution*.
      */
     QuerySolution* pickBestPlan(CanonicalQuery* cq) {
-        AutoGetCollectionForRead ctx(&_opCtx, nss);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         Collection* collection = ctx.getCollection();
 
         QueryPlannerParams plannerParams;

@@ -527,8 +527,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
     {
         // 1. copy indexes
 
-        ScopedTransaction scopedXact(opCtx, MODE_IX);
-        Lock::DBLock lk(opCtx->lockState(), _nss.db(), MODE_X);
+        Lock::DBLock lk(opCtx, _nss.db(), MODE_X);
         OldClientContext ctx(opCtx, _nss.ns());
 
         if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, _nss)) {
@@ -888,8 +887,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
     bool didAnything = false;
 
     if (xfer["deleted"].isABSONObj()) {
-        ScopedTransaction scopedXact(opCtx, MODE_IX);
-        Lock::DBLock dlk(opCtx->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
+        Lock::DBLock dlk(opCtx, nsToDatabaseSubstring(ns), MODE_IX);
         Helpers::RemoveSaver rs("moveChunk", ns, "removedDuring");
 
         BSONObjIterator i(xfer["deleted"].Obj());  // deleted documents
@@ -985,8 +983,7 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* opCtx,
 
     {
         // Get global lock to wait for write to be commited to journal.
-        ScopedTransaction scopedXact(opCtx, MODE_S);
-        Lock::GlobalRead lk(opCtx->lockState());
+        Lock::GlobalRead lk(opCtx);
 
         // if durability is on, force a write to journal
         if (getDur().commitNow(opCtx)) {
@@ -1003,7 +1000,6 @@ Status MigrationDestinationManager::_notePending(OperationContext* opCtx,
                                                  const BSONObj& min,
                                                  const BSONObj& max,
                                                  const OID& epoch) {
-    ScopedTransaction scopedXact(opCtx, MODE_IX);
     AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
 
     auto css = CollectionShardingState::get(opCtx, nss);
@@ -1046,7 +1042,6 @@ Status MigrationDestinationManager::_forgetPending(OperationContext* opCtx,
         _chunkMarkedPending = false;
     }
 
-    ScopedTransaction scopedXact(opCtx, MODE_IX);
     AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
 
     auto css = CollectionShardingState::get(opCtx, nss);

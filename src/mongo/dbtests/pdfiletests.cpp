@@ -44,7 +44,7 @@ namespace PdfileTests {
 namespace Insert {
 class Base {
 public:
-    Base() : _scopedXact(&_opCtx, MODE_X), _lk(_opCtx.lockState()), _context(&_opCtx, ns()) {}
+    Base() : _lk(&_opCtx), _context(&_opCtx, ns()) {}
 
     virtual ~Base() {
         if (!collection())
@@ -62,9 +62,8 @@ protected:
         return _context.db()->getCollection(ns());
     }
 
-    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _opCtx = *_txnPtr;
-    ScopedTransaction _scopedXact;
+    const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
+    OperationContext& _opCtx = *_opCtxPtr;
     Lock::GlobalWrite _lk;
     OldClientContext _context;
 };

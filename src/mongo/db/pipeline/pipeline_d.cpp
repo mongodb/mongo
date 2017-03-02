@@ -96,7 +96,7 @@ public:
     }
 
     bool isSharded(const NamespaceString& nss) final {
-        AutoGetCollectionForRead autoColl(_ctx->opCtx, nss);
+        AutoGetCollectionForReadCommand autoColl(_ctx->opCtx, nss);
         // TODO SERVER-24960: Use CollectionShardingState::collectionIsSharded() to confirm sharding
         // state.
         auto css = CollectionShardingState::get(_ctx->opCtx, nss);
@@ -114,7 +114,7 @@ public:
 
     CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
                                           const NamespaceString& ns) final {
-        AutoGetCollectionForRead autoColl(opCtx, ns);
+        AutoGetCollectionForReadCommand autoColl(opCtx, ns);
 
         Collection* collection = autoColl.getCollection();
         if (!collection) {
@@ -149,7 +149,7 @@ public:
         const NamespaceString& targetNs,
         const BSONObj& originalCollectionOptions,
         const std::list<BSONObj>& originalIndexes) final {
-        Lock::GlobalWrite globalLock(_ctx->opCtx->lockState());
+        Lock::GlobalWrite globalLock(_ctx->opCtx);
 
         if (SimpleBSONObjComparator::kInstance.evaluate(originalCollectionOptions !=
                                                         getCollectionOptions(targetNs))) {
@@ -193,7 +193,7 @@ public:
 
         pipeline.getValue()->optimizePipeline();
 
-        AutoGetCollectionForRead autoColl(expCtx->opCtx, expCtx->ns);
+        AutoGetCollectionForReadCommand autoColl(expCtx->opCtx, expCtx->ns);
 
         // makePipeline() is only called to perform secondary aggregation requests and expects the
         // collection representing the document source to be not-sharded. We confirm sharding state
@@ -269,7 +269,7 @@ StatusWith<unique_ptr<PlanExecutor>> createRandomCursorExecutor(Collection* coll
     }
 
     {
-        AutoGetCollection autoColl(opCtx, collection->ns(), MODE_IS);
+        AutoGetCollectionForRead autoColl(opCtx, collection->ns());
 
         // If we're in a sharded environment, we need to filter out documents we don't own.
         if (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, collection->ns().ns())) {

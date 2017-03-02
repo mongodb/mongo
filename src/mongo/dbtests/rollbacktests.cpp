@@ -51,8 +51,7 @@ namespace {
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
 void dropDatabase(OperationContext* opCtx, const NamespaceString& nss) {
-    ScopedTransaction transaction(opCtx, MODE_X);
-    Lock::GlobalWrite globalWriteLock(opCtx->lockState());
+    Lock::GlobalWrite globalWriteLock(opCtx);
     Database* db = dbHolder().get(opCtx, nss.db());
 
     if (db) {
@@ -66,8 +65,7 @@ bool collectionExists(OldClientContext* ctx, const string& ns) {
     return std::find(names.begin(), names.end(), ns) != names.end();
 }
 void createCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    ScopedTransaction transaction(opCtx, MODE_IX);
-    Lock::DBLock dbXLock(opCtx->lockState(), nss.db(), MODE_X);
+    Lock::DBLock dbXLock(opCtx, nss.db(), MODE_X);
     OldClientContext ctx(opCtx, nss.ns());
     {
         WriteUnitOfWork uow(opCtx);
@@ -155,8 +153,7 @@ public:
         NamespaceString nss(ns);
         dropDatabase(&opCtx, nss);
 
-        ScopedTransaction transaction(&opCtx, MODE_IX);
-        Lock::DBLock dbXLock(opCtx.lockState(), nss.db(), MODE_X);
+        Lock::DBLock dbXLock(&opCtx, nss.db(), MODE_X);
         OldClientContext ctx(&opCtx, ns);
         {
             WriteUnitOfWork uow(&opCtx);
@@ -187,8 +184,7 @@ public:
         NamespaceString nss(ns);
         dropDatabase(&opCtx, nss);
 
-        ScopedTransaction transaction(&opCtx, MODE_IX);
-        Lock::DBLock dbXLock(opCtx.lockState(), nss.db(), MODE_X);
+        Lock::DBLock dbXLock(&opCtx, nss.db(), MODE_X);
         OldClientContext ctx(&opCtx, ns);
         {
             WriteUnitOfWork uow(&opCtx);
@@ -231,8 +227,7 @@ public:
         dropDatabase(&opCtx, source);
         dropDatabase(&opCtx, target);
 
-        ScopedTransaction transaction(&opCtx, MODE_X);
-        Lock::GlobalWrite globalWriteLock(opCtx.lockState());
+        Lock::GlobalWrite globalWriteLock(&opCtx);
         OldClientContext ctx(&opCtx, source.ns());
 
         {
@@ -283,8 +278,7 @@ public:
         dropDatabase(&opCtx, source);
         dropDatabase(&opCtx, target);
 
-        ScopedTransaction transaction(&opCtx, MODE_X);
-        Lock::GlobalWrite globalWriteLock(opCtx.lockState());
+        Lock::GlobalWrite globalWriteLock(&opCtx);
         OldClientContext ctx(&opCtx, source.ns());
 
         BSONObj sourceDoc = BSON("_id"
@@ -354,8 +348,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         dropDatabase(&opCtx, nss);
 
-        ScopedTransaction transaction(&opCtx, MODE_IX);
-        Lock::DBLock dbXLock(opCtx.lockState(), nss.db(), MODE_X);
+        Lock::DBLock dbXLock(&opCtx, nss.db(), MODE_X);
         OldClientContext ctx(&opCtx, nss.ns());
 
         BSONObj oldDoc = BSON("_id"
@@ -415,8 +408,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         dropDatabase(&opCtx, nss);
 
-        ScopedTransaction transaction(&opCtx, MODE_IX);
-        Lock::DBLock dbXLock(opCtx.lockState(), nss.db(), MODE_X);
+        Lock::DBLock dbXLock(&opCtx, nss.db(), MODE_X);
         OldClientContext ctx(&opCtx, nss.ns());
 
         BSONObj doc = BSON("_id"
@@ -456,8 +448,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         dropDatabase(&opCtx, nss);
 
-        ScopedTransaction transaction(&opCtx, MODE_IX);
-        Lock::DBLock dbXLock(opCtx.lockState(), nss.db(), MODE_X);
+        Lock::DBLock dbXLock(&opCtx, nss.db(), MODE_X);
         OldClientContext ctx(&opCtx, nss.ns());
 
         BSONObj doc = BSON("_id"
@@ -513,7 +504,6 @@ public:
         dropDatabase(&opCtx, nss);
         createCollection(&opCtx, nss);
 
-        ScopedTransaction transaction(&opCtx, MODE_IX);
         AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
 
         Collection* coll = autoDb.getDb()->getCollection(ns);
@@ -555,7 +545,6 @@ public:
         dropDatabase(&opCtx, nss);
         createCollection(&opCtx, nss);
 
-        ScopedTransaction transaction(&opCtx, MODE_IX);
         AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
 
         Collection* coll = autoDb.getDb()->getCollection(ns);
@@ -609,7 +598,6 @@ public:
         dropDatabase(&opCtx, nss);
         createCollection(&opCtx, nss);
 
-        ScopedTransaction transaction(&opCtx, MODE_IX);
         AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
 
         Collection* coll = autoDb.getDb()->getCollection(ns);
@@ -654,7 +642,6 @@ public:
         dropDatabase(&opCtx, nss);
         createCollection(&opCtx, nss);
 
-        ScopedTransaction transaction(&opCtx, MODE_IX);
         AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
 
         Collection* coll = autoDb.getDb()->getCollection(ns);
@@ -717,8 +704,7 @@ public:
         NamespaceString nss(ns);
         dropDatabase(&opCtx, nss);
 
-        ScopedTransaction transaction(&opCtx, MODE_IX);
-        Lock::DBLock dbXLock(opCtx.lockState(), nss.db(), MODE_X);
+        Lock::DBLock dbXLock(&opCtx, nss.db(), MODE_X);
         OldClientContext ctx(&opCtx, nss.ns());
 
         string idxNameA = "indexA";

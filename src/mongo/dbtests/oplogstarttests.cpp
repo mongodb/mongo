@@ -44,11 +44,7 @@ static const NamespaceString nss("unittests.oplogstarttests");
 
 class Base {
 public:
-    Base()
-        : _scopedXact(&_opCtx, MODE_X),
-          _lk(_opCtx.lockState()),
-          _context(&_opCtx, nss.ns()),
-          _client(&_opCtx) {
+    Base() : _lk(&_opCtx), _context(&_opCtx, nss.ns()), _client(&_opCtx) {
         Collection* c = _context.db()->getCollection(nss.ns());
         if (!c) {
             WriteUnitOfWork wuow(&_opCtx);
@@ -99,9 +95,8 @@ protected:
 
 private:
     // The order of these is important in order to ensure order of destruction
-    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _opCtx = *_txnPtr;
-    ScopedTransaction _scopedXact;
+    const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
+    OperationContext& _opCtx = *_opCtxPtr;
     Lock::GlobalWrite _lk;
     OldClientContext _context;
 

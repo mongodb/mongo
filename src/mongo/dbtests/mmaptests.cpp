@@ -75,9 +75,8 @@ public:
         } catch (...) {
         }
 
-        MMAPV1LockerImpl lockState;
-        Lock::GlobalWrite lk(&lockState);
         auto opCtx = cc().makeOperationContext();
+        Lock::GlobalWrite lk(opCtx.get());
 
         {
             DurableMappedFile f(opCtx.get());

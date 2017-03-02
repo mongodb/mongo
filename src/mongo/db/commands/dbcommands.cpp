@@ -293,8 +293,7 @@ public:
         }
 
         // Closing a database requires a global lock.
-        ScopedTransaction transaction(opCtx, MODE_X);
-        Lock::GlobalWrite lk(opCtx->lockState());
+        Lock::GlobalWrite lk(opCtx);
         if (!dbHolder().get(opCtx, dbname)) {
             // If the name doesn't make an exact match, check for a case insensitive match.
             std::set<std::string> otherCasing = dbHolder().getNamesWithConflictingCasing(dbname);
@@ -399,11 +398,9 @@ public:
 
         const bool readOnly = (profilingLevel < 0 || profilingLevel > 2);
         const LockMode dbMode = readOnly ? MODE_S : MODE_X;
-        const LockMode transactionMode = readOnly ? MODE_IS : MODE_IX;
 
         Status status = Status::OK();
 
-        ScopedTransaction transaction(opCtx, transactionMode);
         AutoGetDb ctx(opCtx, dbname, dbMode);
         Database* db = ctx.getDb();
 
@@ -482,9 +479,7 @@ public:
 
         // This doesn't look like it requires exclusive DB lock, because it uses its own diag
         // locking, but originally the lock was set to be WRITE, so preserving the behaviour.
-        //
-        ScopedTransaction transaction(opCtx, MODE_IX);
-        Lock::DBLock dbXLock(opCtx->lockState(), dbname, MODE_X);
+        Lock::DBLock dbXLock(opCtx, dbname, MODE_X);
 
         // TODO (Kal): OldClientContext legacy, needs to be removed
         {
@@ -773,7 +768,8 @@ public:
             // Check shard version at startup.
             // This will throw before we've done any work if shard version is outdated
             // We drop and re-acquire these locks every document because md5'ing is expensive
-            unique_ptr<AutoGetCollectionForRead> ctx(new AutoGetCollectionForRead(opCtx, nss));
+            unique_ptr<AutoGetCollectionForReadCommand> ctx(
+                new AutoGetCollectionForReadCommand(opCtx, nss));
             Collection* coll = ctx->getCollection();
 
             auto statusWithPlanExecutor = getExecutor(opCtx,
@@ -819,7 +815,7 @@ public:
 
                 try {
                     // RELOCKED
-                    ctx.reset(new AutoGetCollectionForRead(opCtx, nss));
+                    ctx.reset(new AutoGetCollectionForReadCommand(opCtx, nss));
                 } catch (const SendStaleConfigException& ex) {
                     LOG(1) << "chunk metadata changed during filemd5, will retarget and continue";
                     break;
@@ -919,7 +915,7 @@ public:
         BSONObj keyPattern = jsobj.getObjectField("keyPattern");
         bool estimate = jsobj["estimate"].trueValue();
 
-        AutoGetCollectionForRead ctx(opCtx, NamespaceString(ns));
+        AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString(ns));
 
         Collection* collection = ctx.getCollection();
         long long numRecords = 0;
@@ -1168,7 +1164,6 @@ public:
         // We lock the entire database in S-mode in order to ensure that the contents will not
         // change for the stats snapshot. This might be unnecessary and if it becomes a
         // performance issue, we can take IS lock and then lock collection-by-collection.
-        ScopedTransaction scopedXact(opCtx, MODE_IS);
         AutoGetDb autoDb(opCtx, ns, MODE_S);
 
         result.append("db", ns);

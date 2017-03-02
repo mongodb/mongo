@@ -227,7 +227,7 @@ Status PlanCacheListQueryShapes::runPlanCacheCommand(OperationContext* opCtx,
                                                      BSONObj& cmdObj,
                                                      BSONObjBuilder* bob) {
     // This is a read lock. The query cache is owned by the collection.
-    AutoGetCollectionForRead ctx(opCtx, NamespaceString(ns));
+    AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString(ns));
 
     PlanCache* planCache;
     Status status = getPlanCache(opCtx, ctx.getCollection(), ns, &planCache);
@@ -279,7 +279,7 @@ Status PlanCacheClear::runPlanCacheCommand(OperationContext* opCtx,
                                            BSONObj& cmdObj,
                                            BSONObjBuilder* bob) {
     // This is a read lock. The query cache is owned by the collection.
-    AutoGetCollectionForRead ctx(opCtx, NamespaceString(ns));
+    AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString(ns));
 
     PlanCache* planCache;
     Status status = getPlanCache(opCtx, ctx.getCollection(), ns, &planCache);
@@ -355,7 +355,7 @@ Status PlanCacheListPlans::runPlanCacheCommand(OperationContext* opCtx,
                                                const std::string& ns,
                                                BSONObj& cmdObj,
                                                BSONObjBuilder* bob) {
-    AutoGetCollectionForRead ctx(opCtx, NamespaceString(ns));
+    AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString(ns));
 
     PlanCache* planCache;
     Status status = getPlanCache(opCtx, ctx.getCollection(), ns, &planCache);

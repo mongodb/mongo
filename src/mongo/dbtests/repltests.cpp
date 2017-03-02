@@ -68,8 +68,8 @@ BSONObj f(const char* s) {
 
 class Base {
 protected:
-    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _opCtx = *_txnPtr;
+    const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
+    OperationContext& _opCtx = *_opCtxPtr;
     mutable DBDirectClient _client;
 
 public:
@@ -145,8 +145,7 @@ protected:
         return _client.findOne(cllNS(), BSONObj());
     }
     int count() const {
-        ScopedTransaction transaction(&_opCtx, MODE_X);
-        Lock::GlobalWrite lk(_opCtx.lockState());
+        Lock::GlobalWrite lk(&_opCtx);
         OldClientContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());
@@ -167,8 +166,7 @@ protected:
         return DBDirectClient(&_opCtx).query(cllNS(), BSONObj())->itcount();
     }
     void applyAllOperations() {
-        ScopedTransaction transaction(&_opCtx, MODE_X);
-        Lock::GlobalWrite lk(_opCtx.lockState());
+        Lock::GlobalWrite lk(&_opCtx);
         vector<BSONObj> ops;
         {
             DBDirectClient db(&_opCtx);
@@ -193,8 +191,7 @@ protected:
         }
     }
     void printAll(const char* ns) {
-        ScopedTransaction transaction(&_opCtx, MODE_X);
-        Lock::GlobalWrite lk(_opCtx.lockState());
+        Lock::GlobalWrite lk(&_opCtx);
         OldClientContext ctx(&_opCtx, ns);
 
         Database* db = ctx.db();
@@ -213,8 +210,7 @@ protected:
     }
     // These deletes don't get logged.
     void deleteAll(const char* ns) const {
-        ScopedTransaction transaction(&_opCtx, MODE_X);
-        Lock::GlobalWrite lk(_opCtx.lockState());
+        Lock::GlobalWrite lk(&_opCtx);
         OldClientContext ctx(&_opCtx, ns);
         WriteUnitOfWork wunit(&_opCtx);
         Database* db = ctx.db();
@@ -227,8 +223,7 @@ protected:
         wunit.commit();
     }
     void insert(const BSONObj& o) const {
-        ScopedTransaction transaction(&_opCtx, MODE_X);
-        Lock::GlobalWrite lk(_opCtx.lockState());
+        Lock::GlobalWrite lk(&_opCtx);
         OldClientContext ctx(&_opCtx, ns());
         WriteUnitOfWork wunit(&_opCtx);
         Database* db = ctx.db();
@@ -1404,8 +1399,7 @@ public:
                                       << "foo"
                                       << "bar"));
 
-        ScopedTransaction transaction(&_opCtx, MODE_X);
-        Lock::GlobalWrite lk(_opCtx.lockState());
+        Lock::GlobalWrite lk(&_opCtx);
 
         // this should fail because we can't connect
         try {

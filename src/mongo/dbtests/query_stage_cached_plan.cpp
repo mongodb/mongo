@@ -78,8 +78,7 @@ public:
     }
 
     void dropCollection() {
-        ScopedTransaction transaction(&_opCtx, MODE_X);
-        Lock::DBLock dbLock(_opCtx.lockState(), nss.db(), MODE_X);
+        Lock::DBLock dbLock(&_opCtx, nss.db(), MODE_X);
         Database* database = dbHolder().get(&_opCtx, nss.db());
         if (!database) {
             return;
@@ -104,8 +103,8 @@ public:
     }
 
 protected:
-    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _opCtx = *_txnPtr;
+    const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
+    OperationContext& _opCtx = *_opCtxPtr;
     WorkingSet _ws;
 };
 
@@ -116,7 +115,7 @@ protected:
 class QueryStageCachedPlanFailure : public QueryStageCachedPlanBase {
 public:
     void run() {
-        AutoGetCollectionForRead ctx(&_opCtx, nss);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         Collection* collection = ctx.getCollection();
         ASSERT(collection);
 
@@ -184,7 +183,7 @@ public:
 class QueryStageCachedPlanHitMaxWorks : public QueryStageCachedPlanBase {
 public:
     void run() {
-        AutoGetCollectionForRead ctx(&_opCtx, nss);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         Collection* collection = ctx.getCollection();
         ASSERT(collection);
 

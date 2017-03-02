@@ -53,7 +53,6 @@
 
 namespace mongo {
 Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionName) {
-    ScopedTransaction scopedXact(opCtx, MODE_IX);
     AutoGetDb autoDb(opCtx, collectionName.db(), MODE_X);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
@@ -242,7 +241,6 @@ Status convertToCapped(OperationContext* opCtx,
     StringData dbname = collectionName.db();
     StringData shortSource = collectionName.coll();
 
-    ScopedTransaction transaction(opCtx, MODE_IX);
     AutoGetDb autoDb(opCtx, collectionName.db(), MODE_X);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&

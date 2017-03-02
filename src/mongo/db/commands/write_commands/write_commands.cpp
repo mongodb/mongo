@@ -328,7 +328,6 @@ public:
 
         // Explains of write commands are read-only, but we take write locks so that timing
         // info is more accurate.
-        ScopedTransaction scopedXact(opCtx, MODE_IX);
         AutoGetCollection collection(opCtx, batch.ns, MODE_IX);
 
         auto exec = uassertStatusOK(getExecutorUpdate(
@@ -396,7 +395,6 @@ public:
 
         // Explains of write commands are read-only, but we take write locks so that timing
         // info is more accurate.
-        ScopedTransaction scopedXact(opCtx, MODE_IX);
         AutoGetCollection collection(opCtx, batch.ns, MODE_IX);
 
         // Explain the plan tree.

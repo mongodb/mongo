@@ -33,6 +33,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
@@ -87,8 +88,7 @@ public:
             return appendCommandStatus(result, status);
         }
 
-        ScopedTransaction scopedXact(opCtx, MODE_X);
-        Lock::GlobalWrite globalWrite(opCtx->lockState());
+        Lock::GlobalWrite globalWrite(opCtx);
 
         WriteUnitOfWork wuow(opCtx);
         getGlobalServiceContext()->getOpObserver()->onOpMessage(opCtx, dataElement.Obj());

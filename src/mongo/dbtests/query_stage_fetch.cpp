@@ -82,8 +82,8 @@ public:
     }
 
 protected:
-    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _opCtx = *_txnPtr;
+    const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
+    OperationContext& _opCtx = *_opCtxPtr;
     DBDirectClient _client;
 };
 
@@ -158,8 +158,7 @@ public:
 class FetchStageFilter : public QueryStageFetchBase {
 public:
     void run() {
-        ScopedTransaction transaction(&_opCtx, MODE_IX);
-        Lock::DBLock lk(_opCtx.lockState(), nsToDatabaseSubstring(ns()), MODE_X);
+        Lock::DBLock lk(&_opCtx, nsToDatabaseSubstring(ns()), MODE_X);
         OldClientContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         Collection* coll = db->getCollection(ns());

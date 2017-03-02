@@ -369,7 +369,6 @@ Config::Config(const string& _dbname, const BSONObj& cmdObj) {
 void State::dropTempCollections() {
     if (!_config.tempNamespace.isEmpty()) {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            ScopedTransaction scopedXact(_opCtx, MODE_IX);
             AutoGetDb autoDb(_opCtx, _config.tempNamespace.db(), MODE_X);
             if (auto db = autoDb.getDb()) {
                 WriteUnitOfWork wunit(_opCtx);
@@ -392,8 +391,7 @@ void State::dropTempCollections() {
         repl::UnreplicatedWritesBlock uwb(_opCtx);
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            ScopedTransaction scopedXact(_opCtx, MODE_IX);
-            Lock::DBLock lk(_opCtx->lockState(), _config.incLong.db(), MODE_X);
+            Lock::DBLock lk(_opCtx, _config.incLong.db(), MODE_X);
             if (Database* db = dbHolder().get(_opCtx, _config.incLong.ns())) {
                 WriteUnitOfWork wunit(_opCtx);
                 db->dropCollection(_opCtx, _config.incLong.ns());
@@ -611,9 +609,8 @@ long long State::postProcessCollection(OperationContext* opCtx,
 
     invariant(!opCtx->lockState()->isLocked());
 
-    ScopedTransaction transaction(opCtx, MODE_X);
     // This must be global because we may write across different databases.
-    Lock::GlobalWrite lock(opCtx->lockState());
+    Lock::GlobalWrite lock(opCtx);
     holdingGlobalLock = true;
     return postProcessCollectionNonAtomic(opCtx, curOp, pm, holdingGlobalLock);
 }
@@ -626,10 +623,10 @@ unsigned long long _collectionCount(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     bool callerHoldsGlobalLock) {
     Collection* coll = nullptr;
-    boost::optional<AutoGetCollectionForRead> ctx;
+    boost::optional<AutoGetCollectionForReadCommand> ctx;
 
-    // If the global write lock is held, we must avoid using AutoGetCollectionForRead as it may lead
-    // to deadlock when waiting for a majority snapshot to be committed. See SERVER-24596.
+    // If the global write lock is held, we must avoid using AutoGetCollectionForReadCommand as it
+    // may lead to deadlock when waiting for a majority snapshot to be committed. See SERVER-24596.
     if (callerHoldsGlobalLock) {
         Database* db = dbHolder().get(opCtx, nss.ns());
         if (db) {
@@ -654,9 +651,8 @@ long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
 
     if (_config.outputOptions.outType == Config::REPLACE ||
         _collectionCount(opCtx, _config.outputOptions.finalNamespace, callerHoldsGlobalLock) == 0) {
-        ScopedTransaction transaction(opCtx, MODE_X);
         // This must be global because we may write across different databases.
-        Lock::GlobalWrite lock(opCtx->lockState());
+        Lock::GlobalWrite lock(opCtx);
         // replace: just rename from temp to final collection name, dropping previous collection
         _db.dropCollection(_config.outputOptions.finalNamespace.ns());
         BSONObj info;
@@ -682,9 +678,7 @@ long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
         }
         unique_ptr<DBClientCursor> cursor = _db.query(_config.tempNamespace.ns(), BSONObj());
         while (cursor->more()) {
-            ScopedTransaction scopedXact(opCtx, MODE_X);
-            Lock::DBLock lock(
-                opCtx->lockState(), _config.outputOptions.finalNamespace.db(), MODE_X);
+            Lock::DBLock lock(opCtx, _config.outputOptions.finalNamespace.db(), MODE_X);
             BSONObj o = cursor->nextSafe();
             Helpers::upsert(opCtx, _config.outputOptions.finalNamespace.ns(), o);
             pm.hit();
@@ -704,9 +698,8 @@ long long State::postProcessCollectionNonAtomic(OperationContext* opCtx,
         }
         unique_ptr<DBClientCursor> cursor = _db.query(_config.tempNamespace.ns(), BSONObj());
         while (cursor->more()) {
-            ScopedTransaction transaction(opCtx, MODE_X);
             // This must be global because we may write across different databases.
-            Lock::GlobalWrite lock(opCtx->lockState());
+            Lock::GlobalWrite lock(opCtx);
             BSONObj temp = cursor->nextSafe();
             BSONObj old;
 
@@ -1088,7 +1081,8 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp, ProgressMeterHold
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(_opCtx, "finalReduce", _config.incLong.ns());
 
-    unique_ptr<AutoGetCollectionForRead> ctx(new AutoGetCollectionForRead(_opCtx, _config.incLong));
+    unique_ptr<AutoGetCollectionForReadCommand> ctx(
+        new AutoGetCollectionForReadCommand(_opCtx, _config.incLong));
 
     BSONObj prev;
     BSONList all;
@@ -1143,7 +1137,7 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp, ProgressMeterHold
         // reduce a finalize array
         finalReduce(all);
 
-        ctx.reset(new AutoGetCollectionForRead(_opCtx, _config.incLong));
+        ctx.reset(new AutoGetCollectionForReadCommand(_opCtx, _config.incLong));
 
         all.clear();
         prev = o;
@@ -1163,7 +1157,7 @@ void State::finalReduce(OperationContext* opCtx, CurOp* curOp, ProgressMeterHold
     ctx.reset();
     // reduce and finalize last array
     finalReduce(all);
-    ctx.reset(new AutoGetCollectionForRead(_opCtx, _config.incLong));
+    ctx.reset(new AutoGetCollectionForReadCommand(_opCtx, _config.incLong));
 
     pm.finished();
 }
@@ -1405,7 +1399,7 @@ public:
         unique_ptr<RangePreserver> rangePreserver;
         ScopedCollectionMetadata collMetadata;
         {
-            AutoGetCollectionForRead ctx(opCtx, config.nss);
+            AutoGetCollectionForReadCommand ctx(opCtx, config.nss);
 
             Collection* collection = ctx.getCollection();
             if (collection) {
@@ -1424,8 +1418,8 @@ public:
         // be done under the lock.
         ON_BLOCK_EXIT([opCtx, &config, &rangePreserver] {
             if (rangePreserver) {
-                // Be sure not to use AutoGetCollectionForRead here, since that has side-effects
-                // other than lock acquisition.
+                // Be sure not to use AutoGetCollectionForReadCommand here, since that has
+                // side-effects other than lock acquisition.
                 AutoGetCollection ctx(opCtx, config.nss, MODE_IS);
                 rangePreserver.reset();
             }
@@ -1489,7 +1483,6 @@ public:
                 // useful cursor.
 
                 // Need lock and context to use it
-                unique_ptr<ScopedTransaction> scopedXact(new ScopedTransaction(opCtx, MODE_IS));
                 unique_ptr<AutoGetDb> scopedAutoDb(new AutoGetDb(opCtx, config.nss.db(), MODE_S));
 
                 auto qr = stdx::make_unique<QueryRequest>(config.nss);
@@ -1565,11 +1558,9 @@ public:
                         exec->saveState();
 
                         scopedAutoDb.reset();
-                        scopedXact.reset();
 
                         state.reduceAndSpillInMemoryStateIfNeeded();
 
-                        scopedXact.reset(new ScopedTransaction(opCtx, MODE_IS));
                         scopedAutoDb.reset(new AutoGetDb(opCtx, config.nss.db(), MODE_S));
 
                         if (!exec->restoreState()) {

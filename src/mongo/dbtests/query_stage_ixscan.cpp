@@ -46,10 +46,7 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 class IndexScanTest {
 public:
     IndexScanTest()
-        : _scopedXact(&_opCtx, MODE_IX),
-          _dbLock(_opCtx.lockState(), nsToDatabaseSubstring(ns()), MODE_X),
-          _ctx(&_opCtx, ns()),
-          _coll(NULL) {}
+        : _dbLock(&_opCtx, nsToDatabaseSubstring(ns()), MODE_X), _ctx(&_opCtx, ns()), _coll(NULL) {}
 
     virtual ~IndexScanTest() {}
 
@@ -147,10 +144,9 @@ public:
     }
 
 protected:
-    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _opCtx = *_txnPtr;
+    const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
+    OperationContext& _opCtx = *_opCtxPtr;
 
-    ScopedTransaction _scopedXact;
     Lock::DBLock _dbLock;
     OldClientContext _ctx;
     Collection* _coll;

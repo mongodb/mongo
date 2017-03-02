@@ -255,7 +255,6 @@ public:
             return appendCommandStatus(result, parseCursorStatus);
         }
 
-        ScopedTransaction scopedXact(opCtx, MODE_IS);
         AutoGetDb autoDb(opCtx, dbname, MODE_S);
 
         Database* db = autoDb.getDb();

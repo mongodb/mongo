@@ -118,7 +118,6 @@ public:
             return false;
         }
 
-        ScopedTransaction transaction(opCtx, MODE_IX);
         AutoGetDb autoDb(opCtx, dbname, MODE_X);
 
         NamespaceString nss(dbname, to);

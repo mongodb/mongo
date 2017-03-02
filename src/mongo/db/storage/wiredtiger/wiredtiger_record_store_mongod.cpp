@@ -81,8 +81,6 @@ public:
         OperationContext& opCtx = *opCtxPtr;
 
         try {
-            ScopedTransaction transaction(&opCtx, MODE_IX);
-
             AutoGetDb autoDb(&opCtx, _ns.db(), MODE_IX);
             Database* db = autoDb.getDb();
             if (!db) {

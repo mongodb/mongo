@@ -117,7 +117,6 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 
     // Snapshot the committed metadata from the time the migration starts
     {
-        ScopedTransaction scopedXact(opCtx, MODE_IS);
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IS);
 
         _collectionMetadata = CollectionShardingState::get(opCtx, getNss())->getMetadata();
@@ -183,7 +182,6 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
 
     {
         // Register for notifications from the replication subsystem
-        ScopedTransaction scopedXact(opCtx, MODE_IX);
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
 
         auto css = CollectionShardingState::get(opCtx, getNss().ns());
@@ -232,7 +230,6 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* opCtx) {
         // The critical section must be entered with collection X lock in order to ensure there are
         // no writes which could have entered and passed the version check just before we entered
         // the crticial section, but managed to complete after we left it.
-        ScopedTransaction scopedXact(opCtx, MODE_IX);
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
 
         // Check that the collection has not been dropped or recreated since the migration began.
@@ -379,7 +376,6 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         ShardingState::get(opCtx)->refreshMetadataNow(opCtx, getNss(), &unusedShardVersion);
 
     if (refreshStatus.isOK()) {
-        ScopedTransaction scopedXact(opCtx, MODE_IS);
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IS);
 
         auto refreshedMetadata = CollectionShardingState::get(opCtx, getNss())->getMetadata();
@@ -402,7 +398,6 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         log() << "Migration succeeded and updated collection version to "
               << refreshedMetadata->getCollVersion();
     } else {
-        ScopedTransaction scopedXact(opCtx, MODE_IX);
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
 
         CollectionShardingState::get(opCtx, getNss())->refreshMetadata(opCtx, nullptr);
@@ -458,7 +453,6 @@ void MigrationSourceManager::_cleanup(OperationContext* opCtx) {
 
     auto cloneDriver = [&]() {
         // Unregister from the collection's sharding state
-        ScopedTransaction scopedXact(opCtx, MODE_IX);
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
 
         auto css = CollectionShardingState::get(opCtx, getNss().ns());

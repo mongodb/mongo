@@ -48,7 +48,6 @@ public:
     StatusWith<Value> next() override;
 
 private:
-    ScopedTransaction _transaction;
     Lock::DBLock _dbLock;
     Lock::CollectionLock _collectionLock;
     OldClientContext _ctx;
@@ -56,8 +55,7 @@ private:
 };
 
 OplogIteratorLocal::OplogIteratorLocal(OperationContext* opCtx, const std::string& collectionName)
-    : _transaction(opCtx, MODE_IS),
-      _dbLock(opCtx->lockState(), nsToDatabase(collectionName), MODE_IS),
+    : _dbLock(opCtx, nsToDatabase(collectionName), MODE_IS),
       _collectionLock(opCtx->lockState(), collectionName, MODE_S),
       _ctx(opCtx, collectionName),
       _exec(InternalPlanner::collectionScan(opCtx,

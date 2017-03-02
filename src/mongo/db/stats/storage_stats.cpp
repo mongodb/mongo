@@ -54,7 +54,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
 
     bool verbose = param["verbose"].trueValue();
 
-    AutoGetCollectionForRead ctx(opCtx, nss);
+    AutoGetCollectionForReadCommand ctx(opCtx, nss);
     if (!ctx.getDb()) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Database [" << nss.db().toString() << "] not found."};

@@ -87,8 +87,7 @@ ServiceContext* ServiceContextMongoDTest::getServiceContext() {
 void ServiceContextMongoDTest::_dropAllDBs(OperationContext* opCtx) {
     dropAllDatabasesExceptLocal(opCtx);
 
-    ScopedTransaction transaction(opCtx, MODE_X);
-    Lock::GlobalWrite lk(opCtx->lockState());
+    Lock::GlobalWrite lk(opCtx);
     AutoGetDb autoDBLocal(opCtx, "local", MODE_X);
     const auto localDB = autoDBLocal.getDb();
     if (localDB) {

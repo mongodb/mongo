@@ -256,7 +256,7 @@ Message getMore(OperationContext* opCtx,
     // Note that we declare our locks before our ClientCursorPin, in order to ensure that the
     // pin's destructor is called before the lock destructors (so that the unpin occurs under
     // the lock).
-    unique_ptr<AutoGetCollectionForRead> ctx;
+    unique_ptr<AutoGetCollectionForReadCommand> ctx;
     unique_ptr<Lock::DBLock> unpinDBLock;
     unique_ptr<Lock::CollectionLock> unpinCollLock;
 
@@ -267,8 +267,8 @@ Message getMore(OperationContext* opCtx,
         // the data within a collection.
         cursorManager = CursorManager::getGlobalCursorManager();
     } else {
-        ctx = stdx::make_unique<AutoGetCollectionOrViewForRead>(opCtx, nss);
-        auto viewCtx = static_cast<AutoGetCollectionOrViewForRead*>(ctx.get());
+        ctx = stdx::make_unique<AutoGetCollectionOrViewForReadCommand>(opCtx, nss);
+        auto viewCtx = static_cast<AutoGetCollectionOrViewForReadCommand*>(ctx.get());
         if (viewCtx->getView()) {
             uasserted(
                 ErrorCodes::CommandNotSupportedOnView,
@@ -414,7 +414,7 @@ Message getMore(OperationContext* opCtx,
             curOp.setExpectedLatencyMs(durationCount<Milliseconds>(timeout));
 
             // Reacquiring locks.
-            ctx = make_unique<AutoGetCollectionForRead>(opCtx, nss);
+            ctx = make_unique<AutoGetCollectionForReadCommand>(opCtx, nss);
             exec->restoreState();
 
             // We woke up because either the timed_wait expired, or there was more data. Either
@@ -449,7 +449,7 @@ Message getMore(OperationContext* opCtx,
         // if the cursor is aggregation, we release these locks.
         if (cc->isAggCursor()) {
             invariant(NULL == ctx.get());
-            unpinDBLock = make_unique<Lock::DBLock>(opCtx->lockState(), nss.db(), MODE_IS);
+            unpinDBLock = make_unique<Lock::DBLock>(opCtx, nss.db(), MODE_IS);
             unpinCollLock =
                 make_unique<Lock::CollectionLock>(opCtx->lockState(), nss.ns(), MODE_IS);
         }
@@ -531,7 +531,7 @@ std::string runQuery(OperationContext* opCtx,
     LOG(2) << "Running query: " << redact(cq->toStringShort());
 
     // Parse, canonicalize, plan, transcribe, and get a plan executor.
-    AutoGetCollectionOrViewForRead ctx(opCtx, nss);
+    AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss);
     Collection* collection = ctx.getCollection();
 
     if (ctx.getView()) {

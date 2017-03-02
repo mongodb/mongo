@@ -160,7 +160,6 @@ Status dropIndexes(OperationContext* opCtx,
                    const BSONObj& cmdObj,
                    BSONObjBuilder* result) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(opCtx, MODE_IX);
         AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
 
         bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&

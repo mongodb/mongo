@@ -63,10 +63,8 @@ void checkNS(OperationContext* opCtx, const std::list<std::string>& nsToCheck) {
 
         LOG(3) << "IndexRebuilder::checkNS: " << ns;
 
-        // This write lock is held throughout the index building process
-        // for this namespace.
-        ScopedTransaction transaction(opCtx, MODE_IX);
-        Lock::DBLock lk(opCtx->lockState(), nsToDatabaseSubstring(ns), MODE_X);
+        // This write lock is held throughout the index building process for this namespace.
+        Lock::DBLock lk(opCtx, nsToDatabaseSubstring(ns), MODE_X);
         OldClientContext ctx(opCtx, ns);
 
         Collection* collection = ctx.db()->getCollection(ns);
@@ -155,7 +153,6 @@ void restartInProgressIndexesFromLastShutdown(OperationContext* opCtx) {
         for (std::vector<std::string>::const_iterator dbName = dbNames.begin();
              dbName < dbNames.end();
              ++dbName) {
-            ScopedTransaction scopedXact(opCtx, MODE_IS);
             AutoGetDb autoDb(opCtx, *dbName, MODE_S);
 
             Database* db = autoDb.getDb();

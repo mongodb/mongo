@@ -95,7 +95,7 @@ void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int 
         list<BSONObj> src;
         {
             const NamespaceString localSources{"local.sources"};
-            AutoGetCollectionForRead ctx(opCtx, localSources);
+            AutoGetCollectionForReadCommand ctx(opCtx, localSources);
             unique_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(
                 opCtx, localSources.ns(), ctx.getCollection(), PlanExecutor::YIELD_MANUAL));
             BSONObj obj;

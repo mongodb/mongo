@@ -111,7 +111,7 @@ public:
         }
 
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
-        AutoGetCollectionForRead ctx(opCtx, nss);
+        AutoGetCollectionForReadCommand ctx(opCtx, nss);
 
         Collection* collection = ctx.getCollection();
         if (!collection) {

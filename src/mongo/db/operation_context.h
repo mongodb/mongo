@@ -33,7 +33,8 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/write_concern_options.h"
@@ -48,7 +49,6 @@ namespace mongo {
 
 class Client;
 class CurOp;
-class Locker;
 class ProgressMeter;
 class ServiceContext;
 class StringData;
@@ -502,37 +502,6 @@ private:
 
     bool _committed;
     bool _toplevel;
-};
-
-
-/**
- * RAII-style class to mark the scope of a transaction. ScopedTransactions may be nested.
- * An outermost ScopedTransaction calls abandonSnapshot() on destruction, so that the storage
- * engine can release resources, such as snapshots or locks, that it may have acquired during
- * the transaction. Note that any writes are committed in nested WriteUnitOfWork scopes,
- * so write conflicts cannot happen on completing a ScopedTransaction.
- *
- * TODO: The ScopedTransaction should hold the global lock
- */
-class ScopedTransaction {
-    MONGO_DISALLOW_COPYING(ScopedTransaction);
-
-public:
-    /**
-     * The mode for the transaction indicates whether the transaction will write (MODE_IX) or
-     * only read (MODE_IS), or needs to run without other writers (MODE_S) or any other
-     * operations (MODE_X) on the server.
-     */
-    ScopedTransaction(OperationContext* opCtx, LockMode mode) : _opCtx(opCtx) {}
-
-    ~ScopedTransaction() {
-        if (!_opCtx->lockState()->isLocked()) {
-            _opCtx->recoveryUnit()->abandonSnapshot();
-        }
-    }
-
-private:
-    OperationContext* _opCtx;
 };
 
 namespace repl {

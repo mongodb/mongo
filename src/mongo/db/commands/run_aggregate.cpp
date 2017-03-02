@@ -309,7 +309,7 @@ Status runAggregate(OperationContext* opCtx,
         // same sharding version that we synchronize on here. This is also why we always need to
         // create a ClientCursor even when we aren't outputting to a cursor. See the comment on
         // ShardFilterStage for more details.
-        AutoGetCollectionOrViewForRead ctx(opCtx, nss);
+        AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss);
         Collection* collection = ctx.getCollection();
 
         // If this is a view, resolve it by finding the underlying collection and stitching view
@@ -487,7 +487,7 @@ Status runAggregate(OperationContext* opCtx,
             // AutoGetCollectionForRead.  AutoGetCollectionForRead will throw if the
             // sharding version is out of date, and we don't care if the sharding version
             // has changed.
-            Lock::DBLock dbLock(opCtx->lockState(), nss.db(), MODE_IS);
+            Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
             Lock::CollectionLock collLock(opCtx->lockState(), nss.ns(), MODE_IS);
             if (keepCursor) {
                 pin->release();
@@ -498,7 +498,7 @@ Status runAggregate(OperationContext* opCtx,
     } catch (...) {
         // On our way out of scope, we clean up our ClientCursorPin if needed.
         if (pin) {
-            Lock::DBLock dbLock(opCtx->lockState(), nss.db(), MODE_IS);
+            Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
             Lock::CollectionLock collLock(opCtx->lockState(), nss.ns(), MODE_IS);
             pin->deleteUnderlying();
         }

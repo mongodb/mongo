@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/collection_scan_common.h"
@@ -54,10 +55,7 @@ const int kInterjections = kDocuments;
 class CountStageTest {
 public:
     CountStageTest()
-        : _scopedXact(&_opCtx, MODE_IX),
-          _dbLock(_opCtx.lockState(), nsToDatabaseSubstring(ns()), MODE_X),
-          _ctx(&_opCtx, ns()),
-          _coll(NULL) {}
+        : _dbLock(&_opCtx, nsToDatabaseSubstring(ns()), MODE_X), _ctx(&_opCtx, ns()), _coll(NULL) {}
 
     virtual ~CountStageTest() {}
 
@@ -233,9 +231,8 @@ public:
 
 protected:
     vector<RecordId> _recordIds;
-    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _opCtx = *_txnPtr;
-    ScopedTransaction _scopedXact;
+    const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
+    OperationContext& _opCtx = *_opCtxPtr;
     Lock::DBLock _dbLock;
     OldClientContext _ctx;
     Collection* _coll;

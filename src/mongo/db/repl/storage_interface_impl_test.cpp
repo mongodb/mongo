@@ -89,8 +89,7 @@ NamespaceString makeNamespace(const T& t, const char* suffix = "") {
  */
 BSONObj getMinValidDocument(OperationContext* opCtx, const NamespaceString& minValidNss) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(opCtx, MODE_IS);
-        Lock::DBLock dblk(opCtx->lockState(), minValidNss.db(), MODE_IS);
+        Lock::DBLock dblk(opCtx, minValidNss.db(), MODE_IS);
         Lock::CollectionLock lk(opCtx->lockState(), minValidNss.ns(), MODE_IS);
         BSONObj mv;
         if (Helpers::getSingleton(opCtx, minValidNss.ns().c_str(), mv)) {
@@ -120,8 +119,7 @@ void createCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
                       const CollectionOptions& options = CollectionOptions()) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(opCtx, MODE_IX);
-        Lock::DBLock dblk(opCtx->lockState(), nss.db(), MODE_X);
+        Lock::DBLock dblk(opCtx, nss.db(), MODE_X);
         OldClientContext ctx(opCtx, nss.ns());
         auto db = ctx.db();
         ASSERT_TRUE(db);
@@ -449,7 +447,7 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, InsertMissingDocWorksOnExistingCap
     opts.cappedSize = 1024 * 1024;
     createCollection(opCtx, nss, opts);
     ASSERT_OK(storage.insertDocument(opCtx, nss, BSON("_id" << 1)));
-    AutoGetCollectionForRead autoColl(opCtx, nss);
+    AutoGetCollectionForReadCommand autoColl(opCtx, nss);
     ASSERT_TRUE(autoColl.getCollection());
 }
 
@@ -459,7 +457,7 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, InsertMissingDocWorksOnExistingCol
     NamespaceString nss("foo.bar");
     createCollection(opCtx, nss);
     ASSERT_OK(storage.insertDocument(opCtx, nss, BSON("_id" << 1)));
-    AutoGetCollectionForRead autoColl(opCtx, nss);
+    AutoGetCollectionForReadCommand autoColl(opCtx, nss);
     ASSERT_TRUE(autoColl.getCollection());
 }
 
@@ -487,7 +485,7 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, CreateCollectionWithIDIndexCommits
     ASSERT_OK(loader->insertDocuments(docs.begin(), docs.end()));
     ASSERT_OK(loader->commit());
 
-    AutoGetCollectionForRead autoColl(opCtx, nss);
+    AutoGetCollectionForReadCommand autoColl(opCtx, nss);
     auto coll = autoColl.getCollection();
     ASSERT(coll);
     ASSERT_EQ(coll->getRecordStore()->numRecords(opCtx), 2LL);
@@ -516,7 +514,7 @@ void _testDestroyUncommitedCollectionBulkLoader(
     // Collection and ID index should not exist after 'loader' is destroyed.
     destroyLoaderFn(std::move(loader));
 
-    AutoGetCollectionForRead autoColl(opCtx, nss);
+    AutoGetCollectionForReadCommand autoColl(opCtx, nss);
     auto coll = autoColl.getCollection();
 
     // Bulk loader is used to create indexes. The collection is not dropped when the bulk loader is
@@ -590,12 +588,12 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, CreateOplogCreateCappedCollection)
     StorageInterfaceImpl storage;
     NamespaceString nss("local.oplog.X");
     {
-        AutoGetCollectionForRead autoColl(opCtx, nss);
+        AutoGetCollectionForReadCommand autoColl(opCtx, nss);
         ASSERT_FALSE(autoColl.getCollection());
     }
     ASSERT_OK(storage.createOplog(opCtx, nss));
     {
-        AutoGetCollectionForRead autoColl(opCtx, nss);
+        AutoGetCollectionForReadCommand autoColl(opCtx, nss);
         ASSERT_TRUE(autoColl.getCollection());
         ASSERT_EQ(nss.toString(), autoColl.getCollection()->ns().toString());
         ASSERT_TRUE(autoColl.getCollection()->isCapped());
@@ -608,7 +606,7 @@ TEST_F(StorageInterfaceImplWithReplCoordTest,
     StorageInterfaceImpl storage;
     NamespaceString nss("local.oplog.Y");
     {
-        AutoGetCollectionForRead autoColl(opCtx, nss);
+        AutoGetCollectionForReadCommand autoColl(opCtx, nss);
         ASSERT_FALSE(autoColl.getCollection());
     }
 
@@ -622,12 +620,12 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, CreateCollectionFailsIfCollectionE
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
     {
-        AutoGetCollectionForRead autoColl(opCtx, nss);
+        AutoGetCollectionForReadCommand autoColl(opCtx, nss);
         ASSERT_FALSE(autoColl.getCollection());
     }
     ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
     {
-        AutoGetCollectionForRead autoColl(opCtx, nss);
+        AutoGetCollectionForReadCommand autoColl(opCtx, nss);
         ASSERT_TRUE(autoColl.getCollection());
         ASSERT_EQ(nss.toString(), autoColl.getCollection()->ns().toString());
     }
@@ -652,7 +650,7 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, DropCollectionWorksWithExistingEmp
     NamespaceString nss("foo.bar");
     createCollection(opCtx, nss);
     ASSERT_OK(storage.dropCollection(opCtx, nss));
-    AutoGetCollectionForRead autoColl(opCtx, nss);
+    AutoGetCollectionForReadCommand autoColl(opCtx, nss);
     ASSERT_FALSE(autoColl.getCollection());
 }
 
@@ -662,7 +660,7 @@ TEST_F(StorageInterfaceImplWithReplCoordTest, DropCollectionWorksWithMissingColl
     NamespaceString nss("foo.bar");
     ASSERT_FALSE(AutoGetDb(opCtx, nss.db(), MODE_IS).getDb());
     ASSERT_OK(storage.dropCollection(opCtx, nss));
-    ASSERT_FALSE(AutoGetCollectionForRead(opCtx, nss).getCollection());
+    ASSERT_FALSE(AutoGetCollectionForReadCommand(opCtx, nss).getCollection());
     // Database should not be created after running dropCollection.
     ASSERT_FALSE(AutoGetDb(opCtx, nss.db(), MODE_IS).getDb());
 }

@@ -133,7 +133,7 @@ public:
 
         addIndex(BSON("foo" << 1));
 
-        AutoGetCollectionForRead ctx(&_opCtx, nss);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         const Collection* coll = ctx.getCollection();
 
         // Plan 0: IXScan over foo == 7
@@ -227,7 +227,7 @@ public:
         addIndex(BSON("a" << 1));
         addIndex(BSON("b" << 1));
 
-        AutoGetCollectionForRead ctx(&_opCtx, nss);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         Collection* collection = ctx.getCollection();
 
         // Query for both 'a' and 'b' and sort on 'b'.
@@ -335,7 +335,7 @@ public:
             secondPlan->pushBack(PlanStage::NEED_TIME);
         }
 
-        AutoGetCollectionForRead ctx(&_opCtx, nss);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
 
         auto qr = stdx::make_unique<QueryRequest>(nss);
         qr->setFilter(BSON("x" << 1));
@@ -413,7 +413,7 @@ public:
         addIndex(BSON("foo" << 1));
         addIndex(BSON("foo" << -1 << "bar" << 1));
 
-        AutoGetCollectionForRead ctx(&_opCtx, nss);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         Collection* coll = ctx.getCollection();
 
         // Create the executor (Matching all documents).

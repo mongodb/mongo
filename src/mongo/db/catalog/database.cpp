@@ -47,6 +47,7 @@
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
@@ -581,8 +582,7 @@ const DatabaseCatalogEntry* Database::getDatabaseCatalogEntry() const {
 }
 
 void dropAllDatabasesExceptLocal(OperationContext* opCtx) {
-    ScopedTransaction transaction(opCtx, MODE_X);
-    Lock::GlobalWrite lk(opCtx->lockState());
+    Lock::GlobalWrite lk(opCtx);
 
     vector<string> n;
     StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();

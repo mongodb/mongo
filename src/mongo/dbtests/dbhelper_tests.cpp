@@ -70,8 +70,7 @@ public:
 
         {
             // Remove _id range [_min, _max).
-            ScopedTransaction transaction(&opCtx, MODE_IX);
-            Lock::DBLock lk(opCtx.lockState(), nsToDatabaseSubstring(ns), MODE_X);
+            Lock::DBLock lk(&opCtx, nsToDatabaseSubstring(ns), MODE_X);
             OldClientContext ctx(&opCtx, ns);
 
             KeyRange range(ns, BSON("_id" << _min), BSON("_id" << _max), BSON("_id" << 1));

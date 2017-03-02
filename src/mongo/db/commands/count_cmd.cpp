@@ -122,7 +122,7 @@ public:
         }
 
         // Acquire the db read lock.
-        AutoGetCollectionOrViewForRead ctx(opCtx, request.getValue().getNs());
+        AutoGetCollectionOrViewForReadCommand ctx(opCtx, request.getValue().getNs());
         Collection* collection = ctx.getCollection();
 
         if (ctx.getView()) {
@@ -187,7 +187,7 @@ public:
                        "http://dochub.mongodb.org/core/3.4-feature-compatibility."));
         }
 
-        AutoGetCollectionOrViewForRead ctx(opCtx, request.getValue().getNs());
+        AutoGetCollectionOrViewForReadCommand ctx(opCtx, request.getValue().getNs());
         Collection* collection = ctx.getCollection();
 
         if (ctx.getView()) {

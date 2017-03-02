@@ -144,7 +144,6 @@ public:
         if (cmdObj.hasElement("validate"))
             compactOptions.validateDocuments = cmdObj["validate"].trueValue();
 
-        ScopedTransaction transaction(opCtx, MODE_IX);
         AutoGetDb autoDb(opCtx, db, MODE_X);
         Database* const collDB = autoDb.getDb();
 

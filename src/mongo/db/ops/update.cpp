@@ -87,8 +87,7 @@ UpdateResult update(OperationContext* opCtx, Database* db, const UpdateRequest& 
                   locker->isLockHeldForMode(ResourceId(RESOURCE_DATABASE, nsString.db()), MODE_X));
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            ScopedTransaction transaction(opCtx, MODE_IX);
-            Lock::DBLock lk(opCtx->lockState(), nsString.db(), MODE_X);
+            Lock::DBLock lk(opCtx, nsString.db(), MODE_X);
 
             const bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
                 !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nsString);

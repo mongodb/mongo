@@ -128,8 +128,7 @@ public:
 
         LOG(0) << "CMD: reIndex " << toReIndexNs;
 
-        ScopedTransaction transaction(opCtx, MODE_IX);
-        Lock::DBLock dbXLock(opCtx->lockState(), dbname, MODE_X);
+        Lock::DBLock dbXLock(opCtx, dbname, MODE_X);
         OldClientContext ctx(opCtx, toReIndexNs.ns());
 
         Collection* collection = ctx.db()->getCollection(toReIndexNs.ns());

@@ -102,7 +102,7 @@ public:
             return false;
         }
 
-        AutoGetCollectionForRead context(opCtx, nss);
+        AutoGetCollectionForReadCommand context(opCtx, nss);
 
         Collection* collection = context.getCollection();
         if (!collection) {

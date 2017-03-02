@@ -40,8 +40,7 @@ public:
     IndexIteratorTests() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        ScopedTransaction transaction(&opCtx, MODE_IX);
-        Lock::DBLock lk(opCtx.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
+        Lock::DBLock lk(&opCtx, nsToDatabaseSubstring(_ns), MODE_X);
         OldClientContext ctx(&opCtx, _ns);
         WriteUnitOfWork wuow(&opCtx);
 
@@ -54,8 +53,7 @@ public:
     ~IndexIteratorTests() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        ScopedTransaction transaction(&opCtx, MODE_IX);
-        Lock::DBLock lk(opCtx.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
+        Lock::DBLock lk(&opCtx, nsToDatabaseSubstring(_ns), MODE_X);
         OldClientContext ctx(&opCtx, _ns);
         WriteUnitOfWork wuow(&opCtx);
 
@@ -109,8 +107,7 @@ public:
     RefreshEntry() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        ScopedTransaction transaction(&opCtx, MODE_IX);
-        Lock::DBLock lk(opCtx.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
+        Lock::DBLock lk(&opCtx, nsToDatabaseSubstring(_ns), MODE_X);
         OldClientContext ctx(&opCtx, _ns);
         WriteUnitOfWork wuow(&opCtx);
 
@@ -123,8 +120,7 @@ public:
     ~RefreshEntry() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        ScopedTransaction transaction(&opCtx, MODE_IX);
-        Lock::DBLock lk(opCtx.lockState(), nsToDatabaseSubstring(_ns), MODE_X);
+        Lock::DBLock lk(&opCtx, nsToDatabaseSubstring(_ns), MODE_X);
         OldClientContext ctx(&opCtx, _ns);
         WriteUnitOfWork wuow(&opCtx);
 

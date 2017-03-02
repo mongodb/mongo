@@ -60,8 +60,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
     }
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(opCtx, MODE_X);
-        Lock::GlobalWrite lk(opCtx->lockState());
+        Lock::GlobalWrite lk(opCtx);
         AutoGetDb autoDB(opCtx, dbName, MODE_X);
         Database* const db = autoDB.getDb();
         if (!db) {

@@ -506,7 +506,6 @@ static WriteResult::SingleResult performSingleUpdateOp(OperationContext* opCtx,
     ParsedUpdate parsedUpdate(opCtx, &request);
     uassertStatusOK(parsedUpdate.parseRequest());
 
-    ScopedTransaction scopedXact(opCtx, MODE_IX);
     boost::optional<AutoGetCollection> collection;
     while (true) {
         opCtx->checkForInterrupt();
@@ -631,7 +630,6 @@ static WriteResult::SingleResult performSingleDeleteOp(OperationContext* opCtx,
         uasserted(ErrorCodes::InternalError, "failAllRemoves failpoint active!");
     }
 
-    ScopedTransaction scopedXact(opCtx, MODE_IX);
     AutoGetCollection collection(opCtx,
                                  ns,
                                  MODE_IX,  // DB is always IX, even if collection is X.

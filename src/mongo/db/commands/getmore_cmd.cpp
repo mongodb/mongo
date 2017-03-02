@@ -185,7 +185,7 @@ public:
         // Note that we declare our locks before our ClientCursorPin, in order to ensure that
         // the pin's destructor is called before the lock destructors (so that the unpin occurs
         // under the lock).
-        std::unique_ptr<AutoGetCollectionForRead> ctx;
+        std::unique_ptr<AutoGetCollectionForReadCommand> ctx;
         std::unique_ptr<Lock::DBLock> unpinDBLock;
         std::unique_ptr<Lock::CollectionLock> unpinCollLock;
 
@@ -193,8 +193,8 @@ public:
         if (request.nss.isListIndexesCursorNS() || request.nss.isListCollectionsCursorNS()) {
             cursorManager = CursorManager::getGlobalCursorManager();
         } else {
-            ctx = stdx::make_unique<AutoGetCollectionOrViewForRead>(opCtx, request.nss);
-            auto viewCtx = static_cast<AutoGetCollectionOrViewForRead*>(ctx.get());
+            ctx = stdx::make_unique<AutoGetCollectionOrViewForReadCommand>(opCtx, request.nss);
+            auto viewCtx = static_cast<AutoGetCollectionOrViewForReadCommand*>(ctx.get());
             Collection* collection = ctx->getCollection();
             if (!collection) {
                 // Rewrite a getMore on a view to a getMore on the original underlying collection.
@@ -251,7 +251,7 @@ public:
             invariant(!unpinCollLock);
             sleepFor(Milliseconds(10));
             ctx.reset();
-            ctx = stdx::make_unique<AutoGetCollectionForRead>(opCtx, request.nss);
+            ctx = stdx::make_unique<AutoGetCollectionForReadCommand>(opCtx, request.nss);
         }
 
         if (request.nss.ns() != cursor->ns()) {
@@ -402,7 +402,7 @@ public:
                 // CappedInsertNotifier.
                 curOp->setExpectedLatencyMs(durationCount<Milliseconds>(timeout));
 
-                ctx.reset(new AutoGetCollectionForRead(opCtx, request.nss));
+                ctx.reset(new AutoGetCollectionForReadCommand(opCtx, request.nss));
                 exec->restoreState();
 
                 // We woke up because either the timed_wait expired, or there was more data. Either
@@ -463,7 +463,7 @@ public:
             // earlier and need to reacquire it in order to clean up our ClientCursorPin.
             if (cursor->isAggCursor()) {
                 invariant(NULL == ctx.get());
-                unpinDBLock.reset(new Lock::DBLock(opCtx->lockState(), request.nss.db(), MODE_IS));
+                unpinDBLock.reset(new Lock::DBLock(opCtx, request.nss.db(), MODE_IS));
                 unpinCollLock.reset(
                     new Lock::CollectionLock(opCtx->lockState(), request.nss.ns(), MODE_IS));
             }
@@ -567,7 +567,7 @@ public:
         std::unique_ptr<Lock::CollectionLock> unpinCollLock;
 
         if (cursor->isAggCursor()) {
-            unpinDBLock.reset(new Lock::DBLock(opCtx->lockState(), request.nss.db(), MODE_IS));
+            unpinDBLock.reset(new Lock::DBLock(opCtx, request.nss.db(), MODE_IS));
             unpinCollLock.reset(
                 new Lock::CollectionLock(opCtx->lockState(), request.nss.ns(), MODE_IS));
         }

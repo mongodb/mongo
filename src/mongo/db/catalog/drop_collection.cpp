@@ -59,8 +59,6 @@ Status dropCollection(OperationContext* opCtx,
     const std::string dbname = collectionName.db().toString();
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(opCtx, MODE_IX);
-
         AutoGetDb autoDb(opCtx, dbname, MODE_X);
         Database* const db = autoDb.getDb();
         Collection* coll = db ? db->getCollection(collectionName) : nullptr;

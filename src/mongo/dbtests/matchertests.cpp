@@ -234,7 +234,7 @@ public:
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         const NamespaceString nss("unittests.matchertests");
-        AutoGetCollectionForRead ctx(&opCtx, nss);
+        AutoGetCollectionForReadCommand ctx(&opCtx, nss);
 
         const CollatorInterface* collator = nullptr;
         M m(BSON("$where"

@@ -52,7 +52,6 @@ Status TextMatchExpression::init(OperationContext* opCtx,
     fts::TextIndexVersion version;
     {
         // Find text index.
-        ScopedTransaction transaction(opCtx, MODE_IS);
         AutoGetDb autoDb(opCtx, nss.db(), MODE_IS);
         Lock::CollectionLock collLock(opCtx->lockState(), nss.ns(), MODE_IS);
         Database* db = autoDb.getDb();

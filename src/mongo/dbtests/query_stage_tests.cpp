@@ -79,7 +79,7 @@ public:
     }
 
     int countResults(const IndexScanParams& params, BSONObj filterObj = BSONObj()) {
-        AutoGetCollectionForRead ctx(&_opCtx, NamespaceString(ns()));
+        AutoGetCollectionForReadCommand ctx(&_opCtx, NamespaceString(ns()));
 
         const CollatorInterface* collator = nullptr;
         StatusWithMatchExpression statusWithMatcher = MatchExpressionParser::parse(
@@ -117,7 +117,7 @@ public:
     }
 
     IndexDescriptor* getIndex(const BSONObj& obj) {
-        AutoGetCollectionForRead ctx(&_opCtx, NamespaceString(ns()));
+        AutoGetCollectionForReadCommand ctx(&_opCtx, NamespaceString(ns()));
         Collection* collection = ctx.getCollection();
         std::vector<IndexDescriptor*> indexes;
         collection->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);

@@ -552,7 +552,6 @@ StatusWith<ChunkVersion> ShardingState::_refreshMetadata(
     }
 
     // Exclusive collection lock needed since we're now changing the metadata
-    ScopedTransaction transaction(opCtx, MODE_IX);
     AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
 
     auto css = CollectionShardingState::get(opCtx, nss);

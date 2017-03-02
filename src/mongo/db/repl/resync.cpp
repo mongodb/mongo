@@ -105,8 +105,7 @@ public:
         }
 
         // Master/Slave resync.
-        ScopedTransaction transaction(opCtx, MODE_X);
-        Lock::GlobalWrite globalWriteLock(opCtx->lockState());
+        Lock::GlobalWrite globalWriteLock(opCtx);
         // below this comment pertains only to master/slave replication
         if (cmdObj.getBoolField("force")) {
             if (!waitForSyncToFinish(opCtx, errmsg))

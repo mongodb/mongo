@@ -84,7 +84,7 @@ public:
     }
 
     int countResults(CollectionScanParams::Direction direction, const BSONObj& filterObj) {
-        AutoGetCollectionForRead ctx(&_opCtx, nss);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
 
         // Configure the scan.
         CollectionScanParams params;
@@ -206,7 +206,7 @@ public:
 class QueryStageCollscanObjectsInOrderForward : public QueryStageCollectionScanBase {
 public:
     void run() {
-        AutoGetCollectionForRead ctx(&_opCtx, nss);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
 
         // Configure the scan.
         CollectionScanParams params;
@@ -242,7 +242,7 @@ public:
 class QueryStageCollscanObjectsInOrderBackward : public QueryStageCollectionScanBase {
 public:
     void run() {
-        AutoGetCollectionForRead ctx(&_opCtx, nss);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
 
         CollectionScanParams params;
         params.collection = ctx.getCollection();

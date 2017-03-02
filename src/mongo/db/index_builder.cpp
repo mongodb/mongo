@@ -94,8 +94,7 @@ void IndexBuilder::run() {
     }
     NamespaceString ns(_index["ns"].String());
 
-    ScopedTransaction transaction(&opCtx, MODE_IX);
-    Lock::DBLock dlk(opCtx.lockState(), ns.db(), MODE_X);
+    Lock::DBLock dlk(&opCtx, ns.db(), MODE_X);
     OldClientContext ctx(&opCtx, ns.getSystemIndexesCollection());
 
     Database* db = dbHolder().get(&opCtx, ns.db().toString());

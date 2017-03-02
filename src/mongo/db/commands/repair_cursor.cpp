@@ -75,7 +75,7 @@ public:
                      BSONObjBuilder& result) {
         NamespaceString ns(parseNs(dbname, cmdObj));
 
-        AutoGetCollectionForRead ctx(opCtx, ns);
+        AutoGetCollectionForReadCommand ctx(opCtx, ns);
 
         Collection* collection = ctx.getCollection();
         if (!collection) {

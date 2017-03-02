@@ -134,7 +134,7 @@ public:
                           "http://dochub.mongodb.org/core/3.4-feature-compatibility.");
         }
 
-        AutoGetCollectionOrViewForRead ctx(opCtx, nss);
+        AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss);
         Collection* collection = ctx.getCollection();
 
         if (ctx.getView()) {
@@ -189,7 +189,7 @@ public:
                        "http://dochub.mongodb.org/core/3.4-feature-compatibility."));
         }
 
-        AutoGetCollectionOrViewForRead ctx(opCtx, nss);
+        AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss);
         Collection* collection = ctx.getCollection();
 
         if (ctx.getView()) {

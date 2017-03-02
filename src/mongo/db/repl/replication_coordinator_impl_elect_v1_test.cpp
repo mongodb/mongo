@@ -1431,7 +1431,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryDoNotNeedToCatchUp) {
     ASSERT_EQUALS(1, countLogLinesContaining("My optime is most up-to-date, skipping catch-up"));
     auto opCtx = makeOperationContext();
     getReplCoord()->signalDrainComplete(opCtx.get(), getReplCoord()->getTerm());
-    Lock::GlobalLock lock(opCtx->lockState(), MODE_IX, 1);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, 1);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
@@ -1455,7 +1455,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryFreshnessScanTimeout) {
     ASSERT_EQUALS(1, countLogLinesContaining("Could not access any nodes within timeout"));
     auto opCtx = makeOperationContext();
     getReplCoord()->signalDrainComplete(opCtx.get(), getReplCoord()->getTerm());
-    Lock::GlobalLock lock(opCtx->lockState(), MODE_IX, 1);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, 1);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
@@ -1485,7 +1485,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryCatchUpSucceeds) {
     ASSERT_EQUALS(1, countLogLinesContaining("Finished catch-up oplog after becoming primary."));
     auto opCtx = makeOperationContext();
     getReplCoord()->signalDrainComplete(opCtx.get(), getReplCoord()->getTerm());
-    Lock::GlobalLock lock(opCtx->lockState(), MODE_IX, 1);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, 1);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
@@ -1509,7 +1509,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryCatchUpTimeout) {
     ASSERT_EQUALS(1, countLogLinesContaining("Cannot catch up oplog after becoming primary"));
     auto opCtx = makeOperationContext();
     getReplCoord()->signalDrainComplete(opCtx.get(), getReplCoord()->getTerm());
-    Lock::GlobalLock lock(opCtx->lockState(), MODE_IX, 1);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, 1);
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
@@ -1537,7 +1537,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringFreshnessScan) {
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Stopped transition to primary"));
     auto opCtx = makeOperationContext();
-    Lock::GlobalLock lock(opCtx->lockState(), MODE_IX, 1);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, 1);
     ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
@@ -1571,7 +1571,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Cannot catch up oplog after becoming primary"));
-    Lock::GlobalLock lock(opCtx->lockState(), MODE_IX, 1);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, 1);
     ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
@@ -1620,11 +1620,11 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
     ASSERT(replCoord->getApplierState() == ApplierState::Draining);
     auto opCtx = makeOperationContext();
     {
-        Lock::GlobalLock lock(opCtx->lockState(), MODE_IX, 1);
+        Lock::GlobalLock lock(opCtx.get(), MODE_IX, 1);
         ASSERT_FALSE(replCoord->canAcceptWritesForDatabase(opCtx.get(), "test"));
     }
     replCoord->signalDrainComplete(opCtx.get(), replCoord->getTerm());
-    Lock::GlobalLock lock(opCtx->lockState(), MODE_IX, 1);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, 1);
     ASSERT(replCoord->getApplierState() == ApplierState::Stopped);
     ASSERT_TRUE(replCoord->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }

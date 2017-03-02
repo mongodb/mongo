@@ -156,7 +156,7 @@ Status _applyOps(OperationContext* opCtx,
                     //
                     // We do not have a wrapping WriteUnitOfWork so it is possible for a journal
                     // commit to happen with a subset of ops applied.
-                    Lock::GlobalWrite globalWriteLockDisallowTempRelease(opCtx->lockState());
+                    Lock::GlobalWrite globalWriteLockDisallowTempRelease(opCtx);
 
                     // Ensures that yielding will not happen (see the comment above).
                     DEV {
@@ -309,8 +309,7 @@ Status applyOps(OperationContext* opCtx,
                 const std::string& dbName,
                 const BSONObj& applyOpCmd,
                 BSONObjBuilder* result) {
-    ScopedTransaction scopedXact(opCtx, MODE_X);
-    Lock::GlobalWrite globalWriteLock(opCtx->lockState());
+    Lock::GlobalWrite globalWriteLock(opCtx);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
         !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(opCtx, dbName);

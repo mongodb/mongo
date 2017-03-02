@@ -93,7 +93,7 @@ public:
                      BSONObjBuilder& result) {
         const NamespaceString ns(parseNsCollectionRequired(dbname, cmdObj));
 
-        AutoGetCollectionForRead ctx(opCtx, ns);
+        AutoGetCollectionForReadCommand ctx(opCtx, ns);
 
         Collection* collection = ctx.getCollection();
         if (!collection)

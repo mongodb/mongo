@@ -38,6 +38,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/copydb.h"
 #include "mongo/db/commands/copydb_start_commands.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 
@@ -226,12 +227,10 @@ public:
 
         if (fromSelf) {
             // SERVER-4328 todo lock just the two db's not everything for the fromself case
-            ScopedTransaction transaction(opCtx, MODE_X);
-            Lock::GlobalWrite lk(opCtx->lockState());
+            Lock::GlobalWrite lk(opCtx);
             uassertStatusOK(cloner.copyDb(opCtx, todb, fromhost, cloneOptions, NULL));
         } else {
-            ScopedTransaction transaction(opCtx, MODE_IX);
-            Lock::DBLock lk(opCtx->lockState(), todb, MODE_X);
+            Lock::DBLock lk(opCtx, todb, MODE_X);
             uassertStatusOK(cloner.copyDb(opCtx, todb, fromhost, cloneOptions, NULL));
         }
 

@@ -197,8 +197,7 @@ void logStartup(OperationContext* opCtx) {
 
     BSONObj o = toLog.obj();
 
-    ScopedTransaction transaction(opCtx, MODE_X);
-    Lock::GlobalWrite lk(opCtx->lockState());
+    Lock::GlobalWrite lk(opCtx);
     AutoGetOrCreateDb autoDb(opCtx, startupLogCollectionName.db(), mongo::MODE_X);
     Database* db = autoDb.getDb();
     Collection* collection = db->getCollection(startupLogCollectionName);
@@ -255,6 +254,8 @@ void checkForIdIndexes(OperationContext* opCtx, Database* db) {
  *          --replset.
  */
 unsigned long long checkIfReplMissingFromCommandLine(OperationContext* opCtx) {
+    // This is helpful for the query below to work as you can't open files when readlocked
+    Lock::GlobalWrite lk(opCtx);
     if (!repl::getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
         DBDirectClient c(opCtx);
         return c.count(kSystemReplSetCollection.ns());
@@ -280,8 +281,7 @@ void checkForCappedOplog(OperationContext* opCtx, Database* db) {
 void repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     LOG(1) << "enter repairDatabases (to check pdfile version #)";
 
-    ScopedTransaction transaction(opCtx, MODE_X);
-    Lock::GlobalWrite lk(opCtx->lockState());
+    Lock::GlobalWrite lk(opCtx);
 
     vector<string> dbNames;
 
@@ -308,7 +308,7 @@ void repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         // yet, then it will be created. If the mongod is running in a read-only mode, then it is
         // fine to not open the "local" database and populate the catalog entries because we won't
         // attempt to drop the temporary collections anyway.
-        Lock::DBLock dbLock(opCtx->lockState(), kSystemReplSetCollection.db(), MODE_X);
+        Lock::DBLock dbLock(opCtx, kSystemReplSetCollection.db(), MODE_X);
         dbHolder().openDb(opCtx, kSystemReplSetCollection.db());
     }
 
@@ -697,8 +697,7 @@ ExitCode _initAndListen(int listenPort) {
 
         if (!replSettings.usingReplSets() && !replSettings.isSlave() &&
             storageGlobalParams.engine != "devnull") {
-            ScopedTransaction transaction(startupOpCtx.get(), MODE_X);
-            Lock::GlobalWrite lk(startupOpCtx.get()->lockState());
+            Lock::GlobalWrite lk(startupOpCtx.get());
             FeatureCompatibilityVersion::setIfCleanStartup(
                 startupOpCtx.get(), repl::StorageInterface::get(getGlobalServiceContext()));
         }
@@ -1020,8 +1019,7 @@ static void shutdownTask() {
     //
     // TODO: This call chain uses the locker directly, because we do not want to start an
     // operation context, which also instantiates a recovery unit. Also, using the
-    // lockGlobalBegin/lockGlobalComplete sequence, we avoid taking the flush lock. This will
-    // all go away if we start acquiring the global/flush lock as part of ScopedTransaction.
+    // lockGlobalBegin/lockGlobalComplete sequence, we avoid taking the flush lock.
     //
     // For a Windows service, dbexit does not call exit(), so we must leak the lock outside
     // of this function to prevent any operations from running that need a lock.

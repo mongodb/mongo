@@ -68,8 +68,7 @@ Status renameCollection(OperationContext* opCtx,
                         bool stayTemp) {
     DisableDocumentValidation validationDisabler(opCtx);
 
-    ScopedTransaction transaction(opCtx, MODE_X);
-    Lock::GlobalWrite globalWriteLock(opCtx->lockState());
+    Lock::GlobalWrite globalWriteLock(opCtx);
     // We stay in source context the whole time. This is mostly to set the CurOp namespace.
     OldClientContext ctx(opCtx, source.ns());
 

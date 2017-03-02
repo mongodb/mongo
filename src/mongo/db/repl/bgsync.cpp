@@ -660,8 +660,7 @@ OpTimeWithHash BackgroundSync::_readLastAppliedOpTimeWithHash(OperationContext* 
     BSONObj oplogEntry;
     try {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            ScopedTransaction transaction(opCtx, MODE_IX);
-            Lock::DBLock lk(opCtx->lockState(), "local", MODE_X);
+            Lock::DBLock lk(opCtx, "local", MODE_X);
             bool success = Helpers::getLast(opCtx, rsOplogName.c_str(), oplogEntry);
             if (!success) {
                 // This can happen when we are to do an initial sync.  lastHash will be set

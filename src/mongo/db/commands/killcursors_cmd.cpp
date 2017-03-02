@@ -48,7 +48,7 @@ private:
     Status _killCursor(OperationContext* opCtx,
                        const NamespaceString& nss,
                        CursorId cursorId) final {
-        std::unique_ptr<AutoGetCollectionOrViewForRead> ctx;
+        std::unique_ptr<AutoGetCollectionOrViewForReadCommand> ctx;
 
         CursorManager* cursorManager;
         if (nss.isListIndexesCursorNS() || nss.isListCollectionsCursorNS()) {
@@ -57,7 +57,7 @@ private:
             // data within a collection.
             cursorManager = CursorManager::getGlobalCursorManager();
         } else {
-            ctx = stdx::make_unique<AutoGetCollectionOrViewForRead>(opCtx, nss);
+            ctx = stdx::make_unique<AutoGetCollectionOrViewForReadCommand>(opCtx, nss);
             Collection* collection = ctx->getCollection();
             ViewDefinition* view = ctx->getView();
             if (view) {

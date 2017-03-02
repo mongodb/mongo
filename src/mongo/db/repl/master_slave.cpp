@@ -196,8 +196,7 @@ void ReplSource::ensureMe(OperationContext* opCtx) {
     bool exists = Helpers::getSingleton(opCtx, "local.me", _me);
 
     if (!exists || !_me.hasField("host") || _me["host"].String() != myname) {
-        ScopedTransaction transaction(opCtx, MODE_IX);
-        Lock::DBLock dblk(opCtx->lockState(), "local", MODE_X);
+        Lock::DBLock dblk(opCtx, "local", MODE_X);
         WriteUnitOfWork wunit(opCtx);
         // clean out local.me
         Helpers::emptyCollection(opCtx, "local.me");
@@ -771,7 +770,7 @@ void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* opCtx,
         }
     }
 
-    unique_ptr<Lock::GlobalWrite> lk(alreadyLocked ? 0 : new Lock::GlobalWrite(opCtx->lockState()));
+    unique_ptr<Lock::GlobalWrite> lk(alreadyLocked ? 0 : new Lock::GlobalWrite(opCtx));
 
     if (replAllDead) {
         // hmmm why is this check here and not at top of this function? does it get set between top
@@ -914,8 +913,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
             }
             // obviously global isn't ideal, but non-repl set is old so
             // keeping it simple
-            ScopedTransaction transaction(opCtx, MODE_X);
-            Lock::GlobalWrite lk(opCtx->lockState());
+            Lock::GlobalWrite lk(opCtx);
             save(opCtx);
         }
 
@@ -977,8 +975,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
             log() << ns << " oplog is empty" << endl;
         }
         {
-            ScopedTransaction transaction(opCtx, MODE_X);
-            Lock::GlobalWrite lk(opCtx->lockState());
+            Lock::GlobalWrite lk(opCtx);
             save(opCtx);
         }
         return okResultCode;
@@ -1045,8 +1042,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
             const bool moreInitialSyncsPending = !addDbNextPass.empty() && n;
 
             if (moreInitialSyncsPending || !oplogReader.more()) {
-                ScopedTransaction transaction(opCtx, MODE_X);
-                Lock::GlobalWrite lk(opCtx->lockState());
+                Lock::GlobalWrite lk(opCtx);
 
                 if (tailing) {
                     okResultCode = restartSync;  // don't sleep
@@ -1060,8 +1056,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
 
             OCCASIONALLY if (n > 0 && (n > 100000 || time(0) - saveLast > 60)) {
                 // periodically note our progress, in case we are doing a lot of work and crash
-                ScopedTransaction transaction(opCtx, MODE_X);
-                Lock::GlobalWrite lk(opCtx->lockState());
+                Lock::GlobalWrite lk(opCtx);
                 syncedTo = nextOpTime;
                 // can't update local log ts since there are pending operations from our peer
                 save(opCtx);
@@ -1075,8 +1070,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
 
             int b = replApplyBatchSize.load();
             bool justOne = b == 1;
-            unique_ptr<Lock::GlobalWrite> lk(justOne ? 0
-                                                     : new Lock::GlobalWrite(opCtx->lockState()));
+            unique_ptr<Lock::GlobalWrite> lk(justOne ? 0 : new Lock::GlobalWrite(opCtx));
             while (1) {
                 BSONElement ts = op.getField("ts");
                 if (!(ts.type() == Date || ts.type() == bsonTimestamp)) {
@@ -1108,8 +1102,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
                     oplogReader.putBack(op);
                     _sleepAdviceTime = nextOpTime.getSecs() +
                         durationCount<Seconds>(replSettings.getSlaveDelaySecs()) + 1;
-                    ScopedTransaction transaction(opCtx, MODE_X);
-                    Lock::GlobalWrite lk(opCtx->lockState());
+                    Lock::GlobalWrite lk(opCtx);
                     if (n > 0) {
                         syncedTo = last;
                         save(opCtx);
@@ -1191,8 +1184,7 @@ _ reuse that cursor when we can
 int _replMain(OperationContext* opCtx, ReplSource::SourceVector& sources, int& nApplied) {
     {
         ReplInfo r("replMain load sources");
-        ScopedTransaction transaction(opCtx, MODE_X);
-        Lock::GlobalWrite lk(opCtx->lockState());
+        Lock::GlobalWrite lk(opCtx);
         ReplSource::loadAll(opCtx, sources);
 
         // only need this param for initial reset
@@ -1254,8 +1246,7 @@ static void replMain(OperationContext* opCtx) {
     while (1) {
         auto s = restartSync;
         {
-            ScopedTransaction transaction(opCtx, MODE_X);
-            Lock::GlobalWrite lk(opCtx->lockState());
+            Lock::GlobalWrite lk(opCtx);
             if (replAllDead) {
                 // throttledForceResyncDead can throw
                 if (!getGlobalReplicationCoordinator()->getSettings().isAutoResyncEnabled() ||
@@ -1288,8 +1279,7 @@ static void replMain(OperationContext* opCtx) {
         }
 
         {
-            ScopedTransaction transaction(opCtx, MODE_X);
-            Lock::GlobalWrite lk(opCtx->lockState());
+            Lock::GlobalWrite lk(opCtx);
             invariant(syncing.swap(0) == 1);
         }
 
@@ -1324,7 +1314,7 @@ static void replMasterThread() {
         OperationContext& opCtx = *opCtxPtr;
         AuthorizationSession::get(opCtx.getClient())->grantInternalAuthorization();
 
-        Lock::GlobalWrite globalWrite(opCtx.lockState(), 1);
+        Lock::GlobalWrite globalWrite(&opCtx, 1);
         if (globalWrite.isLocked()) {
             toSleep = 10;
 
@@ -1405,9 +1395,8 @@ void pretouchN(vector<BSONObj>& v, unsigned a, unsigned b) {
     Client::initThreadIfNotAlready("pretouchN");
 
     const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
-    OperationContext& opCtx = *opCtxPtr;
-    ScopedTransaction transaction(&opCtx, MODE_S);
-    Lock::GlobalRead lk(opCtx.lockState());
+    OperationContext& opCtx = *opCtxPtr;  // XXX
+    Lock::GlobalRead lk(&opCtx);
 
     for (unsigned i = a; i <= b; i++) {
         const BSONObj& op = v[i];
@@ -1464,7 +1453,7 @@ void pretouchOperation(OperationContext* opCtx, const BSONObj& op) {
             BSONObjBuilder b;
             b.append(_id);
             BSONObj result;
-            AutoGetCollectionForRead ctx(opCtx, NamespaceString(ns));
+            AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString(ns));
             if (Helpers::findById(opCtx, ctx.getDb(), ns, b.done(), result)) {
                 _dummy_z += result.objsize();  // touch
             }

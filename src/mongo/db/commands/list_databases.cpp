@@ -114,8 +114,7 @@ public:
         vector<string> dbNames;
         StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
         {
-            ScopedTransaction transaction(opCtx, MODE_IS);
-            Lock::GlobalLock lk(opCtx->lockState(), MODE_IS, UINT_MAX);
+            Lock::GlobalLock lk(opCtx, MODE_IS, UINT_MAX);
             storageEngine->listDatabases(&dbNames);
         }
 
@@ -135,8 +134,7 @@ public:
                 if (filterNameOnly && !filter->matchesBSON(b.asTempObj()))
                     continue;
 
-                ScopedTransaction transaction(opCtx, MODE_IS);
-                Lock::DBLock dbLock(opCtx->lockState(), dbname, MODE_IS);
+                Lock::DBLock dbLock(opCtx, dbname, MODE_IS);
 
                 Database* db = dbHolder().get(opCtx, dbname);
                 if (!db)

@@ -118,8 +118,6 @@ void profile(OperationContext* opCtx, NetworkOp op) {
     try {
         bool acquireDbXLock = false;
         while (true) {
-            ScopedTransaction scopedXact(opCtx, MODE_IX);
-
             std::unique_ptr<AutoGetDb> autoGetDb;
             if (acquireDbXLock) {
                 autoGetDb.reset(new AutoGetDb(opCtx, dbName, MODE_X));

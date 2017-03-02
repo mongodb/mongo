@@ -121,7 +121,7 @@ public:
         // Make an index on a:1
         addIndex(BSON("a" << 1));
 
-        AutoGetCollectionForRead ctx(&_opCtx, nss);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         Collection* coll = ctx.getCollection();
 
         // Set up the distinct stage.
@@ -188,7 +188,7 @@ public:
         // Make an index on a:1
         addIndex(BSON("a" << 1));
 
-        AutoGetCollectionForRead ctx(&_opCtx, nss);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         Collection* coll = ctx.getCollection();
 
         // Set up the distinct stage.
@@ -257,7 +257,7 @@ public:
 
         addIndex(BSON("a" << 1 << "b" << 1));
 
-        AutoGetCollectionForRead ctx(&_opCtx, nss);
+        AutoGetCollectionForReadCommand ctx(&_opCtx, nss);
         Collection* coll = ctx.getCollection();
 
         std::vector<IndexDescriptor*> indices;

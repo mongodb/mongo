@@ -71,8 +71,8 @@ void OplogBufferCollectionTest::setUp() {
     ServiceContextMongoDTest::setUp();
     auto service = getServiceContext();
 
-    // AutoGetCollectionForRead requires a valid replication coordinator in order to check the shard
-    // version.
+    // AutoGetCollectionForReadCommand requires a valid replication coordinator in order to check
+    // the shard version.
     ReplSettings replSettings;
     replSettings.setOplogSizeBytes(5 * 1024 * 1024);
     ReplicationCoordinator::set(
@@ -137,10 +137,10 @@ void testStartupCreatesCollection(OperationContext* opCtx,
     OplogBufferCollection oplogBuffer(storageInterface, nss);
 
     // Collection should not exist until startup() is called.
-    ASSERT_FALSE(AutoGetCollectionForRead(opCtx, nss).getCollection());
+    ASSERT_FALSE(AutoGetCollectionForReadCommand(opCtx, nss).getCollection());
 
     oplogBuffer.startup(opCtx);
-    ASSERT_TRUE(AutoGetCollectionForRead(opCtx, nss).getCollection());
+    ASSERT_TRUE(AutoGetCollectionForReadCommand(opCtx, nss).getCollection());
 }
 
 TEST_F(OplogBufferCollectionTest, StartupWithDefaultNamespaceCreatesCollection) {
@@ -158,7 +158,7 @@ TEST_F(OplogBufferCollectionTest, StartupDropsExistingCollectionBeforeCreatingNe
     ASSERT_OK(_storageInterface->createCollection(_opCtx.get(), nss, CollectionOptions()));
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
     oplogBuffer.startup(_opCtx.get());
-    ASSERT_TRUE(AutoGetCollectionForRead(_opCtx.get(), nss).getCollection());
+    ASSERT_TRUE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
 }
 
 DEATH_TEST_F(OplogBufferCollectionTest,
@@ -172,9 +172,9 @@ TEST_F(OplogBufferCollectionTest, ShutdownDropsCollection) {
     OplogBufferCollection oplogBuffer(_storageInterface, nss);
 
     oplogBuffer.startup(_opCtx.get());
-    ASSERT_TRUE(AutoGetCollectionForRead(_opCtx.get(), nss).getCollection());
+    ASSERT_TRUE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
     oplogBuffer.shutdown(_opCtx.get());
-    ASSERT_FALSE(AutoGetCollectionForRead(_opCtx.get(), nss).getCollection());
+    ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
 }
 
 TEST_F(OplogBufferCollectionTest, extractEmbeddedOplogDocumentChangesIdToTimestamp) {
@@ -542,7 +542,7 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     _assertDocumentsInCollectionEquals(_opCtx.get(), nss, {oplog, sentinel, oplog2});
 
     oplogBuffer.clear(_opCtx.get());
-    ASSERT_TRUE(AutoGetCollectionForRead(_opCtx.get(), nss).getCollection());
+    ASSERT_TRUE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
     ASSERT_EQUALS(oplogBuffer.getSize(), 0UL);
     ASSERT_EQUALS(0U, oplogBuffer.getSentinelCount_forTest());

@@ -165,7 +165,7 @@ Status ListFilters::runIndexFilterCommand(OperationContext* opCtx,
                                           BSONObj& cmdObj,
                                           BSONObjBuilder* bob) {
     // This is a read lock. The query settings is owned by the collection.
-    AutoGetCollectionForRead ctx(opCtx, NamespaceString(ns));
+    AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString(ns));
 
     QuerySettings* querySettings;
     PlanCache* unused;
@@ -233,7 +233,7 @@ Status ClearFilters::runIndexFilterCommand(OperationContext* opCtx,
                                            BSONObj& cmdObj,
                                            BSONObjBuilder* bob) {
     // This is a read lock. The query settings is owned by the collection.
-    AutoGetCollectionForRead ctx(opCtx, NamespaceString(ns));
+    AutoGetCollectionForReadCommand ctx(opCtx, NamespaceString(ns));
 
     QuerySettings* querySettings;
     PlanCache* planCache;
@@ -335,7 +335,7 @@ Status SetFilter::runIndexFilterCommand(OperationContext* opCtx,
                                         BSONObjBuilder* bob) {
     // This is a read lock. The query settings is owned by the collection.
     const NamespaceString nss(ns);
-    AutoGetCollectionForRead ctx(opCtx, nss);
+    AutoGetCollectionForReadCommand ctx(opCtx, nss);
 
     QuerySettings* querySettings;
     PlanCache* planCache;

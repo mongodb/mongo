@@ -36,8 +36,8 @@
                           tojson(res.totals));
 
             // We allow an unexpected entry in top if the insert counter has been cleared. This is
-            // probably due to a background job releasing an AutoGetCollectionForRead for that
-            // collection.
+            // probably due to a background job releasing an AutoGetCollectionForReadCommand for
+            // that collection.
             entriesInTop.forEach(function(coll) {
                 if (expectedEntryNames.includes(coll)) {
                     return;

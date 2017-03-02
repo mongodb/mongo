@@ -169,7 +169,7 @@ public:
 
         // Acquire locks. If the namespace is a view, we release our locks and convert the query
         // request into an aggregation command.
-        AutoGetCollectionOrViewForRead ctx(opCtx, nss);
+        AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss);
         if (ctx.getView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
             ctx.releaseLocksForView();
@@ -297,7 +297,7 @@ public:
 
         // Acquire locks. If the query is on a view, we release our locks and convert the query
         // request into an aggregation command.
-        AutoGetCollectionOrViewForRead ctx(opCtx, nss);
+        AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss);
         Collection* collection = ctx.getCollection();
         if (ctx.getView()) {
             // Relinquish locks. The aggregation command will re-acquire them.

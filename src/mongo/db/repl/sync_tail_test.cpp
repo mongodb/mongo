@@ -177,8 +177,7 @@ void createCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
                       const CollectionOptions& options) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(opCtx, MODE_IX);
-        Lock::DBLock dblk(opCtx->lockState(), nss.db(), MODE_X);
+        Lock::DBLock dblk(opCtx, nss.db(), MODE_X);
         OldClientContext ctx(opCtx, nss.ns());
         auto db = ctx.db();
         ASSERT_TRUE(db);
@@ -363,7 +362,7 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentDatabaseMissing) {
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionMissing) {
     {
-        Lock::GlobalWrite globalLock(_opCtx->lockState());
+        Lock::GlobalWrite globalLock(_opCtx.get());
         bool justCreated = false;
         Database* db = dbHolder().openDb(_opCtx.get(), "test", &justCreated);
         ASSERT_TRUE(db);
@@ -374,7 +373,7 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionMissing) {
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionExists) {
     {
-        Lock::GlobalWrite globalLock(_opCtx->lockState());
+        Lock::GlobalWrite globalLock(_opCtx.get());
         bool justCreated = false;
         Database* db = dbHolder().openDb(_opCtx.get(), "test", &justCreated);
         ASSERT_TRUE(db);
@@ -614,7 +613,7 @@ TEST_F(SyncTailTest, MultiSyncApplyUsesSyncApplyToApplyOperation) {
     multiSyncApply(&ops, nullptr);
     // Collection should be created after SyncTail::syncApply() processes operation.
     _opCtx = cc().makeOperationContext();
-    ASSERT_TRUE(AutoGetCollectionForRead(_opCtx.get(), nss).getCollection());
+    ASSERT_TRUE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyDisablesDocumentValidationWhileApplyingOperations) {
@@ -866,7 +865,7 @@ TEST_F(SyncTailTest,
 
     // Since the missing document is not found on the sync source, the collection referenced by
     // the failed operation should not be automatically created.
-    ASSERT_FALSE(AutoGetCollectionForRead(_opCtx.get(), nss).getCollection());
+    ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
     ASSERT_EQUALS(fetchCount.load(), 1U);
 }
 
@@ -1007,14 +1006,14 @@ OplogEntry IdempotencyTest::dropIndex(const std::string& indexName) {
 }
 
 std::string IdempotencyTest::validate() {
-    auto collection = AutoGetCollectionForRead(_opCtx.get(), nss).getCollection();
+    auto collection = AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection();
     if (!collection) {
         return "CollectionNotFound";
     }
     ValidateResults validateResults;
     BSONObjBuilder bob;
 
-    Lock::DBLock lk(_opCtx->lockState(), nss.db(), MODE_IS);
+    Lock::DBLock lk(_opCtx.get(), nss.db(), MODE_IS);
     Lock::CollectionLock lock(_opCtx->lockState(), nss.ns(), MODE_IS);
     ASSERT_OK(collection->validate(_opCtx.get(), kValidateFull, &validateResults, &bob));
     ASSERT_TRUE(validateResults.valid);

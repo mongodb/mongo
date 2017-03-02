@@ -104,8 +104,7 @@ NamespaceString StorageInterfaceImpl::getMinValidNss() const {
 
 BSONObj StorageInterfaceImpl::getMinValidDocument(OperationContext* opCtx) const {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(opCtx, MODE_IS);
-        Lock::DBLock dblk(opCtx->lockState(), _minValidNss.db(), MODE_IS);
+        Lock::DBLock dblk(opCtx, _minValidNss.db(), MODE_IS);
         Lock::CollectionLock lk(opCtx->lockState(), _minValidNss.ns(), MODE_IS);
         BSONObj doc;
         bool found = Helpers::getSingleton(opCtx, _minValidNss.ns().c_str(), doc);
@@ -121,9 +120,8 @@ BSONObj StorageInterfaceImpl::getMinValidDocument(OperationContext* opCtx) const
 void StorageInterfaceImpl::updateMinValidDocument(OperationContext* opCtx,
                                                   const BSONObj& updateSpec) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(opCtx, MODE_IX);
         // For now this needs to be MODE_X because it sometimes creates the collection.
-        Lock::DBLock dblk(opCtx->lockState(), _minValidNss.db(), MODE_X);
+        Lock::DBLock dblk(opCtx, _minValidNss.db(), MODE_X);
         Helpers::putSingleton(opCtx, _minValidNss.ns().c_str(), updateSpec);
     }
     MONGO_WRITE_CONFLICT_RETRY_LOOP_END(
@@ -263,7 +261,6 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
         // Retry if WCE.
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             // Get locks and create the collection.
-            ScopedTransaction transaction(opCtx, MODE_IX);
             auto db = stdx::make_unique<AutoGetOrCreateDb>(opCtx, nss.db(), MODE_IX);
             auto coll = stdx::make_unique<AutoGetCollection>(opCtx, nss, MODE_X);
             collection = coll->getCollection();
@@ -321,7 +318,6 @@ Status insertDocumentsSingleBatch(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   std::vector<BSONObj>::const_iterator begin,
                                   std::vector<BSONObj>::const_iterator end) {
-    ScopedTransaction transaction(opCtx, MODE_IX);
     AutoGetCollection autoColl(opCtx, nss, MODE_IX);
     auto collection = autoColl.getCollection();
     if (!collection) {
@@ -384,7 +380,7 @@ Status StorageInterfaceImpl::createOplog(OperationContext* opCtx, const Namespac
 
 StatusWith<size_t> StorageInterfaceImpl::getOplogMaxSize(OperationContext* opCtx,
                                                          const NamespaceString& nss) {
-    AutoGetCollectionForRead collection(opCtx, nss);
+    AutoGetCollectionForReadCommand collection(opCtx, nss);
     if (!collection.getCollection()) {
         return {ErrorCodes::NamespaceNotFound,
                 str::stream() << "Your oplog doesn't exist: " << nss.ns()};
@@ -401,7 +397,6 @@ Status StorageInterfaceImpl::createCollection(OperationContext* opCtx,
                                               const NamespaceString& nss,
                                               const CollectionOptions& options) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(opCtx, MODE_IX);
         AutoGetOrCreateDb databaseWriteGuard(opCtx, nss.db(), MODE_X);
         auto db = databaseWriteGuard.getDb();
         invariant(db);
@@ -424,7 +419,6 @@ Status StorageInterfaceImpl::createCollection(OperationContext* opCtx,
 
 Status StorageInterfaceImpl::dropCollection(OperationContext* opCtx, const NamespaceString& nss) {
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(opCtx, MODE_IX);
         AutoGetDb autoDB(opCtx, nss.db(), MODE_X);
         if (!autoDB.getDb()) {
             // Database does not exist - nothing to do.
@@ -470,7 +464,6 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
         auto collectionAccessMode = isFind ? MODE_IS : MODE_IX;
-        ScopedTransaction transaction(opCtx, collectionAccessMode);
         AutoGetCollection collectionGuard(opCtx, nss, collectionAccessMode);
         auto collection = collectionGuard.getCollection();
         if (!collection) {
@@ -607,7 +600,6 @@ StatusWith<std::vector<BSONObj>> StorageInterfaceImpl::deleteDocuments(
 }
 
 Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
-    ScopedTransaction transaction(opCtx, MODE_IX);
     AutoGetDb autoDB(opCtx, "admin", MODE_X);
     return checkAdminDatabase(opCtx, autoDB.getDb());
 }

@@ -132,7 +132,7 @@ public:
             return appendCommandStatus(result, parseCursorStatus);
         }
 
-        AutoGetCollectionForRead autoColl(opCtx, ns);
+        AutoGetCollectionForReadCommand autoColl(opCtx, ns);
         if (!autoColl.getDb()) {
             return appendCommandStatus(result,
                                        Status(ErrorCodes::NamespaceNotFound, "no database"));

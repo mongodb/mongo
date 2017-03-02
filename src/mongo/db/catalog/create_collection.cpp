@@ -73,8 +73,7 @@ Status createCollection(OperationContext* opCtx,
                 options.hasField("$nExtents"));
 
     MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-        ScopedTransaction transaction(opCtx, MODE_IX);
-        Lock::DBLock dbXLock(opCtx->lockState(), dbName, MODE_X);
+        Lock::DBLock dbXLock(opCtx, dbName, MODE_X);
         OldClientContext ctx(opCtx, nss.ns());
         if (opCtx->writesAreReplicated() &&
             !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nss)) {

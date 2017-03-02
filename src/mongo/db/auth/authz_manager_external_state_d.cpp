@@ -78,7 +78,7 @@ Status AuthzManagerExternalStateMongod::findOne(OperationContext* opCtx,
                                                 const NamespaceString& collectionName,
                                                 const BSONObj& query,
                                                 BSONObj* result) {
-    AutoGetCollectionForRead ctx(opCtx, collectionName);
+    AutoGetCollectionForReadCommand ctx(opCtx, collectionName);
 
     BSONObj found;
     if (Helpers::findOne(opCtx, ctx.getCollection(), query, found)) {

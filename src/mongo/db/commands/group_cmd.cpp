@@ -134,7 +134,7 @@ private:
 
         groupRequest.explain = true;
 
-        AutoGetCollectionForRead ctx(opCtx, groupRequest.ns);
+        AutoGetCollectionForReadCommand ctx(opCtx, groupRequest.ns);
         Collection* coll = ctx.getCollection();
 
         auto statusWithPlanExecutor =
@@ -166,7 +166,7 @@ private:
             return appendCommandStatus(result, parseRequestStatus);
         }
 
-        AutoGetCollectionForRead ctx(opCtx, groupRequest.ns);
+        AutoGetCollectionForReadCommand ctx(opCtx, groupRequest.ns);
         Collection* coll = ctx.getCollection();
 
         auto statusWithPlanExecutor =

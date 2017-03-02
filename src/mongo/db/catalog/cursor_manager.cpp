@@ -226,7 +226,7 @@ bool GlobalCursorIdCache::eraseCursor(OperationContext* opCtx, CursorId id, bool
 
     // If not, then the cursor must be owned by a collection.  Erase the cursor under the
     // collection lock (to prevent the collection from going away during the erase).
-    AutoGetCollectionForRead ctx(opCtx, nss);
+    AutoGetCollectionForReadCommand ctx(opCtx, nss);
     Collection* collection = ctx.getCollection();
     if (!collection) {
         if (checkAuth)
@@ -266,7 +266,7 @@ std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* opCtx, int mil
     // For each collection, time out its cursors under the collection lock (to prevent the
     // collection from going away during the erase).
     for (unsigned i = 0; i < todo.size(); i++) {
-        AutoGetCollectionOrViewForRead ctx(opCtx, NamespaceString(todo[i]));
+        AutoGetCollectionOrViewForReadCommand ctx(opCtx, NamespaceString(todo[i]));
         if (!ctx.getDb()) {
             continue;
         }

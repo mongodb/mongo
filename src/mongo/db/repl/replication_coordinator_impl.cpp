@@ -938,8 +938,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
         }
     }
 
-    ScopedTransaction transaction(opCtx, MODE_X);
-    Lock::GlobalWrite globalWriteLock(opCtx->lockState());
+    Lock::GlobalWrite globalWriteLock(opCtx);
     lk.lock();
 
     // Exit drain mode when the buffer is empty in the current term and we're in Draining mode.
@@ -1806,7 +1805,7 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
         return {ErrorCodes::NotMaster, "not primary so can't step down"};
     }
 
-    Lock::GlobalLock globalReadLock(opCtx->lockState(), MODE_S, Lock::GlobalLock::EnqueueOnly());
+    Lock::GlobalLock globalReadLock(opCtx, MODE_S, Lock::GlobalLock::EnqueueOnly());
 
     // We've requested the global shared lock which will stop new writes from coming in,
     // but existing writes could take a long time to finish, so kill all user operations

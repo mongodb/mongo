@@ -365,9 +365,8 @@ OldThreadPool* ReplicationCoordinatorExternalStateImpl::getDbWorkThreadPool() co
 
 Status ReplicationCoordinatorExternalStateImpl::runRepairOnLocalDB(OperationContext* opCtx) {
     try {
-        ScopedTransaction scopedXact(opCtx, MODE_X);
-        Lock::GlobalWrite globalWrite(opCtx->lockState());
-        StorageEngine* engine = _service->getGlobalStorageEngine();
+        Lock::GlobalWrite globalWrite(opCtx);
+        StorageEngine* engine = getGlobalServiceContext()->getGlobalStorageEngine();
 
         if (!engine->isMmapV1()) {
             return Status::OK();
@@ -390,8 +389,7 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
         createOplog(opCtx);
 
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            ScopedTransaction scopedXact(opCtx, MODE_X);
-            Lock::GlobalWrite globalWrite(opCtx->lockState());
+            Lock::GlobalWrite globalWrite(opCtx);
 
             WriteUnitOfWork wuow(opCtx);
             Helpers::putSingleton(opCtx, configCollectionName, config);
@@ -436,8 +434,6 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
 
     if (isV1ElectionProtocol) {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            ScopedTransaction scopedXact(opCtx, MODE_X);
-
             WriteUnitOfWork wuow(opCtx);
             opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(
                 opCtx,
@@ -466,8 +462,7 @@ OID ReplicationCoordinatorExternalStateImpl::ensureMe(OperationContext* opCtx) {
     std::string myname = getHostName();
     OID myRID;
     {
-        ScopedTransaction transaction(opCtx, MODE_IX);
-        Lock::DBLock lock(opCtx->lockState(), meDatabaseName, MODE_X);
+        Lock::DBLock lock(opCtx, meDatabaseName, MODE_X);
 
         BSONObj me;
         // local.me is an identifier for a server for getLastError w:2+
@@ -514,8 +509,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalConfigDocument(Operati
                                                                          const BSONObj& config) {
     try {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            ScopedTransaction transaction(opCtx, MODE_IX);
-            Lock::DBLock dbWriteLock(opCtx->lockState(), configDatabaseName, MODE_X);
+            Lock::DBLock dbWriteLock(opCtx, configDatabaseName, MODE_X);
             Helpers::putSingleton(opCtx, configCollectionName, config);
             return Status::OK();
         }
@@ -550,8 +544,7 @@ Status ReplicationCoordinatorExternalStateImpl::storeLocalLastVoteDocument(
     BSONObj lastVoteObj = lastVote.toBSON();
     try {
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-            ScopedTransaction transaction(opCtx, MODE_IX);
-            Lock::DBLock dbWriteLock(opCtx->lockState(), lastVoteDatabaseName, MODE_X);
+            Lock::DBLock dbWriteLock(opCtx, lastVoteDatabaseName, MODE_X);
 
             // If there is no last vote document, we want to store one. Otherwise, we only want to
             // replace it if the new last vote document would have a higher term. We both check

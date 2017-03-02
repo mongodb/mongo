@@ -472,7 +472,6 @@ void MigrationChunkClonerSourceLegacy::_cleanup(OperationContext* opCtx) {
     }
 
     if (_deleteNotifyExec) {
-        ScopedTransaction scopedXact(opCtx, MODE_IS);
         AutoGetCollection autoColl(opCtx, _args.getNss(), MODE_IS);
 
         _deleteNotifyExec.reset();
@@ -510,7 +509,6 @@ StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::_callRecipient(const BSONO
 }
 
 Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opCtx) {
-    ScopedTransaction scopedXact(opCtx, MODE_IS);
     AutoGetCollection autoColl(opCtx, _args.getNss(), MODE_IS);
 
     Collection* const collection = autoColl.getCollection();

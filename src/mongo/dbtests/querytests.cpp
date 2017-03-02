@@ -65,7 +65,7 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
 class Base {
 public:
-    Base() : _scopedXact(&_opCtx, MODE_X), _lk(_opCtx.lockState()), _context(&_opCtx, ns()) {
+    Base() : _lk(&_opCtx), _context(&_opCtx, ns()) {
         {
             WriteUnitOfWork wunit(&_opCtx);
             _database = _context.db();
@@ -121,9 +121,8 @@ protected:
     }
 
 
-    const ServiceContext::UniqueOperationContext _txnPtr = cc().makeOperationContext();
-    OperationContext& _opCtx = *_txnPtr;
-    ScopedTransaction _scopedXact;
+    const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
+    OperationContext& _opCtx = *_opCtxPtr;
     Lock::GlobalWrite _lk;
     OldClientContext _context;
 
@@ -188,8 +187,7 @@ public:
     void run() {
         // We don't normally allow empty objects in the database, but test that we can find
         // an empty object (one might be allowed inside a reserved namespace at some point).
-        ScopedTransaction transaction(&_opCtx, MODE_X);
-        Lock::GlobalWrite lk(_opCtx.lockState());
+        Lock::GlobalWrite lk(&_opCtx);
         OldClientContext ctx(&_opCtx, "unittests.querytests");
 
         {
@@ -336,7 +334,7 @@ public:
 
         // Check that the cursor has been removed.
         {
-            AutoGetCollectionForRead ctx(&_opCtx, NamespaceString(ns));
+            AutoGetCollectionForReadCommand ctx(&_opCtx, NamespaceString(ns));
             ASSERT(0 == ctx.getCollection()->getCursorManager()->numCursors());
         }
 
@@ -384,7 +382,7 @@ public:
 
         // Check that the cursor still exists
         {
-            AutoGetCollectionForRead ctx(&_opCtx, NamespaceString(ns));
+            AutoGetCollectionForReadCommand ctx(&_opCtx, NamespaceString(ns));
             ASSERT(1 == ctx.getCollection()->getCursorManager()->numCursors());
             ASSERT_OK(ctx.getCollection()->getCursorManager()->pinCursor(cursorId).getStatus());
         }
@@ -661,8 +659,7 @@ public:
         _client.dropCollection(ns);
         _client.createCollection(ns, 10, true);
 
-        ScopedTransaction transaction(&_opCtx, MODE_IX);
-        Lock::DBLock lk(_opCtx.lockState(), "unittests", MODE_X);
+        Lock::DBLock lk(&_opCtx, "unittests", MODE_X);
         OldClientContext ctx(&_opCtx, ns);
 
         BSONObj info;
@@ -1137,8 +1134,7 @@ private:
 class DirectLocking : public ClientBase {
 public:
     void run() {
-        ScopedTransaction transaction(&_opCtx, MODE_X);
-        Lock::GlobalWrite lk(_opCtx.lockState());
+        Lock::GlobalWrite lk(&_opCtx);
         OldClientContext ctx(&_opCtx, "unittests.DirectLocking");
         _client.remove("a.b", BSONObj());
         ASSERT_EQUALS("unittests", ctx.db()->name());
@@ -1252,7 +1248,7 @@ public:
     }
 
     size_t numCursorsOpen() {
-        AutoGetCollectionForRead ctx(&_opCtx, NamespaceString(_ns));
+        AutoGetCollectionForReadCommand ctx(&_opCtx, NamespaceString(_ns));
         Collection* collection = ctx.getCollection();
         if (!collection)
             return 0;
@@ -1600,13 +1596,9 @@ public:
 class CollectionInternalBase : public CollectionBase {
 public:
     CollectionInternalBase(const char* nsLeaf)
-        : CollectionBase(nsLeaf),
-          _scopedXact(&_opCtx, MODE_IX),
-          _lk(_opCtx.lockState(), "unittests", MODE_X),
-          _ctx(&_opCtx, ns()) {}
+        : CollectionBase(nsLeaf), _lk(&_opCtx, "unittests", MODE_X), _ctx(&_opCtx, ns()) {}
 
 private:
-    ScopedTransaction _scopedXact;
     Lock::DBLock _lk;
     OldClientContext _ctx;
 };
@@ -1656,7 +1648,7 @@ public:
 
         ClientCursor* clientCursor = 0;
         {
-            AutoGetCollectionForRead ctx(&_opCtx, NamespaceString(ns()));
+            AutoGetCollectionForReadCommand ctx(&_opCtx, NamespaceString(ns()));
             auto clientCursorPin =
                 unittest::assertGet(ctx.getCollection()->getCursorManager()->pinCursor(cursorId));
             clientCursor = clientCursorPin.getCursor();

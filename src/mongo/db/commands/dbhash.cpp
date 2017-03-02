@@ -109,7 +109,6 @@ public:
 
         // We lock the entire database in S-mode in order to ensure that the contents will not
         // change for the snapshot.
-        ScopedTransaction scopedXact(opCtx, MODE_IS);
         AutoGetDb autoDb(opCtx, ns, MODE_S);
         Database* db = autoDb.getDb();
         if (db) {

@@ -57,8 +57,7 @@ class AutoGetActiveCloner {
     MONGO_DISALLOW_COPYING(AutoGetActiveCloner);
 
 public:
-    AutoGetActiveCloner(OperationContext* opCtx, const MigrationSessionId& migrationSessionId)
-        : _scopedXact(opCtx, MODE_IS) {
+    AutoGetActiveCloner(OperationContext* opCtx, const MigrationSessionId& migrationSessionId) {
         ShardingState* const gss = ShardingState::get(opCtx);
 
         const auto nss = gss->getActiveDonateChunkNss();
@@ -105,9 +104,6 @@ public:
     }
 
 private:
-    // Scoped transaction to reset the WT snapshot
-    ScopedTransaction _scopedXact;
-
     // Scoped database + collection lock
     boost::optional<AutoGetCollection> _autoColl;
 

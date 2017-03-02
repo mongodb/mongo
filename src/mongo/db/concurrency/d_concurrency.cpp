@@ -135,51 +135,53 @@ bool Lock::ResourceMutex::isAtLeastReadLocked(Locker* locker) {
     return locker->isLockHeldForMode(_rid, MODE_IS);
 }
 
-Lock::GlobalLock::GlobalLock(Locker* locker, LockMode lockMode, unsigned timeoutMs)
-    : GlobalLock(locker, lockMode, EnqueueOnly()) {
+Lock::GlobalLock::GlobalLock(OperationContext* opCtx, LockMode lockMode, unsigned timeoutMs)
+    : GlobalLock(opCtx, lockMode, EnqueueOnly()) {
     waitForLock(timeoutMs);
 }
 
-Lock::GlobalLock::GlobalLock(Locker* locker, LockMode lockMode, EnqueueOnly enqueueOnly)
-    : _locker(locker), _result(LOCK_INVALID), _pbwm(locker, resourceIdParallelBatchWriterMode) {
+Lock::GlobalLock::GlobalLock(OperationContext* opCtx, LockMode lockMode, EnqueueOnly enqueueOnly)
+    : _opCtx(opCtx),
+      _result(LOCK_INVALID),
+      _pbwm(opCtx->lockState(), resourceIdParallelBatchWriterMode) {
     _enqueue(lockMode);
 }
 
 void Lock::GlobalLock::_enqueue(LockMode lockMode) {
-    if (_locker->shouldConflictWithSecondaryBatchApplication()) {
+    if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
         _pbwm.lock(MODE_IS);
     }
 
-    _result = _locker->lockGlobalBegin(lockMode);
+    _result = _opCtx->lockState()->lockGlobalBegin(lockMode);
 }
 
 void Lock::GlobalLock::waitForLock(unsigned timeoutMs) {
     if (_result == LOCK_WAITING) {
-        _result = _locker->lockGlobalComplete(timeoutMs);
+        _result = _opCtx->lockState()->lockGlobalComplete(timeoutMs);
     }
 
-    if (_result != LOCK_OK && _locker->shouldConflictWithSecondaryBatchApplication()) {
+    if (_result != LOCK_OK && _opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
         _pbwm.unlock();
     }
 }
 
 void Lock::GlobalLock::_unlock() {
     if (isLocked()) {
-        _locker->unlockGlobal();
+        _opCtx->lockState()->unlockGlobal();
         _result = LOCK_INVALID;
     }
 }
 
 
-Lock::DBLock::DBLock(Locker* locker, StringData db, LockMode mode)
+Lock::DBLock::DBLock(OperationContext* opCtx, StringData db, LockMode mode)
     : _id(RESOURCE_DATABASE, db),
-      _locker(locker),
+      _opCtx(opCtx),
       _mode(mode),
-      _globalLock(locker, isSharedLockMode(_mode) ? MODE_IS : MODE_IX, UINT_MAX) {
+      _globalLock(opCtx, isSharedLockMode(_mode) ? MODE_IS : MODE_IX, UINT_MAX) {
     massert(28539, "need a valid database name", !db.empty() && nsIsDbOnly(db));
 
     // Need to acquire the flush lock
-    _locker->lockMMAPV1Flush();
+    _opCtx->lockState()->lockMMAPV1Flush();
 
     // The check for the admin db is to ensure direct writes to auth collections
     // are serialized (see SERVER-16092).
@@ -187,24 +189,24 @@ Lock::DBLock::DBLock(Locker* locker, StringData db, LockMode mode)
         _mode = MODE_X;
     }
 
-    invariant(LOCK_OK == _locker->lock(_id, _mode));
+    invariant(LOCK_OK == _opCtx->lockState()->lock(_id, _mode));
 }
 
 Lock::DBLock::~DBLock() {
-    _locker->unlock(_id);
+    _opCtx->lockState()->unlock(_id);
 }
 
 void Lock::DBLock::relockWithMode(LockMode newMode) {
     // 2PL would delay the unlocking
-    invariant(!_locker->inAWriteUnitOfWork());
+    invariant(!_opCtx->lockState()->inAWriteUnitOfWork());
 
     // Not allowed to change global intent
     invariant(!isSharedLockMode(_mode) || isSharedLockMode(newMode));
 
-    _locker->unlock(_id);
+    _opCtx->lockState()->unlock(_id);
     _mode = newMode;
 
-    invariant(LOCK_OK == _locker->lock(_id, _mode));
+    invariant(LOCK_OK == _opCtx->lockState()->lock(_id, _mode));
 }
 
 

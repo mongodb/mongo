@@ -547,8 +547,7 @@ public:
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
 
-        ScopedTransaction transaction(&opCtx, MODE_IX);
-        Lock::DBLock lk(opCtx.lockState(), dbName, MODE_X);
+        Lock::DBLock lk(&opCtx, dbName, MODE_X);
 
         bool justCreated;
         Database* db = dbHolder().openDb(&opCtx, dbName, &justCreated);
@@ -592,8 +591,7 @@ public:
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
 
-        ScopedTransaction transaction(&opCtx, MODE_IX);
-        Lock::DBLock lk(opCtx.lockState(), dbName, MODE_X);
+        Lock::DBLock lk(&opCtx, dbName, MODE_X);
 
         bool justCreated;
         Database* db = dbHolder().openDb(&opCtx, dbName, &justCreated);

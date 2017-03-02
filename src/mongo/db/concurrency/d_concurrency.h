@@ -31,6 +31,7 @@
 #include <climits>  // For UINT_MAX
 
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -161,23 +162,30 @@ public:
      * Global lock.
      *
      * Grabs global resource lock. Allows further (recursive) acquisition of the global lock
-     * in any mode, see LockMode.
+     * in any mode, see LockMode. An outermost GlobalLock calls abandonSnapshot() on destruction, so
+     * that the storage engine can release resources, such as snapshots or locks, that it may have
+     * acquired during the transaction. Note that any writes are committed in nested WriteUnitOfWork
+     * scopes, so write conflicts cannot happen when releasing the GlobalLock.
+     *
      * NOTE: Does not acquire flush lock.
      */
     class GlobalLock {
     public:
         class EnqueueOnly {};
 
-        GlobalLock(Locker* locker, LockMode lockMode, unsigned timeoutMs);
+        GlobalLock(OperationContext* opCtx, LockMode lockMode, unsigned timeoutMs);
 
         /**
          * Enqueues lock but does not block on lock acquisition.
          * Call waitForLock() to complete locking process.
          */
-        GlobalLock(Locker* locker, LockMode lockMode, EnqueueOnly enqueueOnly);
+        GlobalLock(OperationContext* opCtx, LockMode lockMode, EnqueueOnly enqueueOnly);
 
         ~GlobalLock() {
             _unlock();
+            if (!_opCtx->lockState()->isLocked()) {
+                _opCtx->recoveryUnit()->abandonSnapshot();
+            }
         }
 
         /**
@@ -193,7 +201,7 @@ public:
         void _enqueue(LockMode lockMode);
         void _unlock();
 
-        Locker* const _locker;
+        OperationContext* const _opCtx;
         LockResult _result;
         ResourceLock _pbwm;
     };
@@ -208,10 +216,10 @@ public:
      */
     class GlobalWrite : public GlobalLock {
     public:
-        explicit GlobalWrite(Locker* locker, unsigned timeoutMs = UINT_MAX)
-            : GlobalLock(locker, MODE_X, timeoutMs) {
+        explicit GlobalWrite(OperationContext* opCtx, unsigned timeoutMs = UINT_MAX)
+            : GlobalLock(opCtx, MODE_X, timeoutMs) {
             if (isLocked()) {
-                locker->lockMMAPV1Flush();
+                opCtx->lockState()->lockMMAPV1Flush();
             }
         }
     };
@@ -226,10 +234,10 @@ public:
      */
     class GlobalRead : public GlobalLock {
     public:
-        explicit GlobalRead(Locker* locker, unsigned timeoutMs = UINT_MAX)
-            : GlobalLock(locker, MODE_S, timeoutMs) {
+        explicit GlobalRead(OperationContext* opCtx, unsigned timeoutMs = UINT_MAX)
+            : GlobalLock(opCtx, MODE_S, timeoutMs) {
             if (isLocked()) {
-                locker->lockMMAPV1Flush();
+                opCtx->lockState()->lockMMAPV1Flush();
             }
         }
     };
@@ -251,7 +259,7 @@ public:
      */
     class DBLock {
     public:
-        DBLock(Locker* locker, StringData db, LockMode mode);
+        DBLock(OperationContext* opCtx, StringData db, LockMode mode);
         ~DBLock();
 
         /**
@@ -264,7 +272,7 @@ public:
 
     private:
         const ResourceId _id;
-        Locker* const _locker;
+        OperationContext* const _opCtx;
 
         // May be changed through relockWithMode. The global lock mode won't change though,
         // because we never change from IS/S to IX/X or vice versa, just convert locks from
