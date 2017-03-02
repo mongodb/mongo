@@ -415,7 +415,7 @@ public:
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
+        return false;
     }
 } reIndexCmd;
 
