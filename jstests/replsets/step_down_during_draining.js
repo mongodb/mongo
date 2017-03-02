@@ -57,7 +57,7 @@ load("jstests/replsets/rslib.js");
     // Do an initial insert to prevent the secondary from going into recovery
     var numDocuments = 20;
     var coll = primary.getDB("foo").foo;
-    assert.writeOK(coll.insert({x: 0}, {writeConcern: {w: 3, j: true}}));
+    assert.writeOK(coll.insert({x: 0}, {writeConcern: {w: 3}}));
     replSet.awaitReplication();
 
     // Enable fail point to stop replication.
