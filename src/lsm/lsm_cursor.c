@@ -699,7 +699,8 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		if (btree->bulk_load_ok) {
 			btree->bulk_load_ok = false;
 			WT_WITH_BTREE(session, btree,
-			    __wt_btree_lsm_switch_primary(session, true));
+			    ret = __wt_btree_lsm_switch_primary(session, true));
+			WT_ERR(ret);
 		}
 	}
 

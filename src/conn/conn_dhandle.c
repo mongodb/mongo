@@ -12,16 +12,20 @@
  * __conn_dhandle_destroy --
  *	Destroy a data handle.
  */
-static void
+static int
 __conn_dhandle_destroy(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
 {
+	WT_DECL_RET;
+
+	WT_WITH_DHANDLE(session, dhandle, ret = __wt_btree_discard(session));
+
 	__wt_rwlock_destroy(session, &dhandle->rwlock);
 	__wt_free(session, dhandle->name);
 	__wt_free(session, dhandle->checkpoint);
-	__wt_btree_discard(session, &dhandle->handle);
 	__wt_spin_destroy(session, &dhandle->close_lock);
 	__wt_stat_dsrc_discard(session, dhandle);
 	__wt_overwrite_and_free(session, dhandle);
+	return (ret);
 }
 
 /*
@@ -76,7 +80,7 @@ __wt_conn_dhandle_alloc(
 	session->dhandle = dhandle;
 	return (0);
 
-err:	__conn_dhandle_destroy(session, dhandle);
+err:	WT_TRET(__conn_dhandle_destroy(session, dhandle));
 	return (ret);
 }
 
@@ -604,7 +608,7 @@ __wt_conn_dhandle_discard_single(
 	 */
 	if (ret == 0 || final) {
 		__conn_btree_config_clear(session);
-		__conn_dhandle_destroy(session, dhandle);
+		WT_TRET(__conn_dhandle_destroy(session, dhandle));
 		session->dhandle = NULL;
 	}
 

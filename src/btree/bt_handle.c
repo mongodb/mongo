@@ -15,6 +15,44 @@ static int __btree_preload(WT_SESSION_IMPL *);
 static int __btree_tree_open_empty(WT_SESSION_IMPL *, bool);
 
 /*
+ * __btree_clear --
+ *	Clear a Btree, either on handle discard or re-open.
+ */
+static int
+__btree_clear(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_DECL_RET;
+
+	btree = S2BT(session);
+
+	/*
+	 * If the tree hasn't gone through an open/close cycle, there's no
+	 * cleanup to be done.
+	 */
+	if (!F_ISSET(btree, WT_BTREE_CLOSED))
+		return (0);
+
+	/* Close the Huffman tree. */
+	__wt_btree_huffman_close(session);
+
+	/* Terminate any associated collator. */
+	if (btree->collator_owned && btree->collator->terminate != NULL)
+		WT_TRET(btree->collator->terminate(
+		    btree->collator, &session->iface));
+
+	/* Destroy locks. */
+	__wt_rwlock_destroy(session, &btree->ovfl_lock);
+	__wt_spin_destroy(session, &btree->flush_lock);
+
+	/* Free allocated memory. */
+	__wt_free(session, btree->key_format);
+	__wt_free(session, btree->value_format);
+
+	return (ret);
+}
+
+/*
  * __wt_btree_open --
  *	Open a Btree.
  */
@@ -33,21 +71,21 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 	const char *filename;
 	bool creation, forced_salvage, readonly;
 
-	/*
-	 * This may be a re-open of an underlying object and we want to clear
-	 * everything. We can't clear the operation flags, however, they're
-	 * set by the connection handle software.
-	 */
 	btree = S2BT(session);
+	dhandle = session->dhandle;
+
+	/*
+	 * This may be a re-open of an underlying object and we have to clean
+	 * up. We can't clear the operation flags, however, they're set by the
+	 * connection handle software that called us.
+	 */
+	WT_RET(__btree_clear(session));
+
 	mask = F_MASK(btree, WT_BTREE_SPECIAL_FLAGS);
 	memset(btree, 0, sizeof(*btree));
 	btree->flags = mask;
 
-	/*
-	 * Set the data handle immediately, our called functions reasonably
-	 * use it.
-	 */
-	dhandle = session->dhandle;
+	/* Set the data handle first, our called functions reasonably use it. */
 	btree->dhandle = dhandle;
 
 	/* Checkpoint files are readonly. */
@@ -203,22 +241,6 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 		WT_TRET(bm->close(bm, session));
 	}
 
-	/* Close the Huffman tree. */
-	__wt_btree_huffman_close(session);
-
-	/* Terminate any associated collator. */
-	if (btree->collator_owned && btree->collator->terminate != NULL)
-		WT_TRET(btree->collator->terminate(
-		    btree->collator, &session->iface));
-
-	/* Destroy locks. */
-	__wt_rwlock_destroy(session, &btree->ovfl_lock);
-	__wt_spin_destroy(session, &btree->flush_lock);
-
-	/* Free allocated memory. */
-	__wt_free(session, btree->key_format);
-	__wt_free(session, btree->value_format);
-
 	return (ret);
 }
 
@@ -226,14 +248,19 @@ __wt_btree_close(WT_SESSION_IMPL *session)
  * __wt_btree_discard --
  *	Discard a Btree.
  */
-void
-__wt_btree_discard(WT_SESSION_IMPL *session, void **handlep)
+int
+__wt_btree_discard(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
+	WT_DECL_RET;
 
-	btree = *handlep;
-	*handlep = NULL;
+	ret = __btree_clear(session);
+
+	btree = S2BT(session);
 	__wt_overwrite_and_free(session, btree);
+	session->dhandle->handle = NULL;
+
+	return (ret);
 }
 
 /*

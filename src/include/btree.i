@@ -1549,7 +1549,7 @@ __wt_btree_lsm_over_size(WT_SESSION_IMPL *session, uint64_t maxsize)
  * __wt_btree_lsm_switch_primary --
  *      Switch a btree handle to/from the current primary chunk of an LSM tree.
  */
-static inline void
+static inline int
 __wt_btree_lsm_switch_primary(WT_SESSION_IMPL *session, bool on)
 {
 	WT_BTREE *btree;
@@ -1563,13 +1563,15 @@ __wt_btree_lsm_switch_primary(WT_SESSION_IMPL *session, bool on)
 	cache = S2C(session)->cache;
 	root = btree->root.page;
 
-	if (!F_ISSET(btree, WT_BTREE_LSM_PRIMARY))
-		F_SET(btree, WT_BTREE_LSM_PRIMARY | WT_BTREE_NO_EVICTION);
+	if (!F_ISSET(btree, WT_BTREE_LSM_PRIMARY)) {
+		F_SET(btree, WT_BTREE_LSM_PRIMARY);
+		WT_RET(__wt_evict_file_exclusive_on(session));
+	}
 	if (!on && F_ISSET(btree, WT_BTREE_LSM_PRIMARY)) {
 		pindex = WT_INTL_INDEX_GET_SAFE(root);
 		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
 		    pindex->entries != 1)
-			return;
+			return (0);
 		first = pindex->index[0];
 
 		/*
@@ -1590,8 +1592,10 @@ __wt_btree_lsm_switch_primary(WT_SESSION_IMPL *session, bool on)
 			(void)__wt_atomic_add64(&cache->bytes_dirty_leaf, size);
 		}
 
-		F_CLR(btree, WT_BTREE_LSM_PRIMARY | WT_BTREE_NO_EVICTION);
+		F_CLR(btree, WT_BTREE_LSM_PRIMARY);
+		__wt_evict_file_exclusive_off(session);
 	}
+	return (0);
 }
 
 /*
