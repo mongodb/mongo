@@ -150,7 +150,7 @@ public:
             // Take a global IS lock to ensure the storage engine is not shutdown
             Lock::GlobalLock global(txn->lockState(), MODE_IS, UINT_MAX);
             StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-            result.append("numFiles", storageEngine->flushAllFiles(sync));
+            result.append("numFiles", storageEngine->flushAllFiles(txn, sync));
             return true;
         }
 
@@ -362,7 +362,7 @@ void FSyncLockThread::run() {
         StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
 
         try {
-            storageEngine->flushAllFiles(true);
+            storageEngine->flushAllFiles(&txn, true);
         } catch (const std::exception& e) {
             error() << "error doing flushAll: " << e.what();
             fsyncCmd.threadStatus = Status(ErrorCodes::CommandFailed, e.what());

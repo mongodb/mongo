@@ -60,7 +60,7 @@ void QueryYield::yieldAllLocks(OperationContext* txn,
     Locker::LockSnapshot snapshot;
 
     if (fetcher) {
-        fetcher->setup();
+        fetcher->setup(txn);
     }
 
     // Nothing was unlocked, just return, yielding is pointless.

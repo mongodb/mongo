@@ -91,7 +91,7 @@ public:
     virtual Status dropIdent(OperationContext* opCtx, StringData ident) = 0;
 
     // optional
-    virtual int flushAllFiles(bool sync) {
+    virtual int flushAllFiles(OperationContext* txn, bool sync) {
         return 0;
     }
 

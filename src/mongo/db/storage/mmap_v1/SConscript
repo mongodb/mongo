@@ -115,9 +115,11 @@ env.Library(
         'mmap_${TARGET_OS_FAMILY}.cpp',
     ],
     LIBDEPS=[
-        'file_allocator',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/util/progress_meter',
-        '$BUILD_DIR/mongo/db/storage/storage_options'
+        'file_allocator',
     ],
 )
 

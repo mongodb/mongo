@@ -36,7 +36,9 @@
 #include <boost/filesystem/path.hpp>
 #include <fstream>
 
+#include "mongo/db/client.h"
 #include "mongo/db/mongod_options.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/data_file_sync.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
@@ -311,6 +313,9 @@ Status MMAPV1Engine::closeDatabase(OperationContext* txn, StringData db) {
 
     stdx::lock_guard<stdx::mutex> lk(_entryMapMutex);
     MMAPV1DatabaseCatalogEntry* entry = _entryMap[db.toString()];
+    if (entry) {
+        entry->close(txn);
+    }
     delete entry;
     _entryMap.erase(db.toString());
     return Status::OK();
@@ -345,8 +350,8 @@ void MMAPV1Engine::_listDatabases(const std::string& directory, std::vector<std:
     }
 }
 
-int MMAPV1Engine::flushAllFiles(bool sync) {
-    return MongoFile::flushAll(sync);
+int MMAPV1Engine::flushAllFiles(OperationContext* txn, bool sync) {
+    return MongoFile::flushAll(txn, sync);
 }
 
 Status MMAPV1Engine::beginBackup(OperationContext* txn) {
@@ -374,21 +379,32 @@ void MMAPV1Engine::cleanShutdown() {
     // we would only hang here if the file_allocator code generates a
     // synchronous signal, which we don't expect
     log() << "shutdown: waiting for fs preallocator..." << endl;
+    auto txn = cc().getOperationContext();
+
+    // In some cases we may shutdown early before we have any operation context yet, but we need
+    // one for synchronization purposes.
+    ServiceContext::UniqueOperationContext newTxn;
+    if (!txn) {
+        newTxn = cc().makeOperationContext();
+        txn = newTxn.get();
+        invariant(txn);
+    }
+
     FileAllocator::get()->waitUntilFinished();
 
     if (storageGlobalParams.dur) {
         log() << "shutdown: final commit..." << endl;
 
-        getDur().commitAndStopDurThread();
+        getDur().commitAndStopDurThread(txn);
     }
 
     log() << "shutdown: closing all files..." << endl;
     stringstream ss3;
-    MemoryMappedFile::closeAllFiles(ss3);
+    MemoryMappedFile::closeAllFiles(txn, ss3);
     log() << ss3.str() << endl;
 }
 
 void MMAPV1Engine::setJournalListener(JournalListener* jl) {
     dur::setJournalListener(jl);
 }
-}
+}  // namespace

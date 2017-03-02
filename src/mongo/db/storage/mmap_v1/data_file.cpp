@@ -104,14 +104,14 @@ int DataFile::_defaultSize() const {
 }
 
 /** @return true if found and opened. if uninitialized (prealloc only) does not open. */
-Status DataFile::openExisting(const char* filename) {
+Status DataFile::openExisting(OperationContext* txn, const char* filename) {
     invariant(_mb == 0);
 
     if (!boost::filesystem::exists(filename)) {
         return Status(ErrorCodes::InvalidPath, "DataFile::openExisting - file does not exist");
     }
 
-    if (!mmf.open(filename)) {
+    if (!mmf.open(txn, filename)) {
         return Status(ErrorCodes::InternalError, "DataFile::openExisting - mmf.open failed");
     }
 
@@ -170,7 +170,7 @@ void DataFile::open(OperationContext* txn,
     {
         invariant(_mb == 0);
         unsigned long long sz = size;
-        if (mmf.create(filename, sz)) {
+        if (mmf.create(txn, filename, sz)) {
             _mb = mmf.getView();
         }
 

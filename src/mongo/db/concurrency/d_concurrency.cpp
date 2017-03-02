@@ -85,7 +85,7 @@ public:
      */
     static void ensureInitialized() {
         if (!resourceIdFactory) {
-            resourceIdFactory = stdx::make_unique<ResourceIdFactory>();
+            resourceIdFactory = new ResourceIdFactory();
         }
     }
 
@@ -98,14 +98,14 @@ private:
         return ResourceId(RESOURCE_MUTEX, nextId++);
     }
 
-    static std::unique_ptr<ResourceIdFactory> resourceIdFactory;
+    static ResourceIdFactory* resourceIdFactory;
 
     std::uint64_t nextId = 0;
     std::vector<std::string> labels;
     stdx::mutex labelsMutex;
 };
 
-std::unique_ptr<ResourceIdFactory> ResourceIdFactory::resourceIdFactory;
+ResourceIdFactory* ResourceIdFactory::resourceIdFactory;
 
 /**
  * Guarantees `ResourceIdFactory::ensureInitialized` is called at least once during initialization.
@@ -125,6 +125,14 @@ Lock::ResourceMutex::ResourceMutex(std::string resourceLabel)
 std::string Lock::ResourceMutex::getName(ResourceId resourceId) {
     invariant(resourceId.getType() == RESOURCE_MUTEX);
     return ResourceIdFactory::nameForId(resourceId);
+}
+
+bool Lock::ResourceMutex::isExclusivelyLocked(Locker* locker) {
+    return locker->isLockHeldForMode(_rid, MODE_X);
+}
+
+bool Lock::ResourceMutex::isAtLeastReadLocked(Locker* locker) {
+    return locker->isLockHeldForMode(_rid, MODE_IS);
 }
 
 Lock::GlobalLock::GlobalLock(Locker* locker, LockMode lockMode, unsigned timeoutMs)

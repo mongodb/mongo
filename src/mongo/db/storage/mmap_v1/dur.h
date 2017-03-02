@@ -112,7 +112,7 @@ public:
         *
         * Must be called under the global X lock.
         */
-    virtual void commitAndStopDurThread() = 0;
+    virtual void commitAndStopDurThread(OperationContext* txn) = 0;
 
     /**
      * Commits pending changes, flushes all changes to main data files, then removes the

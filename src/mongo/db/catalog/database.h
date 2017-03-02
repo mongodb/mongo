@@ -46,9 +46,7 @@
 namespace mongo {
 
 class Collection;
-class DataFile;
 class DatabaseCatalogEntry;
-class ExtentManager;
 class IndexCatalog;
 class NamespaceDetails;
 class OperationContext;
