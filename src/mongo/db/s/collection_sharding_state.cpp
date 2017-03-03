@@ -297,7 +297,7 @@ bool CollectionShardingState::_checkShardVersionOk(OperationContext* txn,
         return true;
     }
 
-    if (!repl::ReplicationCoordinator::get(txn)->canAcceptWritesForDatabase(_nss.db())) {
+    if (!repl::ReplicationCoordinator::get(txn)->canAcceptWritesForDatabase(txn, _nss.db())) {
         // Right now connections to secondaries aren't versioned at all.
         return true;
     }

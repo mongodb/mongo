@@ -366,7 +366,7 @@ void _logOpsInner(OperationContext* txn,
     ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
 
     if (nss.size() && replicationMode == ReplicationCoordinator::modeReplSet &&
-        !replCoord->canAcceptWritesFor(nss)) {
+        !replCoord->canAcceptWritesFor(txn, nss)) {
         severe() << "logOp() but can't accept write to collection " << nss.ns();
         fassertFailed(17405);
     }
@@ -768,7 +768,7 @@ Status applyOperation_inlock(OperationContext* txn,
             }
 
             bool relaxIndexConstraints =
-                ReplicationCoordinator::get(txn)->shouldRelaxIndexConstraints(indexNss);
+                ReplicationCoordinator::get(txn)->shouldRelaxIndexConstraints(txn, indexNss);
             if (indexSpec["background"].trueValue()) {
                 Lock::TempRelease release(txn->lockState());
                 if (txn->lockState()->isLocked()) {

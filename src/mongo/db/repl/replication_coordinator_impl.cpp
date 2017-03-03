@@ -1864,7 +1864,15 @@ bool ReplicationCoordinatorImpl::isMasterForReportingPurposes() {
     return false;
 }
 
-bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(StringData dbName) {
+bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(OperationContext* txn,
+                                                            StringData dbName) {
+    // The answer isn't meaningful unless we hold the global lock.
+    invariant(txn->lockState()->isLocked());
+    return canAcceptWritesForDatabase_UNSAFE(txn, dbName);
+}
+
+bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase_UNSAFE(OperationContext* txn,
+                                                                   StringData dbName) {
     // _canAcceptNonLocalWrites is always true for standalone nodes, always false for nodes
     // started with --slave, and adjusted based on primary+drain state in replica sets.
     //
@@ -1881,17 +1889,31 @@ bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(StringData dbName) {
     return !replAllDead && _settings.isMaster();
 }
 
-bool ReplicationCoordinatorImpl::canAcceptWritesFor(const NamespaceString& ns) {
+bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* txn,
+                                                    const NamespaceString& ns) {
+    invariant(txn->lockState()->isLocked());
+    return canAcceptWritesFor_UNSAFE(txn, ns);
+}
+
+bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* txn,
+                                                           const NamespaceString& ns) {
     if (_memberState.rollback() && ns.isOplog()) {
         return false;
     }
     StringData dbName = ns.db();
-    return canAcceptWritesForDatabase(dbName);
+    return canAcceptWritesForDatabase_UNSAFE(txn, dbName);
 }
 
 Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* txn,
                                                          const NamespaceString& ns,
                                                          bool slaveOk) {
+    invariant(txn->lockState()->isLocked());
+    return checkCanServeReadsFor_UNSAFE(txn, ns, slaveOk);
+}
+
+Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext* txn,
+                                                                const NamespaceString& ns,
+                                                                bool slaveOk) {
     auto client = txn->getClient();
     // Oplog reads are not allowed during STARTUP state, but we make an exception for internal
     // reads and master-slave replication. Internel reads are required for cleaning up unfinished
@@ -1906,7 +1928,7 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* txn,
     if (client->isInDirectClient()) {
         return Status::OK();
     }
-    if (canAcceptWritesFor(ns)) {
+    if (canAcceptWritesFor_UNSAFE(txn, ns)) {
         return Status::OK();
     }
     if (_settings.isSlave() || _settings.isMaster()) {
@@ -1926,8 +1948,9 @@ bool ReplicationCoordinatorImpl::isInPrimaryOrSecondaryState() const {
     return _canServeNonLocalReads.loadRelaxed();
 }
 
-bool ReplicationCoordinatorImpl::shouldRelaxIndexConstraints(const NamespaceString& ns) {
-    return !canAcceptWritesFor(ns);
+bool ReplicationCoordinatorImpl::shouldRelaxIndexConstraints(OperationContext* txn,
+                                                             const NamespaceString& ns) {
+    return !canAcceptWritesFor(txn, ns);
 }
 
 OID ReplicationCoordinatorImpl::getElectionId() {

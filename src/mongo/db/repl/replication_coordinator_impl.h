@@ -136,17 +136,22 @@ public:
 
     virtual bool isMasterForReportingPurposes();
 
-    virtual bool canAcceptWritesForDatabase(StringData dbName);
+    virtual bool canAcceptWritesForDatabase(OperationContext* txn, StringData dbName);
+    virtual bool canAcceptWritesForDatabase_UNSAFE(OperationContext* txn, StringData dbName);
 
-    bool canAcceptWritesFor(const NamespaceString& ns) override;
+    bool canAcceptWritesFor(OperationContext* txn, const NamespaceString& ns) override;
+    bool canAcceptWritesFor_UNSAFE(OperationContext* txn, const NamespaceString& ns) override;
 
     virtual Status checkIfWriteConcernCanBeSatisfied(const WriteConcernOptions& writeConcern) const;
 
     virtual Status checkCanServeReadsFor(OperationContext* txn,
                                          const NamespaceString& ns,
                                          bool slaveOk);
+    virtual Status checkCanServeReadsFor_UNSAFE(OperationContext* txn,
+                                                const NamespaceString& ns,
+                                                bool slaveOk);
 
-    virtual bool shouldRelaxIndexConstraints(const NamespaceString& ns);
+    virtual bool shouldRelaxIndexConstraints(OperationContext* txn, const NamespaceString& ns);
 
     virtual Status setLastOptimeForSlave(const OID& rid, const Timestamp& ts);
 

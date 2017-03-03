@@ -246,7 +246,7 @@ Status collMod(OperationContext* txn,
     OldClientContext ctx(txn, nss.ns());
 
     bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss);
+        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, nss);
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotMaster,

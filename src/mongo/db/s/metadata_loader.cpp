@@ -261,8 +261,8 @@ Status MetadataLoader::_writeNewChunksIfPrimary(OperationContext* txn,
 
     // Only do the write(s) if this is a primary or standalone. Otherwise, return OK.
     if (serverGlobalParams.clusterRole != ClusterRole::ShardServer ||
-        !repl::ReplicationCoordinator::get(txn)->canAcceptWritesForDatabase(
-            chunkMetadataNss.ns())) {
+        !repl::ReplicationCoordinator::get(txn)->canAcceptWritesForDatabase_UNSAFE(
+            txn, chunkMetadataNss.ns())) {
         return Status::OK();
     }
 

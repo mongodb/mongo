@@ -57,7 +57,7 @@ Status emptyCapped(OperationContext* txn, const NamespaceString& collectionName)
     AutoGetDb autoDb(txn, collectionName.db(), MODE_X);
 
     bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(collectionName);
+        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, collectionName);
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotMaster,
@@ -244,7 +244,7 @@ Status convertToCapped(OperationContext* txn, const NamespaceString& collectionN
     AutoGetDb autoDb(txn, collectionName.db(), MODE_X);
 
     bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(collectionName);
+        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, collectionName);
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotMaster,

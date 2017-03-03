@@ -199,7 +199,7 @@ int CollectionRangeDeleter::_doDeletion(OperationContext* txn,
 
         invariant(PlanExecutor::ADVANCED == state);
         WriteUnitOfWork wuow(txn);
-        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(_nss)) {
+        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, _nss)) {
             warning() << "stepped down from primary while deleting chunk; orphaning data in "
                       << _nss << " in range [" << min << ", " << max << ")";
             break;

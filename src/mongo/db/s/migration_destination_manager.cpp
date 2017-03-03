@@ -484,7 +484,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
         // 0. copy system.namespaces entry if collection doesn't already exist
 
         OldClientWriteContext ctx(txn, _nss.ns());
-        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(_nss)) {
+        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, _nss)) {
             _errmsg = str::stream() << "Not primary during migration: " << _nss.ns()
                                     << ": checking if collection exists";
             warning() << _errmsg;
@@ -525,7 +525,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* txn,
         Lock::DBLock lk(txn->lockState(), _nss.db(), MODE_X);
         OldClientContext ctx(txn, _nss.ns());
 
-        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(_nss)) {
+        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, _nss)) {
             _errmsg = str::stream() << "Not primary during migration: " << _nss.ns();
             warning() << _errmsg;
             setState(FAIL);

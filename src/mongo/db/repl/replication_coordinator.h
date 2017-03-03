@@ -245,7 +245,14 @@ public:
      * NOTE: This function can only be meaningfully called while the caller holds the global
      * lock in some mode other than MODE_NONE.
      */
-    virtual bool canAcceptWritesForDatabase(StringData dbName) = 0;
+    virtual bool canAcceptWritesForDatabase(OperationContext* txn, StringData dbName) = 0;
+
+    /**
+     * Version which does not check for the global lock.  Do not use in new code.
+     * Without the global lock held, the return value may be inaccurate by the time
+     * the function returns.
+     */
+    virtual bool canAcceptWritesForDatabase_UNSAFE(OperationContext* txn, StringData dbName) = 0;
 
     /**
      * Returns true if it is valid for this node to accept writes on the given namespace.
@@ -253,7 +260,14 @@ public:
      * The result of this function should be consistent with canAcceptWritesForDatabase()
      * for the database the namespace refers to, with additional checks on the collection.
      */
-    virtual bool canAcceptWritesFor(const NamespaceString& ns) = 0;
+    virtual bool canAcceptWritesFor(OperationContext* txn, const NamespaceString& ns) = 0;
+
+    /**
+     * Version which does not check for the global lock.  Do not use in new code.
+     * Without the global lock held, the return value may be inaccurate by the time
+     * the function returns.
+     */
+    virtual bool canAcceptWritesFor_UNSAFE(OperationContext* txn, const NamespaceString& ns) = 0;
 
     /**
      * Checks if the current replica set configuration can satisfy the given write concern.
@@ -275,12 +289,21 @@ public:
                                          bool slaveOk) = 0;
 
     /**
+     * Version which does not check for the global lock.  Do not use in new code.
+     * Without the global lock held, the return value may be inaccurate by the time
+     * the function returns.
+     */
+    virtual Status checkCanServeReadsFor_UNSAFE(OperationContext* txn,
+                                                const NamespaceString& ns,
+                                                bool slaveOk) = 0;
+
+    /**
      * Returns true if this node should ignore index constraints for idempotency reasons.
      *
      * The namespace "ns" is passed in because the "local" database is usually writable
      * and we need to enforce the constraints for it.
      */
-    virtual bool shouldRelaxIndexConstraints(const NamespaceString& ns) = 0;
+    virtual bool shouldRelaxIndexConstraints(OperationContext* txn, const NamespaceString& ns) = 0;
 
     /**
      * Updates our internal tracking of the last OpTime applied for the given slave

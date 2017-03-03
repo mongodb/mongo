@@ -158,7 +158,7 @@ Status waitForLinearizableReadConcern(OperationContext* txn) {
         Lock::DBLock lk(txn->lockState(), "local", MODE_IX);
         Lock::CollectionLock lock(txn->lockState(), "local.oplog.rs", MODE_IX);
 
-        if (!replCoord->canAcceptWritesForDatabase("admin")) {
+        if (!replCoord->canAcceptWritesForDatabase(txn, "admin")) {
             return {ErrorCodes::NotMaster,
                     "No longer primary when waiting for linearizable read concern"};
         }

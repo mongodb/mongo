@@ -120,7 +120,8 @@ bool ReplicationCoordinatorMock::isMasterForReportingPurposes() {
     return true;
 }
 
-bool ReplicationCoordinatorMock::canAcceptWritesForDatabase(StringData dbName) {
+bool ReplicationCoordinatorMock::canAcceptWritesForDatabase(OperationContext* txn,
+                                                            StringData dbName) {
     // Return true if we allow writes explicitly even when not in primary state, as in sharding
     // unit tests, so that the op observers can fire but the tests don't have to set all the states
     // as if it's in primary.
@@ -130,9 +131,20 @@ bool ReplicationCoordinatorMock::canAcceptWritesForDatabase(StringData dbName) {
     return dbName == "local" || _memberState.primary() || _settings.isMaster();
 }
 
-bool ReplicationCoordinatorMock::canAcceptWritesFor(const NamespaceString& ns) {
+bool ReplicationCoordinatorMock::canAcceptWritesForDatabase_UNSAFE(OperationContext* txn,
+                                                                   StringData dbName) {
+    return canAcceptWritesForDatabase(txn, dbName);
+}
+
+bool ReplicationCoordinatorMock::canAcceptWritesFor(OperationContext* txn,
+                                                    const NamespaceString& ns) {
     // TODO
-    return canAcceptWritesForDatabase(ns.db());
+    return canAcceptWritesForDatabase(txn, ns.db());
+}
+
+bool ReplicationCoordinatorMock::canAcceptWritesFor_UNSAFE(OperationContext* txn,
+                                                           const NamespaceString& ns) {
+    return canAcceptWritesFor(txn, ns);
 }
 
 Status ReplicationCoordinatorMock::checkCanServeReadsFor(OperationContext* txn,
@@ -142,8 +154,15 @@ Status ReplicationCoordinatorMock::checkCanServeReadsFor(OperationContext* txn,
     return Status::OK();
 }
 
-bool ReplicationCoordinatorMock::shouldRelaxIndexConstraints(const NamespaceString& ns) {
-    return !canAcceptWritesFor(ns);
+Status ReplicationCoordinatorMock::checkCanServeReadsFor_UNSAFE(OperationContext* txn,
+                                                                const NamespaceString& ns,
+                                                                bool slaveOk) {
+    return checkCanServeReadsFor(txn, ns, slaveOk);
+}
+
+bool ReplicationCoordinatorMock::shouldRelaxIndexConstraints(OperationContext* txn,
+                                                             const NamespaceString& ns) {
+    return !canAcceptWritesFor(txn, ns);
 }
 
 Status ReplicationCoordinatorMock::setLastOptimeForSlave(const OID& rid, const Timestamp& ts) {

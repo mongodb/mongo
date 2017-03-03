@@ -289,7 +289,8 @@ Message getMore(OperationContext* txn,
     // passing in a query object (necessary to check SlaveOK query option), the only state where
     // reads are allowed is PRIMARY (or master in master/slave).  This function uasserts if
     // reads are not okay.
-    Status status = repl::getGlobalReplicationCoordinator()->checkCanServeReadsFor(txn, nss, true);
+    Status status =
+        repl::getGlobalReplicationCoordinator()->checkCanServeReadsFor_UNSAFE(txn, nss, true);
     uassertStatusOK(status);
 
     // A pin performs a CC lookup and if there is a CC, increments the CC's pin value so it
@@ -583,7 +584,7 @@ std::string runQuery(OperationContext* txn,
     // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.
     bool slaveOK = qr.isSlaveOk() || qr.hasReadPref();
     Status serveReadsStatus =
-        repl::getGlobalReplicationCoordinator()->checkCanServeReadsFor(txn, nss, slaveOK);
+        repl::getGlobalReplicationCoordinator()->checkCanServeReadsFor_UNSAFE(txn, nss, slaveOK);
     uassertStatusOK(serveReadsStatus);
 
     // Run the query.
