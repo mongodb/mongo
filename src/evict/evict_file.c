@@ -27,7 +27,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	 * page. Assert eviction has been locked out.
 	 */
 	WT_ASSERT(session,
-	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
+	    btree->evict_disabled > 0 ||
 	    !F_ISSET(session->dhandle, WT_DHANDLE_OPEN));
 
 	/*

@@ -120,7 +120,8 @@ struct __wt_btree {
 
 	WT_REF root;			/* Root page reference */
 	bool modified;			/* If the tree ever modified */
-	bool bulk_load_ok;		/* Bulk-load is a possibility */
+	uint8_t bulk_load_ok;		/* Bulk-load is a possibility
+					   (want a bool but needs atomic cas) */
 
 	WT_BM	*bm;			/* Block manager reference */
 	u_int	 block_header;		/* WT_PAGE_HEADER_BYTE_SIZE */
@@ -139,7 +140,7 @@ struct __wt_btree {
 	u_int	    evict_walk_period;	/* Skip this many LRU walks */
 	u_int	    evict_walk_saved;	/* Saved walk skips for checkpoints */
 	u_int	    evict_walk_skips;	/* Number of walks skipped */
-	u_int	    evict_disabled;	/* Eviction disabled count */
+	int	    evict_disabled;	/* Eviction disabled count */
 	volatile uint32_t evict_busy;	/* Count of threads in eviction */
 	int	    evict_start_type;	/* Start position for eviction walk
 					   (see WT_EVICT_WALK_START). */
@@ -162,14 +163,13 @@ struct __wt_btree {
 #define	WT_BTREE_LOOKASIDE	0x001000 /* Look-aside table */
 #define	WT_BTREE_LSM_PRIMARY	0x002000 /* Handle is current LSM primary */
 #define	WT_BTREE_NO_CHECKPOINT	0x004000 /* Disable checkpoints */
-#define	WT_BTREE_NO_EVICTION	0x008000 /* Disable eviction */
-#define	WT_BTREE_NO_LOGGING	0x010000 /* Disable logging */
-#define	WT_BTREE_NO_RECONCILE	0x020000 /* Allow splits, even with no evict */
-#define	WT_BTREE_REBALANCE	0x040000 /* Handle is for rebalance */
-#define	WT_BTREE_SALVAGE	0x080000 /* Handle is for salvage */
-#define	WT_BTREE_SKIP_CKPT	0x100000 /* Handle skipped checkpoint */
-#define	WT_BTREE_UPGRADE	0x200000 /* Handle is for upgrade */
-#define	WT_BTREE_VERIFY		0x400000 /* Handle is for verify */
+#define	WT_BTREE_NO_LOGGING	0x008000 /* Disable logging */
+#define	WT_BTREE_NO_RECONCILE	0x010000 /* Allow splits, even with no evict */
+#define	WT_BTREE_REBALANCE	0x020000 /* Handle is for rebalance */
+#define	WT_BTREE_SALVAGE	0x040000 /* Handle is for salvage */
+#define	WT_BTREE_SKIP_CKPT	0x080000 /* Handle skipped checkpoint */
+#define	WT_BTREE_UPGRADE	0x100000 /* Handle is for upgrade */
+#define	WT_BTREE_VERIFY		0x200000 /* Handle is for verify */
 	uint32_t flags;
 };
 

@@ -55,6 +55,26 @@ __cursor_size_chk(WT_SESSION_IMPL *session, WT_ITEM *kv)
 }
 
 /*
+ * __cursor_disable_bulk --
+ *	Disable bulk loads into a tree.
+ */
+static inline void
+__cursor_disable_bulk(WT_SESSION_IMPL *session, WT_BTREE *btree)
+{
+	/*
+	 * Once a tree is no longer empty, eviction should pay attention to it,
+	 * and it's no longer possible to bulk-load into it.
+	 *
+	 * We use a compare-and-swap here to avoid races among the first
+	 * inserts into a tree.  Eviction is disabled when an empty tree is
+	 * opened, it must only be enabled once.
+	 */
+	if (btree->bulk_load_ok &&
+	    __wt_atomic_cas8(&btree->bulk_load_ok, 1, 0))
+		__wt_evict_file_exclusive_off(session);
+}
+
+/*
  * __cursor_fix_implicit --
  *	Return if search went past the end of the tree.
  */
@@ -506,14 +526,8 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
 	WT_RET(__cursor_size_chk(session, &cursor->value));
 
-	/*
-	 * The tree is no longer empty: eviction should pay attention to it,
-	 * and it's no longer possible to bulk-load into it.
-	 */
-	if (btree->bulk_load_ok) {
-		btree->bulk_load_ok = false;
-		__wt_evict_file_exclusive_off(session);
-	}
+	/* It's no longer possible to bulk-load into the tree. */
+	__cursor_disable_bulk(session, btree);
 
 retry:	WT_RET(__cursor_func_init(cbt, true));
 
@@ -760,14 +774,8 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
 	WT_RET(__cursor_size_chk(session, &cursor->value));
 
-	/*
-	 * The tree is no longer empty: eviction should pay attention to it,
-	 * and it's no longer possible to bulk-load into it.
-	 */
-	if (btree->bulk_load_ok) {
-		btree->bulk_load_ok = false;
-		__wt_evict_file_exclusive_off(session);
-	}
+	/* It's no longer possible to bulk-load into the tree. */
+	__cursor_disable_bulk(session, btree);
 
 retry:	WT_RET(__cursor_func_init(cbt, true));
 

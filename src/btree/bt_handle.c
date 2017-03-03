@@ -562,7 +562,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, bool creation)
 	 * tree.
 	 */
 	if (creation)
-		btree->bulk_load_ok = true;
+		btree->bulk_load_ok = 1;
 
 	/*
 	 * A note about empty trees: the initial tree is a single root page.
