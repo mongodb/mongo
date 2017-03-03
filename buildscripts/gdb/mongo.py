@@ -1,8 +1,8 @@
 """GDB Pretty-printers and utility commands for MongoDB
 """
+from __future__ import print_function
+
 import gdb.printing
-import glob
-import os
 import sys
 
 try:
@@ -19,6 +19,7 @@ except ImportError as e:
 def get_unique_ptr(obj):
     """Read the value of a libstdc++ std::unique_ptr"""
     return obj["_M_t"]['_M_head_impl']
+
 
 ###################################################################################################
 #
@@ -355,11 +356,76 @@ class MongoDBAnalyze(gdb.Command):
             # Note that output will go to mongod's standard output, not the debugger output window
             gdb.execute("call ('mongo::(anonymous namespace)::globalLockManager').dump()",
                         from_tty=False, to_string=False)
-        except gdb.Error as gdberr:
+        except gdb.error as gdberr:
             print("Ignoring error '%s'" % str(gdberr))
 
 # Register command
 MongoDBAnalyze()
+
+
+class MongoDBUniqueStack(gdb.Command):
+    """Print unique stack traces of all threads in current process"""
+
+    def __init__(self):
+        register_mongo_command(self, "mongodb-uniqstack", gdb.COMMAND_DATA)
+
+    def invoke(self, arg, _from_tty):
+        stacks = {}
+        if not arg:
+            arg = 'bt' # default to 'bt'
+
+        current_thread = gdb.selected_thread()
+        try:
+            for thread in gdb.selected_inferior().threads():
+                if not thread.is_valid():
+                    continue
+                thread.switch()
+                self._process_thread_stack(arg, stacks, thread)
+            self._dump_unique_stacks(stacks)
+        finally:
+            if current_thread and current_thread.is_valid():
+                current_thread.switch()
+
+    def _process_thread_stack(self, arg, stacks, thread):
+        thread_info = {} # thread dict to hold per thread data
+        thread_info['frames'] = [] # the complete backtrace per thread from gdb
+        thread_info['functions'] = [] # list of function names from frames
+        thread_info['pthread'] = hex(int(gdb.parse_and_eval("(uint64_t)pthread_self()")))
+
+        frame = gdb.newest_frame()
+        while frame:
+            thread_info['functions'].append(frame.name())
+            frame = frame.older()
+
+        thread_info['functions'] = tuple(thread_info['functions'])
+        if thread_info['functions'] in stacks:
+            stacks[thread_info['functions']]['tids'].append(thread.num)
+        else:
+            thread_info['header'] = "Thread {} (Thread {} (LWP {})):".format(
+                thread.num, thread_info['pthread'], thread.ptid[1])
+            try:
+                thread_info['frames'] = gdb.execute(arg, to_string=True).rstrip()
+            except gdb.error as err:
+                raise gdb.GdbError("{} {}".format(thread_info['header'], err))
+            else:
+                thread_info['tids'] = []
+                thread_info['tids'].append(thread.num)
+                stacks[thread_info['functions']] = thread_info
+
+    def _dump_unique_stacks(self, stacks):
+        def first_tid(stack):
+            return stack['tids'][0]
+
+        for stack in sorted(stacks.values(), key=first_tid, reverse=True):
+            print(stack['header'])
+            if len(stack['tids']) > 1:
+                print("{} duplicate thread(s):".format(len(stack['tids']) - 1), end=' ')
+                print(", ".join((str(tid) for tid in stack['tids'][1:])))
+            print(stack['frames'])
+            print() # leave extra blank line after each thread stack
+
+# Register command
+MongoDBUniqueStack()
 
 
 class MongoDBHelp(gdb.Command):

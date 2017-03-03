@@ -302,6 +302,23 @@ class GDBDumper(object):
         gdb_dir = os.path.join(script_dir, "gdb")
         printers_script = os.path.join(gdb_dir, "mongo.py")
 
+        bt_command = "mongodb-uniqstack bt"
+        if sys.platform.startswith("sunos"):
+            '''
+            On Solaris, currently calling mongo-uniqstack leads to an error:
+
+            Thread 198 received signal SIGSEGV, Segmentation fault.
+            0x0000000000000000 in ?? ()
+            Python Exception <class 'gdb.error'> The program being debugged was signaled while in a
+            function called from GDB.
+            GDB remains in the frame where the signal was received.
+            To change this behavior use "set unwindonsignal on".
+            Evaluation of the expression containing the function
+            (at 0x0x0) will be abandoned.
+            When the function is done executing, GDB will silently stop.
+            '''
+            bt_command = "thread apply all bt"
+
         cmds = [
             "set pagination off",
             "attach %d" % pid,
@@ -309,7 +326,7 @@ class GDBDumper(object):
             "info threads",  # Dump a simple list of commands to get the thread name
             "set python print-stack full",
             "source " + printers_script,
-            "thread apply all bt",
+            bt_command,
             dump_command,
             "mongodb-analyze",
             "set confirm off",
