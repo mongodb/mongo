@@ -380,9 +380,11 @@ Message getMore(OperationContext* txn,
             stdx::lock_guard<Client> lk(*txn->getClient());
             curOp.setPlanSummary_inlock(planSummary);
 
-            // Ensure that the original query or command object is available in the slow query log,
-            // profiler and currentOp.
-            curOp.setQuery_inlock(cc->getQuery());
+            // Ensure that the original query object is available in the slow query log, profiler
+            // and currentOp. Upconvert _query to resemble a getMore command, and set the original
+            // command or upconverted legacy query in the originatingCommand field.
+            curOp.setQuery_inlock(upconvertGetMoreEntry(nss, cursorid, ntoreturn));
+            curOp.setOriginatingCommand_inlock(cc->getQuery());
         }
 
         PlanExecutor::ExecState state;
@@ -673,7 +675,7 @@ std::string runQuery(OperationContext* txn,
              nss.ns(),
              txn->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
              qr.getOptions(),
-             qr.getFilter()});
+             upconvertQueryEntry(q.query, qr.nss(), q.ntoreturn, q.ntoskip)});
         ccId = pinnedCursor.getCursor()->cursorid();
 
         LOG(5) << "caching executor with cursorid " << ccId << " after returning " << numResults
