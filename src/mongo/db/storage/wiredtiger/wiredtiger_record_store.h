@@ -198,6 +198,8 @@ public:
 
     void waitForAllEarlierOplogWritesToBeVisible(OperationContext* txn) const override;
 
+    Status updateCappedSize(OperationContext* txn, long long cappedSize) final;
+
     bool isOplog() const {
         return _isOplog;
     }
@@ -287,7 +289,7 @@ private:
     const bool _isEphemeral;
     // True if the namespace of this record store starts with "local.oplog.", and false otherwise.
     const bool _isOplog;
-    const int64_t _cappedMaxSize;
+    int64_t  _cappedMaxSize;
     const int64_t _cappedMaxSizeSlack;  // when to start applying backpressure
     const int64_t _cappedMaxDocs;
     RecordId _cappedFirstRecord;

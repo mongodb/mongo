@@ -130,6 +130,11 @@ public:
                                  StringData validationLevel,
                                  StringData validationAction) = 0;
 
+    /**
+    * Updates size of a capped Collection.
+    */
+    virtual void updateCappedSize(OperationContext* txn, long long size) = 0;
+
 private:
     NamespaceString _ns;
 };

@@ -436,4 +436,9 @@ void NamespaceDetailsCollectionCatalogEntry::setNamespacesRecordId(OperationCont
         _namespacesRecordId = newId;
     }
 }
+
+void NamespaceDetailsCollectionCatalogEntry::updateCappedSize(OperationContext* txn,
+                                                             long long size) {
+    invariant(false);
+}
 }

@@ -155,11 +155,11 @@ WiredTigerRecordStore::OplogStones::OplogStones(OperationContext* txn, WiredTige
     const unsigned long long kMaxStonesToKeep = 100ULL;
 
     unsigned long long numStones = maxSize / BSONObjMaxInternalSize;
-    _numStonesToKeep = std::min(kMaxStonesToKeep, std::max(kMinStonesToKeep, numStones));
-    _minBytesPerStone = maxSize / _numStonesToKeep;
+    size_t numStonesToKeep = std::min(kMaxStonesToKeep, std::max(kMinStonesToKeep, numStones));
+    _minBytesPerStone = maxSize / numStonesToKeep;
     invariant(_minBytesPerStone > 0);
 
-    _calculateStones(txn);
+    _calculateStones(txn, numStonesToKeep);
     _pokeReclaimThreadIfNeeded();  // Reclaim stones if over the limit.
 }
 
@@ -179,7 +179,13 @@ void WiredTigerRecordStore::OplogStones::kill() {
 void WiredTigerRecordStore::OplogStones::awaitHasExcessStonesOrDead() {
     // Wait until kill() is called or there are too many oplog stones.
     stdx::unique_lock<stdx::mutex> lock(_oplogReclaimMutex);
-    while (!_isDead && !hasExcessStones()) {
+    while (!_isDead) {
+        {
+                stdx::lock_guard<stdx::mutex> lk(_mutex);
+                if (hasExcessStones_inlock()) {
+                        break;
+                }
+        }
         _oplogReclaimCv.wait(lock);
     }
 }
@@ -188,7 +194,7 @@ boost::optional<WiredTigerRecordStore::OplogStones::Stone>
 WiredTigerRecordStore::OplogStones::peekOldestStoneIfNeeded() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-    if (!hasExcessStones()) {
+    if (!hasExcessStones_inlock()) {
         return {};
     }
 
@@ -220,6 +226,7 @@ void WiredTigerRecordStore::OplogStones::createNewStoneIfNeeded(RecordId lastRec
         return;
     }
 
+    LOG(1) << "create new oplogStone, current stones:" << _stones.size();
     OplogStones::Stone stone = {_currentRecords.swap(0), _currentBytes.swap(0), lastRecord};
     _stones.push_back(stone);
 
@@ -277,15 +284,15 @@ void WiredTigerRecordStore::OplogStones::setMinBytesPerStone(int64_t size) {
 
 void WiredTigerRecordStore::OplogStones::setNumStonesToKeep(size_t numStones) {
     invariant(numStones > 0);
-
+    return;
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     // Only allow changing the number of stones to keep if no data has been inserted.
     invariant(_stones.size() == 0 && _currentRecords.load() == 0);
-    _numStonesToKeep = numStones;
+    //_numStonesToKeep = numStones;
 }
 
-void WiredTigerRecordStore::OplogStones::_calculateStones(OperationContext* txn) {
+void WiredTigerRecordStore::OplogStones::_calculateStones(OperationContext* txn, size_t numStonesToKeep) {
     long long numRecords = _rs->numRecords(txn);
     long long dataSize = _rs->dataSize(txn);
 
@@ -300,7 +307,7 @@ void WiredTigerRecordStore::OplogStones::_calculateStones(OperationContext* txn)
     // oplog to determine where to put down stones.
     if (numRecords <= 0 || dataSize <= 0 ||
         uint64_t(numRecords) <
-            kMinSampleRatioForRandCursor * kRandomSamplesPerStone * _numStonesToKeep) {
+            kMinSampleRatioForRandCursor * kRandomSamplesPerStone * numStonesToKeep) {
         _calculateStonesByScanning(txn);
         return;
     }
@@ -423,10 +430,23 @@ void WiredTigerRecordStore::OplogStones::_calculateStonesBySampling(OperationCon
 }
 
 void WiredTigerRecordStore::OplogStones::_pokeReclaimThreadIfNeeded() {
-    if (hasExcessStones()) {
+    if (hasExcessStones_inlock()) {
         _oplogReclaimCv.notify_one();
     }
 }
+
+void WiredTigerRecordStore::OplogStones::adjust(int64_t maxSize) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    const unsigned long long kMinStonesToKeep = 10ULL;
+    const unsigned long long kMaxStonesToKeep = 100ULL;
+
+    unsigned long long numStones = maxSize / BSONObjMaxInternalSize;
+    size_t numStonesToKeep = std::min(kMaxStonesToKeep, std::max(kMinStonesToKeep, numStones));
+    _minBytesPerStone = maxSize / numStonesToKeep;
+    invariant(_minBytesPerStone > 0);
+    _pokeReclaimThreadIfNeeded();
+}
+
 
 class WiredTigerRecordStore::Cursor final : public SeekableRecordCursor {
 public:
@@ -1923,6 +1943,17 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* txn,
         _oplogStones->updateStonesAfterCappedTruncateAfter(
             recordsRemoved, bytesRemoved, firstRemovedId);
     }
+}
+
+Status WiredTigerRecordStore::updateCappedSize(OperationContext* txn, long long cappedSize) {
+        if (_cappedMaxSize == cappedSize) {
+                return Status::OK();
+        }
+        _cappedMaxSize = cappedSize;
+        if (_oplogStones) {
+                _oplogStones->adjust(cappedSize);
+        }
+        return Status::OK();
 }
 
 }  // namespace mongo
