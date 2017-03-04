@@ -217,6 +217,7 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::fsync
         << ActionType::invalidateUserCache // userAdminAnyDatabase gets this also
         << ActionType::killop
+        << ActionType::replSetResizeOplog
         << ActionType::resync;  // clusterManager gets this also
 
     // hostManager role actions that target the database resource
