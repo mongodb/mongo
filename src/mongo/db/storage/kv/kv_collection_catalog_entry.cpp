@@ -252,6 +252,12 @@ void KVCollectionCatalogEntry::updateValidator(OperationContext* txn,
     _catalog->putMetaData(txn, ns().toString(), md);
 }
 
+void KVCollectionCatalogEntry::updateCappedSize(OperationContext* opCtx, long long size) {
+    MetaData md = _getMetaData(opCtx);
+    md.options.cappedSize = size;
+    _catalog->putMetaData(opCtx, ns().toString(), md);
+}
+
 BSONCollectionCatalogEntry::MetaData KVCollectionCatalogEntry::_getMetaData(
     OperationContext* txn) const {
     return _catalog->getMetaData(txn, ns().toString());

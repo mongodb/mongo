@@ -399,6 +399,7 @@
         replSetSyncFrom: {skip: isUnrelated},
         replSetTest: {skip: isUnrelated},
         replSetUpdatePosition: {skip: isUnrelated},
+        replSetResizeOplog: {skip: isUnrelated},
         resetError: {skip: isUnrelated},
         resync: {skip: isUnrelated},
         revokePrivilegesFromRole: {

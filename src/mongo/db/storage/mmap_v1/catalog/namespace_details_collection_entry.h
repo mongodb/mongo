@@ -104,6 +104,8 @@ public:
                          StringData validationLevel,
                          StringData validationAction) final;
 
+    void updateCappedSize(OperationContext* opCtx, long long size) final;
+
     // not part of interface, but available to my storage engine
 
     int _findIndexNumber(OperationContext* txn, StringData indexName) const;

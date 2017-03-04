@@ -1381,7 +1381,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
     }
 }
 
-// Verify that oplog stones are reclaimed when the number of stones to keep is exceeded.
+// Verify that oplog stones are reclaimed when cappedMaxSize is exceeded.
 TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
     WiredTigerHarnessHelper harnessHelper;
 
@@ -1392,8 +1392,12 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
     WiredTigerRecordStore* wtrs = static_cast<WiredTigerRecordStore*>(rs.get());
     WiredTigerRecordStore::OplogStones* oplogStones = wtrs->oplogStones();
 
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
+        ASSERT_OK(wtrs->updateCappedSize(opCtx.get(), 230U));
+    }
+
     oplogStones->setMinBytesPerStone(100);
-    oplogStones->setNumStonesToKeep(2U);
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
@@ -1409,7 +1413,7 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
         ASSERT_EQ(0, oplogStones->currentBytes());
     }
 
-    // Truncate a stone when number of stones to keep is exceeded.
+    // Truncate a stone when cappedMaxSize is exceeded.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
 
@@ -1442,68 +1446,24 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
 
         wtrs->reclaimOplog(opCtx.get());
 
-        ASSERT_EQ(3, rs->numRecords(opCtx.get()));
-        ASSERT_EQ(320, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(2U, oplogStones->numStones());
+        ASSERT_EQ(2, rs->numRecords(opCtx.get()));
+        ASSERT_EQ(190, rs->dataSize(opCtx.get()));
+        ASSERT_EQ(1U, oplogStones->numStones());
         ASSERT_EQ(1, oplogStones->currentRecords());
         ASSERT_EQ(50, oplogStones->currentBytes());
     }
 
-    // No-op if the number of oplog stones is less than or equal to the number of stones to keep.
+    // No-op if dataSize <= cappedMaxSize.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
 
         wtrs->reclaimOplog(opCtx.get());
 
-        ASSERT_EQ(3, rs->numRecords(opCtx.get()));
-        ASSERT_EQ(320, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(2U, oplogStones->numStones());
+        ASSERT_EQ(2, rs->numRecords(opCtx.get()));
+        ASSERT_EQ(190, rs->dataSize(opCtx.get()));
+        ASSERT_EQ(1U, oplogStones->numStones());
         ASSERT_EQ(1, oplogStones->currentRecords());
         ASSERT_EQ(50, oplogStones->currentBytes());
-    }
-}
-
-// Verify that oplog stones are not reclaimed even if the size of the record store exceeds
-// 'cappedMaxSize'.
-TEST(WiredTigerRecordStoreTest, OplogStones_ExceedCappedMaxSize) {
-    WiredTigerHarnessHelper harnessHelper;
-
-    const int64_t cappedMaxSize = 256;
-    unique_ptr<RecordStore> rs(
-        harnessHelper.newCappedRecordStore("local.oplog.stones", cappedMaxSize, -1));
-
-    WiredTigerRecordStore* wtrs = static_cast<WiredTigerRecordStore*>(rs.get());
-    WiredTigerRecordStore::OplogStones* oplogStones = wtrs->oplogStones();
-
-    oplogStones->setMinBytesPerStone(100);
-    oplogStones->setNumStonesToKeep(10U);
-
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
-
-        ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 1), 100), RecordId(1, 1));
-        ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 2), 110), RecordId(1, 2));
-        ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 3), 120), RecordId(1, 3));
-
-        ASSERT_EQ(3, rs->numRecords(opCtx.get()));
-        ASSERT_EQ(330, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(3U, oplogStones->numStones());
-        ASSERT_EQ(0, oplogStones->currentRecords());
-        ASSERT_EQ(0, oplogStones->currentBytes());
-    }
-
-    // Shouldn't truncate a stone when the number of oplog stones is less than the number of stones
-    // to keep, even though the size of the record store exceeds 'cappedMaxSize'.
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper.newOperationContext());
-
-        wtrs->reclaimOplog(opCtx.get());
-
-        ASSERT_EQ(3, rs->numRecords(opCtx.get()));
-        ASSERT_EQ(330, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(3U, oplogStones->numStones());
-        ASSERT_EQ(0, oplogStones->currentRecords());
-        ASSERT_EQ(0, oplogStones->currentBytes());
     }
 }
 

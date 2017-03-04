@@ -126,6 +126,7 @@ env.Library(
         "plan_cache_commands.cpp",
         "rename_collection_cmd.cpp",
         "repair_cursor.cpp",
+        "resize_oplog.cpp",
         "set_feature_compatibility_version_command.cpp",
         "snapshot_management.cpp",
         "test_commands.cpp",

@@ -80,6 +80,8 @@ public:
                          StringData validationLevel,
                          StringData validationAction) final;
 
+    void updateCappedSize(OperationContext*, long long int) final;
+
     RecordStore* getRecordStore() {
         return _recordStore.get();
     }

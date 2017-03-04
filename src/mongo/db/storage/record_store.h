@@ -622,6 +622,14 @@ public:
                                         long long numRecords,
                                         long long dataSize) = 0;
 
+    /**
+     * used to support online change oplog size.
+     */
+    virtual Status updateCappedSize(OperationContext* opCtx, long long cappedSize) {
+        return Status(ErrorCodes::CommandNotSupported,
+                      "this storage engine does not support updateCappedSize");
+    }
+
 protected:
     std::string _ns;
 };
