@@ -111,8 +111,6 @@ public:
 
     void setMinBytesPerStone(int64_t size);
 
-    void setNumStonesToKeep(size_t numStones);
-
 private:
     class InsertChange;
     class TruncateChange;

@@ -282,16 +282,6 @@ void WiredTigerRecordStore::OplogStones::setMinBytesPerStone(int64_t size) {
     _minBytesPerStone = size;
 }
 
-void WiredTigerRecordStore::OplogStones::setNumStonesToKeep(size_t numStones) {
-    invariant(numStones > 0);
-    return;
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-
-    // Only allow changing the number of stones to keep if no data has been inserted.
-    invariant(_stones.size() == 0 && _currentRecords.load() == 0);
-    //_numStonesToKeep = numStones;
-}
-
 void WiredTigerRecordStore::OplogStones::_calculateStones(OperationContext* txn, size_t numStonesToKeep) {
     long long numRecords = _rs->numRecords(txn);
     long long dataSize = _rs->dataSize(txn);
