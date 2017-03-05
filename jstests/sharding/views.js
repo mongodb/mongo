@@ -5,6 +5,9 @@
 (function() {
     "use strict";
 
+    // For profilerHasSingleMatchingEntryOrThrow.
+    load("jstests/libs/profiler.js");
+
     // Given sharded explain output in 'shardedExplain', verifies that the explain mode 'verbosity'
     // affected the output verbosity appropriately, and that the response has the expected format.
     function verifyExplainResult(shardedExplain, verbosity) {
@@ -132,6 +135,21 @@
     //
     assert.commandFailedWithCode(db.adminCommand({getShardVersion: view.getFullName()}),
                                  ErrorCodes.NamespaceNotSharded);
+
+    //
+    // Confirm that the comment parameter on a find command is retained when rewritten as an
+    // expanded aggregation on the view.
+    //
+    let sdb = st.shard0.getDB(jsTestName());
+    assert.commandWorked(sdb.setProfilingLevel(2));
+
+    assert.eq(5, view.find({a: {$lte: 8}}).comment("agg_comment").itcount());
+
+    profilerHasSingleMatchingEntryOrThrow(sdb, {
+        "command.aggregate": coll.getName(),
+        "command.fromRouter": true,
+        "command.comment": "agg_comment"
+    });
 
     st.stop();
 })();

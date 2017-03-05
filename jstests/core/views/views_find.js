@@ -69,6 +69,10 @@
     assert.commandFailed(viewsDB.runCommand({find: "identityView", batchSize: -1}));
     assert.commandFailed(viewsDB.runCommand({find: "identityView", limit: -1}));
 
+    // Comment should succeed.
+    assert.commandWorked(
+        viewsDB.runCommand({find: "identityView", filter: {}, comment: "views_find"}));
+
     // Views support find with explain.
     assert.commandWorked(viewsDB.identityView.find().explain());
 

@@ -56,6 +56,7 @@ const StringData AggregationRequest::kCollationName = "collation"_sd;
 const StringData AggregationRequest::kExplainName = "explain"_sd;
 const StringData AggregationRequest::kAllowDiskUseName = "allowDiskUse"_sd;
 const StringData AggregationRequest::kHintName = "hint"_sd;
+const StringData AggregationRequest::kCommentName = "comment"_sd;
 
 const long long AggregationRequest::kDefaultBatchSize = 101;
 
@@ -136,6 +137,13 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
                                   << " must be specified as a string representing an index"
                                   << " name, or an object representing an index's key pattern");
             }
+        } else if (kCommentName == fieldName) {
+            if (elem.type() != BSONType::String) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream() << kCommentName << " must be a string, not a "
+                                      << typeName(elem.type())};
+            }
+            request.setComment(elem.str());
         } else if (kExplainName == fieldName) {
             if (elem.type() != BSONType::Bool) {
                 return {ErrorCodes::TypeMismatch,
@@ -222,7 +230,9 @@ Document AggregationRequest::serializeToCommandObj() const {
         // Only serialize batchSize when explain is false.
         {kCursorName, _explainMode ? Value() : Value(Document{{kBatchSizeName, _batchSize}})},
         // Only serialize a hint if one was specified.
-        {kHintName, _hint.isEmpty() ? Value() : Value(_hint)}};
+        {kHintName, _hint.isEmpty() ? Value() : Value(_hint)},
+        // Only serialize a comment if one was specified.
+        {kCommentName, _comment.empty() ? Value() : Value(_comment)}};
 }
 
 }  // namespace mongo

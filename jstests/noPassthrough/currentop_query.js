@@ -99,8 +99,11 @@
             {
               test: function() {
                   assert.eq(db.currentop_query
-                                .aggregate([{$match: {a: 1, $comment: "currentop_query"}}],
-                                           {collation: {locale: "fr"}, hint: {_id: 1}})
+                                .aggregate([{$match: {a: 1, $comment: "currentop_query"}}], {
+                                    collation: {locale: "fr"},
+                                    hint: {_id: 1},
+                                    comment: "currentop_query_2"
+                                })
                                 .itcount(),
                             1);
               },
@@ -108,6 +111,7 @@
               planSummary: "IXSCAN { _id: 1 }",
               currentOpFilter: {
                   "query.pipeline.0.$match.$comment": "currentop_query",
+                  "query.comment": "currentop_query_2",
                   "query.collation": {locale: "fr"},
                   "query.hint": {_id: 1}
               }

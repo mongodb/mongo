@@ -1178,10 +1178,15 @@ TEST(QueryRequestTest, ConvertToAggregationWithReturnKeyFails) {
     ASSERT_NOT_OK(qr.asAggregationCommand());
 }
 
-TEST(QueryRequestTest, ConvertToAggregationWithCommentFails) {
+TEST(QueryRequestTest, ConvertToAggregationWithCommentSucceeds) {
     QueryRequest qr(testns);
     qr.setComment("test");
-    ASSERT_NOT_OK(qr.asAggregationCommand());
+    const auto aggCmd = qr.asAggregationCommand();
+    ASSERT_OK(aggCmd);
+
+    auto ar = AggregationRequest::parseFromBSON(testns, aggCmd.getValue());
+    ASSERT_OK(ar.getStatus());
+    ASSERT_EQ(qr.getComment(), ar.getValue().getComment());
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithShowRecordIdFails) {

@@ -56,7 +56,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     const BSONObj inputBson = fromjson(
         "{pipeline: [{$match: {a: 'abc'}}], explain: true, allowDiskUse: true, fromRouter: true, "
         "bypassDocumentValidation: true, collation: {locale: 'en_US'}, cursor: {batchSize: 10}, "
-        "hint: {a: 1}}");
+        "hint: {a: 1}, comment: 'agg_comment'}");
     auto request = unittest::assertGet(AggregationRequest::parseFromBSON(nss, inputBson));
     ASSERT_TRUE(request.getExplain());
     ASSERT(*request.getExplain() == ExplainOptions::Verbosity::kQueryPlanner);
@@ -65,6 +65,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     ASSERT_TRUE(request.shouldBypassDocumentValidation());
     ASSERT_EQ(request.getBatchSize(), 10);
     ASSERT_BSONOBJ_EQ(request.getHint(), BSON("a" << 1));
+    ASSERT_EQ(request.getComment(), "agg_comment");
     ASSERT_BSONOBJ_EQ(request.getCollation(),
                       BSON("locale"
                            << "en_US"));
@@ -121,6 +122,7 @@ TEST(AggregationRequestTest, ShouldNotSerializeOptionalValuesIfEquivalentToDefau
     request.setBypassDocumentValidation(false);
     request.setCollation(BSONObj());
     request.setHint(BSONObj());
+    request.setComment("");
 
     auto expectedSerialization =
         Document{{AggregationRequest::kCommandName, nss.coll()},
@@ -138,6 +140,8 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     request.setBatchSize(10);
     const auto hintObj = BSON("a" << 1);
     request.setHint(hintObj);
+    const auto comment = std::string("agg_comment");
+    request.setComment(comment);
     const auto collationObj = BSON("locale"
                                    << "en_US");
     request.setCollation(collationObj);
@@ -151,7 +155,8 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
                  {AggregationRequest::kCollationName, collationObj},
                  {AggregationRequest::kCursorName,
                   Value(Document({{AggregationRequest::kBatchSizeName, 10}}))},
-                 {AggregationRequest::kHintName, hintObj}};
+                 {AggregationRequest::kHintName, hintObj},
+                 {AggregationRequest::kCommentName, comment}};
     ASSERT_DOCUMENT_EQ(request.serializeToCommandObj(), expectedSerialization);
 }
 
@@ -237,6 +242,14 @@ TEST(AggregationRequestTest, ShouldRejectHintAsArray) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson =
         fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, hint: []}]}");
+    ASSERT_NOT_OK(
+        AggregationRequest::parseFromBSON(NamespaceString("a.collection"), inputBson).getStatus());
+}
+
+TEST(AggregationRequestTest, ShouldRejectNonStringComment) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson =
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, comment: 1}");
     ASSERT_NOT_OK(
         AggregationRequest::parseFromBSON(NamespaceString("a.collection"), inputBson).getStatus());
 }

@@ -56,6 +56,7 @@ public:
     static const StringData kExplainName;
     static const StringData kAllowDiskUseName;
     static const StringData kHintName;
+    static const StringData kCommentName;
 
     static const long long kDefaultBatchSize;
 
@@ -131,6 +132,10 @@ public:
         return _hint;
     }
 
+    const std::string& getComment() const {
+        return _comment;
+    }
+
     boost::optional<ExplainOptions::Verbosity> getExplain() const {
         return _explainMode;
     }
@@ -153,6 +158,10 @@ public:
 
     void setHint(BSONObj hint) {
         _hint = hint.getOwned();
+    }
+
+    void setComment(const std::string& comment) {
+        _comment = comment;
     }
 
     void setExplain(boost::optional<ExplainOptions::Verbosity> verbosity) {
@@ -190,6 +199,9 @@ private:
     // the key pattern hinted.  If the hint was by index name, the value of '_hint' is
     // {$hint: <String>}, where <String> is the index name hinted.
     BSONObj _hint;
+
+    // The comment parameter attached to this aggregation.
+    std::string _comment;
 
     // The explain mode to use, or boost::none if this is not a request for an aggregation explain.
     boost::optional<ExplainOptions::Verbosity> _explainMode;

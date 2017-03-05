@@ -125,6 +125,15 @@ TEST(ResolvedViewTest, ExpandingAggRequestPreservesCollation) {
                            << "fr_CA"));
 }
 
+TEST(ResolvedViewTest, ExpandingAggRequestPreservesComment) {
+    const ResolvedView resolvedView{backingNss, emptyPipeline};
+    AggregationRequest aggRequest(viewNss, {});
+    aggRequest.setComment("agg_comment");
+
+    auto result = resolvedView.asExpandedViewAggregation(aggRequest);
+    ASSERT_EQ(result.getComment(), "agg_comment");
+}
+
 TEST(ResolvedViewTest, FromBSONFailsIfMissingResolvedView) {
     BSONObj badCmdResponse = BSON("x" << 1);
     ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), UserException, 40248);
