@@ -122,6 +122,10 @@ PseudoRandom hashGenerator(std::unique_ptr<SecureRandom>(SecureRandom::create())
 // appears in the oplog.
 stdx::mutex newOpMutex;
 stdx::condition_variable newTimestampNotifier;
+// Remembers that last timestamp generated for creating new oplog entries or last timestamp of
+// oplog entry applied as a secondary. This should only be used for the snapshot thread. Must hold
+// the newOpMutex when accessing this variable.
+Timestamp lastSetTimestamp;
 
 static std::string _oplogCollectionName;
 
@@ -164,6 +168,7 @@ void getNextOpTime(OperationContext* opCtx,
     stdx::lock_guard<stdx::mutex> lk(newOpMutex);
 
     auto ts = LogicalClock::get(opCtx)->reserveTicks(count).asTimestamp();
+    lastSetTimestamp = ts;
     newTimestampNotifier.notify_all();
 
     fassert(28560, oplog->getRecordStore()->oplogDiskLocRegister(opCtx, ts));
@@ -1113,6 +1118,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
 void setNewTimestamp(ServiceContext* service, const Timestamp& newTime) {
     stdx::lock_guard<stdx::mutex> lk(newOpMutex);
     LogicalClock::get(service)->advanceClusterTimeFromTrustedSource(LogicalTime(newTime));
+    lastSetTimestamp = newTime;
     newTimestampNotifier.notify_all();
 }
 
@@ -1178,7 +1184,7 @@ void SnapshotThread::run() {
     auto service = client.getServiceContext();
     auto replCoord = ReplicationCoordinator::get(service);
 
-    Timestamp lastTimestamp = {};
+    Timestamp lastTimestamp(Timestamp::max());  // hack to trigger snapshot from startup.
     while (true) {
         // This block logically belongs at the end of the loop, but having it at the top
         // simplifies handling of the "continue" cases. It is harmless to do these before the
@@ -1196,10 +1202,9 @@ void SnapshotThread::run() {
                 if (_inShutdown.load())
                     return;
 
-                auto clusterTime = LogicalClock::get(service)->getClusterTime().getTime();
-                if (_forcedSnapshotPending.load() || lastTimestamp != clusterTime.asTimestamp()) {
+                if (_forcedSnapshotPending.load() || lastTimestamp != lastSetTimestamp) {
                     _forcedSnapshotPending.store(false);
-                    lastTimestamp = clusterTime.asTimestamp();
+                    lastTimestamp = lastSetTimestamp;
                     break;
                 }
 
