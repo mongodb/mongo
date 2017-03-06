@@ -37,7 +37,7 @@ class ServiceContext;
 namespace repl {
 
 class ReplicationCoordinatorExternalState;
-class ReplicaSetConfig;
+class ReplSetConfig;
 
 /**
  * Validates that "newConfig" is a legal configuration that the current
@@ -50,8 +50,8 @@ class ReplicaSetConfig;
  * successor configuration.
  */
 StatusWith<int> validateConfigForStartUp(ReplicationCoordinatorExternalState* externalState,
-                                         const ReplicaSetConfig& oldConfig,
-                                         const ReplicaSetConfig& newConfig,
+                                         const ReplSetConfig& oldConfig,
+                                         const ReplSetConfig& newConfig,
                                          ServiceContext* ctx);
 
 /**
@@ -62,7 +62,7 @@ StatusWith<int> validateConfigForStartUp(ReplicationCoordinatorExternalState* ex
  * on success, and an indicative error on failure.
  */
 StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* externalState,
-                                          const ReplicaSetConfig& newConfig,
+                                          const ReplSetConfig& newConfig,
                                           ServiceContext* ctx);
 
 /**
@@ -76,8 +76,8 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
  * on success, and an indicative error on failure.
  */
 StatusWith<int> validateConfigForReconfig(ReplicationCoordinatorExternalState* externalState,
-                                          const ReplicaSetConfig& oldConfig,
-                                          const ReplicaSetConfig& newConfig,
+                                          const ReplSetConfig& oldConfig,
+                                          const ReplSetConfig& newConfig,
                                           ServiceContext* ctx,
                                           bool force);
 
@@ -91,7 +91,7 @@ StatusWith<int> validateConfigForReconfig(ReplicationCoordinatorExternalState* e
  */
 StatusWith<int> validateConfigForHeartbeatReconfig(
     ReplicationCoordinatorExternalState* externalState,
-    const ReplicaSetConfig& newConfig,
+    const ReplSetConfig& newConfig,
     ServiceContext* ctx);
 }  // namespace repl
 }  // namespace mongo

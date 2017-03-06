@@ -538,7 +538,7 @@ protected:
         ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
 
         {
-            mongo::repl::ReplicaSetConfig oldConfig = _replSet->getReplConfig();
+            mongo::repl::ReplSetConfig oldConfig = _replSet->getReplConfig();
 
             mongo::BSONObjBuilder newConfigBuilder;
             newConfigBuilder.append("_id", oldConfig.getReplSetName());
@@ -616,7 +616,7 @@ protected:
             }
 
             membersBuilder.done();
-            mongo::repl::ReplicaSetConfig newConfig;
+            mongo::repl::ReplSetConfig newConfig;
             fassert(28569, newConfig.initialize(newConfigBuilder.done()));
             fassert(28568, newConfig.validate());
             _replSet->setConfig(newConfig);

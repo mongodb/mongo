@@ -334,7 +334,7 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
     const BSONElement rsConfigElement = doc[kConfigFieldName];
     if (rsConfigElement.eoo()) {
         _configSet = false;
-        _config = ReplicaSetConfig();
+        _config = ReplSetConfig();
         return Status::OK();
     } else if (rsConfigElement.type() != Object) {
         return Status(ErrorCodes::TypeMismatch,
@@ -368,7 +368,7 @@ Seconds ReplSetHeartbeatResponse::getTime() const {
     return _time;
 }
 
-const ReplicaSetConfig& ReplSetHeartbeatResponse::getConfig() const {
+const ReplSetConfig& ReplSetHeartbeatResponse::getConfig() const {
     invariant(_configSet);
     return _config;
 }

@@ -34,7 +34,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/repl/bgsync.h"
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/reporter.h"
 #include "mongo/executor/task_executor.h"

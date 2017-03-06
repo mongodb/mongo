@@ -32,7 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
 
@@ -42,7 +42,7 @@ class Status;
 
 namespace repl {
 
-class ReplicaSetConfig;
+class ReplSetConfig;
 class ScatterGatherRunner;
 
 class FreshnessChecker {
@@ -60,7 +60,7 @@ public:
     class Algorithm : public ScatterGatherAlgorithm {
     public:
         Algorithm(Timestamp lastOpTimeApplied,
-                  const ReplicaSetConfig& rsConfig,
+                  const ReplSetConfig& rsConfig,
                   int selfIndex,
                   const std::vector<HostAndPort>& targets);
         virtual ~Algorithm();
@@ -87,7 +87,7 @@ public:
         const Timestamp _lastOpTimeApplied;
 
         // Config to use for this check
-        const ReplicaSetConfig _rsConfig;
+        const ReplSetConfig _rsConfig;
 
         // Our index position in _rsConfig
         const int _selfIndex;
@@ -120,7 +120,7 @@ public:
      **/
     StatusWith<ReplicationExecutor::EventHandle> start(ReplicationExecutor* executor,
                                                        const Timestamp& lastOpTimeApplied,
-                                                       const ReplicaSetConfig& currentConfig,
+                                                       const ReplSetConfig& currentConfig,
                                                        int selfIndex,
                                                        const std::vector<HostAndPort>& targets);
 

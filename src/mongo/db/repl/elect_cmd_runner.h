@@ -32,7 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
 
@@ -42,7 +42,7 @@ class Status;
 
 namespace repl {
 
-class ReplicaSetConfig;
+class ReplSetConfig;
 class ScatterGatherRunner;
 
 class ElectCmdRunner {
@@ -51,7 +51,7 @@ class ElectCmdRunner {
 public:
     class Algorithm : public ScatterGatherAlgorithm {
     public:
-        Algorithm(const ReplicaSetConfig& rsConfig,
+        Algorithm(const ReplSetConfig& rsConfig,
                   int selfIndex,
                   const std::vector<HostAndPort>& targets,
                   OID round);
@@ -75,7 +75,7 @@ public:
 
         bool _sufficientResponsesReceived;
 
-        const ReplicaSetConfig _rsConfig;
+        const ReplSetConfig _rsConfig;
         const int _selfIndex;
         const std::vector<HostAndPort> _targets;
         const OID _round;
@@ -91,7 +91,7 @@ public:
      * Returned handle can be used to schedule a callback when the process is complete.
      */
     StatusWith<ReplicationExecutor::EventHandle> start(ReplicationExecutor* executor,
-                                                       const ReplicaSetConfig& currentConfig,
+                                                       const ReplSetConfig& currentConfig,
                                                        int selfIndex,
                                                        const std::vector<HostAndPort>& targets);
 

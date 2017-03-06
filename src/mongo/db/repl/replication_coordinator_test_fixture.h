@@ -47,7 +47,7 @@ class NetworkInterfaceMock;
 
 namespace repl {
 
-class ReplicaSetConfig;
+class ReplSetConfig;
 class ReplicationCoordinatorExternalStateMock;
 class ReplicationCoordinatorImpl;
 class StorageInterfaceMock;
@@ -73,10 +73,10 @@ public:
                                              Milliseconds millis = Milliseconds(0));
 
     /**
-     * Constructs a ReplicaSetConfig from the given BSON, or raises a test failure exception.
+     * Constructs a ReplSetConfig from the given BSON, or raises a test failure exception.
      */
-    static ReplicaSetConfig assertMakeRSConfig(const BSONObj& configBSON);
-    static ReplicaSetConfig assertMakeRSConfigV0(const BSONObj& configBson);
+    static ReplSetConfig assertMakeRSConfig(const BSONObj& configBSON);
+    static ReplSetConfig assertMakeRSConfigV0(const BSONObj& configBson);
 
     /**
      * Adds { protocolVersion: 0 or 1 } to the config.

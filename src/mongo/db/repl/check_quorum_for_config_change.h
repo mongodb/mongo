@@ -35,7 +35,7 @@
 namespace mongo {
 namespace repl {
 
-class ReplicaSetConfig;
+class ReplSetConfig;
 
 /**
  * Quorum checking state machine.
@@ -57,7 +57,7 @@ public:
      *
      * "rsConfig" must stay in scope until QuorumChecker's destructor completes.
      */
-    QuorumChecker(const ReplicaSetConfig* rsConfig, int myIndex);
+    QuorumChecker(const ReplSetConfig* rsConfig, int myIndex);
     virtual ~QuorumChecker();
 
     virtual std::vector<executor::RemoteCommandRequest> getRequests() const;
@@ -86,7 +86,7 @@ private:
                                     const ResponseStatus& response);
 
     // Pointer to the replica set configuration for which we're checking quorum.
-    const ReplicaSetConfig* const _rsConfig;
+    const ReplSetConfig* const _rsConfig;
 
     // Index of the local node's member configuration in _rsConfig.
     const int _myIndex;
@@ -127,7 +127,7 @@ private:
  * - No node reports a replica set name other than the one in "rsConfig".
  */
 Status checkQuorumForInitiate(ReplicationExecutor* executor,
-                              const ReplicaSetConfig& rsConfig,
+                              const ReplSetConfig& rsConfig,
                               const int myIndex);
 
 /**
@@ -145,7 +145,7 @@ Status checkQuorumForInitiate(ReplicationExecutor* executor,
  * - All responding nodes report a config version less than the one in "rsConfig".
  */
 Status checkQuorumForReconfig(ReplicationExecutor* executor,
-                              const ReplicaSetConfig& rsConfig,
+                              const ReplSetConfig& rsConfig,
                               const int myIndex);
 
 }  // namespace repl

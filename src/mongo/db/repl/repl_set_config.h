@@ -35,7 +35,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/repl/member_config.h"
-#include "mongo/db/repl/replica_set_tag.h"
+#include "mongo/db/repl/repl_set_tag.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
@@ -49,7 +49,7 @@ namespace repl {
 /**
  * Representation of the configuration information about a particular replica set.
  */
-class ReplicaSetConfig {
+class ReplSetConfig {
 public:
     typedef std::vector<MemberConfig>::const_iterator MemberIterator;
 
@@ -67,7 +67,7 @@ public:
     static const bool kDefaultChainingAllowed;
 
     /**
-     * Initializes this ReplicaSetConfig from the contents of "cfg".
+     * Initializes this ReplSetConfig from the contents of "cfg".
      * The default protocol version is 0 to keep backward-compatibility.
      * If usePV1ByDefault is true, the protocol version will be 1 when it's not specified in "cfg".
      * Sets _replicaSetId to "defaultReplicaSetId" if a replica set ID is not specified in "cfg".
@@ -137,14 +137,14 @@ public:
     }
 
     /**
-     * Gets a begin iterator over the MemberConfigs stored in this ReplicaSetConfig.
+     * Gets a begin iterator over the MemberConfigs stored in this ReplSetConfig.
      */
     MemberIterator membersBegin() const {
         return _members.begin();
     }
 
     /**
-     * Gets an end iterator over the MemberConfigs stored in this ReplicaSetConfig.
+     * Gets an end iterator over the MemberConfigs stored in this ReplSetConfig.
      */
     MemberIterator membersEnd() const {
         return _members.end();
@@ -267,24 +267,24 @@ public:
     }
 
     /**
-     * Returns a ReplicaSetTag with the given "key" and "value", or an invalid
+     * Returns a ReplSetTag with the given "key" and "value", or an invalid
      * tag if the configuration describes no such tag.
      */
-    ReplicaSetTag findTag(StringData key, StringData value) const;
+    ReplSetTag findTag(StringData key, StringData value) const;
 
     /**
      * Returns the pattern corresponding to "patternName" in this configuration.
      * If "patternName" is not a valid pattern in this configuration, returns
      * ErrorCodes::NoSuchKey.
      */
-    StatusWith<ReplicaSetTagPattern> findCustomWriteMode(StringData patternName) const;
+    StatusWith<ReplSetTagPattern> findCustomWriteMode(StringData patternName) const;
 
     /**
      * Returns the "tags configuration" for this replicaset.
      *
      * NOTE(schwerin): Not clear if this should be used other than for reporting/debugging.
      */
-    const ReplicaSetTagConfig& getTagConfig() const {
+    const ReplSetTagConfig& getTagConfig() const {
         return _tagConfig;
     }
 
@@ -388,8 +388,8 @@ private:
     int _majorityVoteCount = 0;
     int _writeMajority = 0;
     int _totalVotingMembers = 0;
-    ReplicaSetTagConfig _tagConfig;
-    StringMap<ReplicaSetTagPattern> _customWriteConcernModes;
+    ReplSetTagConfig _tagConfig;
+    StringMap<ReplSetTagPattern> _customWriteConcernModes;
     long long _protocolVersion = 0;
     bool _configServer = false;
     OID _replicaSetId;

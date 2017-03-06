@@ -44,7 +44,7 @@ namespace repl {
 
 using executor::RemoteCommandRequest;
 
-VoteRequester::Algorithm::Algorithm(const ReplicaSetConfig& rsConfig,
+VoteRequester::Algorithm::Algorithm(const ReplSetConfig& rsConfig,
                                     long long candidateIndex,
                                     long long term,
                                     bool dryRun,
@@ -141,7 +141,7 @@ VoteRequester::VoteRequester() : _isCanceled(false) {}
 VoteRequester::~VoteRequester() {}
 
 StatusWith<ReplicationExecutor::EventHandle> VoteRequester::start(ReplicationExecutor* executor,
-                                                                  const ReplicaSetConfig& rsConfig,
+                                                                  const ReplSetConfig& rsConfig,
                                                                   long long candidateIndex,
                                                                   long long term,
                                                                   bool dryRun,

@@ -177,7 +177,7 @@ RemoteCommandRequest OplogFetcherTest::processNetworkResponse(
 HostAndPort source("localhost:12345");
 NamespaceString nss("local.oplog.rs");
 
-ReplicaSetConfig _createConfig(bool isV1ElectionProtocol) {
+ReplSetConfig _createConfig(bool isV1ElectionProtocol) {
     BSONObjBuilder bob;
     bob.append("_id", "myset");
     bob.append("version", 1);
@@ -195,7 +195,7 @@ ReplicaSetConfig _createConfig(bool isV1ElectionProtocol) {
     }
     auto configObj = bob.obj();
 
-    ReplicaSetConfig config;
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(configObj));
     return config;
 }
@@ -267,7 +267,7 @@ TEST_F(OplogFetcherTest, InvalidConstruction) {
                                              lastFetched,
                                              source,
                                              nss,
-                                             ReplicaSetConfig(),
+                                             ReplSetConfig(),
                                              0,
                                              dataReplicatorExternalState.get(),
                                              enqueueDocumentsFn,

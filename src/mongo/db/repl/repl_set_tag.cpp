@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/replica_set_tag.h"
+#include "mongo/db/repl/repl_set_tag.h"
 
 #include <algorithm>
 
@@ -41,15 +41,15 @@
 namespace mongo {
 namespace repl {
 
-bool ReplicaSetTag::operator==(const ReplicaSetTag& other) const {
+bool ReplSetTag::operator==(const ReplSetTag& other) const {
     return _keyIndex == other._keyIndex && _valueIndex == other._valueIndex;
 }
 
-bool ReplicaSetTag::operator!=(const ReplicaSetTag& other) const {
+bool ReplSetTag::operator!=(const ReplSetTag& other) const {
     return !(*this == other);
 }
 
-void ReplicaSetTagPattern::addTagCountConstraint(int32_t keyIndex, int32_t minCount) {
+void ReplSetTagPattern::addTagCountConstraint(int32_t keyIndex, int32_t minCount) {
     const std::vector<TagCountConstraint>::iterator iter = std::find_if(
         _constraints.begin(),
         _constraints.end(),
@@ -63,18 +63,18 @@ void ReplicaSetTagPattern::addTagCountConstraint(int32_t keyIndex, int32_t minCo
     }
 }
 
-ReplicaSetTagPattern::TagCountConstraint::TagCountConstraint(int32_t keyIndex, int32_t minCount)
+ReplSetTagPattern::TagCountConstraint::TagCountConstraint(int32_t keyIndex, int32_t minCount)
     : _keyIndex(keyIndex), _minCount(minCount) {}
 
-ReplicaSetTagMatch::ReplicaSetTagMatch(const ReplicaSetTagPattern& pattern) {
-    for (ReplicaSetTagPattern::ConstraintIterator iter = pattern.constraintsBegin();
+ReplSetTagMatch::ReplSetTagMatch(const ReplSetTagPattern& pattern) {
+    for (ReplSetTagPattern::ConstraintIterator iter = pattern.constraintsBegin();
          iter != pattern.constraintsEnd();
          ++iter) {
         _boundTagValues.push_back(BoundTagValue(*iter));
     }
 }
 
-bool ReplicaSetTagMatch::update(const ReplicaSetTag& tag) {
+bool ReplSetTagMatch::update(const ReplSetTag& tag) {
     const std::vector<BoundTagValue>::iterator iter =
         std::find_if(_boundTagValues.begin(),
                      _boundTagValues.end(),
@@ -89,7 +89,7 @@ bool ReplicaSetTagMatch::update(const ReplicaSetTag& tag) {
     return isSatisfied();
 }
 
-bool ReplicaSetTagMatch::isSatisfied() const {
+bool ReplSetTagMatch::isSatisfied() const {
     const std::vector<BoundTagValue>::const_iterator iter =
         std::find_if(_boundTagValues.begin(),
                      _boundTagValues.end(),
@@ -98,11 +98,11 @@ bool ReplicaSetTagMatch::isSatisfied() const {
     return iter == _boundTagValues.end();
 }
 
-bool ReplicaSetTagMatch::BoundTagValue::isSatisfied() const {
+bool ReplSetTagMatch::BoundTagValue::isSatisfied() const {
     return constraint.getMinCount() <= int32_t(boundValues.size());
 }
 
-ReplicaSetTag ReplicaSetTagConfig::makeTag(StringData key, StringData value) {
+ReplSetTag ReplSetTagConfig::makeTag(StringData key, StringData value) {
     int32_t keyIndex = _findKeyIndex(key);
     if (size_t(keyIndex) == _tagData.size()) {
         _tagData.push_back(make_pair(key.toString(), ValueVector()));
@@ -111,32 +111,32 @@ ReplicaSetTag ReplicaSetTagConfig::makeTag(StringData key, StringData value) {
     for (size_t valueIndex = 0; valueIndex < values.size(); ++valueIndex) {
         if (values[valueIndex] != value)
             continue;
-        return ReplicaSetTag(keyIndex, int32_t(valueIndex));
+        return ReplSetTag(keyIndex, int32_t(valueIndex));
     }
     values.push_back(value.toString());
-    return ReplicaSetTag(keyIndex, int32_t(values.size()) - 1);
+    return ReplSetTag(keyIndex, int32_t(values.size()) - 1);
 }
 
-ReplicaSetTag ReplicaSetTagConfig::findTag(StringData key, StringData value) const {
+ReplSetTag ReplSetTagConfig::findTag(StringData key, StringData value) const {
     int32_t keyIndex = _findKeyIndex(key);
     if (size_t(keyIndex) == _tagData.size())
-        return ReplicaSetTag(-1, -1);
+        return ReplSetTag(-1, -1);
     const ValueVector& values = _tagData[keyIndex].second;
     for (size_t valueIndex = 0; valueIndex < values.size(); ++valueIndex) {
         if (values[valueIndex] == value) {
-            return ReplicaSetTag(keyIndex, int32_t(valueIndex));
+            return ReplSetTag(keyIndex, int32_t(valueIndex));
         }
     }
-    return ReplicaSetTag(-1, -1);
+    return ReplSetTag(-1, -1);
 }
 
-ReplicaSetTagPattern ReplicaSetTagConfig::makePattern() const {
-    return ReplicaSetTagPattern();
+ReplSetTagPattern ReplSetTagConfig::makePattern() const {
+    return ReplSetTagPattern();
 }
 
-Status ReplicaSetTagConfig::addTagCountConstraintToPattern(ReplicaSetTagPattern* pattern,
-                                                           StringData tagKey,
-                                                           int32_t minCount) const {
+Status ReplSetTagConfig::addTagCountConstraintToPattern(ReplSetTagPattern* pattern,
+                                                        StringData tagKey,
+                                                        int32_t minCount) const {
     int32_t keyIndex = _findKeyIndex(tagKey);
     if (size_t(keyIndex) == _tagData.size()) {
         return Status(ErrorCodes::NoSuchKey,
@@ -146,7 +146,7 @@ Status ReplicaSetTagConfig::addTagCountConstraintToPattern(ReplicaSetTagPattern*
     return Status::OK();
 }
 
-int32_t ReplicaSetTagConfig::_findKeyIndex(StringData key) const {
+int32_t ReplSetTagConfig::_findKeyIndex(StringData key) const {
     size_t i;
     for (i = 0; i < _tagData.size(); ++i) {
         if (_tagData[i].first == key) {
@@ -156,29 +156,29 @@ int32_t ReplicaSetTagConfig::_findKeyIndex(StringData key) const {
     return int32_t(i);
 }
 
-std::string ReplicaSetTagConfig::getTagKey(const ReplicaSetTag& tag) const {
+std::string ReplSetTagConfig::getTagKey(const ReplSetTag& tag) const {
     invariant(tag.isValid() && size_t(tag.getKeyIndex()) < _tagData.size());
     return _tagData[tag.getKeyIndex()].first;
 }
 
-std::string ReplicaSetTagConfig::getTagValue(const ReplicaSetTag& tag) const {
+std::string ReplSetTagConfig::getTagValue(const ReplSetTag& tag) const {
     invariant(tag.isValid() && size_t(tag.getKeyIndex()) < _tagData.size());
     const ValueVector& values = _tagData[tag.getKeyIndex()].second;
     invariant(tag.getValueIndex() >= 0 && size_t(tag.getValueIndex()) < values.size());
     return values[tag.getValueIndex()];
 }
 
-void ReplicaSetTagConfig::put(const ReplicaSetTag& tag, std::ostream& os) const {
+void ReplSetTagConfig::put(const ReplSetTag& tag, std::ostream& os) const {
     BSONObjBuilder builder;
     _appendTagKey(tag.getKeyIndex(), &builder);
     _appendTagValue(tag.getKeyIndex(), tag.getValueIndex(), &builder);
     os << builder.done();
 }
 
-void ReplicaSetTagConfig::put(const ReplicaSetTagPattern& pattern, std::ostream& os) const {
+void ReplSetTagConfig::put(const ReplSetTagPattern& pattern, std::ostream& os) const {
     BSONObjBuilder builder;
     BSONArrayBuilder allConstraintsBuilder(builder.subarrayStart("constraints"));
-    for (ReplicaSetTagPattern::ConstraintIterator iter = pattern.constraintsBegin();
+    for (ReplSetTagPattern::ConstraintIterator iter = pattern.constraintsBegin();
          iter != pattern.constraintsEnd();
          ++iter) {
         BSONObjBuilder constraintBuilder(allConstraintsBuilder.subobjStart());
@@ -188,7 +188,7 @@ void ReplicaSetTagConfig::put(const ReplicaSetTagPattern& pattern, std::ostream&
     os << builder.done();
 }
 
-void ReplicaSetTagConfig::put(const ReplicaSetTagMatch& matcher, std::ostream& os) const {
+void ReplSetTagConfig::put(const ReplSetTagMatch& matcher, std::ostream& os) const {
     BSONObjBuilder builder;
     BSONArrayBuilder allBindingsBuilder(builder.subarrayStart("bindings"));
     for (size_t i = 0; i < matcher._boundTagValues.size(); ++i) {
@@ -206,7 +206,7 @@ void ReplicaSetTagConfig::put(const ReplicaSetTagMatch& matcher, std::ostream& o
     os << builder.done();
 }
 
-void ReplicaSetTagConfig::_appendTagKey(int32_t keyIndex, BSONObjBuilder* builder) const {
+void ReplSetTagConfig::_appendTagKey(int32_t keyIndex, BSONObjBuilder* builder) const {
     if (keyIndex < 0 || size_t(keyIndex) >= _tagData.size()) {
         builder->append("tagKey", int(keyIndex));
     } else {
@@ -214,9 +214,9 @@ void ReplicaSetTagConfig::_appendTagKey(int32_t keyIndex, BSONObjBuilder* builde
     }
 }
 
-void ReplicaSetTagConfig::_appendTagValue(int32_t keyIndex,
-                                          int32_t valueIndex,
-                                          BSONObjBuilder* builder) const {
+void ReplSetTagConfig::_appendTagValue(int32_t keyIndex,
+                                       int32_t valueIndex,
+                                       BSONObjBuilder* builder) const {
     if (keyIndex < 0 || size_t(keyIndex) >= _tagData.size()) {
         builder->append("tagValue", valueIndex);
         return;
@@ -228,8 +228,8 @@ void ReplicaSetTagConfig::_appendTagValue(int32_t keyIndex,
     builder->append("tagValue", keyEntry.second[valueIndex]);
 }
 
-void ReplicaSetTagConfig::_appendConstraint(
-    const ReplicaSetTagPattern::TagCountConstraint& constraint, BSONObjBuilder* builder) const {
+void ReplSetTagConfig::_appendConstraint(const ReplSetTagPattern::TagCountConstraint& constraint,
+                                         BSONObjBuilder* builder) const {
     _appendTagKey(constraint.getKeyIndex(), builder);
     builder->append("minCount", int(constraint.getMinCount()));
 }

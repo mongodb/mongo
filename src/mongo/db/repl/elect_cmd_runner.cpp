@@ -34,7 +34,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/repl/member_heartbeat_data.h"
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
 #include "mongo/util/log.h"
@@ -44,7 +44,7 @@ namespace repl {
 
 using executor::RemoteCommandRequest;
 
-ElectCmdRunner::Algorithm::Algorithm(const ReplicaSetConfig& rsConfig,
+ElectCmdRunner::Algorithm::Algorithm(const ReplSetConfig& rsConfig,
                                      int selfIndex,
                                      const std::vector<HostAndPort>& targets,
                                      OID round)
@@ -130,7 +130,7 @@ ElectCmdRunner::~ElectCmdRunner() {}
 
 StatusWith<ReplicationExecutor::EventHandle> ElectCmdRunner::start(
     ReplicationExecutor* executor,
-    const ReplicaSetConfig& currentConfig,
+    const ReplSetConfig& currentConfig,
     int selfIndex,
     const std::vector<HostAndPort>& targets) {
     _algorithm.reset(new Algorithm(currentConfig, selfIndex, targets, OID::gen()));

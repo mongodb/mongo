@@ -34,9 +34,9 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
-#include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -48,7 +48,7 @@ namespace repl {
 
 using executor::RemoteCommandRequest;
 
-QuorumChecker::QuorumChecker(const ReplicaSetConfig* rsConfig, int myIndex)
+QuorumChecker::QuorumChecker(const ReplSetConfig* rsConfig, int myIndex)
     : _rsConfig(rsConfig),
       _myIndex(myIndex),
       _numResponses(1),  // We "responded" to ourself already.
@@ -280,7 +280,7 @@ bool QuorumChecker::hasReceivedSufficientResponses() const {
 }
 
 Status checkQuorumGeneral(ReplicationExecutor* executor,
-                          const ReplicaSetConfig& rsConfig,
+                          const ReplSetConfig& rsConfig,
                           const int myIndex) {
     QuorumChecker checker(&rsConfig, myIndex);
     ScatterGatherRunner runner(&checker, executor);
@@ -293,14 +293,14 @@ Status checkQuorumGeneral(ReplicationExecutor* executor,
 }
 
 Status checkQuorumForInitiate(ReplicationExecutor* executor,
-                              const ReplicaSetConfig& rsConfig,
+                              const ReplSetConfig& rsConfig,
                               const int myIndex) {
     invariant(rsConfig.getConfigVersion() == 1);
     return checkQuorumGeneral(executor, rsConfig, myIndex);
 }
 
 Status checkQuorumForReconfig(ReplicationExecutor* executor,
-                              const ReplicaSetConfig& rsConfig,
+                              const ReplSetConfig& rsConfig,
                               const int myIndex) {
     invariant(rsConfig.getConfigVersion() > 1);
     return checkQuorumGeneral(executor, rsConfig, myIndex);

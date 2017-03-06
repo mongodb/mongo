@@ -30,8 +30,8 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/replica_set_config.h"
-#include "mongo/db/repl/replica_set_config_checks.h"
+#include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/repl_set_config_checks.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/server_options.h"
@@ -46,7 +46,7 @@ TEST(ValidateConfigForInitiate, VersionMustBe1) {
     ReplicationCoordinatorExternalStateMock rses;
     rses.addSelf(HostAndPort("h1"));
 
-    ReplicaSetConfig config;
+    ReplSetConfig config;
     ASSERT_OK(config.initializeForInitiate(BSON("_id"
                                                 << "rs0"
                                                 << "version"
@@ -59,7 +59,7 @@ TEST(ValidateConfigForInitiate, VersionMustBe1) {
 }
 
 TEST(ValidateConfigForInitiate, MustFindSelf) {
-    ReplicaSetConfig config;
+    ReplSetConfig config;
     ASSERT_OK(config.initializeForInitiate(BSON("_id"
                                                 << "rs0"
                                                 << "version"
@@ -92,7 +92,7 @@ TEST(ValidateConfigForInitiate, MustFindSelf) {
 }
 
 TEST(ValidateConfigForInitiate, SelfMustBeElectable) {
-    ReplicaSetConfig config;
+    ReplSetConfig config;
     ASSERT_OK(config.initializeForInitiate(BSON("_id"
                                                 << "rs0"
                                                 << "version"
@@ -119,8 +119,8 @@ TEST(ValidateConfigForReconfig, NewConfigVersionNumberMustBeHigherThanOld) {
     ReplicationCoordinatorExternalStateMock externalState;
     externalState.addSelf(HostAndPort("h1"));
 
-    ReplicaSetConfig oldConfig;
-    ReplicaSetConfig newConfig;
+    ReplSetConfig oldConfig;
+    ReplSetConfig newConfig;
 
     // Two configurations, identical except for version.
     ASSERT_OK(oldConfig.initialize(BSON("_id"
@@ -183,8 +183,8 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotChangeSetName) {
     ReplicationCoordinatorExternalStateMock externalState;
     externalState.addSelf(HostAndPort("h1"));
 
-    ReplicaSetConfig oldConfig;
-    ReplicaSetConfig newConfig;
+    ReplSetConfig oldConfig;
+    ReplSetConfig newConfig;
 
     // Two configurations, compatible except for set name.
     ASSERT_OK(oldConfig.initialize(BSON("_id"
@@ -228,8 +228,8 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotChangeSetId) {
     ReplicationCoordinatorExternalStateMock externalState;
     externalState.addSelf(HostAndPort("h1"));
 
-    ReplicaSetConfig oldConfig;
-    ReplicaSetConfig newConfig;
+    ReplSetConfig oldConfig;
+    ReplSetConfig newConfig;
 
     // Two configurations, compatible except for set ID.
     ASSERT_OK(oldConfig.initialize(BSON("_id"
@@ -279,9 +279,9 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotFlipBuildIndexesFlag) {
     ReplicationCoordinatorExternalStateMock externalState;
     externalState.addSelf(HostAndPort("h1"));
 
-    ReplicaSetConfig oldConfig;
-    ReplicaSetConfig newConfig;
-    ReplicaSetConfig oldConfigRefresh;
+    ReplSetConfig oldConfig;
+    ReplSetConfig newConfig;
+    ReplSetConfig oldConfigRefresh;
 
     // Three configurations, two compatible except that h2 flips the buildIndex flag.
     // The third, compatible with the first.
@@ -355,9 +355,9 @@ TEST(ValidateConfigForReconfig, NewConfigMustNotFlipArbiterFlag) {
     ReplicationCoordinatorExternalStateMock externalState;
     externalState.addSelf(HostAndPort("h1"));
 
-    ReplicaSetConfig oldConfig;
-    ReplicaSetConfig newConfig;
-    ReplicaSetConfig oldConfigRefresh;
+    ReplSetConfig oldConfig;
+    ReplSetConfig newConfig;
+    ReplSetConfig oldConfigRefresh;
 
     // Three configurations, two compatible except that h2 flips the arbiterOnly flag.
     // The third, compatible with the first.
@@ -428,10 +428,10 @@ TEST(ValidateConfigForReconfig, HostAndIdRemappingRestricted) {
     ReplicationCoordinatorExternalStateMock externalState;
     externalState.addSelf(HostAndPort("h1"));
 
-    ReplicaSetConfig oldConfig;
-    ReplicaSetConfig legalNewConfigWithNewHostAndId;
-    ReplicaSetConfig illegalNewConfigReusingHost;
-    ReplicaSetConfig illegalNewConfigReusingId;
+    ReplSetConfig oldConfig;
+    ReplSetConfig legalNewConfigWithNewHostAndId;
+    ReplSetConfig illegalNewConfigReusingHost;
+    ReplSetConfig illegalNewConfigReusingId;
 
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
@@ -524,7 +524,7 @@ TEST(ValidateConfigForReconfig, HostAndIdRemappingRestricted) {
 TEST(ValidateConfigForReconfig, MustFindSelf) {
     // Old and new config are same except for version change; this is just testing that we can
     // find ourself in the new config.
-    ReplicaSetConfig oldConfig;
+    ReplSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
@@ -537,7 +537,7 @@ TEST(ValidateConfigForReconfig, MustFindSelf) {
                                                       << BSON("_id" << 3 << "host"
                                                                     << "h3")))));
 
-    ReplicaSetConfig newConfig;
+    ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
@@ -591,7 +591,7 @@ TEST(ValidateConfigForReconfig, MustFindSelf) {
 TEST(ValidateConfigForReconfig, SelfMustEndElectable) {
     // Old and new config are same except for version change and the electability of one node;
     // this is just testing that we must be electable in the new config.
-    ReplicaSetConfig oldConfig;
+    ReplSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
@@ -604,7 +604,7 @@ TEST(ValidateConfigForReconfig, SelfMustEndElectable) {
                                                       << BSON("_id" << 3 << "host"
                                                                     << "h3")))));
 
-    ReplicaSetConfig newConfig;
+    ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
@@ -636,7 +636,7 @@ TEST(ValidateConfigForInitiate, NewConfigInvalid) {
     // The new config is not valid due to a duplicate _id value. This tests that if the new
     // config is invalid, validateConfigForInitiate will return a status indicating what is
     // wrong with the new config.
-    ReplicaSetConfig newConfig;
+    ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initializeForInitiate(BSON("_id"
                                                    << "rs0"
                                                    << "version"
@@ -659,7 +659,7 @@ TEST(ValidateConfigForReconfig, NewConfigInvalid) {
     // The new config is not valid due to a duplicate _id value. This tests that if the new
     // config is invalid, validateConfigForReconfig will return a status indicating what is
     // wrong with the new config.
-    ReplicaSetConfig oldConfig;
+    ReplSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
@@ -668,7 +668,7 @@ TEST(ValidateConfigForReconfig, NewConfigInvalid) {
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")))));
 
-    ReplicaSetConfig newConfig;
+    ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
@@ -698,7 +698,7 @@ TEST(ValidateConfigForStartUp, NewConfigInvalid) {
     // The new config is not valid due to a duplicate _id value. This tests that if the new
     // config is invalid, validateConfigForStartUp will return a status indicating what is wrong
     // with the new config.
-    ReplicaSetConfig oldConfig;
+    ReplSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
@@ -707,7 +707,7 @@ TEST(ValidateConfigForStartUp, NewConfigInvalid) {
                                         << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                                  << "h2")))));
 
-    ReplicaSetConfig newConfig;
+    ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
@@ -730,7 +730,7 @@ TEST(ValidateConfigForStartUp, OldAndNewConfigIncompatible) {
     // The new config is not compatible with the old config due to a member changing _ids. This
     // tests that validateConfigForStartUp will return a status indicating the incompatiblilty
     // between the old and new config.
-    ReplicaSetConfig oldConfig;
+    ReplSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
@@ -742,7 +742,7 @@ TEST(ValidateConfigForStartUp, OldAndNewConfigIncompatible) {
                                                                     << "h3")))));
 
 
-    ReplicaSetConfig newConfig;
+    ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
@@ -765,7 +765,7 @@ TEST(ValidateConfigForStartUp, OldAndNewConfigCompatible) {
     // The new config is compatible with the old config. This tests that
     // validateConfigForStartUp will return a Status::OK() indicating the validity of this
     // config change.
-    ReplicaSetConfig oldConfig;
+    ReplSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
@@ -777,7 +777,7 @@ TEST(ValidateConfigForStartUp, OldAndNewConfigCompatible) {
                                                                     << "h3")))));
 
 
-    ReplicaSetConfig newConfig;
+    ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
@@ -801,7 +801,7 @@ TEST(ValidateConfigForHeartbeatReconfig, NewConfigInvalid) {
     // The new config is not valid due to a duplicate _id value. This tests that if the new
     // config is invalid, validateConfigForHeartbeatReconfig will return a status indicating
     // what is wrong with the new config.
-    ReplicaSetConfig newConfig;
+    ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
@@ -823,7 +823,7 @@ TEST(ValidateConfigForHeartbeatReconfig, NewConfigInvalid) {
 TEST(ValidateConfigForHeartbeatReconfig, NewConfigValid) {
     // The new config is valid. This tests that validateConfigForHeartbeatReconfig will return
     // a Status::OK() indicating the validity of this config change.
-    ReplicaSetConfig newConfig;
+    ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
@@ -844,7 +844,7 @@ TEST(ValidateConfigForHeartbeatReconfig, NewConfigValid) {
 TEST(ValidateForReconfig, ForceStillNeedsValidConfig) {
     // The new config is invalid due to two nodes with the same _id value. This tests that
     // ValidateForReconfig fails with an invalid config, even if force is true.
-    ReplicaSetConfig oldConfig;
+    ReplSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
@@ -856,7 +856,7 @@ TEST(ValidateForReconfig, ForceStillNeedsValidConfig) {
                                                                     << "h3")))));
 
 
-    ReplicaSetConfig newConfig;
+    ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
@@ -879,7 +879,7 @@ TEST(ValidateForReconfig, ForceStillNeedsValidConfig) {
 TEST(ValidateForReconfig, ForceStillNeedsSelfPresent) {
     // The new config does not contain self. This tests that ValidateForReconfig fails
     // if the member receiving it is absent from the config, even if force is true.
-    ReplicaSetConfig oldConfig;
+    ReplSetConfig oldConfig;
     ASSERT_OK(oldConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
@@ -891,7 +891,7 @@ TEST(ValidateForReconfig, ForceStillNeedsSelfPresent) {
                                                                     << "h3")))));
 
 
-    ReplicaSetConfig newConfig;
+    ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"

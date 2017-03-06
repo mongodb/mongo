@@ -45,7 +45,7 @@ namespace repl {
 
 using executor::RemoteCommandRequest;
 
-FreshnessScanner::Algorithm::Algorithm(const ReplicaSetConfig& rsConfig,
+FreshnessScanner::Algorithm::Algorithm(const ReplSetConfig& rsConfig,
                                        int myIndex,
                                        Milliseconds timeout)
     : _rsConfig(rsConfig), _myIndex(myIndex), _timeout(timeout) {
@@ -108,11 +108,10 @@ FreshnessScanner::Result FreshnessScanner::Algorithm::getResult() const {
     return _freshnessInfos;
 }
 
-StatusWith<ReplicationExecutor::EventHandle> FreshnessScanner::start(
-    ReplicationExecutor* executor,
-    const ReplicaSetConfig& rsConfig,
-    int myIndex,
-    Milliseconds timeout) {
+StatusWith<ReplicationExecutor::EventHandle> FreshnessScanner::start(ReplicationExecutor* executor,
+                                                                     const ReplSetConfig& rsConfig,
+                                                                     int myIndex,
+                                                                     Milliseconds timeout) {
     _algorithm.reset(new Algorithm(rsConfig, myIndex, timeout));
     _runner.reset(new ScatterGatherRunner(_algorithm.get(), executor));
     return _runner->start();

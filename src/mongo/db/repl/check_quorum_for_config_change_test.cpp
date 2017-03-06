@@ -33,9 +33,9 @@
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
-#include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/platform/unordered_set.h"
@@ -72,7 +72,7 @@ class CheckQuorumTest : public mongo::unittest::Test {
 protected:
     CheckQuorumTest();
 
-    void startQuorumCheck(const ReplicaSetConfig& config, int myIndex);
+    void startQuorumCheck(const ReplSetConfig& config, int myIndex);
     Status waitForQuorumCheck();
     bool isQuorumCheckDone();
 
@@ -83,8 +83,8 @@ private:
     void setUp();
     void tearDown();
 
-    void _runQuorumCheck(const ReplicaSetConfig& config, int myIndex);
-    virtual Status _runQuorumCheckImpl(const ReplicaSetConfig& config, int myIndex) = 0;
+    void _runQuorumCheck(const ReplSetConfig& config, int myIndex);
+    virtual Status _runQuorumCheckImpl(const ReplSetConfig& config, int myIndex) = 0;
 
     std::unique_ptr<stdx::thread> _executorThread;
     std::unique_ptr<stdx::thread> _quorumCheckThread;
@@ -107,7 +107,7 @@ void CheckQuorumTest::tearDown() {
     _executorThread->join();
 }
 
-void CheckQuorumTest::startQuorumCheck(const ReplicaSetConfig& config, int myIndex) {
+void CheckQuorumTest::startQuorumCheck(const ReplSetConfig& config, int myIndex) {
     ASSERT_FALSE(_quorumCheckThread);
     _isQuorumCheckDone = false;
     _quorumCheckThread.reset(
@@ -125,7 +125,7 @@ bool CheckQuorumTest::isQuorumCheckDone() {
     return _isQuorumCheckDone;
 }
 
-void CheckQuorumTest::_runQuorumCheck(const ReplicaSetConfig& config, int myIndex) {
+void CheckQuorumTest::_runQuorumCheck(const ReplSetConfig& config, int myIndex) {
     _quorumCheckStatus = _runQuorumCheckImpl(config, myIndex);
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _isQuorumCheckDone = true;
@@ -133,46 +133,46 @@ void CheckQuorumTest::_runQuorumCheck(const ReplicaSetConfig& config, int myInde
 
 class CheckQuorumForInitiate : public CheckQuorumTest {
 private:
-    virtual Status _runQuorumCheckImpl(const ReplicaSetConfig& config, int myIndex) {
+    virtual Status _runQuorumCheckImpl(const ReplSetConfig& config, int myIndex) {
         return checkQuorumForInitiate(_executor.get(), config, myIndex);
     }
 };
 
 class CheckQuorumForReconfig : public CheckQuorumTest {
 protected:
-    virtual Status _runQuorumCheckImpl(const ReplicaSetConfig& config, int myIndex) {
+    virtual Status _runQuorumCheckImpl(const ReplSetConfig& config, int myIndex) {
         return checkQuorumForReconfig(_executor.get(), config, myIndex);
     }
 };
 
-ReplicaSetConfig assertMakeRSConfig(const BSONObj& configBson) {
-    ReplicaSetConfig config;
+ReplSetConfig assertMakeRSConfig(const BSONObj& configBson) {
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(configBson));
     ASSERT_OK(config.validate());
     return config;
 }
 
 TEST_F(CheckQuorumForInitiate, ValidSingleNodeSet) {
-    ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
-                                                      << "rs0"
-                                                      << "version"
-                                                      << 1
-                                                      << "members"
-                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                               << "h1"))));
+    ReplSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                   << "rs0"
+                                                   << "version"
+                                                   << 1
+                                                   << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                            << "h1"))));
     startQuorumCheck(config, 0);
     ASSERT_OK(waitForQuorumCheck());
 }
 
 TEST_F(CheckQuorumForInitiate, QuorumCheckCanceledByShutdown) {
     _executor->shutdown();
-    ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
-                                                      << "rs0"
-                                                      << "version"
-                                                      << 1
-                                                      << "members"
-                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                               << "h1"))));
+    ReplSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                   << "rs0"
+                                                   << "version"
+                                                   << 1
+                                                   << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                            << "h1"))));
     startQuorumCheck(config, 0);
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, waitForQuorumCheck());
 }
@@ -181,21 +181,21 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSeveralDownNodes) {
     // In this test, "we" are host "h3:1".  All other nodes time out on
     // their heartbeat request, and so the quorum check for initiate
     // will fail because some members were unavailable.
-    ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
-                                                      << "rs0"
-                                                      << "version"
-                                                      << 1
-                                                      << "members"
-                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                               << "h1:1")
-                                                                    << BSON("_id" << 2 << "host"
-                                                                                  << "h2:1")
-                                                                    << BSON("_id" << 3 << "host"
-                                                                                  << "h3:1")
-                                                                    << BSON("_id" << 4 << "host"
-                                                                                  << "h4:1")
-                                                                    << BSON("_id" << 5 << "host"
-                                                                                  << "h5:1"))));
+    ReplSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                   << "rs0"
+                                                   << "version"
+                                                   << 1
+                                                   << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                            << "h1:1")
+                                                                 << BSON("_id" << 2 << "host"
+                                                                               << "h2:1")
+                                                                 << BSON("_id" << 3 << "host"
+                                                                               << "h3:1")
+                                                                 << BSON("_id" << 4 << "host"
+                                                                               << "h4:1")
+                                                                 << BSON("_id" << 5 << "host"
+                                                                               << "h5:1"))));
     startQuorumCheck(config, 2);
     _net->enterNetwork();
     const Date_t startDate = _net->now();
@@ -219,7 +219,7 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSeveralDownNodes) {
     ASSERT_REASON_CONTAINS(status, "h5:1");
 }
 
-const BSONObj makeHeartbeatRequest(const ReplicaSetConfig& rsConfig, int myConfigIndex) {
+const BSONObj makeHeartbeatRequest(const ReplSetConfig& rsConfig, int myConfigIndex) {
     const MemberConfig& myConfig = rsConfig.getMemberAt(myConfigIndex);
     ReplSetHeartbeatArgs hbArgs;
     hbArgs.setSetName(rsConfig.getReplSetName());
@@ -235,7 +235,7 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckSuccessForFiveNodes) {
     // In this test, "we" are host "h3:1".  All nodes respond successfully to their heartbeat
     // requests, and the quorum check succeeds.
 
-    const ReplicaSetConfig rsConfig =
+    const ReplSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
                                 << "version"
@@ -282,7 +282,7 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToOneDownNode) {
     // all nodes must be available for initiate.  This is so even though "h2"
     // is neither voting nor electable.
 
-    const ReplicaSetConfig rsConfig =
+    const ReplSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
                                 << "version"
@@ -348,7 +348,7 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetNameMismatch) {
     // successfully to their heartbeat requests, but quorum check fails because
     // "h4" declares that the requested replica set name was not what it expected.
 
-    const ReplicaSetConfig rsConfig =
+    const ReplSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
                                 << "version"
@@ -410,7 +410,7 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSetIdMismatch) {
     // "h4" declares that the requested replica set ID was not what it expected.
 
     const auto replicaSetId = OID::gen();
-    const ReplicaSetConfig rsConfig =
+    const ReplSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
                                 << "version"
@@ -491,7 +491,7 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToInitializedNode) {
     // successfully to their heartbeat requests, but quorum check fails because
     // "h5" declares that it is already initialized.
 
-    const ReplicaSetConfig rsConfig =
+    const ReplSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
                                 << "version"
@@ -557,7 +557,7 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToInitializedNodeOnlyOneRespo
     //
     // Compare to QuorumCheckFailedDueToInitializedNode, above.
 
-    const ReplicaSetConfig rsConfig =
+    const ReplSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
                                 << "version"
@@ -618,7 +618,7 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToNodeWithData) {
     // In this test, "we" are host "h3:1".  Only node "h5" responds before the test completes,
     // and quorum check fails because "h5" declares that it has data already.
 
-    const ReplicaSetConfig rsConfig =
+    const ReplSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
                                 << "version"
@@ -676,7 +676,7 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckVetoedDueToHigherConfigVersion) {
     // In this test, "we" are host "h3:1".  The request to "h2" does not arrive before the end
     // of the test, and the request to "h1" comes back indicating a higher config version.
 
-    const ReplicaSetConfig rsConfig =
+    const ReplSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
                                 << "version"
@@ -731,7 +731,7 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckVetoedDueToIncompatibleSetName) {
     // In this test, "we" are host "h3:1".  The request to "h1" times out,
     // and the request to "h2" comes back indicating an incompatible set name.
 
-    const ReplicaSetConfig rsConfig =
+    const ReplSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
                                 << "version"
@@ -785,7 +785,7 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToInsufficientVoters) {
     // "h5" also responds, but because it cannot vote, is irrelevant for the reconfig
     // quorum check.
 
-    const ReplicaSetConfig rsConfig =
+    const ReplSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
                                 << "version"
@@ -850,7 +850,7 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToNoElectableNodeResponding) {
     // In this test, "we" are host "h4".  Only "h1", "h2" and "h3" are electable,
     // and none of them respond.
 
-    const ReplicaSetConfig rsConfig =
+    const ReplSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
                                 << "version"
@@ -907,7 +907,7 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckSucceedsWithAsSoonAsPossible) {
     // This test should succeed as soon as h1 and h2 respond, so we block
     // h3 and h5 from responding or timing out until the test completes.
 
-    const ReplicaSetConfig rsConfig =
+    const ReplSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "rs0"
                                 << "version"

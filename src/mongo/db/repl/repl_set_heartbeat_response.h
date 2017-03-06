@@ -32,7 +32,7 @@
 
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -117,7 +117,7 @@ public:
     bool hasConfig() const {
         return _configSet;
     }
-    const ReplicaSetConfig& getConfig() const;
+    const ReplSetConfig& getConfig() const;
     bool hasPrimaryId() const {
         return _primaryIdSet;
     }
@@ -227,7 +227,7 @@ public:
     /**
      * Initializes _config with "config".
      */
-    void setConfig(const ReplicaSetConfig& config) {
+    void setConfig(const ReplSetConfig& config) {
         _configSet = true;
         _config = config;
     }
@@ -280,7 +280,7 @@ private:
     HostAndPort _syncingTo;
 
     bool _configSet = false;
-    ReplicaSetConfig _config;
+    ReplSetConfig _config;
 
     bool _primaryIdSet = false;
     long long _primaryId = -1;

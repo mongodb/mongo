@@ -115,7 +115,7 @@ std::unique_ptr<OplogBuffer> DataReplicatorExternalStateImpl::makeSteadyStateOpl
     return _replicationCoordinatorExternalState->makeSteadyStateOplogBuffer(txn);
 }
 
-StatusWith<ReplicaSetConfig> DataReplicatorExternalStateImpl::getCurrentConfig() const {
+StatusWith<ReplSetConfig> DataReplicatorExternalStateImpl::getCurrentConfig() const {
     return _replicationCoordinator->getConfig();
 }
 

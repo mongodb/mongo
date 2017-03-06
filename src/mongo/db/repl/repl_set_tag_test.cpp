@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/repl/replica_set_tag.h"
+#include "mongo/db/repl/repl_set_tag.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -36,19 +36,19 @@ namespace {
 template <typename T>
 class StreamPutter {
 public:
-    StreamPutter(const ReplicaSetTagConfig& tagConfig, const T& item)
+    StreamPutter(const ReplSetTagConfig& tagConfig, const T& item)
         : _tagConfig(&tagConfig), _item(&item) {}
     void put(std::ostream& os) const {
         _tagConfig->put(*_item, os);
     }
 
 private:
-    const ReplicaSetTagConfig* _tagConfig;
+    const ReplSetTagConfig* _tagConfig;
     const T* _item;
 };
 
 template <typename T>
-StreamPutter<T> streamput(const ReplicaSetTagConfig& tagConfig, const T& item) {
+StreamPutter<T> streamput(const ReplSetTagConfig& tagConfig, const T& item) {
     return StreamPutter<T>(tagConfig, item);
 }
 
@@ -58,12 +58,12 @@ std::ostream& operator<<(std::ostream& os, const StreamPutter<T>& putter) {
     return os;
 }
 
-TEST(ReplicaSetTagConfigTest, MakeAndFindTags) {
-    ReplicaSetTagConfig tagConfig;
-    ReplicaSetTag dcNY = tagConfig.makeTag("dc", "ny");
-    ReplicaSetTag dcRI = tagConfig.makeTag("dc", "ri");
-    ReplicaSetTag rack1 = tagConfig.makeTag("rack", "1");
-    ReplicaSetTag rack2 = tagConfig.makeTag("rack", "2");
+TEST(ReplSetTagConfigTest, MakeAndFindTags) {
+    ReplSetTagConfig tagConfig;
+    ReplSetTag dcNY = tagConfig.makeTag("dc", "ny");
+    ReplSetTag dcRI = tagConfig.makeTag("dc", "ri");
+    ReplSetTag rack1 = tagConfig.makeTag("rack", "1");
+    ReplSetTag rack2 = tagConfig.makeTag("rack", "2");
     ASSERT_TRUE(dcNY.isValid());
     ASSERT_EQUALS("dc", tagConfig.getTagKey(dcNY));
     ASSERT_EQUALS("ny", tagConfig.getTagValue(dcNY));
@@ -84,7 +84,7 @@ TEST(ReplicaSetTagConfigTest, MakeAndFindTags) {
     ASSERT_FALSE(tagConfig.findTag("country", "us").isValid());
 }
 
-class ReplicaSetTagMatchTest : public unittest::Test {
+class ReplSetTagMatchTest : public unittest::Test {
 public:
     void setUp() {
         dcNY = tagConfig.makeTag("dc", "ny");
@@ -97,27 +97,27 @@ public:
     }
 
 protected:
-    ReplicaSetTagConfig tagConfig;
-    ReplicaSetTag dcNY;
-    ReplicaSetTag dcVA;
-    ReplicaSetTag dcRI;
-    ReplicaSetTag rack1;
-    ReplicaSetTag rack2;
-    ReplicaSetTag rack3;
-    ReplicaSetTag rack4;
+    ReplSetTagConfig tagConfig;
+    ReplSetTag dcNY;
+    ReplSetTag dcVA;
+    ReplSetTag dcRI;
+    ReplSetTag rack1;
+    ReplSetTag rack2;
+    ReplSetTag rack3;
+    ReplSetTag rack4;
 };
 
-TEST_F(ReplicaSetTagMatchTest, EmptyPatternAlwaysSatisfied) {
-    ReplicaSetTagPattern pattern = tagConfig.makePattern();
-    ASSERT_TRUE(ReplicaSetTagMatch(pattern).isSatisfied());
+TEST_F(ReplSetTagMatchTest, EmptyPatternAlwaysSatisfied) {
+    ReplSetTagPattern pattern = tagConfig.makePattern();
+    ASSERT_TRUE(ReplSetTagMatch(pattern).isSatisfied());
     ASSERT_OK(tagConfig.addTagCountConstraintToPattern(&pattern, "dc", 0));
-    ASSERT_TRUE(ReplicaSetTagMatch(pattern).isSatisfied());
+    ASSERT_TRUE(ReplSetTagMatch(pattern).isSatisfied());
 }
 
-TEST_F(ReplicaSetTagMatchTest, SingleTagConstraint) {
-    ReplicaSetTagPattern pattern = tagConfig.makePattern();
+TEST_F(ReplSetTagMatchTest, SingleTagConstraint) {
+    ReplSetTagPattern pattern = tagConfig.makePattern();
     ASSERT_OK(tagConfig.addTagCountConstraintToPattern(&pattern, "dc", 2));
-    ReplicaSetTagMatch matcher(pattern);
+    ReplSetTagMatch matcher(pattern);
     ASSERT_FALSE(matcher.isSatisfied());
     ASSERT_FALSE(matcher.update(dcVA));   // One DC alone won't satisfy "dc: 2".
     ASSERT_FALSE(matcher.update(rack2));  // Adding one rack won't satisfy.
@@ -129,12 +129,12 @@ TEST_F(ReplicaSetTagMatchTest, SingleTagConstraint) {
     ASSERT_TRUE(matcher.update(rack1));  // Once matcher is satisfied, it stays satisfied.
 }
 
-TEST_F(ReplicaSetTagMatchTest, MaskingConstraints) {
+TEST_F(ReplSetTagMatchTest, MaskingConstraints) {
     // The highest count constraint for a tag key is the only one that matters.
-    ReplicaSetTagPattern pattern = tagConfig.makePattern();
+    ReplSetTagPattern pattern = tagConfig.makePattern();
     ASSERT_OK(tagConfig.addTagCountConstraintToPattern(&pattern, "rack", 2));
     ASSERT_OK(tagConfig.addTagCountConstraintToPattern(&pattern, "rack", 3));
-    ReplicaSetTagMatch matcher(pattern);
+    ReplSetTagMatch matcher(pattern);
     ASSERT_FALSE(matcher.isSatisfied());
     ASSERT_FALSE(matcher.update(rack2));
     ASSERT_FALSE(matcher.update(rack3));
@@ -142,11 +142,11 @@ TEST_F(ReplicaSetTagMatchTest, MaskingConstraints) {
     ASSERT_TRUE(matcher.update(rack1));
 }
 
-TEST_F(ReplicaSetTagMatchTest, MultipleConstraints) {
-    ReplicaSetTagPattern pattern = tagConfig.makePattern();
+TEST_F(ReplSetTagMatchTest, MultipleConstraints) {
+    ReplSetTagPattern pattern = tagConfig.makePattern();
     ASSERT_OK(tagConfig.addTagCountConstraintToPattern(&pattern, "dc", 3));
     ASSERT_OK(tagConfig.addTagCountConstraintToPattern(&pattern, "rack", 2));
-    ReplicaSetTagMatch matcher(pattern);
+    ReplSetTagMatch matcher(pattern);
     ASSERT_FALSE(matcher.isSatisfied());
     ASSERT_FALSE(matcher.update(dcVA));
     ASSERT_FALSE(matcher.update(rack2));

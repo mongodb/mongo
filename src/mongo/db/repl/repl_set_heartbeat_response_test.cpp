@@ -295,7 +295,7 @@ TEST(ReplSetHeartbeatResponse, DefaultConstructThenSlowlyBuildToFullObj) {
     ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toBSON(false).toString());
 
     // set config
-    ReplicaSetConfig config;
+    ReplSetConfig config;
     hbResponse.setConfig(config);
     ++fieldsSet;
     ASSERT_EQUALS(false, hbResponse.hasState());
