@@ -91,7 +91,7 @@ UpdateResult update(OperationContext* txn, Database* db, const UpdateRequest& re
             Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
 
             const bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-                !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, nsString);
+                !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString);
 
             if (userInitiatedWritesAndNotPrimary) {
                 uassertStatusOK(Status(ErrorCodes::PrimarySteppedDown,

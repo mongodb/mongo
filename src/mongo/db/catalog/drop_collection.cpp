@@ -74,7 +74,7 @@ Status dropCollection(OperationContext* txn,
         OldClientContext context(txn, collectionName.ns(), shardVersionCheck);
 
         bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, collectionName);
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(collectionName);
 
         if (userInitiatedWritesAndNotPrimary) {
             return Status(ErrorCodes::NotMaster,

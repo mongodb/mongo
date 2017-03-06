@@ -145,13 +145,12 @@ struct Cloner::Fun {
         // XXX: can probably take dblock instead
         unique_ptr<ScopedTransaction> scopedXact(new ScopedTransaction(txn, MODE_X));
         unique_ptr<Lock::GlobalWrite> globalWriteLock(new Lock::GlobalWrite(txn->lockState()));
-        uassert(
-            ErrorCodes::NotMaster,
-            str::stream() << "Not primary while cloning collection " << from_collection.ns()
-                          << " to "
-                          << to_collection.ns(),
-            !txn->writesAreReplicated() ||
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, to_collection));
+        uassert(ErrorCodes::NotMaster,
+                str::stream() << "Not primary while cloning collection " << from_collection.ns()
+                              << " to "
+                              << to_collection.ns(),
+                !txn->writesAreReplicated() ||
+                    repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(to_collection));
 
         // Make sure database still exists after we resume from the temp release
         Database* db = dbHolder().openDb(txn, _dbName);
@@ -205,11 +204,11 @@ struct Cloner::Fun {
 
                 // Check if everything is still all right.
                 if (txn->writesAreReplicated()) {
-                    uassert(28592,
-                            str::stream() << "Cannot write to ns: " << to_collection.ns()
-                                          << " after yielding",
-                            repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(
-                                txn, to_collection));
+                    uassert(
+                        28592,
+                        str::stream() << "Cannot write to ns: " << to_collection.ns()
+                                      << " after yielding",
+                        repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(to_collection));
                 }
 
                 // TODO: SERVER-16598 abort if original db or collection is gone.
@@ -350,7 +349,7 @@ void Cloner::copy(OperationContext* txn,
                           << " with filter "
                           << query.toString(),
             !txn->writesAreReplicated() ||
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, to_collection));
+                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(to_collection));
 }
 
 void Cloner::copyIndexes(OperationContext* txn,
@@ -373,7 +372,7 @@ void Cloner::copyIndexes(OperationContext* txn,
                           << to_collection.ns()
                           << " (Cloner)",
             !txn->writesAreReplicated() ||
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, to_collection));
+                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(to_collection));
 
 
     if (indexesToBuild.empty())
@@ -480,7 +479,7 @@ bool Cloner::copyCollection(OperationContext* txn,
     uassert(ErrorCodes::PrimarySteppedDown,
             str::stream() << "Not primary while copying collection " << ns << " (Cloner)",
             !txn->writesAreReplicated() ||
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, nss));
+                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss));
 
     Database* db = dbHolder().openDb(txn, dbname);
 
@@ -705,7 +704,7 @@ Status Cloner::copyDb(OperationContext* txn,
             str::stream() << "Not primary while cloning database " << opts.fromDB
                           << " (after getting list of collections to clone)",
             !txn->writesAreReplicated() ||
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(txn, toDBName));
+                repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(toDBName));
 
     if (opts.syncData) {
         if (opts.createCollections) {

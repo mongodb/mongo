@@ -191,8 +191,8 @@ void appendCommandResponse(PlanExecutor* exec,
     }
 }
 
-Status checkCanAcceptWritesForDatabase(OperationContext* txn, const NamespaceString& nsString) {
-    if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, nsString)) {
+Status checkCanAcceptWritesForDatabase(const NamespaceString& nsString) {
+    if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString)) {
         return Status(ErrorCodes::NotMaster,
                       str::stream()
                           << "Not primary while running findAndModify command on collection "
@@ -407,7 +407,7 @@ public:
                 auto css = CollectionShardingState::get(txn, nsString);
                 css->checkShardVersionOrThrow(txn);
 
-                Status isPrimary = checkCanAcceptWritesForDatabase(txn, nsString);
+                Status isPrimary = checkCanAcceptWritesForDatabase(nsString);
                 if (!isPrimary.isOK()) {
                     return appendCommandStatus(result, isPrimary);
                 }
@@ -484,7 +484,7 @@ public:
                 auto css = CollectionShardingState::get(txn, nsString);
                 css->checkShardVersionOrThrow(txn);
 
-                Status isPrimary = checkCanAcceptWritesForDatabase(txn, nsString);
+                Status isPrimary = checkCanAcceptWritesForDatabase(nsString);
                 if (!isPrimary.isOK()) {
                     return appendCommandStatus(result, isPrimary);
                 }
@@ -503,7 +503,7 @@ public:
                     // in exclusive mode in order to create the collection.
                     collLock.relockAsDatabaseExclusive(autoDb.lock());
                     collection = autoDb.getDb()->getCollection(nsString.ns());
-                    Status isPrimaryAfterRelock = checkCanAcceptWritesForDatabase(txn, nsString);
+                    Status isPrimaryAfterRelock = checkCanAcceptWritesForDatabase(nsString);
                     if (!isPrimaryAfterRelock.isOK()) {
                         return appendCommandStatus(result, isPrimaryAfterRelock);
                     }

@@ -77,7 +77,7 @@ Status createCollection(OperationContext* txn,
         Lock::DBLock dbXLock(txn->lockState(), dbName, MODE_X);
         OldClientContext ctx(txn, nss.ns());
         if (txn->writesAreReplicated() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, nss)) {
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss)) {
             return Status(ErrorCodes::NotMaster,
                           str::stream() << "Not primary while creating collection " << nss.ns());
         }

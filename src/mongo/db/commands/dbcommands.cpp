@@ -1535,7 +1535,7 @@ void mongo::execCommandDatabase(OperationContext* txn,
 
         repl::ReplicationCoordinator* replCoord =
             repl::ReplicationCoordinator::get(txn->getClient()->getServiceContext());
-        const bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(txn, dbname);
+        const bool iAmPrimary = replCoord->canAcceptWritesForDatabase(dbname);
 
         {
             bool commandCanRunOnSecondary = command->slaveOk();
@@ -1556,7 +1556,7 @@ void mongo::execCommandDatabase(OperationContext* txn,
 
             if (!command->maintenanceOk() &&
                 replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&
-                !replCoord->canAcceptWritesForDatabase_UNSAFE(txn, dbname) &&
+                !replCoord->canAcceptWritesForDatabase(dbname) &&
                 !replCoord->getMemberState().secondary()) {
 
                 uassert(ErrorCodes::NotMasterOrSecondary,

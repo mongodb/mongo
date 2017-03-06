@@ -1003,7 +1003,7 @@ Status UpdateStage::restoreUpdateState() {
 
     // We may have stepped down during the yield.
     bool userInitiatedWritesAndNotPrimary = getOpCtx()->writesAreReplicated() &&
-        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(getOpCtx(), nsString);
+        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nsString);
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::PrimarySteppedDown,

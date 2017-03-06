@@ -1431,8 +1431,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryDoNotNeedToCatchUp) {
     ASSERT_EQUALS(1, countLogLinesContaining("My optime is most up-to-date, skipping catch-up"));
     auto txn = makeOperationContext();
     getReplCoord()->signalDrainComplete(txn.get(), getReplCoord()->getTerm());
-    Lock::GlobalLock lock(txn->lockState(), MODE_IX, 1);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(txn.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase("test"));
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryFreshnessScanTimeout) {
@@ -1455,8 +1454,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryFreshnessScanTimeout) {
     ASSERT_EQUALS(1, countLogLinesContaining("Could not access any nodes within timeout"));
     auto txn = makeOperationContext();
     getReplCoord()->signalDrainComplete(txn.get(), getReplCoord()->getTerm());
-    Lock::GlobalLock lock(txn->lockState(), MODE_IX, 1);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(txn.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase("test"));
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryCatchUpSucceeds) {
@@ -1485,8 +1483,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryCatchUpSucceeds) {
     ASSERT_EQUALS(1, countLogLinesContaining("Finished catch-up oplog after becoming primary."));
     auto txn = makeOperationContext();
     getReplCoord()->signalDrainComplete(txn.get(), getReplCoord()->getTerm());
-    Lock::GlobalLock lock(txn->lockState(), MODE_IX, 1);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(txn.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase("test"));
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryCatchUpTimeout) {
@@ -1509,8 +1506,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryCatchUpTimeout) {
     ASSERT_EQUALS(1, countLogLinesContaining("Cannot catch up oplog after becoming primary"));
     auto txn = makeOperationContext();
     getReplCoord()->signalDrainComplete(txn.get(), getReplCoord()->getTerm());
-    Lock::GlobalLock lock(txn->lockState(), MODE_IX, 1);
-    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(txn.get(), "test"));
+    ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase("test"));
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringFreshnessScan) {
@@ -1536,9 +1532,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringFreshnessScan) {
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Stopped transition to primary"));
-    auto txn = makeOperationContext();
-    Lock::GlobalLock lock(txn->lockState(), MODE_IX, 1);
-    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(txn.get(), "test"));
+    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase("test"));
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
@@ -1571,8 +1565,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
     ASSERT(getReplCoord()->getApplierState() == ApplierState::Running);
     stopCapturingLogMessages();
     ASSERT_EQUALS(1, countLogLinesContaining("Cannot catch up oplog after becoming primary"));
-    Lock::GlobalLock lock(txn->lockState(), MODE_IX, 1);
-    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(txn.get(), "test"));
+    ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase("test"));
 }
 
 TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
@@ -1618,15 +1611,11 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
         getNet()->scheduleResponse(noi, getNet()->now(), makeFreshnessScanResponse(OpTime()));
     });
     ASSERT(replCoord->getApplierState() == ApplierState::Draining);
+    ASSERT_FALSE(replCoord->canAcceptWritesForDatabase("test"));
     auto txn = makeOperationContext();
-    {
-        Lock::GlobalLock lock(txn->lockState(), MODE_IX, 1);
-        ASSERT_FALSE(replCoord->canAcceptWritesForDatabase(txn.get(), "test"));
-    }
     replCoord->signalDrainComplete(txn.get(), replCoord->getTerm());
-    Lock::GlobalLock lock(txn->lockState(), MODE_IX, 1);
     ASSERT(replCoord->getApplierState() == ApplierState::Stopped);
-    ASSERT_TRUE(replCoord->canAcceptWritesForDatabase(txn.get(), "test"));
+    ASSERT_TRUE(replCoord->canAcceptWritesForDatabase("test"));
 }
 
 }  // namespace

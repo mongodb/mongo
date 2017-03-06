@@ -269,7 +269,7 @@ void DeleteStage::doRestoreState() {
     uassert(28537,
             str::stream() << "Demoted from primary while removing from " << ns.ns(),
             !getOpCtx()->writesAreReplicated() ||
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(getOpCtx(), ns));
+                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns));
 }
 
 unique_ptr<PlanStageStats> DeleteStage::getStats() {

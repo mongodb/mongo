@@ -437,7 +437,7 @@ long long Helpers::removeRange(OperationContext* txn,
                 }
             }
 
-            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, nss)) {
+            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss)) {
                 warning() << "stepped down from primary while deleting chunk; "
                           << "orphaning data in " << nss.ns() << " in range [" << redact(min)
                           << ", " << redact(max) << ")";

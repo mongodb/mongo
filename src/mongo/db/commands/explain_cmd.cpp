@@ -135,7 +135,7 @@ public:
         // copied from Command::execCommand and should be abstracted. Until then, make
         // sure to keep it up to date.
         repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
-        bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(txn, dbname);
+        bool iAmPrimary = replCoord->canAcceptWritesForDatabase(dbname);
         bool commandCanRunOnSecondary = commToExplain->slaveOk();
 
         bool commandIsOverriddenToRunOnSecondary = commToExplain->slaveOverrideOk() &&

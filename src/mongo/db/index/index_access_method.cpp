@@ -116,7 +116,7 @@ bool IndexAccessMethod::ignoreKeyTooLong(OperationContext* txn) {
     // Ignore this error if we cannot write to the collection or if the user requested it
     const auto shouldRelaxConstraints =
         repl::ReplicationCoordinator::get(txn)->shouldRelaxIndexConstraints(
-            txn, NamespaceString(_btreeState->ns()));
+            NamespaceString(_btreeState->ns()));
     return shouldRelaxConstraints || !failIndexKeyTooLong.load();
 }
 

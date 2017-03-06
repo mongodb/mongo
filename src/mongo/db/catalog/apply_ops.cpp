@@ -313,7 +313,7 @@ Status applyOps(OperationContext* txn,
     Lock::GlobalWrite globalWriteLock(txn->lockState());
 
     bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-        !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(txn, dbName);
+        !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbName);
 
     if (userInitiatedWritesAndNotPrimary)
         return Status(ErrorCodes::NotMaster,
