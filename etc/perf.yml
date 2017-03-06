@@ -610,7 +610,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ OBJCOPY=/opt/mongodbtoolchain/v2/bin/objcopy --ssl
     mongod_exec_wrapper: &exec_wrapper "numactl --physcpubind=4,5,6,7 -i 1"
     perf_exec_wrapper: &perf_wrapper "numactl --physcpubind=1,2,3 -i 0"
-    mongod_flags: "--storageEngine=inMemory --logpath ./mongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false  --inMemorySizeGB 60 --auth"
+    mongod_flags: "--storageEngine=inMemory --logpath ./mongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false --inMemoryEngineConfigString 'eviction=(threads_min=1),' --inMemorySizeGB 60 --auth"
     use_scons_cache: true
     project: &project perf
   run_on:
@@ -658,7 +658,7 @@ buildvariants:
   expansions:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--replSet=test --storageEngine=inMemory  --logpath ./mongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --inMemorySizeGB 60 --oplogSize 30000 --setParameter diagnosticDataCollectionEnabled=false --auth"
+    mongod_flags: "--replSet=test --storageEngine=inMemory  --logpath ./mongod.log --fork --syncdelay 0 --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false --inMemoryEngineConfigString 'eviction=(threads_min=1),' --inMemorySizeGB 60 --auth --oplogSize 30000"
     project: *project
   run_on:
   - "centos6-perf"
@@ -674,7 +674,7 @@ buildvariants:
   expansions:
     mongod_exec_wrapper: *exec_wrapper
     perf_exec_wrapper: *perf_wrapper
-    mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --oplogSize 100000 --setParameter diagnosticDataCollectionEnabled=false --auth"
+    mongod_flags: "--replSet=test --storageEngine=mmapv1 --logpath ./mongod.log --fork --syncdelay 0 --nojournal --setParameter ttlMonitorEnabled=false --setParameter diagnosticDataCollectionEnabled=false --auth --oplogSize 100000"
     project: *project
   run_on:
   - "centos6-perf"
