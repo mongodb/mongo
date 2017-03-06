@@ -219,7 +219,7 @@ void FeatureCompatibilityVersion::set(OperationContext* txn, StringData version)
                                   << "'. Not primary while attempting to create index on: "
                                   << nss.ns(),
                     repl::ReplicationCoordinator::get(txn->getServiceContext())
-                        ->canAcceptWritesFor(nss));
+                        ->canAcceptWritesFor(txn, nss));
 
             IndexBuilder builder(k32IncompatibleIndexSpec, false);
             auto status = builder.buildInForeground(txn, autoDB.getDb());

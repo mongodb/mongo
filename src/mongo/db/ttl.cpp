@@ -189,7 +189,7 @@ private:
             return;
         }
 
-        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(collectionNSS)) {
+        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, collectionNSS)) {
             return;
         }
 

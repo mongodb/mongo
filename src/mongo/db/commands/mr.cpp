@@ -379,7 +379,7 @@ void State::dropTempCollections() {
                 uassert(ErrorCodes::PrimarySteppedDown,
                         "no longer primary",
                         repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(
-                            _config.tempNamespace));
+                            _txn, _config.tempNamespace));
                 db->dropCollection(_txn, _config.tempNamespace.ns());
                 wunit.commit();
             }
@@ -499,7 +499,8 @@ void State::prepTempCollection() {
         WriteUnitOfWork wuow(_txn);
         uassert(ErrorCodes::PrimarySteppedDown,
                 "no longer primary",
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(_config.tempNamespace));
+                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(_txn,
+                                                                            _config.tempNamespace));
         Collection* tempColl = tempCtx.getCollection();
         invariant(!tempColl);
 
@@ -750,7 +751,7 @@ void State::insert(const NamespaceString& nss, const BSONObj& o) {
         WriteUnitOfWork wuow(_txn);
         uassert(ErrorCodes::PrimarySteppedDown,
                 "no longer primary",
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss));
+                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(_txn, nss));
         Collection* coll = getCollectionOrUassert(ctx.db(), nss);
 
         BSONObjBuilder b;
@@ -1443,7 +1444,8 @@ public:
         if (state.isOnDisk()) {
             // this means that it will be doing a write operation, make sure we are on Master
             // ideally this check should be in slaveOk(), but at that point config is not known
-            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(config.nss)) {
+            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor_UNSAFE(txn,
+                                                                                    config.nss)) {
                 errmsg = "not master";
                 return false;
             }

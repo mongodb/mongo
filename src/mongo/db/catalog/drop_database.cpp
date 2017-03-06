@@ -71,7 +71,7 @@ Status dropDatabase(OperationContext* txn, const std::string& dbName) {
         }
 
         bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(dbName);
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(txn, dbName);
 
         if (userInitiatedWritesAndNotPrimary) {
             return Status(ErrorCodes::NotMaster,

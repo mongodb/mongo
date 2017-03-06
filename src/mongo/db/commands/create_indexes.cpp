@@ -248,7 +248,7 @@ public:
         // Note: createIndexes command does not currently respect shard versioning.
         ScopedTransaction transaction(txn, MODE_IX);
         Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_X);
-        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns)) {
+        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, ns)) {
             return appendCommandStatus(
                 result,
                 Status(ErrorCodes::NotMaster,
@@ -334,7 +334,7 @@ public:
         if (indexer.getBuildInBackground()) {
             txn->recoveryUnit()->abandonSnapshot();
             dbLock.relockWithMode(MODE_IX);
-            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns)) {
+            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, ns)) {
                 return appendCommandStatus(
                     result,
                     Status(ErrorCodes::NotMaster,
@@ -356,7 +356,7 @@ public:
                     // that day, to avoid data corruption due to lack of index cleanup.
                     txn->recoveryUnit()->abandonSnapshot();
                     dbLock.relockWithMode(MODE_X);
-                    if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns)) {
+                    if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, ns)) {
                         return appendCommandStatus(
                             result,
                             Status(ErrorCodes::NotMaster,
@@ -378,7 +378,7 @@ public:
             dbLock.relockWithMode(MODE_X);
             uassert(ErrorCodes::NotMaster,
                     str::stream() << "Not primary while completing index build in " << dbname,
-                    repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(ns));
+                    repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, ns));
 
             Database* db = dbHolder().get(txn, ns.db());
             uassert(28551, "database dropped during index build", db);

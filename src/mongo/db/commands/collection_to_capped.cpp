@@ -122,7 +122,7 @@ public:
         AutoGetDb autoDb(txn, dbname, MODE_X);
 
         NamespaceString nss(dbname, to);
-        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(nss)) {
+        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, nss)) {
             return appendCommandStatus(
                 result,
                 Status(ErrorCodes::NotMaster,

@@ -63,7 +63,7 @@ StatusWith<BSONObj> ViewShardingCheck::getResolvedViewIfSharded(OperationContext
     const auto& sourceNss = resolvedView.getValue().getNamespace();
     const auto isPrimary =
         repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext())
-            ->canAcceptWritesForDatabase(db->name());
+            ->canAcceptWritesForDatabase(opCtx, db->name());
 
     if (isPrimary && !collectionIsSharded(opCtx, sourceNss)) {
         return BSONObj();

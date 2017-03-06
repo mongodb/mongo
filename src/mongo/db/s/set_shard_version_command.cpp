@@ -210,19 +210,20 @@ public:
 
         // Step 4
 
-        // we can run on a slave up to here
-        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nss.db())) {
-            result.append("errmsg", "not master");
-            result.append("note", "from post init in setShardVersion");
-            return false;
-        }
-
         const ChunkVersion connectionVersion = info->getVersion(ns);
         connectionVersion.addToBSON(result, "oldVersion");
 
         {
             boost::optional<AutoGetDb> autoDb;
             autoDb.emplace(txn, nss.db(), MODE_IS);
+
+            // we can run on a slave up to here
+            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(txn,
+                                                                                     nss.db())) {
+                result.append("errmsg", "not master");
+                result.append("note", "from post init in setShardVersion");
+                return false;
+            }
 
             // Views do not require a shard version check.
             if (autoDb->getDb() && !autoDb->getDb()->getCollection(nss.ns()) &&

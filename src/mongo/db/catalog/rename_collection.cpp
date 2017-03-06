@@ -74,7 +74,7 @@ Status renameCollection(OperationContext* txn,
     OldClientContext ctx(txn, source.ns());
 
     bool userInitiatedWritesAndNotPrimary = txn->writesAreReplicated() &&
-        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(source);
+        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(txn, source);
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotMaster,
