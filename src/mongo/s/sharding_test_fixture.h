@@ -116,6 +116,12 @@ protected:
         executor::NetworkTestEnv::OnFindCommandWithMetadataFunction func);
 
     /**
+     * Same as the onCommand* variants, but expects the request to be placed on the arbitrary
+     * executor of the Grid's executorPool.
+     */
+    void onCommandForPoolExecutor(executor::NetworkTestEnv::OnCommandFunction func);
+
+    /**
      * Setup the shard registry to contain the given shards until the next reload.
      */
     void setupShards(const std::vector<ShardType>& shards);
@@ -214,9 +220,14 @@ private:
     RemoteCommandTargeterFactoryMock* _targeterFactory;
     RemoteCommandTargeterMock* _configTargeter;
 
+    // For the Grid's fixed executor.
     executor::NetworkInterfaceMock* _mockNetwork;
     executor::TaskExecutor* _executor;
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;
+
+    // For the Grid's arbitrary executor in its executorPool.
+    std::unique_ptr<executor::NetworkTestEnv> _networkTestEnvForPool;
+
     DistLockManagerMock* _distLockManager = nullptr;
     ShardingCatalogClientImpl* _catalogClient = nullptr;
 };

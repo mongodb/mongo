@@ -110,7 +110,7 @@ public:
     Status targetBatch(OperationContext* opCtx,
                        const NSTargeter& targeter,
                        bool recordTargetErrors,
-                       std::vector<TargetedWriteBatch*>* targetedBatches);
+                       std::map<ShardId, TargetedWriteBatch*>* targetedBatches);
 
     /**
      * Fills a BatchCommandRequest from a TargetedWriteBatch for this BatchWriteOp.

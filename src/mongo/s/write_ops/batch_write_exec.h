@@ -42,7 +42,6 @@
 namespace mongo {
 
 class BatchWriteExecStats;
-class MultiCommandDispatch;
 class OperationContext;
 
 /**
@@ -64,7 +63,7 @@ class BatchWriteExec {
     MONGO_DISALLOW_COPYING(BatchWriteExec);
 
 public:
-    BatchWriteExec(NSTargeter* targeter, MultiCommandDispatch* dispatcher);
+    BatchWriteExec(NSTargeter* targeter);
 
     /**
      * Executes a client batch write request by sending child batches to several shard
@@ -80,9 +79,6 @@ public:
 private:
     // Not owned here
     NSTargeter* _targeter;
-
-    // Not owned here
-    MultiCommandDispatch* _dispatcher;
 };
 
 struct HostOpTime {

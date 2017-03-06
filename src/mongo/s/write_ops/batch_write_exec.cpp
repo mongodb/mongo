@@ -38,7 +38,8 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter.h"
-#include "mongo/s/client/multi_command_dispatch.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batch_write_op.h"
@@ -50,9 +51,9 @@ namespace mongo {
 using std::make_pair;
 using std::stringstream;
 using std::vector;
+using std::map;
 
-BatchWriteExec::BatchWriteExec(NSTargeter* targeter, MultiCommandDispatch* dispatcher)
-    : _targeter(targeter), _dispatcher(dispatcher) {}
+BatchWriteExec::BatchWriteExec(NSTargeter* targeter) : _targeter(targeter) {}
 
 namespace {
 
@@ -62,7 +63,7 @@ namespace {
 //
 
 // TODO: Unordered map?
-typedef OwnedPointerMap<ConnectionString, TargetedWriteBatch> OwnedHostBatchMap;
+typedef OwnedPointerMap<ShardId, TargetedWriteBatch> OwnedShardBatchMap;
 }
 
 static void buildErrorFrom(const Status& status, WriteErrorDetail* error) {
@@ -90,7 +91,6 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                                   BatchWriteExecStats* stats) {
     LOG(4) << "starting execution of write batch of size "
            << static_cast<int>(clientRequest.sizeWriteOps()) << " for " << clientRequest.getNS();
-
     BatchWriteOp batchOp;
     batchOp.initClientRequest(&clientRequest);
 
@@ -125,8 +125,8 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
         //    exactly when the metadata changed.
         //
 
-        OwnedPointerVector<TargetedWriteBatch> childBatchesOwned;
-        vector<TargetedWriteBatch*>& childBatches = childBatchesOwned.mutableVector();
+        OwnedPointerMap<ShardId, TargetedWriteBatch> childBatchesOwned;
+        map<ShardId, TargetedWriteBatch*>& childBatches = childBatchesOwned.mutableMap();
 
         // If we've already had a targeting error, we've refreshed the metadata once and can
         // record target errors definitively.
@@ -149,84 +149,30 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
         size_t numToSend = childBatches.size();
         while (numSent != numToSend) {
             // Collect batches out on the network, mapped by endpoint
-            OwnedHostBatchMap ownedPendingBatches;
-            OwnedHostBatchMap::MapType& pendingBatches = ownedPendingBatches.mutableMap();
+            OwnedShardBatchMap ownedPendingBatches;
+            OwnedShardBatchMap::MapType& pendingBatches = ownedPendingBatches.mutableMap();
 
             //
-            // Send side
+            // Construct the requests.
             //
+
+            vector<AsyncRequestsSender::Request> requests;
 
             // Get as many batches as we can at once
-            for (vector<TargetedWriteBatch*>::iterator it = childBatches.begin();
-                 it != childBatches.end();
-                 ++it) {
-                //
-                // Collect the info needed to dispatch our targeted batch
-                //
+            for (auto it = childBatches.begin(); it != childBatches.end(); ++it) {
 
-                TargetedWriteBatch* nextBatch = *it;
+                TargetedWriteBatch* nextBatch = it->second;
+
                 // If the batch is NULL, we sent it previously, so skip
                 if (nextBatch == NULL)
                     continue;
 
-                // Figure out what host we need to dispatch our targeted batch
-                const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
-                auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(
-                    opCtx, nextBatch->getEndpoint().shardName);
-
-                bool resolvedHost = false;
-                ConnectionString shardHost;
-                if (!shardStatus.isOK()) {
-                    Status status(std::move(shardStatus.getStatus()));
-
-                    // Record a resolve failure
-                    // TODO: It may be necessary to refresh the cache if stale, or maybe just
-                    // cancel and retarget the batch
-                    WriteErrorDetail error;
-                    buildErrorFrom(status, &error);
-                    LOG(4) << "unable to send write batch to " << nextBatch->getEndpoint().shardName
-                           << causedBy(status);
-                    batchOp.noteBatchError(*nextBatch, error);
-                } else {
-                    auto shard = shardStatus.getValue();
-
-                    auto swHostAndPort = shard->getTargeter()->findHostNoWait(readPref);
-                    if (!swHostAndPort.isOK()) {
-
-                        // Record a resolve failure
-                        // TODO: It may be necessary to refresh the cache if stale, or maybe just
-                        // cancel and retarget the batch
-                        WriteErrorDetail error;
-                        buildErrorFrom(swHostAndPort.getStatus(), &error);
-                        LOG(4) << "unable to send write batch to "
-                               << nextBatch->getEndpoint().shardName
-                               << causedBy(swHostAndPort.getStatus());
-                        batchOp.noteBatchError(*nextBatch, error);
-                    } else {
-                        shardHost = ConnectionString(std::move(swHostAndPort.getValue()));
-                        resolvedHost = true;
-                    }
-                }
-
-                if (!resolvedHost) {
-                    ++stats->numResolveErrors;
-
-                    // We're done with this batch
-                    // Clean up when we can't resolve a host
-                    delete *it;
-                    *it = NULL;
-                    --numToSend;
-                    continue;
-                }
-
-                // If we already have a batch for this host, wait until the next time
-                OwnedHostBatchMap::MapType::iterator pendingIt = pendingBatches.find(shardHost);
+                // If we already have a batch for this shard, wait until the next time
+                ShardId targetShardId = nextBatch->getEndpoint().shardName;
+                OwnedShardBatchMap::MapType::iterator pendingIt =
+                    pendingBatches.find(targetShardId);
                 if (pendingIt != pendingBatches.end())
                     continue;
-
-                //
-                // We now have all the info needed to dispatch the batch
-                //
 
                 BatchedCommandRequest request(clientRequest.getBatchType());
                 batchOp.buildBatchRequest(*nextBatch, &request);
@@ -236,48 +182,90 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 NamespaceString nss(request.getNS());
                 request.setNS(nss);
 
-                LOG(4) << "sending write batch to " << shardHost.toString() << ": "
+                LOG(4) << "sending write batch to " << targetShardId << ": "
                        << redact(request.toString());
 
-                _dispatcher->addCommand(shardHost, nss.db(), request.toBSON());
+                requests.emplace_back(targetShardId, request.toBSON());
 
                 // Indicate we're done by setting the batch to NULL
                 // We'll only get duplicate hostEndpoints if we have broadcast and non-broadcast
                 // endpoints for the same host, so this should be pretty efficient without
                 // moving stuff around.
-                *it = NULL;
+                it->second = NULL;
 
                 // Recv-side is responsible for cleaning up the nextBatch when used
-                pendingBatches.insert(make_pair(shardHost, nextBatch));
+                pendingBatches.insert(make_pair(targetShardId, nextBatch));
             }
 
-            // Send them all out
-            _dispatcher->sendAll();
+            //
+            // Send the requests.
+            //
+
+            const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
+            AsyncRequestsSender ars(opCtx,
+                                    Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                                    clientRequest.getTargetingNSS().db(),
+                                    requests,
+                                    readPref);
             numSent += pendingBatches.size();
 
             //
-            // Recv side
+            // Receive the responses.
             //
 
-            while (_dispatcher->numPending() > 0) {
-                // Get the response
-                ConnectionString shardHost;
-                BatchedCommandResponse response;
-                Status dispatchStatus = _dispatcher->recvAny(&shardHost, &response);
+            while (!ars.done()) {
+                // Block until a response is available.
+                auto response = ars.next();
 
                 // Get the TargetedWriteBatch to find where to put the response
-                dassert(pendingBatches.find(shardHost) != pendingBatches.end());
-                TargetedWriteBatch* batch = pendingBatches.find(shardHost)->second;
+                dassert(pendingBatches.find(response.shardId) != pendingBatches.end());
+                TargetedWriteBatch* batch = pendingBatches.find(response.shardId)->second;
 
-                if (dispatchStatus.isOK()) {
+                // First check if we were able to target a shard host.
+                if (!response.shardHostAndPort) {
+                    invariant(!response.swResponse.isOK());
+
+                    // Record a resolve failure
+                    // TODO: It may be necessary to refresh the cache if stale, or maybe just
+                    // cancel and retarget the batch
+                    LOG(4) << "unable to send write batch to " << batch->getEndpoint().shardName
+                           << causedBy(response.swResponse.getStatus());
+                    WriteErrorDetail error;
+                    buildErrorFrom(std::move(response.swResponse.getStatus()), &error);
+                    batchOp.noteBatchError(*batch, error);
+
+                    // We're done with this batch
+                    // Clean up when we can't resolve a host
+                    auto it = childBatches.find(batch->getEndpoint().shardName);
+                    invariant(it != childBatches.end());
+                    delete it->second;
+                    it->second = NULL;
+                    continue;
+                }
+                ConnectionString shardHost(std::move(*response.shardHostAndPort));
+
+
+                // Then check if we successfully got a response.
+                Status status = response.swResponse.getStatus();
+                BatchedCommandResponse batchedCommandResponse;
+                if (status.isOK()) {
+                    std::string errMsg;
+                    if (!batchedCommandResponse.parseBSON(response.swResponse.getValue().data,
+                                                          &errMsg) ||
+                        !batchedCommandResponse.isValid(&errMsg)) {
+                        status = {ErrorCodes::FailedToParse, errMsg};
+                    }
+                }
+
+                if (status.isOK()) {
                     TrackedErrors trackedErrors;
                     trackedErrors.startTracking(ErrorCodes::StaleShardVersion);
 
                     LOG(4) << "write results received from " << shardHost.toString() << ": "
-                           << redact(response.toString());
+                           << redact(batchedCommandResponse.toString());
 
                     // Dispatch was ok, note response
-                    batchOp.noteBatchResponse(*batch, response, &trackedErrors);
+                    batchOp.noteBatchResponse(*batch, batchedCommandResponse, &trackedErrors);
 
                     // Note if anything was stale
                     const vector<ShardError*>& staleErrors =
@@ -291,22 +279,25 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                     // Remember that we successfully wrote to this shard
                     // NOTE: This will record lastOps for shards where we actually didn't update
                     // or delete any documents, which preserves old behavior but is conservative
-                    stats->noteWriteAt(
-                        shardHost,
-                        response.isLastOpSet() ? response.getLastOp() : repl::OpTime(),
-                        response.isElectionIdSet() ? response.getElectionId() : OID());
+                    stats->noteWriteAt(shardHost,
+                                       batchedCommandResponse.isLastOpSet()
+                                           ? batchedCommandResponse.getLastOp()
+                                           : repl::OpTime(),
+                                       batchedCommandResponse.isElectionIdSet()
+                                           ? batchedCommandResponse.getElectionId()
+                                           : OID());
                 } else {
                     // Error occurred dispatching, note it
 
                     stringstream msg;
                     msg << "write results unavailable from " << shardHost.toString()
-                        << causedBy(dispatchStatus.toString());
+                        << causedBy(status.toString());
 
                     WriteErrorDetail error;
                     buildErrorFrom(Status(ErrorCodes::RemoteResultsUnavailable, msg.str()), &error);
 
                     LOG(4) << "unable to receive write results from " << shardHost.toString()
-                           << causedBy(redact(dispatchStatus.toString()));
+                           << causedBy(redact(status.toString()));
 
                     batchOp.noteBatchError(*batch, error);
                 }

@@ -111,7 +111,7 @@ Status enforceLegacyWriteConcern(OperationContext* opCtx,
         requests.emplace_back(swShard.getValue()->getId(), gleCmd);
     }
 
-    // Send the requests and wait to receive all the responses.
+    // Send the requests.
 
     const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
     AsyncRequestsSender ars(opCtx,
@@ -119,12 +119,14 @@ Status enforceLegacyWriteConcern(OperationContext* opCtx,
                             dbName,
                             requests,
                             readPref);
-    auto responses = ars.waitForResponses(opCtx);
 
-    // Parse the responses.
+    // Receive the responses.
 
     vector<Status> failedStatuses;
-    for (const auto& response : responses) {
+    while (!ars.done()) {
+        // Block until a response is available.
+        auto response = ars.next();
+
         // Return immediately if we failed to contact a shard.
         if (!response.shardHostAndPort) {
             invariant(!response.swResponse.isOK());

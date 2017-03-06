@@ -116,7 +116,10 @@ void ShardingTestFixture::setUp() {
 
     auto netForPool = stdx::make_unique<executor::NetworkInterfaceMock>();
     netForPool->setEgressMetadataHook(stdx::make_unique<ShardingEgressMetadataHookForMongos>());
+    auto _mockNetworkForPool = netForPool.get();
     auto execForPool = makeThreadPoolTestExecutor(std::move(netForPool));
+    _networkTestEnvForPool =
+        stdx::make_unique<NetworkTestEnv>(execForPool.get(), _mockNetworkForPool);
     std::vector<std::unique_ptr<executor::TaskExecutor>> executorsForPool;
     executorsForPool.emplace_back(std::move(execForPool));
 
@@ -263,6 +266,10 @@ void ShardingTestFixture::onFindCommand(NetworkTestEnv::OnFindCommandFunction fu
 void ShardingTestFixture::onFindWithMetadataCommand(
     NetworkTestEnv::OnFindCommandWithMetadataFunction func) {
     _networkTestEnv->onFindWithMetadataCommand(func);
+}
+
+void ShardingTestFixture::onCommandForPoolExecutor(NetworkTestEnv::OnCommandFunction func) {
+    _networkTestEnvForPool->onCommand(func);
 }
 
 void ShardingTestFixture::setupShards(const std::vector<ShardType>& shards) {

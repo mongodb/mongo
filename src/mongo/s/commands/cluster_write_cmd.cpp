@@ -270,7 +270,7 @@ private:
             requests.emplace_back(shardStatus.getValue()->getId(), command);
         }
 
-        // Send the requests and wait to receive all the responses.
+        // Send the requests.
 
         const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
         AsyncRequestsSender ars(opCtx,
@@ -278,12 +278,14 @@ private:
                                 dbName,
                                 requests,
                                 readPref);
-        auto responses = ars.waitForResponses(opCtx);
 
-        // Parse the responses.
+        // Receive the responses.
 
         Status dispatchStatus = Status::OK();
-        for (const auto& response : responses) {
+        while (!ars.done()) {
+            // Block until a response is available.
+            auto response = ars.next();
+
             if (!response.swResponse.isOK()) {
                 dispatchStatus = std::move(response.swResponse.getStatus());
                 break;
@@ -295,12 +297,7 @@ private:
             invariant(response.shardHostAndPort);
             result.target = ConnectionString(std::move(*response.shardHostAndPort));
 
-            auto shardStatus = shardRegistry->getShard(opCtx, result.target.toString());
-            if (!shardStatus.isOK()) {
-                return shardStatus.getStatus();
-            }
-            result.shardTargetId = shardStatus.getValue()->getId();
-
+            result.shardTargetId = std::move(response.shardId);
             result.result = std::move(response.swResponse.getValue().data);
 
             results->push_back(result);

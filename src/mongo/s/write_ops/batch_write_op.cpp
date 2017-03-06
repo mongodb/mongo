@@ -238,7 +238,7 @@ static void cancelBatches(const WriteErrorDetail& why,
 Status BatchWriteOp::targetBatch(OperationContext* opCtx,
                                  const NSTargeter& targeter,
                                  bool recordTargetErrors,
-                                 vector<TargetedWriteBatch*>* targetedBatches) {
+                                 std::map<ShardId, TargetedWriteBatch*>* targetedBatches) {
     //
     // Targeting of unordered batches is fairly simple - each remaining write op is targeted,
     // and each of those targeted writes are grouped into a batch for a particular shard
@@ -402,7 +402,8 @@ Status BatchWriteOp::targetBatch(OperationContext* opCtx,
         // Remember targeted batch for reporting
         _targeted.insert(batch);
         // Send the handle back to caller
-        targetedBatches->push_back(batch);
+        invariant(targetedBatches->find(batch->getEndpoint().shardName) == targetedBatches->end());
+        targetedBatches->insert(std::make_pair(batch->getEndpoint().shardName, batch));
     }
 
     return Status::OK();

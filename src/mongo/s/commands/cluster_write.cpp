@@ -42,7 +42,6 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/chunk_manager_targeter.h"
-#include "mongo/s/commands/dbclient_multi_command.h"
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
@@ -309,8 +308,7 @@ void ClusterWriter::write(OperationContext* opCtx,
                 return;
             }
 
-            DBClientMultiCommand dispatcher;
-            BatchWriteExec exec(&targeter, &dispatcher);
+            BatchWriteExec exec(&targeter);
             exec.executeBatch(opCtx, *request, response, &_stats);
         }
 
