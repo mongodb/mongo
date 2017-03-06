@@ -54,8 +54,10 @@
 #include "mongo/db/repl/rs_rollback.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -80,6 +82,13 @@ public:
     ReplicationCoordinatorRollbackMock(ServiceContext* service)
         : ReplicationCoordinatorMock(service, createReplSettings()) {}
     void resetLastOpTimesFromOplog(OperationContext* opCtx) override {}
+    bool setFollowerMode(const MemberState& newState) override {
+        if (newState == _failSetFollowerModeOnThisMemberState) {
+            return false;
+        }
+        return ReplicationCoordinatorMock::setFollowerMode(newState);
+    }
+    MemberState _failSetFollowerModeOnThisMemberState = MemberState::RS_UNKNOWN;
 };
 
 
@@ -132,7 +141,7 @@ protected:
     ServiceContext::UniqueOperationContext _opCtx;
 
     // Owned by service context
-    ReplicationCoordinator* _coordinator;
+    ReplicationCoordinatorRollbackMock* _coordinator;
 
     repl::StorageInterfaceMock _storageInterface;
 
@@ -159,6 +168,11 @@ void RSRollbackTest::tearDown() {
     _opCtx.reset();
     ServiceContextMongoDTest::tearDown();
     setGlobalReplicationCoordinator(nullptr);
+}
+
+OplogInterfaceMock::Operation makeNoopOplogEntryAndRecordId(Seconds seconds) {
+    OpTime ts(Timestamp(seconds, 0), 0);
+    return std::make_pair(BSON("ts" << ts.getTimestamp() << "h" << ts.getTerm()), RecordId(1));
 }
 
 TEST_F(RSRollbackTest, InconsistentMinValid) {
@@ -1078,6 +1092,109 @@ TEST(RSRollbackTest, LocalEntryWithoutO2IsFatal) {
     ASSERT_OK(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry));
     ASSERT_THROWS(updateFixUpInfoFromLocalOplogEntry(fui, validOplogEntry.removeField("o2")),
                   RSFatalException);
+}
+
+TEST_F(RSRollbackTest, RollbackReturnsImmediatelyOnFailureToTransitionToRollback) {
+    // On failing to transition to ROLLBACK, rollback() should return immediately and not call
+    // syncRollback(). We provide an empty oplog so that if syncRollback() is called erroneously,
+    // we would go fatal.
+    OplogInterfaceMock localOplogWithSingleOplogEntry({makeNoopOplogEntryAndRecordId(Seconds(1))});
+    RollbackSourceMock rollbackSourceWithInvalidOplog(
+        std::unique_ptr<OplogInterface>(new OplogInterfaceMock(kEmptyMockOperations)));
+
+    // Inject ReplicationCoordinator::setFollowerMode() error. We set the current member state
+    // because it will be logged by rollback() on failing to transition to ROLLBACK.
+    _coordinator->setFollowerMode(MemberState::RS_SECONDARY);
+    _coordinator->_failSetFollowerModeOnThisMemberState = MemberState::RS_ROLLBACK;
+
+    startCapturingLogMessages();
+    rollback(_opCtx.get(),
+             localOplogWithSingleOplogEntry,
+             rollbackSourceWithInvalidOplog,
+             {},
+             _coordinator,
+             &_storageInterface);
+    stopCapturingLogMessages();
+
+    ASSERT_EQUALS(1, countLogLinesContaining("Cannot transition from SECONDARY to ROLLBACK"));
+    ASSERT_EQUALS(MemberState(MemberState::RS_SECONDARY), _coordinator->getMemberState());
+}
+
+DEATH_TEST_F(RSRollbackTest,
+             RollbackUnrecoverableRollbackErrorTriggersFatalAssertion,
+             "Unable to complete rollback. A full resync may be needed: "
+             "UnrecoverableRollbackError: need to rollback, but unable to determine common point "
+             "between local and remote oplog: InvalidSyncSource: remote oplog empty or unreadable "
+             "@ 18752") {
+    // rollback() should abort on getting UnrecoverableRollbackError from syncRollback(). An empty
+    // local oplog will make syncRollback() return the intended error.
+    OplogInterfaceMock localOplogWithSingleOplogEntry({makeNoopOplogEntryAndRecordId(Seconds(1))});
+    RollbackSourceMock rollbackSourceWithInvalidOplog(
+        std::unique_ptr<OplogInterface>(new OplogInterfaceMock(kEmptyMockOperations)));
+
+    rollback(_opCtx.get(),
+             localOplogWithSingleOplogEntry,
+             rollbackSourceWithInvalidOplog,
+             {},
+             _coordinator,
+             &_storageInterface);
+}
+
+TEST_F(RSRollbackTest, RollbackLogsRetryMessageAndReturnsOnNonUnrecoverableRollbackError) {
+    // If local oplog is empty, syncRollback() returns OplogStartMissing (instead of
+    // UnrecoverableRollbackError when the remote oplog is missing). rollback() should log a message
+    // about retrying rollback later before returning.
+    OplogInterfaceMock localOplogWithNoEntries(kEmptyMockOperations);
+    RollbackSourceMock rollbackSourceWithValidOplog(std::unique_ptr<OplogInterface>(
+        new OplogInterfaceMock({makeNoopOplogEntryAndRecordId(Seconds(1))})));
+    auto noopSleepSecsFn = [](int) {};
+
+    startCapturingLogMessages();
+    rollback(_opCtx.get(),
+             localOplogWithNoEntries,
+             rollbackSourceWithValidOplog,
+             {},
+             _coordinator,
+             &_storageInterface,
+             noopSleepSecsFn);
+    stopCapturingLogMessages();
+
+    ASSERT_EQUALS(
+        1, countLogLinesContaining("rollback cannot complete at this time (retrying later)"));
+    ASSERT_EQUALS(MemberState(MemberState::RS_RECOVERING), _coordinator->getMemberState());
+}
+
+DEATH_TEST_F(RSRollbackTest,
+             RollbackTriggersFatalAssertionOnDetectingShardIdentityDocumentRollback,
+             "shardIdentity document rollback detected.  Shutting down to clear in-memory sharding "
+             "state.  Restarting this process should safely return it to a healthy state") {
+    auto commonOperation = makeNoopOplogEntryAndRecordId(Seconds(1));
+    OplogInterfaceMock localOplog({commonOperation});
+    RollbackSourceMock rollbackSource(
+        std::unique_ptr<OplogInterface>(new OplogInterfaceMock({commonOperation})));
+
+    ASSERT_FALSE(ShardIdentityRollbackNotifier::get(_opCtx.get())->didRollbackHappen());
+    ShardIdentityRollbackNotifier::get(_opCtx.get())->recordThatRollbackHappened();
+    ASSERT_TRUE(ShardIdentityRollbackNotifier::get(_opCtx.get())->didRollbackHappen());
+
+    createOplog(_opCtx.get());
+    rollback(_opCtx.get(), localOplog, rollbackSource, {}, _coordinator, &_storageInterface);
+}
+
+DEATH_TEST_F(
+    RSRollbackTest,
+    RollbackTriggersFatalAssertionOnFailingToTransitionToRecoveringAfterSyncRollbackReturns,
+    "Failed to transition into RECOVERING; expected to be in state ROLLBACK but found self in "
+    "ROLLBACK") {
+    auto commonOperation = makeNoopOplogEntryAndRecordId(Seconds(1));
+    OplogInterfaceMock localOplog({commonOperation});
+    RollbackSourceMock rollbackSource(
+        std::unique_ptr<OplogInterface>(new OplogInterfaceMock({commonOperation})));
+
+    _coordinator->_failSetFollowerModeOnThisMemberState = MemberState::RS_RECOVERING;
+
+    createOplog(_opCtx.get());
+    rollback(_opCtx.get(), localOplog, rollbackSource, {}, _coordinator, &_storageInterface);
 }
 
 // The testcases used here are trying to detect off-by-one errors in
