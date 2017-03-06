@@ -51,11 +51,8 @@ class OperationContext;
 
 namespace repl {
 
-class OplogInterface;
 class ReplicationCoordinator;
 class ReplicationCoordinatorExternalState;
-class RollbackSource;
-class StorageInterface;
 
 class BackgroundSync {
     MONGO_DISALLOW_COPYING(BackgroundSync);
@@ -163,16 +160,6 @@ private:
                              Fetcher::Documents::const_iterator end,
                              const OplogFetcher::DocumentsInfo& info,
                              boost::optional<int>* requiredRBID);
-
-    /**
-     * Executes a rollback.
-     */
-    void _rollback(OperationContext* opCtx,
-                   const OplogInterface& localOplog,
-                   const RollbackSource& rollbackSource,
-                   boost::optional<int> requiredRBID,
-                   ReplicationCoordinator* replCoord,
-                   StorageInterface* storageInterface);
 
     // restart syncing
     void start(OperationContext* opCtx);

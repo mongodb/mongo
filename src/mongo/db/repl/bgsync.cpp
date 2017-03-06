@@ -473,9 +473,18 @@ void BackgroundSync::_produce(OperationContext* opCtx) {
             }
         }
 
+        if (MONGO_FAIL_POINT(rollbackHangBeforeStart)) {
+            // This log output is used in js tests so please leave it.
+            log() << "rollback - rollbackHangBeforeStart fail point "
+                     "enabled. Blocking until fail point is disabled.";
+            while (MONGO_FAIL_POINT(rollbackHangBeforeStart) && !inShutdown()) {
+                mongo::sleepsecs(1);
+            }
+        }
+
         OplogInterfaceLocal localOplog(opCtx, rsOplogName);
         RollbackSourceImpl rollbackSource(getConnection, source, rsOplogName);
-        _rollback(
+        rollback(
             opCtx, localOplog, rollbackSource, syncSourceResp.rbid, _replCoord, storageInterface);
 
         // Reset the producer to clear the sync source and the last optime fetched.
@@ -611,100 +620,6 @@ void BackgroundSync::consume(OperationContext* opCtx) {
         // This means that shutdown() was called between the consumer's calls to peek() and
         // consume(). shutdown() cleared the buffer so there is nothing for us to consume here.
         // Since our postcondition is already met, it is safe to return successfully.
-    }
-}
-
-void BackgroundSync::_rollback(OperationContext* opCtx,
-                               const OplogInterface& localOplog,
-                               const RollbackSource& rollbackSource,
-                               boost::optional<int> requiredRBID,
-                               ReplicationCoordinator* replCoord,
-                               StorageInterface* storageInterface) {
-    if (MONGO_FAIL_POINT(rollbackHangBeforeStart)) {
-        // This log output is used in js tests so please leave it.
-        log() << "rollback - rollbackHangBeforeStart fail point "
-                 "enabled. Blocking until fail point is disabled.";
-        while (MONGO_FAIL_POINT(rollbackHangBeforeStart) && !inShutdown()) {
-            mongo::sleepsecs(1);
-        }
-    }
-
-    // Set state to ROLLBACK while we are in this function. This prevents serving reads, even from
-    // the oplog. This can fail if we are elected PRIMARY, in which case we better not do any
-    // rolling back. If we successfully enter ROLLBACK we will only exit this function fatally or
-    // after transitioning to RECOVERING. We always transition to RECOVERING regardless of success
-    // or (recoverable) failure since we may be in an inconsistent state. If rollback failed before
-    // writing anything, SyncTail will quickly take us to SECONDARY since are are still at our
-    // original MinValid, which is fine because we may choose a sync source that doesn't require
-    // rollback. If it failed after we wrote to MinValid, then we will pick a sync source that will
-    // cause us to roll back to the same common point, which is fine. If we succeeded, we will be
-    // consistent as soon as we apply up to/through MinValid and SyncTail will make us SECONDARY
-    // then.
-    {
-        log() << "rollback 0";
-        Lock::GlobalWrite globalWrite(opCtx->lockState());
-        if (!replCoord->setFollowerMode(MemberState::RS_ROLLBACK)) {
-            log() << "Cannot transition from " << replCoord->getMemberState().toString() << " to "
-                  << MemberState(MemberState::RS_ROLLBACK).toString();
-            return;
-        }
-    }
-
-    try {
-        auto status = syncRollback(
-            opCtx, localOplog, rollbackSource, requiredRBID, replCoord, storageInterface);
-
-        // Abort only when syncRollback detects we are in a unrecoverable state.
-        // WARNING: these statuses sometimes have location codes which are lost with uassertStatusOK
-        // so we need to check here first.
-        if (ErrorCodes::UnrecoverableRollbackError == status.code()) {
-            severe() << "Unable to complete rollback. A full resync may be needed: "
-                     << redact(status);
-            fassertFailedNoTrace(28723);
-        }
-
-        // In other cases, we log the message contained in the error status and retry later.
-        uassertStatusOK(status);
-    } catch (const DBException& ex) {
-        // UnrecoverableRollbackError should only come from a returned status which is handled
-        // above.
-        invariant(ex.getCode() != ErrorCodes::UnrecoverableRollbackError);
-
-        warning() << "rollback cannot complete at this time (retrying later): " << redact(ex)
-                  << " appliedThrough=" << replCoord->getMyLastAppliedOpTime()
-                  << " minvalid=" << storageInterface->getMinValid(opCtx);
-
-        // Sleep a bit to allow upstream node to coalesce, if that was the cause of the failure. If
-        // we failed in a way that will keep failing, but wasn't flagged as a fatal failure, this
-        // will also prevent us from hot-looping and putting too much load on upstream nodes.
-        sleepsecs(5);  // 5 seconds was chosen as a completely arbitrary amount of time.
-    } catch (...) {
-        std::terminate();
-    }
-
-    // At this point we are about to leave rollback.  Before we do, wait for any writes done
-    // as part of rollback to be durable, and then do any necessary checks that we didn't
-    // wind up rolling back something illegal.  We must wait for the rollback to be durable
-    // so that if we wind up shutting down uncleanly in response to something we rolled back
-    // we know that we won't wind up right back in the same situation when we start back up
-    // because the rollback wasn't durable.
-    opCtx->recoveryUnit()->waitUntilDurable();
-
-    // If we detected that we rolled back the shardIdentity document as part of this rollback
-    // then we must shut down to clear the in-memory ShardingState associated with the
-    // shardIdentity document.
-    if (ShardIdentityRollbackNotifier::get(opCtx)->didRollbackHappen()) {
-        severe() << "shardIdentity document rollback detected.  Shutting down to clear "
-                    "in-memory sharding state.  Restarting this process should safely return it "
-                    "to a healthy state";
-        fassertFailedNoTrace(40276);
-    }
-
-    if (!replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
-        severe() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING)
-                 << "; expected to be in state " << MemberState(MemberState::RS_ROLLBACK)
-                 << " but found self in " << replCoord->getMemberState();
-        fassertFailedNoTrace(40364);
     }
 }
 

@@ -11,6 +11,7 @@ env.Library(
     ],
     LIBDEPS=[
         'data_replicator_external_state_impl',
+        'oplog_interface_local',
         'repl_coordinator_interface',
         'rollback_source_impl',
         'rs_rollback',
@@ -239,10 +240,8 @@ env.Library(
         'rs_rollback.cpp',
     ],
     LIBDEPS=[
-        'oplog_interface_local',
-        'oplog_interface_remote',
         'roll_back_local_operations',
-        'rollback_source_impl',
+        #'$BUILD_DIR/mongo/db/s/sharding', # CYCLE
         #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
         #'$BUILD_DIR/mongo/db/dbhelpers', # CYCLE
         #'$BUILD_DIR/mongo/db/db_raii', # CYCLE
@@ -274,6 +273,7 @@ env.CppUnitTest(
         'rs_rollback_test.cpp',
     ],
     LIBDEPS=[
+        'oplog_interface_local',
         'oplog_interface_mock',
         'replmocks',
         'rs_rollback',
