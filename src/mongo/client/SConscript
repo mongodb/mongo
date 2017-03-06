@@ -150,6 +150,7 @@ clientDriverEnv.Library(
         'replica_set_monitor_manager.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/bson/bson_depth',
         '$BUILD_DIR/mongo/db/auth/authcommon',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/dbmessage',

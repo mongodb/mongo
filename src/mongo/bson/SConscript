@@ -73,3 +73,12 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/base',
     ],
 )
+
+env.Library(
+    target='bson_depth',
+    source=[
+        'bson_depth.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
