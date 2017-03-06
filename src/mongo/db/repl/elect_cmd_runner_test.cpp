@@ -32,7 +32,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/elect_cmd_runner.h"
 #include "mongo/db/repl/member_heartbeat_data.h"
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/stdx/functional.h"
@@ -54,7 +54,7 @@ using executor::RemoteCommandResponse;
 class ElectCmdRunnerTest : public mongo::unittest::Test {
 public:
     void startTest(ElectCmdRunner* electCmdRunner,
-                   const ReplicaSetConfig& currentConfig,
+                   const ReplSetConfig& currentConfig,
                    int selfIndex,
                    const std::vector<HostAndPort>& hosts);
 
@@ -63,7 +63,7 @@ public:
     void electCmdRunnerRunner(const ReplicationExecutor::CallbackArgs& data,
                               ElectCmdRunner* electCmdRunner,
                               StatusWith<ReplicationExecutor::EventHandle>* evh,
-                              const ReplicaSetConfig& currentConfig,
+                              const ReplSetConfig& currentConfig,
                               int selfIndex,
                               const std::vector<HostAndPort>& hosts);
 
@@ -90,14 +90,14 @@ void ElectCmdRunnerTest::tearDown() {
     _executorThread->join();
 }
 
-ReplicaSetConfig assertMakeRSConfig(const BSONObj& configBson) {
-    ReplicaSetConfig config;
+ReplSetConfig assertMakeRSConfig(const BSONObj& configBson) {
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(configBson));
     ASSERT_OK(config.validate());
     return config;
 }
 
-const BSONObj makeElectRequest(const ReplicaSetConfig& rsConfig, int selfIndex) {
+const BSONObj makeElectRequest(const ReplSetConfig& rsConfig, int selfIndex) {
     const MemberConfig& myConfig = rsConfig.getMemberAt(selfIndex);
     return BSON("replSetElect" << 1 << "set" << rsConfig.getReplSetName() << "who"
                                << myConfig.getHostAndPort().toString()
@@ -126,7 +126,7 @@ BSONObj stripRound(const BSONObj& orig) {
 void ElectCmdRunnerTest::electCmdRunnerRunner(const ReplicationExecutor::CallbackArgs& data,
                                               ElectCmdRunner* electCmdRunner,
                                               StatusWith<ReplicationExecutor::EventHandle>* evh,
-                                              const ReplicaSetConfig& currentConfig,
+                                              const ReplSetConfig& currentConfig,
                                               int selfIndex,
                                               const std::vector<HostAndPort>& hosts) {
     invariant(data.status.isOK());
@@ -136,7 +136,7 @@ void ElectCmdRunnerTest::electCmdRunnerRunner(const ReplicationExecutor::Callbac
 }
 
 void ElectCmdRunnerTest::startTest(ElectCmdRunner* electCmdRunner,
-                                   const ReplicaSetConfig& currentConfig,
+                                   const ReplSetConfig& currentConfig,
                                    int selfIndex,
                                    const std::vector<HostAndPort>& hosts) {
     StatusWith<ReplicationExecutor::EventHandle> evh(ErrorCodes::InternalError, "Not set");
@@ -161,13 +161,13 @@ void ElectCmdRunnerTest::waitForTest() {
 
 TEST_F(ElectCmdRunnerTest, OneNode) {
     // Only one node in the config.
-    const ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
-                                                            << "rs0"
-                                                            << "version"
-                                                            << 1
-                                                            << "members"
-                                                            << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                                     << "h1"))));
+    const ReplSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                         << "rs0"
+                                                         << "version"
+                                                         << 1
+                                                         << "members"
+                                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                                  << "h1"))));
 
     std::vector<HostAndPort> hosts;
     ElectCmdRunner electCmdRunner;
@@ -178,16 +178,15 @@ TEST_F(ElectCmdRunnerTest, OneNode) {
 
 TEST_F(ElectCmdRunnerTest, TwoNodes) {
     // Two nodes, we are node h1.
-    const ReplicaSetConfig config =
-        assertMakeRSConfig(BSON("_id"
-                                << "rs0"
-                                << "version"
-                                << 1
-                                << "members"
-                                << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                         << "h0")
-                                              << BSON("_id" << 2 << "host"
-                                                            << "h1"))));
+    const ReplSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                         << "rs0"
+                                                         << "version"
+                                                         << 1
+                                                         << "members"
+                                                         << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                                  << "h0")
+                                                                       << BSON("_id" << 2 << "host"
+                                                                                     << "h1"))));
 
     std::vector<HostAndPort> hosts;
     hosts.push_back(config.getMemberAt(1).getHostAndPort());
@@ -217,15 +216,15 @@ TEST_F(ElectCmdRunnerTest, TwoNodes) {
 
 TEST_F(ElectCmdRunnerTest, ShuttingDown) {
     // Two nodes, we are node h1.  Shutdown happens while we're scheduling remote commands.
-    ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
-                                                      << "rs0"
-                                                      << "version"
-                                                      << 1
-                                                      << "members"
-                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                               << "h0")
-                                                                    << BSON("_id" << 2 << "host"
-                                                                                  << "h1"))));
+    ReplSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                   << "rs0"
+                                                   << "version"
+                                                   << 1
+                                                   << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                            << "h0")
+                                                                 << BSON("_id" << 2 << "host"
+                                                                               << "h1"))));
 
     std::vector<HostAndPort> hosts;
     hosts.push_back(config.getMemberAt(1).getHostAndPort());
@@ -254,11 +253,11 @@ public:
     virtual void start(const BSONObj& configObj) {
         int selfConfigIndex = 0;
 
-        ReplicaSetConfig config;
+        ReplSetConfig config;
         config.initialize(configObj);
 
         std::vector<HostAndPort> hosts;
-        for (ReplicaSetConfig::MemberIterator mem = ++config.membersBegin();
+        for (ReplSetConfig::MemberIterator mem = ++config.membersBegin();
              mem != config.membersEnd();
              ++mem) {
             hosts.push_back(mem->getHostAndPort());

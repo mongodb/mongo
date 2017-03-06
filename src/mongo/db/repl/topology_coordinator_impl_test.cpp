@@ -131,7 +131,7 @@ protected:
                       int selfIndex,
                       Date_t now = Date_t::fromMillisSinceEpoch(-1),
                       const OpTime& lastOp = OpTime()) {
-        ReplicaSetConfig config;
+        ReplSetConfig config;
         ASSERT_OK(config.initialize(cfg));
         ASSERT_OK(config.validate());
 
@@ -189,7 +189,7 @@ protected:
         ErrorCodes::Error errcode = ErrorCodes::HostUnreachable) {
         // timed out heartbeat to mark a node as down
 
-        Milliseconds roundTripTime{ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod};
+        Milliseconds roundTripTime{ReplSetConfig::kDefaultHeartbeatTimeoutPeriod};
         return _receiveHeartbeatHelper(Status(errcode, ""),
                                        member,
                                        setName,
@@ -244,7 +244,7 @@ private:
 private:
     unique_ptr<TopologyCoordinatorImpl> _topo;
     unique_ptr<ReplicationExecutor::CallbackArgs> _cbData;
-    ReplicaSetConfig _currentConfig;
+    ReplSetConfig _currentConfig;
     Date_t _now;
     int _selfIndex;
     TopologyCoordinatorImpl::Options _options;
@@ -1571,7 +1571,7 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
         startupTime + Milliseconds(2), Milliseconds(1), member, hbResponseGood, OpTime());
     getTopoCoord().prepareHeartbeatRequest(startupTime + Milliseconds(3), setName, member);
     Date_t timeoutTime =
-        startupTime + Milliseconds(3) + ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod;
+        startupTime + Milliseconds(3) + ReplSetConfig::kDefaultHeartbeatTimeoutPeriod;
 
     StatusWith<ReplSetHeartbeatResponse> hbResponseDown =
         StatusWith<ReplSetHeartbeatResponse>(Status(ErrorCodes::HostUnreachable, ""));
@@ -2632,7 +2632,7 @@ TEST_F(HeartbeatResponseHighVerbosityTest, UpdateHeartbeatDataSameConfig) {
 
     // construct a copy of the original config for log message checking later
     // see HeartbeatResponseTest for the origin of the original config
-    ReplicaSetConfig originalConfig;
+    ReplSetConfig originalConfig;
     originalConfig.initialize(BSON("_id"
                                    << "rs0"
                                    << "version"
@@ -2696,7 +2696,7 @@ TEST_F(HeartbeatResponseHighVerbosityTest, UpdateHeartbeatDataOldConfig) {
 TEST_F(HeartbeatResponseTestOneRetry, ReconfigWhenHeartbeatResponseContainsAConfig) {
     // Confirm that action responses can come back from retries; in this, expect a Reconfig
     // action.
-    ReplicaSetConfig newConfig;
+    ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
@@ -2881,7 +2881,7 @@ TEST_F(HeartbeatResponseTestTwoRetries, NodeDoesNotRetryHeartbeatsAfterFailingTw
 TEST_F(HeartbeatResponseTestTwoRetries, ReconfigWhenHeartbeatResponseContainsAConfig) {
     // Confirm that action responses can come back from retries; in this, expect a Reconfig
     // action.
-    ReplicaSetConfig newConfig;
+    ReplSetConfig newConfig;
     ASSERT_OK(newConfig.initialize(BSON("_id"
                                         << "rs0"
                                         << "version"
@@ -4954,7 +4954,7 @@ TEST_F(TopoCoordTest, BecomeCandidateWhenBecomingSecondaryInSingleNodeSet) {
 TEST_F(TopoCoordTest, BecomeCandidateWhenReconfigToBeElectableInSingleNodeSet) {
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-    ReplicaSetConfig cfg;
+    ReplSetConfig cfg;
     cfg.initialize(BSON("_id"
                         << "rs0"
                         << "version"
@@ -4988,7 +4988,7 @@ TEST_F(TopoCoordTest, BecomeCandidateWhenReconfigToBeElectableInSingleNodeSet) {
 TEST_F(TopoCoordTest, NodeDoesNotBecomeCandidateWhenBecomingSecondaryInSingleNodeSetIfUnelectable) {
     ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-    ReplicaSetConfig cfg;
+    ReplSetConfig cfg;
     cfg.initialize(BSON("_id"
                         << "rs0"
                         << "version"
@@ -6523,7 +6523,7 @@ TEST_F(TopoCoordTest, CSRSConfigServerRejectsPV0Config) {
                                                       << "h2")
                                         << BSON("_id" << 30 << "host"
                                                       << "h3")));
-    ReplicaSetConfig config;
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(configObj, false));
     ASSERT_EQ(ErrorCodes::BadValue, config.validate());
 }

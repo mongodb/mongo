@@ -39,7 +39,7 @@
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/old_update_position_args.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/repl/replication_executor.h"
@@ -79,7 +79,7 @@ class HeartbeatResponseAction;
 class LastVote;
 class OplogReader;
 class ReplSetRequestVotesArgs;
-class ReplicaSetConfig;
+class ReplSetConfig;
 class SyncSourceFeedback;
 class StorageInterface;
 class TopologyCoordinator;
@@ -200,7 +200,7 @@ public:
 
     virtual void appendSlaveInfoData(BSONObjBuilder* result) override;
 
-    virtual ReplicaSetConfig getConfig() const override;
+    virtual ReplSetConfig getConfig() const override;
 
     virtual void processReplSetGetConfig(BSONObjBuilder* result) override;
 
@@ -340,7 +340,7 @@ public:
     /**
      * Gets the replica set configuration in use by the node.
      */
-    ReplicaSetConfig getReplicaSetConfig_forTest();
+    ReplSetConfig getReplicaSetConfig_forTest();
 
     /**
      * Returns scheduled time of election timeout callback.
@@ -596,7 +596,7 @@ private:
      * Returns an action to be performed after unlocking _mutex, via
      * _performPostMemberStateUpdateAction.
      */
-    PostMemberStateUpdateAction _setCurrentRSConfig_inlock(const ReplicaSetConfig& newConfig,
+    PostMemberStateUpdateAction _setCurrentRSConfig_inlock(const ReplSetConfig& newConfig,
                                                            int myIndex);
 
     /**
@@ -649,7 +649,7 @@ private:
      * "durablyWritten" indicates whether the operation has to be durably applied.
      */
     bool _haveTaggedNodesReachedOpTime_inlock(const OpTime& opTime,
-                                              const ReplicaSetTagPattern& tagPattern,
+                                              const ReplSetTagPattern& tagPattern,
                                               bool durablyWritten);
 
     Status _checkIfWriteConcernCanBeSatisfied_inlock(const WriteConcernOptions& writeConcern) const;
@@ -800,7 +800,7 @@ private:
      * to kConfigSteady, so that we can begin processing heartbeats and reconfigs.
      */
     void _finishLoadLocalConfig(const ReplicationExecutor::CallbackArgs& cbData,
-                                const ReplicaSetConfig& localConfig,
+                                const ReplSetConfig& localConfig,
                                 const StatusWith<OpTime>& lastOpTimeStatus,
                                 const StatusWith<LastVote>& lastVoteStatus);
 
@@ -819,14 +819,14 @@ private:
      * Finishes the work of processReplSetInitiate() while holding _topoMutex, in the event of
      * a successful quorum check.
      */
-    void _finishReplSetInitiate(const ReplicaSetConfig& newConfig, int myIndex);
+    void _finishReplSetInitiate(const ReplSetConfig& newConfig, int myIndex);
 
     /**
      * Finishes the work of processReplSetReconfig while holding _topoMutex, in the event of
      * a successful quorum check.
      */
     void _finishReplSetReconfig(const ReplicationExecutor::CallbackArgs& cbData,
-                                const ReplicaSetConfig& newConfig,
+                                const ReplSetConfig& newConfig,
                                 int myIndex);
 
     /**
@@ -944,26 +944,26 @@ private:
     /**
      * Schedules a replica set config change.
      */
-    void _scheduleHeartbeatReconfig(const ReplicaSetConfig& newConfig);
+    void _scheduleHeartbeatReconfig(const ReplSetConfig& newConfig);
 
     /**
      * Callback that continues a heartbeat-initiated reconfig after a running election
      * completes.
      */
     void _heartbeatReconfigAfterElectionCanceled(const ReplicationExecutor::CallbackArgs& cbData,
-                                                 const ReplicaSetConfig& newConfig);
+                                                 const ReplSetConfig& newConfig);
 
     /**
      * Method to write a configuration transmitted via heartbeat message to stable storage.
      */
     void _heartbeatReconfigStore(const ReplicationExecutor::CallbackArgs& cbd,
-                                 const ReplicaSetConfig& newConfig);
+                                 const ReplSetConfig& newConfig);
 
     /**
      * Conclusion actions of a heartbeat-triggered reconfiguration.
      */
     void _heartbeatReconfigFinish(const ReplicationExecutor::CallbackArgs& cbData,
-                                  const ReplicaSetConfig& newConfig,
+                                  const ReplSetConfig& newConfig,
                                   StatusWith<int> myIndex);
 
     /**
@@ -1072,8 +1072,8 @@ private:
      * Resets the term of last vote to 0 to prevent any node from voting for term 0.
      * Returns the event handle that indicates when last vote write finishes.
      */
-    EventHandle _resetElectionInfoOnProtocolVersionUpgrade(const ReplicaSetConfig& oldConfig,
-                                                           const ReplicaSetConfig& newConfig);
+    EventHandle _resetElectionInfoOnProtocolVersionUpgrade(const ReplSetConfig& oldConfig,
+                                                           const ReplSetConfig& newConfig);
 
     /**
      * Schedules work and returns handle to callback.
@@ -1273,7 +1273,7 @@ private:
 
     // The current ReplicaSet configuration object, including the information about tag groups
     // that is used to satisfy write concern requests with named gle modes.
-    ReplicaSetConfig _rsConfig;  // (MX)
+    ReplSetConfig _rsConfig;  // (MX)
 
     // This member's index position in the current config.
     int _selfIndex;  // (MX)

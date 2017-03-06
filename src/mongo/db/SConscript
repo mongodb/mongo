@@ -426,7 +426,7 @@ env.Library(
         "clientlistplugin.cpp",
         "restapi.cpp",
         "stats/snapshots_webplugins.cpp",
-        "repl/replset_web_handler.cpp",
+        "repl/repl_set_web_handler.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/background',

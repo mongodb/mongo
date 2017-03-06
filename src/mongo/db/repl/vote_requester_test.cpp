@@ -57,7 +57,7 @@ bool stringContains(const std::string& haystack, const std::string& needle) {
 class VoteRequesterTest : public mongo::unittest::Test {
 public:
     virtual void setUp() {
-        ReplicaSetConfig config;
+        ReplSetConfig config;
         ASSERT_OK(config.initialize(BSON("_id"
                                          << "rs0"
                                          << "version"
@@ -191,7 +191,7 @@ protected:
 class VoteRequesterDryRunTest : public VoteRequesterTest {
 public:
     virtual void setUp() {
-        ReplicaSetConfig config;
+        ReplSetConfig config;
         ASSERT_OK(config.initialize(BSON("_id"
                                          << "rs0"
                                          << "version"

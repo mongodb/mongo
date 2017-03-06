@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 
 #include <algorithm>
 
@@ -42,17 +42,17 @@
 namespace mongo {
 namespace repl {
 
-const size_t ReplicaSetConfig::kMaxMembers;
-const size_t ReplicaSetConfig::kMaxVotingMembers;
+const size_t ReplSetConfig::kMaxMembers;
+const size_t ReplSetConfig::kMaxVotingMembers;
 
-const std::string ReplicaSetConfig::kConfigServerFieldName = "configsvr";
-const std::string ReplicaSetConfig::kVersionFieldName = "version";
-const std::string ReplicaSetConfig::kMajorityWriteConcernModeName = "$majority";
-const Milliseconds ReplicaSetConfig::kDefaultHeartbeatInterval(2000);
-const Seconds ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
-const Milliseconds ReplicaSetConfig::kDefaultElectionTimeoutPeriod(10000);
-const Milliseconds ReplicaSetConfig::kDefaultCatchUpTimeoutPeriod(2000);
-const bool ReplicaSetConfig::kDefaultChainingAllowed(true);
+const std::string ReplSetConfig::kConfigServerFieldName = "configsvr";
+const std::string ReplSetConfig::kVersionFieldName = "version";
+const std::string ReplSetConfig::kMajorityWriteConcernModeName = "$majority";
+const Milliseconds ReplSetConfig::kDefaultHeartbeatInterval(2000);
+const Seconds ReplSetConfig::kDefaultHeartbeatTimeoutPeriod(10);
+const Milliseconds ReplSetConfig::kDefaultElectionTimeoutPeriod(10000);
+const Milliseconds ReplSetConfig::kDefaultCatchUpTimeoutPeriod(2000);
+const bool ReplSetConfig::kDefaultChainingAllowed(true);
 
 namespace {
 
@@ -65,11 +65,11 @@ const std::string kWriteConcernMajorityJournalDefaultFieldName =
     "writeConcernMajorityJournalDefault";
 
 const std::string kLegalConfigTopFieldNames[] = {kIdFieldName,
-                                                 ReplicaSetConfig::kVersionFieldName,
+                                                 ReplSetConfig::kVersionFieldName,
                                                  kMembersFieldName,
                                                  kSettingsFieldName,
                                                  kProtocolVersionFieldName,
-                                                 ReplicaSetConfig::kConfigServerFieldName,
+                                                 ReplSetConfig::kConfigServerFieldName,
                                                  kWriteConcernMajorityJournalDefaultFieldName};
 
 const std::string kChainingAllowedFieldName = "chainingAllowed";
@@ -83,20 +83,20 @@ const std::string kReplicaSetIdFieldName = "replicaSetId";
 
 }  // namespace
 
-Status ReplicaSetConfig::initialize(const BSONObj& cfg,
-                                    bool usePV1ByDefault,
-                                    OID defaultReplicaSetId) {
+Status ReplSetConfig::initialize(const BSONObj& cfg,
+                                 bool usePV1ByDefault,
+                                 OID defaultReplicaSetId) {
     return _initialize(cfg, false, usePV1ByDefault, defaultReplicaSetId);
 }
 
-Status ReplicaSetConfig::initializeForInitiate(const BSONObj& cfg, bool usePV1ByDefault) {
+Status ReplSetConfig::initializeForInitiate(const BSONObj& cfg, bool usePV1ByDefault) {
     return _initialize(cfg, true, usePV1ByDefault, OID());
 }
 
-Status ReplicaSetConfig::_initialize(const BSONObj& cfg,
-                                     bool forInitiate,
-                                     bool usePV1ByDefault,
-                                     OID defaultReplicaSetId) {
+Status ReplSetConfig::_initialize(const BSONObj& cfg,
+                                  bool forInitiate,
+                                  bool usePV1ByDefault,
+                                  OID defaultReplicaSetId) {
     _isInitialized = false;
     _members.clear();
     Status status =
@@ -219,7 +219,7 @@ Status ReplicaSetConfig::_initialize(const BSONObj& cfg,
     return Status::OK();
 }
 
-Status ReplicaSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
+Status ReplSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
     //
     // Parse heartbeatIntervalMillis
     //
@@ -340,7 +340,7 @@ Status ReplicaSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
                                         << " to be an Object, not "
                                         << typeName(modeElement.type()));
         }
-        ReplicaSetTagPattern pattern = _tagConfig.makePattern();
+        ReplSetTagPattern pattern = _tagConfig.makePattern();
         for (BSONObj::iterator constraintIter(modeElement.Obj()); constraintIter.more();) {
             const BSONElement constraintElement = constraintIter.next();
             if (!constraintElement.isNumber()) {
@@ -391,7 +391,7 @@ Status ReplicaSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
     return Status::OK();
 }
 
-Status ReplicaSetConfig::validate() const {
+Status ReplSetConfig::validate() const {
     if (_version <= 0 || _version > std::numeric_limits<int>::max()) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << kVersionFieldName << " field value of " << _version
@@ -568,21 +568,21 @@ Status ReplicaSetConfig::validate() const {
 
     if (!_connectionString.isValid()) {
         return Status(ErrorCodes::BadValue,
-                      "ReplicaSetConfig represented an invalid replica set ConnectionString");
+                      "ReplSetConfig represented an invalid replica set ConnectionString");
     }
 
     return Status::OK();
 }
 
-Status ReplicaSetConfig::checkIfWriteConcernCanBeSatisfied(
+Status ReplSetConfig::checkIfWriteConcernCanBeSatisfied(
     const WriteConcernOptions& writeConcern) const {
     if (!writeConcern.wMode.empty() && writeConcern.wMode != WriteConcernOptions::kMajority) {
-        StatusWith<ReplicaSetTagPattern> tagPatternStatus = findCustomWriteMode(writeConcern.wMode);
+        StatusWith<ReplSetTagPattern> tagPatternStatus = findCustomWriteMode(writeConcern.wMode);
         if (!tagPatternStatus.isOK()) {
             return tagPatternStatus.getStatus();
         }
 
-        ReplicaSetTagMatch matcher(tagPatternStatus.getValue());
+        ReplSetTagMatch matcher(tagPatternStatus.getValue());
         for (size_t j = 0; j < _members.size(); ++j) {
             const MemberConfig& memberConfig = _members[j];
             for (MemberConfig::TagIterator it = memberConfig.tagsBegin();
@@ -613,12 +613,12 @@ Status ReplicaSetConfig::checkIfWriteConcernCanBeSatisfied(
     }
 }
 
-const MemberConfig& ReplicaSetConfig::getMemberAt(size_t i) const {
+const MemberConfig& ReplSetConfig::getMemberAt(size_t i) const {
     invariant(i < _members.size());
     return _members[i];
 }
 
-const MemberConfig* ReplicaSetConfig::findMemberByID(int id) const {
+const MemberConfig* ReplSetConfig::findMemberByID(int id) const {
     for (std::vector<MemberConfig>::const_iterator it = _members.begin(); it != _members.end();
          ++it) {
         if (it->getId() == id) {
@@ -628,7 +628,7 @@ const MemberConfig* ReplicaSetConfig::findMemberByID(int id) const {
     return NULL;
 }
 
-const int ReplicaSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap) const {
+const int ReplSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap) const {
     int x = 0;
     for (std::vector<MemberConfig>::const_iterator it = _members.begin(); it != _members.end();
          ++it) {
@@ -640,7 +640,7 @@ const int ReplicaSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap)
     return -1;
 }
 
-const int ReplicaSetConfig::findMemberIndexByConfigId(long long configId) const {
+const int ReplSetConfig::findMemberIndexByConfigId(long long configId) const {
     int x = 0;
     for (const auto& member : _members) {
         if (member.getId() == configId) {
@@ -651,39 +651,38 @@ const int ReplicaSetConfig::findMemberIndexByConfigId(long long configId) const 
     return -1;
 }
 
-const MemberConfig* ReplicaSetConfig::findMemberByHostAndPort(const HostAndPort& hap) const {
+const MemberConfig* ReplSetConfig::findMemberByHostAndPort(const HostAndPort& hap) const {
     int idx = findMemberIndexByHostAndPort(hap);
     return idx != -1 ? &getMemberAt(idx) : NULL;
 }
 
-Milliseconds ReplicaSetConfig::getHeartbeatInterval() const {
+Milliseconds ReplSetConfig::getHeartbeatInterval() const {
     return _heartbeatInterval;
 }
 
-bool ReplicaSetConfig::isLocalHostAllowed() const {
-    // It is sufficient to check any one member's hostname, since in ReplicaSetConfig::validate,
+bool ReplSetConfig::isLocalHostAllowed() const {
+    // It is sufficient to check any one member's hostname, since in ReplSetConfig::validate,
     // it's ensured that either all members have hostname localhost or none do.
     return _members.begin()->getHostAndPort().isLocalHost();
 }
 
-ReplicaSetTag ReplicaSetConfig::findTag(StringData key, StringData value) const {
+ReplSetTag ReplSetConfig::findTag(StringData key, StringData value) const {
     return _tagConfig.findTag(key, value);
 }
 
-StatusWith<ReplicaSetTagPattern> ReplicaSetConfig::findCustomWriteMode(
-    StringData patternName) const {
-    const StringMap<ReplicaSetTagPattern>::const_iterator iter =
+StatusWith<ReplSetTagPattern> ReplSetConfig::findCustomWriteMode(StringData patternName) const {
+    const StringMap<ReplSetTagPattern>::const_iterator iter =
         _customWriteConcernModes.find(patternName);
     if (iter == _customWriteConcernModes.end()) {
-        return StatusWith<ReplicaSetTagPattern>(
+        return StatusWith<ReplSetTagPattern>(
             ErrorCodes::UnknownReplWriteConcern,
             str::stream() << "No write concern mode named '" << escape(patternName.toString())
                           << "' found in replica set configuration");
     }
-    return StatusWith<ReplicaSetTagPattern>(iter->second);
+    return StatusWith<ReplSetTagPattern>(iter->second);
 }
 
-void ReplicaSetConfig::_calculateMajorities() {
+void ReplSetConfig::_calculateMajorities() {
     const int voters = std::count_if(_members.begin(),
                                      _members.end(),
                                      stdx::bind(&MemberConfig::isVoter, stdx::placeholders::_1));
@@ -696,10 +695,10 @@ void ReplicaSetConfig::_calculateMajorities() {
     _writeMajority = std::min(_majorityVoteCount, voters - arbiters);
 }
 
-void ReplicaSetConfig::_addInternalWriteConcernModes() {
+void ReplSetConfig::_addInternalWriteConcernModes() {
     // $majority: the majority of voting nodes or all non-arbiter voting nodes if
     // the majority of voting nodes are arbiters.
-    ReplicaSetTagPattern pattern = _tagConfig.makePattern();
+    ReplSetTagPattern pattern = _tagConfig.makePattern();
 
     Status status = _tagConfig.addTagCountConstraintToPattern(
         &pattern, MemberConfig::kInternalVoterTagName, _writeMajority);
@@ -725,7 +724,7 @@ void ReplicaSetConfig::_addInternalWriteConcernModes() {
     }
 }
 
-void ReplicaSetConfig::_initializeConnectionString() {
+void ReplSetConfig::_initializeConnectionString() {
     std::vector<HostAndPort> visibleMembers;
     for (const auto& member : _members) {
         if (!member.isHidden() && !member.isArbiter()) {
@@ -742,7 +741,7 @@ void ReplicaSetConfig::_initializeConnectionString() {
     }
 }
 
-BSONObj ReplicaSetConfig::toBSON() const {
+BSONObj ReplSetConfig::toBSON() const {
     BSONObjBuilder configBuilder;
     configBuilder.append(kIdFieldName, _replSetName);
     configBuilder.appendIntOrLL(kVersionFieldName, _version);
@@ -752,12 +751,12 @@ BSONObj ReplicaSetConfig::toBSON() const {
     }
 
     // Only include writeConcernMajorityJournalDefault if it is not the default version for this
-    // ProtocolVersion to prevent breaking cross version-3.2.1 compatibilty of ReplicaSetConfigs.
+    // ProtocolVersion to prevent breaking cross version-3.2.1 compatibilty of ReplSetConfigs.
     if (_protocolVersion > 0) {
         configBuilder.append(kProtocolVersionFieldName, _protocolVersion);
         // Only include writeConcernMajorityJournalDefault if it is not the default version for this
         // ProtocolVersion to prevent breaking cross version-3.2.1 compatibilty of
-        // ReplicaSetConfigs.
+        // ReplSetConfigs.
         if (!_writeConcernMajorityJournalDefault) {
             configBuilder.append(kWriteConcernMajorityJournalDefaultFieldName,
                                  _writeConcernMajorityJournalDefault);
@@ -786,7 +785,7 @@ BSONObj ReplicaSetConfig::toBSON() const {
 
 
     BSONObjBuilder gleModes(settingsBuilder.subobjStart(kGetLastErrorModesFieldName));
-    for (StringMap<ReplicaSetTagPattern>::const_iterator mode = _customWriteConcernModes.begin();
+    for (StringMap<ReplSetTagPattern>::const_iterator mode = _customWriteConcernModes.begin();
          mode != _customWriteConcernModes.end();
          ++mode) {
         if (mode->first[0] == '$') {
@@ -794,10 +793,10 @@ BSONObj ReplicaSetConfig::toBSON() const {
             continue;
         }
         BSONObjBuilder modeBuilder(gleModes.subobjStart(mode->first));
-        for (ReplicaSetTagPattern::ConstraintIterator itr = mode->second.constraintsBegin();
+        for (ReplSetTagPattern::ConstraintIterator itr = mode->second.constraintsBegin();
              itr != mode->second.constraintsEnd();
              itr++) {
-            modeBuilder.append(_tagConfig.getTagKey(ReplicaSetTag(itr->getKeyIndex(), 0)),
+            modeBuilder.append(_tagConfig.getTagKey(ReplSetTag(itr->getKeyIndex(), 0)),
                                itr->getMinCount());
         }
         modeBuilder.done();
@@ -814,9 +813,9 @@ BSONObj ReplicaSetConfig::toBSON() const {
     return configBuilder.obj();
 }
 
-std::vector<std::string> ReplicaSetConfig::getWriteConcernNames() const {
+std::vector<std::string> ReplSetConfig::getWriteConcernNames() const {
     std::vector<std::string> names;
-    for (StringMap<ReplicaSetTagPattern>::const_iterator mode = _customWriteConcernModes.begin();
+    for (StringMap<ReplSetTagPattern>::const_iterator mode = _customWriteConcernModes.begin();
          mode != _customWriteConcernModes.end();
          ++mode) {
         names.push_back(mode->first);
@@ -824,13 +823,13 @@ std::vector<std::string> ReplicaSetConfig::getWriteConcernNames() const {
     return names;
 }
 
-Milliseconds ReplicaSetConfig::getPriorityTakeoverDelay(int memberIdx) const {
+Milliseconds ReplSetConfig::getPriorityTakeoverDelay(int memberIdx) const {
     auto member = getMemberAt(memberIdx);
     int priorityRank = _calculatePriorityRank(member.getPriority());
     return (priorityRank + 1) * getElectionTimeoutPeriod();
 }
 
-int ReplicaSetConfig::_calculatePriorityRank(double priority) const {
+int ReplSetConfig::_calculatePriorityRank(double priority) const {
     int count = 0;
     for (MemberIterator mem = membersBegin(); mem != membersEnd(); mem++) {
         if (mem->getPriority() > priority) {

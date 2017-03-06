@@ -60,7 +60,7 @@ public:
 
     std::unique_ptr<OplogBuffer> makeSteadyStateOplogBuffer(OperationContext* txn) const override;
 
-    StatusWith<ReplicaSetConfig> getCurrentConfig() const override;
+    StatusWith<ReplSetConfig> getCurrentConfig() const override;
 
     // Task executor. Not owned by us.
     executor::TaskExecutor* taskExecutor = nullptr;
@@ -94,7 +94,7 @@ public:
     MultiInitialSyncApplyFn multiInitialSyncApplyFn = [](
         MultiApplier::OperationPtrs*, const HostAndPort&, AtomicUInt32*) { return Status::OK(); };
 
-    StatusWith<ReplicaSetConfig> replSetConfigResult = ReplicaSetConfig();
+    StatusWith<ReplSetConfig> replSetConfigResult = ReplSetConfig();
 
 private:
     StatusWith<OpTime> _multiApply(OperationContext* txn,

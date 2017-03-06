@@ -120,7 +120,7 @@ protected:
         return makeResponseStatus(response);
     }
 
-    ReplicaSetConfig _config;
+    ReplSetConfig _config;
 
 private:
     // owned by _executor

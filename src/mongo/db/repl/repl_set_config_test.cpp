@@ -32,7 +32,7 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
@@ -42,7 +42,7 @@ namespace repl {
 namespace {
 
 // Creates a bson document reprsenting a replica set config doc with the given members, and votes
-BSONObj createConfigDoc(int members, int voters = ReplicaSetConfig::kMaxVotingMembers) {
+BSONObj createConfigDoc(int members, int voters = ReplSetConfig::kMaxVotingMembers) {
     str::stream configJson;
     configJson << "{_id:'rs0', version:1, members:[";
     for (int i = 0; i < members; ++i) {
@@ -58,8 +58,8 @@ BSONObj createConfigDoc(int members, int voters = ReplicaSetConfig::kMaxVotingMe
     return fromjson(configJson);
 }
 
-TEST(ReplicaSetConfig, ParseMinimalConfigAndCheckDefaults) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseMinimalConfigAndCheckDefaults) {
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
                                      << "version"
@@ -74,11 +74,10 @@ TEST(ReplicaSetConfig, ParseMinimalConfigAndCheckDefaults) {
     ASSERT_EQUALS(0, config.membersBegin()->getId());
     ASSERT_EQUALS(1, config.getDefaultWriteConcern().wNumNodes);
     ASSERT_EQUALS("", config.getDefaultWriteConcern().wMode);
-    ASSERT_EQUALS(ReplicaSetConfig::kDefaultHeartbeatInterval, config.getHeartbeatInterval());
-    ASSERT_EQUALS(ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod,
+    ASSERT_EQUALS(ReplSetConfig::kDefaultHeartbeatInterval, config.getHeartbeatInterval());
+    ASSERT_EQUALS(ReplSetConfig::kDefaultHeartbeatTimeoutPeriod,
                   config.getHeartbeatTimeoutPeriod());
-    ASSERT_EQUALS(ReplicaSetConfig::kDefaultElectionTimeoutPeriod,
-                  config.getElectionTimeoutPeriod());
+    ASSERT_EQUALS(ReplSetConfig::kDefaultElectionTimeoutPeriod, config.getElectionTimeoutPeriod());
     ASSERT_TRUE(config.isChainingAllowed());
     ASSERT_FALSE(config.getWriteConcernMajorityShouldJournal());
     ASSERT_FALSE(config.isConfigServer());
@@ -88,8 +87,8 @@ TEST(ReplicaSetConfig, ParseMinimalConfigAndCheckDefaults) {
         config.getConnectionString().toString());
 }
 
-TEST(ReplicaSetConfig, ParseLargeConfigAndCheckAccessors) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseLargeConfigAndCheckAccessors) {
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
                                      << "version"
@@ -135,8 +134,8 @@ TEST(ReplicaSetConfig, ParseLargeConfigAndCheckAccessors) {
         config.getConnectionString().toString());
 }
 
-TEST(ReplicaSetConfig, GetConnectionStringFiltersHiddenNodes) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, GetConnectionStringFiltersHiddenNodes) {
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
                                      << "version"
@@ -163,8 +162,8 @@ TEST(ReplicaSetConfig, GetConnectionStringFiltersHiddenNodes) {
                   config.getConnectionString().toString());
 }
 
-TEST(ReplicaSetConfig, MajorityCalculationThreeVotersNoArbiters) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, MajorityCalculationThreeVotersNoArbiters) {
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
                                      << "version"
@@ -193,8 +192,8 @@ TEST(ReplicaSetConfig, MajorityCalculationThreeVotersNoArbiters) {
     ASSERT_EQUALS(2, config.getWriteMajority());
 }
 
-TEST(ReplicaSetConfig, MajorityCalculationNearlyHalfArbiters) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, MajorityCalculationNearlyHalfArbiters) {
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "mySet"
                                      << "version"
@@ -228,8 +227,8 @@ TEST(ReplicaSetConfig, MajorityCalculationNearlyHalfArbiters) {
     ASSERT_EQUALS(3, config.getWriteMajority());
 }
 
-TEST(ReplicaSetConfig, MajorityCalculationEvenNumberOfMembers) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, MajorityCalculationEvenNumberOfMembers) {
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "mySet"
                                      << "version"
@@ -255,8 +254,8 @@ TEST(ReplicaSetConfig, MajorityCalculationEvenNumberOfMembers) {
     ASSERT_EQUALS(3, config.getWriteMajority());
 }
 
-TEST(ReplicaSetConfig, MajorityCalculationNearlyHalfSecondariesNoVotes) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, MajorityCalculationNearlyHalfSecondariesNoVotes) {
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "mySet"
                                      << "version"
@@ -294,8 +293,8 @@ TEST(ReplicaSetConfig, MajorityCalculationNearlyHalfSecondariesNoVotes) {
     ASSERT_EQUALS(2, config.getWriteMajority());
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithBadOrMissingIdField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithBadOrMissingIdField) {
+    ReplSetConfig config;
     // Replica set name must be a string.
     ASSERT_EQUALS(ErrorCodes::TypeMismatch,
                   config.initialize(BSON("_id" << 1 << "version" << 1 << "members"
@@ -321,8 +320,8 @@ TEST(ReplicaSetConfig, ParseFailsWithBadOrMissingIdField) {
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithBadOrMissingVersionField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithBadOrMissingVersionField) {
+    ReplSetConfig config;
     // Config version field must be present.
     ASSERT_EQUALS(ErrorCodes::NoSuchKey,
                   config.initialize(BSON("_id"
@@ -365,8 +364,8 @@ TEST(ReplicaSetConfig, ParseFailsWithBadOrMissingVersionField) {
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithBadMembers) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithBadMembers) {
+    ReplSetConfig config;
     ASSERT_EQUALS(ErrorCodes::TypeMismatch,
                   config.initialize(BSON("_id"
                                          << "rs0"
@@ -385,8 +384,8 @@ TEST(ReplicaSetConfig, ParseFailsWithBadMembers) {
                                                             << "localhost:12345")))));
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithLocalNonLocalHostMix) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithLocalNonLocalHostMix) {
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
                                      << "version"
@@ -399,8 +398,8 @@ TEST(ReplicaSetConfig, ParseFailsWithLocalNonLocalHostMix) {
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithNoElectableNodes) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithNoElectableNodes) {
+    ReplSetConfig config;
     const BSONObj configBsonNoElectableNodes = BSON("_id"
                                                     << "rs0"
                                                     << "version"
@@ -471,8 +470,8 @@ TEST(ReplicaSetConfig, ParseFailsWithNoElectableNodes) {
     ASSERT_OK(config.validate());
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithTooFewVoters) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithTooFewVoters) {
+    ReplSetConfig config;
     const BSONObj configBsonNoVoters = BSON("_id"
                                             << "rs0"
                                             << "version"
@@ -513,16 +512,16 @@ TEST(ReplicaSetConfig, ParseFailsWithTooFewVoters) {
     ASSERT_OK(config.validate());
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithTooManyVoters) {
-    ReplicaSetConfig config;
-    ASSERT_OK(config.initialize(createConfigDoc(8, ReplicaSetConfig::kMaxVotingMembers)));
+TEST(ReplSetConfig, ParseFailsWithTooManyVoters) {
+    ReplSetConfig config;
+    ASSERT_OK(config.initialize(createConfigDoc(8, ReplSetConfig::kMaxVotingMembers)));
     ASSERT_OK(config.validate());
-    ASSERT_OK(config.initialize(createConfigDoc(8, ReplicaSetConfig::kMaxVotingMembers + 1)));
+    ASSERT_OK(config.initialize(createConfigDoc(8, ReplSetConfig::kMaxVotingMembers + 1)));
     ASSERT_NOT_OK(config.validate());
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithDuplicateHost) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithDuplicateHost) {
+    ReplSetConfig config;
     const BSONObj configBson = BSON("_id"
                                     << "rs0"
                                     << "version"
@@ -536,8 +535,8 @@ TEST(ReplicaSetConfig, ParseFailsWithDuplicateHost) {
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithTooManyNodes) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithTooManyNodes) {
+    ReplSetConfig config;
     namespace mmb = mutablebson;
     mmb::Document configDoc;
     mmb::Element configDocRoot = configDoc.root();
@@ -545,13 +544,13 @@ TEST(ReplicaSetConfig, ParseFailsWithTooManyNodes) {
     ASSERT_OK(configDocRoot.appendInt("version", 1));
     mmb::Element membersArray = configDoc.makeElementArray("members");
     ASSERT_OK(configDocRoot.pushBack(membersArray));
-    for (size_t i = 0; i < ReplicaSetConfig::kMaxMembers; ++i) {
+    for (size_t i = 0; i < ReplSetConfig::kMaxMembers; ++i) {
         mmb::Element memberElement = configDoc.makeElementObject("");
         ASSERT_OK(membersArray.pushBack(memberElement));
         ASSERT_OK(memberElement.appendInt("_id", i));
         ASSERT_OK(
             memberElement.appendString("host", std::string(str::stream() << "localhost" << i + 1)));
-        if (i >= ReplicaSetConfig::kMaxVotingMembers) {
+        if (i >= ReplSetConfig::kMaxVotingMembers) {
             ASSERT_OK(memberElement.appendInt("votes", 0));
             ASSERT_OK(memberElement.appendInt("priority", 0));
         }
@@ -560,9 +559,9 @@ TEST(ReplicaSetConfig, ParseFailsWithTooManyNodes) {
 
     mmb::Element memberElement = configDoc.makeElementObject("");
     ASSERT_OK(membersArray.pushBack(memberElement));
-    ASSERT_OK(memberElement.appendInt("_id", ReplicaSetConfig::kMaxMembers));
+    ASSERT_OK(memberElement.appendInt("_id", ReplSetConfig::kMaxMembers));
     ASSERT_OK(memberElement.appendString(
-        "host", std::string(str::stream() << "localhost" << ReplicaSetConfig::kMaxMembers + 1)));
+        "host", std::string(str::stream() << "localhost" << ReplSetConfig::kMaxMembers + 1)));
     ASSERT_OK(memberElement.appendInt("votes", 0));
     ASSERT_OK(memberElement.appendInt("priority", 0));
     const BSONObj configBsonTooManyNodes = configDoc.getObject();
@@ -574,8 +573,8 @@ TEST(ReplicaSetConfig, ParseFailsWithTooManyNodes) {
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithUnexpectedField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithUnexpectedField) {
+    ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
                                            << "version"
@@ -585,8 +584,8 @@ TEST(ReplicaSetConfig, ParseFailsWithUnexpectedField) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithNonArrayMembersField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithNonArrayMembersField) {
+    ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
                                            << "version"
@@ -596,8 +595,8 @@ TEST(ReplicaSetConfig, ParseFailsWithNonArrayMembersField) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithNonNumericHeartbeatIntervalMillisField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithNonNumericHeartbeatIntervalMillisField) {
+    ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
                                            << "version"
@@ -613,11 +612,11 @@ TEST(ReplicaSetConfig, ParseFailsWithNonNumericHeartbeatIntervalMillisField) {
     ASSERT_FALSE(config.isInitialized());
 
     // Uninitialized configuration should return default heartbeat interval.
-    ASSERT_EQUALS(ReplicaSetConfig::kDefaultHeartbeatInterval, config.getHeartbeatInterval());
+    ASSERT_EQUALS(ReplSetConfig::kDefaultHeartbeatInterval, config.getHeartbeatInterval());
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithNonNumericElectionTimeoutMillisField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithNonNumericElectionTimeoutMillisField) {
+    ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
                                            << "version"
@@ -631,8 +630,8 @@ TEST(ReplicaSetConfig, ParseFailsWithNonNumericElectionTimeoutMillisField) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithNonNumericHeartbeatTimeoutSecsField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithNonNumericHeartbeatTimeoutSecsField) {
+    ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
                                            << "version"
@@ -646,8 +645,8 @@ TEST(ReplicaSetConfig, ParseFailsWithNonNumericHeartbeatTimeoutSecsField) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithNonBoolChainingAllowedField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithNonBoolChainingAllowedField) {
+    ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
                                            << "version"
@@ -661,8 +660,8 @@ TEST(ReplicaSetConfig, ParseFailsWithNonBoolChainingAllowedField) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithNonBoolConfigServerField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithNonBoolConfigServerField) {
+    ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
                                            << "version"
@@ -675,8 +674,8 @@ TEST(ReplicaSetConfig, ParseFailsWithNonBoolConfigServerField) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithNonObjectSettingsField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithNonObjectSettingsField) {
+    ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
                                            << "version"
@@ -689,8 +688,8 @@ TEST(ReplicaSetConfig, ParseFailsWithNonObjectSettingsField) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithGetLastErrorDefaultsFieldUnparseable) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithGetLastErrorDefaultsFieldUnparseable) {
+    ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
                                            << "version"
@@ -704,8 +703,8 @@ TEST(ReplicaSetConfig, ParseFailsWithGetLastErrorDefaultsFieldUnparseable) {
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithNonObjectGetLastErrorDefaultsField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithNonObjectGetLastErrorDefaultsField) {
+    ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
                                            << "version"
@@ -719,8 +718,8 @@ TEST(ReplicaSetConfig, ParseFailsWithNonObjectGetLastErrorDefaultsField) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithNonObjectGetLastErrorModesField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithNonObjectGetLastErrorModesField) {
+    ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
                                            << "version"
@@ -734,8 +733,8 @@ TEST(ReplicaSetConfig, ParseFailsWithNonObjectGetLastErrorModesField) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithDuplicateGetLastErrorModesField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithDuplicateGetLastErrorModesField) {
+    ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
                                            << "version"
@@ -753,8 +752,8 @@ TEST(ReplicaSetConfig, ParseFailsWithDuplicateGetLastErrorModesField) {
     ASSERT_EQUALS(ErrorCodes::DuplicateKey, status);
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithNonObjectGetLastErrorModesEntryField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithNonObjectGetLastErrorModesEntryField) {
+    ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
                                            << "version"
@@ -770,8 +769,8 @@ TEST(ReplicaSetConfig, ParseFailsWithNonObjectGetLastErrorModesEntryField) {
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithNonNumericGetLastErrorModesConstraintValue) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithNonNumericGetLastErrorModesConstraintValue) {
+    ReplSetConfig config;
     Status status =
         config.initialize(BSON("_id"
                                << "rs0"
@@ -789,8 +788,8 @@ TEST(ReplicaSetConfig, ParseFailsWithNonNumericGetLastErrorModesConstraintValue)
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithNegativeGetLastErrorModesConstraintValue) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithNegativeGetLastErrorModesConstraintValue) {
+    ReplSetConfig config;
     Status status =
         config.initialize(BSON("_id"
                                << "rs0"
@@ -807,8 +806,8 @@ TEST(ReplicaSetConfig, ParseFailsWithNegativeGetLastErrorModesConstraintValue) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(ReplicaSetConfig, ParseFailsWithNonExistentGetLastErrorModesConstraintTag) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ParseFailsWithNonExistentGetLastErrorModesConstraintTag) {
+    ReplSetConfig config;
     Status status =
         config.initialize(BSON("_id"
                                << "rs0"
@@ -825,8 +824,8 @@ TEST(ReplicaSetConfig, ParseFailsWithNonExistentGetLastErrorModesConstraintTag) 
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, status);
 }
 
-TEST(ReplicaSetConfig, ValidateFailsWithBadProtocolVersion) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ValidateFailsWithBadProtocolVersion) {
+    ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
                                            << "protocolVersion"
@@ -844,8 +843,8 @@ TEST(ReplicaSetConfig, ValidateFailsWithBadProtocolVersion) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(ReplicaSetConfig, ValidateFailsWithDuplicateMemberId) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ValidateFailsWithDuplicateMemberId) {
+    ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
                                            << "version"
@@ -861,8 +860,8 @@ TEST(ReplicaSetConfig, ValidateFailsWithDuplicateMemberId) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(ReplicaSetConfig, ValidateFailsWithInvalidMember) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ValidateFailsWithInvalidMember) {
+    ReplSetConfig config;
     Status status = config.initialize(BSON("_id"
                                            << "rs0"
                                            << "version"
@@ -878,8 +877,8 @@ TEST(ReplicaSetConfig, ValidateFailsWithInvalidMember) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
-TEST(ReplicaSetConfig, ChainingAllowedField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ChainingAllowedField) {
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
                                      << "version"
@@ -905,8 +904,8 @@ TEST(ReplicaSetConfig, ChainingAllowedField) {
     ASSERT_FALSE(config.isChainingAllowed());
 }
 
-TEST(ReplicaSetConfig, ConfigServerField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ConfigServerField) {
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
                                      << "protocolVersion"
@@ -920,7 +919,7 @@ TEST(ReplicaSetConfig, ConfigServerField) {
                                                               << "localhost:12345")))));
     ASSERT_TRUE(config.isConfigServer());
 
-    ReplicaSetConfig config2;
+    ReplSetConfig config2;
     ASSERT_OK(config2.initialize(BSON("_id"
                                       << "rs0"
                                       << "version"
@@ -944,10 +943,10 @@ TEST(ReplicaSetConfig, ConfigServerField) {
     ASSERT_OK(config2.validate());
 }
 
-TEST(ReplicaSetConfig, ConfigServerFieldDefaults) {
+TEST(ReplSetConfig, ConfigServerFieldDefaults) {
     serverGlobalParams.clusterRole = ClusterRole::None;
 
-    ReplicaSetConfig config;
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
                                      << "protocolVersion"
@@ -959,7 +958,7 @@ TEST(ReplicaSetConfig, ConfigServerFieldDefaults) {
                                                               << "localhost:12345")))));
     ASSERT_FALSE(config.isConfigServer());
 
-    ReplicaSetConfig config2;
+    ReplSetConfig config2;
     ASSERT_OK(config2.initializeForInitiate(BSON("_id"
                                                  << "rs0"
                                                  << "protocolVersion"
@@ -974,7 +973,7 @@ TEST(ReplicaSetConfig, ConfigServerFieldDefaults) {
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
     ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
 
-    ReplicaSetConfig config3;
+    ReplSetConfig config3;
     ASSERT_OK(config3.initialize(BSON("_id"
                                       << "rs0"
                                       << "protocolVersion"
@@ -986,7 +985,7 @@ TEST(ReplicaSetConfig, ConfigServerFieldDefaults) {
                                                                << "localhost:12345")))));
     ASSERT_FALSE(config3.isConfigServer());
 
-    ReplicaSetConfig config4;
+    ReplSetConfig config4;
     ASSERT_OK(config4.initializeForInitiate(BSON("_id"
                                                  << "rs0"
                                                  << "protocolVersion"
@@ -999,8 +998,8 @@ TEST(ReplicaSetConfig, ConfigServerFieldDefaults) {
     ASSERT_TRUE(config4.isConfigServer());
 }
 
-TEST(ReplicaSetConfig, HeartbeatIntervalField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, HeartbeatIntervalField) {
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
                                      << "version"
@@ -1025,8 +1024,8 @@ TEST(ReplicaSetConfig, HeartbeatIntervalField) {
     ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
 }
 
-TEST(ReplicaSetConfig, ElectionTimeoutField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, ElectionTimeoutField) {
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
                                      << "version"
@@ -1052,8 +1051,8 @@ TEST(ReplicaSetConfig, ElectionTimeoutField) {
     ASSERT_STRING_CONTAINS(status.reason(), "election timeout must be greater than 0");
 }
 
-TEST(ReplicaSetConfig, HeartbeatTimeoutField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, HeartbeatTimeoutField) {
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
                                      << "version"
@@ -1079,8 +1078,8 @@ TEST(ReplicaSetConfig, HeartbeatTimeoutField) {
     ASSERT_STRING_CONTAINS(status.reason(), "heartbeat timeout must be greater than 0");
 }
 
-TEST(ReplicaSetConfig, GleDefaultField) {
-    ReplicaSetConfig config;
+TEST(ReplSetConfig, GleDefaultField) {
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
                                      << "version"
@@ -1152,17 +1151,17 @@ bool operator==(const MemberConfig& a, const MemberConfig& b) {
         a.getNumTags() == b.getNumTags();
 }
 
-bool operator==(const ReplicaSetConfig& a, const ReplicaSetConfig& b) {
+bool operator==(const ReplSetConfig& a, const ReplSetConfig& b) {
     // compare WriteConcernModes
     std::vector<std::string> modeNames = a.getWriteConcernNames();
     for (std::vector<std::string>::iterator it = modeNames.begin(); it != modeNames.end(); it++) {
-        ReplicaSetTagPattern patternA = a.findCustomWriteMode(*it).getValue();
-        ReplicaSetTagPattern patternB = b.findCustomWriteMode(*it).getValue();
-        for (ReplicaSetTagPattern::ConstraintIterator itrA = patternA.constraintsBegin();
+        ReplSetTagPattern patternA = a.findCustomWriteMode(*it).getValue();
+        ReplSetTagPattern patternB = b.findCustomWriteMode(*it).getValue();
+        for (ReplSetTagPattern::ConstraintIterator itrA = patternA.constraintsBegin();
              itrA != patternA.constraintsEnd();
              itrA++) {
             bool same = false;
-            for (ReplicaSetTagPattern::ConstraintIterator itrB = patternB.constraintsBegin();
+            for (ReplSetTagPattern::ConstraintIterator itrB = patternB.constraintsBegin();
                  itrB != patternB.constraintsEnd();
                  itrB++) {
                 if (itrA->getKeyIndex() == itrB->getKeyIndex() &&
@@ -1178,9 +1177,9 @@ bool operator==(const ReplicaSetConfig& a, const ReplicaSetConfig& b) {
     }
 
     // compare the members
-    for (ReplicaSetConfig::MemberIterator memA = a.membersBegin(); memA != a.membersEnd(); memA++) {
+    for (ReplSetConfig::MemberIterator memA = a.membersBegin(); memA != a.membersEnd(); memA++) {
         bool same = false;
-        for (ReplicaSetConfig::MemberIterator memB = b.membersBegin(); memB != b.membersEnd();
+        for (ReplSetConfig::MemberIterator memB = b.membersBegin(); memB != b.membersEnd();
              memB++) {
             if (*memA == *memB) {
                 same = true;
@@ -1206,9 +1205,9 @@ bool operator==(const ReplicaSetConfig& a, const ReplicaSetConfig& b) {
         a.getReplicaSetId() == b.getReplicaSetId();
 }
 
-TEST(ReplicaSetConfig, toBSONRoundTripAbility) {
-    ReplicaSetConfig configA;
-    ReplicaSetConfig configB;
+TEST(ReplSetConfig, toBSONRoundTripAbility) {
+    ReplSetConfig configA;
+    ReplSetConfig configB;
     ASSERT_OK(configA.initialize(BSON(
         "_id"
         << "rs0"
@@ -1224,9 +1223,9 @@ TEST(ReplicaSetConfig, toBSONRoundTripAbility) {
     ASSERT_TRUE(configA == configB);
 }
 
-TEST(ReplicaSetConfig, toBSONRoundTripAbilityLarge) {
-    ReplicaSetConfig configA;
-    ReplicaSetConfig configB;
+TEST(ReplSetConfig, toBSONRoundTripAbilityLarge) {
+    ReplSetConfig configA;
+    ReplSetConfig configB;
     ASSERT_OK(configA.initialize(
         BSON("_id"
              << "asdf"
@@ -1294,9 +1293,9 @@ TEST(ReplicaSetConfig, toBSONRoundTripAbilityLarge) {
     ASSERT_TRUE(configA == configB);
 }
 
-TEST(ReplicaSetConfig, toBSONRoundTripAbilityInvalid) {
-    ReplicaSetConfig configA;
-    ReplicaSetConfig configB;
+TEST(ReplSetConfig, toBSONRoundTripAbilityInvalid) {
+    ReplSetConfig configA;
+    ReplSetConfig configB;
     ASSERT_OK(
         configA.initialize(BSON("_id"
                                 << ""
@@ -1336,8 +1335,8 @@ TEST(ReplicaSetConfig, toBSONRoundTripAbilityInvalid) {
     ASSERT_TRUE(configA == configB);
 }
 
-TEST(ReplicaSetConfig, CheckIfWriteConcernCanBeSatisfied) {
-    ReplicaSetConfig configA;
+TEST(ReplSetConfig, CheckIfWriteConcernCanBeSatisfied) {
+    ReplSetConfig configA;
     ASSERT_OK(configA.initialize(BSON("_id"
                                       << "rs0"
                                       << "version"
@@ -1423,9 +1422,9 @@ TEST(ReplicaSetConfig, CheckIfWriteConcernCanBeSatisfied) {
                   configA.checkIfWriteConcernCanBeSatisfied(invalidModeNotEnoughNodesWC));
 }
 
-TEST(ReplicaSetConfig, CheckMaximumNodesOkay) {
-    ReplicaSetConfig configA;
-    ReplicaSetConfig configB;
+TEST(ReplSetConfig, CheckMaximumNodesOkay) {
+    ReplSetConfig configA;
+    ReplSetConfig configB;
     const int memberCount = 50;
     ASSERT_OK(configA.initialize(createConfigDoc(memberCount)));
     ASSERT_OK(configB.initialize(configA.toBSON()));
@@ -1434,9 +1433,9 @@ TEST(ReplicaSetConfig, CheckMaximumNodesOkay) {
     ASSERT_TRUE(configA == configB);
 }
 
-TEST(ReplicaSetConfig, CheckBeyondMaximumNodesFailsValidate) {
-    ReplicaSetConfig configA;
-    ReplicaSetConfig configB;
+TEST(ReplSetConfig, CheckBeyondMaximumNodesFailsValidate) {
+    ReplSetConfig configA;
+    ReplSetConfig configB;
     const int memberCount = 51;
     ASSERT_OK(configA.initialize(createConfigDoc(memberCount)));
     ASSERT_OK(configB.initialize(configA.toBSON()));
@@ -1445,8 +1444,8 @@ TEST(ReplicaSetConfig, CheckBeyondMaximumNodesFailsValidate) {
     ASSERT_TRUE(configA == configB);
 }
 
-TEST(ReplicaSetConfig, CheckConfigServerCantBeProtocolVersion0) {
-    ReplicaSetConfig configA;
+TEST(ReplSetConfig, CheckConfigServerCantBeProtocolVersion0) {
+    ReplSetConfig configA;
     ASSERT_OK(configA.initialize(BSON("_id"
                                       << "rs0"
                                       << "protocolVersion"
@@ -1467,8 +1466,8 @@ TEST(ReplicaSetConfig, CheckConfigServerCantBeProtocolVersion0) {
     ASSERT_STRING_CONTAINS(status.reason(), "cannot run in protocolVersion 0");
 }
 
-TEST(ReplicaSetConfig, CheckConfigServerCantHaveArbiters) {
-    ReplicaSetConfig configA;
+TEST(ReplSetConfig, CheckConfigServerCantHaveArbiters) {
+    ReplSetConfig configA;
     ASSERT_OK(configA.initialize(BSON("_id"
                                       << "rs0"
                                       << "protocolVersion"
@@ -1489,8 +1488,8 @@ TEST(ReplicaSetConfig, CheckConfigServerCantHaveArbiters) {
     ASSERT_STRING_CONTAINS(status.reason(), "Arbiters are not allowed");
 }
 
-TEST(ReplicaSetConfig, CheckConfigServerMustBuildIndexes) {
-    ReplicaSetConfig configA;
+TEST(ReplSetConfig, CheckConfigServerMustBuildIndexes) {
+    ReplSetConfig configA;
     ASSERT_OK(configA.initialize(BSON("_id"
                                       << "rs0"
                                       << "protocolVersion"
@@ -1513,8 +1512,8 @@ TEST(ReplicaSetConfig, CheckConfigServerMustBuildIndexes) {
     ASSERT_STRING_CONTAINS(status.reason(), "must build indexes");
 }
 
-TEST(ReplicaSetConfig, CheckConfigServerCantHaveSlaveDelay) {
-    ReplicaSetConfig configA;
+TEST(ReplSetConfig, CheckConfigServerCantHaveSlaveDelay) {
+    ReplSetConfig configA;
     ASSERT_OK(configA.initialize(BSON("_id"
                                       << "rs0"
                                       << "protocolVersion"
@@ -1537,10 +1536,10 @@ TEST(ReplicaSetConfig, CheckConfigServerCantHaveSlaveDelay) {
     ASSERT_STRING_CONTAINS(status.reason(), "cannot have a non-zero slaveDelay");
 }
 
-TEST(ReplicaSetConfig, CheckConfigServerMustHaveTrueForWriteConcernMajorityJournalDefault) {
+TEST(ReplSetConfig, CheckConfigServerMustHaveTrueForWriteConcernMajorityJournalDefault) {
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
     ON_BLOCK_EXIT([&] { serverGlobalParams.clusterRole = ClusterRole::None; });
-    ReplicaSetConfig configA;
+    ReplSetConfig configA;
     ASSERT_OK(configA.initialize(BSON("_id"
                                       << "rs0"
                                       << "protocolVersion"
@@ -1561,8 +1560,8 @@ TEST(ReplicaSetConfig, CheckConfigServerMustHaveTrueForWriteConcernMajorityJourn
     ASSERT_STRING_CONTAINS(status.reason(), " must be true in replica set configurations being ");
 }
 
-TEST(ReplicaSetConfig, GetPriorityTakeoverDelay) {
-    ReplicaSetConfig configA;
+TEST(ReplSetConfig, GetPriorityTakeoverDelay) {
+    ReplSetConfig configA;
     ASSERT_OK(configA.initialize(BSON("_id"
                                       << "rs0"
                                       << "version"
@@ -1597,7 +1596,7 @@ TEST(ReplicaSetConfig, GetPriorityTakeoverDelay) {
     ASSERT_EQUALS(Milliseconds(2000), configA.getPriorityTakeoverDelay(3));
     ASSERT_EQUALS(Milliseconds(1000), configA.getPriorityTakeoverDelay(4));
 
-    ReplicaSetConfig configB;
+    ReplSetConfig configB;
     ASSERT_OK(configB.initialize(BSON("_id"
                                       << "rs0"
                                       << "version"
@@ -1633,9 +1632,9 @@ TEST(ReplicaSetConfig, GetPriorityTakeoverDelay) {
     ASSERT_EQUALS(Milliseconds(1000), configB.getPriorityTakeoverDelay(4));
 }
 
-TEST(ReplicaSetConfig, ConfirmDefaultValuesOfAndAbilityToSetWriteConcernMajorityJournalDefault) {
+TEST(ReplSetConfig, ConfirmDefaultValuesOfAndAbilityToSetWriteConcernMajorityJournalDefault) {
     // PV0, should default to false.
-    ReplicaSetConfig config;
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(BSON("_id"
                                      << "rs0"
                                      << "version"
@@ -1692,24 +1691,24 @@ TEST(ReplicaSetConfig, ConfirmDefaultValuesOfAndAbilityToSetWriteConcernMajority
     ASSERT_TRUE(config.toBSON().hasField("writeConcernMajorityJournalDefault"));
 }
 
-TEST(ReplicaSetConfig, ReplSetId) {
+TEST(ReplSetConfig, ReplSetId) {
     // Uninitialized configuration has no ID.
-    ASSERT_FALSE(ReplicaSetConfig().hasReplicaSetId());
+    ASSERT_FALSE(ReplSetConfig().hasReplicaSetId());
 
     // Cannot provide replica set ID in configuration document when initialized from
     // replSetInitiate.
     auto status =
-        ReplicaSetConfig().initializeForInitiate(BSON("_id"
-                                                      << "rs0"
-                                                      << "version"
-                                                      << 1
-                                                      << "members"
-                                                      << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                               << "localhost:12345"
-                                                                               << "priority"
-                                                                               << 1))
-                                                      << "settings"
-                                                      << BSON("replicaSetId" << OID::gen())));
+        ReplSetConfig().initializeForInitiate(BSON("_id"
+                                                   << "rs0"
+                                                   << "version"
+                                                   << 1
+                                                   << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                                            << "localhost:12345"
+                                                                            << "priority"
+                                                                            << 1))
+                                                   << "settings"
+                                                   << BSON("replicaSetId" << OID::gen())));
     ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig, status);
     ASSERT_STRING_CONTAINS(status.reason(),
                            "replica set configuration cannot contain 'replicaSetId' field when "
@@ -1717,7 +1716,7 @@ TEST(ReplicaSetConfig, ReplSetId) {
 
 
     // Configuration created by replSetInitiate should generate replica set ID.
-    ReplicaSetConfig configInitiate;
+    ReplSetConfig configInitiate;
     ASSERT_OK(
         configInitiate.initializeForInitiate(BSON("_id"
                                                   << "rs0"
@@ -1733,7 +1732,7 @@ TEST(ReplicaSetConfig, ReplSetId) {
     OID replicaSetId = configInitiate.getReplicaSetId();
 
     // Configuration initialized from local database can contain ID.
-    ReplicaSetConfig configLocal;
+    ReplSetConfig configLocal;
     ASSERT_OK(configLocal.initialize(BSON("_id"
                                           << "rs0"
                                           << "version"

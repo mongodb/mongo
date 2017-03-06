@@ -56,7 +56,7 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 // kMajority implies JOURNAL if journaling is
                                                 // supported by mongod and
                                                 // writeConcernMajorityJournalDefault is set to true
-                                                // in the ReplicaSetConfig.
+                                                // in the ReplSetConfig.
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 Seconds(15));
 

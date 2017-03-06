@@ -90,7 +90,7 @@ std::unique_ptr<OplogBuffer> DataReplicatorExternalStateMock::makeSteadyStateOpl
     return stdx::make_unique<OplogBufferBlockingQueue>();
 }
 
-StatusWith<ReplicaSetConfig> DataReplicatorExternalStateMock::getCurrentConfig() const {
+StatusWith<ReplSetConfig> DataReplicatorExternalStateMock::getCurrentConfig() const {
     return replSetConfigResult;
 }
 

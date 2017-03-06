@@ -28,11 +28,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/replica_set_config_checks.h"
+#include "mongo/db/repl/repl_set_config_checks.h"
 
 #include <iterator>
 
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/mongoutils/str.h"
@@ -49,10 +49,10 @@ namespace {
  * "newConfig".
  */
 StatusWith<int> findSelfInConfig(ReplicationCoordinatorExternalState* externalState,
-                                 const ReplicaSetConfig& newConfig,
+                                 const ReplSetConfig& newConfig,
                                  ServiceContext* ctx) {
-    std::vector<ReplicaSetConfig::MemberIterator> meConfigs;
-    for (ReplicaSetConfig::MemberIterator iter = newConfig.membersBegin();
+    std::vector<ReplSetConfig::MemberIterator> meConfigs;
+    for (ReplSetConfig::MemberIterator iter = newConfig.membersBegin();
          iter != newConfig.membersEnd();
          ++iter) {
         if (externalState->isSelf(iter->getHostAndPort(), ctx)) {
@@ -89,7 +89,7 @@ StatusWith<int> findSelfInConfig(ReplicationCoordinatorExternalState* externalSt
  * Checks if the node with the given config index is electable, returning a useful
  * status message if not.
  */
-Status checkElectable(const ReplicaSetConfig& newConfig, int configIndex) {
+Status checkElectable(const ReplSetConfig& newConfig, int configIndex) {
     const MemberConfig& myConfig = newConfig.getMemberAt(configIndex);
     if (!myConfig.isElectable()) {
         return Status(ErrorCodes::NodeNotElectable,
@@ -110,7 +110,7 @@ Status checkElectable(const ReplicaSetConfig& newConfig, int configIndex) {
  * reconfig or initiate commands.
  */
 StatusWith<int> findSelfInConfigIfElectable(ReplicationCoordinatorExternalState* externalState,
-                                            const ReplicaSetConfig& newConfig,
+                                            const ReplSetConfig& newConfig,
                                             ServiceContext* ctx) {
     StatusWith<int> result = findSelfInConfig(externalState, newConfig, ctx);
     if (result.isOK()) {
@@ -126,8 +126,8 @@ StatusWith<int> findSelfInConfigIfElectable(ReplicationCoordinatorExternalState*
  * Checks that the priorities of all the arbiters in the configuration are 0.  If they were 1,
  * they should have been set to 0 in MemberConfig::initialize().  Otherwise, they are illegal.
  */
-Status validateArbiterPriorities(const ReplicaSetConfig& config) {
-    for (ReplicaSetConfig::MemberIterator iter = config.membersBegin(); iter != config.membersEnd();
+Status validateArbiterPriorities(const ReplSetConfig& config) {
+    for (ReplSetConfig::MemberIterator iter = config.membersBegin(); iter != config.membersEnd();
          ++iter) {
         if (iter->isArbiter() && iter->getPriority() != 0) {
             return Status(ErrorCodes::InvalidReplicaSetConfig,
@@ -154,8 +154,8 @@ Status validateArbiterPriorities(const ReplicaSetConfig& config) {
  * require knowledge of which node is executing the configuration are out of scope
  * for this function.
  */
-Status validateOldAndNewConfigsCompatible(const ReplicaSetConfig& oldConfig,
-                                          const ReplicaSetConfig& newConfig) {
+Status validateOldAndNewConfigsCompatible(const ReplSetConfig& oldConfig,
+                                          const ReplSetConfig& newConfig) {
     invariant(newConfig.isInitialized());
     invariant(oldConfig.isInitialized());
 
@@ -190,8 +190,7 @@ Status validateOldAndNewConfigsCompatible(const ReplicaSetConfig& oldConfig,
 
     if (oldConfig.isConfigServer() && !newConfig.isConfigServer()) {
         return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                      str::stream() << "Cannot remove \""
-                                    << ReplicaSetConfig::kConfigServerFieldName
+                      str::stream() << "Cannot remove \"" << ReplSetConfig::kConfigServerFieldName
                                     << "\" from replica set configuration on reconfig");
     }
 
@@ -203,10 +202,10 @@ Status validateOldAndNewConfigsCompatible(const ReplicaSetConfig& oldConfig,
     // Also, one may not use reconfig to change the value of the buildIndexes or
     // arbiterOnly flags.
     //
-    for (ReplicaSetConfig::MemberIterator mNew = newConfig.membersBegin();
+    for (ReplSetConfig::MemberIterator mNew = newConfig.membersBegin();
          mNew != newConfig.membersEnd();
          ++mNew) {
-        for (ReplicaSetConfig::MemberIterator mOld = oldConfig.membersBegin();
+        for (ReplSetConfig::MemberIterator mOld = oldConfig.membersBegin();
              mOld != oldConfig.membersEnd();
              ++mOld) {
             const bool idsEqual = mOld->getId() == mNew->getId();
@@ -257,8 +256,8 @@ Status validateOldAndNewConfigsCompatible(const ReplicaSetConfig& oldConfig,
 }  // namespace
 
 StatusWith<int> validateConfigForStartUp(ReplicationCoordinatorExternalState* externalState,
-                                         const ReplicaSetConfig& oldConfig,
-                                         const ReplicaSetConfig& newConfig,
+                                         const ReplSetConfig& oldConfig,
+                                         const ReplSetConfig& newConfig,
                                          ServiceContext* ctx) {
     Status status = newConfig.validate();
     if (!status.isOK()) {
@@ -274,7 +273,7 @@ StatusWith<int> validateConfigForStartUp(ReplicationCoordinatorExternalState* ex
 }
 
 StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* externalState,
-                                          const ReplicaSetConfig& newConfig,
+                                          const ReplSetConfig& newConfig,
                                           ServiceContext* ctx) {
     Status status = newConfig.validate();
     if (!status.isOK()) {
@@ -304,8 +303,8 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
 }
 
 StatusWith<int> validateConfigForReconfig(ReplicationCoordinatorExternalState* externalState,
-                                          const ReplicaSetConfig& oldConfig,
-                                          const ReplicaSetConfig& newConfig,
+                                          const ReplSetConfig& oldConfig,
+                                          const ReplSetConfig& newConfig,
                                           ServiceContext* ctx,
                                           bool force) {
     Status status = newConfig.validate();
@@ -340,7 +339,7 @@ StatusWith<int> validateConfigForReconfig(ReplicationCoordinatorExternalState* e
 
 StatusWith<int> validateConfigForHeartbeatReconfig(
     ReplicationCoordinatorExternalState* externalState,
-    const ReplicaSetConfig& newConfig,
+    const ReplSetConfig& newConfig,
     ServiceContext* ctx) {
     Status status = newConfig.validate();
     if (!status.isOK()) {

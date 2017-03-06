@@ -44,11 +44,11 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
@@ -4349,7 +4349,7 @@ TEST_F(ReplCoordTest,
 
     // Respond to node1's heartbeat command with a config that excludes node1.
     ReplSetHeartbeatResponse hbResp;
-    ReplicaSetConfig config;
+    ReplSetConfig config;
     config.initialize(BSON("_id"
                            << "mySet"
                            << "protocolVersion"

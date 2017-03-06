@@ -32,7 +32,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/freshness_checker.h"
 #include "mongo/db/repl/member_heartbeat_data.h"
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/platform/unordered_set.h"
@@ -60,7 +60,7 @@ bool stringContains(const std::string& haystack, const std::string& needle) {
 class FreshnessCheckerTest : public mongo::unittest::Test {
 protected:
     void startTest(const Timestamp& lastOpTimeApplied,
-                   const ReplicaSetConfig& currentConfig,
+                   const ReplSetConfig& currentConfig,
                    int selfIndex,
                    const std::vector<HostAndPort>& hosts);
     void waitOnChecker();
@@ -79,7 +79,7 @@ protected:
 private:
     void freshnessCheckerRunner(const ReplicationExecutor::CallbackArgs& data,
                                 const Timestamp& lastOpTimeApplied,
-                                const ReplicaSetConfig& currentConfig,
+                                const ReplSetConfig& currentConfig,
                                 int selfIndex,
                                 const std::vector<HostAndPort>& hosts);
     void setUp();
@@ -110,14 +110,14 @@ FreshnessChecker::ElectionAbortReason FreshnessCheckerTest::shouldAbortElection(
     return _checker->shouldAbortElection();
 }
 
-ReplicaSetConfig assertMakeRSConfig(const BSONObj& configBson) {
-    ReplicaSetConfig config;
+ReplSetConfig assertMakeRSConfig(const BSONObj& configBson) {
+    ReplSetConfig config;
     ASSERT_OK(config.initialize(configBson));
     ASSERT_OK(config.validate());
     return config;
 }
 
-const BSONObj makeFreshRequest(const ReplicaSetConfig& rsConfig,
+const BSONObj makeFreshRequest(const ReplSetConfig& rsConfig,
                                Timestamp lastOpTimeApplied,
                                int selfIndex) {
     const MemberConfig& myConfig = rsConfig.getMemberAt(selfIndex);
@@ -135,7 +135,7 @@ const BSONObj makeFreshRequest(const ReplicaSetConfig& rsConfig,
 // for correct concurrency operation.
 void FreshnessCheckerTest::freshnessCheckerRunner(const ReplicationExecutor::CallbackArgs& data,
                                                   const Timestamp& lastOpTimeApplied,
-                                                  const ReplicaSetConfig& currentConfig,
+                                                  const ReplSetConfig& currentConfig,
                                                   int selfIndex,
                                                   const std::vector<HostAndPort>& hosts) {
     invariant(data.status.isOK());
@@ -147,7 +147,7 @@ void FreshnessCheckerTest::freshnessCheckerRunner(const ReplicationExecutor::Cal
 }
 
 void FreshnessCheckerTest::startTest(const Timestamp& lastOpTimeApplied,
-                                     const ReplicaSetConfig& currentConfig,
+                                     const ReplSetConfig& currentConfig,
                                      int selfIndex,
                                      const std::vector<HostAndPort>& hosts) {
     _executor->wait(
@@ -162,15 +162,15 @@ void FreshnessCheckerTest::startTest(const Timestamp& lastOpTimeApplied,
 
 TEST_F(FreshnessCheckerTest, TwoNodes) {
     // Two nodes, we are node h1.  We are freshest, but we tie with h2.
-    ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
-                                                      << "rs0"
-                                                      << "version"
-                                                      << 1
-                                                      << "members"
-                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                               << "h0")
-                                                                    << BSON("_id" << 2 << "host"
-                                                                                  << "h1"))));
+    ReplSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                   << "rs0"
+                                                   << "version"
+                                                   << 1
+                                                   << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                            << "h0")
+                                                                 << BSON("_id" << 2 << "host"
+                                                                               << "h1"))));
 
     std::vector<HostAndPort> hosts;
     hosts.push_back(config.getMemberAt(1).getHostAndPort());
@@ -207,15 +207,15 @@ TEST_F(FreshnessCheckerTest, TwoNodes) {
 
 TEST_F(FreshnessCheckerTest, ShuttingDown) {
     // Two nodes, we are node h1.  Shutdown happens while we're scheduling remote commands.
-    ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
-                                                      << "rs0"
-                                                      << "version"
-                                                      << 1
-                                                      << "members"
-                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                               << "h0")
-                                                                    << BSON("_id" << 2 << "host"
-                                                                                  << "h1"))));
+    ReplSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                   << "rs0"
+                                                   << "version"
+                                                   << 1
+                                                   << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                            << "h0")
+                                                                 << BSON("_id" << 2 << "host"
+                                                                               << "h1"))));
 
     std::vector<HostAndPort> hosts;
     hosts.push_back(config.getMemberAt(1).getHostAndPort());
@@ -232,15 +232,15 @@ TEST_F(FreshnessCheckerTest, ShuttingDown) {
 TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshest) {
     // other responds as fresher than us
     startCapturingLogMessages();
-    ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
-                                                      << "rs0"
-                                                      << "version"
-                                                      << 1
-                                                      << "members"
-                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                               << "h0")
-                                                                    << BSON("_id" << 2 << "host"
-                                                                                  << "h1"))));
+    ReplSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                   << "rs0"
+                                                   << "version"
+                                                   << 1
+                                                   << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                            << "h0")
+                                                                 << BSON("_id" << 2 << "host"
+                                                                               << "h1"))));
 
     std::vector<HostAndPort> hosts;
     hosts.push_back(config.getMemberAt(1).getHostAndPort());
@@ -285,15 +285,15 @@ TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshest) {
 TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshestOpTime) {
     // other responds with a later optime than ours
     startCapturingLogMessages();
-    ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
-                                                      << "rs0"
-                                                      << "version"
-                                                      << 1
-                                                      << "members"
-                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                               << "h0")
-                                                                    << BSON("_id" << 2 << "host"
-                                                                                  << "h1"))));
+    ReplSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                   << "rs0"
+                                                   << "version"
+                                                   << 1
+                                                   << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                            << "h0")
+                                                                 << BSON("_id" << 2 << "host"
+                                                                               << "h1"))));
 
     std::vector<HostAndPort> hosts;
     hosts.push_back(config.getMemberAt(1).getHostAndPort());
@@ -335,15 +335,15 @@ TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshestOpTime) {
 TEST_F(FreshnessCheckerTest, ElectWrongTypeInFreshnessResponse) {
     // other responds with "opTime" field of non-Date value, causing not freshest
     startCapturingLogMessages();
-    ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
-                                                      << "rs0"
-                                                      << "version"
-                                                      << 1
-                                                      << "members"
-                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                               << "h0")
-                                                                    << BSON("_id" << 2 << "host"
-                                                                                  << "h1"))));
+    ReplSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                   << "rs0"
+                                                   << "version"
+                                                   << 1
+                                                   << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                            << "h0")
+                                                                 << BSON("_id" << 2 << "host"
+                                                                               << "h1"))));
 
     std::vector<HostAndPort> hosts;
     hosts.push_back(config.getMemberAt(1).getHostAndPort());
@@ -388,15 +388,15 @@ TEST_F(FreshnessCheckerTest, ElectWrongTypeInFreshnessResponse) {
 TEST_F(FreshnessCheckerTest, ElectVetoed) {
     // other responds with veto
     startCapturingLogMessages();
-    ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
-                                                      << "rs0"
-                                                      << "version"
-                                                      << 1
-                                                      << "members"
-                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                               << "h0")
-                                                                    << BSON("_id" << 2 << "host"
-                                                                                  << "h1"))));
+    ReplSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                   << "rs0"
+                                                   << "version"
+                                                   << 1
+                                                   << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                            << "h0")
+                                                                 << BSON("_id" << 2 << "host"
+                                                                               << "h1"))));
 
     std::vector<HostAndPort> hosts;
     hosts.push_back(config.getMemberAt(1).getHostAndPort());
@@ -443,7 +443,7 @@ TEST_F(FreshnessCheckerTest, ElectVetoed) {
                                           "'I'd rather you didn't'"));
 }
 
-int findIdForMember(const ReplicaSetConfig& rsConfig, const HostAndPort& host) {
+int findIdForMember(const ReplSetConfig& rsConfig, const HostAndPort& host) {
     const MemberConfig* member = rsConfig.findMemberByHostAndPort(host);
     ASSERT_TRUE(member != NULL) << "No host named " << host.toString() << " in config";
     return member->getId();
@@ -452,24 +452,24 @@ int findIdForMember(const ReplicaSetConfig& rsConfig, const HostAndPort& host) {
 TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshestManyNodes) {
     // one other responds as fresher than us
     startCapturingLogMessages();
-    ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
-                                                      << "rs0"
-                                                      << "version"
-                                                      << 1
-                                                      << "members"
-                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                               << "h0")
-                                                                    << BSON("_id" << 2 << "host"
-                                                                                  << "h1")
-                                                                    << BSON("_id" << 3 << "host"
-                                                                                  << "h2")
-                                                                    << BSON("_id" << 4 << "host"
-                                                                                  << "h3")
-                                                                    << BSON("_id" << 5 << "host"
-                                                                                  << "h4"))));
+    ReplSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                   << "rs0"
+                                                   << "version"
+                                                   << 1
+                                                   << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                            << "h0")
+                                                                 << BSON("_id" << 2 << "host"
+                                                                               << "h1")
+                                                                 << BSON("_id" << 3 << "host"
+                                                                               << "h2")
+                                                                 << BSON("_id" << 4 << "host"
+                                                                               << "h3")
+                                                                 << BSON("_id" << 5 << "host"
+                                                                               << "h4"))));
 
     std::vector<HostAndPort> hosts;
-    for (ReplicaSetConfig::MemberIterator mem = ++config.membersBegin(); mem != config.membersEnd();
+    for (ReplSetConfig::MemberIterator mem = ++config.membersBegin(); mem != config.membersEnd();
          ++mem) {
         hosts.push_back(mem->getHostAndPort());
     }
@@ -512,24 +512,24 @@ TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshestManyNodes) {
 TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshestOpTimeManyNodes) {
     // one other responds with a later optime than ours
     startCapturingLogMessages();
-    ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
-                                                      << "rs0"
-                                                      << "version"
-                                                      << 1
-                                                      << "members"
-                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                               << "h0")
-                                                                    << BSON("_id" << 2 << "host"
-                                                                                  << "h1")
-                                                                    << BSON("_id" << 3 << "host"
-                                                                                  << "h2")
-                                                                    << BSON("_id" << 4 << "host"
-                                                                                  << "h3")
-                                                                    << BSON("_id" << 5 << "host"
-                                                                                  << "h4"))));
+    ReplSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                   << "rs0"
+                                                   << "version"
+                                                   << 1
+                                                   << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                            << "h0")
+                                                                 << BSON("_id" << 2 << "host"
+                                                                               << "h1")
+                                                                 << BSON("_id" << 3 << "host"
+                                                                               << "h2")
+                                                                 << BSON("_id" << 4 << "host"
+                                                                               << "h3")
+                                                                 << BSON("_id" << 5 << "host"
+                                                                               << "h4"))));
 
     std::vector<HostAndPort> hosts;
-    for (ReplicaSetConfig::MemberIterator mem = config.membersBegin(); mem != config.membersEnd();
+    for (ReplSetConfig::MemberIterator mem = config.membersBegin(); mem != config.membersEnd();
          ++mem) {
         if (HostAndPort("h0") == mem->getHostAndPort()) {
             continue;
@@ -585,24 +585,24 @@ TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshestOpTimeManyNodes
 TEST_F(FreshnessCheckerTest, ElectWrongTypeInFreshnessResponseManyNodes) {
     // one other responds with "opTime" field of non-Date value, causing not freshest
     startCapturingLogMessages();
-    ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
-                                                      << "rs0"
-                                                      << "version"
-                                                      << 1
-                                                      << "members"
-                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                               << "h0")
-                                                                    << BSON("_id" << 2 << "host"
-                                                                                  << "h1")
-                                                                    << BSON("_id" << 3 << "host"
-                                                                                  << "h2")
-                                                                    << BSON("_id" << 4 << "host"
-                                                                                  << "h3")
-                                                                    << BSON("_id" << 5 << "host"
-                                                                                  << "h4"))));
+    ReplSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                   << "rs0"
+                                                   << "version"
+                                                   << 1
+                                                   << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                            << "h0")
+                                                                 << BSON("_id" << 2 << "host"
+                                                                               << "h1")
+                                                                 << BSON("_id" << 3 << "host"
+                                                                               << "h2")
+                                                                 << BSON("_id" << 4 << "host"
+                                                                               << "h3")
+                                                                 << BSON("_id" << 5 << "host"
+                                                                               << "h4"))));
 
     std::vector<HostAndPort> hosts;
-    for (ReplicaSetConfig::MemberIterator mem = ++config.membersBegin(); mem != config.membersEnd();
+    for (ReplSetConfig::MemberIterator mem = ++config.membersBegin(); mem != config.membersEnd();
          ++mem) {
         hosts.push_back(mem->getHostAndPort());
     }
@@ -647,24 +647,24 @@ TEST_F(FreshnessCheckerTest, ElectWrongTypeInFreshnessResponseManyNodes) {
 TEST_F(FreshnessCheckerTest, ElectVetoedManyNodes) {
     // one other responds with veto
     startCapturingLogMessages();
-    ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
-                                                      << "rs0"
-                                                      << "version"
-                                                      << 1
-                                                      << "members"
-                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                               << "h0")
-                                                                    << BSON("_id" << 2 << "host"
-                                                                                  << "h1")
-                                                                    << BSON("_id" << 3 << "host"
-                                                                                  << "h2")
-                                                                    << BSON("_id" << 4 << "host"
-                                                                                  << "h3")
-                                                                    << BSON("_id" << 5 << "host"
-                                                                                  << "h4"))));
+    ReplSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                   << "rs0"
+                                                   << "version"
+                                                   << 1
+                                                   << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                            << "h0")
+                                                                 << BSON("_id" << 2 << "host"
+                                                                               << "h1")
+                                                                 << BSON("_id" << 3 << "host"
+                                                                               << "h2")
+                                                                 << BSON("_id" << 4 << "host"
+                                                                               << "h3")
+                                                                 << BSON("_id" << 5 << "host"
+                                                                               << "h4"))));
 
     std::vector<HostAndPort> hosts;
-    for (ReplicaSetConfig::MemberIterator mem = ++config.membersBegin(); mem != config.membersEnd();
+    for (ReplSetConfig::MemberIterator mem = ++config.membersBegin(); mem != config.membersEnd();
          ++mem) {
         hosts.push_back(mem->getHostAndPort());
     }
@@ -709,24 +709,24 @@ TEST_F(FreshnessCheckerTest, ElectVetoedManyNodes) {
 TEST_F(FreshnessCheckerTest, ElectVetoedAndTiedFreshnessManyNodes) {
     // one other responds with veto and another responds with tie
     startCapturingLogMessages();
-    ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
-                                                      << "rs0"
-                                                      << "version"
-                                                      << 1
-                                                      << "members"
-                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                               << "h0")
-                                                                    << BSON("_id" << 2 << "host"
-                                                                                  << "h1")
-                                                                    << BSON("_id" << 3 << "host"
-                                                                                  << "h2")
-                                                                    << BSON("_id" << 4 << "host"
-                                                                                  << "h3")
-                                                                    << BSON("_id" << 5 << "host"
-                                                                                  << "h4"))));
+    ReplSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                   << "rs0"
+                                                   << "version"
+                                                   << 1
+                                                   << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                            << "h0")
+                                                                 << BSON("_id" << 2 << "host"
+                                                                               << "h1")
+                                                                 << BSON("_id" << 3 << "host"
+                                                                               << "h2")
+                                                                 << BSON("_id" << 4 << "host"
+                                                                               << "h3")
+                                                                 << BSON("_id" << 5 << "host"
+                                                                               << "h4"))));
 
     std::vector<HostAndPort> hosts;
-    for (ReplicaSetConfig::MemberIterator mem = config.membersBegin(); mem != config.membersEnd();
+    for (ReplSetConfig::MemberIterator mem = config.membersBegin(); mem != config.membersEnd();
          ++mem) {
         if (HostAndPort("h0") == mem->getHostAndPort()) {
             continue;
@@ -787,24 +787,24 @@ TEST_F(FreshnessCheckerTest, ElectVetoedAndTiedFreshnessManyNodes) {
 }
 
 TEST_F(FreshnessCheckerTest, ElectManyNodesNotAllRespond) {
-    ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
-                                                      << "rs0"
-                                                      << "version"
-                                                      << 1
-                                                      << "members"
-                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                               << "h0")
-                                                                    << BSON("_id" << 2 << "host"
-                                                                                  << "h1")
-                                                                    << BSON("_id" << 3 << "host"
-                                                                                  << "h2")
-                                                                    << BSON("_id" << 4 << "host"
-                                                                                  << "h3")
-                                                                    << BSON("_id" << 5 << "host"
-                                                                                  << "h4"))));
+    ReplSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                   << "rs0"
+                                                   << "version"
+                                                   << 1
+                                                   << "members"
+                                                   << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                            << "h0")
+                                                                 << BSON("_id" << 2 << "host"
+                                                                               << "h1")
+                                                                 << BSON("_id" << 3 << "host"
+                                                                               << "h2")
+                                                                 << BSON("_id" << 4 << "host"
+                                                                               << "h3")
+                                                                 << BSON("_id" << 5 << "host"
+                                                                               << "h4"))));
 
     std::vector<HostAndPort> hosts;
-    for (ReplicaSetConfig::MemberIterator mem = ++config.membersBegin(); mem != config.membersEnd();
+    for (ReplSetConfig::MemberIterator mem = ++config.membersBegin(); mem != config.membersEnd();
          ++mem) {
         hosts.push_back(mem->getHostAndPort());
     }
@@ -851,7 +851,7 @@ public:
         int selfConfigIndex = 0;
         Timestamp lastOpTimeApplied(100, 0);
 
-        ReplicaSetConfig config;
+        ReplSetConfig config;
         config.initialize(BSON("_id"
                                << "rs0"
                                << "version"
@@ -865,7 +865,7 @@ public:
                                                            << "host2"))));
 
         std::vector<HostAndPort> hosts;
-        for (ReplicaSetConfig::MemberIterator mem = ++config.membersBegin();
+        for (ReplSetConfig::MemberIterator mem = ++config.membersBegin();
              mem != config.membersEnd();
              ++mem) {
             hosts.push_back(mem->getHostAndPort());

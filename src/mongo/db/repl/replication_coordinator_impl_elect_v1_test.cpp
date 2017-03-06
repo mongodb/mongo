@@ -33,9 +33,9 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/is_master_response.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
-#include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
@@ -66,7 +66,7 @@ TEST_F(ReplCoordTest, RandomizedElectionOffsetWithinProperBounds) {
                                            << BSON("_id" << 3 << "host"
                                                          << "node3:12345")));
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+    ReplSetConfig config = assertMakeRSConfig(configObj);
 
     Milliseconds electionTimeout = config.getElectionTimeoutPeriod();
     long long randomOffsetUpperBound = durationCount<Milliseconds>(electionTimeout) *
@@ -330,7 +330,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
                              << "protocolVersion"
                              << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+    ReplSetConfig config = assertMakeRSConfig(configObj);
 
     OperationContextNoop txn;
     OpTime time1(Timestamp(100, 1), 0);
@@ -389,7 +389,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenDryRunResponseContainsANewerTerm) {
                              << "protocolVersion"
                              << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+    ReplSetConfig config = assertMakeRSConfig(configObj);
 
     OperationContextNoop txn;
     OpTime time1(Timestamp(100, 1), 0);
@@ -469,7 +469,7 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
     ReplSetHeartbeatResponse hbResp2;
-    ReplicaSetConfig config;
+    ReplSetConfig config;
     config.initialize(BSON("_id"
                            << "mySet"
                            << "version"
@@ -504,7 +504,7 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
 
     // receive sufficient heartbeats to allow the node to see a majority.
     ReplicationCoordinatorImpl* replCoord = getReplCoord();
-    ReplicaSetConfig rsConfig = replCoord->getReplicaSetConfig_forTest();
+    ReplSetConfig rsConfig = replCoord->getReplicaSetConfig_forTest();
     net->enterNetwork();
     for (int i = 0; i < 2; ++i) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
@@ -566,7 +566,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringRequest
                              << "protocolVersion"
                              << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+    ReplSetConfig config = assertMakeRSConfig(configObj);
 
     OperationContextNoop txn;
     OpTime time1(Timestamp(100, 1), 0);
@@ -617,7 +617,7 @@ TEST_F(ReplCoordTest, ElectionsAbortWhenNodeTransitionsToRollbackState) {
                              << "protocolVersion"
                              << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+    ReplSetConfig config = assertMakeRSConfig(configObj);
 
     OperationContextNoop txn;
     OpTime time1(Timestamp(100, 1), 0);
@@ -655,7 +655,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenVoteRequestResponseContainsANewerTerm) {
                              << "protocolVersion"
                              << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+    ReplSetConfig config = assertMakeRSConfig(configObj);
 
     OperationContextNoop txn;
     OpTime time1(Timestamp(100, 1), 0);
@@ -711,7 +711,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringDryRun) {
                              << 1);
 
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+    ReplSetConfig config = assertMakeRSConfig(configObj);
 
     OperationContextNoop txn;
     OpTime time1(Timestamp(100, 1), 0);
@@ -750,7 +750,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenTermChangesDuringActualElection) {
                              << "protocolVersion"
                              << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+    ReplSetConfig config = assertMakeRSConfig(configObj);
 
     OperationContextNoop txn;
     OpTime time1(Timestamp(100, 1), 0);
@@ -795,7 +795,7 @@ public:
      * Verify that a given priority takeover delay is valid. Takeover delays are
      * verified in terms of bounds since the delay value is randomized.
      */
-    void assertValidTakeoverDelay(ReplicaSetConfig config,
+    void assertValidTakeoverDelay(ReplSetConfig config,
                                   Date_t now,
                                   Date_t priorityTakeoverTime,
                                   int nodeIndex) {
@@ -828,7 +828,7 @@ public:
      *
      * Returns the time that it ran until, which should always be equal to 'until'.
      */
-    Date_t respondToHeartbeatsUntil(const ReplicaSetConfig& config,
+    Date_t respondToHeartbeatsUntil(const ReplSetConfig& config,
                                     Date_t until,
                                     const HostAndPort& primaryHostAndPort,
                                     const OpTime& otherNodesOpTime) {
@@ -883,7 +883,7 @@ private:
      *
      * Intended as a helper function only.
      */
-    void _respondToHeartbeatsNow(const ReplicaSetConfig& config,
+    void _respondToHeartbeatsNow(const ReplSetConfig& config,
                                  const HostAndPort& primaryHostAndPort,
                                  const OpTime& otherNodesOpTime) {
 
@@ -937,7 +937,7 @@ TEST_F(PriorityTakeoverTest, SchedulesPriorityTakeoverIfNodeHasHigherPriorityTha
                              << "protocolVersion"
                              << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+    ReplSetConfig config = assertMakeRSConfig(configObj);
 
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
@@ -984,7 +984,7 @@ TEST_F(PriorityTakeoverTest, SuccessfulPriorityTakeover) {
                              << "protocolVersion"
                              << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+    ReplSetConfig config = assertMakeRSConfig(configObj);
 
     auto replCoord = getReplCoord();
     auto now = getNet()->now();
@@ -1036,7 +1036,7 @@ TEST_F(PriorityTakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
                              << "protocolVersion"
                              << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+    ReplSetConfig config = assertMakeRSConfig(configObj);
     HostAndPort primaryHostAndPort("node2", 12345);
 
     auto replCoord = getReplCoord();
@@ -1112,7 +1112,7 @@ TEST_F(PriorityTakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecon
                              << "protocolVersion"
                              << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    ReplicaSetConfig config = assertMakeRSConfig(configObj);
+    ReplSetConfig config = assertMakeRSConfig(configObj);
     HostAndPort primaryHostAndPort("node2", 12345);
 
     auto replCoord = getReplCoord();
@@ -1279,7 +1279,7 @@ protected:
     using FreshnessScanFn = stdx::function<void(const NetworkOpIter)>;
 
     void replyToHeartbeatRequestAsSecondaries(const NetworkOpIter noi) {
-        ReplicaSetConfig rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+        ReplSetConfig rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
         ReplSetHeartbeatResponse hbResp;
         hbResp.setSetName(rsConfig.getReplSetName());
         hbResp.setState(MemberState::RS_SECONDARY);
@@ -1337,7 +1337,7 @@ protected:
         }
     }
 
-    ReplicaSetConfig setUp3NodeReplSetAndRunForElection(OpTime opTime) {
+    ReplSetConfig setUp3NodeReplSetAndRunForElection(OpTime opTime) {
         BSONObj configObj = BSON("_id"
                                  << "mySet"
                                  << "version"
@@ -1354,7 +1354,7 @@ protected:
                                  << "settings"
                                  << BSON("catchUpTimeoutMillis" << 5000));
         assertStartSuccess(configObj, HostAndPort("node1", 12345));
-        ReplicaSetConfig config = assertMakeRSConfig(configObj);
+        ReplSetConfig config = assertMakeRSConfig(configObj);
 
         getReplCoord()->setMyLastAppliedOpTime(opTime);
         getReplCoord()->setMyLastDurableOpTime(opTime);
@@ -1421,7 +1421,7 @@ protected:
 TEST_F(PrimaryCatchUpTest, PrimaryDoNotNeedToCatchUp) {
     startCapturingLogMessages();
     OpTime time1(Timestamp(100, 1), 0);
-    ReplicaSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
+    ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
 
     processFreshnessScanRequests([this](const NetworkOpIter noi) {
         getNet()->scheduleResponse(noi, getNet()->now(), makeFreshnessScanResponse(OpTime()));
@@ -1439,7 +1439,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryFreshnessScanTimeout) {
     startCapturingLogMessages();
 
     OpTime time1(Timestamp(100, 1), 0);
-    ReplicaSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
+    ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
 
     processFreshnessScanRequests([this](const NetworkOpIter noi) {
         auto request = noi->getRequest();
@@ -1464,7 +1464,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryCatchUpSucceeds) {
 
     OpTime time1(Timestamp(100, 1), 0);
     OpTime time2(Timestamp(100, 2), 0);
-    ReplicaSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
+    ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
 
     processFreshnessScanRequests([this, time2](const NetworkOpIter noi) {
         auto net = getNet();
@@ -1494,7 +1494,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryCatchUpTimeout) {
 
     OpTime time1(Timestamp(100, 1), 0);
     OpTime time2(Timestamp(100, 2), 0);
-    ReplicaSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
+    ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
 
     // The new primary learns of the latest OpTime.
     processFreshnessScanRequests([this, time2](const NetworkOpIter noi) {
@@ -1518,7 +1518,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringFreshnessScan) {
 
     OpTime time1(Timestamp(100, 1), 0);
     OpTime time2(Timestamp(100, 2), 0);
-    ReplicaSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
+    ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
 
     processFreshnessScanRequests([this, time2](const NetworkOpIter noi) {
         auto request = noi->getRequest();
@@ -1546,7 +1546,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
 
     OpTime time1(Timestamp(100, 1), 0);
     OpTime time2(Timestamp(100, 2), 0);
-    ReplicaSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
+    ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
 
     processFreshnessScanRequests([this, time2](const NetworkOpIter noi) {
         auto net = getNet();
@@ -1580,7 +1580,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
 
     OpTime time1(Timestamp(100, 1), 0);
     OpTime time2(Timestamp(100, 2), 0);
-    ReplicaSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
+    ReplSetConfig config = setUp3NodeReplSetAndRunForElection(time1);
 
     processFreshnessScanRequests([this, time2](const NetworkOpIter noi) {
         auto net = getNet();

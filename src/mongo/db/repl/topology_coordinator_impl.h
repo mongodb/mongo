@@ -36,7 +36,7 @@
 #include "mongo/db/repl/member_heartbeat_data.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/server_options.h"
@@ -198,7 +198,7 @@ public:
     virtual StatusWith<PrepareFreezeResponseResult> prepareFreezeResponse(Date_t now,
                                                                           int secs,
                                                                           BSONObjBuilder* response);
-    virtual void updateConfig(const ReplicaSetConfig& newConfig,
+    virtual void updateConfig(const ReplSetConfig& newConfig,
                               int selfIndex,
                               Date_t now,
                               const OpTime& lastOpApplied);
@@ -371,9 +371,7 @@ private:
      * _currentConfig, copies their heartbeat info into the corresponding entry in the updated
      * _hbdata vector.
      */
-    void _updateHeartbeatDataForReconfig(const ReplicaSetConfig& newConfig,
-                                         int selfIndex,
-                                         Date_t now);
+    void _updateHeartbeatDataForReconfig(const ReplSetConfig& newConfig, int selfIndex, Date_t now);
 
     void _stepDownSelfAndReplaceWith(int newPrimary);
 
@@ -423,7 +421,7 @@ private:
 
     int _selfIndex;  // this node's index in _members and _currentConfig
 
-    ReplicaSetConfig _rsConfig;  // The current config, including a vector of MemberConfigs
+    ReplSetConfig _rsConfig;  // The current config, including a vector of MemberConfigs
 
     // heartbeat data for each member.  It is guaranteed that this vector will be maintained
     // in the same order as the MemberConfigs in _currentConfig, therefore the member config

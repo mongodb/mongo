@@ -34,7 +34,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
@@ -53,7 +53,7 @@ class FreshnessScanner {
 
 public:
     struct FreshnessInfo {
-        // The index of node in ReplicaSetConfig.
+        // The index of node in ReplSetConfig.
         int index;
         // The latest applied opTime on that node.
         OpTime opTime;
@@ -63,7 +63,7 @@ public:
 
     class Algorithm : public ScatterGatherAlgorithm {
     public:
-        Algorithm(const ReplicaSetConfig& rsConfig, int myIndex, Milliseconds timeout);
+        Algorithm(const ReplSetConfig& rsConfig, int myIndex, Milliseconds timeout);
         virtual std::vector<executor::RemoteCommandRequest> getRequests() const;
         virtual void processResponse(const executor::RemoteCommandRequest& request,
                                      const ResponseStatus& response);
@@ -77,7 +77,7 @@ public:
         Result getResult() const;
 
     private:
-        const ReplicaSetConfig _rsConfig;
+        const ReplSetConfig _rsConfig;
         std::vector<HostAndPort> _targets;
         const int _myIndex;
         const Milliseconds _timeout;
@@ -97,7 +97,7 @@ public:
      * If this function returns Status::OK(), evh is then guaranteed to be signaled.
      **/
     StatusWith<ReplicationExecutor::EventHandle> start(ReplicationExecutor* executor,
-                                                       const ReplicaSetConfig& rsConfig,
+                                                       const ReplSetConfig& rsConfig,
                                                        int myIndex,
                                                        Milliseconds timeout);
 

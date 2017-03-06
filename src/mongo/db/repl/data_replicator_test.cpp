@@ -349,7 +349,7 @@ protected:
         dataReplicatorExternalState->currentTerm = 1LL;
         dataReplicatorExternalState->lastCommittedOpTime = _myLastOpTime;
         {
-            ReplicaSetConfig config;
+            ReplSetConfig config;
             ASSERT_OK(config.initialize(BSON("_id"
                                              << "myset"
                                              << "version"

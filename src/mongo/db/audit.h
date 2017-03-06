@@ -45,7 +45,6 @@ class Client;
 class Command;
 class NamespaceString;
 class OperationContext;
-class ReplSetConfig;
 class StringData;
 class UserName;
 

@@ -34,7 +34,7 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/optime_with.h"
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/net/hostandport.h"
@@ -121,7 +121,7 @@ public:
     /**
      * Returns the current replica set config if there is one, or an error why there isn't.
      */
-    virtual StatusWith<ReplicaSetConfig> getCurrentConfig() const = 0;
+    virtual StatusWith<ReplSetConfig> getCurrentConfig() const = 0;
 
 private:
     /**

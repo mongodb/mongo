@@ -72,7 +72,7 @@ class OldUpdatePositionArgs;
 class OplogReader;
 class OpTime;
 class ReadConcernArgs;
-class ReplicaSetConfig;
+class ReplSetConfig;
 class ReplicationExecutor;
 class ReplSetHeartbeatArgs;
 class ReplSetHeartbeatArgsV1;
@@ -542,9 +542,9 @@ public:
     virtual void appendSlaveInfoData(BSONObjBuilder* result) = 0;
 
     /**
-     * Returns a copy of the current ReplicaSetConfig.
+     * Returns a copy of the current ReplSetConfig.
      */
-    virtual ReplicaSetConfig getConfig() const = 0;
+    virtual ReplSetConfig getConfig() const = 0;
 
     /**
      * Handles an incoming replSetGetConfig command. Adds BSON to 'result'.

@@ -55,13 +55,13 @@
 #include "mongo/db/repl/old_update_position_args.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/repl_set_config_checks.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_set_html_summary.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replica_set_config_checks.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -125,10 +125,10 @@ BSONObj incrementConfigVersionByRandom(BSONObj config) {
     BSONObjBuilder builder;
     for (BSONObjIterator iter(config); iter.more(); iter.next()) {
         BSONElement elem = *iter;
-        if (elem.fieldNameStringData() == ReplicaSetConfig::kVersionFieldName && elem.isNumber()) {
+        if (elem.fieldNameStringData() == ReplSetConfig::kVersionFieldName && elem.isNumber()) {
             std::unique_ptr<SecureRandom> generator(SecureRandom::create());
             const int random = std::abs(static_cast<int>(generator->nextInt64()) % 100000);
-            builder.appendIntOrLL(ReplicaSetConfig::kVersionFieldName,
+            builder.appendIntOrLL(ReplSetConfig::kVersionFieldName,
                                   elem.numberLong() + 10000 + random);
         } else {
             builder.append(elem);
@@ -370,7 +370,7 @@ void ReplicationCoordinatorImpl::_waitForStartUpComplete() {
     }
 }
 
-ReplicaSetConfig ReplicationCoordinatorImpl::getReplicaSetConfig_forTest() {
+ReplSetConfig ReplicationCoordinatorImpl::getReplicaSetConfig_forTest() {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _rsConfig;
 }
@@ -432,7 +432,7 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* txn) {
               << cfg.getStatus();
         return true;
     }
-    ReplicaSetConfig localConfig;
+    ReplSetConfig localConfig;
     Status status = localConfig.initialize(cfg.getValue());
     if (!status.isOK()) {
         error() << "Locally stored replica set configuration does not parse; See "
@@ -465,7 +465,7 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* txn) {
 
 void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     const ReplicationExecutor::CallbackArgs& cbData,
-    const ReplicaSetConfig& localConfig,
+    const ReplSetConfig& localConfig,
     const StatusWith<OpTime>& lastOpTimeStatus,
     const StatusWith<LastVote>& lastVoteStatus) {
     if (!cbData.status.isOK()) {
@@ -1532,12 +1532,12 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
         }
         // Continue and wait for replication to the majority (of voters).
         // *** Needed for J:True, writeConcernMajorityShouldJournal:False (appliedOpTime snapshot).
-        patternName = ReplicaSetConfig::kMajorityWriteConcernModeName;
+        patternName = ReplSetConfig::kMajorityWriteConcernModeName;
     } else {
         patternName = writeConcern.wMode;
     }
 
-    StatusWith<ReplicaSetTagPattern> tagPattern = _rsConfig.findCustomWriteMode(patternName);
+    StatusWith<ReplSetTagPattern> tagPattern = _rsConfig.findCustomWriteMode(patternName);
     if (!tagPattern.isOK()) {
         return true;
     }
@@ -1569,8 +1569,8 @@ bool ReplicationCoordinatorImpl::_haveNumNodesReachedOpTime_inlock(const OpTime&
 }
 
 bool ReplicationCoordinatorImpl::_haveTaggedNodesReachedOpTime_inlock(
-    const OpTime& opTime, const ReplicaSetTagPattern& tagPattern, bool durablyWritten) {
-    ReplicaSetTagMatch matcher(tagPattern);
+    const OpTime& opTime, const ReplSetTagPattern& tagPattern, bool durablyWritten) {
+    ReplSetTagMatch matcher(tagPattern);
     for (SlaveInfoVector::iterator it = _slaveInfo.begin(); it != _slaveInfo.end(); ++it) {
         const OpTime& slaveTime = durablyWritten ? it->lastDurableOpTime : it->lastAppliedOpTime;
         if (slaveTime >= opTime) {
@@ -2132,7 +2132,7 @@ void ReplicationCoordinatorImpl::_appendSlaveInfoData_inlock(BSONObjBuilder* res
     }
 }
 
-ReplicaSetConfig ReplicationCoordinatorImpl::getConfig() const {
+ReplSetConfig ReplicationCoordinatorImpl::getConfig() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _rsConfig;
 }
@@ -2339,10 +2339,10 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* txn,
         &lk,
         stdx::bind(&ReplicationCoordinatorImpl::_setConfigState_inlock, this, kConfigSteady));
 
-    ReplicaSetConfig oldConfig = _rsConfig;
+    ReplSetConfig oldConfig = _rsConfig;
     lk.unlock();
 
-    ReplicaSetConfig newConfig;
+    ReplSetConfig newConfig;
     BSONObj newConfigObj = args.newConfigObj;
     if (args.force) {
         newConfigObj = incrementConfigVersionByRandom(newConfigObj);
@@ -2416,9 +2416,7 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* txn,
 }
 
 void ReplicationCoordinatorImpl::_finishReplSetReconfig(
-    const ReplicationExecutor::CallbackArgs& cbData,
-    const ReplicaSetConfig& newConfig,
-    int myIndex) {
+    const ReplicationExecutor::CallbackArgs& cbData, const ReplSetConfig& newConfig, int myIndex) {
     LockGuard topoLock(_topoMutex);
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
@@ -2448,7 +2446,7 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     }
 
 
-    const ReplicaSetConfig oldConfig = _rsConfig;
+    const ReplSetConfig oldConfig = _rsConfig;
     const PostMemberStateUpdateAction action = _setCurrentRSConfig_inlock(newConfig, myIndex);
 
     // On a reconfig we drop all snapshots so we don't mistakenely read from the wrong one.
@@ -2495,7 +2493,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
             &ReplicationCoordinatorImpl::_setConfigState_inlock, this, kConfigUninitialized));
     lk.unlock();
 
-    ReplicaSetConfig newConfig;
+    ReplSetConfig newConfig;
     Status status = newConfig.initializeForInitiate(configObj, true);
     if (!status.isOK()) {
         error() << "replSet initiate got " << status << " while parsing " << configObj;
@@ -2553,7 +2551,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
     return Status::OK();
 }
 
-void ReplicationCoordinatorImpl::_finishReplSetInitiate(const ReplicaSetConfig& newConfig,
+void ReplicationCoordinatorImpl::_finishReplSetInitiate(const ReplSetConfig& newConfig,
                                                         int myIndex) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
     invariant(_rsConfigState == kConfigInitiating);
@@ -2842,7 +2840,7 @@ Status ReplicationCoordinatorImpl::processReplSetElect(const ReplSetElectArgs& a
 }
 
 ReplicationCoordinatorImpl::PostMemberStateUpdateAction
-ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(const ReplicaSetConfig& newConfig,
+ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(const ReplSetConfig& newConfig,
                                                        int myIndex) {
     invariant(_settings.usingReplSets());
     _cancelHeartbeats_inlock();
@@ -2852,7 +2850,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(const ReplicaSetConfig& n
     OpTime myOptime = _getMyLastAppliedOpTime_inlock();
     _topCoord->updateConfig(newConfig, myIndex, _replExecutor.now(), myOptime);
     _cachedTerm = _topCoord->getTerm();
-    const ReplicaSetConfig oldConfig = _rsConfig;
+    const ReplSetConfig oldConfig = _rsConfig;
     _rsConfig = newConfig;
     _protVersion.store(_rsConfig.getProtocolVersion());
     log() << "New replica set config in use: " << _rsConfig.toBSON() << rsLog;
@@ -3569,7 +3567,7 @@ void ReplicationCoordinatorImpl::waitForElectionDryRunFinish_forTest() {
 }
 
 EventHandle ReplicationCoordinatorImpl::_resetElectionInfoOnProtocolVersionUpgrade(
-    const ReplicaSetConfig& oldConfig, const ReplicaSetConfig& newConfig) {
+    const ReplSetConfig& oldConfig, const ReplSetConfig& newConfig) {
     // On protocol version upgrade, reset last vote as if I just learned the term 0 from other
     // nodes.
     if (!oldConfig.isInitialized() ||

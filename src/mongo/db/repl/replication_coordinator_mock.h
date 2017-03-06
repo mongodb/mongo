@@ -30,7 +30,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/platform/atomic_word.h"
 
@@ -156,7 +156,7 @@ public:
 
     void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
 
-    virtual ReplicaSetConfig getConfig() const;
+    virtual ReplSetConfig getConfig() const;
 
     virtual void processReplSetGetConfig(BSONObjBuilder* result);
 
@@ -273,7 +273,7 @@ public:
     /**
      * Sets the return value for calls to getConfig.
      */
-    void setGetConfigReturnValue(ReplicaSetConfig returnValue);
+    void setGetConfigReturnValue(ReplSetConfig returnValue);
 
     /**
      * Always allow writes even if this node is not master. Used by sharding unit tests.
@@ -293,7 +293,7 @@ private:
     MemberState _memberState;
     OpTime _myLastDurableOpTime;
     OpTime _myLastAppliedOpTime;
-    ReplicaSetConfig _getConfigReturnValue;
+    ReplSetConfig _getConfigReturnValue;
     bool _alwaysAllowWrites = false;
 };
 

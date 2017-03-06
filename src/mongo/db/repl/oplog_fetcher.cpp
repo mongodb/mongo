@@ -76,7 +76,7 @@ ServerStatusMetricField<Counter64> displayBytesRead("repl.network.bytes", &netwo
 /**
  * Calculates await data timeout based on the current replica set configuration.
  */
-Milliseconds calculateAwaitDataTimeout(const ReplicaSetConfig& config) {
+Milliseconds calculateAwaitDataTimeout(const ReplSetConfig& config) {
     // Under protocol version 1, make the awaitData timeout (maxTimeMS) dependent on the election
     // timeout. This enables the sync source to communicate liveness of the primary to secondaries.
     // Under protocol version 0, use a default timeout of 2 seconds for awaitData.
@@ -275,7 +275,7 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
                            OpTimeWithHash lastFetched,
                            HostAndPort source,
                            NamespaceString nss,
-                           ReplicaSetConfig config,
+                           ReplSetConfig config,
                            std::size_t maxFetcherRestarts,
                            DataReplicatorExternalState* dataReplicatorExternalState,
                            EnqueueDocumentsFn enqueueDocumentsFn,

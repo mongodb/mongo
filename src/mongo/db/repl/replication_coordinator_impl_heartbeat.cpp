@@ -37,10 +37,10 @@
 #include "mongo/db/repl/elect_cmd_runner.h"
 #include "mongo/db/repl/freshness_checker.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
+#include "mongo/db/repl/repl_set_config_checks.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
-#include "mongo/db/repl/replica_set_config_checks.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/topology_coordinator.h"
@@ -397,7 +397,7 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
     _replExecutor.signalEvent(finishedEvent);
 }
 
-void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(const ReplicaSetConfig& newConfig) {
+void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(const ReplSetConfig& newConfig) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     if (_inShutdown) {
         return;
@@ -445,7 +445,7 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(const ReplicaSetConf
 }
 
 void ReplicationCoordinatorImpl::_heartbeatReconfigAfterElectionCanceled(
-    const ReplicationExecutor::CallbackArgs& cbData, const ReplicaSetConfig& newConfig) {
+    const ReplicationExecutor::CallbackArgs& cbData, const ReplSetConfig& newConfig) {
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
@@ -464,7 +464,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigAfterElectionCanceled(
 }
 
 void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
-    const ReplicationExecutor::CallbackArgs& cbd, const ReplicaSetConfig& newConfig) {
+    const ReplicationExecutor::CallbackArgs& cbd, const ReplSetConfig& newConfig) {
     if (cbd.status.code() == ErrorCodes::CallbackCanceled) {
         log() << "The callback to persist the replica set configuration was canceled - "
               << "the configuration was not persisted but was used: " << newConfig.toBSON();
@@ -545,7 +545,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
 
 void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     const ReplicationExecutor::CallbackArgs& cbData,
-    const ReplicaSetConfig& newConfig,
+    const ReplSetConfig& newConfig,
     StatusWith<int> myIndex) {
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
@@ -614,7 +614,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         }
         myIndex = StatusWith<int>(-1);
     }
-    const ReplicaSetConfig oldConfig = _rsConfig;
+    const ReplSetConfig oldConfig = _rsConfig;
     // If we do not have an index, we should pass -1 as our index to avoid falsely adding ourself to
     // the data structures inside of the TopologyCoordinator.
     const int myIndexValue = myIndex.getStatus().isOK() ? myIndex.getValue() : -1;
