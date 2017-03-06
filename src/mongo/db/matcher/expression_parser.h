@@ -52,8 +52,8 @@ public:
     static StatusWithMatchExpression parse(const BSONObj& obj,
                                            const ExtensionsCallback& extensionsCallback,
                                            const CollatorInterface* collator) {
-        const bool topLevelCall = true;
-        return MatchExpressionParser(&extensionsCallback)._parse(obj, collator, topLevelCall);
+        // The 0 initializes the match expression tree depth.
+        return MatchExpressionParser(&extensionsCallback)._parse(obj, collator, 0);
     }
 
 private:
@@ -86,12 +86,13 @@ private:
      * 'collator' is the collator that constructed collation-aware MatchExpressions will use.  It
      * must outlive the returned MatchExpression and any clones made of it.
      *
-     * 'topLevel' indicates whether or not the we are at the top level of the tree across recursive
-     * class to this function. This is used to apply special logic at the top level.
+     * 'level' tracks the current depth of the tree across recursive calls to this
+     * function. Used in order to apply special logic at the top-level and to return an
+     * error if the tree exceeds the maximum allowed depth.
      */
     StatusWithMatchExpression _parse(const BSONObj& obj,
                                      const CollatorInterface* collator,
-                                     bool topLevel);
+                                     int level);
 
     /**
      * parses a field in a sub expression
@@ -102,7 +103,7 @@ private:
                      const BSONObj& obj,
                      AndMatchExpression* root,
                      const CollatorInterface* collator,
-                     bool topLevel);
+                     int level);
 
     /**
      * parses a single field in a sub expression
@@ -114,7 +115,7 @@ private:
                                              const char* name,
                                              const BSONElement& e,
                                              const CollatorInterface* collator,
-                                             bool topLevel);
+                                             int level);
 
     StatusWithMatchExpression _parseComparison(const char* name,
                                                ComparisonMatchExpression* cmp,
@@ -139,24 +140,24 @@ private:
     StatusWithMatchExpression _parseElemMatch(const char* name,
                                               const BSONElement& e,
                                               const CollatorInterface* collator,
-                                              bool topLevel);
+                                              int level);
 
     StatusWithMatchExpression _parseAll(const char* name,
                                         const BSONElement& e,
                                         const CollatorInterface* collator,
-                                        bool topLevel);
+                                        int level);
 
     // tree
 
     Status _parseTreeList(const BSONObj& arr,
                           ListOfMatchExpression* out,
                           const CollatorInterface* collator,
-                          bool topLevel);
+                          int level);
 
     StatusWithMatchExpression _parseNot(const char* name,
                                         const BSONElement& e,
                                         const CollatorInterface* collator,
-                                        bool topLevel);
+                                        int level);
 
     /**
      * Parses 'e' into a BitTestMatchExpression.

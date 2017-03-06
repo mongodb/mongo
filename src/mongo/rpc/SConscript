@@ -75,7 +75,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/bson_depth',
         '$BUILD_DIR/mongo/db/server_parameters',
     ],
 )
