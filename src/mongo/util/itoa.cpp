@@ -1038,7 +1038,7 @@ const char kIndexTable[] =
 
 constexpr size_t ItoA::kBufSize;
 
-ItoA::ItoA(std::uint32_t val) {
+ItoA::ItoA(std::uint64_t val) {
     if (val < 10u) {
         _str = kIndexTable + (2 * val);
         _len = 1;

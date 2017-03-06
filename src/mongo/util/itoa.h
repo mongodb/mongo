@@ -29,6 +29,7 @@
 #pragma once
 
 #include <cstdint>
+#include <limits>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
@@ -43,9 +44,11 @@ class ItoA {
     MONGO_DISALLOW_COPYING(ItoA);
 
 public:
-    static constexpr size_t kBufSize = 11;
+    static constexpr size_t kBufSize = std::numeric_limits<uint64_t>::digits10  //
+        + 1   // digits10 is 1 less than the maximum number of digits.
+        + 1;  // NUL byte.
 
-    explicit ItoA(std::uint32_t i);
+    explicit ItoA(std::uint64_t i);
 
     operator StringData() {
         return {_str, _len};
@@ -54,7 +57,6 @@ public:
 private:
     const char* _str{nullptr};
     std::size_t _len{0};
-    // 11 is provably the max size we need as uint32_t max has 10 digits.
     char _buf[kBufSize];
 };
 

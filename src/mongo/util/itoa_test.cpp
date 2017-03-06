@@ -40,18 +40,19 @@ namespace {
 using namespace mongo;
 
 TEST(ItoA, StringDataEquality) {
-    ASSERT_EQ(ItoA::kBufSize - 1, std::to_string(std::numeric_limits<std::uint32_t>::max()).size());
+    ASSERT_EQ(ItoA::kBufSize - 1, std::to_string(std::numeric_limits<std::uint64_t>::max()).size());
 
-    for (auto testCase : {1u,
-                          12u,
-                          133u,
-                          1446u,
-                          17789u,
-                          192923u,
-                          2389489u,
-                          29313479u,
-                          1928127389u,
-                          std::numeric_limits<std::uint32_t>::max()}) {
+    for (auto testCase : {uint64_t(1),
+                          uint64_t(12),
+                          uint64_t(133),
+                          uint64_t(1446),
+                          uint64_t(17789),
+                          uint64_t(192923),
+                          uint64_t(2389489),
+                          uint64_t(29313479),
+                          uint64_t(1928127389),
+                          std::numeric_limits<std::uint64_t>::max() - 1,
+                          std::numeric_limits<std::uint64_t>::max()}) {
         ItoA itoa{testCase};
         ASSERT_EQ(std::to_string(testCase), StringData(itoa));
     }

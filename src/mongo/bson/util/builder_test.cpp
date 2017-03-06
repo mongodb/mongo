@@ -82,4 +82,45 @@ TEST(Builder, StackAllocatorShouldNotLeak) {
     stackAlloc.malloc(StackAllocator::SZ + 1);  // Force heap allocation.
     // Let the builder go out of scope. If this leaks, it will trip the ASAN leak detector.
 }
+
+template <typename T>
+void testStringBuilderIntegral() {
+    auto check = [](T num) { ASSERT_EQ(std::string(str::stream() << num), std::to_string(num)); };
+
+    // Do some simple sanity checks.
+    check(0);
+    check(1);
+    check(-1);
+    check(std::numeric_limits<T>::min());
+    check(std::numeric_limits<T>::max());
+
+    // Check the full range of int16_t. Using int32_t as loop variable to detect when we are done.
+    for (int32_t num = std::numeric_limits<int16_t>::min();
+         num <= std::numeric_limits<int16_t>::max();
+         num++) {
+        check(num);
+    }
+}
+
+TEST(Builder, AppendInt) {
+    testStringBuilderIntegral<int>();
+}
+TEST(Builder, AppendUnsigned) {
+    testStringBuilderIntegral<unsigned>();
+}
+TEST(Builder, AppendLong) {
+    testStringBuilderIntegral<long>();
+}
+TEST(Builder, AppendUnsignedLong) {
+    testStringBuilderIntegral<unsigned long>();
+}
+TEST(Builder, AppendLongLong) {
+    testStringBuilderIntegral<long long>();
+}
+TEST(Builder, AppendUnsignedLongLong) {
+    testStringBuilderIntegral<unsigned long long>();
+}
+TEST(Builder, AppendShort) {
+    testStringBuilderIntegral<short>();
+}
 }
