@@ -178,6 +178,20 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckCanceledByShutdown) {
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, waitForQuorumCheck());
 }
 
+TEST_F(CheckQuorumForInitiate, ValidSingleNodeInternalHostSet) {
+    ReplicaSetConfig config = assertMakeRSConfig(BSON("_id"
+                                                      << "rs0"
+                                                      << "version"
+                                                      << 1
+                                                      << "members"
+                                                      << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                               << "h1"
+                                                                               << "hostInternal"
+                                                                               << "p1"))));
+    startQuorumCheck(config, 0);
+    ASSERT_OK(waitForQuorumCheck());
+}
+
 TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSeveralDownNodes) {
     // In this test, "we" are host "h3:1".  All other nodes time out on
     // their heartbeat request, and so the quorum check for initiate
@@ -227,7 +241,7 @@ const BSONObj makeHeartbeatRequest(const ReplicaSetConfig& rsConfig, int myConfi
     hbArgs.setProtocolVersion(1);
     hbArgs.setConfigVersion(rsConfig.getConfigVersion());
     hbArgs.setCheckEmpty(rsConfig.getConfigVersion() == 1);
-    hbArgs.setSenderHost(myConfig.getHostAndPort());
+    hbArgs.setSenderHost(myConfig.getInternalHostAndPort());
     hbArgs.setSenderId(myConfig.getId());
     return hbArgs.toBSON();
 }

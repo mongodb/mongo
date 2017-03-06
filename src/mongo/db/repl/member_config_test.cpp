@@ -46,6 +46,7 @@ TEST(MemberConfig, ParseMinimalMemberConfigAndCheckDefaults) {
                             &tagConfig));
     ASSERT_EQUALS(0, mc.getId());
     ASSERT_EQUALS(HostAndPort("localhost", 12345), mc.getHostAndPort());
+    ASSERT_EQUALS(HostAndPort("localhost", 12345), mc.getInternalHostAndPort());
     ASSERT_EQUALS(1.0, mc.getPriority());
     ASSERT_EQUALS(Seconds(0), mc.getSlaveDelay());
     ASSERT_TRUE(mc.isVoter());
@@ -72,6 +73,15 @@ TEST(MemberConfig, ParseFailsWithMissingIdField) {
     MemberConfig mc;
     ASSERT_EQUALS(ErrorCodes::NoSuchKey,
                   mc.initialize(BSON("host"
+                                     << "localhost:12345"),
+                                &tagConfig));
+}
+
+TEST(MemberConfig, ParseFailsWithJustInternalHost) {
+    ReplicaSetTagConfig tagConfig;
+    MemberConfig mc;
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey,
+                  mc.initialize(BSON("hostInternal"
                                      << "localhost:12345"),
                                 &tagConfig));
 }
@@ -113,6 +123,12 @@ TEST(MemberConfig, ParseFailsWithBadHostField) {
                                 &tagConfig));
     ASSERT_EQUALS(ErrorCodes::FailedToParse,
                   mc.initialize(BSON("_id" << 0 << "host"
+                                           << "myhost:zabc"),
+                                &tagConfig));
+    ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                  mc.initialize(BSON("_id" << 0 << "host"
+                                           << "myhost:12345"
+                                           << "hostInternal"
                                            << "myhost:zabc"),
                                 &tagConfig));
 }
@@ -311,6 +327,14 @@ TEST(MemberConfig, ValidateVotes) {
                                        << "votes"
                                        << 1.0),
                             &tagConfig));
+    ASSERT_OK(mc.initialize(BSON("_id" << 0 << "host"
+                                       << "h"
+                                       << "hostInternal"
+                                       << "hh"
+                                       << "votes"
+                                       << 1.0),
+                            &tagConfig));
+
     ASSERT_OK(mc.validate());
     ASSERT_TRUE(mc.isVoter());
 
