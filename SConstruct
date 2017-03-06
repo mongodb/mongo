@@ -2658,7 +2658,9 @@ def doConfigure(myenv):
 
         def CheckPThreadSetNameNP(context):
             compile_test_body = textwrap.dedent("""
+            #ifndef _GNU_SOURCE
             #define _GNU_SOURCE
+            #endif
             #include <pthread.h>
 
             int main() {
