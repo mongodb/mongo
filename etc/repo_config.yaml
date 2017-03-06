@@ -178,6 +178,14 @@ repos:
       - yum/redhat/6/mongodb-enterprise
       - yum/redhat/6Server/mongodb-enterprise
 
+  - name: rhel67
+    type: rpm
+    edition: enterprise
+    bucket: repo.mongodb.com
+    repos:
+      - yum/redhat/6/mongodb-enterprise
+      - yum/redhat/6Server/mongodb-enterprise
+        
   - name: rhel70
     type: rpm
     edition: enterprise
