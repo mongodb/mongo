@@ -199,7 +199,7 @@ functions:
           cmd_flags=$([ "${reports_analysis}" = "true" ] && echo "$reports_analysis_flags" || echo "")
           REFTAG="3.4.1-Baseline"
           OVERRIDE="../dsi/analysis/master/perf_override.json" # Note use of master here cannot use ${project}
-          python ../dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag $REFTAG --overrideFile $OVERRIDE --variant ${build_variant} --task ${task_name} --threshold 0.10 --threadThreshold 0.15
+          python ../dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag $REFTAG --overrideFile $OVERRIDE --variant ${build_variant} --task ${task_name} --threshold 0.05 --threadThreshold 0.075
   "run perf tests":
     - command: shell.exec
       params:
