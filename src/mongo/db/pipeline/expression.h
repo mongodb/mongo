@@ -72,11 +72,15 @@ class Variables {
 
 public:
     /**
-     * Each unique variable is assigned a unique id of this type
+     * Each unique variable is assigned a unique id of this type. Negative ids are reserved for
+     * system variables and non-negative ids are allocated for user variables.
      */
-    typedef size_t Id;
+    typedef int64_t Id;
 
-    // This is only for expressions that use no variables (even ROOT).
+    /**
+     * Constructs a placeholder for expressions that use no variables (even builtins like ROOT or
+     * REMOVE).
+     */
     Variables() : _numVars(0) {}
 
     explicit Variables(size_t numVars, const Document& root = Document())
@@ -85,7 +89,12 @@ public:
     static void uassertValidNameForUserWrite(StringData varName);
     static void uassertValidNameForUserRead(StringData varName);
 
-    static const Id ROOT_ID = Id(-1);
+    // Ids for builtin variables.
+    static constexpr Id kRootId = Id(-1);
+    static constexpr Id kRemoveId = Id(-2);
+
+    // Map from builtin var name to reserved id number.
+    static const StringMap<Id> kBuiltinVarNameToId;
 
     /**
      * Use this instead of setValue for setting ROOT
@@ -100,11 +109,19 @@ public:
         return _root;
     }
 
+    /**
+     * Sets the value of a user-defined variable. Illegal to use with the reserved builtin variables
+     * defined above.
+     */
     void setValue(Id id, const Value& value);
+
+    /**
+     * Gets the value of a user-defined or system variable.
+     */
     Value getValue(Id id) const;
 
     /**
-     * returns Document() for non-document values.
+     * Returns Document() for non-document values, but otherwise identical to getValue().
      */
     Document getDocument(Id id) const;
 

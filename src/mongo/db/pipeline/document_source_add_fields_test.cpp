@@ -152,5 +152,47 @@ TEST_F(AddFieldsTest, ShouldPropagatePauses) {
     ASSERT_TRUE(addFields->getNext().isEOF());
 }
 
+TEST_F(AddFieldsTest, AddFieldsWithRemoveSystemVariableDoesNotAddField) {
+    auto addFields = DocumentSourceAddFields::create(BSON("fieldToAdd"
+                                                          << "$$REMOVE"),
+                                                     getExpCtx());
+    auto mock = DocumentSourceMock::create(Document{{"existingField", 1}});
+    addFields->setSource(mock.get());
+
+    auto next = addFields->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    Document expected{{"existingField", 1}};
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
+    ASSERT_TRUE(addFields->getNext().isEOF());
+}
+
+TEST_F(AddFieldsTest, AddFieldsWithRootSystemVariableAddsRootAsSubDoc) {
+    auto addFields = DocumentSourceAddFields::create(BSON("b"
+                                                          << "$$ROOT"),
+                                                     getExpCtx());
+    auto mock = DocumentSourceMock::create(Document{{"a", 1}});
+    addFields->setSource(mock.get());
+
+    auto next = addFields->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    Document expected{{"a", 1}, {"b", Document{{"a", 1}}}};
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
+    ASSERT_TRUE(addFields->getNext().isEOF());
+}
+
+TEST_F(AddFieldsTest, AddFieldsWithCurrentSystemVariableAddsRootAsSubDoc) {
+    auto addFields = DocumentSourceAddFields::create(BSON("b"
+                                                          << "$$CURRENT"),
+                                                     getExpCtx());
+    auto mock = DocumentSourceMock::create(Document{{"a", 1}});
+    addFields->setSource(mock.get());
+
+    auto next = addFields->getNext();
+    ASSERT_TRUE(next.isAdvanced());
+    Document expected{{"a", 1}, {"b", Document{{"a", 1}}}};
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
+    ASSERT_TRUE(addFields->getNext().isEOF());
+}
+
 }  // namespace
 }  // namespace mongo

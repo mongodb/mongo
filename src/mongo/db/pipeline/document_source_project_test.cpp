@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/value.h"
 #include "mongo/unittest/unittest.h"
 
@@ -240,6 +241,24 @@ TEST_F(ProjectStageTest, ExclusionProjectionReportsExcludedPathsWithIdExclusion)
     ASSERT_EQUALS(1U, modifiedPaths.paths.count("_id"));
     ASSERT_EQUALS(1U, modifiedPaths.paths.count("b.c.d"));
     ASSERT_EQUALS(1U, modifiedPaths.paths.count("e.f.g"));
+}
+
+TEST_F(ProjectStageTest, CanUseRemoveSystemVariableToConditionallyExcludeProjectedField) {
+    auto project = DocumentSourceProject::create(
+        fromjson("{a: 1, b: {$cond: [{$eq: ['$b', 4]}, '$$REMOVE', '$b']}}"), getExpCtx());
+    auto source = DocumentSourceMock::create({"{a: 2, b: 2}", "{a: 3, b: 4}"});
+    project->setSource(source.get());
+    auto next = project->getNext();
+    ASSERT(next.isAdvanced());
+    Document expected{{"a", 2}, {"b", 2}};
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
+
+    next = project->getNext();
+    ASSERT(next.isAdvanced());
+    expected = Document{{"a", 3}};
+    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expected);
+
+    ASSERT(project->getNext().isEOF());
 }
 
 }  // namespace

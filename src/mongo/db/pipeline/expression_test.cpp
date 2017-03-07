@@ -2074,6 +2074,18 @@ private:
     }
 };
 
+TEST(ExpressionConstantTest, ConstantOfValueMissingRemovesField) {
+    intrusive_ptr<Expression> expression = ExpressionConstant::create(nullptr, Value());
+    assertBinaryEqual(BSONObj(), toBson(expression->evaluate(Document{{"foo", Value("bar"_sd)}})));
+}
+
+TEST(ExpressionConstantTest, ConstantOfValueMissingSerializesToRemoveSystemVar) {
+    intrusive_ptr<Expression> expression = ExpressionConstant::create(nullptr, Value());
+    assertBinaryEqual(BSON("field"
+                           << "$$REMOVE"),
+                      BSON("field" << expression->serialize(false)));
+}
+
 }  // namespace Constant
 
 TEST(ExpressionFromAccumulators, Avg) {
@@ -3835,6 +3847,48 @@ TEST(ExpressionTypeTest, WithMaxKeyValue) {
 }
 
 }  // namespace Type
+
+namespace BuiltinRemoveVariable {
+
+TEST(BuiltinRemoveVariableTest, TypeOfRemoveIsMissing) {
+    assertExpectedResults("$type", {{{Value("$$REMOVE"_sd)}, Value("missing"_sd)}});
+}
+
+TEST(BuiltinRemoveVariableTest, LiteralEscapesRemoveVar) {
+    assertExpectedResults(
+        "$literal", {{{Value("$$REMOVE"_sd)}, Value(std::vector<Value>{Value("$$REMOVE"_sd)})}});
+}
+
+TEST(BuiltinRemoveVariableTest, RemoveSerializesCorrectly) {
+    VariablesIdGenerator idGenerator{};
+    VariablesParseState vps{&idGenerator};
+    auto expression = ExpressionFieldPath::parse(nullptr, "$$REMOVE", vps);
+    ASSERT_BSONOBJ_EQ(BSON("foo"
+                           << "$$REMOVE"),
+                      BSON("foo" << expression->serialize(false)));
+}
+
+TEST(BuiltinRemoveVariableTest, RemoveSerializesCorrectlyWithTrailingPath) {
+    VariablesIdGenerator idGenerator{};
+    VariablesParseState vps{&idGenerator};
+    auto expression = ExpressionFieldPath::parse(nullptr, "$$REMOVE.a.b", vps);
+    ASSERT_BSONOBJ_EQ(BSON("foo"
+                           << "$$REMOVE.a.b"),
+                      BSON("foo" << expression->serialize(false)));
+}
+
+TEST(BuiltinRemoveVariableTest, RemoveSerializesCorrectlyAfterOptimization) {
+    VariablesIdGenerator idGenerator{};
+    VariablesParseState vps{&idGenerator};
+    auto expression = ExpressionFieldPath::parse(nullptr, "$$REMOVE.a.b", vps);
+    auto optimizedExpression = expression->optimize();
+    ASSERT(dynamic_cast<ExpressionConstant*>(optimizedExpression.get()));
+    ASSERT_BSONOBJ_EQ(BSON("foo"
+                           << "$$REMOVE"),
+                      BSON("foo" << optimizedExpression->serialize(false)));
+}
+
+}  // namespace BuiltinRemoveVariable
 
 namespace ToLower {
 
