@@ -884,6 +884,65 @@ namespace mongo {
             }
         } disinctCmd;
 
+        class DistinctcountCmd : public PublicGridCommand {
+        public:
+            DistinctcountCmd() : PublicGridCommand("distinctcount") {}
+            virtual void help( stringstream &help ) const {
+                help << "{ distinctcount : 'collection name' , key : 'a.b' , query : {} }";
+            }
+            virtual bool passOptions() const { return true; }
+            bool run(const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
+                string collection = cmdObj.firstElement().valuestrsafe();
+                string fullns = dbName + "." + collection;
+
+                DBConfigPtr conf = grid.getDBConfig( dbName , false );
+
+                if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
+                    return passthrough( conf , cmdObj , options, result );
+                }
+
+                ChunkManagerPtr cm = conf->getChunkManager( fullns );
+                massert( 16486 ,  "how could chunk manager be null!" , cm );
+
+                BSONObj query = getQuery(cmdObj);
+                set<Shard> shards;
+                cm->getShardsForQuery(shards, query);
+
+                set<BSONObj,BSONObjCmp> all;
+                int size = 32;
+
+                for ( set<Shard>::iterator i=shards.begin(), end=shards.end() ; i != end; ++i ) {
+                    ShardConnection conn( *i , fullns );
+                    BSONObj res;
+                    bool ok = conn->runCommand( conf->getName() , cmdObj , res, options );
+                    conn.done();
+
+                    if ( ! ok ) {
+                        result.appendElements( res );
+                        return false;
+                    }
+
+                    BSONObjIterator it( res["values"].embeddedObject() );
+                    while ( it.more() ) {
+                        BSONElement nxt = it.next();
+                        BSONObjBuilder temp(32);
+                        temp.appendAs( nxt , "" );
+                        all.insert( temp.obj() );
+                    }
+
+                }
+
+                BSONObjBuilder b( size );
+                int n=0;
+                for ( set<BSONObj,BSONObjCmp>::iterator i = all.begin() ; i != all.end(); i++ ) {
+                    b.appendAs( i->firstElement() , b.numStr( n++ ) );
+                }
+
+                result.appendArray( "values" , b.obj() );
+                return true;
+            }
+        } distinctcountCmd;
+
         class FileMD5Cmd : public PublicGridCommand {
         public:
             FileMD5Cmd() : PublicGridCommand("filemd5") {}
