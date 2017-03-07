@@ -43,6 +43,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_common.h"
@@ -51,6 +52,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/rpc/metadata/server_selection_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog_cache.h"
@@ -125,6 +127,46 @@ void execCommandHandler(OperationContext* opCtx,
     execCommandClient(opCtx, command, queryFlags, request.getDatabase().rawData(), cmdObj, result);
 
     replyBuilder->setCommandReply(result.done()).setMetadata(rpc::makeEmptyMetadata());
+}
+
+/**
+ * Extract and process metadata from the command request body.
+ */
+Status processCommandMetadata(OperationContext* opCtx, const BSONObj& cmdObj) {
+    auto logicalClock = LogicalClock::get(opCtx);
+    invariant(logicalClock);
+
+    auto logicalTimeMetadata = rpc::LogicalTimeMetadata::readFromMetadata(cmdObj);
+    if (!logicalTimeMetadata.isOK()) {
+        return logicalTimeMetadata.getStatus();
+    }
+
+    auto authSession = AuthorizationSession::get(opCtx->getClient());
+    if (authSession->getAuthorizationManager().isAuthEnabled()) {
+        auto advanceClockStatus =
+            logicalClock->advanceClusterTime(logicalTimeMetadata.getValue().getSignedTime());
+
+        if (!advanceClockStatus.isOK()) {
+            return advanceClockStatus;
+        }
+    } else {
+        auto advanceClockStatus = logicalClock->advanceClusterTimeFromTrustedSource(
+            logicalTimeMetadata.getValue().getSignedTime());
+
+        if (!advanceClockStatus.isOK()) {
+            return advanceClockStatus;
+        }
+    }
+
+    return Status::OK();
+}
+
+/**
+ * Append required fields to command response.
+ */
+void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* responseBuilder) {
+    rpc::LogicalTimeMetadata logicalTimeMetadata(LogicalClock::get(opCtx)->getClusterTime());
+    logicalTimeMetadata.writeToMetadata(responseBuilder);
 }
 
 MONGO_INITIALIZER(InitializeCommandExecCommandHandler)(InitializerContext* const) {
@@ -613,6 +655,8 @@ void execCommandClient(OperationContext* opCtx,
                        BSONObjBuilder& result) {
     const std::string dbname = nsToDatabase(ns);
 
+    ON_BLOCK_EXIT([opCtx, &result] { appendRequiredFieldsToResponse(opCtx, &result); });
+
     StringMap<int> topLevelFields;
     for (auto&& element : cmdObj) {
         StringData fieldName = element.fieldNameStringData();
@@ -660,11 +704,16 @@ void execCommandClient(OperationContext* opCtx,
         return;
     }
 
-
     // attach tracking
     rpc::TrackingMetadata trackingMetadata;
     trackingMetadata.initWithOperName(c->getName());
     rpc::TrackingMetadata::get(opCtx) = trackingMetadata;
+
+    auto metadataStatus = processCommandMetadata(opCtx, cmdObj);
+    if (!metadataStatus.isOK()) {
+        Command::appendCommandStatus(result, metadataStatus);
+        return;
+    }
 
     std::string errmsg;
     bool ok = false;

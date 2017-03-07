@@ -131,7 +131,7 @@ assert.neq = function(a, b, msg) {
     doassert("[" + a + "] != [" + b + "] are equal : " + msg);
 };
 
-assert.hasFields = function(o, arr, msg) {
+assert.hasFields = function(result, arr, msg) {
     var count = 0;
     if (!Array.isArray(arr)) {
         throw new Error("The second argument to assert.hasFields must be an array.");
